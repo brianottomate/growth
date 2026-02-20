@@ -1,0 +1,37 @@
+interface Stat {
+  label: string;
+  value: string;
+  change?: string;
+}
+
+interface StatsProps {
+  stats: Stat[];
+  title?: string;
+}
+
+export function Stats({ stats, title }: StatsProps) {
+  return (
+    <div className="my-8">
+      {title && (
+        <h3 className="text-primary mb-6 text-center text-lg font-semibold">
+          {title}
+        </h3>
+      )}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {stats.map((stat, index) => (
+          <div key={index} className="bg-surface-secondary border-secondary rounded-lg border p-6 shadow-sm">
+            <div className="text-3xl font-bold text-amber-600">
+              {stat.value}
+            </div>
+            <div className="text-primary mt-1 text-sm font-medium">
+              {stat.label}
+            </div>
+            {stat.change && (
+              <div className="mt-2 text-sm text-green-500">{stat.change}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "CustomerIO": {
+      "type": "http",
+      "url": "https://mcp.customer.io/mcp"
+    }
+  }
+}

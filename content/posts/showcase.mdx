@@ -1,0 +1,192 @@
+---
+h1: "Component Showcase"
+h1Subtitle: "Explore our design system"
+metaTitle: "Showcase"
+metaDescription: "Component library showcase"
+publishedAt: "2025-01-04"
+author: "default"
+tags: []
+language: "en-US"
+showStickyCTA: true
+enableAutoCtAs: false
+readingTime: 5
+---
+
+<TLDR>
+This is a showcase page demonstrating all available MDX components:
+
+- **CtaCard:** Call-to-action cards with features list
+- **CalloutBoxes:** Success, error, warning, and info variants
+- **Feature Grids:** Display features in grid layouts (icon-based and image-based showcase variants)
+- **Stats:** Display data with impact
+- **Video embeds:** YouTube video integration
+- **Quotes:** Attributed quotes with roles
+- **NewsletterCard:** Email subscription forms
+
+</TLDR>
+
+## First Section - CTA Card
+
+CTA Cards display a title, description, features list, and call-to-action button with a gradient background.
+
+<CtaCard
+  title="Explore Our Features"
+  description="Discover powerful tools and insights to help you achieve your goals. Get started today with our comprehensive platform."
+  buttonText="Get Started"
+  buttonHref="#"
+/>
+
+**With custom features:**
+
+<CtaCard
+  title="Try Premium Free for 30 Days"
+  description="Experience all premium features with our risk-free trial. No credit card required."
+  buttonText="Start Free Trial"
+  buttonHref="#"
+  features={[
+    { label: "30 day trial", description: "No credit card required" },
+    {
+      label: "All premium features",
+      description: "Access advanced tools and analytics",
+    },
+    {
+      label: "Cancel anytime",
+      description: "Full control over your subscription",
+    },
+  ]}
+/>
+
+## Second Section - CalloutBoxes
+
+CalloutBoxes come in different types for different contexts.
+
+<CalloutBox type="success">
+  **Success!** Your changes have been saved successfully. All systems are
+  functioning normally.
+</CalloutBox>
+
+<CalloutBox type="error">
+  **Error:** Unable to process your request. Please check your input and try
+  again. Common issues include invalid data formats or missing required fields.
+</CalloutBox>
+
+<CalloutBox type="warning">
+  **Warning:** This action cannot be undone. Please review your changes
+  carefully before proceeding. Make sure you have a backup of important data.
+</CalloutBox>
+
+<CalloutBox type="info">
+  **Did you know?** You can customize these callout boxes to match your brand.
+  They support markdown formatting and can include links, lists, and emphasis.
+</CalloutBox>
+
+## Third Section - Video Embed
+
+Here's how video embeds work:
+
+<Video
+  url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  title="Demo Video Showcase"
+/>
+
+## Fourth Section - Feature Grids
+
+Feature grids are great for displaying multiple options. Supports two variants: `default` (icon-based cards) and `showcase` (image-based cards).
+
+**Default variant** (icon-based):
+
+<FeatureGrid
+  features={[
+    {
+      title: "Smart Analytics",
+      description:
+        "Track your progress with intelligent insights and data-driven recommendations tailored to your goals",
+      icon: "brain",
+    },
+    {
+      title: "Time Tracking",
+      description:
+        "Monitor your productivity with precise time tracking and automated reporting tools",
+      icon: "clock",
+    },
+    {
+      title: "Business Tools",
+      description:
+        "Access a comprehensive suite of professional tools designed for modern entrepreneurs",
+      icon: "utensils",
+    },
+    {
+      title: "Advanced Search",
+      description:
+        "Find what you need instantly with our powerful search engine and smart filters",
+      icon: "search",
+    },
+  ]}
+/>
+
+**Showcase variant** (image-based cards):
+
+<FeatureGrid
+  variant="showcase"
+  features={[
+    {
+      title: "Templates",
+      description:
+        "Get started fast with prebuilt editor templates that include commonly used features.",
+      image: "/placeholder.svg",
+      imageAlt: "Editor templates preview",
+    },
+    {
+      title: "Components",
+      description:
+        "Already using our system? Drop in just the pieces you need with our modular components.",
+      image: "/placeholder.svg",
+      imageAlt: "Component library preview",
+    },
+  ]}
+/>
+
+## Fifth Section - Quotes
+
+Quotes with attribution and roles:
+
+<Quote author="Jane Smith" role="Product Designer">
+  Great design is not just about aesthetics—it's about creating experiences that
+  feel natural and intuitive. Every element should have a purpose and enhance
+  the user's journey.
+</Quote>
+
+## Sixth Section - Stats Component
+
+Show data with impact using the Stats component:
+
+<Stats
+  title="Platform Performance Metrics"
+  stats={[
+    {
+      label: "Productivity Increase",
+      value: "3x",
+      change: "faster workflows",
+    },
+    {
+      label: "Customer Satisfaction",
+      value: "98%",
+      change: "approval rating",
+    },
+    {
+      label: "Performance Score",
+      value: "95",
+      change: "system reliability",
+    },
+  ]}
+/>
+
+## Seventh Section - Newsletter Card
+
+Capture email subscriptions with a conversion-optimized card.
+
+<NewsletterCard />
+
+---
+
+All components showcased.

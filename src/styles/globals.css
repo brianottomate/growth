@@ -1,0 +1,627 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@plugin "tailwindcss-radix";
+@plugin "@tailwindcss/forms" {
+  strategy: class;
+}
+@import "tw-animate-css";
+@import "@wandercom/design-system-tokens/tailwind.css";
+@import "@wandercom/design-system-web/styles.css";
+
+@layer base {
+  * {
+    @apply border-primary;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-surface-primary text-primary;
+  }
+}
+
+@layer utilities {
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  /* Radial gradient for glowing effects */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+
+  /* Subtle pulse animation */
+  .animate-pulse-subtle {
+    animation: pulse-subtle 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-subtle {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 oklch(0.55 0.18 75 / 0.4);
+    }
+    50% {
+      box-shadow: 0 0 20px 4px oklch(0.55 0.18 75 / 0.2);
+    }
+  }
+}
+
+/* Tiptap Editor Styles */
+.tiptap-editor .ProseMirror,
+.tiptap-viewer .ProseMirror {
+  outline: none;
+}
+
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
+}
+
+.tiptap-editor .ProseMirror .mention,
+.tiptap-viewer .ProseMirror .mention {
+  background-color: oklch(0.92 0.08 85);
+  color: oklch(0.45 0.12 85);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .tiptap-editor .ProseMirror .mention,
+[data-theme="dark"] .tiptap-viewer .ProseMirror .mention {
+  background-color: oklch(0.28 0.08 85);
+  color: oklch(0.75 0.12 85);
+}
+
+.tiptap-editor .ProseMirror ul,
+.tiptap-editor .ProseMirror ol,
+.tiptap-viewer .ProseMirror ul,
+.tiptap-viewer .ProseMirror ol {
+  padding-left: 1.5rem;
+}
+
+.tiptap-editor .ProseMirror code,
+.tiptap-viewer .ProseMirror code {
+  background-color: hsl(var(--muted));
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  font-size: 0.875em;
+  font-family: var(--font-mono);
+}
+
+.tiptap-editor .ProseMirror strong,
+.tiptap-viewer .ProseMirror strong {
+  font-weight: 600;
+}
+
+.tiptap-editor .ProseMirror em,
+.tiptap-viewer .ProseMirror em {
+  font-style: italic;
+}
+
+@theme {
+  /* Font families - Instrument Sans is set via instrumentSans.variable in layout.tsx */
+  /* The design system tokens package already configures --font-sans properly */
+  
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* Border radius variables */
+  --radius: 0.5rem;
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Animation keyframes */
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+
+  @keyframes pulse-slow {
+    0%,
+    100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes pulse-gentle {
+    0%,
+    100% {
+      opacity: 0.7;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.02);
+    }
+  }
+
+  @keyframes pulse-speak {
+    0%,
+    100% {
+      opacity: 0.8;
+      transform: scale(1);
+    }
+    25% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.04);
+    }
+    75% {
+      opacity: 1;
+      transform: scale(1.06);
+    }
+  }
+
+  @keyframes pulse-think {
+    0%,
+    100% {
+      opacity: 0.6;
+      transform: scale(1) rotate(0deg);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.03) rotate(180deg);
+    }
+  }
+
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-pulse-slow: pulse-slow 4s ease-in-out infinite;
+  --animate-pulse-gentle: pulse-gentle 3s ease-in-out infinite;
+  --animate-pulse-speak: pulse-speak 1.2s ease-in-out infinite;
+  --animate-pulse-think: pulse-think 2s ease-in-out infinite;
+  --animate-spin-slow: spin-slow 3s linear infinite;
+}
+
+/* ============================================================================
+   WANDER ANIMATION LIBRARY
+   ============================================================================ */
+
+/* Keyframes for animations */
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-down-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-right-fade {
+  0% {
+    opacity: 0;
+    transform: translateX(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-down-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-left-fade {
+  0% {
+    opacity: 0;
+    transform: translateX(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes enter-from-bottom {
+  0% {
+    translate: 0 100%;
+    opacity: 0;
+  }
+  100% {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+
+@keyframes leave-to-bottom {
+  100% {
+    translate: 0 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes enter-from-top {
+  0% {
+    translate: 0 -100%;
+    opacity: 0;
+  }
+  100% {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+
+@keyframes leave-to-top {
+  0% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  100% {
+    translate: 0 -100%;
+    opacity: 0;
+  }
+}
+
+@keyframes enter-from-left {
+  0% {
+    translate: -100% 0;
+    opacity: 0;
+  }
+  100% {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+
+@keyframes leave-to-left {
+  0% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  100% {
+    translate: -100% 0;
+    opacity: 0;
+  }
+}
+
+@keyframes enter-from-right {
+  0% {
+    translate: 100% 0;
+    opacity: 0;
+  }
+  100% {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+
+@keyframes leave-to-right {
+  0% {
+    translate: 0 0;
+    opacity: 1;
+  }
+  100% {
+    translate: 100% 0;
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-after-shine {
+  0% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes marquee-x {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(calc(-50% - 0.5rem));
+  }
+}
+
+@keyframes marquee-y {
+  0% {
+    transform: translateY(0%);
+  }
+  100% {
+    transform: translateY(calc(-50% - 0.5rem));
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shadow-pulse {
+  0% {
+    overflow: hidden;
+    box-shadow: 0px 0px 0px 0px transparent;
+  }
+  15% {
+    box-shadow: 0px 0px 28px 0px oklch(100% 0 0 / 0.2);
+  }
+  25% {
+    box-shadow: 0px 0px 24px 0px oklch(100% 0 0 / 0.15);
+  }
+  100% {
+    overflow: visible;
+    box-shadow: 0px 0px 24px 0px oklch(100% 0 0 / 0.15);
+  }
+}
+
+@keyframes shine {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  1% {
+    width: 100%;
+  }
+  50% {
+    opacity: 0.1;
+  }
+  70% {
+    opacity: 0;
+  }
+  99% {
+    opacity: 0;
+    transform: translateX(100%);
+    width: 100%;
+  }
+}
+
+@keyframes slide-right {
+  0% {
+    opacity: 0;
+    transform: translateX(-80px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-left {
+  0% {
+    opacity: 0;
+    transform: translateX(80px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Animation utility classes */
+@utility animate-marquee-x {
+  animation: marquee-x var(--animation-duration, 120s) linear infinite;
+}
+
+@utility animate-marquee-y {
+  animation: marquee-y var(--animation-duration, 120s) linear infinite;
+}
+
+@utility animate-slide-right {
+  animation: slide-right 343ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@utility animate-slide-left {
+  animation: slide-left 343ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@utility animate-slide-down {
+  animation: slide-down 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-slide-down-out {
+  animation: slide-down-out 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-slide-up {
+  animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility animate-enter-from-top {
+  animation: enter-from-top 0.150s ease;
+}
+
+@utility animate-leave-to-top {
+  animation: leave-to-top 0.150s ease;
+}
+
+@utility animate-enter-from-bottom {
+  animation: enter-from-bottom 0.150s ease;
+}
+
+@utility animate-leave-to-bottom {
+  animation: leave-to-bottom 0.150s ease;
+}
+
+@utility animate-enter-from-left {
+  animation: enter-from-left 0.150s ease;
+}
+
+@utility animate-leave-to-left {
+  animation: leave-to-left 0.150s ease;
+}
+
+@utility animate-enter-from-right {
+  animation: enter-from-right 0.150s ease;
+}
+
+@utility animate-leave-to-right {
+  animation: leave-to-right 0.150s ease;
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.2s ease;
+}
+
+@utility animate-fade-out {
+  animation: fade-out 0.2s ease forwards reverse;
+}
+
+@utility animate-pop {
+  animation: pop 0.3s ease;
+}
+
+@utility animate-shadow-pulse {
+  animation: shadow-pulse 4s ease forwards;
+}
+
+@utility animate-shine {
+  animation: shine 1s 300ms ease;
+}
+
+@utility animate-fade-in-after-shine {
+  animation: fade-in-after-shine 200ms 700ms ease backwards;
+}
+
+@utility animate-toast-enter-left {
+  animation: enter-from-left 1s cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+@utility animate-toast-exit-left {
+  animation: leave-to-left 3s cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+@utility animate-toast-enter-right {
+  animation: enter-from-right 750ms cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+@utility animate-toast-exit-right {
+  animation: leave-to-right 3s cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+@utility animate-toast-enter-bottom {
+  animation: enter-from-bottom 750ms cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+@utility animate-toast-exit-bottom {
+  animation: leave-to-bottom 3s cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+@utility animate-toast-enter-top {
+  animation: enter-from-top 750ms cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+@utility animate-toast-exit-top {
+  animation: leave-to-top 3s cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
