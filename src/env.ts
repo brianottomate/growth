@@ -38,6 +38,7 @@ export const env = createEnv({
     BIGQUERY_PROJECT_ID: z.string().min(1), // GCP project ID (required)
     BIGQUERY_DATASET_ID: z.string().optional(), // Default dataset
     GOOGLE_APPLICATION_CREDENTIALS_JSON: z.string().optional(), // Service account JSON (as string)
+    GCP_SA_JSON_B64: z.string().optional(), // Base64-encoded service account JSON
     SYNC_DEBUG: z.coerce.boolean().default(true), // Debug logging for sync/workflow traces
     // Minerva (lead enrichment)
     MINERVA_API_URL: z.string().url().default("https://api.minerva.io"), // Minerva API base URL (v2 default)
@@ -96,6 +97,7 @@ export const env = createEnv({
     BIGQUERY_DATASET_ID: process.env.BIGQUERY_DATASET_ID,
     GOOGLE_APPLICATION_CREDENTIALS_JSON:
       process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
+    GCP_SA_JSON_B64: process.env.GCP_SA_JSON_B64,
     SYNC_DEBUG: process.env.SYNC_DEBUG,
     // Minerva
     MINERVA_API_URL: process.env.MINERVA_API_URL,

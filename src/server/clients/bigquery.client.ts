@@ -47,13 +47,34 @@ function parseServiceAccountCredentials(raw: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+function parseServiceAccountCredentialsFromBase64(
+  b64: string,
+): Record<string, unknown> {
+  let decoded: string;
+  try {
+    decoded = Buffer.from(b64, "base64").toString("utf8");
+  } catch {
+    throw new Error("Invalid GCP_SA_JSON_B64 (base64 decode failed)");
+  }
+
+  return parseServiceAccountCredentials(decoded);
+}
+
 async function getClient(): Promise<BigQueryClient> {
   if (_client) return _client;
 
   const { BigQuery } = await import("@google-cloud/bigquery");
 
-  // Explicit credentials from env var take priority
-  if (env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  // Explicit credentials from env vars take priority
+  if (env.GCP_SA_JSON_B64) {
+    const credentials = parseServiceAccountCredentialsFromBase64(
+      env.GCP_SA_JSON_B64,
+    );
+    _client = new BigQuery({
+      projectId: env.BIGQUERY_PROJECT_ID,
+      credentials,
+    });
+  } else if (env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
     const credentials = parseServiceAccountCredentials(
       env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
     );
