@@ -216,10 +216,25 @@ export function formatDateForOutreach(value: unknown): string | null {
   }
   const str = toPlainString(normalized);
   if (!str) return null;
-  if (str.includes("T")) {
-    return str.split("T")[0]!;
+
+  // Handle numeric timestamps (seconds or milliseconds)
+  const num = Number(str);
+  if (!isNaN(num) && num > 0) {
+    const ms = num > 1e12 ? num : num * 1000;
+    return new Date(ms).toISOString().split("T")[0]!;
   }
-  return str;
+
+  let candidate = str;
+  if (candidate.includes("T")) {
+    candidate = candidate.split("T")[0]!;
+  }
+
+  // Validate YYYY-MM-DD format before returning
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+    console.warn(`⚠️ [FieldMapping] Invalid date for Outreach: "${str}" → skipping`);
+    return null;
+  }
+  return candidate;
 }
 
 /**
