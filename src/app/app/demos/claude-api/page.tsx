@@ -5,6 +5,8 @@ import {
   CLAUDE_MODELS,
 } from "@/server/clients/claude.client";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Claude API Demo
  *
@@ -190,7 +192,7 @@ async function ModelComparisonDemo() {
       }),
       completeText({
         prompt,
-        model: CLAUDE_MODELS.HAIKU_3_5,
+        model: CLAUDE_MODELS.SONNET_3_7,
         max_tokens: 100,
       }),
     ]);
@@ -211,7 +213,7 @@ async function ModelComparisonDemo() {
 
         <div>
           <h3 className="mb-2 text-sm font-medium">
-            Haiku 3.5 (Fast, Affordable)
+            Sonnet 3.7 (Economy Tier)
           </h3>
           <div className="rounded bg-muted p-4">
             <p className="whitespace-pre-wrap text-sm">{haiku.text}</p>
