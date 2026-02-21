@@ -146,6 +146,7 @@ export const OUTREACH_STAGES = {
 export const SYNC_TAG_MAPPING: Record<string, string> = {
   payment_info_entered: "RealtimeSync-PaymentEntered",
   checkout_started: "RealtimeSync-CheckoutStarted",
+  abandoned_cart: "RealtimeSync-AbandonedCart",
   user_signed_up: "RealtimeSync-UserSignedUp",
   order_completed: "RealtimeSync-OrderCompleted",
   product_added_to_wishlist: "RealtimeSync-Wishlisted",
@@ -340,7 +341,7 @@ export function getActivityTag(eventTypes: string | null): string | null {
   const types = eventTypes.toLowerCase();
   if (types.includes("order_completed")) return "Completed Purchase";
   if (types.includes("payment_info_entered")) return "Abandoned Payment";
-  if (types.includes("checkout_started")) return "Abandoned Cart";
+  if (types.includes("checkout_started") || types.includes("abandoned_cart")) return "Abandoned Cart";
   if (types.includes("user_signed_up")) return "New Signup";
   return null;
 }
