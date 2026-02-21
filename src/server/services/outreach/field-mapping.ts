@@ -225,8 +225,12 @@ export function formatDateForOutreach(value: unknown): string | null {
   }
 
   let candidate = str;
+  // Handle both ISO "T" separator and Postgres space separator
+  // e.g. "2026-02-21T15:17:44Z" or "2026-02-21 15:17:44.787+00"
   if (candidate.includes("T")) {
     candidate = candidate.split("T")[0]!;
+  } else if (/^\d{4}-\d{2}-\d{2}\s/.test(candidate)) {
+    candidate = candidate.split(" ")[0]!;
   }
 
   // Validate YYYY-MM-DD format before returning
@@ -602,10 +606,9 @@ export function buildCreatePayload(lead: LeadData): {
   const tags = buildTags(lead);
 
   const attributes: Record<string, unknown> = {
-    // Standard fields
+    // Standard fields (name is computed by Outreach from firstName+lastName — don't set it)
     firstName: lead.first_name ?? null,
     lastName: lead.last_name ?? null,
-    name: lead.full_name ?? null,
     emails: lead.email ? [lead.email] : [],
     addressCity: lead.city ?? null,
     addressState: lead.state ?? null,
