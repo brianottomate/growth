@@ -4,6 +4,7 @@ import type {
   Prospect,
   ProspectsResponse,
   ProspectResponse,
+  StagesResponse,
   UsersResponse,
 } from "./outreach.types";
 
@@ -114,6 +115,14 @@ function isCachedTokenValid(): boolean {
   );
 
   return now < expiryWithBuffer;
+}
+
+/**
+ * Clear cached S2S token so the next request forces a fresh token exchange.
+ */
+function clearS2STokenCache(): void {
+  cachedToken = null;
+  tokenExpiresAt = null;
 }
 
 // =====================================================
@@ -584,14 +593,54 @@ async function outreachRequest<T>(
   options: RequestInit = {},
   authParams?: { userId?: string; preferOAuth?: boolean },
 ): Promise<T> {
-  const headers = await getAuthHeaders(authParams);
-
   const url = endpoint.startsWith("http")
     ? endpoint
     : `${OUTREACH_API_BASE}${endpoint}`;
 
+  function isExpiredAccessTokenError(errorText: string): boolean {
+    if (errorText.includes("expiredAccessToken")) {
+      return true;
+    }
 
-  try {
+    try {
+      const parsed: unknown = JSON.parse(errorText);
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "id" in parsed &&
+        (parsed as { id?: unknown }).id === "expiredAccessToken"
+      ) {
+        return true;
+      }
+
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "errors" in parsed &&
+        Array.isArray((parsed as { errors?: unknown[] }).errors)
+      ) {
+        return (parsed as { errors: unknown[] }).errors.some((entry) => {
+          return (
+            typeof entry === "object" &&
+            entry !== null &&
+            "id" in entry &&
+            (entry as { id?: unknown }).id === "expiredAccessToken"
+          );
+        });
+      }
+    } catch {
+      // Ignore parse errors and treat as non-expired-token response.
+    }
+
+    return false;
+  }
+
+  async function performRequest(forceS2SRefresh = false): Promise<T> {
+    if (forceS2SRefresh) {
+      clearS2STokenCache();
+    }
+
+    const headers = await getAuthHeaders(authParams);
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -602,6 +651,20 @@ async function outreachRequest<T>(
 
     if (!response.ok) {
       const errorText = await response.text();
+
+      // Retry once on stale S2S token.
+      if (
+        !forceS2SRefresh &&
+        response.status === 401 &&
+        isS2SConfigured &&
+        isExpiredAccessTokenError(errorText)
+      ) {
+        console.warn(
+          "⚠️ [Outreach] Access token expired. Refreshing S2S token and retrying once.",
+        );
+        return performRequest(true);
+      }
+
       console.error(
         `❌ [Outreach] Request failed: ${response.status}`,
         errorText,
@@ -623,6 +686,10 @@ async function outreachRequest<T>(
     }
 
     return (await response.json()) as T;
+  }
+
+  try {
+    return await performRequest(false);
   } catch (error) {
     if (error instanceof OutreachError) {
       throw error;
@@ -815,6 +882,166 @@ export async function getUsers(options?: {
 
 
   return response;
+}
+
+/**
+ * Get stages from Outreach.
+ *
+ * Useful for exposing canonical stage IDs and names for prospect pipelines.
+ */
+export async function getStages(options?: {
+  pageSize?: number;
+  pageNumber?: number;
+  pageOffset?: number;
+  filters?: Record<string, string | string[]>;
+  sort?: string;
+  provideAuthorizationMeta?: boolean;
+  userId?: string;
+  preferOAuth?: boolean;
+}): Promise<StagesResponse> {
+  if (!isOutreachConfigured) {
+    throw new OutreachError("Outreach is not configured");
+  }
+
+  const pageSize = options?.pageSize ?? 100;
+  const pageNumber = options?.pageNumber;
+  const pageOffset = options?.pageOffset;
+
+  const params = new URLSearchParams({
+    "page[limit]": pageSize.toString(),
+  });
+
+  if (typeof pageOffset === "number" && pageOffset >= 0) {
+    params.set("page[offset]", pageOffset.toString());
+  } else if (pageNumber) {
+    const offset = Math.max(0, (pageNumber - 1) * pageSize);
+    params.set("page[offset]", offset.toString());
+  }
+
+  if (options?.sort) {
+    params.set("sort", options.sort);
+  }
+
+  if (options?.provideAuthorizationMeta) {
+    params.set("provideAuthorizationMeta", "true");
+  }
+
+  if (options?.filters) {
+    Object.entries(options.filters).forEach(([key, value]) => {
+      if (Array.isArray(value)) {
+        params.set(`filter[${key}]`, value.join(","));
+      } else {
+        params.set(`filter[${key}]`, value);
+      }
+    });
+  }
+
+  const response = await outreachRequest<StagesResponse>(
+    `/stages?${params.toString()}`,
+    { method: "GET" },
+    {
+      userId: options?.userId,
+      preferOAuth: options?.preferOAuth,
+    },
+  );
+
+  return response;
+}
+
+export interface ProspectTagSummary {
+  name: string;
+  count: number;
+}
+
+export interface ProspectTagsResult {
+  tags: ProspectTagSummary[];
+  fetchedProspects: number;
+  totalProspects: number | null;
+  pagesFetched: number;
+  complete: boolean;
+}
+
+/**
+ * Collect unique tags by scanning prospect pages.
+ *
+ * Outreach tags are currently exposed on prospect attributes in this codebase,
+ * so this helper normalizes and aggregates all observed tags.
+ */
+export async function getProspectTags(options?: {
+  pageSize?: number;
+  maxPages?: number;
+  userId?: string;
+  preferOAuth?: boolean;
+}): Promise<ProspectTagsResult> {
+  if (!isOutreachConfigured) {
+    throw new OutreachError("Outreach is not configured");
+  }
+
+  const pageSize = Math.min(Math.max(options?.pageSize ?? 100, 1), 200);
+  const maxPages = Math.min(Math.max(options?.maxPages ?? 50, 1), 200);
+
+  const tagCounts = new Map<string, number>();
+  let fetchedProspects = 0;
+  let pagesFetched = 0;
+  let totalProspects: number | null = null;
+
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex++) {
+    const pageOffset = pageIndex * pageSize;
+    const response = await getProspects({
+      pageSize,
+      pageOffset,
+      includeCount: true,
+      userId: options?.userId,
+      preferOAuth: options?.preferOAuth,
+    });
+
+    pagesFetched += 1;
+    const prospects = response.data;
+    fetchedProspects += prospects.length;
+
+    if (totalProspects === null && typeof response.meta?.count === "number") {
+      totalProspects = response.meta.count;
+    }
+
+    for (const prospect of prospects) {
+      const tags = prospect.attributes.tags;
+      if (!Array.isArray(tags)) {
+        continue;
+      }
+
+      for (const rawTag of tags) {
+        const name = (rawTag ?? "").trim();
+        if (!name) {
+          continue;
+        }
+        tagCounts.set(name, (tagCounts.get(name) ?? 0) + 1);
+      }
+    }
+
+    const exhaustedByPageSize = prospects.length < pageSize;
+    const exhaustedByCount =
+      totalProspects !== null && fetchedProspects >= totalProspects;
+    if (exhaustedByPageSize || exhaustedByCount) {
+      break;
+    }
+  }
+
+  const complete =
+    totalProspects === null
+      ? fetchedProspects === 0 || pagesFetched < maxPages
+      : fetchedProspects >= totalProspects;
+
+  const tags = Array.from(tagCounts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  return {
+    tags,
+    fetchedProspects,
+    totalProspects,
+    pagesFetched,
+    complete,
+  };
 }
 
 export interface OwnerProspectLoad {
@@ -1094,6 +1321,7 @@ export interface OutreachProspect {
     firstName: string | null;
     lastName: string | null;
     emails: string[];
+    tags?: string[];
     title: string | null;
     company: string | null;
     createdAt: string;

@@ -28,6 +28,9 @@ export const env = createEnv({
     OUTREACH_OAUTH_CLIENT_ID: z.string().optional(), // For Outreach OAuth
     OUTREACH_OAUTH_CLIENT_SECRET: z.string().optional(), // For Outreach OAuth
     OUTREACH_WEBHOOK_SECRET: z.string().optional(), // For Outreach webhook verification
+    OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK: z.coerce
+      .boolean()
+      .default(false), // Dev-only escape hatch for webhook debugging
     // Customer.io
     CUSTOMER_IO_APP_KEY: z.string().min(1), // App API key (Bearer) for reading customer data
     CUSTOMER_IO_SITE_ID: z.string().min(1), // Site ID for Track API (Basic auth)
@@ -40,6 +43,10 @@ export const env = createEnv({
     GOOGLE_APPLICATION_CREDENTIALS_JSON: z.string().optional(), // Service account JSON (as string)
     GCP_SA_JSON_B64: z.string().optional(), // Base64-encoded service account JSON
     SYNC_DEBUG: z.coerce.boolean().default(true), // Debug logging for sync/workflow traces
+    // Meta Ads
+    FB_SYSUSER_TOKEN: z.string().optional(), // Meta system user token (preferred)
+    META_ACCESS_TOKEN: z.string().optional(), // Meta access token (fallback)
+    META_AD_ACCOUNT_ID: z.string().optional(), // Meta ad account ID (e.g. act_885632...)
     // Minerva (lead enrichment)
     MINERVA_API_URL: z.string().url().default("https://api.minerva.io"), // Minerva API base URL (v2 default)
     MINERVA_API_KEY: z.string().min(1).optional(), // Minerva API key (x-api-key)
@@ -85,6 +92,8 @@ export const env = createEnv({
     OUTREACH_OAUTH_CLIENT_ID: process.env.OUTREACH_OAUTH_CLIENT_ID,
     OUTREACH_OAUTH_CLIENT_SECRET: process.env.OUTREACH_OAUTH_CLIENT_SECRET,
     OUTREACH_WEBHOOK_SECRET: process.env.OUTREACH_WEBHOOK_SECRET,
+    OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK:
+      process.env.OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK,
     // Customer.io
     CUSTOMER_IO_APP_KEY: process.env.CUSTOMER_IO_APP_KEY,
     CUSTOMER_IO_SITE_ID: process.env.CUSTOMER_IO_SITE_ID,
@@ -99,6 +108,10 @@ export const env = createEnv({
       process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON,
     GCP_SA_JSON_B64: process.env.GCP_SA_JSON_B64,
     SYNC_DEBUG: process.env.SYNC_DEBUG,
+    // Meta Ads
+    FB_SYSUSER_TOKEN: process.env.FB_SYSUSER_TOKEN,
+    META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,
+    META_AD_ACCOUNT_ID: process.env.META_AD_ACCOUNT_ID,
     // Minerva
     MINERVA_API_URL: process.env.MINERVA_API_URL,
     MINERVA_API_KEY: process.env.MINERVA_API_KEY,

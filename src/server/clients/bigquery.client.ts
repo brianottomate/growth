@@ -544,6 +544,33 @@ LIMIT @limit
 }
 
 // =====================================================
+// WRITE: STREAMING INSERT
+// =====================================================
+
+/**
+ * Stream rows into a BigQuery table.
+ *
+ * Uses BigQuery's streaming insert API (table.insert), which is the
+ * simplest write path for small batches like daily ad data.
+ *
+ * The caller is responsible for deleting stale rows before calling
+ * this (delete-then-insert = upsert pattern).
+ */
+export async function insertRows(
+  datasetId: string,
+  tableId: string,
+  rows: Record<string, unknown>[],
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  const client = await getClient();
+  const table = client.dataset(datasetId).table(tableId);
+
+  // table.insert() throws PartialFailureError if any rows fail
+  await table.insert(rows);
+}
+
+// =====================================================
 // BACKFILL QUERY
 // =====================================================
 

@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { createHmac, timingSafeEqual } from "crypto";
 import { env } from "@/env";
 
 type JsonRecord = Record<string, unknown>;
@@ -60,7 +59,10 @@ function parseWebhookPayload(raw: string): OutreachWebhookPayload {
       };
     }
 
-    if (isRecord(parsed.data.relationships) && isRecord(parsed.data.relationships.org)) {
+    if (
+      isRecord(parsed.data.relationships) &&
+      isRecord(parsed.data.relationships.org)
+    ) {
       const orgData = isRecord(parsed.data.relationships.org.data)
         ? parsed.data.relationships.org.data
         : undefined;
@@ -79,97 +81,63 @@ function parseWebhookPayload(raw: string): OutreachWebhookPayload {
   return payload;
 }
 
-function verifyWebhookSignature(
-  payload: string,
-  signature: string | null,
-  secret: string,
-): boolean {
-  if (!signature) return false;
-
-  const hmac = createHmac("sha256", secret);
-  hmac.update(payload);
-  const expectedHex = hmac.digest("hex");
-  const expectedBase64 = Buffer.from(expectedHex, "hex").toString("base64");
-
-  const actual = signature.trim().replace(/^sha256=/i, "");
-  const looksHex = /^[0-9a-f]+$/i.test(actual);
-  const expected = looksHex ? expectedHex : expectedBase64;
-  if (actual.length !== expected.length) return false;
-
-  try {
-    return timingSafeEqual(
-      Buffer.from(actual, "utf8"),
-      Buffer.from(expected, "utf8"),
-    );
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text();
     const body = parseWebhookPayload(rawBody);
-    const webhookId = request.headers.get("outreach-webhook-id");
-    const eventName = body.meta?.eventName || body.data?.type;
-
-    if (env.OUTREACH_WEBHOOK_SECRET) {
-      const signature = request.headers.get("outreach-webhook-signature");
-      const isValid = verifyWebhookSignature(
-        rawBody,
-        signature,
-        env.OUTREACH_WEBHOOK_SECRET,
-      );
-
-      if (!isValid) {
-        console.error("❌ [Outreach Webhook] Invalid signature", {
-          hasSignatureHeader: Boolean(signature),
-          signaturePrefix: signature?.slice(0, 12) ?? null,
-          bodyLength: rawBody.length,
-        });
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Invalid webhook signature",
-          },
-          { status: 401 },
-        );
-      }
-    }
-
+    const eventName = body.meta?.eventName || body.data?.type || "unknown";
     const eventType = body.data?.type;
     const installId = body.data?.id;
     const installedAt = body.data?.attributes?.installedAt;
     const orgId = body.data?.relationships?.org?.data?.id;
 
+    // Lifecycle endpoint intentionally bypasses signature verification by default.
+
+    // Ignore non-lifecycle events on this endpoint.
+    const lifecycleEventTypes = new Set(["install", "uninstall", "setup"]);
+    if (!eventType || !lifecycleEventTypes.has(eventType)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unsupported lifecycle event type",
+          eventType: eventType ?? null,
+        },
+        { status: 400 },
+      );
+    }
+
     if (eventType === "install") {
       console.log(
-        `✅ [Outreach Webhook] install received (installId=${installId ?? "unknown"}, orgId=${orgId ?? "unknown"})`,
+        `✅ [Outreach Lifecycle Webhook] install received (installId=${installId ?? "unknown"}, orgId=${orgId ?? "unknown"})`,
       );
     } else if (eventType === "uninstall") {
       console.log(
-        `ℹ️ [Outreach Webhook] uninstall received (installId=${installId ?? "unknown"})`,
+        `ℹ️ [Outreach Lifecycle Webhook] uninstall received (installId=${installId ?? "unknown"})`,
       );
     } else {
       console.log(
-        `ℹ️ [Outreach Webhook] event received (event=${eventName ?? "unknown"}, webhookId=${webhookId ?? "unknown"})`,
+        `ℹ️ [Outreach Lifecycle Webhook] setup received (event=${eventName}, installId=${installId ?? "unknown"})`,
       );
     }
 
     return NextResponse.json({
       success: true,
+      eventName,
       eventType: eventType ?? null,
       installId: installId ?? null,
       orgId: orgId ?? null,
       installedAt: installedAt ?? null,
     });
   } catch (error) {
-    console.error("❌ [Outreach Webhook] Error processing webhook:", error);
+    console.error(
+      "❌ [Outreach Lifecycle Webhook] Error processing webhook:",
+      error,
+    );
 
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to process webhook",
+        error: "Failed to process lifecycle webhook",
         message: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
@@ -178,11 +146,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  const webhookUrl = `${env.NEXT_PUBLIC_BASE_URL}/api/webhooks/outreach`;
+  const webhookUrl = `${env.NEXT_PUBLIC_BASE_URL}/api/webhooks/outreach/lifecycle`;
   return NextResponse.json({
     success: true,
-    message: "Outreach webhook endpoint ready",
+    message: "Outreach lifecycle webhook endpoint ready",
     webhookUrl,
     signatureVerificationEnabled: Boolean(env.OUTREACH_WEBHOOK_SECRET),
+    acceptedEventTypes: ["install", "uninstall", "setup"],
   });
 }

@@ -401,6 +401,9 @@ export interface LeadData {
   // Webhook context
   webhook_event_type?: string | null;
   webhook_property_name?: string | null;
+  webhook_checkin_date?: string | null;
+  webhook_checkout_date?: string | null;
+  webhook_checkout_amount?: number | null;
 
   // Minerva AI
   minerva_rank?: number | null;
@@ -580,6 +583,11 @@ export function buildTags(lead: LeadData, existingTags?: string[]): string[] {
     : null;
   if (syncTag) tags.add(syncTag);
 
+  // Payment info implies checkout intent; keep both tags for BDR workflows.
+  if (lead.webhook_event_type === "payment_info_entered") {
+    tags.add("Abandoned Cart");
+  }
+
   // Minerva tags
   if (lead.flag_has_minerva_score) {
     tags.add("minerva_enriched_v2");
@@ -593,6 +601,25 @@ export function buildTags(lead: LeadData, existingTags?: string[]): string[] {
   }
 
   return Array.from(tags);
+}
+
+/**
+ * Format abandoned cart checkout context for Outreach personalNote2.
+ * e.g. "Abandoned Cart (Feb 23, 2026): Property: Casa Sol | Check-in: 2026-03-15 | Check-out: 2026-03-22 | Amount: $4,200"
+ */
+function formatCheckoutContext(lead: LeadData): string | null {
+  const parts: string[] = [];
+  if (lead.webhook_property_name) parts.push(`Property: ${lead.webhook_property_name}`);
+  const checkin = lead.webhook_checkin_date ? formatDateForOutreach(lead.webhook_checkin_date) : null;
+  if (checkin) parts.push(`Check-in: ${checkin}`);
+  const checkout = lead.webhook_checkout_date ? formatDateForOutreach(lead.webhook_checkout_date) : null;
+  if (checkout) parts.push(`Check-out: ${checkout}`);
+  if (lead.webhook_checkout_amount != null) {
+    parts.push(`Amount: $${lead.webhook_checkout_amount.toLocaleString("en-US")}`);
+  }
+  if (parts.length === 0) return null;
+  const dateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return `Abandoned Cart (${dateStr}): ${parts.join(" | ")}`;
 }
 
 /**
@@ -635,6 +662,10 @@ export function buildCreatePayload(lead: LeadData): {
     attributes.personalNote1 = safeString(lead.minerva_lead_summary, 5000);
   }
 
+  // personalNote2: Abandoned cart checkout context (property, dates, amount)
+  const checkoutNote = formatCheckoutContext(lead);
+  if (checkoutNote) attributes.personalNote2 = checkoutNote;
+
   return { attributes, stageId };
 }
 
@@ -656,6 +687,10 @@ export function buildUpdatePayload(
     tags,
     ...customFields,
   };
+
+  // personalNote2: Abandoned cart checkout context (property, dates, amount)
+  const checkoutNote = formatCheckoutContext(lead);
+  if (checkoutNote) attributes.personalNote2 = checkoutNote;
 
   // Upgrade stage to booked-direct if order_completed
   let stageId: number | undefined;

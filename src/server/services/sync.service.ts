@@ -154,6 +154,42 @@ export async function processLead(params: {
     if (eventData?.property_name) {
       leadData.webhook_property_name = eventData.property_name as string;
     }
+    leadData.last_activity_type = eventType;
+
+    // Keep last-event filters fresh even when CIO templates omit/format timestamp inconsistently.
+    const rawTimestamp = eventData?.timestamp;
+    const nowIso = new Date().toISOString();
+    if (rawTimestamp != null && rawTimestamp !== "") {
+      const parsed = new Date(String(rawTimestamp));
+      if (!isNaN(parsed.getTime())) {
+        const ageMs = Date.now() - parsed.getTime();
+        const maxAgeMs = 1000 * 60 * 60 * 24 * 7; // 7 days
+        leadData.last_activity_ts =
+          ageMs >= 0 && ageMs <= maxAgeMs
+            ? parsed.toISOString()
+            : nowIso;
+      } else {
+        leadData.last_activity_ts = nowIso;
+      }
+    } else {
+      leadData.last_activity_ts = nowIso;
+    }
+
+    // Carry forward checkout-specific context (checkin/checkout dates, amount)
+    // CIO renders missing dates as the string "false" — filter those out
+    const rawCheckin = eventData?.checkin;
+    if (rawCheckin != null && rawCheckin !== false && rawCheckin !== "false" && rawCheckin !== "") {
+      leadData.webhook_checkin_date = String(rawCheckin);
+    }
+    const rawCheckout = eventData?.checkout;
+    if (rawCheckout != null && rawCheckout !== false && rawCheckout !== "false" && rawCheckout !== "") {
+      leadData.webhook_checkout_date = String(rawCheckout);
+    }
+    const rawAmount = eventData?.checkout_amount;
+    if (rawAmount != null && rawAmount !== "") {
+      const amount = Number(rawAmount);
+      if (!isNaN(amount) && amount > 0) leadData.webhook_checkout_amount = amount;
+    }
 
     // -----------------------------------------------
     // Step 2: Apply Minerva enrichment + phone fallback

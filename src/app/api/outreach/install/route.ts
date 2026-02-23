@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
     const privateKey = await importPKCS8(privateKeyPem, "RS256");
 
     // Create JWT
-    const appToken = await new SignJWT({})
+    const appToken = await new SignJWT({
+      bento: env.OUTREACH_S2S_GUID,
+    })
       .setProtectedHeader({ alg: "RS256" })
       .setIssuer(env.OUTREACH_S2S_GUID)
       .setAudience("https://api.outreach.io/api/v2/oauth/token")
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
     console.log("🔄 [Outreach Install] Exchanging setup token for install ID...");
 
     const response = await fetch(
-      `https://api.outreach.io/api/v2/oauth/app/installs/${installSetupToken}/actions/setupToken`,
+      `https://api.outreach.io/api/app/installs/${installSetupToken}/actions/setupToken`,
       {
         method: "POST",
         headers: {
