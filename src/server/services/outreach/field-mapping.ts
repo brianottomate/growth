@@ -447,12 +447,15 @@ export function mapLeadToOutreachFields(lead: LeadData): MappedCustomFields {
   const howHot = determineHowHot(lead);
   if (howHot) fields.custom1 = howHot;
 
-  // custom23: Last Property Checked Out
+  // custom23 + custom59: Last Property Checked Out (dual-write for legacy compat)
   const lastCheckout =
     lead.last_checkout_property ??
     lead.last_activity_property_name ??
     lead.webhook_property_name;
-  if (lastCheckout) fields.custom23 = safeString(lastCheckout);
+  if (lastCheckout) {
+    fields.custom23 = safeString(lastCheckout);
+    fields.custom59 = safeString(lastCheckout);
+  }
 
   // custom24: Total Money Spent
   const spend = safeFloat(lead.total_spend);
