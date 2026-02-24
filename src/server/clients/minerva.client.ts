@@ -13,12 +13,10 @@ import { env } from "@/env";
  * - Household income estimation (estimated_income_range)
  * - Phone number enrichment (last-resort fallback in the enrichment chain)
  *
- * In the Python growth API, Minerva is used for:
+ * Minerva enrichment is used for:
  * 1. Phone enrichment: BigQuery → webhook → CIO → **Minerva** (last resort)
- * 2. Income backfill: Daily cron updates Outreach custom38 from Minerva data
- * 3. Location enrichment: Populates Outreach custom33 with city/state/zip
- *
- * Reference: wander-growth-api/app/services/ (Minerva enrichment endpoints)
+ * 2. Income backfill: Outreach custom38 (household_income)
+ * 3. Location enrichment: Outreach addressCity / addressState / addressCountry
  */
 
 export const isMinervaConfigured =
