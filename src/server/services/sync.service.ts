@@ -61,9 +61,9 @@ function describeFields(attributes: Record<string, unknown>): string {
 
 /** Compact data source status for the outcome log line. */
 function dataSourcesSummary(
-  bqData: unknown | null,
-  cioData: unknown | null,
-  minervaData: unknown | null,
+  bqData: null | object,
+  cioData: null | object,
+  minervaData: null | object,
   minervaBackfilled: string[],
 ): string {
   const minervaStr = minervaData
@@ -190,8 +190,8 @@ export async function processLead(params: {
     // Keep last-event filters fresh even when CIO templates omit/format timestamp inconsistently.
     const rawTimestamp = eventData?.timestamp;
     const nowIso = new Date().toISOString();
-    if (rawTimestamp != null && rawTimestamp !== "") {
-      const parsed = new Date(String(rawTimestamp));
+    if (rawTimestamp != null && rawTimestamp !== "" && (typeof rawTimestamp === "string" || typeof rawTimestamp === "number")) {
+      const parsed = new Date(rawTimestamp);
       if (!isNaN(parsed.getTime())) {
         const ageMs = Date.now() - parsed.getTime();
         const maxAgeMs = 1000 * 60 * 60 * 24 * 7; // 7 days
@@ -209,11 +209,11 @@ export async function processLead(params: {
     // Carry forward checkout-specific context (checkin/checkout dates, amount)
     // CIO renders missing dates as the string "false" — filter those out
     const rawCheckin = eventData?.checkin;
-    if (rawCheckin != null && rawCheckin !== false && rawCheckin !== "false" && rawCheckin !== "") {
+    if (rawCheckin != null && rawCheckin !== false && rawCheckin !== "false" && rawCheckin !== "" && (typeof rawCheckin === "string" || typeof rawCheckin === "number")) {
       leadData.webhook_checkin_date = String(rawCheckin);
     }
     const rawCheckout = eventData?.checkout;
-    if (rawCheckout != null && rawCheckout !== false && rawCheckout !== "false" && rawCheckout !== "") {
+    if (rawCheckout != null && rawCheckout !== false && rawCheckout !== "false" && rawCheckout !== "" && (typeof rawCheckout === "string" || typeof rawCheckout === "number")) {
       leadData.webhook_checkout_date = String(rawCheckout);
     }
     const rawAmount = eventData?.checkout_amount;
@@ -354,11 +354,12 @@ export async function processLead(params: {
         `✅ [Sync] updated #${prospectId} | ${dataSourcesSummary(bqData, cioCustomer, minervaData, minervaBackfilled)} | owner: ${assignedBdr?.name ?? "none"}(${assignedBdr?.outreachUserId ?? "-"}, src: ${assignmentSource}) | stage: ${stageName(stageId)} | fields: ${describeFields(attributes)}`,
       );
     } else {
-      const { attributes, stageId } = buildCreatePayload(leadData);
+      const { attributes, stageId, personaId } = buildCreatePayload(leadData);
 
       const created = await createProspect({
         attributes,
         stageId,
+        personaId,
         ownerId: assignedBdr
           ? parseInt(assignedBdr.outreachUserId, 10)
           : undefined,
