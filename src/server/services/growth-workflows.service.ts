@@ -10,13 +10,15 @@ import { processLead, type SyncResult } from "@/server/services/sync.service";
 export type GrowthWorkflowName =
   | "daily_comprehensive_sync"
   | "outreach_auto_healing"
-  | "bdr_alignment_backfill";
+  | "bdr_alignment_backfill"
+  | "backfill_checkout";
 
 interface WorkflowOptions {
   limit?: number;
   hoursBack?: number;
   concurrency?: number;
   dryRun?: boolean;
+  sinceDate?: string;
 }
 
 interface RunCandidateResult {
@@ -62,6 +64,8 @@ function toCandidateTasks(candidates: SyncCandidate[]): CandidateTask[] {
   return [...deduped.values()];
 }
 
+const PROGRESS_LOG_INTERVAL = 50;
+
 async function runCandidates(params: {
   workflow: GrowthWorkflowName;
   candidates: CandidateTask[];
@@ -70,8 +74,14 @@ async function runCandidates(params: {
 }): Promise<WorkflowRunResult> {
   const startedAt = new Date();
   const startedMs = Date.now();
+  const total = params.candidates.length;
+
+  console.log(
+    `🚀 [${params.workflow}] Starting | candidates: ${total} | concurrency: ${params.concurrency} | dryRun: ${params.dryRun}`,
+  );
 
   let index = 0;
+  let completedCount = 0;
   const results: RunCandidateResult[] = [];
 
   const workerCount = Math.max(1, Math.min(params.concurrency, 25));
@@ -93,6 +103,7 @@ async function runCandidates(params: {
           eventType: candidate.eventType,
           status: "skipped",
         });
+        completedCount += 1;
         continue;
       }
 
@@ -113,6 +124,17 @@ async function runCandidates(params: {
         processingTimeMs: syncResult.processingTimeMs,
         error: syncResult.error,
       });
+
+      completedCount += 1;
+      if (completedCount % PROGRESS_LOG_INTERVAL === 0) {
+        const pct = Math.round((completedCount / total) * 100);
+        const successSoFar = results.filter((r) => r.status === "success").length;
+        const failedSoFar = results.filter((r) => r.status === "failed").length;
+        const elapsedS = ((Date.now() - startedMs) / 1000).toFixed(1);
+        console.log(
+          `⏳ [${params.workflow}] Progress: ${completedCount}/${total} (${pct}%) | ✅ ${successSoFar} | ❌ ${failedSoFar} | ${elapsedS}s elapsed`,
+        );
+      }
     }
   });
 
@@ -121,6 +143,11 @@ async function runCandidates(params: {
   const successCount = results.filter((r) => r.status === "success").length;
   const failedCount = results.filter((r) => r.status === "failed").length;
   const skippedCount = results.filter((r) => r.status === "skipped").length;
+
+  const totalMs = Date.now() - startedMs;
+  console.log(
+    `✅ [${params.workflow}] Done | ${successCount} success | ${failedCount} failed | ${skippedCount} skipped | ${(totalMs / 1000).toFixed(1)}s`,
+  );
 
   return {
     workflow: params.workflow,
@@ -205,6 +232,32 @@ async function runBdrAlignmentBackfill(
   });
 }
 
+async function runBackfillCheckout(
+  options: WorkflowOptions,
+): Promise<WorkflowRunResult> {
+  const limit = options.limit ?? 2000;
+  const concurrency = options.concurrency ?? 5;
+
+  const dateLabel = options.sinceDate ?? `last ${options.hoursBack ?? 336}h`;
+  console.log(`🔍 [backfill_checkout] Fetching candidates since ${dateLabel} (limit: ${limit})...`);
+
+  const candidates = await fetchRecentSyncCandidates({
+    hoursBack: options.hoursBack ?? 336, // fallback: 14 days
+    limit,
+    onlyCheckout: false,
+    sinceDate: options.sinceDate,
+  });
+
+  console.log(`📋 [backfill_checkout] Found ${candidates.length} candidates`);
+
+  return runCandidates({
+    workflow: "backfill_checkout",
+    candidates: toCandidateTasks(candidates),
+    concurrency,
+    dryRun: options.dryRun ?? false,
+  });
+}
+
 export async function runGrowthWorkflow(
   workflow: GrowthWorkflowName,
   options: WorkflowOptions = {},
@@ -216,6 +269,8 @@ export async function runGrowthWorkflow(
       return runOutreachAutoHealing(options);
     case "bdr_alignment_backfill":
       return runBdrAlignmentBackfill(options);
+    case "backfill_checkout":
+      return runBackfillCheckout(options);
     default: {
       const _never: never = workflow;
       throw new Error(`Unknown workflow: ${String(_never)}`);
