@@ -1364,6 +1364,8 @@ export async function createOutreachWebhook(params: {
   action: string;
   secret?: string;
   payloadVersion?: 1 | 2;
+  /** Outreach user ID to set as webhook authorizer (required by the API). */
+  authorizerUserId: number;
 }): Promise<OutreachWebhookConfig> {
   const body = {
     data: {
@@ -1376,6 +1378,9 @@ export async function createOutreachWebhook(params: {
         ...(params.payloadVersion !== undefined
           ? { payloadVersion: params.payloadVersion }
           : {}),
+      },
+      relationships: {
+        authorizer: { data: { type: "user", id: params.authorizerUserId } },
       },
     },
   };
