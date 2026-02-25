@@ -1440,6 +1440,21 @@ export async function listOutreachWebhooks(): Promise<OutreachWebhookConfig[]> {
 }
 
 /**
+ * Delete an Outreach webhook by ID using S2S credentials.
+ */
+export async function deleteOutreachWebhookById(id: number | string): Promise<void> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${OUTREACH_API_BASE}/webhooks/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (res.status !== 204 && res.status !== 200 && res.status !== 404) {
+    const body = await res.text();
+    throw new OutreachError(`Delete webhook failed: ${res.status} ${body}`, { statusCode: res.status });
+  }
+}
+
+/**
  * Delete an Outreach webhook using its single-use cleanup token.
  *
  * The cleanup token arrives in every webhook payload in the
