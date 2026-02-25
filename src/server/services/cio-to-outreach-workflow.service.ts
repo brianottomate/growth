@@ -1,6 +1,5 @@
 import "server-only";
 
-import { waitUntil } from "@vercel/functions";
 import { type NextRequest, NextResponse } from "next/server";
 import { env } from "@/env";
 import { processLead } from "@/server/services/sync.service";
@@ -117,30 +116,23 @@ export async function handleCioToOutreachWebhook(
       `📨 [${options.serviceLabel}] Received: ${normalized.eventType} for ${normalized.email} (step: ${normalized.workflowStep ?? "n/a"}, ${Date.now() - startMs}ms)`,
     );
 
-    waitUntil(
-      processLead({
-        email: normalized.email,
-        eventType: normalized.eventType,
-        eventData: normalized.eventData,
-      })
-        .then((result) => {
-          console.log(
-            `📋 [${options.serviceLabel}] Sync result: ${result.status} — ${result.outreachAction ?? "no action"} (${result.processingTimeMs}ms)`,
-          );
-        })
-        .catch((error) => {
-          console.error(
-            `❌ [${options.serviceLabel}] Background processing error:`,
-            error,
-          );
-        }),
+    const result = await processLead({
+      email: normalized.email,
+      eventType: normalized.eventType,
+      eventData: normalized.eventData,
+    });
+
+    console.log(
+      `📋 [${options.serviceLabel}] Sync result: ${result.status} — ${result.outreachAction ?? "no action"} (${result.processingTimeMs}ms)`,
     );
 
     return NextResponse.json({
       success: true,
       email: normalized.email,
       eventType: normalized.eventType,
-      message: "Processing in background",
+      status: result.status,
+      outreachAction: result.outreachAction,
+      processingTimeMs: result.processingTimeMs,
     });
   } catch (error) {
     console.error(`❌ [${options.serviceLabel}] Error:`, error);

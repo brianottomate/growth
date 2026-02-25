@@ -15,6 +15,8 @@ import {
 import {
   buildCreatePayload,
   buildUpdatePayload,
+  getSemanticName,
+  OUTREACH_STAGES,
   type LeadData,
 } from "@/server/services/outreach/field-mapping";
 import {
@@ -44,6 +46,40 @@ export interface SyncResult {
 }
 
 // =====================================================
+// LOGGING HELPERS
+// =====================================================
+
+/** Map custom attribute keys back to semantic names for readable logs. */
+function describeFields(attributes: Record<string, unknown>): string {
+  const names: string[] = [];
+  for (const [key, value] of Object.entries(attributes)) {
+    if (value == null || key === "tags") continue;
+    names.push(key.startsWith("custom") ? (getSemanticName(key) ?? key) : key);
+  }
+  return names.length > 0 ? names.join(", ") : "none";
+}
+
+/** Compact data source status for the outcome log line. */
+function dataSourcesSummary(
+  bqData: unknown | null,
+  cioData: unknown | null,
+  minervaData: unknown | null,
+  minervaBackfilled: string[],
+): string {
+  const minervaStr = minervaData
+    ? `Minerva✅${minervaBackfilled.length ? `(${minervaBackfilled.join(",")})` : ""}`
+    : "Minerva❌";
+  return [bqData ? "BQ✅" : "BQ❌", cioData ? "CIO✅" : "CIO❌", minervaStr].join("  ");
+}
+
+/** Human-readable stage name for the outcome log line. */
+function stageName(stageId: number | undefined): string {
+  if (!stageId) return "unchanged";
+  const entry = Object.entries(OUTREACH_STAGES).find(([, v]) => v === stageId);
+  return entry ? `${entry[0]}(${stageId})` : String(stageId);
+}
+
+// =====================================================
 // MAIN SYNC FUNCTION
 // =====================================================
 
@@ -66,7 +102,16 @@ export async function processLead(params: {
   const { email, eventType, eventData } = params;
   const startMs = Date.now();
 
-  console.log(`\n🔄 [Sync] Processing lead: ${email} (event: ${eventType})`);
+  if (email.toLowerCase().endsWith("@wander.com")) {
+    console.log(`⏭️ [Sync] Skipping internal email: ${email}`);
+    return {
+      status: "skipped",
+      email,
+      eventType,
+      error: "internal_email",
+      processingTimeMs: Date.now() - startMs,
+    };
+  }
 
   try {
     // -----------------------------------------------
@@ -75,7 +120,6 @@ export async function processLead(params: {
     let leadData: LeadData | null = null;
     let dataSource = "none";
 
-    console.log("📊 [Sync] Fetching from BigQuery + Customer.io + Minerva...");
     const [bqResult, cioResult, minervaResult] = await Promise.allSettled([
       fetchLeadForRealtimeSync({
         email,
@@ -108,31 +152,18 @@ export async function processLead(params: {
         : null;
     if (minervaResult.status === "rejected") {
       console.warn("⚠️ [Sync] Minerva fetch failed", minervaResult.reason);
-    } else if (isMinervaConfigured) {
-      if (minervaData) {
-        console.log(
-          `🔮 [Minerva] Enriched ${email}: phone=${minervaData.phone ?? "none"}, city=${minervaData.city ?? "none"}, state=${minervaData.state ?? "none"}, income=${minervaData.estimatedIncomeRange ?? "none"}`,
-        );
-      } else {
-        console.log(`🔮 [Minerva] No enrichment match for ${email}`);
-      }
     }
 
     if (bqData && cioCustomer) {
       const cioLead = transformCioToLeadFormat(cioCustomer, eventType, eventData);
       leadData = mergeLeadData(bqData as LeadData, cioLead);
       dataSource = "bigquery+customerio";
-      console.log(
-        `✅ [Sync] BQ + CIO data found (bqUser=${bqData.id_user}, cioId=${cioCustomer.id})`,
-      );
     } else if (bqData) {
       leadData = bqData as LeadData;
       dataSource = "bigquery";
-      console.log(`✅ [Sync] BigQuery data found (user: ${bqData.id_user})`);
     } else if (cioCustomer) {
       leadData = transformCioToLeadFormat(cioCustomer, eventType, eventData);
       dataSource = "customerio";
-      console.log(`✅ [Sync] Customer.io data found (id: ${cioCustomer.id})`);
     }
 
     // If no data from either source, build minimal lead from webhook
@@ -194,8 +225,8 @@ export async function processLead(params: {
     // -----------------------------------------------
     // Step 2: Apply Minerva enrichment + phone fallback
     // -----------------------------------------------
+    const minervaBackfilled: string[] = [];
     if (minervaData) {
-      const minervaBackfilled: string[] = [];
       if (!leadData.phone && minervaData.phone) {
         leadData.phone = minervaData.phone;
         minervaBackfilled.push("phone");
@@ -215,11 +246,6 @@ export async function processLead(params: {
       if (!leadData.minerva_household_income && minervaData.estimatedIncomeRange) {
         leadData.minerva_household_income = minervaData.estimatedIncomeRange;
         minervaBackfilled.push("minerva_household_income");
-      }
-      if (minervaBackfilled.length > 0) {
-        console.log(
-          `🔮 [Sync] Backfilled from Minerva: ${minervaBackfilled.join(", ")}`,
-        );
       }
     }
 
@@ -260,9 +286,6 @@ export async function processLead(params: {
           assignNewLeads: true,
         };
         assignmentSource = "outreach_owner";
-        console.log(
-          `✅ [Sync] Preserving existing Outreach owner: ${assignedBdr.name} (${assignedBdr.outreachUserId})`,
-        );
       }
     }
 
@@ -285,9 +308,6 @@ export async function processLead(params: {
           assignNewLeads: true,
         };
         assignmentSource = "cio_existing";
-        console.log(
-          `✅ [Sync] Reusing existing CIO assignment from Outreach: ${assignedBdr.name} (${assignedBdr.outreachUserId})`,
-        );
       }
     }
 
@@ -300,11 +320,6 @@ export async function processLead(params: {
         assignedBdr = getNextBdr(hasPhone);
         if (assignedBdr) assignmentSource = "static_round_robin";
       }
-      if (assignedBdr) {
-        console.log(
-          `🆕 [Sync] New BDR selected (${assignmentSource}): ${assignedBdr.name}`,
-        );
-      }
     }
 
     // -----------------------------------------------
@@ -314,11 +329,6 @@ export async function processLead(params: {
     let prospectId: string;
 
     if (existingProspect) {
-      // Update existing prospect
-      console.log(
-        `✏️ [Sync] Updating existing prospect ${existingProspect.id}`,
-      );
-
       // Carry forward existing sync count
       leadData.existing_sync_count =
         parseInt((existingProspect.attributes.custom51!) ?? "0", 10) ||
@@ -327,9 +337,6 @@ export async function processLead(params: {
       const { attributes, stageId } = buildUpdatePayload(
         leadData,
         existingProspect.attributes.tags,
-      );
-      console.log(
-        `📝 [Sync] Would write UPDATE payload: fields=${Object.keys(attributes).length}, stage=${stageId ?? "unchanged"}, owner=${assignedBdr?.outreachUserId ?? "none"}`,
       );
 
       const updated = await updateProspect(existingProspect.id, {
@@ -342,14 +349,12 @@ export async function processLead(params: {
 
       outreachAction = "updated";
       prospectId = String(updated.id);
-    } else {
-      // Create new prospect
-      console.log(`➕ [Sync] Creating new prospect for ${email}`);
 
-      const { attributes, stageId } = buildCreatePayload(leadData);
       console.log(
-        `📝 [Sync] Would write CREATE payload: fields=${Object.keys(attributes).length}, stage=${stageId}, owner=${assignedBdr?.outreachUserId ?? "none"}`,
+        `✅ [Sync] updated #${prospectId} | ${dataSourcesSummary(bqData, cioCustomer, minervaData, minervaBackfilled)} | owner: ${assignedBdr?.name ?? "none"}(${assignedBdr?.outreachUserId ?? "-"}, src: ${assignmentSource}) | stage: ${stageName(stageId)} | fields: ${describeFields(attributes)}`,
       );
+    } else {
+      const { attributes, stageId } = buildCreatePayload(leadData);
 
       const created = await createProspect({
         attributes,
@@ -361,6 +366,10 @@ export async function processLead(params: {
 
       outreachAction = "created";
       prospectId = String(created.id);
+
+      console.log(
+        `✅ [Sync] created #${prospectId} | ${dataSourcesSummary(bqData, cioCustomer, minervaData, minervaBackfilled)} | owner: ${assignedBdr?.name ?? "none"}(${assignedBdr?.outreachUserId ?? "-"}, src: ${assignmentSource}) | stage: ${stageName(stageId)} | fields: ${describeFields(attributes)}`,
+      );
     }
 
     // -----------------------------------------------
@@ -381,9 +390,6 @@ export async function processLead(params: {
           `⚠️ [Sync] Skipping CIO parity write-back for ${assignedBdr.outreachUserId}: owner email not available`,
         );
       } else {
-      console.log(
-          `📧 [Sync] Writing CIO ownership parity (${assignmentSource}): ${assignedBdr.name}`,
-      );
       try {
         await updateBdrAssignment({
           customerEmail: email,
@@ -402,10 +408,6 @@ export async function processLead(params: {
     // Done
     // -----------------------------------------------
     const processingTimeMs = Date.now() - startMs;
-
-    console.log(
-      `✅ [Sync] Complete: ${outreachAction} prospect ${prospectId} for ${email} in ${processingTimeMs}ms`,
-    );
 
     return {
       status: "success",
