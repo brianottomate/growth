@@ -427,11 +427,16 @@ export async function fetchRecentSyncCandidates(params: {
   hoursBack: number;
   limit: number;
   onlyCheckout?: boolean;
+  sinceDate?: string;
 }): Promise<SyncCandidate[]> {
   const eventTypes = params.onlyCheckout
     ? ["checkout_started"]
     : ["checkout_started", "payment_info_entered"];
   const eventTypeList = eventTypes.map((e) => `'${e}'`).join(", ");
+
+  const timeFilter = params.sinceDate
+    ? `fe.ts >= TIMESTAMP(@since_date)`
+    : `fe.ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @hours_back HOUR)`;
 
   const sql = `
 WITH recent_events AS (
@@ -444,7 +449,7 @@ WITH recent_events AS (
   JOIN \`wander-9fc9c.analytics.customer_profiles\` cp
     ON cp.id_user = fe.id_user
   WHERE cp.email IS NOT NULL
-    AND fe.ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @hours_back HOUR)
+    AND ${timeFilter}
     AND fe.event_type IN (${eventTypeList})
 )
 SELECT
@@ -458,15 +463,16 @@ ORDER BY last_event_ts DESC
 LIMIT @limit
 `;
 
+  const queryParams: BigQueryParams = params.sinceDate
+    ? { since_date: params.sinceDate, limit: params.limit }
+    : { hours_back: params.hoursBack, limit: params.limit };
+
   const rows = await executeQuery<{
     email: string;
     last_event_type: string | null;
     last_property_name: string | null;
     last_event_ts: string | Date | null;
-  }>(sql, {
-    hours_back: params.hoursBack,
-    limit: params.limit,
-  });
+  }>(sql, queryParams);
 
   return rows
     .filter((row) => row.email && row.last_event_type)

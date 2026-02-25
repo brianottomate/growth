@@ -9,6 +9,7 @@ const WORKFLOW_NAMES: GrowthWorkflowName[] = [
   "daily_comprehensive_sync",
   "outreach_auto_healing",
   "bdr_alignment_backfill",
+  "backfill_checkout",
 ];
 
 function isWorkflowName(value: string | null): value is GrowthWorkflowName {
@@ -82,19 +83,21 @@ async function runFromRequest(request: NextRequest) {
   const hoursBack = parseNumber(
     request.nextUrl.searchParams.get("hoursBack"),
     workflowParam === "outreach_auto_healing" ? 48 : 24,
-    { min: 1, max: 168 },
+    { min: 1, max: 720 },
   );
   const concurrency = parseNumber(
     request.nextUrl.searchParams.get("concurrency"),
     8,
     { min: 1, max: 25 },
   );
+  const since = request.nextUrl.searchParams.get("since") ?? undefined;
 
   const result = await runGrowthWorkflow(workflowParam, {
     dryRun,
     limit,
     hoursBack,
     concurrency,
+    sinceDate: since,
   });
 
   return NextResponse.json({
@@ -105,6 +108,7 @@ async function runFromRequest(request: NextRequest) {
       limit,
       hoursBack,
       concurrency,
+      ...(since ? { since } : {}),
     },
     result,
   });
