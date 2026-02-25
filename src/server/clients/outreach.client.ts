@@ -5,6 +5,8 @@ import type {
   ProspectsResponse,
   ProspectResponse,
   StagesResponse,
+  User,
+  UserResponse,
   UsersResponse,
 } from "./outreach.types";
 
@@ -1164,6 +1166,7 @@ export async function createProspect(params: {
   attributes: Record<string, unknown>;
   stageId?: number;
   ownerId?: number;
+  personaId?: number;
 }): Promise<Prospect> {
   if (!isOutreachConfigured) {
     throw new OutreachError("Outreach is not configured");
@@ -1183,6 +1186,12 @@ export async function createProspect(params: {
   if (params.ownerId) {
     relationships.owner = {
       data: { type: "user", id: params.ownerId },
+    };
+  }
+
+  if (params.personaId) {
+    relationships.persona = {
+      data: { type: "persona", id: params.personaId },
     };
   }
 
@@ -1268,6 +1277,185 @@ export async function updateProspect(
     `✅ [Outreach] Updated prospect ${response.data.id}`,
   );
   return response.data;
+}
+
+/**
+ * Get a single prospect by Outreach ID.
+ *
+ * Used by the Outreach → CIO webhook to fetch the email after receiving a
+ * prospect.updated event (the delta payload doesn't include unchanged fields).
+ */
+export async function getProspectById(
+  prospectId: string | number,
+): Promise<Prospect | null> {
+  if (!isOutreachConfigured) {
+    throw new OutreachError("Outreach is not configured");
+  }
+
+  try {
+    const response = await outreachRequest<ProspectResponse>(
+      `/prospects/${prospectId}`,
+      { method: "GET" },
+    );
+    return response.data;
+  } catch (error) {
+    if (error instanceof OutreachError && error.statusCode === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get a single Outreach user by ID.
+ *
+ * Used by the Outreach → CIO webhook to resolve an owner ID to name + email
+ * so we can write the BDR assignment back to Customer.io.
+ */
+export async function getUserById(
+  userId: string | number,
+): Promise<User | null> {
+  if (!isOutreachConfigured) {
+    throw new OutreachError("Outreach is not configured");
+  }
+
+  try {
+    const response = await outreachRequest<UserResponse>(
+      `/users/${userId}`,
+      { method: "GET" },
+    );
+    return response.data;
+  } catch (error) {
+    if (error instanceof OutreachError && error.statusCode === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+// =====================================================
+// WEBHOOK MANAGEMENT
+// =====================================================
+
+export interface OutreachWebhookConfig {
+  id: string | number;
+  url: string;
+  resource: string;
+  action: string;
+  active: boolean;
+  secret?: string;
+  cleanupToken?: string;
+  payloadVersion?: number;
+  disabledReason?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Register a new Outreach webhook.
+ *
+ * Use payloadVersion: 2 to get beforeUpdate context (strongly recommended).
+ * Store the returned cleanupToken — it's the only way to delete the webhook
+ * if S2S credentials are later revoked.
+ */
+export async function createOutreachWebhook(params: {
+  url: string;
+  resource: string;
+  action: string;
+  secret?: string;
+  payloadVersion?: 1 | 2;
+}): Promise<OutreachWebhookConfig> {
+  const body = {
+    data: {
+      type: "webhook",
+      attributes: {
+        url: params.url,
+        resource: params.resource,
+        action: params.action,
+        ...(params.secret ? { secret: params.secret } : {}),
+        ...(params.payloadVersion !== undefined
+          ? { payloadVersion: params.payloadVersion }
+          : {}),
+      },
+    },
+  };
+
+  const response = await outreachRequest<{
+    data: {
+      id: string | number;
+      type: "webhook";
+      attributes: OutreachWebhookConfig & Record<string, unknown>;
+    };
+  }>("/webhooks", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  const a = response.data.attributes;
+  return {
+    id: response.data.id,
+    url: a.url,
+    resource: a.resource,
+    action: a.action,
+    active: a.active,
+    secret: a.secret,
+    cleanupToken: a.cleanupToken,
+    payloadVersion: a.payloadVersion,
+    disabledReason: a.disabledReason,
+    createdAt: a.createdAt,
+    updatedAt: a.updatedAt,
+  };
+}
+
+/**
+ * List all registered Outreach webhooks (up to 100).
+ */
+export async function listOutreachWebhooks(): Promise<OutreachWebhookConfig[]> {
+  const response = await outreachRequest<{
+    data: Array<{
+      id: string | number;
+      type: "webhook";
+      attributes: OutreachWebhookConfig & Record<string, unknown>;
+    }>;
+  }>("/webhooks?page[limit]=100", { method: "GET" });
+
+  return response.data.map((w) => ({
+    id: w.id,
+    url: w.attributes.url,
+    resource: w.attributes.resource,
+    action: w.attributes.action,
+    active: w.attributes.active,
+    secret: w.attributes.secret,
+    cleanupToken: w.attributes.cleanupToken,
+    payloadVersion: w.attributes.payloadVersion,
+    disabledReason: w.attributes.disabledReason,
+    createdAt: w.attributes.createdAt,
+    updatedAt: w.attributes.updatedAt,
+  }));
+}
+
+/**
+ * Delete an Outreach webhook using its single-use cleanup token.
+ *
+ * The cleanup token arrives in every webhook payload in the
+ * outreach-webhook-cleanup-token HTTP header — no other credentials needed.
+ * Returns true on success or if the webhook was already gone.
+ */
+export async function deleteOutreachWebhookByCleanupToken(
+  cleanupToken: string,
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      "https://api.outreach.io/api/v2/webhooks/cleanup",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cleanupToken}` },
+      },
+    );
+    return response.status === 204 || response.status === 404;
+  } catch {
+    return false;
+  }
 }
 
 // =====================================================
