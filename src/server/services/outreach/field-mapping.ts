@@ -139,6 +139,9 @@ export const OUTREACH_STAGES = {
   DEMAND_BOOKED_DIRECT: 68,
 } as const;
 
+/** Outreach persona ID for "Booking Guest" — set on all demand synced leads */
+export const PERSONA_BOOKING_GUEST_ID = 3;
+
 // =====================================================
 // SYNC TAG MAPPING
 // =====================================================
@@ -632,6 +635,7 @@ function formatCheckoutContext(lead: LeadData): string | null {
 export function buildCreatePayload(lead: LeadData): {
   attributes: Record<string, unknown>;
   stageId: number;
+  personaId: number;
 } {
   const customFields = mapLeadToOutreachFields(lead);
   const tags = buildTags(lead);
@@ -669,7 +673,7 @@ export function buildCreatePayload(lead: LeadData): {
   const checkoutNote = formatCheckoutContext(lead);
   if (checkoutNote) attributes.personalNote2 = checkoutNote;
 
-  return { attributes, stageId };
+  return { attributes, stageId, personaId: PERSONA_BOOKING_GUEST_ID };
 }
 
 /**
