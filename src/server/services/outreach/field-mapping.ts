@@ -613,6 +613,15 @@ export function buildTags(lead: LeadData, existingTags?: string[]): string[] {
  * Format abandoned cart checkout context for Outreach personalNote2.
  * e.g. "Abandoned Cart (Feb 23, 2026): Property: Casa Sol | Check-in: 2026-03-15 | Check-out: 2026-03-22 | Amount: $4,200"
  */
+function eventContextLabel(eventType: string | null | undefined): string {
+  switch (eventType) {
+    case "order_completed": return "Booking Confirmed";
+    case "payment_info_entered": return "Abandoned Payment";
+    case "product_added_to_wishlist": return "Wishlisted";
+    default: return "Abandoned Cart";
+  }
+}
+
 function formatCheckoutContext(lead: LeadData): string | null {
   const parts: string[] = [];
   if (lead.webhook_property_name) parts.push(`Property: ${lead.webhook_property_name}`);
@@ -625,7 +634,8 @@ function formatCheckoutContext(lead: LeadData): string | null {
   }
   if (parts.length === 0) return null;
   const dateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  return `Abandoned Cart (${dateStr}): ${parts.join(" | ")}`;
+  const label = eventContextLabel(lead.webhook_event_type);
+  return `${label} (${dateStr}): ${parts.join(" | ")}`;
 }
 
 /**
