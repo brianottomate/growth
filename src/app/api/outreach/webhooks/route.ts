@@ -55,11 +55,12 @@ export async function POST(request: NextRequest) {
       action?: string;
       secret?: string;
       payloadVersion?: 1 | 2;
+      authorizerUserId?: number;
     };
 
-    if (!body.url || !body.resource || !body.action) {
+    if (!body.url || !body.resource || !body.action || !body.authorizerUserId) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields: url, resource, action" },
+        { success: false, error: "Missing required fields: url, resource, action, authorizerUserId" },
         { status: 400 },
       );
     }
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
       action: body.action,
       secret: body.secret,
       payloadVersion: body.payloadVersion,
+      authorizerUserId: body.authorizerUserId,
     });
 
     console.log(
