@@ -37,13 +37,6 @@ function norm(v: number[]): number {
   return Math.sqrt(dotProduct(v, v));
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  const normA = norm(a);
-  const normB = norm(b);
-  if (normA === 0 || normB === 0) return 0;
-  return dotProduct(a, b) / (normA * normB);
-}
-
 function normalizeVector(v: number[]): number[] {
   const n = norm(v);
   if (n === 0) return v;
@@ -290,6 +283,7 @@ function generateForYou(
   profile: UserProfile,
   embeddings: Record<string, PropertyEmbedding>,
   popularityScores: Map<string, number>,
+  profiles: Map<string, UserProfile>,
 ): Recommendation[] {
   const booked = new Set(
     Object.entries(profile.properties)
@@ -310,12 +304,29 @@ function generateForYou(
   }
   scored.sort((a, b) => b.sim - a.sim);
 
+  // Compute recency scores for candidates (days since last interaction across all users)
+  const now = new Date();
+  function recencyScore(propName: string): number {
+    let latest: string | null = null;
+    for (const p of profiles.values()) {
+      const sig = p.properties[propName];
+      if (sig?.last_interaction && (!latest || sig.last_interaction > latest)) {
+        latest = sig.last_interaction;
+      }
+    }
+    if (!latest) return 0;
+    const daysAgo = (now.getTime() - new Date(latest).getTime()) / (1000 * 60 * 60 * 24);
+    return Math.max(0, 1 - daysAgo / RECS_CONFIG.recencyDays);
+  }
+
   // Multi-factor scoring on top candidates
+  // Note: diversity (0.15) is applied via landscape filtering below, not as a score factor
   const candidates: Recommendation[] = [];
   for (const { name, sim } of scored.slice(0, RECS_CONFIG.topCandidates)) {
     const emb = embeddings[name]!;
     const score =
       sim * SCORING_WEIGHTS.similarity +
+      recencyScore(name) * SCORING_WEIGHTS.recency +
       (popularityScores.get(name) ?? 0) * SCORING_WEIGHTS.popularity +
       priceMatchScore(emb.base_price, pricePref) * SCORING_WEIGHTS.price_match;
 
@@ -383,7 +394,11 @@ function generateNearYou(
     if (booked.has(name)) continue;
 
     let geoScore = 0;
-    if (top.city && emb.city.toLowerCase() === top.city.toLowerCase()) {
+    if (
+      top.city &&
+      emb.city.toLowerCase() === top.city.toLowerCase() &&
+      emb.state.toLowerCase() === top.state!.toLowerCase()
+    ) {
       geoScore = 1.0;
     } else if (emb.state.toLowerCase() === top.state!.toLowerCase()) {
       geoScore = 0.7;
@@ -482,6 +497,7 @@ export function generateAllRecommendations(
       profile,
       embeddings,
       popularityScores,
+      profiles,
     );
     const nearYou = generateNearYou(profile, embeddings);
 
