@@ -184,10 +184,10 @@ export async function fetchUserBehaviorSignals(userIds?: string[]): Promise<BQUs
   return executeQuery<BQUserSignal>(
     `
     WITH property_views AS (
-      SELECT id_user, property_name, COUNT(*) AS view_count, MAX(ts) AS last_view
+      SELECT id_user, product_name AS property_name, COUNT(*) AS view_count, MAX(ts) AS last_view
       FROM \`wander-9fc9c.analytics.int_product_viewed\`
-      WHERE id_user IS NOT NULL AND property_name IS NOT NULL
-      GROUP BY id_user, property_name
+      WHERE id_user IS NOT NULL AND product_name IS NOT NULL
+      GROUP BY id_user, product_name
     ),
     abandoned_checkouts AS (
       SELECT id_user, property_name, COUNT(*) AS abandon_count, MAX(ts) AS last_abandon
