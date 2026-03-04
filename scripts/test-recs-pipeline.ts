@@ -145,7 +145,10 @@ async function runRankPhase() {
     fetchUserSearchHistory(userIds),
   ]);
 
-  const profiles = buildUserProfiles(signals, searches);
+  const allProfiles = buildUserProfiles(signals, searches);
+  // Safety net: ensure only test users are ranked even if BQ filter leaks
+  const profiles = new Map([...allProfiles].filter(([uid]) => userIds.includes(uid)));
+  console.log(`  ${profiles.size} profiles after filter (expected ${userIds.length})`);
   const index = buildPropertyIndex(profiles);
   const { recs, coldStart } = generateAllRecs(profiles, propertyEmbeddings, index);
 

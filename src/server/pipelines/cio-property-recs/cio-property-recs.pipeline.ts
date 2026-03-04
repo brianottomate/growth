@@ -179,7 +179,7 @@ export async function fetchBookableProperties(): Promise<BQProperty[]> {
 
 export async function fetchUserBehaviorSignals(userIds?: string[]): Promise<BQUserSignal[]> {
   const userFilter = userIds?.length
-    ? `AND COALESCE(v.id_user, a.id_user, b.id_user) IN UNNEST(@user_ids)`
+    ? `WHERE COALESCE(v.id_user, a.id_user, b.id_user) IN UNNEST(@user_ids)`
     : "";
   return executeQuery<BQUserSignal>(
     `
