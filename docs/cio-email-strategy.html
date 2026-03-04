@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wander — Customer.io & Email Strategy</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --border: #e4e2dc;
+  --text: #1a1917;
+  --text-muted: #6b6860;
+  --nav-bg: #1a1917;
+  --nav-text: #a09d98;
+  --nav-hover: #ffffff;
+  --accent: #b45309;
+
+  --c-event: #1d4ed8;
+  --c-event-bg: #eff6ff;
+  --c-event-border: #bfdbfe;
+  --c-segment: #6d28d9;
+  --c-segment-bg: #f5f3ff;
+  --c-segment-border: #ddd6fe;
+  --c-campaign: #047857;
+  --c-campaign-bg: #ecfdf5;
+  --c-campaign-border: #a7f3d0;
+  --c-newsletter: #b45309;
+  --c-newsletter-bg: #fffbeb;
+  --c-newsletter-border: #fde68a;
+  --c-transactional: #475569;
+  --c-transactional-bg: #f1f5f9;
+  --c-transactional-border: #cbd5e1;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg);
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Nav ── */
+nav {
+  width: 220px;
+  min-width: 220px;
+  background: var(--nav-bg);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 32px 0;
+  display: flex;
+  flex-direction: column;
+}
+.nav-logo {
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 0 20px 28px;
+  border-bottom: 1px solid #2d2b28;
+  letter-spacing: -0.01em;
+}
+.nav-logo span { color: var(--accent); }
+.nav-section-label {
+  color: #4a4845;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 20px 20px 8px;
+}
+nav a {
+  display: block;
+  color: var(--nav-text);
+  text-decoration: none;
+  padding: 6px 20px;
+  font-size: 13.5px;
+  transition: color 0.15s;
+  border-left: 2px solid transparent;
+}
+nav a:hover { color: var(--nav-hover); }
+nav a.active { color: var(--nav-hover); border-left-color: var(--accent); }
+
+/* ── Main ── */
+main {
+  flex: 1;
+  min-width: 0;
+  max-width: 920px;
+  padding: 48px 56px;
+}
+
+/* ── Sections ── */
+section { margin-bottom: 72px; }
+
+.section-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+h2 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.section-desc {
+  color: var(--text-muted);
+  margin-bottom: 28px;
+  max-width: 640px;
+}
+h3 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 14px;
+  color: var(--text);
+}
+
+/* ── Page header ── */
+.page-header {
+  margin-bottom: 52px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+.page-header h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+.page-header .meta { font-size: 13px; color: var(--text-muted); }
+
+/* ── Callout ── */
+.callout {
+  background: #fef9ec;
+  border: 1px solid #fde68a;
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 32px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.callout strong { color: var(--text); }
+
+/* ── Lifecycle diagram ── */
+.lifecycle {
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding: 24px 0 28px;
+  margin-bottom: 40px;
+  gap: 0;
+}
+.lifecycle-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 108px;
+  text-align: center;
+}
+.stage-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--text);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.stage-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.stage-campaigns {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.lifecycle-arrow {
+  flex-shrink: 0;
+  padding: 0 6px;
+  margin-top: 17px;
+  color: #c9c6be;
+  font-size: 20px;
+}
+
+/* ── Quick reference ── */
+.ref-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.ref-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.ref-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+.ref-card ul { list-style: none; }
+.ref-card li {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 4px 0;
+  border-bottom: 1px solid #f3f2ef;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ref-card li:last-child { border-bottom: none; }
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Tables ── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 28px;
+  font-size: 14px;
+}
+th {
+  background: #f3f2ef;
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3f2ef;
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafaf8; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.badge-event        { background: var(--c-event-bg);         color: var(--c-event);         border: 1px solid var(--c-event-border); }
+.badge-segment      { background: var(--c-segment-bg);       color: var(--c-segment);       border: 1px solid var(--c-segment-border); }
+.badge-campaign     { background: var(--c-campaign-bg);      color: var(--c-campaign);      border: 1px solid var(--c-campaign-border); }
+.badge-newsletter   { background: var(--c-newsletter-bg);    color: var(--c-newsletter);    border: 1px solid var(--c-newsletter-border); }
+.badge-transactional{ background: var(--c-transactional-bg); color: var(--c-transactional); border: 1px solid var(--c-transactional-border); }
+
+code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  background: #f0efe9;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text);
+}
+
+/* ── Campaign cards ── */
+.campaign-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.campaign-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.campaign-header h3 { margin: 0; font-size: 15px; }
+.campaign-header-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.campaign-body {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+.campaign-meta { display: flex; flex-direction: column; gap: 9px; }
+.meta-row { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; }
+.meta-label {
+  color: var(--text-muted);
+  min-width: 54px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 2px;
+}
+.meta-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: #fafaf8;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+/* ── Flow diagram ── */
+.flow-diagram { display: flex; flex-direction: column; gap: 0; }
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.flow-step-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.flow-step-box {
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+  line-height: 1.4;
+}
+.flow-connector {
+  display: flex;
+  align-items: center;
+  padding-left: 13px;
+  height: 18px;
+}
+.flow-connector::before {
+  content: '';
+  width: 1px;
+  height: 18px;
+  background: #d8d5ce;
+}
+
+/* Step colour variants */
+.step-trigger   .flow-step-icon { background: #fed7aa; color: #92400e; }
+.step-trigger   .flow-step-box  { background: #fff7ed; border: 1px solid #fed7aa; color: #92400e; }
+.step-email     .flow-step-icon { background: #bfdbfe; color: #1e40af; }
+.step-email     .flow-step-box  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
+.step-push      .flow-step-icon { background: #a7f3d0; color: #065f46; }
+.step-push      .flow-step-box  { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+.step-wait      .flow-step-icon { background: #e5e7eb; color: #374151; }
+.step-wait      .flow-step-box  { background: #f9fafb; border: 1px solid #e5e7eb; color: #4b5563; }
+.step-condition .flow-step-icon { background: #ddd6fe; color: #5b21b6; }
+.step-condition .flow-step-box  { background: #f5f3ff; border: 1px solid #ddd6fe; color: #4c1d95; }
+.step-exit      .flow-step-icon { background: #fecaca; color: #991b1b; }
+.step-exit      .flow-step-box  { background: #fff1f2; border: 1px solid #fecaca; color: #881337; }
+.step-webhook   .flow-step-icon { background: #fde68a; color: #78350f; }
+.step-webhook   .flow-step-box  { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; }
+
+/* ── Newsletter grid ── */
+.newsletter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.newsletter-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.newsletter-card h4 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.newsletter-card p  { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
+.newsletter-card-meta { font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+.newsletter-card-meta span { color: var(--text-muted); }
+.newsletter-card-meta strong { color: var(--text); }
+
+/* ── Priority list ── */
+.priority-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+.priority-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 13px 18px;
+  border-bottom: 1px solid #f3f2ef;
+  gap: 14px;
+  font-size: 14px;
+}
+.priority-item:last-child { border-bottom: none; }
+.priority-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--text);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.subsection { margin-top: 36px; }
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  body { flex-direction: column; }
+  nav { width: 100%; height: auto; position: static; flex-direction: row; flex-wrap: wrap; padding: 12px 16px; gap: 4px; }
+  .nav-section-label { display: none; }
+  nav a { padding: 4px 10px; font-size: 13px; border-left: none; }
+  main { padding: 28px 20px; }
+  .ref-grid { grid-template-columns: 1fr 1fr; }
+  .campaign-body { grid-template-columns: 1fr; }
+  .newsletter-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar nav ── -->
+<nav>
+  <div class="nav-logo">Wander <span>×</span> CIO</div>
+  <div class="nav-section-label">Strategy</div>
+  <a href="#overview">Overview</a>
+  <a href="#segments">Segments</a>
+  <a href="#events">Events</a>
+  <div class="nav-section-label">Automation</div>
+  <a href="#campaigns">Campaigns</a>
+  <a href="#newsletters">Newsletters</a>
+  <div class="nav-section-label">Reference</div>
+  <a href="#transactional">Transactional</a>
+  <a href="#suppression">Suppression Rules</a>
+</nav>
+
+<!-- ── Main content ── -->
+<main>
+
+  <div class="page-header">
+    <h1>Customer.io &amp; Email Strategy</h1>
+    <p class="meta">Wander.com · Growth Engineering · March 2026 · Draft</p>
+  </div>
+
+  <!-- ════════════════════════════════════════
+       01 OVERVIEW
+  ═══════════════════════════════════════════ -->
+  <section id="overview">
+    <div class="section-eyebrow">01 / Overview</div>
+    <h2>The Framework</h2>
+    <p class="section-desc">A clean mental model for how messaging works at Wander. Built around the guest lifecycle, not around one-off blasts.</p>
+
+    <div class="callout">
+      <strong>Core principle:</strong> CIO owns the relationship. The app owns the transaction.<br>
+      Booking confirmations, receipts, and password resets live in the codebase. Pre-trip nurturing, lifecycle automation, newsletters, and re-engagement live here. If it's critical to delivering what a user already purchased → app. If it's about relationship and conversion → CIO.
+    </div>
+
+    <!-- Guest lifecycle diagram -->
+    <h3>Guest Lifecycle</h3>
+    <div class="lifecycle">
+      <div class="lifecycle-stage">
+        <div class="stage-num">1</div>
+        <div class="stage-label">Sign Up</div>
+        <div class="stage-campaigns">Welcome<br>Onboarding</div>
+      </div>
+      <div class="lifecycle-arrow">→</div>
+      <div class="lifecycle-stage">
+        <div class="stage-num">2</div>
+        <div class="stage-label">Browse</div>
+        <div class="stage-campaigns">Wishlist Nudge<br>Abandoned Cart<br>Price Drop</div>
+      </div>
+      <div class="lifecycle-arrow">→</div>
+      <div class="lifecycle-stage">
+        <div class="stage-num">3</div>
+        <div class="stage-label">Book</div>
+        <div class="stage-campaigns">Invite Guests<br>Pre-Trip</div>
+      </div>
+      <div class="lifecycle-arrow">→</div>
+      <div class="lifecycle-stage">
+        <div class="stage-num">4</div>
+        <div class="stage-label">On-Trip</div>
+        <div class="stage-campaigns">Check-In Day<br>On-Trip<br>Extensions</div>
+      </div>
+      <div class="lifecycle-arrow">→</div>
+      <div class="lifecycle-stage">
+        <div class="stage-num">5</div>
+        <div class="stage-label">Post-Trip</div>
+        <div class="stage-campaigns">Review Request<br>Rebook Nudge</div>
+      </div>
+      <div class="lifecycle-arrow">→</div>
+      <div class="lifecycle-stage">
+        <div class="stage-num">6</div>
+        <div class="stage-label">Re-engage</div>
+        <div class="stage-campaigns">Win-back<br>Weekly Deals<br>Personalised Recs</div>
+      </div>
+    </div>
+
+    <!-- Quick reference -->
+    <h3>Quick Reference</h3>
+    <div class="ref-grid">
+      <div class="ref-card">
+        <div class="ref-card-title" style="color: var(--c-segment)">Core Segments</div>
+        <ul>
+          <li><span class="dot" style="background:var(--c-segment)"></span>All Active</li>
+          <li><span class="dot" style="background:var(--c-segment)"></span>High Intent</li>
+          <li><span class="dot" style="background:var(--c-segment)"></span>Bookers</li>
+          <li><span class="dot" style="background:var(--c-segment)"></span>Recent Guests</li>
+          <li><span class="dot" style="background:var(--c-segment)"></span>Lapsed</li>
+          <li><span class="dot" style="background:var(--c-segment)"></span>In Sales Outreach</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title" style="color: var(--c-campaign)">Campaigns (Journeys)</div>
+        <ul>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Welcome / Onboarding</li>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Abandoned Checkout</li>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Wishlist Nudge</li>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Price Drop Alert</li>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Pre-Trip Series</li>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Check-In Day + On-Trip</li>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Post-Trip + Review</li>
+          <li><span class="dot" style="background:var(--c-campaign)"></span>Re-engagement / Win-back</li>
+        </ul>
+      </div>
+      <div class="ref-card">
+        <div class="ref-card-title" style="color: var(--c-newsletter)">Newsletters (Broadcasts)</div>
+        <ul>
+          <li><span class="dot" style="background:var(--c-newsletter)"></span>Weekly Property Deals</li>
+          <li><span class="dot" style="background:var(--c-newsletter)"></span>New Property Launch</li>
+          <li><span class="dot" style="background:var(--c-newsletter)"></span>Personalised Recs</li>
+          <li><span class="dot" style="background:var(--c-newsletter)"></span>Travel Inspiration</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════
+       02 SEGMENTS
+  ═══════════════════════════════════════════ -->
+  <section id="segments">
+    <div class="section-eyebrow">02 / Segments</div>
+    <h2>Segments</h2>
+    <p class="section-desc">All meaningful segments are <strong>dynamic</strong> — they auto-update as people meet or leave the criteria. Static segments are for one-off broadcasts only and should be archived after use, not left to accumulate.</p>
+
+    <h3>Core Segments</h3>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Definition</th><th>Primary use</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>All Active</strong></td>
+          <td>Valid email + not unsubscribed</td>
+          <td>Weekly newsletters, property launches</td>
+        </tr>
+        <tr>
+          <td><strong>High Intent</strong></td>
+          <td>Checkout started OR wishlisted a property — no <code>order_completed</code> ever</td>
+          <td>Abandoned cart, price drop, weekly deals targeting</td>
+        </tr>
+        <tr>
+          <td><strong>Bookers</strong></td>
+          <td>At least one <code>order_completed</code> ever</td>
+          <td>Re-engagement, recs newsletter, post-trip upsell</td>
+        </tr>
+        <tr>
+          <td><strong>Recent Guests</strong></td>
+          <td>Most recent <code>trip_ended</code> within 90 days</td>
+          <td>Rebook nudge, personalised recs newsletter</td>
+        </tr>
+        <tr>
+          <td><strong>Lapsed</strong></td>
+          <td>Signed up &gt;90 days ago AND (never booked OR last booking &gt;365 days ago)</td>
+          <td>Win-back campaign entry trigger</td>
+        </tr>
+        <tr>
+          <td><strong>In Sales Outreach</strong></td>
+          <td>Attribute <code>bdr_outreach_active = true</code> (set by BDR team via Outreach sync)</td>
+          <td>Suppresses all marketing while sales owns the lead</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="subsection">
+      <h3>Operational Segments</h3>
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Definition</th><th>Use</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>New Sign-Ups</strong></td>
+            <td>Signed up within the last 14 days</td>
+            <td>Suppress from newsletters during onboarding sequence</td>
+          </tr>
+          <tr>
+            <td><strong>App Users</strong></td>
+            <td>Has at least one mobile device registered</td>
+            <td>Push notification campaigns</td>
+          </tr>
+          <tr>
+            <td><strong>VIPs</strong></td>
+            <td>3+ completed bookings or total spend above threshold</td>
+            <td>Early access, special offers, concierge touches</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout" style="margin-top:8px;">
+      <strong>Static segment hygiene:</strong> When you need to send a one-off blast to a CSV list, upload it as a static segment, use it, then archive it immediately. Static segments should never be reused — create a dynamic segment if you find yourself wanting to reuse one.
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════
+       03 EVENTS
+  ═══════════════════════════════════════════ -->
+  <section id="events">
+    <div class="section-eyebrow">03 / Events</div>
+    <h2>Key Events</h2>
+    <p class="section-desc">The behavioral signals that drive campaigns. What you put in the event payload is what you can use for personalization and conditions downstream. <em>Reconcile event names against the tracking plan before using in production.</em></p>
+
+    <h3>Booking Funnel</h3>
+    <table>
+      <thead>
+        <tr><th>Event</th><th>When fired</th><th>Key payload properties</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>checkout_started</code></td>
+          <td>User reaches the checkout screen</td>
+          <td>property_id, property_name, check_in_date, check_out_date, total_price, guests, image_url</td>
+        </tr>
+        <tr>
+          <td><code>payment_info_entered</code></td>
+          <td>Payment details submitted (pre-confirmation)</td>
+          <td>Same as checkout_started + booking_id</td>
+        </tr>
+        <tr>
+          <td><code>order_completed</code></td>
+          <td>Booking confirmed and paid</td>
+          <td>booking_id, property_id, property_name, check_in_date, check_out_date, total_price, nights, guests, image_url, property_address</td>
+        </tr>
+        <tr>
+          <td><code>order_cancelled</code></td>
+          <td>Booking cancelled (guest or admin)</td>
+          <td>booking_id, property_id, cancellation_reason, refund_amount</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="subsection">
+      <h3>Trip Lifecycle</h3>
+      <table>
+        <thead>
+          <tr><th>Event</th><th>When fired</th><th>Key payload properties</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>trip_started</code></td>
+            <td>Check-in date reached (backend)</td>
+            <td>booking_id, property_id, property_name, property_address, access_code, check_out_date, wifi_name, wifi_password</td>
+          </tr>
+          <tr>
+            <td><code>check_in_day</code></td>
+            <td>Morning of check-in day</td>
+            <td>Same as trip_started</td>
+          </tr>
+          <tr>
+            <td><code>trip_ended</code></td>
+            <td>Check-out date reached (backend)</td>
+            <td>booking_id, property_id, property_name, review_url, nights_stayed</td>
+          </tr>
+          <tr>
+            <td><code>product_reviewed</code></td>
+            <td>Guest submits a review</td>
+            <td>booking_id, property_id, rating (1–10), review_id</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>Browsing &amp; Engagement</h3>
+      <table>
+        <thead>
+          <tr><th>Event</th><th>When fired</th><th>Key payload properties</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>user_signed_up</code></td>
+            <td>New account created</td>
+            <td>source, referral_code, channel (web/app)</td>
+          </tr>
+          <tr>
+            <td><code>product_added_to_wishlist</code></td>
+            <td>User saves a property</td>
+            <td>property_id, property_name, location, image_url, price_per_night, bedrooms</td>
+          </tr>
+          <tr>
+            <td><code>product_removed_from_wishlist</code></td>
+            <td>User removes a saved property</td>
+            <td>property_id</td>
+          </tr>
+          <tr>
+            <td><code>price_refresh</code></td>
+            <td>Price drops on a property user interacted with</td>
+            <td>property_id, property_name, old_price, new_price, discount_pct, image_url, checkout_url</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════
+       04 CAMPAIGNS
+  ═══════════════════════════════════════════ -->
+  <section id="campaigns">
+    <div class="section-eyebrow">04 / Campaigns</div>
+    <h2>Campaigns (Automated Journeys)</h2>
+    <p class="section-desc">Always-on automations. Someone enters via a trigger and flows through a sequence. The key discipline: every trip-related campaign <strong>must</strong> define <code>order_cancelled</code> as a global exit condition.</p>
+
+    <!-- 1. Welcome -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>1 — Welcome / Onboarding</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-event">Event Triggered</span>
+          <span class="badge badge-campaign">Email</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span><code>user_signed_up</code></div>
+          <div class="meta-row"><span class="meta-label">Goal</span>First booking within 14 days</div>
+          <div class="meta-row"><span class="meta-label">Exit</span><code>order_completed</code> or 14 days elapsed</div>
+          <div class="meta-row"><span class="meta-label">Suppress</span>n/a — all new users enter</div>
+          <p class="meta-note">On exit, the person transitions naturally into the general newsletter cadence at the next weekly send. No manual step needed — just ensure New Sign-Ups segment is excluded from newsletters.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-trigger">
+            <div class="flow-step-icon">⚡</div>
+            <div class="flow-step-box">Trigger: <code>user_signed_up</code></div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 0 — Welcome: what Wander is + top picks right now</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-wait">
+            <div class="flow-step-icon">⏱</div>
+            <div class="flow-step-box">Wait 2 days</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 2 — Social proof: guest stories + reviews</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-wait">
+            <div class="flow-step-icon">⏱</div>
+            <div class="flow-step-box">Wait 5 days</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 7 — First-booking nudge + offer</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: booked, or 14 days elapsed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Abandoned Checkout -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>2 — Abandoned Checkout</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-event">Event Triggered</span>
+          <span class="badge badge-campaign">Email + Push</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span><code>checkout_started</code></div>
+          <div class="meta-row"><span class="meta-label">Entry</span>No <code>order_completed</code> within 2 hours</div>
+          <div class="meta-row"><span class="meta-label">Goal</span>Recover the booking</div>
+          <div class="meta-row"><span class="meta-label">Exit</span><code>order_completed</code>, <code>order_cancelled</code>, or 7 days</div>
+          <p class="meta-note">Use the event payload to personalise: include the specific property, dates, and price in every message. Don't send if user has already booked a different property during the window.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-trigger">
+            <div class="flow-step-icon">⚡</div>
+            <div class="flow-step-box">Trigger: <code>checkout_started</code></div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-wait">
+            <div class="flow-step-icon">⏱</div>
+            <div class="flow-step-box">Wait 2 hours — check if booked</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Hour 2 — "You left [property] behind" + direct link</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 1 — "Still thinking it over?" + urgency signal</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 4 — Final nudge or similar properties</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: booked, cancelled, or 7 days</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Wishlist Nudge -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>3 — Wishlist Nudge</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-event">Event Triggered</span>
+          <span class="badge badge-campaign">Email</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span><code>product_added_to_wishlist</code></div>
+          <div class="meta-row"><span class="meta-label">Goal</span>Convert saved interest into a booking</div>
+          <div class="meta-row"><span class="meta-label">Exit</span><code>order_completed</code> or <code>product_removed_from_wishlist</code></div>
+          <p class="meta-note">The Price Drop campaign complements this — if a wishlisted property drops in price, a separate one-shot alert fires. These two work together without overlap.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-trigger">
+            <div class="flow-step-icon">⚡</div>
+            <div class="flow-step-box">Trigger: <code>product_added_to_wishlist</code></div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 1 — "Great pick" — property highlights + availability</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-wait">
+            <div class="flow-step-icon">⏱</div>
+            <div class="flow-step-box">Wait 6 days</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 7 — "Dates are going fast" + urgency</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: booked or removed from wishlist</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Price Drop -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>4 — Price Drop Alert</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-event">Event Triggered</span>
+          <span class="badge badge-campaign">Email</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span><code>price_refresh</code></div>
+          <div class="meta-row"><span class="meta-label">Entry</span>User has wishlisted or checked out this property_id</div>
+          <div class="meta-row"><span class="meta-label">Goal</span>Convert on the price signal immediately</div>
+          <div class="meta-row"><span class="meta-label">Exit</span>One-shot — single email, no sequence</div>
+          <p class="meta-note">Use <code>old_price</code> and <code>new_price</code> from the event payload to show actual savings. This is one of the highest-converting triggers if the personalization is tight.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-trigger">
+            <div class="flow-step-icon">⚡</div>
+            <div class="flow-step-box">Trigger: <code>price_refresh</code></div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Immediate — "Price just dropped on [property]" — was $X, now $Y</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: sent (one-shot)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Pre-Trip -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>5 — Pre-Trip Series</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-newsletter">Webhook Triggered</span>
+          <span class="badge badge-campaign">Email + Push</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span>Backend webhook, ~7 days before check-in</div>
+          <div class="meta-row"><span class="meta-label">Goal</span>Prepare guest, build excitement, reduce support load</div>
+          <div class="meta-row"><span class="meta-label">Exit</span><code>order_cancelled</code> <strong>immediately</strong></div>
+          <div class="meta-row"><span class="meta-label">Variants</span>4 — based on travel guide + pre-trip info availability</div>
+          <p class="meta-note">Carry <code>booking_id</code> and <code>check_in_date</code> in the webhook payload for personalisation. The cancellation exit must fire on the correct booking_id — users may have multiple trips.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-webhook">
+            <div class="flow-step-icon">🔗</div>
+            <div class="flow-step-box">Webhook: 7 days before check-in</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-condition">
+            <div class="flow-step-icon">⑂</div>
+            <div class="flow-step-box">Branch: has travel guides AND pre-trip info?</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day −7 — Packing tips + what to expect</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day −3 — Travel guide + local area highlights</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day −1 — Check-in preview + excitement builder</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: check-in day reached OR <code>order_cancelled</code></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Check-In + On-Trip -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>6 — Check-In Day + On-Trip</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-newsletter">Webhook Triggered</span>
+          <span class="badge badge-campaign">Email + Push + SMS</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span>Backend webhook on check-in date</div>
+          <div class="meta-row"><span class="meta-label">Goal</span>Seamless check-in + mid-trip engagement + extension upsell</div>
+          <div class="meta-row"><span class="meta-label">Exit</span><code>trip_ended</code> or <code>order_cancelled</code></div>
+          <p class="meta-note">Check-in details (access code, address, wifi) come from the webhook payload — accuracy is critical. Late cancellation: if <code>order_cancelled</code> fires after trip has started, gracefully end the sequence without sending remaining messages.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-webhook">
+            <div class="flow-step-icon">🔗</div>
+            <div class="flow-step-box">Webhook: check-in date reached</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-push">
+            <div class="flow-step-icon">📱</div>
+            <div class="flow-step-box">Morning — "Today's the day!" push with access code</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 1 — Local area guide + tips from past guests</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Mid-trip — Share your stay + social prompt</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day before checkout — Extend your trip? or Book your next</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: <code>trip_ended</code> or <code>order_cancelled</code></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Post-Trip -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>7 — Post-Trip + Review</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-event">Event Triggered</span>
+          <span class="badge badge-campaign">Email</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span><code>trip_ended</code></div>
+          <div class="meta-row"><span class="meta-label">Goal</span>Review submission + repeat booking</div>
+          <div class="meta-row"><span class="meta-label">Exit</span><code>product_reviewed</code> or 14 days</div>
+          <div class="meta-row"><span class="meta-label">Branch</span>Rating ≥ 9 → ask for public (Google / App Store) review</div>
+          <p class="meta-note">Include the review URL in the <code>trip_ended</code> payload. The high-rating branch is where Wander builds public social proof — don't skip it. Day 7 rebook email should pull from <code>rec_for_you_*</code> attributes if available.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-trigger">
+            <div class="flow-step-icon">⚡</div>
+            <div class="flow-step-box">Trigger: <code>trip_ended</code></div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 1 — "Hope it was amazing" — leave a review</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-wait">
+            <div class="flow-step-icon">⏱</div>
+            <div class="flow-step-box">Wait — check if reviewed</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-condition">
+            <div class="flow-step-icon">⑂</div>
+            <div class="flow-step-box">If reviewed AND rating ≥ 9 → ask for public review</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Day 7 — Book your next Wander + personalised property recs</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: reviewed, or 14 days elapsed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. Re-engagement -->
+    <div class="campaign-card">
+      <div class="campaign-header">
+        <h3>8 — Re-engagement / Win-back</h3>
+        <div class="campaign-header-badges">
+          <span class="badge badge-segment">Segment Triggered</span>
+          <span class="badge badge-campaign">Email</span>
+        </div>
+      </div>
+      <div class="campaign-body">
+        <div class="campaign-meta">
+          <div class="meta-row"><span class="meta-label">Trigger</span>Entry into <strong>Lapsed</strong> segment</div>
+          <div class="meta-row"><span class="meta-label">Goal</span>Reactivate dormant users</div>
+          <div class="meta-row"><span class="meta-label">Exit</span><code>checkout_started</code>, <code>order_completed</code>, or 6 weeks</div>
+          <div class="meta-row"><span class="meta-label">Suppress</span>Skip entirely if in <strong>In Sales Outreach</strong> segment</div>
+          <p class="meta-note">Week 3 should use <code>rec_for_you_*</code> personalised attributes if available. If not, fall back to curated editorial picks.</p>
+        </div>
+        <div class="flow-diagram">
+          <div class="flow-step step-trigger">
+            <div class="flow-step-icon">⚡</div>
+            <div class="flow-step-box">Trigger: enters Lapsed segment</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Week 1 — "What's new at Wander" — new properties + destinations</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Week 3 — Personalised property recs</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-email">
+            <div class="flow-step-icon">✉</div>
+            <div class="flow-step-box">Week 6 — Last touch + time-limited offer</div>
+          </div>
+          <div class="flow-connector"></div>
+          <div class="flow-step step-exit">
+            <div class="flow-step-icon">✓</div>
+            <div class="flow-step-box">Exit: re-engaged (checkout or booking), or 6 weeks</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ════════════════════════════════════════
+       05 NEWSLETTERS
+  ═══════════════════════════════════════════ -->
+  <section id="newsletters">
+    <div class="section-eyebrow">05 / Newsletters</div>
+    <h2>Newsletters (Broadcasts)</h2>
+    <p class="section-desc">One-time sends to a defined audience. Should always target <strong>dynamic segments</strong> — not freshly uploaded CSVs. Newsletters are operational, not strategic: they're how we fill the gaps between campaigns with relevant content.</p>
+
+    <div class="newsletter-grid">
+      <div class="newsletter-card">
+        <h4>Weekly Property Deals</h4>
+        <p>Curated properties, seasonal deals, and travel prompts. The bread-and-butter broadcast. Targets all active users who aren't currently in onboarding or a trip sequence.</p>
+        <div class="newsletter-card-meta">
+          <span><strong>Cadence:</strong> Weekly (Thursdays)</span>
+          <span><strong>Audience:</strong> All Active minus suppressions</span>
+          <span><strong>Channel:</strong> Email</span>
+          <span><strong>Naming:</strong> <code>deals-YYYY-MM-DD</code></span>
+        </div>
+      </div>
+      <div class="newsletter-card">
+        <h4>New Property Launch</h4>
+        <p>Ad-hoc announcement when a new Wander opens. Should feel like a product launch moment — premium, visual, worth opening. Sent to full active list.</p>
+        <div class="newsletter-card-meta">
+          <span><strong>Cadence:</strong> Ad-hoc (per launch)</span>
+          <span><strong>Audience:</strong> All Active</span>
+          <span><strong>Channel:</strong> Email + Push</span>
+          <span><strong>Naming:</strong> <code>launch-[property-slug]</code></span>
+        </div>
+      </div>
+      <div class="newsletter-card">
+        <h4>Personalised Recs</h4>
+        <p>Uses the <code>rec_for_you_*</code> attributes already computed and synced to CIO profiles. Each user sees their own 3 curated properties. Only send to users with <code>recs_updated_at</code> set.</p>
+        <div class="newsletter-card-meta">
+          <span><strong>Cadence:</strong> Weekly or biweekly</span>
+          <span><strong>Audience:</strong> Bookers + High Intent with rec data</span>
+          <span><strong>Channel:</strong> Email</span>
+          <span><strong>Naming:</strong> <code>recs-YYYY-MM-DD</code></span>
+        </div>
+      </div>
+      <div class="newsletter-card">
+        <h4>Travel Inspiration</h4>
+        <p>Longer-form editorial: destination guides, "best time to visit" roundups, Wander guest stories. Lower frequency, higher brand value. Builds affinity with users not yet ready to book.</p>
+        <div class="newsletter-card-meta">
+          <span><strong>Cadence:</strong> Monthly</span>
+          <span><strong>Audience:</strong> All Active</span>
+          <span><strong>Channel:</strong> Email</span>
+          <span><strong>Naming:</strong> <code>inspire-YYYY-MM</code></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════
+       06 TRANSACTIONAL
+  ═══════════════════════════════════════════ -->
+  <section id="transactional">
+    <div class="section-eyebrow">06 / Transactional</div>
+    <h2>Transactional Emails</h2>
+    <p class="section-desc">These live in the app codebase and are sent directly — not via CIO. They are delivery-critical and must never flow through a marketing system where suppression rules or frequency caps could interfere.</p>
+
+    <table>
+      <thead>
+        <tr><th>Email</th><th>When</th><th>Owner</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Booking Confirmation</strong></td>
+          <td>Immediately on <code>order_completed</code></td>
+          <td>App (Resend)</td>
+        </tr>
+        <tr>
+          <td><strong>Payment Receipt</strong></td>
+          <td>Payment processed</td>
+          <td>App / Stripe webhook</td>
+        </tr>
+        <tr>
+          <td><strong>Cancellation Confirmation</strong></td>
+          <td>Booking cancelled, refund issued</td>
+          <td>App</td>
+        </tr>
+        <tr>
+          <td><strong>Guest Invite</strong></td>
+          <td>Primary guest adds secondary guests</td>
+          <td>App</td>
+        </tr>
+        <tr>
+          <td><strong>Password Reset</strong></td>
+          <td>User requests reset</td>
+          <td>App (Better Auth)</td>
+        </tr>
+        <tr>
+          <td><strong>Email Verification</strong></td>
+          <td>New account created</td>
+          <td>App (Better Auth)</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ════════════════════════════════════════
+       07 SUPPRESSION RULES
+  ═══════════════════════════════════════════ -->
+  <section id="suppression">
+    <div class="section-eyebrow">07 / Suppression Rules</div>
+    <h2>Suppression &amp; Conflict Rules</h2>
+    <p class="section-desc">How we prevent a user from being hit by multiple streams at once. The guiding principle: the more specific and time-sensitive the message, the higher its priority.</p>
+
+    <h3>Priority Order</h3>
+    <div class="priority-list">
+      <div class="priority-item">
+        <div class="priority-num">1</div>
+        <div><strong>Transactional</strong> — always delivered. Not affected by any suppression rule. Booking confirmations, receipts, cancellation notices.</div>
+      </div>
+      <div class="priority-item">
+        <div class="priority-num">2</div>
+        <div><strong>Sales Outreach</strong> — if the <em>In Sales Outreach</em> segment is active, all marketing campaigns and newsletters are paused. The sales team owns the relationship until the flag clears.</div>
+      </div>
+      <div class="priority-item">
+        <div class="priority-num">3</div>
+        <div><strong>Trip lifecycle</strong> — pre-trip, check-in, on-trip, and post-trip campaigns take full priority over newsletters. Users actively in a trip sequence are excluded from that week's broadcast.</div>
+      </div>
+      <div class="priority-item">
+        <div class="priority-num">4</div>
+        <div><strong>Onboarding</strong> — new sign-ups in their first 14 days are excluded from newsletters. They're in a dedicated welcome sequence.</div>
+      </div>
+      <div class="priority-item">
+        <div class="priority-num">5</div>
+        <div><strong>Newsletters &amp; broadcasts</strong> — lowest priority. Target the dynamic segments that already exclude groups 2–4 above.</div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Cancellation — Global Exit Signal</h3>
+      <table>
+        <thead>
+          <tr><th>Campaign</th><th>Exit on <code>order_cancelled</code>?</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Abandoned Checkout</td>
+            <td>✅ Yes</td>
+            <td>User explicitly cancelled — don't chase</td>
+          </tr>
+          <tr>
+            <td>Pre-Trip Series</td>
+            <td>✅ Yes — immediately</td>
+            <td>Match on booking_id if user has multiple trips</td>
+          </tr>
+          <tr>
+            <td>Check-In Day + On-Trip</td>
+            <td>✅ Yes — immediately</td>
+            <td>Same booking_id matching required</td>
+          </tr>
+          <tr>
+            <td>Trip Extensions</td>
+            <td>✅ Yes — immediately</td>
+            <td>Extension offer is moot if cancelled</td>
+          </tr>
+          <tr>
+            <td>Post-Trip Review</td>
+            <td>⚠️ Case-by-case</td>
+            <td>Skip if trip was cancelled before starting. If late cancel after check-in, use judgment.</td>
+          </tr>
+          <tr>
+            <td>Welcome / Onboarding</td>
+            <td>❌ No</td>
+            <td>Not booking-specific — continue the sequence</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <h3>Frequency Cap Guideline</h3>
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Suggested max per week</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Marketing emails (newsletters)</td><td>1–2</td></tr>
+          <tr><td>Triggered campaign emails</td><td>3 (lifecycle takes priority)</td></tr>
+          <tr><td>Push notifications</td><td>2</td></tr>
+          <tr><td>Combined weekly cap</td><td>4 total</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // Highlight active nav item on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('nav a');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id));
+      }
+    });
+  }, { rootMargin: '-15% 0px -65% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

@@ -21,15 +21,26 @@ const SCORING = {
 } as const;
 
 const CONFIG = {
-  topCandidates: 50,       // score top N by similarity, then apply multi-factor scoring
-  recsPerUser: 3,          // recommendation slots per user
-  recencyWindowDays: 90,   // properties with interaction in last N days get recency boost
-  decayHalfLifeDays: 30,   // user signal weight halves every N days
-  decayFloor: 0.05,        // minimum signal weight after decay
-  cioConcurrency: 8,       // parallel CIO Track API requests (~10/sec limit)
+  topCandidates: 50, // score top N by similarity, then apply multi-factor scoring
+  recsPerUser: 3, // recommendation slots per user
+  recencyWindowDays: 90, // properties with interaction in last N days get recency boost
+  decayHalfLifeDays: 30, // user signal weight halves every N days
+  decayFloor: 0.05, // minimum signal weight after decay
+  cioConcurrency: 8, // parallel CIO Track API requests (~10/sec limit)
 } as const;
 
-const REC_FIELDS = ["name", "image", "url", "city", "state", "price", "beds", "landscape", "description", "cta"] as const;
+const REC_FIELDS = [
+  "name",
+  "image",
+  "url",
+  "city",
+  "state",
+  "price",
+  "beds",
+  "landscape",
+  "description",
+  "cta",
+] as const;
 
 // ── BigQuery Row Types ────────────────────────────────────────────────────────
 
@@ -79,14 +90,18 @@ interface PropertySignals {
 
 interface UserProfile {
   properties: Record<string, PropertySignals>;
-  searchLocations: Array<{ state: string | null; city: string | null; count: number }>;
+  searchLocations: Array<{
+    state: string | null;
+    city: string | null;
+    count: number;
+  }>;
   totalSignals: number;
 }
 
 // Precomputed property-level scores — built once, used for every user ranking
 interface PropertyIndex {
   popularity: Map<string, number>; // normalized 0–1
-  recency: Map<string, number>;    // normalized 0–1 based on recencyWindowDays
+  recency: Map<string, number>; // normalized 0–1 based on recencyWindowDays
 }
 
 interface Recommendation {
@@ -109,6 +124,8 @@ export interface PipelineOptions {
   dryRun?: boolean;
   /** Cap number of users synced — useful for smoke tests */
   limit?: number;
+  /** Filter pipeline to specific users by email — for local testing */
+  testEmails?: string[];
 }
 
 export interface PipelineResult {
@@ -122,7 +139,21 @@ export interface PipelineResult {
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
-async function fetchBookableProperties(): Promise<BQProperty[]> {
+async function lookupUserIdsByEmail(emails: string[]): Promise<string[]> {
+  const rows = await executeQuery<{ id_user: string }>(
+    `
+    SELECT DISTINCT id_user
+    FROM \`wander-9fc9c.analytics.customer_profiles\`
+    WHERE LOWER(email) IN UNNEST(@emails)
+      AND id_user IS NOT NULL
+    `,
+    { emails: emails.map((e) => e.toLowerCase()) },
+    { emails: ["STRING"] },
+  );
+  return rows.map((r) => r.id_user);
+}
+
+export async function fetchBookableProperties(): Promise<BQProperty[]> {
   return executeQuery<BQProperty>(`
     SELECT
       p.property_name,
@@ -147,8 +178,12 @@ async function fetchBookableProperties(): Promise<BQProperty[]> {
   `);
 }
 
-async function fetchUserBehaviorSignals(): Promise<BQUserSignal[]> {
-  return executeQuery<BQUserSignal>(`
+export async function fetchUserBehaviorSignals(userIds?: string[]): Promise<BQUserSignal[]> {
+  const userFilter = userIds?.length
+    ? `AND COALESCE(v.id_user, a.id_user, b.id_user) IN UNNEST(@user_ids)`
+    : "";
+  return executeQuery<BQUserSignal>(
+    `
     WITH property_views AS (
       SELECT id_user, property_name, COUNT(*) AS view_count, MAX(ts) AS last_view
       FROM \`wander-9fc9c.analytics.int_product_viewed\`
@@ -181,22 +216,32 @@ async function fetchUserBehaviorSignals(): Promise<BQUserSignal[]> {
     FULL OUTER JOIN bookings b
       ON COALESCE(v.id_user, a.id_user) = b.id_user
       AND COALESCE(v.property_name, a.property_name) = b.property_name
-  `);
+    ${userFilter}
+  `,
+    userIds?.length ? { user_ids: userIds } : undefined,
+    userIds?.length ? { user_ids: ["STRING"] } : undefined,
+  );
 }
 
-async function fetchUserSearchHistory(): Promise<BQUserSearch[]> {
-  return executeQuery<BQUserSearch>(`
+export async function fetchUserSearchHistory(userIds?: string[]): Promise<BQUserSearch[]> {
+  const userFilter = userIds?.length ? `AND id_user IN UNNEST(@user_ids)` : "";
+  return executeQuery<BQUserSearch>(
+    `
     SELECT id_user, search_location_state, search_location_city, COUNT(*) AS search_count
     FROM \`wander-9fc9c.analytics.search_sessions\`
     WHERE id_user IS NOT NULL AND search_location_state IS NOT NULL
+      ${userFilter}
     GROUP BY id_user, search_location_state, search_location_city
     ORDER BY id_user, search_count DESC
-  `);
+  `,
+    userIds?.length ? { user_ids: userIds } : undefined,
+    userIds?.length ? { user_ids: ["STRING"] } : undefined,
+  );
 }
 
 // ── Profile Building ──────────────────────────────────────────────────────────
 
-function buildUserProfiles(
+export function buildUserProfiles(
   signals: BQUserSignal[],
   searches: BQUserSearch[],
 ): Map<string, UserProfile> {
@@ -218,7 +263,11 @@ function buildUserProfiles(
       existing.view_count += row.view_count;
       existing.abandon_count += row.abandon_count;
       existing.book_count += row.book_count;
-      if (row.last_interaction && (!existing.last_interaction || row.last_interaction > existing.last_interaction)) {
+      if (
+        row.last_interaction &&
+        (!existing.last_interaction ||
+          row.last_interaction > existing.last_interaction)
+      ) {
         existing.last_interaction = row.last_interaction;
       }
     } else {
@@ -241,7 +290,11 @@ function buildUserProfiles(
     const profile = getOrCreate(uid);
     profile.searchLocations = locs
       .sort((a, b) => b.search_count - a.search_count)
-      .map((l) => ({ state: l.search_location_state, city: l.search_location_city, count: l.search_count }));
+      .map((l) => ({
+        state: l.search_location_state,
+        city: l.search_location_city,
+        count: l.search_count,
+      }));
   }
 
   for (const profile of profiles.values()) {
@@ -270,16 +323,23 @@ function buildUserProfiles(
  * Precompute property-level popularity and recency scores.
  * Called once before the user ranking loop — avoids O(users × properties) recomputation.
  */
-function buildPropertyIndex(profiles: Map<string, UserProfile>): PropertyIndex {
+export function buildPropertyIndex(profiles: Map<string, UserProfile>): PropertyIndex {
   const popRaw = new Map<string, number>();
   const latestInteraction = new Map<string, string>();
 
   for (const profile of profiles.values()) {
     for (const [name, s] of Object.entries(profile.properties)) {
-      popRaw.set(name, (popRaw.get(name) ?? 0) + s.view_count + s.abandon_count * 3 + s.book_count * 10);
+      popRaw.set(
+        name,
+        (popRaw.get(name) ?? 0) +
+          s.view_count +
+          s.abandon_count * 3 +
+          s.book_count * 10,
+      );
       if (s.last_interaction) {
         const cur = latestInteraction.get(name);
-        if (!cur || s.last_interaction > cur) latestInteraction.set(name, s.last_interaction);
+        if (!cur || s.last_interaction > cur)
+          latestInteraction.set(name, s.last_interaction);
       }
     }
   }
@@ -312,8 +372,12 @@ function normalize(v: number[]): number[] {
 
 function timeDecay(lastInteraction: string | null): number {
   if (!lastInteraction) return CONFIG.decayFloor;
-  const daysAgo = (Date.now() - new Date(lastInteraction).getTime()) / 86_400_000;
-  return Math.max(Math.pow(2, -daysAgo / CONFIG.decayHalfLifeDays), CONFIG.decayFloor);
+  const daysAgo =
+    (Date.now() - new Date(lastInteraction).getTime()) / 86_400_000;
+  return Math.max(
+    Math.pow(2, -daysAgo / CONFIG.decayHalfLifeDays),
+    CONFIG.decayFloor,
+  );
 }
 
 function computeUserEmbedding(
@@ -325,7 +389,8 @@ function computeUserEmbedding(
   let totalWeight = 0;
 
   for (const [name, signals] of Object.entries(profile.properties)) {
-    const emb = embeddings[name] ?? findEmbeddingCaseInsensitive(embeddings, name);
+    const emb =
+      embeddings[name] ?? findEmbeddingCaseInsensitive(embeddings, name);
     if (!emb) continue;
 
     const rawWeight =
@@ -374,7 +439,10 @@ function inferUserPricePreference(
   return prices[Math.floor(prices.length / 2)]!; // median
 }
 
-function priceMatchScore(candidatePrice: number | null, userPricePref: number | null): number {
+function priceMatchScore(
+  candidatePrice: number | null,
+  userPricePref: number | null,
+): number {
   if (!candidatePrice || !userPricePref) return 0.5;
   const ratio = candidatePrice / userPricePref;
   return Math.max(0, 1 - Math.abs(Math.log(Math.max(ratio, 0.1))) * 0.5);
@@ -433,7 +501,11 @@ function rankPropertiesForUser(
   const seenLandscapes = new Set<string>();
   for (const rec of scored) {
     if (result.length >= CONFIG.recsPerUser) break;
-    if (seenLandscapes.has(rec.landscape) && result.length < CONFIG.recsPerUser - 1) continue;
+    if (
+      seenLandscapes.has(rec.landscape) &&
+      result.length < CONFIG.recsPerUser - 1
+    )
+      continue;
     result.push(rec);
     seenLandscapes.add(rec.landscape);
   }
@@ -469,7 +541,10 @@ function buildColdStartRecs(
   const seenLandscapes = new Set<string>();
   for (const c of candidates) {
     if (result.length >= CONFIG.recsPerUser) break;
-    if (!seenLandscapes.has(c.landscape) || result.length >= CONFIG.recsPerUser - 1) {
+    if (
+      !seenLandscapes.has(c.landscape) ||
+      result.length >= CONFIG.recsPerUser - 1
+    ) {
       result.push(c);
       seenLandscapes.add(c.landscape);
     }
@@ -477,7 +552,7 @@ function buildColdStartRecs(
   return result;
 }
 
-function generateAllRecs(
+export function generateAllRecs(
   profiles: Map<string, UserProfile>,
   embeddings: Record<string, PropertyEmbedding>,
   index: PropertyIndex,
@@ -489,7 +564,9 @@ function generateAllRecs(
 
   for (const [uid, profile] of profiles) {
     if (++i % 10_000 === 0) {
-      console.log(`  Ranking user ${i.toLocaleString()}/${profiles.size.toLocaleString()}...`);
+      console.log(
+        `  Ranking user ${i.toLocaleString()}/${profiles.size.toLocaleString()}...`,
+      );
     }
 
     const userEmbedding = computeUserEmbedding(profile, embeddings);
@@ -497,7 +574,10 @@ function generateAllRecs(
       recs.set(uid, fallback);
       coldStart++;
     } else {
-      recs.set(uid, rankPropertiesForUser(userEmbedding, profile, embeddings, index));
+      recs.set(
+        uid,
+        rankPropertiesForUser(userEmbedding, profile, embeddings, index),
+      );
     }
   }
 
@@ -531,7 +611,7 @@ function buildCioAttributes(
     for (const field of REC_FIELDS) attrs[`rec_for_you_${i + 1}_${field}`] = "";
   }
 
-  attrs["recs_updated_at"] = new Date().toISOString().split("T")[0]!;
+  attrs.recs_updated_at = new Date().toISOString().split("T")[0]!;
   return attrs;
 }
 
@@ -542,7 +622,9 @@ async function syncToCio(
   const entries = [...allRecs.entries()].slice(0, options.limit ?? Infinity);
 
   if (options.dryRun) {
-    console.log(`  DRY RUN — would sync ${entries.length.toLocaleString()} users`);
+    console.log(
+      `  DRY RUN — would sync ${entries.length.toLocaleString()} users`,
+    );
     return { synced: 0, failed: 0 };
   }
 
@@ -552,7 +634,9 @@ async function syncToCio(
   for (let i = 0; i < entries.length; i += CONFIG.cioConcurrency) {
     const batch = entries.slice(i, i + CONFIG.cioConcurrency);
     const results = await Promise.allSettled(
-      batch.map(([uid, recs]) => trackClient.identify(uid, buildCioAttributes(recs))),
+      batch.map(([uid, recs]) =>
+        trackClient.identify(uid, buildCioAttributes(recs)),
+      ),
     );
     for (const r of results) {
       if (r.status === "fulfilled") synced++;
@@ -565,9 +649,13 @@ async function syncToCio(
 
 // ── Pipeline Entry Point ──────────────────────────────────────────────────────
 
-export async function run(options: PipelineOptions = {}): Promise<PipelineResult> {
+export async function run(
+  options: PipelineOptions = {},
+): Promise<PipelineResult> {
   const start = Date.now();
-  console.log("── CIO Property Recs Pipeline ───────────────────────────────────");
+  console.log(
+    "── CIO Property Recs Pipeline ───────────────────────────────────",
+  );
 
   console.log("  [1/5] Fetching bookable properties...");
   const properties = await fetchBookableProperties();
@@ -577,9 +665,13 @@ export async function run(options: PipelineOptions = {}): Promise<PipelineResult
   const embeddings = await generatePropertyEmbeddings(properties);
 
   console.log("  [3/5] Fetching user signals and search history...");
+  const userIds = options.testEmails?.length
+    ? await lookupUserIdsByEmail(options.testEmails)
+    : undefined;
+  if (userIds) console.log(`        Filtering to ${userIds.length} test users`);
   const [signals, searches] = await Promise.all([
-    fetchUserBehaviorSignals(),
-    fetchUserSearchHistory(),
+    fetchUserBehaviorSignals(userIds),
+    fetchUserSearchHistory(userIds),
   ]);
   const profiles = buildUserProfiles(signals, searches);
   console.log(`        ${profiles.size.toLocaleString()} active users`);
@@ -593,9 +685,13 @@ export async function run(options: PipelineOptions = {}): Promise<PipelineResult
   const { synced, failed } = await syncToCio(recs, options);
 
   const elapsedMs = Date.now() - start;
-  console.log("─────────────────────────────────────────────────────────────────");
+  console.log(
+    "─────────────────────────────────────────────────────────────────",
+  );
   console.log(`  Done in ${(elapsedMs / 1000).toFixed(1)}s`);
-  console.log(`  ${properties.length} properties | ${recs.size.toLocaleString()} users | ${coldStart.toLocaleString()} cold start`);
+  console.log(
+    `  ${properties.length} properties | ${recs.size.toLocaleString()} users | ${coldStart.toLocaleString()} cold start`,
+  );
   console.log(`  ${synced.toLocaleString()} synced | ${failed} failed`);
 
   return {
