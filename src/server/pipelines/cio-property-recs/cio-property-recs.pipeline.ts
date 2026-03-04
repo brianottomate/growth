@@ -209,7 +209,7 @@ export async function fetchUserBehaviorSignals(userIds?: string[]): Promise<BQUs
       COALESCE(v.view_count, 0) AS view_count,
       COALESCE(a.abandon_count, 0) AS abandon_count,
       COALESCE(b.book_count, 0) AS book_count,
-      GREATEST(v.last_view, a.last_abandon, b.last_booking) AS last_interaction
+      CAST(GREATEST(v.last_view, a.last_abandon, b.last_booking) AS STRING) AS last_interaction
     FROM property_views v
     FULL OUTER JOIN abandoned_checkouts a ON v.id_user = a.id_user AND v.property_name = a.property_name
     FULL OUTER JOIN bookings b
@@ -371,8 +371,10 @@ function normalize(v: number[]): number[] {
 
 function timeDecay(lastInteraction: string | null): number {
   if (!lastInteraction) return CONFIG.decayFloor;
-  const daysAgo =
-    (Date.now() - new Date(lastInteraction).getTime()) / 86_400_000;
+  // BQ may return timestamps as objects — extract .value if needed
+  const ts = typeof lastInteraction === "object" ? (lastInteraction as { value: string }).value : lastInteraction;
+  const daysAgo = (Date.now() - new Date(ts).getTime()) / 86_400_000;
+  if (isNaN(daysAgo)) return CONFIG.decayFloor;
   return Math.max(
     Math.pow(2, -daysAgo / CONFIG.decayHalfLifeDays),
     CONFIG.decayFloor,
