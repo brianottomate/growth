@@ -1,4 +1,3 @@
-import "server-only";
 import { TrackClient, APIClient, RegionUS } from "customerio-node";
 import { env } from "@/env";
 
