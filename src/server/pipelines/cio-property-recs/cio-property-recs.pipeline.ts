@@ -53,7 +53,7 @@ interface BQProperty {
   base_price: number | null;
   landscape_category: string;
   description: string;
-  is_pet_allowed: boolean;
+  has_pets_allowed: boolean;
   cover_image_url: string;
   url: string;
   dt_launched: string | null;
@@ -164,7 +164,7 @@ export async function fetchBookableProperties(): Promise<BQProperty[]> {
       p.base_price,
       p.landscape_category,
       p.description,
-      p.is_pet_allowed,
+      p.has_pets_allowed,
       p.cover_image_url,
       p.url,
       p.dt_launched,

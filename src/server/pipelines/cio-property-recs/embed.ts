@@ -24,7 +24,7 @@ interface EmbeddableProperty {
   bathrooms: number | null;
   occupancy: number | null;
   base_price: number | null;
-  is_pet_allowed: boolean;
+  has_pets_allowed: boolean;
   description: string;
   testimonial_text: string | null;
   activities: string | null;
@@ -42,7 +42,7 @@ const BATCH_SIZE = 256; // OpenAI supports up to 2048 inputs per request
 // ── Text Builder ──────────────────────────────────────────────────────────────
 
 function buildPropertyText(prop: EmbeddableProperty): string {
-  const pets = prop.is_pet_allowed ? "pet-friendly" : "no pets";
+  const pets = prop.has_pets_allowed ? "pet-friendly" : "no pets";
   const description = (prop.description ?? "").slice(0, 500);
 
   let testimonials: string[] = [];
