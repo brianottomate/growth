@@ -9,6 +9,7 @@
  *   bun scripts/test-recs-pipeline.ts --phase=embed --limit=3  # embed 3 properties
  *   bun scripts/test-recs-pipeline.ts --phase=rank --emails=a@b.com
  *   bun scripts/test-recs-pipeline.ts --live --limit=10        # actually sync 10 users
+ *   bun scripts/test-recs-pipeline.ts --live --batch-sync=true  # live sync via CIO Pipelines /v1/batch
  */
 
 import {
@@ -25,7 +26,7 @@ import { generatePropertyEmbeddings } from "@/server/pipelines/cio-property-recs
 // ── Arg Parsing ───────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const flags = Object.fromEntries(
+const flags: Record<string, string> = Object.fromEntries(
   args
     .filter((a) => a.startsWith("--"))
     .map((a) => {
@@ -34,10 +35,13 @@ const flags = Object.fromEntries(
     }),
 );
 
-const phase = (flags.phase as string) ?? "full";
+const phase = flags.phase ?? "full";
 const dryRun = flags.live !== "true"; // default is dry run — pass --live to actually write
-const limit = flags.limit ? parseInt(flags.limit as string, 10) : undefined;
-const emails = flags.emails ? (flags.emails as string).split(",").map((e) => e.trim()) : undefined;
+const limit = flags.limit ? parseInt(flags.limit, 10) : undefined;
+const emails = flags.emails
+  ? flags.emails.split(",").map((e) => e.trim())
+  : undefined;
+const useBatchSync = flags["batch-sync"] === "true";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -197,6 +201,7 @@ async function runFull() {
     dryRun,
     limit,
     testEmails: emails,
+    useBatchSync,
   });
 
   separator("Summary");
@@ -211,7 +216,9 @@ async function runFull() {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(`\nRecs pipeline test — phase=${phase} dryRun=${dryRun} limit=${limit ?? "none"} emails=${emails?.join(",") ?? "all"}\n`);
+  console.log(
+    `\nRecs pipeline test — phase=${phase} dryRun=${dryRun} limit=${limit ?? "none"} emails=${emails?.join(",") ?? "all"} useBatchSync=${useBatchSync}\n`,
+  );
 
   switch (phase) {
     case "fetch":

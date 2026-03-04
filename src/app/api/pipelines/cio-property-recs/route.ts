@@ -9,7 +9,7 @@ import { run } from "@/server/pipelines/cio-property-recs/cio-property-recs.pipe
  * Requires Authorization: Bearer <ADMIN_TOKEN>.
  *
  * Body (all optional):
- *   { dryRun?: boolean, limit?: number, testEmails?: string[] }
+ *   { dryRun?: boolean, limit?: number, testEmails?: string[], useBatchSync?: boolean }
  *
  * Examples:
  *   curl -X POST .../api/pipelines/cio-property-recs \
@@ -29,7 +29,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { dryRun?: boolean; limit?: number; testEmails?: string[] } = {};
+  let body: {
+    dryRun?: boolean;
+    limit?: number;
+    testEmails?: string[];
+    useBatchSync?: boolean;
+  } = {};
   try {
     const text = await request.text();
     if (text) body = JSON.parse(text) as typeof body;
@@ -40,14 +45,19 @@ export async function POST(request: NextRequest) {
   const dryRun = body.dryRun ?? true; // default to dry run for safety
   const limit = body.limit;
   const testEmails = body.testEmails;
+  const useBatchSync = body.useBatchSync ?? false;
 
   console.log(
-    `[cio-property-recs] triggered — dryRun=${dryRun} limit=${limit ?? "none"} emails=${testEmails?.join(",") ?? "all"}`,
+    `[cio-property-recs] triggered — dryRun=${dryRun} limit=${limit ?? "none"} emails=${testEmails?.join(",") ?? "all"} useBatchSync=${useBatchSync}`,
   );
 
   try {
-    const result = await run({ dryRun, limit, testEmails });
-    return NextResponse.json({ success: true, options: { dryRun, limit, testEmails }, result });
+    const result = await run({ dryRun, limit, testEmails, useBatchSync });
+    return NextResponse.json({
+      success: true,
+      options: { dryRun, limit, testEmails, useBatchSync },
+      result,
+    });
   } catch (err) {
     console.error("[cio-property-recs] pipeline error:", err);
     return NextResponse.json(
@@ -72,7 +82,12 @@ export async function GET(request: NextRequest) {
     usage: {
       method: "POST",
       auth: "Authorization: Bearer <ADMIN_TOKEN>",
-      body: { dryRun: "boolean (default: true)", limit: "number (optional)", testEmails: "string[] (optional)" },
+      body: {
+        dryRun: "boolean (default: true)",
+        limit: "number (optional)",
+        testEmails: "string[] (optional)",
+        useBatchSync: "boolean (default: false)",
+      },
     },
   });
 }

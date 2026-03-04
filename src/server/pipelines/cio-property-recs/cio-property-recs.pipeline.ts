@@ -11,7 +11,7 @@
  * 3. Fetch user behavior signals from BigQuery (views, abandoned checkouts, bookings)
  * 4. Precompute property-level popularity + recency indexes (once, before user loop)
  * 5. For each user: compute taste embedding → cosine similarity → multi-factor score → top 3
- * 6. Sync 32 flat attributes per user to CIO via Track API
+ * 6. Sync 32 flat attributes per user to CIO (Track API identify or Pipelines batch)
  *
  * SCORING WEIGHTS
  * ───────────────
@@ -53,6 +53,7 @@
 import { executeQuery } from "@/server/clients/bigquery.client";
 import { trackClient } from "@/server/clients/customerio.client";
 import { generatePropertyEmbeddings, type PropertyEmbedding } from "./embed";
+import { syncRecsViaPipelinesApi } from "./sync-batch";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,8 @@ export interface PipelineOptions {
   limit?: number;
   /** Filter pipeline to specific users by email — for local testing */
   testEmails?: string[];
+  /** Use Customer.io Data Pipelines /v1/batch sync instead of per-user identify() */
+  useBatchSync?: boolean;
 }
 
 export interface PipelineResult {
@@ -670,7 +673,7 @@ function buildCioAttributes(
 
 async function syncToCio(
   allRecs: Map<string, Recommendation[]>,
-  options: Pick<PipelineOptions, "dryRun" | "limit">,
+  options: Pick<PipelineOptions, "dryRun" | "limit" | "useBatchSync">,
 ): Promise<{ synced: number; failed: number }> {
   const entries = [...allRecs.entries()].slice(0, options.limit ?? Infinity);
 
@@ -679,6 +682,16 @@ async function syncToCio(
       `  DRY RUN — would sync ${entries.length.toLocaleString()} users`,
     );
     return { synced: 0, failed: 0 };
+  }
+
+  if (options.useBatchSync) {
+    const attrsByUser = new Map<string, Record<string, string | number | null>>(
+      entries.map(([uid, recs]) => [uid, buildCioAttributes(recs)]),
+    );
+    return syncRecsViaPipelinesApi(attrsByUser, {
+      dryRun: options.dryRun,
+      limit: options.limit,
+    });
   }
 
   let synced = 0;
@@ -735,6 +748,9 @@ export async function run(
   console.log(`        ${coldStart.toLocaleString()} cold start users`);
 
   console.log("  [5/5] Syncing to Customer.io...");
+  console.log(
+    `        mode=${options.useBatchSync ? "pipelines-batch" : "track-identify"}`,
+  );
   const { synced, failed } = await syncToCio(recs, options);
 
   const elapsedMs = Date.now() - start;

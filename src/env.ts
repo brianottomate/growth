@@ -37,6 +37,7 @@ export const env = createEnv({
     CUSTOMER_IO_API_KEY: z.string().min(1), // Track API key for writing/updating data
     CUSTOMERIO_WEBHOOK_SECRET: z.string().min(1), // HMAC-SHA256 for CIO reporting webhooks
     CUSTOMERIO_WEBHOOK_BEARER_TOKEN: z.string().min(1), // Bearer token auth for CIO workflow HTTP Request actions
+    CUSTOMER_IO_PIPELINES_KEY: z.string().optional(), // Data Pipelines API key (Sources → HTTP source) for batch syncs
     // BigQuery
     BIGQUERY_PROJECT_ID: z.string().min(1), // GCP project ID (required)
     BIGQUERY_DATASET_ID: z.string().optional(), // Default dataset
@@ -101,6 +102,7 @@ export const env = createEnv({
     CUSTOMERIO_WEBHOOK_SECRET: process.env.CUSTOMERIO_WEBHOOK_SECRET,
     CUSTOMERIO_WEBHOOK_BEARER_TOKEN:
       process.env.CUSTOMERIO_WEBHOOK_BEARER_TOKEN,
+    CUSTOMER_IO_PIPELINES_KEY: process.env.CUSTOMER_IO_PIPELINES_KEY,
     // BigQuery
     BIGQUERY_PROJECT_ID: process.env.BIGQUERY_PROJECT_ID,
     BIGQUERY_DATASET_ID: process.env.BIGQUERY_DATASET_ID,
