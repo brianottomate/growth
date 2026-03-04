@@ -1,3 +1,55 @@
+/**
+ * CIO Property Recommendations Pipeline
+ *
+ * Generates personalized property recommendations for ~450K users and syncs
+ * them to Customer.io as profile attributes, which power personalized emails.
+ *
+ * PIPELINE STAGES
+ * ───────────────
+ * 1. Fetch ~4,700 bookable properties from BigQuery (analytics.int_properties)
+ * 2. Generate OpenAI embeddings for each property (text-embedding-3-small, 1536 dims)
+ * 3. Fetch user behavior signals from BigQuery (views, abandoned checkouts, bookings)
+ * 4. Precompute property-level popularity + recency indexes (once, before user loop)
+ * 5. For each user: compute taste embedding → cosine similarity → multi-factor score → top 3
+ * 6. Sync 32 flat attributes per user to CIO via Track API
+ *
+ * SCORING WEIGHTS
+ * ───────────────
+ * Similarity 50% · Popularity 15% · Recency 10% · Price match 10%
+ * Diversity enforced via landscape-category filtering (not a score factor)
+ *
+ * CIO ATTRIBUTE SCHEMA (per user, 3 slots)
+ * ─────────────────────────────────────────
+ * rec_for_you_{1|2|3}_name         — property name
+ * rec_for_you_{1|2|3}_image        — cover image URL
+ * rec_for_you_{1|2|3}_url          — booking URL
+ * rec_for_you_{1|2|3}_city         — city
+ * rec_for_you_{1|2|3}_state        — state
+ * rec_for_you_{1|2|3}_price        — base price per night
+ * rec_for_you_{1|2|3}_beds         — bedroom count
+ * rec_for_you_{1|2|3}_landscape    — landscape category
+ * rec_for_you_{1|2|3}_description  — property description (truncated to 500 chars)
+ * rec_for_you_{1|2|3}_cta          — call to action text
+ * recs_updated_at                  — ISO date of last sync
+ *
+ * LIVE CIO TEMPLATE
+ * ─────────────────
+ * https://fly.customer.io/workspaces/142511/journeys/template/1802
+ *
+ * Example Liquid usage in CIO email templates:
+ *   {{ customer.rec_for_you_1_name }}
+ *   {{ customer.rec_for_you_1_description | truncate: 180 }}
+ *   {{ customer.rec_for_you_1_cta | default: "Explore this home" }}
+ *
+ * HOW TO RUN
+ * ──────────
+ * bun scripts/test-recs-pipeline.ts --phase=fetch          # test BQ connectivity
+ * bun scripts/test-recs-pipeline.ts --phase=embed --limit=3 # test OpenAI embeddings
+ * bun scripts/test-recs-pipeline.ts --phase=rank --emails=you@wander.com
+ * bun scripts/test-recs-pipeline.ts                        # full dry run
+ * bun scripts/test-recs-pipeline.ts --live --limit=10      # sync 10 users to CIO
+ */
+
 import { executeQuery } from "@/server/clients/bigquery.client";
 import { trackClient } from "@/server/clients/customerio.client";
 import { generatePropertyEmbeddings, type PropertyEmbedding } from "./embed";
