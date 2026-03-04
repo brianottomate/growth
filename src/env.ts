@@ -47,8 +47,6 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: z.string().optional(), // Meta system user token (preferred)
     META_ACCESS_TOKEN: z.string().optional(), // Meta access token (fallback)
     META_AD_ACCOUNT_ID: z.string().optional(), // Meta ad account ID (e.g. act_885632...)
-    // Voyage AI (property embeddings for recs pipeline)
-    VOYAGE_API_KEY: z.string().optional(),
     // Minerva (lead enrichment)
     MINERVA_API_URL: z.string().url().default("https://api.minerva.io"), // Minerva API base URL (v2 default)
     MINERVA_API_KEY: z.string().min(1).optional(), // Minerva API key (x-api-key)
@@ -114,8 +112,6 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: process.env.FB_SYSUSER_TOKEN,
     META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,
     META_AD_ACCOUNT_ID: process.env.META_AD_ACCOUNT_ID,
-    // Voyage AI
-    VOYAGE_API_KEY: process.env.VOYAGE_API_KEY,
     // Minerva
     MINERVA_API_URL: process.env.MINERVA_API_URL,
     MINERVA_API_KEY: process.env.MINERVA_API_KEY,

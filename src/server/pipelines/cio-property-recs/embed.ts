@@ -35,9 +35,10 @@ interface EmbeddableProperty {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const VOYAGE_URL = "https://api.voyageai.com/v1/embeddings";
-const BATCH_SIZE = 128;
-const INTER_BATCH_DELAY_MS = 22_000; // Voyage free tier rate limit
+const OPENAI_EMBED_URL = "https://api.openai.com/v1/embeddings";
+const OPENAI_EMBED_MODEL = "text-embedding-3-small";
+const EMBED_DIMS = 1536;
+const BATCH_SIZE = 256; // OpenAI supports up to 2048 inputs per request
 
 // ── Text Builder ──────────────────────────────────────────────────────────────
 
@@ -75,14 +76,14 @@ function buildPropertyText(prop: EmbeddableProperty): string {
   return text;
 }
 
-// ── Voyage API ────────────────────────────────────────────────────────────────
+// ── OpenAI Embeddings API ─────────────────────────────────────────────────────
 
-interface VoyageResponse {
-  data: Array<{ embedding: number[] }>;
-  usage: { total_tokens: number };
+interface OpenAIEmbedResponse {
+  data: Array<{ embedding: number[]; index: number }>;
+  usage: { prompt_tokens: number; total_tokens: number };
 }
 
-async function callVoyageApi(texts: string[], apiKey: string): Promise<number[][]> {
+async function callOpenAIEmbedApi(texts: string[], apiKey: string): Promise<number[][]> {
   const all: number[][] = [];
   let totalTokens = 0;
   const totalBatches = Math.ceil(texts.length / BATCH_SIZE);
@@ -92,37 +93,32 @@ async function callVoyageApi(texts: string[], apiKey: string): Promise<number[][
     const batchNum = Math.floor(i / BATCH_SIZE) + 1;
     console.log(`  Embedding batch ${batchNum}/${totalBatches} (${batch.length} properties)...`);
 
-    let success = false;
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const res = await fetch(VOYAGE_URL, {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const res = await fetch(OPENAI_EMBED_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ input: batch, model: "voyage-3-lite", input_type: "document" }),
+        body: JSON.stringify({ input: batch, model: OPENAI_EMBED_MODEL, dimensions: EMBED_DIMS }),
       });
 
       if (res.ok) {
-        const data = (await res.json()) as VoyageResponse;
-        all.push(...data.data.map((d) => d.embedding));
+        const data = (await res.json()) as OpenAIEmbedResponse;
+        // OpenAI guarantees order matches input, but sort by index to be safe
+        const sorted = data.data.sort((a, b) => a.index - b.index);
+        all.push(...sorted.map((d) => d.embedding));
         totalTokens += data.usage.total_tokens;
-        success = true;
         break;
       } else if (res.status === 429) {
-        const wait = 25 * (attempt + 1);
+        const wait = 5 * (attempt + 1);
         console.log(`    Rate limited — waiting ${wait}s...`);
         await new Promise((r) => setTimeout(r, wait * 1000));
       } else {
-        throw new Error(`Voyage API error ${res.status}: ${await res.text()}`);
+        throw new Error(`OpenAI embeddings error ${res.status}: ${await res.text()}`);
       }
-    }
-
-    if (!success) throw new Error(`Failed to embed batch ${batchNum} after 8 attempts`);
-    if (i + BATCH_SIZE < texts.length) {
-      await new Promise((r) => setTimeout(r, INTER_BATCH_DELAY_MS));
     }
   }
 
   console.log(
-    `  Total tokens: ${totalTokens.toLocaleString()} (~$${((totalTokens * 0.06) / 1_000_000).toFixed(4)})`,
+    `  Total tokens: ${totalTokens.toLocaleString()} (~$${((totalTokens * 0.02) / 1_000_000).toFixed(4)})`,
   );
   return all;
 }
@@ -132,11 +128,10 @@ async function callVoyageApi(texts: string[], apiKey: string): Promise<number[][
 export async function generatePropertyEmbeddings(
   properties: EmbeddableProperty[],
 ): Promise<Record<string, PropertyEmbedding>> {
-  const apiKey = env.VOYAGE_API_KEY;
-  if (!apiKey) throw new Error("VOYAGE_API_KEY is not configured");
+  const apiKey = env.OPENAI_API_KEY;
 
   console.log(`  Generating embeddings for ${properties.length} properties...`);
-  const vectors = await callVoyageApi(properties.map(buildPropertyText), apiKey);
+  const vectors = await callOpenAIEmbedApi(properties.map(buildPropertyText), apiKey);
 
   return Object.fromEntries(
     properties.map((prop, i) => [
