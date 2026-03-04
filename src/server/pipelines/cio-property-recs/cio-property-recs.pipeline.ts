@@ -1,4 +1,3 @@
-import "server-only";
 import { executeQuery } from "@/server/clients/bigquery.client";
 import { trackClient } from "@/server/clients/customerio.client";
 import { generatePropertyEmbeddings, type PropertyEmbedding } from "./embed";
