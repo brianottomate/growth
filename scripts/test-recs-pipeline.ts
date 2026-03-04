@@ -154,7 +154,11 @@ async function runRankPhase() {
   const profiles = new Map([...allProfiles].filter(([uid]) => userIds.includes(uid)));
   console.log(`  ${profiles.size} profiles after filter (expected ${userIds.length})`);
   const index = buildPropertyIndex(profiles);
-  const { recs, coldStart } = generateAllRecs(profiles, propertyEmbeddings, index);
+  const { recs, coldStart, coldStartUserIds } = generateAllRecs(
+    profiles,
+    propertyEmbeddings,
+    index,
+  );
 
   separator("Results");
   console.log(`${coldStart} cold start users\n`);
@@ -162,7 +166,7 @@ async function runRankPhase() {
   for (const [uid, userRecs] of recs) {
     const email = emailByUserId[uid] ?? uid;
     const profile = profiles.get(uid);
-    const isCold = coldStart > 0 && userRecs === recs.get(uid);
+    const isCold = coldStartUserIds.has(uid);
 
     console.log(`\n👤 ${email} (${uid})${isCold ? " [COLD START]" : ""}`);
 

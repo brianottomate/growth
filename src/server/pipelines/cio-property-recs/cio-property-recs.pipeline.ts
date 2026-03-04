@@ -612,10 +612,15 @@ export function generateAllRecs(
   profiles: Map<string, UserProfile>,
   embeddings: Record<string, PropertyEmbedding>,
   index: PropertyIndex,
-): { recs: Map<string, Recommendation[]>; coldStart: number } {
+): {
+  recs: Map<string, Recommendation[]>;
+  coldStart: number;
+  coldStartUserIds: Set<string>;
+} {
   const recs = new Map<string, Recommendation[]>();
   const fallback = buildColdStartRecs(embeddings, index);
   let coldStart = 0;
+  const coldStartUserIds = new Set<string>();
   let i = 0;
 
   for (const [uid, profile] of profiles) {
@@ -629,6 +634,7 @@ export function generateAllRecs(
     if (!userEmbedding) {
       recs.set(uid, fallback);
       coldStart++;
+      coldStartUserIds.add(uid);
     } else {
       recs.set(
         uid,
@@ -637,7 +643,7 @@ export function generateAllRecs(
     }
   }
 
-  return { recs, coldStart };
+  return { recs, coldStart, coldStartUserIds };
 }
 
 // ── CIO Sync ──────────────────────────────────────────────────────────────────

@@ -92,6 +92,7 @@ async function callOpenAIEmbedApi(texts: string[], apiKey: string): Promise<numb
     const batchNum = Math.floor(i / BATCH_SIZE) + 1;
     console.log(`  Embedding batch ${batchNum}/${totalBatches} (${batch.length} properties)...`);
 
+    let batchSucceeded = false;
     for (let attempt = 0; attempt < 5; attempt++) {
       const res = await fetch(OPENAI_EMBED_URL, {
         method: "POST",
@@ -105,6 +106,7 @@ async function callOpenAIEmbedApi(texts: string[], apiKey: string): Promise<numb
         const sorted = data.data.sort((a, b) => a.index - b.index);
         all.push(...sorted.map((d) => d.embedding));
         totalTokens += data.usage.total_tokens;
+        batchSucceeded = true;
         break;
       } else if (res.status === 429) {
         const wait = 5 * (attempt + 1);
@@ -113,6 +115,12 @@ async function callOpenAIEmbedApi(texts: string[], apiKey: string): Promise<numb
       } else {
         throw new Error(`OpenAI embeddings error ${res.status}: ${await res.text()}`);
       }
+    }
+
+    if (!batchSucceeded) {
+      throw new Error(
+        `OpenAI embeddings failed after retries for batch ${batchNum}/${totalBatches}`,
+      );
     }
   }
 
