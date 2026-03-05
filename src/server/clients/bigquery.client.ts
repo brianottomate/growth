@@ -1,4 +1,3 @@
-import "server-only";
 import type { BigQuery } from "@google-cloud/bigquery";
 import { env } from "@/env";
 

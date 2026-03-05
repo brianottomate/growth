@@ -1,5 +1,3 @@
-import "server-only";
-
 import { fetchLeadForRealtimeSync } from "@/server/clients/bigquery.client";
 import {
   getCustomerByEmail,

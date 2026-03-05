@@ -1,0 +1,350 @@
+version: 0
+updated_at: 2026-02-26
+
+meta:
+  purpose: Canonical event registry for Segment, Amplitude, and partner destinations.
+  status: draft
+  wip_branches:
+    # Partial implementation started 2026-02-26. Full tracking plan PR is separate work.
+    wander_backend: feat/tracking-plan-oc-wip   # adds buildSegmentContext() + wires context into Order Completed
+    wander_com: feat/tracking-plan-oc-wip       # fixes Order Completed product object (sku, category, currency, guests)
+  naming_policy:
+    segment_ecommerce: exact_spec_name
+    custom_events: snake_case
+
+workspaces:
+  WANDER_COM:
+    description: Guest and booking journey
+  WANDER_OS:
+    description: Host/operator journey
+
+surfaces:
+  wander_com_web:
+    type: website
+    segment_source: wander.com production
+  mobile_app:
+    type: mobile
+    segment_source: Wander App Production
+  backend_api:
+    type: server
+    segment_source: Wander API Production
+  app_wander_com:
+    type: website
+    segment_source: app.wander.com production
+
+product_schema:
+  # Listings map to Segment ecommerce products.
+  # quantity = nights (price × quantity = total nightly spend).
+  # price = nightly rate.
+  segment_spec_fields:
+    - product_id      # unit ID
+    - sku             # property slug
+    - name            # property name
+    - category        # property type (Cabin, Beach House, etc.)
+    - brand           # "Wander"
+    - price           # nightly rate
+    - quantity        # nights booked
+    - currency
+    - url
+    - image_url
+  custom_extensions:
+    - checkin_date
+    - checkout_date
+    - nights          # redundant with quantity, kept for readability
+    - guests
+    - city
+    - region
+    - country
+
+partner_destinations:
+  impact_com:
+    enabled_sources:
+      - backend_api
+    planned_sources:
+      - wander_com_web    # Page + Identify only (attribution context, not conversion)
+      - mobile_app        # pending mobile schema cleanup
+    disabled_sources:
+      # IMPORTANT: Order Completed must NOT reach Impact from these sources.
+      # Triple-fire risk: same booking would generate 3x commission payout.
+      - wander_com_web
+      - mobile_app
+    action_event_names:
+      - Order Completed
+    commission_base: revenue   # net of fees, pre-tax — confirm with Impact account
+    parameter_mapping:
+      ClickId: properties.im_ref
+      OrderId: properties.order_id
+      CustomerId: userId
+      CustomerEmail: properties.email
+      # Revenue: properties.revenue (default Impact mapping — verify)
+      # Also recommended in runtime payload where possible:
+      # context.referrer.type = impactRadius
+      # context.referrer.id = <im_ref>
+    click_id:
+      capture_param: im_ref
+      cookie_name: im_ref
+      cookie_ttl_days: 30     # match Impact's standard attribution window
+      persistence: persistent # must survive multi-day sessions and checkout redirects
+      propagation: client_to_server  # read cookie client-side, pass in booking request to backend
+
+common_requirements:
+  event_identity:
+    require_one_of:
+      - userId
+      - anonymousId
+  attribution:
+    optional_fields:
+      - properties.im_ref
+      - context.referrer.id
+      - context.referrer.type
+
+funnels:
+  booking_conversion:
+    workspace: WANDER_COM
+    steps:
+      - Search Started
+      - Product Viewed
+      - Checkout Previewed
+      - Checkout Started
+      - Order Completed
+  checkout_completion:
+    workspace: WANDER_COM
+    steps:
+      - Checkout Started
+      - Payment Info Entered
+      - Order Completed
+  host_activation:
+    workspace: WANDER_OS
+    steps:
+      - Signed Up
+      - User Set Organizations
+      - Domain Connected
+      - Site Published
+
+events:
+  - name: Search Started
+    workspace: WANDER_COM
+    category: ecommerce_browsing
+    canonical_source: wander_com_web
+    emitters:
+      - wander_com_web
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: pageload_or_context
+        enabled: false
+    properties:
+      required:
+        - search_filters
+      optional:
+        - location
+        - checkin_date
+        - checkout_date
+
+  - name: Product Viewed
+    workspace: WANDER_COM
+    category: ecommerce_browsing
+    canonical_source: wander_com_web
+    emitters:
+      - wander_com_web
+      - mobile_app
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: pageload_or_context
+        enabled: false
+    properties:
+      required:
+        - product_id
+      optional:
+        - products
+        - currency
+
+  - name: Checkout Started
+    workspace: WANDER_COM
+    category: ecommerce_ordering
+    canonical_source: wander_com_web
+    emitters:
+      - wander_com_web
+      - mobile_app
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: conversion_or_action
+        enabled: false
+    properties:
+      required:
+        - order_id
+      optional:
+        - checkout_id
+        - value
+        - currency
+
+  - name: Payment Info Entered
+    workspace: WANDER_COM
+    category: ecommerce_ordering
+    canonical_source: wander_com_web
+    emitters:
+      - wander_com_web
+      - mobile_app
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: conversion_or_action
+        enabled: false
+    properties:
+      required:
+        - checkout_id
+      optional:
+        - payment_method
+
+  - name: Order Completed
+    workspace: WANDER_COM
+    category: ecommerce_ordering
+    canonical_source: backend_api
+    emitters:
+      - backend_api
+      - wander_com_web   # client-side fire — does NOT route to Impact
+      - mobile_app       # client-side fire — does NOT route to Impact
+    ownership:
+      payable_event: true
+      authoritative_sender: backend_api
+      notes: >
+        Impact.com destination is enabled on backend_api only.
+        wander.com and mobile also fire this event (for Amplitude/CIO) but must
+        never reach Impact — triple-fire would generate 3x commission payouts.
+        Dedup strategy: rely on source-level routing, not event-level dedup.
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: action
+        enabled: true
+        source: backend_api  # only this source routes to Impact
+    context:
+      # backend_api emits a full Segment context object (as of 2026-02-24).
+      # These mirror what analytics.js auto-enriches on client-side events.
+      campaign:
+        # Canonical UTM location. CIO, Amplitude, most destinations read from here,
+        # not from properties.utm_*. Populated when at least one UTM is present.
+        source:   # <- booking.utm_source
+        medium:   # <- booking.utm_medium
+        name:     # <- booking.utm_campaign
+        term:     # <- booking.utm_term (when present)
+        content:  # <- booking.utm_content (when present)
+      referrer:
+        # Impact click attribution anchor. Also read as properties.im_ref via custom mapping.
+        type: impactRadius  # literal string
+        id:   # <- booking.im_ref (when present)
+      userAgent:  # <- booking.userAgent (when present); also in properties for Impact mapping
+      ip:         # <- booking.ipAddress (when present); also in properties for Impact mapping
+    properties:
+      required:
+        - order_id
+        - currency
+        - revenue   # commission base: Wander net revenue (post-fees, pre-tax)
+      strongly_recommended:
+        - userId
+        - value     # total guest-facing cart value (pre-tax)
+        - total     # total including taxes (do not use as commission base)
+        - products  # array of listing product objects (see product_schema)
+      attribution:
+        - im_ref    # Impact click ID — must be propagated from client cookie to server payload
+        - ipAddress # also in context.ip; kept for Impact's IpAddress custom mapping
+        - userAgent # also in context.userAgent; kept for Impact's UserAgent custom mapping
+
+  - name: Order Cancelled
+    workspace: WANDER_COM
+    category: ecommerce_ordering
+    canonical_source: backend_api
+    emitters:
+      - backend_api
+    ownership:
+      payable_event_adjustment: true
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: action_adjustment
+        enabled: false
+    properties:
+      required:
+        - order_id
+
+  - name: Signed Up
+    workspace: WANDER_OS
+    category: host_activation
+    canonical_source: backend_api
+    emitters:
+      - backend_api
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: none
+        enabled: false
+    properties:
+      required:
+        - user_id
+        - email
+
+  - name: User Set Organizations
+    workspace: WANDER_OS
+    category: host_activation
+    canonical_source: backend_api
+    emitters:
+      - backend_api
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: none
+        enabled: false
+    properties:
+      required:
+        - user_id
+        - organization_ids
+
+  - name: Domain Connected
+    workspace: WANDER_OS
+    category: host_activation
+    canonical_source: backend_api
+    emitters:
+      - backend_api
+      - app_wander_com
+    ownership:
+      authoritative_sender: backend_api
+      notes: Currently appears duplicated client+server.
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: none
+        enabled: false
+    properties:
+      required:
+        - user_id
+        - organization_id
+        - site_domain
+
+  - name: Site Published
+    workspace: WANDER_OS
+    category: host_activation
+    canonical_source: backend_api
+    emitters:
+      - backend_api
+    destinations:
+      segment: true
+      amplitude: true
+      impact_com:
+        type: none
+        enabled: false
+    properties:
+      required:
+        - user_id
+        - organization_id
+        - site_domain
