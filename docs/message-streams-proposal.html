@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wander Message Streams Proposal</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface2: #1a1a26;
+      --border: rgba(255,255,255,0.08);
+      --text: #e2e2e8;
+      --text-muted: rgba(255,255,255,0.5);
+      --text-dim: rgba(255,255,255,0.3);
+      --accent: #3b82f6;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #f43f5e;
+      --violet: #8b5cf6;
+      --pink: #ec4899;
+      --onboarding: #3b82f6;
+      --newsletter: #10b981;
+      --recs: #8b5cf6;
+      --sales: #f59e0b;
+      --transactional: #f43f5e;
+      --concierge: #ec4899;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 60px 32px 120px;
+    }
+
+    /* ── Header ── */
+    .doc-header {
+      margin-bottom: 56px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      margin-bottom: 16px;
+    }
+    .doc-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .doc-meta span { display: flex; align-items: center; gap: 6px; }
+    .doc-meta .label { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(245,158,11,0.15);
+      color: var(--amber);
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+
+    /* ── Sections ── */
+    .section {
+      margin-bottom: 48px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-top: 28px;
+      margin-bottom: 8px;
+    }
+    h4 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 24px;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+    .section-subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 24px;
+    }
+
+    p {
+      font-size: 14px;
+      margin-bottom: 14px;
+      color: var(--text-muted);
+    }
+    p strong { color: var(--text); font-weight: 600; }
+    p em { color: var(--text-muted); font-style: italic; }
+
+    /* ── Lede ── */
+    .lede {
+      font-size: 16px;
+      color: var(--text);
+      line-height: 1.8;
+      margin-bottom: 20px;
+      padding: 20px 24px;
+      background: var(--surface);
+      border-radius: 10px;
+      border-left: 3px solid var(--accent);
+    }
+
+    /* ── Stream cards ── */
+    .stream-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .stream-card {
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .stream-card .stream-name {
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .stream-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .stream-card .stream-detail {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    .stream-card .stream-tool {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Phase timeline ── */
+    .phase-timeline {
+      display: flex;
+      gap: 4px;
+      margin: 16px 0;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+    .phase-pill {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      text-align: center;
+      min-width: 100px;
+    }
+    .phase-pill .phase-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .phase-pill .phase-duration {
+      font-size: 9px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+    .phase-arrow {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      color: var(--text-dim);
+      font-size: 14px;
+    }
+
+    /* ── Concept cards ── */
+    .concept-row {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      margin: 10px 0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .concept-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+      padding-top: 2px;
+    }
+    .concept-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* ── Gap cards ── */
+    .gap-card {
+      margin: 20px 0;
+      padding: 20px 24px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .gap-card .gap-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .gap-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(244,63,94,0.15);
+      color: var(--red);
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .gap-card .result-box {
+      margin: 12px 0;
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: rgba(244,63,94,0.06);
+      border: 1px solid rgba(244,63,94,0.15);
+      font-size: 12px;
+      color: rgba(248,113,113,0.9);
+    }
+    .gap-card .missing-box {
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: rgba(59,130,246,0.06);
+      border: 1px solid rgba(59,130,246,0.15);
+      font-size: 12px;
+      color: rgba(96,165,250,0.9);
+    }
+
+    /* ── Tables ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 12px;
+    }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-dim);
+    }
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      vertical-align: top;
+    }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .rule-hard { color: var(--red); font-weight: 600; }
+    .rule-soft { color: var(--amber); font-weight: 600; }
+
+    /* ── Severity badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .badge-hard { background: rgba(244,63,94,0.15); color: var(--red); }
+    .badge-soft { background: rgba(245,158,11,0.15); color: var(--amber); }
+
+    /* ── Rollout phases ── */
+    .rollout {
+      margin: 16px 0;
+    }
+    .rollout-phase {
+      padding: 16px 20px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+    .rollout-phase .phase-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .rollout-phase .phase-label {
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .rollout-phase .phase-timing {
+      font-size: 11px;
+      color: var(--text-dim);
+      padding: 2px 10px;
+      border-radius: 20px;
+      background: var(--surface2);
+    }
+    .rollout-phase ul {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .rollout-phase li { margin-bottom: 3px; }
+    .rollout-phase .fixes {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--green);
+    }
+
+    /* ── Ask section ── */
+    .ask-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .ask-card {
+      padding: 16px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .ask-card .ask-number {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .ask-card .ask-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .ask-card .ask-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* ── Appendix matrix ── */
+    .matrix-table td {
+      text-align: center;
+      font-size: 11px;
+    }
+    .matrix-table td.on { color: var(--green); font-weight: 600; }
+    .matrix-table td.suppressed { color: var(--text-dim); font-style: italic; }
+    .matrix-table td.conflict { color: var(--amber); font-weight: 700; }
+    .matrix-table td.sequenced { color: var(--violet); }
+    .matrix-table td.off { color: rgba(255,255,255,0.1); }
+    .matrix-table th:first-child,
+    .matrix-table td:first-child { text-align: left; font-weight: 600; color: var(--text); }
+
+    /* ── Dividers ── */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 48px 0;
+    }
+
+    /* ── Inline code ── */
+    code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--surface2);
+      color: var(--accent);
+    }
+
+    /* ── Lists ── */
+    ul, ol {
+      padding-left: 20px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    li { margin-bottom: 4px; }
+
+    /* ── Sequence timeline ── */
+    .sequence-row {
+      display: grid;
+      grid-template-columns: 140px 120px 1fr;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .sequence-row > div {
+      padding: 8px 12px;
+    }
+    .sequence-row .seq-time {
+      color: var(--text-dim);
+      font-family: 'SF Mono', monospace;
+      font-size: 11px;
+    }
+    .sequence-row .seq-stream {
+      font-weight: 600;
+    }
+    .sequence-row .seq-msg {
+      color: var(--text-muted);
+    }
+    .sequence-row.seq-suppress {
+      background: rgba(244,63,94,0.04);
+    }
+    .sequence-row.seq-suppress .seq-msg {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+    .sequence-header {
+      display: grid;
+      grid-template-columns: 140px 120px 1fr;
+      gap: 0;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      border-radius: 8px 8px 0 0;
+    }
+    .sequence-header > div { padding: 8px 12px; }
+    .sequence-wrap {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ═══ HEADER ═══ -->
+    <div class="doc-header">
+      <h1>Wander Message Streams</h1>
+      <p style="font-size:16px; color: var(--text-muted); margin-bottom: 20px;">
+        From Independent Channels to Orchestrated Communication
+      </p>
+      <div class="doc-meta">
+        <span><span class="label">Author</span> Growth Engineering</span>
+        <span><span class="label">Date</span> March 5, 2026</span>
+        <span><span class="label">Audience</span> Kyle, Brian, Sorrell</span>
+        <span><span class="status-badge">Proposal</span></span>
+      </div>
+    </div>
+
+    <!-- ═══ WHY ═══ -->
+    <div class="section">
+      <div class="lede">
+        A Wander user doesn't experience "the Customer.io team" or "the Outreach team." They experience <strong>Wander</strong>. When they get a welcome email at 9am, a BDR cold email at 11am, and a newsletter at 2pm &mdash; all on the same day &mdash; they experience a company that doesn't know what it's doing.
+      </div>
+      <p>
+        Today we have good tools, good people, and good intentions. What we're missing is the <strong>connective tissue</strong> between them: shared rules for who talks to a user, when, and what happens when two teams want to talk to the same person at the same time.
+      </p>
+      <p>
+        This document proposes a shared vocabulary for that problem, describes where we are today, and outlines what coordinated messaging could look like.
+      </p>
+    </div>
+
+    <hr>
+
+    <!-- ═══ OVERARCHING CONCEPT ═══ -->
+    <div class="section">
+      <h2>Overarching Concept</h2>
+      <p>
+        Wander messaging should be treated as one <strong>Communication Orchestrator</strong>, not separate campaigns by team.
+      </p>
+
+      <h3>1) Two-tier channel model</h3>
+      <ul>
+        <li><strong>Tier 1 (decisioning channels):</strong> Onboarding, Newsletter/Topics, Property Recommendations, Sales Outreach, Transactional, Concierge.</li>
+        <li><strong>Tier 2 (downstream amplification channels):</strong> Ads, Social, and later Video.</li>
+      </ul>
+      <p>Tier 2 should not decide independently. It should consume eligibility and suppression state from Tier 1.</p>
+
+      <h3>2) Ads are part of orchestration</h3>
+      <ul>
+        <li>Ads must follow the same suppression and frequency logic as email and sales outreach.</li>
+        <li>Example: if a user is in onboarding or an active booking window, prospecting ads should be paused or narrowed.</li>
+      </ul>
+
+      <h3>3) Video is downstream</h3>
+      <ul>
+        <li>Video is a content format/distribution channel, not a separate decision engine.</li>
+        <li>We decide <em>who should be messaged</em> upstream; video decides <em>how that message is delivered</em> downstream.</li>
+      </ul>
+
+      <h3>4) Newsletter topic subscription source of truth</h3>
+      <ul>
+        <li><strong>Customer.io should be the writable source of truth</strong> for topic subscriptions and channel preferences.</li>
+        <li>The <code>wander.com</code> UI in the Next.js app should be a wrapper interface:
+          User updates preferences in app &rarr; backend writes to Customer.io profile attributes/lists &rarr; backend emits events to Segment for audit/history.
+        </li>
+        <li>Avoid dual writable truth between app DB and Customer.io.</li>
+      </ul>
+
+      <h3>5) Practical implication</h3>
+      <p>This is not just "better campaigns." It is shared state + explicit rules across channels:</p>
+      <ul>
+        <li>Enrollment rules</li>
+        <li>Suppression and precedence rules</li>
+        <li>Handoff rules</li>
+        <li>Frequency caps</li>
+        <li>Observability of what each user has received across all channels</li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <!-- ═══ PART 1: VOCABULARY ═══ -->
+    <div class="section">
+      <h2>Part 1: Vocabulary</h2>
+      <p class="section-subtitle">Before we can fix anything, we need to agree on what we're talking about.</p>
+
+      <h3>Streams</h3>
+      <p>A <strong>message stream</strong> is a series of messages from a single team/tool with a shared purpose. Wander currently has six:</p>
+
+      <div class="stream-grid">
+        <div class="stream-card">
+          <div class="stream-name"><span class="stream-dot" style="background: var(--onboarding)"></span> Onboarding</div>
+          <div class="stream-detail">Welcome sequence &mdash; introduce Wander, nudge first booking</div>
+          <div class="stream-tool"><span>Customer.io</span><span>Growth / Lifecycle</span></div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-name"><span class="stream-dot" style="background: var(--newsletter)"></span> Newsletter & Topics</div>
+          <div class="stream-detail">General newsletters, destination guides, seasonal promos</div>
+          <div class="stream-tool"><span>Customer.io</span><span>Brian's team</span></div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-name"><span class="stream-dot" style="background: var(--recs)"></span> Property Recs</div>
+          <div class="stream-detail">Personalized recs based on search/wishlist behavior</div>
+          <div class="stream-tool"><span>Customer.io</span><span>Growth Engineering</span></div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-name"><span class="stream-dot" style="background: var(--sales)"></span> Sales Outreach</div>
+          <div class="stream-detail">1:1 personal BDR outreach for high-value leads</div>
+          <div class="stream-tool"><span>Outreach</span><span>Sorrell / Demand BDRs</span></div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-name"><span class="stream-dot" style="background: var(--transactional)"></span> Transactional</div>
+          <div class="stream-detail">Booking confirmations, check-in instructions, receipts</div>
+          <div class="stream-tool"><span>System (backend)</span><span>Engineering</span></div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-name"><span class="stream-dot" style="background: var(--concierge)"></span> Concierge</div>
+          <div class="stream-detail">1:1 trip planning and VIP support for booked guests</div>
+          <div class="stream-tool"><span>Human (manual)</span><span>Nick Waze</span></div>
+        </div>
+      </div>
+
+      <p>Each stream has its own trigger, cadence, and exit criteria. <strong>The problem is they run independently.</strong></p>
+
+      <h3>Phases</h3>
+      <p>A <strong>phase</strong> is where a user is in their lifecycle:</p>
+
+      <div class="phase-timeline">
+        <div class="phase-pill"><div class="phase-name">Signup</div><div class="phase-duration">instant</div></div>
+        <div class="phase-arrow">&rarr;</div>
+        <div class="phase-pill"><div class="phase-name">Onboarding</div><div class="phase-duration">7-14 days</div></div>
+        <div class="phase-arrow">&rarr;</div>
+        <div class="phase-pill"><div class="phase-name">Active</div><div class="phase-duration">ongoing</div></div>
+        <div class="phase-arrow">&rarr;</div>
+        <div class="phase-pill"><div class="phase-name">Qualified</div><div class="phase-duration">event-driven</div></div>
+        <div class="phase-arrow">&rarr;</div>
+        <div class="phase-pill"><div class="phase-name">Booking</div><div class="phase-duration">instant</div></div>
+        <div class="phase-arrow">&rarr;</div>
+        <div class="phase-pill"><div class="phase-name">Pre-Trip</div><div class="phase-duration">days-months</div></div>
+        <div class="phase-arrow">&rarr;</div>
+        <div class="phase-pill"><div class="phase-name">During Trip</div><div class="phase-duration">1-14 nights</div></div>
+        <div class="phase-arrow">&rarr;</div>
+        <div class="phase-pill"><div class="phase-name">Post-Trip</div><div class="phase-duration">30 days</div></div>
+      </div>
+
+      <p>Phases determine which streams <em>should</em> be active. During onboarding, the user should hear one clear voice. During pre-trip, transactional and concierge are appropriate but newsletters are noise.</p>
+
+      <h3>Key Concepts</h3>
+
+      <div class="concept-row">
+        <div class="concept-label">Enrollment Rules</div>
+        <div class="concept-desc">What puts a user into a stream. Today these are implicit &mdash; someone set up a campaign trigger months ago and it just runs. We need them explicit.</div>
+      </div>
+      <div class="concept-row">
+        <div class="concept-label" style="color: var(--red)">Suppression Rules</div>
+        <div class="concept-desc"><strong>The most critical missing piece.</strong> "When stream A is active, pause stream B." Two flavors: <span class="badge badge-hard">HARD</span> must not send, <span class="badge badge-soft">SOFT</span> should avoid sending within a time window.</div>
+      </div>
+      <div class="concept-row">
+        <div class="concept-label" style="color: var(--amber)">Conflict Zones</div>
+        <div class="concept-desc">A phase where multiple streams overlap and no suppression rule exists. These are where users get a bad experience. We've identified five.</div>
+      </div>
+      <div class="concept-row">
+        <div class="concept-label" style="color: var(--green)">Handoff Rules</div>
+        <div class="concept-desc">What happens when a user transitions between phases &mdash; which streams start, which stop, and what data gets passed.</div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ═══ PART 2: STATUS QUO ═══ -->
+    <div class="section">
+      <h2>Part 2: Where We Are Today</h2>
+
+      <h3>Current concerns</h3>
+      <ul>
+        <li>No centralized naming, planning, or stream inventory.</li>
+        <li>Fear of "double touch" from overlapping streams.</li>
+        <li>Lack of design and brand cohesion between emails.</li>
+        <li>Customer.io to Outreach sync (and reverse sync) is incomplete.</li>
+        <li>No shared user-state model (<code>onboarding</code>, <code>sales-engaged</code>, <code>booked</code>, <code>in-trip</code>, etc.).</li>
+        <li>No explicit stream precedence when streams conflict.</li>
+        <li>Inconsistent trigger and exit definitions across teams.</li>
+        <li>No global frequency caps across all channels.</li>
+        <li>Weak observability into "what this user received this week."</li>
+        <li>Limited auditability for suppressions and handoffs.</li>
+        <li>Manual handoffs between Marketing, Sales, and Concierge are brittle.</li>
+        <li>Sync latency/failure risk can create stale or conflicting state.</li>
+        <li>Deliverability risk from overlapping campaigns near booking windows.</li>
+        <li>Unclear ownership and escalation path for orchestration incidents.</li>
+      </ul>
+
+      <h3>The good</h3>
+      <ul>
+        <li><strong>Customer.io</strong> is well-configured with 172 tracked events, solid campaign infrastructure, and a working abandoned cart flow.</li>
+        <li><strong>Outreach</strong> has active BDR sequences with CIO webhook integration for lead handoff.</li>
+        <li><strong>Transactional emails</strong> fire reliably on booking events from the backend.</li>
+        <li><strong>The growth platform</strong> handles CIO &harr; Outreach sync, BDR assignment, and property recs.</li>
+      </ul>
+
+      <h3>The gaps</h3>
+      <p>Here's what's actually happening to users today:</p>
+
+      <!-- Gap 1 -->
+      <div class="gap-card">
+        <div class="gap-title"><span class="gap-number">1</span> No suppression during onboarding</div>
+        <p>When a user signs up, the onboarding sequence starts in CIO. But there's nothing stopping a newsletter from also going out that week, or property recs from firing if they view 3+ properties during their first session.</p>
+        <div class="result-box">
+          <strong>Result:</strong> New user gets welcome email (day 0), newsletter (day 2), and "properties like the ones you viewed" (day 3). Three emails in three days from three different "senders." The onboarding narrative is broken.
+        </div>
+        <div class="missing-box">
+          <strong>Missing:</strong> A CIO segment or attribute that marks users as "in onboarding" and suppresses other campaigns.
+        </div>
+      </div>
+
+      <!-- Gap 2 -->
+      <div class="gap-card">
+        <div class="gap-title"><span class="gap-number">2</span> Sales and marketing don't know about each other</div>
+        <p>When a user qualifies for BDR outreach, Sorrell's team picks them up in Outreach. But CIO doesn't know this happened. The user continues receiving automated marketing emails while a BDR is building a personal 1:1 relationship.</p>
+        <div class="result-box">
+          <strong>Result:</strong> BDR sends a personalized "I noticed you were looking at Tahoe" email. Two hours later, CIO sends "Top 10 Beach Houses This Spring!" The personal touch is undercut.
+        </div>
+        <div class="missing-box">
+          <strong>Missing:</strong> Outreach enrollment status synced back to CIO, so marketing campaigns can suppress.
+        </div>
+      </div>
+
+      <!-- Gap 3 -->
+      <div class="gap-card">
+        <div class="gap-title"><span class="gap-number">3</span> Booking creates a message flood</div>
+        <p>When <code>Order Completed</code> fires, multiple streams activate simultaneously: transactional (confirmation, receipt), concierge (welcome), newsletter (regular schedule), and property recs (still running from browsing).</p>
+        <div class="result-box">
+          <strong>Result:</strong> User books a trip and gets 3-4 emails within 48 hours from different parts of Wander.
+        </div>
+        <div class="missing-box">
+          <strong>Missing:</strong> Post-booking suppression window for marketing. Coordination between concierge and transactional.
+        </div>
+      </div>
+
+      <!-- Gap 4 -->
+      <div class="gap-card">
+        <div class="gap-title"><span class="gap-number">4</span> Concierge and system step on each other</div>
+        <p>The concierge team manually handles check-in coordination. The transactional system also sends automated check-in instructions. Neither knows what the other has sent.</p>
+        <div class="result-box">
+          <strong>Result:</strong> Guest gets a warm personal check-in message at 2pm, then an automated "Your check-in instructions" at 4pm with the same information.
+        </div>
+        <div class="missing-box">
+          <strong>Missing:</strong> A flag marking when concierge has handled a touchpoint, so the automated message can be skipped.
+        </div>
+      </div>
+
+      <!-- Gap 5 -->
+      <div class="gap-card">
+        <div class="gap-title"><span class="gap-number">5</span> Post-trip is a free-for-all</div>
+        <p>After checkout, everything fires at once: review request, concierge follow-up, newsletter resumes, property recs resume. No sequencing.</p>
+        <div class="result-box">
+          <strong>Result:</strong> Four emails in three days, right when inbox goodwill from the trip is at its peak.
+        </div>
+        <div class="missing-box">
+          <strong>Missing:</strong> A post-trip sequencing plan that spaces messages and prioritizes the highest-value touchpoint first.
+        </div>
+      </div>
+
+      <h3>The root cause</h3>
+      <p>These aren't tool problems. CIO can suppress campaigns. Outreach can sync data. The backend can set flags.</p>
+      <div class="lede" style="border-left-color: var(--red);">
+        Each stream was built independently, by different people, at different times, with <strong>no shared orchestration layer</strong>. There's no place where the rules live, no place where "is this user in a sales sequence?" is checked before sending a marketing email.
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ═══ PART 3: PROPOSED FUTURE ═══ -->
+    <div class="section">
+      <h2>Part 3: Proposed Future</h2>
+
+      <div class="lede" style="border-left-color: var(--green);">
+        <strong>The goal:</strong> Any Wander user, at any point in their lifecycle, receives messages that feel like they're coming from <strong>one coordinated team</strong> &mdash; not six independent systems racing to their inbox.
+      </div>
+
+      <h3>Principle: Fewer, better messages</h3>
+      <p>The instinct is always to add more messages. The higher-leverage move is to <em>remove</em> messages that conflict and <em>sequence</em> messages that complement each other. A user who gets 2 perfectly-timed emails trusts Wander more than a user who gets 6 overlapping ones.</p>
+
+      <h3>Content Wheel Baseline (Marketplace)</h3>
+      <p>To operationalize this for <code>wander.com</code>, run a fixed baseline and layer "special" interventions on top.</p>
+
+      <table>
+        <thead><tr><th>Channel</th><th>Baseline</th></tr></thead>
+        <tbody>
+          <tr><td>Themes</td><td>12 per year (1 per month)</td></tr>
+          <tr><td>Blog</td><td>Current reality: ~25 posts per month</td></tr>
+          <tr><td>Ads</td><td>3 per week, derived from theme + blog/video/stories + specials</td></tr>
+          <tr><td>Video</td><td>1 every 2 weeks, derived from existing content + specials</td></tr>
+          <tr><td>Social</td><td>3-4 posts per week, mix of cross-post and channel-native</td></tr>
+          <tr><td>Newsletter (general)</td><td>1 per week</td></tr>
+          <tr><td>Newsletter (Wander recs)</td><td>1 per week</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Source content for derivatives:</strong> blog posts, videos, customer stories, operator stories, and specials (human intervention).</p>
+
+      <p><strong>"Special" slot policy:</strong> every special must use one explicit slot rule.</p>
+      <ul>
+        <li><strong>Replace:</strong> push planned content by 1 slot.</li>
+        <li><strong>Insert:</strong> add an extra bulletin without moving baseline slots.</li>
+      </ul>
+
+      <p>At ~25 blog posts/month, the risk is not too little content. The risk is uncoordinated distribution. The orchestrator must control audience eligibility, suppression, and frequency caps across email + ads + social.</p>
+
+      <h3>Suppression Rules</h3>
+
+      <h4>Hard suppressions &mdash; must enforce</h4>
+      <table>
+        <thead><tr><th>When this is active...</th><th>Suppress this</th><th>Implementation</th></tr></thead>
+        <tbody>
+          <tr><td>Onboarding sequence</td><td class="rule-hard">Newsletter</td><td>CIO segment: <code>onboarding_active = true</code> &rarr; exclude from newsletter</td></tr>
+          <tr><td>Onboarding sequence</td><td class="rule-hard">Property recs</td><td>Same segment check in recs campaign</td></tr>
+          <tr><td>Active booking</td><td class="rule-hard">Property recs</td><td>CIO: <code>has_active_booking = true</code> &rarr; pause recs</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Soft coordinations &mdash; should enforce</h4>
+      <table>
+        <thead><tr><th>When this happens...</th><th>Coordinate this</th><th>Implementation</th></tr></thead>
+        <tbody>
+          <tr><td>BDR sends in Outreach</td><td class="rule-soft">Newsletter (48h)</td><td>Sync <code>outreach_sequence_active</code> to CIO via growth platform</td></tr>
+          <tr><td>BDR sends in Outreach</td><td class="rule-soft">Property recs</td><td>Same attribute check</td></tr>
+          <tr><td>Transactional email sent</td><td class="rule-soft">Newsletter (24h)</td><td>Check <code>last_transactional_email_at</code> timestamp</td></tr>
+          <tr><td>Concierge handles check-in</td><td class="rule-soft">Auto check-in email</td><td>CIO: <code>concierge_handled_checkin = true</code> &rarr; skip</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Post-Booking Sequence</h3>
+      <p>Instead of everything firing at once after <code>Order Completed</code>:</p>
+
+      <div class="sequence-wrap">
+        <div class="sequence-header">
+          <div>Timing</div><div>Stream</div><div>Message</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">Immediately</div>
+          <div class="seq-stream" style="color: var(--transactional)">Transactional</div>
+          <div class="seq-msg">Booking confirmation + receipt</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">+4 hours</div>
+          <div class="seq-stream" style="color: var(--concierge)">Concierge</div>
+          <div class="seq-msg">Personal welcome + trip planning offer</div>
+        </div>
+        <div class="sequence-row seq-suppress">
+          <div class="seq-time">+24 hours</div>
+          <div class="seq-stream" style="color: var(--text-dim)">&mdash;</div>
+          <div class="seq-msg">Suppress all marketing</div>
+        </div>
+        <div class="sequence-row seq-suppress">
+          <div class="seq-time">+48 hours</div>
+          <div class="seq-stream" style="color: var(--text-dim)">&mdash;</div>
+          <div class="seq-msg">Suppress all marketing</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">7d before trip</div>
+          <div class="seq-stream" style="color: var(--transactional)">Transactional</div>
+          <div class="seq-msg">Pre-trip checklist</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">Pre-trip</div>
+          <div class="seq-stream" style="color: var(--concierge)">Concierge</div>
+          <div class="seq-msg">Active trip planning (as needed)</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">Checkout +1d</div>
+          <div class="seq-stream" style="color: var(--transactional)">Transactional</div>
+          <div class="seq-msg">Review request</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">Checkout +3d</div>
+          <div class="seq-stream" style="color: var(--concierge)">Concierge</div>
+          <div class="seq-msg">Thank you + feedback</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">Checkout +7d</div>
+          <div class="seq-stream" style="color: var(--recs)">Property Recs</div>
+          <div class="seq-msg">Resume &mdash; new recs based on completed trip</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">Checkout +14d</div>
+          <div class="seq-stream" style="color: var(--newsletter)">Newsletter</div>
+          <div class="seq-msg">Resume regular cadence</div>
+        </div>
+        <div class="sequence-row">
+          <div class="seq-time">Checkout +14d</div>
+          <div class="seq-stream" style="color: var(--transactional)">Transactional</div>
+          <div class="seq-msg">Rebooking nudge</div>
+        </div>
+      </div>
+
+      <h3>What Needs to Change</h3>
+
+      <h4>Customer.io (Brian)</h4>
+      <ol>
+        <li><strong>Add lifecycle attributes</strong>: <code>onboarding_active</code>, <code>outreach_sequence_active</code>, <code>has_active_booking</code>, <code>concierge_handled_checkin</code>, <code>last_transactional_email_at</code></li>
+        <li><strong>Add suppression checks</strong> to newsletter and recs campaigns using those attributes</li>
+        <li><strong>Post-booking suppression window</strong>: 48h suppress on <code>Order Completed</code></li>
+      </ol>
+
+      <h4>Outreach (Sorrell)</h4>
+      <ol>
+        <li><strong>Webhook on sequence enrollment/completion</strong> &rarr; growth platform &rarr; CIO attribute sync</li>
+        <li><strong>Visibility into CIO state</strong> before manual outreach (booking status, onboarding, concierge)</li>
+      </ol>
+
+      <h4>Growth Platform (Engineering)</h4>
+      <ol>
+        <li><strong>Attribute sync service</strong>: Outreach webhooks &rarr; CIO attribute updates</li>
+        <li><strong>Booking lifecycle hooks</strong>: <code>Order Completed</code> / checkout &rarr; CIO attributes</li>
+        <li><strong>Concierge flag API</strong>: Slack command or endpoint for "I've handled check-in for booking X"</li>
+      </ol>
+
+      <h4>Transactional System (Engineering)</h4>
+      <ol>
+        <li>Write <code>last_transactional_email_at</code> to CIO on every send</li>
+        <li>Check <code>concierge_handled_checkin</code> before automated check-in email</li>
+      </ol>
+
+      <h3>Phased Rollout</h3>
+      <div class="rollout">
+        <div class="rollout-phase">
+          <div class="phase-header">
+            <div class="phase-label">Phase 1 &mdash; Quick Wins</div>
+            <div class="phase-timing">Week 1-2</div>
+          </div>
+          <ul>
+            <li>Add <code>onboarding_active</code> attribute to CIO</li>
+            <li>Add suppression filter to newsletter and recs campaigns</li>
+          </ul>
+          <div class="fixes">Fixes Gap 1 for every new user going forward</div>
+        </div>
+        <div class="rollout-phase">
+          <div class="phase-header">
+            <div class="phase-label">Phase 2 &mdash; Sales Coordination</div>
+            <div class="phase-timing">Week 3-4</div>
+          </div>
+          <ul>
+            <li>Build Outreach &rarr; growth platform &rarr; CIO attribute sync</li>
+            <li>Add suppression filter to marketing campaigns</li>
+          </ul>
+          <div class="fixes">Fixes Gap 2 &mdash; BDRs get a clean field</div>
+        </div>
+        <div class="rollout-phase">
+          <div class="phase-header">
+            <div class="phase-label">Phase 3 &mdash; Booking Orchestration</div>
+            <div class="phase-timing">Week 5-6</div>
+          </div>
+          <ul>
+            <li>Implement <code>has_active_booking</code> lifecycle attribute</li>
+            <li>Add post-booking suppression window (48h)</li>
+            <li>Build the sequenced post-booking timeline</li>
+          </ul>
+          <div class="fixes">Fixes Gaps 3 and 5</div>
+        </div>
+        <div class="rollout-phase">
+          <div class="phase-header">
+            <div class="phase-label">Phase 4 &mdash; Concierge Coordination</div>
+            <div class="phase-timing">Week 7-8</div>
+          </div>
+          <ul>
+            <li>Build concierge flag system (Slack command or UI)</li>
+            <li>Add <code>concierge_handled_checkin</code> check to transactional</li>
+          </ul>
+          <div class="fixes">Fixes Gap 4</div>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ═══ THE ASK ═══ -->
+    <div class="section">
+      <h2>What We're Asking For</h2>
+      <div class="ask-grid">
+        <div class="ask-card">
+          <div class="ask-number">1</div>
+          <div class="ask-title">Vocabulary Alignment</div>
+          <div class="ask-desc">Do these six streams and eight phases match how you think about our communication? Are we missing any?</div>
+        </div>
+        <div class="ask-card">
+          <div class="ask-number">2</div>
+          <div class="ask-title">Suppression Rule Agreement</div>
+          <div class="ask-desc">Are the hard/soft designations right? Are there rules we should add or remove?</div>
+        </div>
+        <div class="ask-card">
+          <div class="ask-number">3</div>
+          <div class="ask-title">Ownership Commitment</div>
+          <div class="ask-desc">CIO attributes &rarr; Brian. Outreach webhooks &rarr; Sorrell. Growth platform + hooks &rarr; Engineering.</div>
+        </div>
+        <div class="ask-card">
+          <div class="ask-number">4</div>
+          <div class="ask-title">Priority Call</div>
+          <div class="ask-desc">Onboarding suppression first (highest impact, lowest effort). Does that match your priorities?</div>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ═══ APPENDIX ═══ -->
+    <div class="section">
+      <h2>Appendix: Stream Activity by Phase</h2>
+      <p>Which streams are active in each phase. <span style="color: var(--amber); font-weight: 600;">!</span> = conflict zone needing rules.</p>
+
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>Phase</th>
+            <th><span class="stream-dot" style="background: var(--onboarding)"></span> Onboarding</th>
+            <th><span class="stream-dot" style="background: var(--newsletter)"></span> Newsletter</th>
+            <th><span class="stream-dot" style="background: var(--recs)"></span> Recs</th>
+            <th><span class="stream-dot" style="background: var(--sales)"></span> Sales</th>
+            <th><span class="stream-dot" style="background: var(--transactional)"></span> Transact.</th>
+            <th><span class="stream-dot" style="background: var(--concierge)"></span> Concierge</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Signup</td>
+            <td class="on">ON</td>
+            <td class="conflict">!</td>
+            <td class="conflict">!</td>
+            <td class="off">&mdash;</td>
+            <td class="off">&mdash;</td>
+            <td class="off">&mdash;</td>
+          </tr>
+          <tr>
+            <td>Onboarding</td>
+            <td class="on">ON</td>
+            <td class="suppressed">suppressed</td>
+            <td class="suppressed">suppressed</td>
+            <td class="off">&mdash;</td>
+            <td class="off">&mdash;</td>
+            <td class="off">&mdash;</td>
+          </tr>
+          <tr>
+            <td>Active</td>
+            <td class="off">&mdash;</td>
+            <td class="on">ON</td>
+            <td class="on">ON</td>
+            <td class="off">&mdash;</td>
+            <td class="off">&mdash;</td>
+            <td class="off">&mdash;</td>
+          </tr>
+          <tr>
+            <td>Qualified</td>
+            <td class="off">&mdash;</td>
+            <td class="conflict">!</td>
+            <td class="conflict">!</td>
+            <td class="on">ON</td>
+            <td class="off">&mdash;</td>
+            <td class="off">&mdash;</td>
+          </tr>
+          <tr>
+            <td>Booking</td>
+            <td class="off">&mdash;</td>
+            <td class="conflict">!</td>
+            <td class="suppressed">suppressed</td>
+            <td class="suppressed">winds down</td>
+            <td class="on">ON</td>
+            <td class="off">&mdash;</td>
+          </tr>
+          <tr>
+            <td>Pre-Trip</td>
+            <td class="off">&mdash;</td>
+            <td class="suppressed">suppressed</td>
+            <td class="suppressed">suppressed</td>
+            <td class="off">&mdash;</td>
+            <td class="on">ON</td>
+            <td class="conflict">ON !</td>
+          </tr>
+          <tr>
+            <td>During Trip</td>
+            <td class="off">&mdash;</td>
+            <td class="suppressed">suppressed</td>
+            <td class="suppressed">suppressed</td>
+            <td class="off">&mdash;</td>
+            <td class="on">ON</td>
+            <td class="conflict">ON !</td>
+          </tr>
+          <tr>
+            <td>Post-Trip</td>
+            <td class="off">&mdash;</td>
+            <td class="sequenced">sequenced</td>
+            <td class="sequenced">sequenced</td>
+            <td class="suppressed">may re-enroll</td>
+            <td class="on">ON</td>
+            <td class="on">ON</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">
+        <strong>Legend:</strong>
+        <span class="on" style="font-weight: 600; color: var(--green);">ON</span> = actively sending &nbsp;
+        <span style="color: var(--text-dim); font-style: italic;">suppressed</span> = paused by rule &nbsp;
+        <span style="color: var(--amber); font-weight: 700;">!</span> = conflict zone &nbsp;
+        <span style="color: var(--violet);">sequenced</span> = timed resume &nbsp;
+        <span style="color: rgba(255,255,255,0.1);">&mdash;</span> = not active
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

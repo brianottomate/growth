@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wander Message Streams - Key User Journeys</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121a2b;
+      --panel-2: #0f1729;
+      --text: #e6edf8;
+      --muted: #9fb0c9;
+      --line: #2a3857;
+      --onboarding: #3b82f6;
+      --newsletter: #10b981;
+      --recs: #8b5cf6;
+      --sales: #f59e0b;
+      --transactional: #f43f5e;
+      --concierge: #ec4899;
+      --ads: #22c55e;
+      --social: #14b8a6;
+      --video: #f97316;
+      --special: #fbbf24;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #18233e, var(--bg) 50%);
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+
+    h1, h2, h3 { margin: 0 0 12px; }
+    h1 { font-size: 34px; }
+    h2 { font-size: 24px; margin-top: 28px; }
+    h3 { font-size: 18px; margin-top: 18px; }
+
+    .meta {
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .stat .k {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .stat .v {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 3px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      vertical-align: top;
+    }
+
+    th {
+      color: #b9c8df;
+      text-align: left;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .chip {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      margin: 2px 4px 2px 0;
+      white-space: nowrap;
+    }
+
+    .risk {
+      border-left: 3px solid var(--special);
+      background: rgba(251,191,36,0.08);
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-top: 10px;
+      color: #fbe7a4;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Wander Message Streams: Key User Journeys</h1>
+    <div class="meta">Date: March 5, 2026 · Scope: visualize how one user is hit by multiple content/message streams over time</div>
+
+    <div class="panel">
+      <h2>Legend</h2>
+      <div class="legend">
+        <div class="pill"><span class="dot" style="background: var(--onboarding)"></span>Onboarding (Customer.io)</div>
+        <div class="pill"><span class="dot" style="background: var(--newsletter)"></span>Newsletter</div>
+        <div class="pill"><span class="dot" style="background: var(--recs)"></span>Property Recs</div>
+        <div class="pill"><span class="dot" style="background: var(--sales)"></span>Sales Outreach</div>
+        <div class="pill"><span class="dot" style="background: var(--transactional)"></span>Transactional</div>
+        <div class="pill"><span class="dot" style="background: var(--concierge)"></span>Concierge</div>
+        <div class="pill"><span class="dot" style="background: var(--ads)"></span>Ads</div>
+        <div class="pill"><span class="dot" style="background: var(--social)"></span>Social</div>
+        <div class="pill"><span class="dot" style="background: var(--video)"></span>Video</div>
+        <div class="pill"><span class="dot" style="background: var(--special)"></span>Special (human override)</div>
+      </div>
+      <p class="note">Assumption: baseline cadence remains active unless suppressed by lifecycle rules (onboarding, booking, concierge, sales, frequency cap).</p>
+    </div>
+
+    <div class="panel">
+      <h2>Journey A (Big): 6-Month Marketplace Path</h2>
+      <p>User signs up, browses for ~2 months, becomes qualified, books in month 4, travels in month 5, receives post-trip follow-up in month 6.</p>
+
+      <div class="summary">
+        <div class="stat"><div class="k">Window</div><div class="v">6 months</div></div>
+        <div class="stat"><div class="k">Likely touches</div><div class="v">~90-140</div></div>
+        <div class="stat"><div class="k">Highest risk</div><div class="v">M4-M5 overlaps</div></div>
+        <div class="stat"><div class="k">Goal</div><div class="v">Coordinate, do not flood</div></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>User State</th>
+            <th>Active Streams / Content</th>
+            <th>Orchestration Intent</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>M1</td>
+            <td>Signup + onboarding</td>
+            <td>
+              <span class="chip">Onboarding series</span>
+              <span class="chip">Ads (awareness)</span>
+              <span class="chip">Social (theme-led)</span>
+            </td>
+            <td>Suppress newsletter + recs while onboarding is active.</td>
+          </tr>
+          <tr>
+            <td>M2</td>
+            <td>Active browsing</td>
+            <td>
+              <span class="chip">Newsletter weekly</span>
+              <span class="chip">Property recs weekly</span>
+              <span class="chip">Ads retargeting</span>
+              <span class="chip">Social + blog + video derivatives</span>
+            </td>
+            <td>Enable baseline cadence with channel frequency caps.</td>
+          </tr>
+          <tr>
+            <td>M3</td>
+            <td>Qualified lead</td>
+            <td>
+              <span class="chip">Sales Outreach</span>
+              <span class="chip">Newsletter (limited)</span>
+              <span class="chip">Ads (narrow audience)</span>
+            </td>
+            <td>Sales takes precedence; throttle generic marketing around BDR touches.</td>
+          </tr>
+          <tr>
+            <td>M4</td>
+            <td>Booking event</td>
+            <td>
+              <span class="chip">Transactional confirmation</span>
+              <span class="chip">Concierge intro</span>
+              <span class="chip">Special geo blast risk</span>
+            </td>
+            <td>Hard suppress non-essential marketing for 48h post-booking.</td>
+          </tr>
+          <tr>
+            <td>M5</td>
+            <td>Pre-trip + during trip</td>
+            <td>
+              <span class="chip">Transactional itinerary/check-in</span>
+              <span class="chip">Concierge support</span>
+              <span class="chip">Social ambient touches</span>
+            </td>
+            <td>Concierge and transactional coordinate to avoid duplicate instructions.</td>
+          </tr>
+          <tr>
+            <td>M6</td>
+            <td>Post-trip</td>
+            <td>
+              <span class="chip">Review request</span>
+              <span class="chip">Concierge follow-up</span>
+              <span class="chip">Recs/newsletter resume</span>
+            </td>
+            <td>Resume in sequence: review first, then recs, then newsletter.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="risk">Risk zone: month 4 to month 5 is where transactional + concierge + newsletter + recs + ads can collide if suppressions are not enforced.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Journey B (Small): 1-Month Active Browser (No Booking)</h2>
+      <p>User is active, engages with content, does not book this month.</p>
+      <table>
+        <thead>
+          <tr><th>Week</th><th>Touch Pattern</th><th>Control Rule</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>W1</td>
+            <td><span class="chip">General newsletter</span><span class="chip">3 ads</span><span class="chip">3-4 social posts</span></td>
+            <td>Stay inside weekly global cap.</td>
+          </tr>
+          <tr>
+            <td>W2</td>
+            <td><span class="chip">Property recs</span><span class="chip">Video drop</span><span class="chip">Social derivatives</span></td>
+            <td>Prioritize personalized recs over generic promos.</td>
+          </tr>
+          <tr>
+            <td>W3</td>
+            <td><span class="chip">General newsletter</span><span class="chip">Special optional</span><span class="chip">Ads refresh</span></td>
+            <td>If special runs, apply replace or insert policy.</td>
+          </tr>
+          <tr>
+            <td>W4</td>
+            <td><span class="chip">Property recs</span><span class="chip">Blog-led social</span></td>
+            <td>Suppress sends to low-engagement users to protect deliverability.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Journey C (Small): 1-Month Qualified Lead</h2>
+      <p>User hits qualification threshold and enters sales-assisted motion.</p>
+      <table>
+        <thead>
+          <tr><th>Week</th><th>Touch Pattern</th><th>Control Rule</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>W1</td>
+            <td><span class="chip">Sales outreach starts</span><span class="chip">Ads audience narrows</span></td>
+            <td>Set <code>outreach_sequence_active</code> = true in CIO.</td>
+          </tr>
+          <tr>
+            <td>W2</td>
+            <td><span class="chip">BDR follow-up</span><span class="chip">Optional recs (throttled)</span></td>
+            <td>Soft suppress newsletters within 48h of BDR sends.</td>
+          </tr>
+          <tr>
+            <td>W3</td>
+            <td><span class="chip">BDR follow-up</span><span class="chip">Theme content in ads/social</span></td>
+            <td>Avoid generic top-of-funnel messaging.</td>
+          </tr>
+          <tr>
+            <td>W4</td>
+            <td><span class="chip">Outcome: book or exit</span></td>
+            <td>If no response, release user back to standard nurture logic.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Journey D (Small): 1-Week Booking Window</h2>
+      <p>Critical week where most duplication risk happens.</p>
+      <table>
+        <thead>
+          <tr><th>Day</th><th>Touch Pattern</th><th>Control Rule</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>D0</td><td><span class="chip">Booking confirmation</span><span class="chip">Receipt</span></td><td>Transactional only.</td></tr>
+          <tr><td>D0 + 4h</td><td><span class="chip">Concierge intro</span></td><td>One personal touch, no promo.</td></tr>
+          <tr><td>D1</td><td><span class="chip">Pre-trip checklist (if needed)</span></td><td>Suppress newsletter/recs/ads.</td></tr>
+          <tr><td>D2</td><td><span class="chip">Support touchpoint</span></td><td>Concierge and system must de-duplicate.</td></tr>
+          <tr><td>D3-D6</td><td><span class="chip">Minimal essential messages</span></td><td>Re-introduce baseline only after guardrail window.</td></tr>
+        </tbody>
+      </table>
+      <div class="risk">This week should feel high-confidence and calm, not campaign-heavy.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Operational takeaway</h2>
+      <p>The same content engine can serve both marketplace and WanderOS. Keep orchestration logic reusable (state, suppressions, caps), and swap audience logic, themes, and creative templates per business line.</p>
+    </div>
+  </div>
+</body>
+</html>
