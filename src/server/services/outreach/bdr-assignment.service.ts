@@ -220,7 +220,8 @@ export function getNextBdr(hasPhone: boolean): BdrConfig | null {
  * 1. Fetch active users
  * 2. Filter to BDR candidate pool
  * 3. Fetch owner prospect load for each candidate
- * 4. Pick lowest prospectCount, then oldest touchedAt, then lowest user ID
+ * 4. Pick the least recently updated BDR by oldest lastProspectTouchedAt
+ *    (exact timestamp ties are randomized)
  */
 export async function getNextBdrFromOutreachLoad(
   hasPhone: boolean,

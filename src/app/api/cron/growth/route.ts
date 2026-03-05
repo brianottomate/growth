@@ -24,6 +24,10 @@ function isAuthorized(request: NextRequest): boolean {
   const queryToken = request.nextUrl.searchParams.get("token");
   const adminTokenHeader = request.headers.get("x-admin-token");
 
+  // Vercel injects CRON_SECRET automatically for cron invocations.
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && bearer === cronSecret) return true;
+
   const token = bearer ?? queryToken ?? adminTokenHeader;
   return token === env.ADMIN_TOKEN;
 }
@@ -123,7 +127,7 @@ export async function GET(request: NextRequest) {
       service: "growth-cron",
       allowedJobs: WORKFLOW_NAMES,
       usage: "GET /api/cron/growth?job=daily_comprehensive_sync",
-      auth: "Pass Authorization: Bearer <ADMIN_TOKEN>",
+      auth: "Authorization: Bearer <ADMIN_TOKEN> or Vercel CRON_SECRET",
       timestamp: new Date().toISOString(),
     });
   }
