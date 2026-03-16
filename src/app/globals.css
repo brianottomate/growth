@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-card: #161616;
+  --bg-card-hover: #1a1a1a;
+  --border: #262626;
+  --border-light: #333333;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-muted: #666666;
+  --accent-blue: #6366f1;
+  --accent-blue-light: #818cf8;
+  --accent-blue-dim: #4f46e5;
+  --status-green: #22c55e;
+  --status-yellow: #f59e0b;
+  --status-red: #ef4444;
+  --status-blue: #3b82f6;
+  --shadow-panel: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
+}
+
+html { color-scheme: dark; }
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-tabular { font-variant-numeric: tabular-nums; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+*:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+::selection { background-color: rgba(99, 102, 241, 0.3); }
+
+/* Light Theme */
+[data-theme="light"] {
+  /* Backgrounds */
+  --bg-primary: #fafafa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f5f5f5;
+
+  /* Text */
+  --text-primary: #171717;
+  --text-secondary: #525252;
+  --text-muted: #a3a3a3;
+
+  /* Borders */
+  --border: #e5e5e5;
+  --border-light: #d4d4d4;
+
+  /* Accents remain the same */
+  --accent-blue: #6366f1;
+  --accent-blue-light: #818cf8;
+  --accent-blue-dim: #4f46e5;
+
+  /* Status colors remain the same */
+  --status-green: #22c55e;
+  --status-yellow: #eab308;
+  --status-red: #ef4444;
+  --status-blue: #3b82f6;
+
+  /* Shadows */
+  --shadow-panel: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+
+  color-scheme: light;
+}
+
+/* Theme transition */
+*,
+*::before,
+*::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+}
+
+/* Disable transitions on page load */
+.no-transitions *,
+.no-transitions *::before,
+.no-transitions *::after {
+  transition: none !important;
+}
+
+/* Light mode specific overrides */
+[data-theme="light"] .bg-bg-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] select option {
+  background-color: #ffffff;
+  color: #171717;
+}

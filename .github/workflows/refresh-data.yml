@@ -1,0 +1,46 @@
+name: Refresh Growth Tracker Data
+
+on:
+  schedule:
+    # 8 AM ET (1 PM UTC) and 2 PM ET (7 PM UTC), Monday-Friday
+    - cron: '0 13 * * 1-5'
+    - cron: '0 19 * * 1-5'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh BigQuery + Meta API data
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://wander-growth-tracker-production.up.railway.app/api/refresh/cron")
+
+          body=$(echo "$response" | head -n -1)
+          status=$(echo "$response" | tail -n 1)
+
+          echo "Status: $status"
+          echo "Response: $body"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Refresh failed with status $status"
+            exit 1
+          fi
+
+      - name: Post Slack daily digest
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://wander-growth-tracker-production.up.railway.app/api/digest/cron")
+
+          body=$(echo "$response" | head -n -1)
+          status=$(echo "$response" | tail -n 1)
+
+          echo "Digest status: $status"
+          echo "Digest response: $body"
+
+          # Digest failure is non-fatal — don't fail the workflow
+          if [ "$status" != "200" ]; then
+            echo "::warning::Slack digest failed with status $status (non-fatal)"
+          fi
