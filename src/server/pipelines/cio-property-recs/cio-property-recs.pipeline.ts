@@ -635,10 +635,11 @@ function lifeStageFitScore(
   if (children >= 2 && bedrooms && bedrooms >= 4) score += 0.3;
   else if (children >= 1 && bedrooms && bedrooms >= 3) score += 0.2;
 
-  // Couples: boost 2-bed romantic properties
+  // Couples: boost 2-bed romantic properties (only if we know they have no kids)
   if (
     enrichment.maritalStatus === "Married" &&
-    children === 0 &&
+    enrichment.numberOfChildren !== null &&
+    enrichment.numberOfChildren === 0 &&
     bedrooms &&
     bedrooms <= 3
   ) {
@@ -663,7 +664,7 @@ function lifeStageFitScore(
 
 function engagementHeatScore(enrichment: EnrichmentData | undefined): number {
   if (!enrichment) return 0.5;
-  let score = 0.3; // base
+  let score = 0.5; // start at neutral, boost from there
 
   // Recency of last visit
   if (enrichment.lastVisit) {
