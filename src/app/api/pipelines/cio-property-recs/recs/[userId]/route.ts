@@ -32,12 +32,15 @@ export async function GET(
   }
 
   const { userId } = await params;
-  const limit = Math.min(
-    parseInt(
-      new URL(_request.url).searchParams.get("limit") ?? "6",
-      10,
+  const limit = Math.max(
+    1,
+    Math.min(
+      parseInt(
+        new URL(_request.url).searchParams.get("limit") ?? "6",
+        10,
+      ) || 6,
+      20,
     ),
-    20,
   );
 
   const recs = getStoredRecs(userId);

@@ -587,11 +587,11 @@ function priceMatchScore(
 // ── Enrichment Scoring ────────────────────────────────────────────────────────
 
 const INCOME_TIERS: Record<string, number> = {
-  // Minerva ranges from analytics.customer_profiles
-  "<$100K": 3,
-  "$101K - $250K": 5,
-  "$251K - $500K": 6,
-  "$501K - $1M": 7,
+  // Minerva ranges from analytics.customer_profiles → mapped to 1-7 tiers
+  "<$100K": 2,
+  "$101K - $250K": 4,
+  "$251K - $500K": 5,
+  "$501K - $1M": 6,
   ">$1M": 7,
 };
 
@@ -960,7 +960,8 @@ export function getStoredRecs(userId: string): StoredUserRecs | null {
   return recsStore.get(userId) ?? null;
 }
 
-export function getRecsStoreStats(): { users: number; generatedAt: string } {
+/** Used internally for debugging — not exposed via API */
+function getRecsStoreStats(): { users: number; generatedAt: string } {
   return { users: recsStore.size, generatedAt: recsGeneratedAt };
 }
 
