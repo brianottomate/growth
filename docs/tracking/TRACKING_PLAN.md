@@ -600,6 +600,37 @@ Recommended operating model:
 
 ---
 
+## Performance Marketing Roadmap
+
+> Source: [Growth Marketing Roadmap + Creative Tracker](https://docs.google.com/spreadsheets/d/13FSW3r5-7SQltQiZmqdq6Bk5f8lkQBnJExH12uxngnY/edit?gid=1092679338#gid=1092679338)
+> Last reviewed: 2026-03-10
+
+### Marketplace
+
+| Item | Readiness | Notes |
+|------|-----------|-------|
+| Comcast / TVSquared Tracking QA | **Ready to QA** | Destination middleware exists in `analytics.ts`, maps `order_id`, `revenue`, `coupon`, `productType` to TVSquared's camelCase field names. No code changes needed — just verify events are arriving in TVSquared. |
+| Meta Pixel + CAPI QA | **Blocked by triple-fire fix** | CAPI is live server-side via Segment (`Wander API Production` source). Meta pixel is on wander.com. However the `Order Completed` triple-fire issue means conversion counts will be inflated. Fix that first, then QA. Also verify the deprecated Segment source (`Wander Server-Side API Production`) does not have a Meta CAPI destination enabled. |
+| Google (All Firebase events) | **Needs clarification** | `gclid` / `_gcl_aw` are captured and forwarded on `Order Completed`. Google Ads Conversion API is active via Segment. If this means GA4 / Firebase Analytics for mobile, that's a separate surface — audit `mobile/` Firebase setup independently. Clarify with PM whether this is Google Ads conversions or GA4 event QA. |
+
+### WanderOS
+
+| Item | Readiness | Blockers |
+|------|-----------|----------|
+| OS Google Tracking *(once form off Typeform)* | **Not started** | Two sequential blockers: (1) WanderOS acquisition forms must move off Typeform onto a wander.com-hosted page so the Segment snippet fires on submission. (2) The `host-web` Segment source needs to be set up and the `/os` / `/listed` pages need `page_family` + `business_line` properties on their events. Google tag / Ads conversion action can be wired once the source exists. |
+| OS LinkedIn Tracking | **Not started** | LinkedIn pixel is browser-only (no CAPI equivalent). Low engineering effort — add the LinkedIn Insight Tag to wander.com `/os` and `/listed` pages once the ad account structure decision is made (shared vs. separate from Marketplace). Segment has a LinkedIn Insight Tag destination that can be enabled on `marketplace-web` source scoped to those paths. |
+| Instagram account for WanderOS | **Not an engineering item** | Brand / social decision. No tracking dependency. |
+| LinkedIn — new ad account for WanderOS vs Marketplace | **Open decision** | CMO decision (open since last CMO doc). Determines whether LinkedIn pixel uses a shared account + scoped events, or a fully separate pixel ID. Blocks OS LinkedIn Tracking setup above. |
+
+### What engineering can unblock now (no external decisions needed)
+
+- Build `host-web` Segment source and add `page_family: 'os' | 'listed'` + `business_line: 'host'` to events on WanderOS acquisition pages — this is the prerequisite for all OS performance tracking
+- Fix `Order Completed` triple-fire — prerequisite for Meta Pixel + CAPI QA being meaningful
+- Delete deprecated Segment source — eliminates CAPI double-count risk
+- Add `analytics.reset()` call on sign-out — Segment spec requirement, currently missing
+
+---
+
 ## Known Issues / Red Flags
 
 1. **`Order Completed` triple-fires**: wander.com (client), mobile (client), AND wander backend (server) all fire this event. Without deduplication in Segment, CIO and downstream tools see 2-3x booking events. Needs a `messageId` dedup strategy or one of the client-side fires removed.

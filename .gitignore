@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Segment snapshots (contain OAuth tokens)
+docs/segment-snapshots/
+
 # dependencies
 /node_modules
 /.pnp

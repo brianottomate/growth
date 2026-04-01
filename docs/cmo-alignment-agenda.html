@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CMO Alignment — Wander Growth & Marketing Infrastructure</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f7f6f3;
+      color: #1a1a1a;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .page {
+      max-width: 860px;
+      margin: 48px auto;
+      padding: 0 24px 80px;
+    }
+
+    /* Header */
+    .header {
+      margin-bottom: 48px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid #1a1a1a;
+    }
+
+    .header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 24px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .header-meta span::before {
+      content: '·';
+      margin-right: 8px;
+      color: #ccc;
+    }
+    .header-meta span:first-child::before { content: ''; margin: 0; }
+
+    /* Section */
+    .section {
+      margin-bottom: 40px;
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #e8e6e1;
+      overflow: hidden;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 22px 24px 18px;
+      border-bottom: 1px solid #f0ede8;
+    }
+
+    .section-number {
+      font-size: 12px;
+      font-weight: 700;
+      color: #999;
+      min-width: 24px;
+      padding-top: 3px;
+      letter-spacing: 0.5px;
+    }
+
+    .section-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .section-subtitle {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    .section-body {
+      padding: 20px 24px 24px 64px;
+    }
+
+    /* Text */
+    p {
+      margin-bottom: 12px;
+      color: #2a2a2a;
+    }
+
+    p:last-child { margin-bottom: 0; }
+
+    strong { color: #1a1a1a; }
+
+    /* Labels */
+    .label {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    .label-align { background: #f0f0f0; color: #555; }
+    .label-decision { background: #fff3e0; color: #e65100; }
+    .label-note { background: #e8f5e9; color: #2e7d32; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 13.5px;
+    }
+
+    th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #888;
+      padding: 8px 12px;
+      border-bottom: 2px solid #e8e6e1;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0ede8;
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tr:hover td { background: #faf9f7; }
+
+    /* Decision callout */
+    .decision {
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: #fffbf5;
+      border-left: 3px solid #f5a623;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .decision strong {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #f5a623;
+      margin-bottom: 4px;
+    }
+
+    /* Note callout */
+    .note {
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: #f5f9f5;
+      border-left: 3px solid #4caf50;
+      border-radius: 0 6px 6px 0;
+      font-size: 13.5px;
+      color: #444;
+    }
+
+    .note strong {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #4caf50;
+      margin-bottom: 4px;
+    }
+
+    /* Insight callout */
+    .insight {
+      margin-top: 14px;
+      padding: 14px 16px;
+      background: #f0f4ff;
+      border-left: 3px solid #3b5bdb;
+      border-radius: 0 6px 6px 0;
+      font-size: 14px;
+    }
+
+    .insight strong {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #3b5bdb;
+      margin-bottom: 4px;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: #f0ede8;
+      margin: 18px 0;
+    }
+
+    /* Decisions summary */
+    .summary-section {
+      margin-top: 48px;
+      background: #1a1a1a;
+      color: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .summary-section .section-header {
+      border-bottom-color: #333;
+    }
+
+    .summary-section .section-number { color: #666; }
+    .summary-section .section-title { color: #fff; }
+    .summary-section .section-subtitle { color: #888; }
+
+    .summary-section table { color: #ddd; }
+
+    .summary-section th {
+      color: #666;
+      border-bottom-color: #333;
+    }
+
+    .summary-section td {
+      border-bottom-color: #2a2a2a;
+    }
+
+    .summary-section tr:hover td { background: #222; }
+
+    .priority-high {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #ff3b3020;
+      color: #ff6b6b;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .priority-medium {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #f5a62320;
+      color: #f5a623;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .priority-low {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #ffffff15;
+      color: #888;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    ul {
+      padding-left: 18px;
+      margin: 10px 0;
+    }
+
+    li {
+      margin-bottom: 5px;
+      color: #2a2a2a;
+    }
+
+    @media print {
+      body { background: white; }
+      .page { margin: 0; padding: 16px; }
+      .section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>CMO Alignment — Growth &amp; Marketing Infrastructure</h1>
+    <div class="header-meta">
+      <span>March 2026</span>
+      <span>Working agenda — decisions noted inline</span>
+    </div>
+  </div>
+
+  <!-- 1. Two Products -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">01</div>
+      <div>
+        <div class="section-title">The two products and their domains</div>
+        <div class="section-subtitle">Align on: nomenclature and surface boundaries</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p>Wander operates two distinct products with different users, different goals, and different marketing motions. Everything downstream — pixels, tracking, social, email — should reflect this split.</p>
+
+      <table>
+        <tr>
+          <th></th>
+          <th>Marketplace</th>
+          <th>WanderOS</th>
+        </tr>
+        <tr>
+          <td><strong>Users</strong></td>
+          <td>Guests — travelers booking stays</td>
+          <td>Hosts / operators — property managers</td>
+        </tr>
+        <tr>
+          <td><strong>Scale</strong></td>
+          <td>Millions</td>
+          <td>Thousands</td>
+        </tr>
+        <tr>
+          <td><strong>Conversion KPI</strong></td>
+          <td>Booking completed</td>
+          <td>Site published / listing approved</td>
+        </tr>
+        <tr>
+          <td><strong>Product domain</strong></td>
+          <td>wander.com</td>
+          <td>app.wander.com</td>
+        </tr>
+        <tr>
+          <td><strong>Acquisition pages</strong></td>
+          <td>wander.com everywhere</td>
+          <td>wander.com/os, wander.com/listed</td>
+        </tr>
+        <tr>
+          <td><strong>Segment sources</strong></td>
+          <td>wander.com web, mobile, backend</td>
+          <td>app.wander.com web + backend</td>
+        </tr>
+      </table>
+
+      <div class="note">
+        <strong>Note — os.wander.com</strong>
+        Legacy back office for Wander-Operated homes only. Small user base, indefinite hold. Not relevant to this conversation.
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. One user model -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">02</div>
+      <div>
+        <div class="section-title">One user model — guests and hosts are just users</div>
+        <div class="section-subtitle">Align on: unified identity, surface separation through properties not plumbing</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p>A host who also books a vacation is one person. They get one Segment profile, one identity, one view across both surfaces. We don't split them into two separate systems — we enrich them with traits that describe what they've done on each surface.</p>
+
+      <p><strong>User traits distinguish behaviour, not separate pipelines.</strong> A user profile might have <code>has_marketplace_booking: true</code> and <code>has_wanderos_site: true</code>. Customer.io uses those traits to decide which messages to send. Segment Unify stitches all their events — from wander.com, app.wander.com, mobile — into one profile automatically, as long as they log in with the same userId.</p>
+
+      <p><strong>The scale difference matters for ad audiences.</strong> We expect millions of guests on the marketplace. WanderOS will be thousands of operators. The separation that matters is at the ad audience level — you don't want a "lookalike of people who booked a vacation" contaminated with property managers. That's handled through event properties and audience filters, not separate analytics systems.</p>
+
+      <div class="insight">
+        <strong>Where the real separation lives</strong>
+        Not in Segment plumbing — in Customer.io segmentation (guest streams vs host streams) and social handles (@wander for guests, @wanderos for operators). Those are the places where mixing audiences actually hurts. Segment's job is to give you one clean view of the whole person.
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Analytics architecture -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">03</div>
+      <div>
+        <div class="section-title">Analytics &amp; pixel architecture</div>
+        <div class="section-subtitle">Align on: one workspace, separate sources, pixel decision is separate</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <p><strong>Segment: one workspace, multiple sources.</strong> Segment's own guidance is to avoid splitting workspaces for product or brand separation — instead, use one workspace with separate sources (each with their own write key), labels for partitioning, and resource-scoped roles. Splitting workspaces creates a hard wall that makes cross-product questions structurally harder to answer: guest-host overlap, suppression across journeys, unified lifetime view.</p>
+
+      <table>
+        <tr>
+          <th>Layer</th>
+          <th>Recommendation</th>
+          <th>Why</th>
+        </tr>
+        <tr>
+          <td><strong>Workspace</strong></td>
+          <td>One workspace</td>
+          <td>Keeps guest + host profiles unified. Enables cross-product lifecycle logic and suppression. Segment's recommended default.</td>
+        </tr>
+        <tr>
+          <td><strong>Sources</strong></td>
+          <td>Separate sources per technical surface</td>
+          <td>wander.com web, mobile app, wander backend, app.wander.com — each gets its own write key. Sources map to where code runs, not to business segments.</td>
+        </tr>
+        <tr>
+          <td><strong>Profiles (Unify)</strong></td>
+          <td>One prod Unify space</td>
+          <td>Single customer view across guest and host behaviour. Dev/prod separation via Segment spaces, not separate workspaces.</td>
+        </tr>
+        <tr>
+          <td><strong>Access control</strong></td>
+          <td>Resource-scoped roles + labels</td>
+          <td>Right people see right sources. Label sources by Product=Marketplace/Host and Env=Prod/Dev.</td>
+        </tr>
+      </table>
+
+      <div class="note">
+        <strong>When would you actually split workspaces?</strong>
+        Different legal entity, different compliance regime, different billing/admin ownership, or a deliberate choice that guest and host should never share identity or suppression logic. None of those apply to Wander today.
+      </div>
+
+      <div class="divider"></div>
+
+      <p><strong>Pixels: keep this decision separate from analytics architecture.</strong></p>
+
+      <p>One Meta pixel with custom events per surface is sufficient for now and is how most mature platforms (Airbnb included) operate. Fire <code>Purchase</code> on booking completion, <code>CompleteRegistration</code> on WanderOS signup, <code>Lead</code> on /listed form submit — all through one pixel, attributed to their respective campaigns.</p>
+
+      <div class="note">
+        <strong>The one real constraint</strong>
+        Segment's Facebook Pixel destination is web device-mode only, and a single web source can only connect to one device-mode Meta pixel instance. If you ever want two different Meta pixel IDs routing through Segment, you'd need two separate web sources — not two separate workspaces. This is manageable and is a source-level decision, not a workspace-level one.
+      </div>
+
+      <p style="margin-top: 14px;"><strong>Recommended pixel setup:</strong> One pixel ID for now, custom events for guest vs. host conversions. Add a second pixel ID (WanderOS-specific) only when WanderOS runs dedicated ad campaigns that need independent audience pools — likely when there's a dedicated WanderOS marketing person.</p>
+
+      <div class="decision">
+        <strong>Decision needed</strong>
+        Will WanderOS campaigns run from shared ad accounts (one pixel, custom events) or will they get dedicated ad accounts with their own pixel IDs? This is a resourcing and campaign management question, not an architecture constraint.
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Tracking stack -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">04</div>
+      <div>
+        <div class="section-title">The full tracking stack — pixels, client-side, server-side</div>
+        <div class="section-subtitle">Align on: what we actually run, measurement hygiene, proxy question</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p>We have a larger ad tech footprint than most people realise. Here is the complete picture of what is firing for the guest marketplace today.</p>
+
+      <p><strong>Client-side (browser).</strong> One Segment snippet runs on wander.com. It fans out to: Amplitude, Mixpanel, Customer.io, HubSpot, and ad pixels for Meta, TikTok, Twitter/X, Pinterest, Reddit, and LinkedIn. The mobile app also fires Segment, routing to the same destinations.</p>
+
+      <p><strong>Server-side (backend).</strong> Server-to-server APIs run independently of the browser — unaffected by ad blockers or iOS privacy restrictions. These are already active:</p>
+
+      <table>
+        <tr>
+          <th>Platform</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Notes</th>
+        </tr>
+        <tr>
+          <td><strong>Meta</strong></td>
+          <td>Conversions API (CAPI)</td>
+          <td>✓ Active</td>
+          <td>Primary + Secondary (catalog) — fires from Wander backend. iOS 14 conversions are preserved.</td>
+        </tr>
+        <tr>
+          <td><strong>Google</strong></td>
+          <td>Ads Conversion API</td>
+          <td>✓ Active</td>
+          <td>Server-to-server. GA4 also runs cloud-mode through Segment — no browser dependency.</td>
+        </tr>
+        <tr>
+          <td><strong>Pinterest</strong></td>
+          <td>Conversions API</td>
+          <td>✓ Active</td>
+          <td>Server-side via Segment.</td>
+        </tr>
+        <tr>
+          <td><strong>Reddit</strong></td>
+          <td>Conversions API</td>
+          <td>✓ Active</td>
+          <td>Server-side via Segment.</td>
+        </tr>
+        <tr>
+          <td><strong>TikTok / Bing / LinkedIn</strong></td>
+          <td>Client pixel</td>
+          <td>Active</td>
+          <td>Browser-only. No server-side counterpart currently. TikTok CAPI is available if needed.</td>
+        </tr>
+      </table>
+
+      <div class="insight">
+        <strong>This is already in a healthy state</strong>
+        Having CAPI active for Meta, Google, Pinterest, and Reddit means ad spend measurement has better signal than most companies of our size. Server-side conversions are unaffected by iOS privacy changes or ad blockers. This is not a problem to fix — it is a competitive advantage to protect.
+      </div>
+
+      <div class="divider"></div>
+
+      <p><strong>Self-hosted scripts and reverse proxying.</strong></p>
+
+      <p>Browser-based tracking (Segment snippet, client pixels) is partially blocked by ad blockers — typically 15–30% of desktop traffic. Reverse proxying routes Segment CDN and API calls through our own domain, making them effectively indistinguishable from first-party requests.</p>
+
+      <p>Wander's codebase already has proxy env vars wired up (<code>NEXT_PUBLIC_ANALYTICS_CDN_URL</code>, <code>NEXT_PUBLIC_ANALYTICS_API_HOST</code>) but the server-side route rewrites are not yet configured. Activating this is a single engineering task.</p>
+
+      <table>
+        <tr>
+          <th>Script</th>
+          <th>Proxy value</th>
+          <th>Why</th>
+        </tr>
+        <tr>
+          <td><strong>Segment</strong></td>
+          <td>High</td>
+          <td>Ad blockers target segment.io domains specifically. Proxying through wander.com/cdn/... bypasses this. Estimated 15–25% lift in event capture rate. All downstream destinations (Meta pixel, Customer.io, GA4, Amplitude) benefit from one change.</td>
+        </tr>
+        <tr>
+          <td><strong>Meta pixel</strong></td>
+          <td>Medium</td>
+          <td>CAPI already covers iOS and a portion of ad-blocker users. Proxy adds recovery for desktop ad-blocker users on top. Not urgent given existing CAPI coverage.</td>
+        </tr>
+        <tr>
+          <td><strong>Amplitude / Mixpanel</strong></td>
+          <td>Lower</td>
+          <td>Internal product analytics. Missing events here hurts product decisions less than attribution. Both offer self-hosted SDK paths if needed later.</td>
+        </tr>
+        <tr>
+          <td><strong>HubSpot / TikTok / Bing</strong></td>
+          <td>Not recommended now</td>
+          <td>Marginal gain vs added complexity. Proxying Segment captures events for most of these anyway.</td>
+        </tr>
+      </table>
+
+      <div class="decision">
+        <strong>Decision needed</strong>
+        Approve activating the Segment proxy rewrites — the env vars are already in place, this is one engineering configuration task. This recovers measurement signal across all Segment destinations simultaneously for low engineering cost. Recommended: yes.
+      </div>
+
+      <div class="divider"></div>
+
+      <p><strong>Data hygiene: deprecated source with live destinations.</strong> There is a Segment source labelled "DO NOT USE, GOING TO BE DELETED" that still has live destinations enabled — including Impact.com (affiliate commissions) and Customer.io. This creates a real risk of double-counting commission payments. This is an engineering task to clean up — flagging for awareness only, no CMO decision needed.</p>
+
+    </div>
+  </div>
+
+  <!-- 5. /listed -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">05</div>
+      <div>
+        <div class="section-title">The /listed question — supply vs. OS user</div>
+        <div class="section-subtitle">Align on: are these the same funnel, and how much to invest in /listed</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p>Two acquisition pages, potentially two different audiences:</p>
+
+      <table>
+        <tr>
+          <th>Page</th>
+          <th>Value prop</th>
+          <th>User</th>
+          <th>Destination</th>
+        </tr>
+        <tr>
+          <td><strong>wander.com/listed</strong></td>
+          <td>"List your property on Wander"</td>
+          <td>Host seeking marketplace distribution. High bar — Wander is exclusive.</td>
+          <td>Wander marketplace listing → app.wander.com</td>
+        </tr>
+        <tr>
+          <td><strong>wander.com/os</strong></td>
+          <td>"Build your direct booking site"</td>
+          <td>Host seeking tech independence. Lower bar — they may never list on Wander.</td>
+          <td>WanderOS direct booking site → app.wander.com</td>
+        </tr>
+      </table>
+
+      <p style="margin-top:14px;"><strong>The complicating factor.</strong> New marketplace supply is increasingly coming through OTA integrations, not direct host applications. /listed may be becoming a secondary path even as WanderOS grows.</p>
+
+      <p>These audiences are not mutually exclusive — but they're not the same. A WanderOS user building a direct booking site is not necessarily interested in Wander's curation process. And a host applying to /listed may not want or need WanderOS.</p>
+
+      <div class="decision">
+        <strong>Decision needed</strong>
+        Is /listed an actively invested acquisition channel in 2026, or maintenance mode? And what's the intended relationship — do we push OS users toward /listed as a natural upgrade path, or treat them as genuinely separate audiences with separate campaigns?
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Message Streams -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">06</div>
+      <div>
+        <div class="section-title">Message streams — the coordination problem</div>
+        <div class="section-subtitle">Align on: vocabulary, suppression rules, ownership</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p>We have six messaging streams running in parallel with no shared rules about who talks to a user, when, and what happens when two channels want to reach the same person at the same time.</p>
+
+      <table>
+        <tr>
+          <th>Stream</th>
+          <th>Tool</th>
+          <th>Owner</th>
+          <th>Purpose</th>
+        </tr>
+        <tr>
+          <td><strong>Onboarding</strong></td>
+          <td>Customer.io</td>
+          <td>Growth</td>
+          <td>Welcome, nudge to first booking</td>
+        </tr>
+        <tr>
+          <td><strong>Newsletter</strong></td>
+          <td>Customer.io</td>
+          <td>Brian</td>
+          <td>Weekly blasts, destination guides</td>
+        </tr>
+        <tr>
+          <td><strong>Property Recs</strong></td>
+          <td>Customer.io</td>
+          <td>Growth Eng</td>
+          <td>Personalized recs based on browsing</td>
+        </tr>
+        <tr>
+          <td><strong>Sales Outreach</strong></td>
+          <td>Outreach</td>
+          <td>Sorrell / BDRs</td>
+          <td>1:1 outreach for high-value leads</td>
+        </tr>
+        <tr>
+          <td><strong>Transactional</strong></td>
+          <td>Backend</td>
+          <td>Engineering</td>
+          <td>Booking confirmations, check-in</td>
+        </tr>
+        <tr>
+          <td><strong>Concierge</strong></td>
+          <td>Manual</td>
+          <td>Nick Waze</td>
+          <td>1:1 trip planning and VIP support</td>
+        </tr>
+      </table>
+
+      <p style="margin-top:14px;"><strong>The problem.</strong> A user books a trip and receives: booking confirmation, a personal concierge message, an automated newsletter, and a property recommendation — all within 48 hours — all feeling like they come from different companies. We have good tools and good people. What's missing is shared suppression rules between them.</p>
+
+      <p><strong>The fix is not complicated.</strong> Add lifecycle attributes to Customer.io (in onboarding, in sales sequence, has active booking). Use those to suppress the right channels at the right times. Four phases, ~8 weeks. Full plan in <code>message-streams-proposal.md</code>.</p>
+
+      <div class="decision">
+        <strong>Decisions needed</strong>
+        1. Does this six-stream vocabulary match how you think about our comms? <br/>
+        2. Approve the suppression rules (hard vs. soft). <br/>
+        3. Confirm ownership: Brian owns CIO changes, Sorrell owns Outreach webhooks, Engineering owns the sync layer.
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Social -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">07</div>
+      <div>
+        <div class="section-title">Social media handles</div>
+        <div class="section-subtitle">Align on: WanderOS presence, brand positioning</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p><strong>Marketplace handles</strong> (existing): @wander on Instagram, TikTok, Facebook, LinkedIn.</p>
+
+      <p><strong>WanderOS needs its own presence.</strong> The audience — property managers, operators — is completely different from travelers. Shared handles don't serve either audience well.</p>
+
+      <table>
+        <tr>
+          <th>Platform</th>
+          <th>Priority</th>
+          <th>Why</th>
+        </tr>
+        <tr>
+          <td><strong>LinkedIn</strong></td>
+          <td>Must have</td>
+          <td>Primary B2B channel. Property managers are professionals. Required for paid acquisition.</td>
+        </tr>
+        <tr>
+          <td><strong>Instagram</strong></td>
+          <td>High</td>
+          <td>WanderOS is a visual product. Showcasing customer direct booking sites is strong content.</td>
+        </tr>
+        <tr>
+          <td><strong>YouTube</strong></td>
+          <td>Eventually</td>
+          <td>Product demos, tutorials, customer stories. Worth it once the product has depth.</td>
+        </tr>
+        <tr>
+          <td><strong>TikTok / Facebook</strong></td>
+          <td>Not yet</td>
+          <td>TikTok doesn't fit B2B. Facebook page only for pixel purposes.</td>
+        </tr>
+      </table>
+
+      <div class="decision">
+        <strong>Decisions needed</strong>
+        Handle naming (e.g. @wanderos?) and brand positioning: is WanderOS a Wander sub-brand ("built by the team behind Wander") or a standalone product? This determines whether we lean on the existing @wander audience initially or build separately from scratch.
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Blog -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-number">08</div>
+      <div>
+        <div class="section-title">Blog</div>
+        <div class="section-subtitle">Low urgency — flag for awareness</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p>Current blog: guest-facing, ~25 posts/month, agency-managed CMS, lives on wander.com.</p>
+      <p>WanderOS will need operator-focused content eventually — PMS guides, direct booking benchmarks, host playbooks. Starting point: WanderOS tag on the existing blog. Dedicated blog section or standalone when there's a content person to run it.</p>
+      <div class="decision">
+        <strong>Decision needed (low urgency)</strong>
+        When does WanderOS content become a priority, and who owns it?
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-section">
+    <div class="section-header">
+      <div class="section-number" style="color:#555">—</div>
+      <div>
+        <div class="section-title">Decisions summary</div>
+        <div class="section-subtitle">What we need to leave this meeting with</div>
+      </div>
+    </div>
+    <div class="section-body" style="padding-left: 24px;">
+      <table>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Decision</th>
+          <th style="width:100px">Urgency</th>
+        </tr>
+        <tr>
+          <td style="color:#555">03</td>
+          <td>Pixel strategy: one shared pixel with custom events (recommended default) or separate WanderOS pixel when dedicated campaigns launch?</td>
+          <td><span class="priority-medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td style="color:#555">04</td>
+          <td>Segment proxy: approve activating route rewrites (infrastructure already partially built — recovers measurement across all ad platforms in one engineering step)</td>
+          <td><span class="priority-medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td style="color:#555">05</td>
+          <td>/listed in 2026: active investment or maintenance mode?</td>
+          <td><span class="priority-high">High</span></td>
+        </tr>
+        <tr>
+          <td style="color:#555">05</td>
+          <td>Supply vs. OS relationship: separate audiences or converging funnel?</td>
+          <td><span class="priority-high">High</span></td>
+        </tr>
+        <tr>
+          <td style="color:#555">06</td>
+          <td>Message streams: approve suppression rules + ownership assignments</td>
+          <td><span class="priority-high">High</span></td>
+        </tr>
+        <tr>
+          <td style="color:#555">07</td>
+          <td>WanderOS social: handle naming and brand positioning</td>
+          <td><span class="priority-medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td style="color:#555">07</td>
+          <td>WanderOS brand: sub-brand of Wander or standalone product?</td>
+          <td><span class="priority-medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td style="color:#555">08</td>
+          <td>WanderOS blog: when and who owns it?</td>
+          <td><span class="priority-low">Low</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
