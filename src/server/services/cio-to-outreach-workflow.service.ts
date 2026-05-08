@@ -1,6 +1,6 @@
 import "server-only";
 
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { env } from "@/env";
 import { processLead } from "@/server/services/sync.service";
 import {
@@ -116,23 +116,32 @@ export async function handleCioToOutreachWebhook(
       `📨 [${options.serviceLabel}] Received: ${normalized.eventType} for ${normalized.email} (step: ${normalized.workflowStep ?? "n/a"}, ${Date.now() - startMs}ms)`,
     );
 
-    const result = await processLead({
-      email: normalized.email,
-      eventType: normalized.eventType,
-      eventData: normalized.eventData,
+    // Defer the sync to run after the response is sent. Customer.io's webhook
+    // timeout is ~5s; processLead routinely takes 4-13s (BQ + Outreach API +
+    // BDR selection). Responding immediately keeps CIO's "Sent" metric
+    // accurate and prevents the retry storm that was causing 422 races and
+    // duplicate prospect attempts. See PR for incident write-up.
+    const { email, eventType, eventData } = normalized;
+    after(async () => {
+      const bgStart = Date.now();
+      try {
+        const result = await processLead({ email, eventType, eventData });
+        console.log(
+          `📋 [${options.serviceLabel}] Sync result: ${result.status} — ${result.outreachAction ?? "no action"} (${result.processingTimeMs}ms)`,
+        );
+      } catch (err) {
+        console.error(
+          `❌ [${options.serviceLabel}] Background processLead failed for ${email} (${eventType}) after ${Date.now() - bgStart}ms:`,
+          err,
+        );
+      }
     });
-
-    console.log(
-      `📋 [${options.serviceLabel}] Sync result: ${result.status} — ${result.outreachAction ?? "no action"} (${result.processingTimeMs}ms)`,
-    );
 
     return NextResponse.json({
       success: true,
       email: normalized.email,
       eventType: normalized.eventType,
-      status: result.status,
-      outreachAction: result.outreachAction,
-      processingTimeMs: result.processingTimeMs,
+      status: "queued",
     });
   } catch (error) {
     console.error(`❌ [${options.serviceLabel}] Error:`, error);
