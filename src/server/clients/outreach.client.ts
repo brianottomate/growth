@@ -1454,6 +1454,71 @@ export async function deleteOutreachWebhookById(id: number | string): Promise<vo
   }
 }
 
+// =====================================================
+// ACTIVITY FEED EVENTS
+// =====================================================
+//
+// STATUS: not in use. Standalone primitive for surfacing CIO activity on
+// Outreach prospect timelines. No callers in this repo (verified 2026-05-21).
+//
+// Before wiring this up to live CIO webhook traffic, think about volume:
+// every email send/open/click CIO emits would become an Outreach `/events`
+// POST. That's a lot of serverless invocations and Outreach API calls per
+// active prospect — likely too noisy as-is.
+//
+// If/when revived, pick one:
+//   - Subscribe only to high-signal CIO events (e.g. clicked, replied),
+//     not every send
+//   - Batch/dedup per prospect per time window before posting
+//   - Subset to specific campaigns BDRs actually want timeline visibility on
+//
+// Also: requires the "Activity feed custom events" client extension to be
+// enabled on the Wander app in the Outreach developer portal.
+
+export interface OutreachActivityEventInput {
+  /** Prospect ID in Outreach */
+  prospectId: number | string;
+  /** Human-readable description shown in the activity card */
+  body: string;
+  /** Optional link shown on the activity card (e.g. CIO campaign URL) */
+  externalUrl?: string;
+  /** Event type suffix, e.g. "email_sent". Combined with app prefix: "wander-cio:email_sent" */
+  eventType?: string;
+}
+
+/**
+ * Create a custom activity feed event on an Outreach prospect.
+ *
+ * Requires the "Activity feed custom events" client extension to be enabled
+ * on the Outreach app in the developer portal.
+ *
+ * The event shows up in the prospect's activity timeline, visible to BDRs.
+ */
+export async function createOutreachActivityEvent(
+  input: OutreachActivityEventInput,
+): Promise<void> {
+  const eventName = `wander-cio:${input.eventType ?? "email_sent"}`;
+
+  await outreachRequest<unknown>("/events", {
+    method: "POST",
+    body: JSON.stringify({
+      data: {
+        type: "event",
+        attributes: {
+          name: eventName,
+          body: input.body,
+          ...(input.externalUrl ? { externalUrl: input.externalUrl } : {}),
+        },
+        relationships: {
+          prospect: {
+            data: { type: "prospect", id: String(input.prospectId) },
+          },
+        },
+      },
+    }),
+  });
+}
+
 /**
  * Delete an Outreach webhook using its single-use cleanup token.
  *
