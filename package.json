@@ -28,9 +28,9 @@
     "cio:repair": "bun run src/scripts/repair-cio-assignment.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.2",
-    "@ai-sdk/react": "^3.0.45",
-    "@anthropic-ai/sdk": "^0.72.1",
+    "@ai-sdk/anthropic": "^3.0.78",
+    "@ai-sdk/react": "^3.0.192",
+    "@anthropic-ai/sdk": "^0.98.0",
     "@auth/drizzle-adapter": "^1.7.2",
     "@dagrejs/dagre": "^2.0.4",
     "@dnd-kit/core": "^6.3.1",
@@ -85,7 +85,7 @@
     "@wandercom/design-system-tokens": "^0.1.81",
     "@wandercom/design-system-web": "^0.1.81",
     "@xyflow/react": "^12.10.1",
-    "ai": "^6.0.0-beta.127",
+    "ai": "^6.0.190",
     "better-auth": "^1.4.16",
     "chrono-node": "^2.9.0",
     "class-variance-authority": "^0.7.1",
