@@ -50,6 +50,10 @@ export const env = createEnv({
     // Minerva (lead enrichment)
     MINERVA_API_URL: z.string().url().default("https://api.minerva.io"), // Minerva API base URL (v2 default)
     MINERVA_API_KEY: z.string().min(1).optional(), // Minerva API key (x-api-key)
+    // X / Twitter API v2
+    X_CONSUMER_KEY: z.string().optional(),
+    X_CONSUMER_SECRET: z.string().optional(),
+    X_BEARER_TOKEN: z.string().optional(),
   },
 
   /**
@@ -115,6 +119,10 @@ export const env = createEnv({
     // Minerva
     MINERVA_API_URL: process.env.MINERVA_API_URL,
     MINERVA_API_KEY: process.env.MINERVA_API_KEY,
+    // X / Twitter
+    X_CONSUMER_KEY: process.env.X_CONSUMER_KEY,
+    X_CONSUMER_SECRET: process.env.X_CONSUMER_SECRET,
+    X_BEARER_TOKEN: process.env.X_BEARER_TOKEN,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

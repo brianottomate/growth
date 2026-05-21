@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/growth?job=daily_comprehensive_sync&hoursBack=24&concurrency=6&limit=1000",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/reddit",
+      "schedule": "0 * * * *"
     }
   ]
 }
