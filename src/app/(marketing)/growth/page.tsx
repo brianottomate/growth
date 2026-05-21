@@ -24,6 +24,7 @@ export default function GrowthPage() {
         </header>
 
         <KeywordMonitoringSection />
+        <XSection />
         <RedditSection />
         <LearningsSection />
       </div>
@@ -118,6 +119,53 @@ function KeywordMonitoringSection() {
   );
 }
 
+function XSection() {
+  return (
+    <section className="mt-16 border-t border-gray-200 pt-12">
+      <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
+        X / Twitter
+      </h2>
+      <p className="mt-3 text-base text-gray-600">
+        API credentials are wired (bearer-token auth, read-only) and the smoke
+        test passes. The plan mirrors Reddit: monitor mentions of Wander and
+        adjacent STR conversation, route high-signal threads to the team.
+      </p>
+
+      <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Smoke test: <code className="font-mono text-base">scripts/test-x.ts</code>
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Hits <code className="font-mono">/users/by/username/wander</code>{" "}
+              and <code className="font-mono">/tweets/search/recent</code> to
+              verify auth + tier access. Both endpoints return 200 — credits
+              are funded and reads work.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-900">
+            unblocked
+          </span>
+        </div>
+
+        <details className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-900">
+            Cost model — what to expect
+          </summary>
+          <p className="mt-3 text-sm text-gray-600">
+            X charges per call regardless of tier (the post-2025 credit
+            system). A zero-credit account returns 402 on every endpoint, even
+            user lookup. Budget needs to track query volume × call cost rather
+            than monthly tier, and credits should be auto-topped before they
+            run dry — otherwise the monitor goes dark silently.
+          </p>
+        </details>
+      </div>
+    </section>
+  );
+}
+
 function RedditSection() {
   return (
     <section className="mt-16 border-t border-gray-200 pt-12">
@@ -145,6 +193,20 @@ function RedditSection() {
           <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
             v1 · log-only
           </span>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <h4 className="text-sm font-semibold text-emerald-900">
+            AI scoring layer (local, ready to wire in)
+          </h4>
+          <p className="mt-2 text-sm text-emerald-900/80">
+            <code className="font-mono">scripts/test-reddit-analyze.ts</code>{" "}
+            uses Claude Haiku 4.5 via the AI SDK to score each post on
+            relevance, intent tag, and suggested action. ~100 posts scored in
+            ~50s for a few cents per run. Production wiring will replace the
+            log-only handler once we&apos;ve seen a week of locally scored
+            signal.
+          </p>
         </div>
 
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
@@ -278,9 +340,9 @@ const LEARNINGS: Learning[] = [
   },
   {
     date: "2026-05-21",
-    kind: "blocker",
-    title: "X API works but account has zero credits",
-    body: "Bearer token authenticates cleanly (no 401), but every endpoint returns 402 'CreditsDepleted'. X's 2025+ pricing model burns credits per call regardless of tier. CMO is topping up the developer account; smoke-test script (scripts/test-x.ts) is ready to re-run once credits land.",
+    kind: "finding",
+    title: "X API unblocked — credits funded, reads working end-to-end",
+    body: "After topping up the developer account, both /users/by/username and /tweets/search/recent return 200. Bearer-token auth is fine, no further setup needed. Lesson: monitor credit balance going forward, because zero credits returns 402 on every call (including cheap reads), and the monitor would silently go dark.",
   },
   {
     date: "2026-05-21",
@@ -293,6 +355,12 @@ const LEARNINGS: Learning[] = [
     kind: "decision",
     title: "Log-only Reddit cron in v1, layer AI + Slack after we see signal",
     body: "Instead of building Neon persistence, LLM scoring, and Slack posting up front, we ship a log-only cron and review hits in Vercel logs for a week. This validates signal volume and quality before we commit to a data model or notification UX.",
+  },
+  {
+    date: "2026-05-21",
+    kind: "finding",
+    title: "AI scoring outperforms keyword filter — confirmed against live data",
+    body: "Claude Haiku 4.5 (via the AI SDK with a Zod schema) scored 100 fresh posts in ~50s for ~$0.04 and surfaced things keywords missed: notably a 10/10 critical brand mention on r/vrbohosts ('My Experience with Wander.com — A Warning for Hosts and Property Managers') and a 9/10 high-intent rant about Airbnb's new guest-phone masking. It also correctly classified ambiguous-language posts (e.g. 'How are you all handling bookings…') as monitor/skip rather than over-scoring them. Production wiring is the obvious next step.",
   },
 ];
 
