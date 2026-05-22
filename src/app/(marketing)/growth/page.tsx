@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { RedditScanWidget } from "./RedditScanWidget";
+
 export const metadata: Metadata = {
   title: "Growth",
   description:
@@ -57,12 +59,12 @@ function KeywordMonitoringSection() {
             </p>
           </div>
           <a
-            href="https://f5bot.com"
+            href="https://f5bot.com/dash"
             target="_blank"
             rel="noreferrer noopener"
             className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
-            f5bot.com ↗
+            f5bot dashboard ↗
           </a>
         </div>
 
@@ -102,18 +104,6 @@ function KeywordMonitoringSection() {
           </p>
         </div>
 
-        <details className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-gray-900">
-            Why F5Bot (and not the Reddit API)?
-          </summary>
-          <p className="mt-3 text-sm text-gray-600">
-            Reddit&apos;s <code className="font-mono">/prefs/apps</code>{" "}
-            create-app flow is now gated behind a manual approval ticket — days
-            to weeks of waiting. F5Bot needs zero approval and gives us value
-            tonight. Once the Data API is unblocked (or we add an RSS poller),
-            we can layer in deeper subreddit-scoped monitoring.
-          </p>
-        </details>
       </div>
     </section>
   );
@@ -195,19 +185,7 @@ function RedditSection() {
           </span>
         </div>
 
-        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-          <h4 className="text-sm font-semibold text-emerald-900">
-            AI scoring layer (local, ready to wire in)
-          </h4>
-          <p className="mt-2 text-sm text-emerald-900/80">
-            <code className="font-mono">scripts/test-reddit-analyze.ts</code>{" "}
-            uses Claude Haiku 4.5 via the AI SDK to score each post on
-            relevance, intent tag, and suggested action. ~100 posts scored in
-            ~50s for a few cents per run. Production wiring will replace the
-            log-only handler once we&apos;ve seen a week of locally scored
-            signal.
-          </p>
-        </div>
+        <RedditScanWidget />
 
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
           <div>
