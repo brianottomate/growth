@@ -65,8 +65,7 @@ export function RedditScanWidget() {
           </h4>
           <p className="mt-1 text-sm text-emerald-900/80">
             Fetches the latest posts across the Tier 1 subs and runs them
-            through Claude Haiku 4.5 to surface engagement candidates.
-            Sign-in required.
+            through Claude Sonnet 4.6 to surface engagement candidates.
           </p>
         </div>
         <button
