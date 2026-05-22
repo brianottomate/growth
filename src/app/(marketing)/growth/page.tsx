@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { RedditScanWidget } from "./RedditScanWidget";
+import { TwitterScanWidget } from "./TwitterScanWidget";
 
 export const metadata: Metadata = {
   title: "Growth",
@@ -139,18 +140,7 @@ function XSection() {
           </span>
         </div>
 
-        <details className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-gray-900">
-            Cost model — what to expect
-          </summary>
-          <p className="mt-3 text-sm text-gray-600">
-            X charges per call regardless of tier (the post-2025 credit
-            system). A zero-credit account returns 402 on every endpoint, even
-            user lookup. Budget needs to track query volume × call cost rather
-            than monthly tier, and credits should be auto-topped before they
-            run dry — otherwise the monitor goes dark silently.
-          </p>
-        </details>
+        <TwitterScanWidget />
       </div>
     </section>
   );

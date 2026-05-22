@@ -5,6 +5,7 @@ import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
 import { redditRouter } from "@/server/api/routers/reddit.router";
+import { twitterRouter } from "@/server/api/routers/twitter.router";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -20,6 +21,7 @@ export const appRouter = createTRPCRouter({
   org: orgRouter,
   outreach: outreachRouter,
   reddit: redditRouter,
+  twitter: twitterRouter,
 });
 
 // export type definition of API

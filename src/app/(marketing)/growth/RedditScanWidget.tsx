@@ -50,11 +50,10 @@ export function RedditScanWidget() {
   const trpc = useTRPC();
   const scan = useMutation(trpc.reddit.scanNow.mutationOptions());
 
-  const visible = (scan.data?.scored ?? []).filter(
-    (s) => s.suggestedAction !== "skip",
-  );
-  const skipped =
-    (scan.data?.scored.length ?? 0) - visible.length;
+  const all = scan.data?.scored ?? [];
+  const engage = all.filter((s) => s.suggestedAction === "engage");
+  const monitor = all.filter((s) => s.suggestedAction === "monitor");
+  const skipped = all.length - engage.length - monitor.length;
 
   return (
     <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
@@ -86,20 +85,46 @@ export function RedditScanWidget() {
 
       {scan.data && (
         <p className="mt-3 text-xs text-emerald-900/70">
-          Scored {scan.data.totalFetched} posts · showing{" "}
-          {visible.length} engage/monitor · {skipped} skipped.
+          Scored {scan.data.totalFetched} posts · {engage.length} engage ·{" "}
+          {monitor.length} monitor · {skipped} skip.
         </p>
       )}
 
-      {visible.length > 0 && (
-        <ul className="mt-4 space-y-3">
-          {visible.map((s) => (
-            <li key={s.post.id}>
-              <ScoredPostCard scored={s} />
-            </li>
-          ))}
-        </ul>
+      {engage.length > 0 && (
+        <ScoredGroup label="Engage — act today" tone="engage" items={engage} />
       )}
+      {monitor.length > 0 && (
+        <ScoredGroup label="Monitor — revisit later" tone="monitor" items={monitor} />
+      )}
+    </div>
+  );
+}
+
+function ScoredGroup({
+  label,
+  tone,
+  items,
+}: {
+  label: string;
+  tone: "engage" | "monitor";
+  items: ScannedPost[];
+}) {
+  return (
+    <div className="mt-5">
+      <h5
+        className={`text-xs font-semibold uppercase tracking-wide ${
+          tone === "engage" ? "text-emerald-900" : "text-amber-900"
+        }`}
+      >
+        {label} ({items.length})
+      </h5>
+      <ul className="mt-2 space-y-3">
+        {items.map((s) => (
+          <li key={s.post.id}>
+            <ScoredPostCard scored={s} />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
