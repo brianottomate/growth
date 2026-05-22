@@ -8,6 +8,18 @@ import { useTRPC, type RouterOutputs } from "@/trpc/react";
 type ScannedPost =
   RouterOutputs["reddit"]["scanNow"]["scored"][number];
 
+const PILLS = [
+  { id: "short", label: "Short (<80w)" },
+  { id: "no-pitch", label: "No pitch" },
+  { id: "lead-with-question", label: "Lead with question" },
+  { id: "story-first", label: "Story-first" },
+  { id: "focus-wanderos", label: "Focus: WanderOS" },
+  { id: "focus-sites", label: "Focus: Sites" },
+  { id: "focus-operated", label: "Focus: Operated" },
+] as const;
+
+type Pill = (typeof PILLS)[number]["id"];
+
 const ACTION_STYLES: Record<
   ScannedPost["suggestedAction"],
   { label: string; chip: string }
@@ -96,6 +108,17 @@ export function RedditScanWidget() {
 function ScoredPostCard({ scored }: { scored: ScannedPost }) {
   const trpc = useTRPC();
   const draft = useMutation(trpc.reddit.draftReply.mutationOptions());
+  const [pills, setPills] = useState<Set<Pill>>(new Set());
+  const [customInstructions, setCustomInstructions] = useState("");
+
+  const togglePill = (id: Pill) => {
+    setPills((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const style = ACTION_STYLES[scored.suggestedAction];
 
@@ -132,6 +155,36 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
 
       <p className="mt-2 text-sm text-gray-600">{scored.rationale}</p>
 
+      <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
+        <p className="text-xs font-semibold text-gray-700">Draft options</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {PILLS.map((p) => {
+            const on = pills.has(p.id);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => togglePill(p.id)}
+                className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                  on
+                    ? "border-rose-600 bg-rose-600 text-white"
+                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+        <textarea
+          value={customInstructions}
+          onChange={(e) => setCustomInstructions(e.target.value.slice(0, 500))}
+          placeholder="Optional: extra instructions (e.g. 'mention I'm a fellow operator in Florida')"
+          rows={2}
+          className="mt-2 w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:outline-none focus:ring-1 focus:ring-rose-500"
+        />
+      </div>
+
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -141,6 +194,8 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
               post: scored.post,
               intentTag: scored.intentTag,
               rationale: scored.rationale,
+              pills: Array.from(pills),
+              customInstructions: customInstructions.trim() || undefined,
             })
           }
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"

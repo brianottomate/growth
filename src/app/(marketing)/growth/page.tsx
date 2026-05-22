@@ -338,7 +338,7 @@ const LEARNINGS: Learning[] = [
     date: "2026-05-21",
     kind: "finding",
     title: "AI scoring outperforms keyword filter — confirmed against live data",
-    body: "Claude Haiku 4.5 (via the AI SDK with a Zod schema) scored 100 fresh posts in ~50s for ~$0.04 and surfaced things keywords missed: notably a 10/10 critical brand mention on r/vrbohosts ('My Experience with Wander.com — A Warning for Hosts and Property Managers') and a 9/10 high-intent rant about Airbnb's new guest-phone masking. It also correctly classified ambiguous-language posts (e.g. 'How are you all handling bookings…') as monitor/skip rather than over-scoring them. Production wiring is the obvious next step.",
+    body: "Claude Sonnet 4.6 (via the AI SDK with a Zod schema) scored 100 fresh posts in under a minute for cents per run and surfaced things keywords missed: notably a 10/10 critical brand mention on r/vrbohosts ('My Experience with Wander.com — A Warning for Hosts and Property Managers') and a 9/10 high-intent rant about Airbnb's new guest-phone masking. It also correctly classified ambiguous-language posts (e.g. 'How are you all handling bookings…') as monitor/skip rather than over-scoring them. Drafting uses Opus 4.7 — pricier, but the marketing plan's disclosure + no-pitch-first rules really benefit from the smarter model.",
   },
 ];
 

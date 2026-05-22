@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../trpc";
 import {
+  DRAFT_PILLS,
   INTENT_TAGS,
   draftReplyForPost,
   scanAndScore,
@@ -40,6 +41,8 @@ export const redditRouter = {
         }),
         intentTag: z.enum(INTENT_TAGS),
         rationale: z.string(),
+        pills: z.array(z.enum(DRAFT_PILLS)).optional(),
+        customInstructions: z.string().max(500).optional(),
       }),
     )
     .mutation(async ({ input }) => {

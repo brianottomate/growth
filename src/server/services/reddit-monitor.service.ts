@@ -14,8 +14,8 @@ export const TIER_1_SUBREDDITS = [
 const USER_AGENT =
   "web:wandercom-growth-reddit-monitor:0.1.0 (by /u/homi-scout-bot)";
 
-const SCORING_MODEL = anthropic("claude-haiku-4-5-20251001");
-const DRAFT_MODEL = anthropic("claude-sonnet-4-6");
+const SCORING_MODEL = anthropic("claude-sonnet-4-6");
+const DRAFT_MODEL = anthropic("claude-opus-4-7");
 
 const SCORING_SYSTEM_PROMPT = `You are a growth analyst at Wander, a vacation-rental company.
 
@@ -209,15 +209,57 @@ export async function scanAndScore(): Promise<{
   return { scored, totalFetched: posts.length };
 }
 
+export const DRAFT_PILLS = [
+  "short",
+  "no-pitch",
+  "lead-with-question",
+  "story-first",
+  "focus-wanderos",
+  "focus-sites",
+  "focus-operated",
+] as const;
+export type DraftPill = (typeof DRAFT_PILLS)[number];
+
+const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
+  short: "Keep the reply under 80 words.",
+  "no-pitch":
+    "Do not mention any Wander product. Provide pure value to the OP. Disclosure of affiliation is still required.",
+  "lead-with-question":
+    "Open the reply with a clarifying question to the OP before answering.",
+  "story-first":
+    "Open with a brief first-person anecdote from STR operations before answering.",
+  "focus-wanderos":
+    "If you mention a Wander product, focus on WanderOS (the direct-booking platform).",
+  "focus-sites":
+    "If you mention a Wander product, focus on Wander Sites (branded direct-booking websites).",
+  "focus-operated":
+    "If you mention a Wander product, focus on Wander Operated (full-service property management).",
+};
+
 export async function draftReplyForPost(input: {
   post: RedditPostSummary;
   intentTag: IntentTag;
   rationale: string;
+  pills?: DraftPill[];
+  customInstructions?: string;
 }): Promise<string> {
   const body = input.post.body.replace(/\s+/g, " ").slice(0, 1200);
+
+  const modifierLines: string[] = [];
+  for (const pill of input.pills ?? []) {
+    modifierLines.push(`- ${PILL_INSTRUCTIONS[pill]}`);
+  }
+  const custom = input.customInstructions?.trim();
+  if (custom) modifierLines.push(`- ${custom}`);
+
+  const modifiersBlock =
+    modifierLines.length > 0
+      ? `\n\nAdditional modifiers for THIS draft (override defaults where they conflict):\n${modifierLines.join("\n")}`
+      : "";
+
   const { text } = await generateText({
     model: DRAFT_MODEL,
-    system: DRAFT_SYSTEM_PROMPT,
+    system: DRAFT_SYSTEM_PROMPT + modifiersBlock,
     prompt: `Reddit post to reply to:
 
 sub: r/${input.post.subreddit}

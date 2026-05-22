@@ -21,9 +21,7 @@ const SUBREDDITS = [
 const USER_AGENT =
   "web:wandercom-growth-reddit-monitor:0.1.0 (by /u/homi-scout-bot)";
 
-// Haiku is plenty for this classification task and keeps the run cheap.
-// Swap for sonnet/opus if the scoring quality plateaus.
-const MODEL = anthropic("claude-haiku-4-5-20251001");
+const MODEL = anthropic("claude-sonnet-4-6");
 
 const SYSTEM_PROMPT = `You are a growth analyst at Wander, a vacation-rental company.
 
@@ -83,7 +81,7 @@ const fetched = await Promise.all(SUBREDDITS.map(fetchSubreddit));
 const posts = fetched.flat();
 console.log(`Fetched ${posts.length} posts across ${SUBREDDITS.length} subs.\n`);
 
-console.log("Scoring with Claude Haiku 4.5…");
+console.log("Scoring with Claude Sonnet 4.6…");
 const start = Date.now();
 const { output, usage } = await generateText({
   model: MODEL,
