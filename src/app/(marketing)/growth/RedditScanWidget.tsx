@@ -214,6 +214,25 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
         >
           Open on Reddit ↗
         </a>
+        {/*
+          TODO: Wire up "Open in Claude". On click, this should copy a
+          formatted prompt to the clipboard — including the post title +
+          body + subreddit, the analyst's scoring context (intent tag,
+          rationale), the active draft (if any), and the user's pill/
+          custom-instructions modifiers — then open claude.ai (or
+          chat.openai.com) in a new tab. Lets the user hand off the
+          draft to their own chatbot to keep iterating outside of our
+          single-shot mutation. Disabled until we settle on the prompt
+          shape and the target URL.
+        */}
+        <button
+          type="button"
+          disabled
+          title="Coming soon — will copy the post + scoring context + current draft to your clipboard and open Claude in a new tab"
+          className="cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-400"
+        >
+          Open in Claude ↗
+        </button>
       </div>
 
       {draft.isError && (
