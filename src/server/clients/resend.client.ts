@@ -180,16 +180,13 @@ export async function sendTransactionalEmail<T extends EmailTemplateName>(
   const subject = emailSubjects[templateName];
   const html = await renderEmailTemplate(templateName, variables);
 
-  const DEFAULT_FROM = "Your App <hello@email.wander.com>";
-  const DEFAULT_REPLY_TO = "support@email.wander.com";
-
   try {
     const response = await resend.emails.send({
-      from: options?.from ?? DEFAULT_FROM,
+      from: options?.from ?? env.RESEND_FROM_EMAIL,
       to: email,
       subject,
       html,
-      replyTo: options?.replyTo ?? DEFAULT_REPLY_TO,
+      replyTo: options?.replyTo ?? env.RESEND_REPLY_TO_EMAIL,
     });
 
     if (response.error) {

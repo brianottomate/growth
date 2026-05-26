@@ -575,7 +575,7 @@ function CommandCenterInner() {
       return {
         ...n,
         style: {
-          ...((n.style as Record<string, unknown>) ?? {}),
+          ...((n.style) ?? {}),
           opacity: isHighlighted ? 1 : 0.2,
           transition: "opacity 0.2s",
         },

@@ -204,7 +204,7 @@ function toPlainString(value: unknown): string | null {
 
 function unwrapTemporalValue(value: unknown): unknown {
   if (value && typeof value === "object" && "value" in value) {
-    return (value as { value: unknown }).value;
+    return (value).value;
   }
   return value;
 }

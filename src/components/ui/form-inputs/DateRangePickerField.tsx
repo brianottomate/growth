@@ -106,7 +106,6 @@ export function DateRangePickerField<
                 showOutsideDays={false}
                 fromYear={fromYear}
                 toYear={toYear}
-                initialFocus
               />
             </PopoverContent>
           </Popover>

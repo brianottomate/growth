@@ -180,7 +180,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         ) => {
           if (!env.NEXT_PUBLIC_POSTHOG_KEY) return;
           try {
-            posthog.capture(eventName, properties as Record<string, unknown>);
+            posthog.capture(eventName, properties);
           } catch (error) {
             console.error("❌ [Analytics] PostHog track failed:", error);
           }

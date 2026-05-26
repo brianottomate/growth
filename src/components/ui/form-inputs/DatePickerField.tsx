@@ -98,7 +98,6 @@ export function DatePickerField<
                 captionLayout={captionLayout}
                 fromYear={fromYear}
                 toYear={toYear}
-                initialFocus
               />
             </PopoverContent>
           </Popover>
@@ -221,7 +220,6 @@ function NaturalDatePickerInput({
             captionLayout="dropdown"
             fromYear={fromYear}
             toYear={toYear}
-            initialFocus
           />
         </PopoverContent>
       </Popover>

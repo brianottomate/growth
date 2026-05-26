@@ -27,9 +27,9 @@
     ],
     "incremental": true,
     /* Path Aliases */
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "#velite": ["./.velite"]
     }
   },
   "include": [

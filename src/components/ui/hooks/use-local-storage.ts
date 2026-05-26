@@ -103,7 +103,7 @@ export function useLocalStorage<T>({
 
   const setFrom = React.useCallback(
     (next: T | undefined) => {
-      const resolved = next ?? (defaultValue as T);
+      const resolved = (next ?? defaultValue) as T;
       setValue((prev) => (Object.is(prev, resolved) ? prev : resolved));
     },
     [defaultValue],
@@ -137,10 +137,10 @@ export function useLocalStorage<T>({
     };
 
     window.addEventListener("storage", onStorage);
-    window.addEventListener(LOCAL_EVENT, onLocal as EventListener);
+    window.addEventListener(LOCAL_EVENT, onLocal);
     return () => {
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener(LOCAL_EVENT, onLocal as EventListener);
+      window.removeEventListener(LOCAL_EVENT, onLocal);
     };
   }, [sync, storageKey, setFrom, read]);
 

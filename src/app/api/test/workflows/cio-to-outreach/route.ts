@@ -57,7 +57,7 @@ function buildLeadFromCio(
       assignedBdrName: cioData.assignedBdrName,
       assignedBdrOutreachId: cioData.assignedBdrOutreachId,
     } as Record<string, unknown>),
-  } as LeadData;
+  };
 }
 
 function mergeLeadData(primary: LeadData, secondary: LeadData): LeadData {
@@ -102,7 +102,7 @@ function mergeLeadData(primary: LeadData, secondary: LeadData): LeadData {
     }
   }
 
-  return mergedRecord as LeadData;
+  return mergedRecord;
 }
 
 function getProspectOwnerId(prospect: {
@@ -425,10 +425,10 @@ export async function GET(request: Request) {
       filledFromCio = Object.keys(cioRecord).filter(
         (key) => bqRecord[key] == null && cioRecord[key] != null,
       );
-      leadData = mergeLeadData(bqData as LeadData, cioLead);
+      leadData = mergeLeadData(bqData, cioLead);
     } else if (bqData) {
       dataSource = "bigquery";
-      leadData = bqData as LeadData;
+      leadData = bqData;
     } else if (cioLead) {
       dataSource = "customerio";
       leadData = cioLead;

@@ -103,14 +103,14 @@ export function RichTextareaField<
   // Use useController for the text field if provided
   const textFieldController = useController({
     control,
-    name: (textFieldName ?? name) as Path<TFieldValues>,
+    name: (textFieldName ?? name),
     disabled: !textFieldName,
   });
 
   // Use useController for the markdown field if provided
   const markdownFieldController = useController({
     control,
-    name: (markdownFieldName ?? name) as Path<TFieldValues>,
+    name: (markdownFieldName ?? name),
     disabled: !markdownFieldName,
   });
 
@@ -138,7 +138,7 @@ export function RichTextareaField<
             )}
             <FormControl>
               <EditorComponent
-                content={field.value as JSONContent | string}
+                content={field.value}
                 onChange={(json, text, markdown) => {
                   field.onChange(json);
                   // Update text field if provided

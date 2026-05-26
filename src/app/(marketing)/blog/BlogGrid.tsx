@@ -5,7 +5,7 @@ import { AUTHORS } from "@/lib/blog-authors";
 import { Heading } from "@wandercom/design-system-web/ui/heading";
 import { Text } from "@wandercom/design-system-web/ui/text";
 
-import type { Post } from ".velite";
+import type { Post } from "#velite";
 
 interface BlogGridProps {
   posts: readonly Post[];

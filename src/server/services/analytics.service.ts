@@ -54,7 +54,7 @@ const serverAnalyticsProviders: ServerAnalyticsProvider[] = [
             return posthogCapture({
               distinctId: userId,
               event,
-              properties: properties as Record<string, unknown>,
+              properties: properties,
               timestamp: meta?.timestamp,
               groups: meta?.groups as Record<string, string | number> | undefined,
             });

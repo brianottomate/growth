@@ -5,7 +5,7 @@ import { Search, X } from "lucide-react";
 import { useTransition } from "react";
 
 import { Text } from "@wandercom/design-system-web/ui/text";
-import type { Post } from ".velite";
+import type { Post } from "#velite";
 
 interface BlogSearchProps {
   allPosts: readonly Post[];

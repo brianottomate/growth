@@ -16,6 +16,8 @@ export const env = createEnv({
       .enum(["development", "test", "production"])
       .default("development"),
     RESEND_API_KEY: z.string().optional(),
+    RESEND_FROM_EMAIL: z.string().default("Wander <onboarding@resend.dev>"),
+    RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     ADMIN_TOKEN: z.string().min(32), // Require strong token (32+ chars)
@@ -84,6 +86,8 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+    RESEND_REPLY_TO_EMAIL: process.env.RESEND_REPLY_TO_EMAIL,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,

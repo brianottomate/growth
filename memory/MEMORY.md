@@ -16,3 +16,16 @@
 
 ## Active Branches
 - `feat/wander-data-flow` — Wander system map visualization (SystemMap component + wander-system.ts data)
+
+## Build / Tooling Gotchas (post May 2026 upgrade)
+
+- **Use `import type` not `import { type X }`.** Turbopack on Next 16.2+ doesn't reliably erase the inline `type` modifier; the import chain gets followed and leaks server modules (anything transitively using `next/headers`) into client bundles. Applies especially to type-only imports of `AppRouter` and similar.
+- **ESLint is pinned to `^9.39.4`.** Don't bump to 10 until `eslint-plugin-react` (still 7.37.5) ships ESLint 10 support — 10 removed `context.getFilename()` which the plugin still calls. Revisit when the plugin updates, or consider dropping `eslint-plugin-react` entirely (most rules duplicate `@next/eslint-plugin-next`).
+- **Velite imports use `#velite` alias, not `from ".velite"`.** The old form only worked because of TS's now-deprecated `baseUrl`. Path is registered in `tsconfig.json` paths.
+- **Resend sender is env-driven via `RESEND_FROM_EMAIL` / `RESEND_REPLY_TO_EMAIL`.** Default is `Wander <onboarding@resend.dev>` which works on any Resend account without domain verification — override to `Wander <hello@email.wander.com>` once `email.wander.com` is verified on the Resend account in use.
+
+## Pre-existing lint debt (May 2026)
+
+`bun run check` reports ~18 errors in pre-existing code, none introduced by the upgrade. Hotspots:
+- `src/app/flow/pregen-sites/page.tsx`, `src/app/flow/whiteboard/page.tsx`, `src/components/system-map/SystemMap.tsx` — dagre's `g.node()` returns weakly-typed `any`; fix by typing the result as `{ x: number; y: number }` or using `@types/dagre` types.
+- `src/app/api/instantly/test-write/route.ts` — uncommitted WIP; imports `@/server/clients/instantly.client` which doesn't exist yet. Build will fail until that client is created or this file is removed.

@@ -13,5 +13,5 @@ export function omit<T extends object, K extends keyof T>(
   for (const key of keys) {
     delete result[key];
   }
-  return result as Omit<T, K>;
+  return result;
 }

@@ -154,10 +154,10 @@ export async function processLead(params: {
 
     if (bqData && cioCustomer) {
       const cioLead = transformCioToLeadFormat(cioCustomer, eventType, eventData);
-      leadData = mergeLeadData(bqData as LeadData, cioLead);
+      leadData = mergeLeadData(bqData, cioLead);
       dataSource = "bigquery+customerio";
     } else if (bqData) {
-      leadData = bqData as LeadData;
+      leadData = bqData;
       dataSource = "bigquery";
     } else if (cioCustomer) {
       leadData = transformCioToLeadFormat(cioCustomer, eventType, eventData);
@@ -489,7 +489,7 @@ function transformCioToLeadFormat(
       assignedBdrEmail: cioCustomer.assignedBdrEmail,
       assignedBdrName: cioCustomer.assignedBdrName,
     } as Record<string, unknown>),
-  } as LeadData;
+  };
 }
 
 function mergeLeadData(primary: LeadData, secondary: LeadData): LeadData {
@@ -530,7 +530,7 @@ function mergeLeadData(primary: LeadData, secondary: LeadData): LeadData {
     }
   }
 
-  return mergedRecord as LeadData;
+  return mergedRecord;
 }
 
 function getProspectOwnerId(prospect: {
