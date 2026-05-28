@@ -56,6 +56,8 @@ export const env = createEnv({
     X_CONSUMER_KEY: z.string().optional(),
     X_CONSUMER_SECRET: z.string().optional(),
     X_BEARER_TOKEN: z.string().optional(),
+    // Zernio (social channel centralization + ROI)
+    ZERNIO_API_KEY: z.string().optional(),
   },
 
   /**
@@ -127,6 +129,8 @@ export const env = createEnv({
     X_CONSUMER_KEY: process.env.X_CONSUMER_KEY,
     X_CONSUMER_SECRET: process.env.X_CONSUMER_SECRET,
     X_BEARER_TOKEN: process.env.X_BEARER_TOKEN,
+    // Zernio
+    ZERNIO_API_KEY: process.env.ZERNIO_API_KEY,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
