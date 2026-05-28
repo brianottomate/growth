@@ -37,6 +37,8 @@ import {
 const NODE_WIDTH = 172;
 const NODE_HEIGHT = 52;
 
+type DagrePosition = { x: number; y: number };
+
 function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
@@ -49,7 +51,7 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   dagre.layout(g);
 
   return nodes.map((n) => {
-    const pos = g.node(n.id);
+    const pos = g.node(n.id) as DagrePosition;
     return {
       ...n,
       position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
@@ -95,9 +97,7 @@ function PregenNodeComponent({ data }: NodeProps) {
           style={{ background: d.color }}
         />
         <div className="min-w-0">
-          <div className="truncate text-xs font-bold text-white">
-            {d.label}
-          </div>
+          <div className="truncate text-xs font-bold text-white">{d.label}</div>
           {d.description && (
             <div className="truncate text-[10px] text-white/50">
               {d.description}
@@ -166,7 +166,10 @@ function DetailPanel({
             className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
             style={{ background: `${color}22`, color }}
           >
-            <div className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+            <div
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: color }}
+            />
             {node.kind}
           </div>
           <div
@@ -191,7 +194,7 @@ function DetailPanel({
 
       {connectedEdges.length > 0 && (
         <div>
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+          <div className="mb-2 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
             Connections
           </div>
           <div className="space-y-1.5">
@@ -200,9 +203,14 @@ function DetailPanel({
               const otherId = isSource ? e.target : e.source;
               const otherNode = NODES.find((n) => n.id === otherId);
               return (
-                <div key={e.id} className="flex items-center gap-2 text-xs text-white/50">
+                <div
+                  key={e.id}
+                  className="flex items-center gap-2 text-xs text-white/50"
+                >
                   <span className="text-white/20">{isSource ? "→" : "←"}</span>
-                  <span className="text-white/70">{otherNode?.label ?? otherId}</span>
+                  <span className="text-white/70">
+                    {otherNode?.label ?? otherId}
+                  </span>
                   {e.label && (
                     <span className="text-white/30">({e.label})</span>
                   )}
@@ -253,7 +261,8 @@ function PregenSitesInner() {
     }));
 
     const rfEdges: Edge[] = filteredEdges.map((e) => {
-      const style = EDGE_TYPE_STYLES[e.type ?? "data"] ?? EDGE_TYPE_STYLES.data!;
+      const style =
+        EDGE_TYPE_STYLES[e.type ?? "data"] ?? EDGE_TYPE_STYLES.data!;
       return {
         id: e.id,
         source: e.source,
@@ -367,7 +376,10 @@ function PregenSitesInner() {
         {(Object.entries(KIND_COLORS) as [NodeKind, string][]).map(
           ([kind, color]) => (
             <div key={kind} className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full" style={{ background: color }} />
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ background: color }}
+              />
               <span className="text-[10px] text-white/40">{kind}</span>
             </div>
           ),

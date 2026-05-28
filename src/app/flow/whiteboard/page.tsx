@@ -23,7 +23,6 @@ import "@xyflow/react/dist/style.css";
 
 import {
   PLATFORM_NODES,
-  PLATFORM_EDGES,
   PLATFORM_COLORS,
   KIND_COLORS,
   LENS_META,
@@ -37,6 +36,8 @@ import {
 
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 52;
+
+type DagrePosition = { x: number; y: number };
 
 function applyDagreLayout(
   nodes: Node[],
@@ -55,7 +56,7 @@ function applyDagreLayout(
   dagre.layout(g);
 
   return nodes.map((n) => {
-    const pos = g.node(n.id);
+    const pos = g.node(n.id) as DagrePosition;
     return {
       ...n,
       position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
@@ -66,7 +67,10 @@ function applyDagreLayout(
 // ─── Custom nodes ────────────────────────────────────────
 
 function PlatformNodeComponent({ data }: NodeProps) {
-  const d = data as unknown as PlatformNode & { color: string; borderColor: string };
+  const d = data as unknown as PlatformNode & {
+    color: string;
+    borderColor: string;
+  };
 
   return (
     <div
@@ -88,9 +92,7 @@ function PlatformNodeComponent({ data }: NodeProps) {
           style={{ background: d.color }}
         />
         <div className="min-w-0">
-          <div className="truncate text-xs font-bold text-white">
-            {d.label}
-          </div>
+          <div className="truncate text-xs font-bold text-white">{d.label}</div>
           {d.description && (
             <div className="truncate text-[10px] text-white/50">
               {d.description}
@@ -125,7 +127,7 @@ function GroupNodeComponent({ data }: NodeProps) {
         position={Position.Top}
         style={{ background: "rgba(255,255,255,0.2)", width: 6, height: 6 }}
       />
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+      <div className="text-[10px] font-semibold tracking-wider text-white/40 uppercase">
         {d.label}
       </div>
       <Handle
@@ -233,10 +235,7 @@ function DetailPanel({
           />
           {node.kind}
         </div>
-        <button
-          onClick={onClose}
-          className="text-white/30 hover:text-white/70"
-        >
+        <button onClick={onClose} className="text-white/30 hover:text-white/70">
           ✕
         </button>
       </div>
@@ -248,7 +247,7 @@ function DetailPanel({
 
       {node.tech && (
         <div className="mb-3">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+          <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
             Tech
           </div>
           <div className="text-sm text-white/80">{node.tech}</div>
@@ -257,7 +256,7 @@ function DetailPanel({
 
       {node.platform && (
         <div className="mb-3">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+          <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
             Platform
           </div>
           <div
@@ -274,7 +273,7 @@ function DetailPanel({
 
       {node.repo && (
         <div className="mb-3">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+          <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
             Repository
           </div>
           <div className="font-mono text-xs text-white/70">{node.repo}</div>
@@ -318,7 +317,11 @@ function WhiteboardInner() {
       });
 
       const rfEdges: Edge[] = platformEdges.map((e) => {
-        const fallback = { stroke: "#60a5fa", strokeDasharray: undefined, animated: true };
+        const fallback = {
+          stroke: "#60a5fa",
+          strokeDasharray: undefined,
+          animated: true,
+        };
         const style = EDGE_STYLES[e.type] ?? fallback;
         return {
           id: e.id,
@@ -358,7 +361,12 @@ function WhiteboardInner() {
     buildGraph(activeLens);
   }, [activeLens, buildGraph]);
 
-  const lenses: PlatformLens[] = ["full", "surfaces", "monorepo", "growth-stack"];
+  const lenses: PlatformLens[] = [
+    "full",
+    "surfaces",
+    "monorepo",
+    "growth-stack",
+  ];
 
   return (
     <div className="flex h-full flex-col bg-gray-950">
@@ -433,9 +441,7 @@ function WhiteboardInner() {
 
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-white/10 px-6 py-2">
-        {(
-          Object.entries(PLATFORM_COLORS)
-        ).map(([platform, color]) => (
+        {Object.entries(PLATFORM_COLORS).map(([platform, color]) => (
           <div key={platform} className="flex items-center gap-1.5">
             <div
               className="h-2 w-2 rounded-full"
@@ -454,7 +460,10 @@ function WhiteboardInner() {
             <span className="text-[10px] text-white/40">contains</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="h-px w-5 bg-orange-400" style={{ borderTop: "2px dashed #f97316" }} />
+            <div
+              className="h-px w-5 bg-orange-400"
+              style={{ borderTop: "2px dashed #f97316" }}
+            />
             <span className="text-[10px] text-white/40">depends</span>
           </div>
           <div className="flex items-center gap-1.5">

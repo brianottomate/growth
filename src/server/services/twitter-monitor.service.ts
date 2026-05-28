@@ -5,7 +5,6 @@ import { Output, generateText } from "ai";
 import { z } from "zod";
 
 import {
-  DRAFT_PILLS,
   INTENT_TAGS,
   SUGGESTED_ACTIONS,
   type DraftPill,
@@ -141,9 +140,7 @@ export async function searchRecentTweets(): Promise<TweetSummary[]> {
 
   const json = (await res.json()) as RawSearchResponse;
   const tweets = json.data ?? [];
-  const userById = new Map(
-    (json.includes?.users ?? []).map((u) => [u.id, u]),
-  );
+  const userById = new Map((json.includes?.users ?? []).map((u) => [u.id, u]));
 
   return tweets.map<TweetSummary>((t) => {
     const user = userById.get(t.author_id);

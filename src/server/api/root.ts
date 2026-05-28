@@ -4,6 +4,7 @@ import { blobRouter } from "@/server/api/routers/blob.router";
 import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
+import { instantlyRouter } from "@/server/api/routers/instantly.router";
 import { redditRouter } from "@/server/api/routers/reddit.router";
 import { twitterRouter } from "@/server/api/routers/twitter.router";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
@@ -20,6 +21,7 @@ export const appRouter = createTRPCRouter({
   newsletter: newsletterRouter,
   org: orgRouter,
   outreach: outreachRouter,
+  instantly: instantlyRouter,
   reddit: redditRouter,
   twitter: twitterRouter,
 });

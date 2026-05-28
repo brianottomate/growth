@@ -144,8 +144,8 @@ async function AdsSection({ filter }: { filter: StatusFilter }) {
       <p className="text-xs text-gray-500">
         <span className="font-mono">{result.campaignCount}</span> campaigns ·{" "}
         <span className="font-mono">{result.adSetCount}</span> ad sets ·{" "}
-        <span className="font-mono">{result.totalAds}</span> total ads ·{" "}
-        showing <span className="font-mono">{sorted.length}</span> after filter
+        <span className="font-mono">{result.totalAds}</span> total ads · showing{" "}
+        <span className="font-mono">{sorted.length}</span> after filter
         {result.truncated
           ? ` (capped at ${sorted.length} of ${result.filteredCount})`
           : ""}{" "}
@@ -182,7 +182,7 @@ function StatusDistribution({ counts }: { counts: Record<string, number> }) {
   );
 }
 
-function sortDate(ad: { [key: string]: unknown }): Date | null {
+function sortDate(ad: Record<string, unknown>): Date | null {
   const candidates = [
     "platformCreatedAt",
     "createdAt",

@@ -38,19 +38,30 @@ import {
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 44;
 
-function applyDagreLayout(nodes: Node[], edges: Edge[], direction: "LR" | "TB" = "LR"): Node[] {
+type DagrePosition = { x: number; y: number };
+
+function applyDagreLayout(
+  nodes: Node[],
+  edges: Edge[],
+  direction: "LR" | "TB" = "LR",
+): Node[] {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: direction, ranksep: 80, nodesep: 40 });
 
-  nodes.forEach((n) => g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }));
+  nodes.forEach((n) =>
+    g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT }),
+  );
   edges.forEach((e) => g.setEdge(e.source, e.target));
 
   dagre.layout(g);
 
   return nodes.map((n) => {
-    const pos = g.node(n.id);
-    return { ...n, position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 } };
+    const pos = g.node(n.id) as DagrePosition;
+    return {
+      ...n,
+      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
+    };
   });
 }
 
@@ -68,18 +79,29 @@ function WanderNodeComponent({ data }: NodeProps) {
         minWidth: NODE_WIDTH,
       }}
     >
-      <Handle type="target" position={Position.Left} style={{ background: "rgba(255,255,255,0.2)" }} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ background: "rgba(255,255,255,0.2)" }}
+      />
       <div className="flex items-center gap-2">
         <div
           className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
           style={{ background: nodeData.color }}
         />
         <div>
-          <div className="text-xs font-semibold leading-tight text-white">{nodeData.label}</div>
+          <div className="text-xs leading-tight font-semibold text-white">
+            {nodeData.label}
+          </div>
           {nodeData.description && (
             <div
               className="mt-0.5 text-[10px] text-white/50"
-              style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              style={{
+                maxWidth: 140,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
             >
               {nodeData.description}
             </div>
@@ -92,7 +114,11 @@ function WanderNodeComponent({ data }: NodeProps) {
           className="absolute -top-1.5 -right-1.5 h-3 w-3 rounded-full bg-amber-400"
         />
       )}
-      <Handle type="source" position={Position.Right} style={{ background: "rgba(255,255,255,0.2)" }} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ background: "rgba(255,255,255,0.2)" }}
+      />
     </div>
   );
 }
@@ -101,12 +127,22 @@ const nodeTypes: NodeTypes = { wander: WanderNodeComponent };
 
 // ─── Lens button ──────────────────────────────────────────
 
-function LensButton({ lens, active, onClick }: { lens: Lens; active: boolean; onClick: () => void }) {
+function LensButton({
+  lens,
+  active,
+  onClick,
+}: {
+  lens: Lens;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
       className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
-        active ? "bg-white text-gray-900 shadow" : "text-white/60 hover:bg-white/10 hover:text-white/90"
+        active
+          ? "bg-white text-gray-900 shadow"
+          : "text-white/60 hover:bg-white/10 hover:text-white/90"
       }`}
     >
       {LENS_LABELS[lens]}
@@ -159,12 +195,21 @@ function SystemMapInner() {
           type: MarkerType.ArrowClosed,
           width: 12,
           height: 12,
-          color: e.type === "events" ? "#60a5fa" : e.type === "webhook" ? "#a78bfa" : "#94a3b8",
+          color:
+            e.type === "events"
+              ? "#60a5fa"
+              : e.type === "webhook"
+                ? "#a78bfa"
+                : "#94a3b8",
         },
         animated: e.type === "events",
       }));
 
-      const laid = applyDagreLayout(rfNodes, rfEdges, lens === "full" ? "TB" : "LR");
+      const laid = applyDagreLayout(
+        rfNodes,
+        rfEdges,
+        lens === "full" ? "TB" : "LR",
+      );
       setNodes(laid);
       setEdges(rfEdges);
       setSelectedNode(null);
@@ -176,19 +221,34 @@ function SystemMapInner() {
     buildGraph(activeLens);
   }, [activeLens, buildGraph]);
 
-  const lenses: Lens[] = ["full", "data-spine", "guest-journey", "sales-motion", "attribution"];
+  const lenses: Lens[] = [
+    "full",
+    "data-spine",
+    "guest-journey",
+    "sales-motion",
+    "attribution",
+  ];
 
   return (
     <div className="flex h-full flex-col bg-gray-950">
       {/* Header */}
       <div className="flex items-start justify-between border-b border-white/10 px-6 py-4">
         <div>
-          <h1 className="text-sm font-semibold text-white">Wander System Map</h1>
-          <p className="mt-0.5 text-xs text-white/40">{LENS_DESCRIPTIONS[activeLens]}</p>
+          <h1 className="text-sm font-semibold text-white">
+            Wander System Map
+          </h1>
+          <p className="mt-0.5 text-xs text-white/40">
+            {LENS_DESCRIPTIONS[activeLens]}
+          </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
           {lenses.map((lens) => (
-            <LensButton key={lens} lens={lens} active={activeLens === lens} onClick={() => setActiveLens(lens)} />
+            <LensButton
+              key={lens}
+              lens={lens}
+              active={activeLens === lens}
+              onClick={() => setActiveLens(lens)}
+            />
           ))}
         </div>
       </div>
@@ -212,7 +272,12 @@ function SystemMapInner() {
             maxZoom={2}
             colorMode="dark"
           >
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="rgba(255,255,255,0.06)" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={24}
+              size={1}
+              color="rgba(255,255,255,0.06)"
+            />
             <Controls />
             <MiniMap
               nodeColor={(n) => {
@@ -235,31 +300,50 @@ function SystemMapInner() {
                   color: NODE_COLORS[selectedNode.type],
                 }}
               >
-                <div className="h-1.5 w-1.5 rounded-full" style={{ background: NODE_COLORS[selectedNode.type] }} />
+                <div
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: NODE_COLORS[selectedNode.type] }}
+                />
                 {selectedNode.type}
               </div>
-              <button onClick={() => setSelectedNode(null)} className="text-white/30 hover:text-white/70">
+              <button
+                onClick={() => setSelectedNode(null)}
+                className="text-white/30 hover:text-white/70"
+              >
                 ✕
               </button>
             </div>
 
-            <h2 className="mb-1 text-base font-semibold text-white">{selectedNode.label}</h2>
+            <h2 className="mb-1 text-base font-semibold text-white">
+              {selectedNode.label}
+            </h2>
             {selectedNode.description && (
-              <p className="mb-4 text-sm text-white/60">{selectedNode.description}</p>
+              <p className="mb-4 text-sm text-white/60">
+                {selectedNode.description}
+              </p>
             )}
 
             {selectedNode.owner && (
               <div className="mb-3">
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Owner</div>
-                <div className="text-sm text-white/80">{selectedNode.owner}</div>
+                <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+                  Owner
+                </div>
+                <div className="text-sm text-white/80">
+                  {selectedNode.owner}
+                </div>
               </div>
             )}
 
             <div className="mb-3">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Appears in lenses</div>
+              <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+                Appears in lenses
+              </div>
               <div className="flex flex-wrap gap-1">
                 {selectedNode.lenses.map((l) => (
-                  <span key={l} className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">
+                  <span
+                    key={l}
+                    className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60"
+                  >
                     {LENS_LABELS[l]}
                   </span>
                 ))}
@@ -301,7 +385,10 @@ function SystemMapInner() {
           ] as const
         ).map(([type, label]) => (
           <div key={type} className="flex items-center gap-1.5">
-            <div className="h-2 w-2 rounded-full" style={{ background: NODE_COLORS[type] }} />
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{ background: NODE_COLORS[type] }}
+            />
             <span className="text-[10px] text-white/40">{label}</span>
           </div>
         ))}

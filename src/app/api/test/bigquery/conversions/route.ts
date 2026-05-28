@@ -16,13 +16,6 @@ export async function GET(request: Request) {
 
   const startMs = Date.now();
 
-  // The stg_ view references fivetran_google_ads which the SA may not have
-  // access to. Try the analytics view first, fall back to the raw Fivetran table.
-  const TABLES = [
-    "wander-9fc9c.analytics.stg_fivetran__custom_conversions_by_action",
-    "wander-9fc9c.fivetran_google_ads.custom_conversions_by_action",
-  ] as const;
-
   try {
     if (mode === "schema") {
       const columns = await executeQuery<{
