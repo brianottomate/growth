@@ -15,6 +15,32 @@ export const firecrawl = new Firecrawl({
   apiKey: env.FIRECRAWL_API_KEY!,
 });
 
+export const isFirecrawlConfigured = !!env.FIRECRAWL_API_KEY;
+
+/**
+ * Scrape a site for lead enrichment: main-content markdown + page metadata +
+ * a full-page screenshot URL. Throws on failure (the discovery service wraps
+ * each provider in its own try/catch envelope).
+ */
+export async function scrapeForEnrichment(url: string): Promise<{
+  markdown?: string;
+  metadata?: Record<string, unknown>;
+  screenshot?: string;
+}> {
+  const result = await firecrawl.scrape(url, {
+    formats: ["markdown", "screenshot"],
+    onlyMainContent: true,
+  });
+  return {
+    markdown: result.markdown,
+    metadata: result.metadata,
+    // v4 returns the screenshot as a hosted URL on `screenshot`.
+    screenshot:
+      (result as { screenshot?: string }).screenshot ??
+      (result as { screenshotUrl?: string }).screenshotUrl,
+  };
+}
+
 // =====================================================
 // TYPE DEFINITIONS
 // =====================================================

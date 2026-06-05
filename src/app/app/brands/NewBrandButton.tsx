@@ -1,0 +1,125 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTRPC } from "@/trpc/react";
+
+const TYPES = [
+  { value: "company", label: "Company" },
+  { value: "personal", label: "Personal" },
+];
+
+export function NewBrandButton() {
+  const router = useRouter();
+  const trpc = useTRPC();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [brandType, setBrandType] = useState("company");
+  const [website, setWebsite] = useState("");
+
+  const createM = useMutation(
+    trpc.brand.create.mutationOptions({
+      onSuccess: () => {
+        setOpen(false);
+        setName("");
+        setWebsite("");
+        setBrandType("company");
+        router.refresh();
+      },
+    }),
+  );
+
+  const save = () =>
+    createM.mutate({
+      name,
+      scope: "owned",
+      brandType: brandType as never,
+      website: website || undefined,
+    });
+
+  return (
+    <>
+      <Button size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
+        <Plus className="size-3.5" />
+        New brand
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New brand</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-1.5">
+              <Label>Name</Label>
+              <Input
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Wander"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Type</Label>
+              <Select value={brandType} onValueChange={setBrandType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Website</Label>
+              <Input
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="wander.com"
+              />
+              <p className="text-muted-foreground text-xs">
+                Optional — we&apos;ll auto-fill details from the site.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={createM.isPending}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={save} loading={createM.isPending} disabled={!name.trim()}>
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
