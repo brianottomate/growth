@@ -1,0 +1,333 @@
+"use client";
+
+import { useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { ExternalLink, Sparkles } from "lucide-react";
+
+import { useTRPC } from "@/trpc/react";
+import { EnrichDrawer } from "./EnrichDrawer";
+
+const SOURCE_BADGE: Record<string, string> = {
+  builtwith: "bg-slate-500/15 text-slate-300",
+  hubspot: "bg-orange-500/15 text-orange-300",
+  pregen: "bg-emerald-500/15 text-emerald-300",
+  instantly: "bg-violet-500/15 text-violet-300",
+};
+
+const fmt = (n: number | null | undefined) =>
+  n == null ? "—" : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`;
+
+type SourceKey = "builtwith" | "hubspot" | "pregen" | "instantly";
+
+function StatCard({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={`bg-card rounded-xl border p-4 ${accent ? "border-emerald-500/30" : ""}`}
+    >
+      <div className="text-muted-foreground text-xs font-medium">{label}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
+      {hint && <div className="text-muted-foreground/70 mt-0.5 text-[11px]">{hint}</div>}
+    </div>
+  );
+}
+
+function Pill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+        active
+          ? "bg-foreground text-background border-foreground"
+          : "border-border text-muted-foreground hover:bg-accent"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function LeadsClient() {
+  const trpc = useTRPC();
+
+  const [q, setQ] = useState("");
+  const [source, setSource] = useState<SourceKey | undefined>(undefined);
+  const [pms, setPms] = useState<string | undefined>(undefined);
+  const [integratedOnly, setIntegratedOnly] = useState(false);
+  const [hasPregen, setHasPregen] = useState(false);
+  const [sort, setSort] = useState<"units" | "composite" | "domain" | "updated">("units");
+  const [page, setPage] = useState(0);
+  const [enrichDomain, setEnrichDomain] = useState<string | null>(null);
+
+  const limit = 50;
+
+  const stats = useQuery(trpc.leads.stats.queryOptions());
+  const pmsOptions = useQuery(trpc.leads.pmsOptions.queryOptions());
+
+  const list = useQuery(
+    trpc.leads.listDomains.queryOptions(
+      {
+        q: q || undefined,
+        source,
+        pms,
+        integratedPmsOnly: integratedOnly || undefined,
+        hasPregenSite: hasPregen || undefined,
+        sort,
+        dir: sort === "domain" ? "asc" : "desc",
+        limit,
+        offset: page * limit,
+      },
+      { placeholderData: keepPreviousData },
+    ),
+  );
+
+  const resetPage = () => setPage(0);
+  const s = stats.data;
+
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
+      <p className="text-muted-foreground mt-1 text-sm">
+        Domain-centric prospecting universe · BuiltWith + HubSpot + pregen +
+        Instantly, deduped on domain
+      </p>
+
+      {/* summary cards */}
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <StatCard label="Domains" value={fmt(s?.domains)} hint="unique, deduped" />
+        <StatCard label="Contacts" value={fmt(s?.contacts)} hint="across domains" />
+        <StatCard
+          label="Untouched"
+          value={fmt(s?.untouched)}
+          hint="BuiltWith, no CRM/pregen"
+          accent
+        />
+        <StatCard label="Pregen sites" value={fmt(s?.withPregenSite)} hint="already built" />
+        <StatCard
+          label="Pregen ∩ CRM"
+          value={fmt(s?.pregenInCrm)}
+          hint="pre-send guard"
+        />
+        <StatCard
+          label="Integrated PMS"
+          value={fmt(s?.integratedPms)}
+          hint="API-connected"
+        />
+      </div>
+
+      {/* filter bar */}
+      <div className="mt-6 flex flex-wrap items-center gap-2 border-b pb-4">
+        <input
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            resetPage();
+          }}
+          placeholder="Search domain or company…"
+          className="border-border bg-background focus:ring-ring w-64 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
+        />
+        <span className="bg-border mx-1 h-4 w-px" />
+        <Pill active={!source} onClick={() => { setSource(undefined); resetPage(); }}>
+          All sources
+        </Pill>
+        {(["builtwith", "hubspot", "pregen", "instantly"] as SourceKey[]).map((sk) => (
+          <Pill
+            key={sk}
+            active={source === sk}
+            onClick={() => { setSource(source === sk ? undefined : sk); resetPage(); }}
+          >
+            {sk}
+            {s ? ` · ${fmt(s[sk])}` : ""}
+          </Pill>
+        ))}
+        <span className="bg-border mx-1 h-4 w-px" />
+        <select
+          value={pms ?? ""}
+          onChange={(e) => { setPms(e.target.value || undefined); resetPage(); }}
+          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+        >
+          <option value="">All PMS</option>
+          {pmsOptions.data?.map((p) => (
+            <option key={p.pms} value={p.pms ?? ""}>
+              {p.pms} ({p.count})
+            </option>
+          ))}
+        </select>
+        <Pill active={integratedOnly} onClick={() => { setIntegratedOnly((v) => !v); resetPage(); }}>
+          Integrated PMS
+        </Pill>
+        <Pill active={hasPregen} onClick={() => { setHasPregen((v) => !v); resetPage(); }}>
+          Has pregen site
+        </Pill>
+        <span className="flex-1" />
+        <select
+          value={sort}
+          onChange={(e) => { setSort(e.target.value as typeof sort); resetPage(); }}
+          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+        >
+          <option value="units">Sort: units</option>
+          <option value="composite">Sort: score</option>
+          <option value="domain">Sort: domain A–Z</option>
+          <option value="updated">Sort: recently updated</option>
+        </select>
+      </div>
+
+      {/* result count */}
+      <div className="text-muted-foreground mt-3 text-xs">
+        {list.data ? `${fmt(list.data.total)} matching domains` : "Loading…"}
+      </div>
+
+      {/* table */}
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr className="text-muted-foreground text-left text-xs">
+              <th className="border-b py-2 pr-3 font-medium">Domain</th>
+              <th className="border-b px-3 py-2 font-medium">Company</th>
+              <th className="border-b px-3 py-2 font-medium">PMS</th>
+              <th className="border-b px-3 py-2 text-right font-medium">Units</th>
+              <th className="border-b px-3 py-2 font-medium">Tier</th>
+              <th className="border-b px-3 py-2 font-medium">Sources</th>
+              <th className="border-b px-3 py-2 font-medium">Pregen</th>
+              <th className="border-b px-3 py-2 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.data?.items.map((d) => (
+              <tr key={d.id} className="hover:bg-accent/30">
+                <td className="border-b py-2 pr-3 font-medium">
+                  <a
+                    href={`https://${d.domain}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    {d.domain}
+                    <ExternalLink className="size-3 opacity-40" />
+                  </a>
+                </td>
+                <td className="text-muted-foreground border-b px-3 py-2">
+                  <span className="line-clamp-1 max-w-[16rem]">
+                    {d.companyName ?? "—"}
+                  </span>
+                </td>
+                <td className="border-b px-3 py-2">
+                  {d.pms ? (
+                    <span className="inline-flex items-center gap-1">
+                      {d.pms}
+                      {d.isIntegratedPms && (
+                        <span className="size-1.5 rounded-full bg-emerald-400" title="Integrated PMS" />
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="border-b px-3 py-2 text-right tabular-nums">
+                  {fmt(d.unitCount)}
+                </td>
+                <td className="text-muted-foreground border-b px-3 py-2 text-xs">
+                  {d.sourceTier ?? "—"}
+                </td>
+                <td className="border-b px-3 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {(["builtwith", "hubspot", "pregen", "instantly"] as SourceKey[])
+                      .filter((sk) =>
+                        sk === "builtwith"
+                          ? d.inBuiltwith
+                          : sk === "hubspot"
+                            ? d.inHubspot
+                            : sk === "pregen"
+                              ? d.inPregen
+                              : d.inInstantly,
+                      )
+                      .map((sk) => (
+                        <span
+                          key={sk}
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${SOURCE_BADGE[sk]}`}
+                        >
+                          {sk.slice(0, 2).toUpperCase()}
+                        </span>
+                      ))}
+                  </div>
+                </td>
+                <td className="border-b px-3 py-2 text-xs">
+                  {d.pregenSiteUrl ? (
+                    <span className="text-emerald-300">{d.pregenStatus ?? "ready"}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="border-b px-3 py-2 text-right">
+                  <button
+                    onClick={() => setEnrichDomain(d.domain)}
+                    title="Enrich (inspect)"
+                    className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                  >
+                    <Sparkles className="size-3" />
+                    Enrich
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {list.data && list.data.items.length === 0 && (
+          <div className="text-muted-foreground py-12 text-center text-sm">
+            No domains match these filters.
+          </div>
+        )}
+      </div>
+
+      {/* pagination */}
+      {list.data && list.data.total > limit && (
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground text-xs">
+            {page * limit + 1}–{Math.min((page + 1) * limit, list.data.total)} of{" "}
+            {fmt(list.data.total)}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              className="border-border rounded-md border px-3 py-1 text-xs disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              disabled={!list.data.hasMore}
+              onClick={() => setPage((p) => p + 1)}
+              className="border-border rounded-md border px-3 py-1 text-xs disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      <EnrichDrawer
+        domain={enrichDomain}
+        open={enrichDomain !== null}
+        onOpenChange={(o) => !o && setEnrichDomain(null)}
+      />
+    </div>
+  );
+}
