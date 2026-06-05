@@ -87,9 +87,9 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
   // PostHog is already initialized in instrumentation-client.ts
   // No need to re-initialize here
 
-  // Auto-consent for logged-in non-anonymous users
+  // Auto-consent for logged-in users
   useEffect(() => {
-    if (session.data?.user && !session.data.user.isAnonymous) {
+    if (session.data?.user) {
       console.info("🔐 [Analytics] Auto-consent for logged-in user");
       localStorage.setItem("cookieConsent", "true");
       localStorage.setItem("cookieConsentTimestamp", Date.now().toString());
@@ -258,7 +258,6 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       email: user.email,
       name: user.name,
       username: user.username,
-      isAnonymous: user.isAnonymous,
     };
 
     console.log("🔵 [Analytics] Identifying user:", userId);

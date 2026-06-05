@@ -49,7 +49,7 @@ export default function IntroPage() {
               </Text>
 
               <div className="mt-10 flex items-center justify-center gap-x-6">
-                <Link href="/app/demos">
+                <Link href="/app">
                   <Button variant="primary" size="lg" className="gap-2">
                     <Sparkles className="h-4 w-4" />
                     Explore Demos
@@ -240,7 +240,7 @@ export default function IntroPage() {
             you need is ready to go.
           </Text>
           <div className="mt-10 flex items-center justify-center gap-x-6">
-            <Link href="/app/demos">
+            <Link href="/app">
               <Button
                 variant="secondary"
                 size="lg"

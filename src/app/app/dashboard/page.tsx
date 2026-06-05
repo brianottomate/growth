@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/server/better-auth";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { LayoutDashboard, FileText, Settings } from "lucide-react";
+import { FileText, Settings } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth.api.getSession({
@@ -25,25 +25,6 @@ export default async function DashboardPage() {
 
       {/* Quick Links Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Link href="/app/demos">
-          <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
-                  <LayoutDashboard className="text-primary h-5 w-5" />
-                </div>
-                Best Practices Demos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm">
-                Explore comprehensive examples of Next.js patterns and best
-                practices
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-
         <Link href="/blog">
           <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader>

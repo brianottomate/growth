@@ -8,6 +8,8 @@
 @import "@wandercom/design-system-tokens/tailwind.css";
 @import "@wandercom/design-system-web/styles.css";
 
+@custom-variant dark (&:is(.dark *));
+
 @layer base {
   * {
     @apply border-primary;
@@ -121,7 +123,7 @@
 @theme {
   /* Font families - Instrument Sans is set via instrumentSans.variable in layout.tsx */
   /* The design system tokens package already configures --font-sans properly */
-  
+
   --font-mono:
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", "Courier New", monospace;
@@ -624,4 +626,43 @@
 
 @utility animate-toast-exit-top {
   animation: leave-to-top 3s cubic-bezier(0.77, -0.006, 0, 1.222) forwards;
+}
+
+/* ---- shadcn/ui ↔ wandercom design-system bridge -----------------------
+   shadcn components reference semantic color tokens (bg-background, bg-card,
+   bg-primary, text-primary-foreground, etc.) that the wandercom design system
+   doesn't define. Alias them to wandercom tokens here so shadcn components
+   render with real colors. wandercom switches via [data-theme], so these are
+   automatically theme-aware — we intentionally do NOT use shadcn's `dark:`
+   variant (this app themes via data-theme, not a `.dark` class).
+
+   Note: `--color-primary` is wandercom's *primary text* color (light in dark
+   mode), so shadcn `bg-primary` buttons are light with dark (`primary-foreground`)
+   text — an inverted primary. */
+@theme inline {
+  --color-background: var(--color-surface-primary);
+  --color-foreground: var(--color-primary);
+  --color-card: var(--color-surface-secondary);
+  --color-card-foreground: var(--color-primary);
+  --color-popover: var(--color-surface-modal);
+  --color-popover-foreground: var(--color-primary);
+  --color-muted: var(--color-surface-tertiary);
+  --color-muted-foreground: var(--color-neutral-550);
+  --color-accent: var(--color-surface-tertiary);
+  --color-accent-foreground: var(--color-primary);
+  --color-secondary-foreground: var(--color-primary);
+  --color-primary-foreground: var(--color-surface-primary);
+  --color-border: var(--color-border-primary);
+  --color-input: var(--color-border-primary);
+  --color-ring: var(--color-border-blue);
+
+  /* shadcn sidebar -> wandercom surfaces (theme-aware) */
+  --color-sidebar: var(--color-surface-secondary);
+  --color-sidebar-foreground: var(--color-primary);
+  --color-sidebar-primary: var(--color-primary);
+  --color-sidebar-primary-foreground: var(--color-surface-primary);
+  --color-sidebar-accent: var(--color-surface-tertiary);
+  --color-sidebar-accent-foreground: var(--color-primary);
+  --color-sidebar-border: var(--color-border-primary);
+  --color-sidebar-ring: var(--color-border-blue);
 }
