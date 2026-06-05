@@ -1,0 +1,71 @@
+erDiagram
+    %% ---- Identity & access ----
+    user ||--o{ member : "is"
+    organization ||--o{ member : has
+    organization ||--o{ team : has
+    team ||--o{ team_member : has
+    user ||--o{ team_member : in
+    organization ||--o{ invitation : has
+    user ||--o{ account : auth
+    user ||--o{ session : auth
+    organization ||--o{ brand : "owns (null org = competitor)"
+    user ||--o{ access : "granted to"
+    access }o--o| brand : "scopes (notion-style)"
+
+    %% ---- Brand core (one table; self-referencing inspiration) ----
+    %% brand_inspiration.purpose = competitor | inspiration
+    brand ||--o{ brand_inspiration : "tracks (competitor / inspiration)"
+    brand ||--o{ brand_inspiration : "referenced as"
+    brand ||--o{ platform_post : "owns feed (scraped + published)"
+
+    %% ---- Channels & websites ----
+    %% channel.kind = social | ad | newsletter | blog  (a STREAM of time-series content)
+    %% web_page = a PERSISTENT page on a site (home/landing/evergreen/product)
+    brand ||--o{ channel : "social / ad / newsletter / blog"
+    brand ||--o{ website : "one per domain"
+    website ||--o{ web_page : "home / landing / evergreen / product"
+    web_page ||--o{ web_page : "sub-pages (parent_page_id)"
+    web_page }o--o| campaign : "landing page for"
+    channel ||--o{ platform_post : "published via"
+    channel ||--o{ ad_spot : "ad channel"
+
+    %% ---- Content (the spine) ----
+    %% platform_post covers social posts, newsletter issues AND blog posts
+    %% engagement stats live INLINE on platform_post (stats jsonb); no metric table for v1
+    brand ||--o{ post : "master content"
+    post ||--o{ platform_post : "renders to"
+    platform_post ||--o{ comment : has
+    brand ||--o{ content_pillar : strategy
+    post }o--o{ content_pillar : "tagged with"
+    brand ||--o{ media_asset : "upload lake"
+    media_asset }o--o{ post : "attached to"
+
+    %% ---- Ads & creative ----
+    %% stats + spend live INLINE on ad_spot (stats jsonb, spend); no metric table for v1
+    brand ||--o{ campaign : "ad campaign / post series"
+    campaign ||--o{ post : "groups (series)"
+    campaign ||--o{ ad_spot : "groups (paid)"
+    brand ||--o{ audience : "for ads"
+    audience ||--o{ ad_spot : targets
+    media_asset ||--o{ creative : "composed into"
+    creative ||--o{ ad_spot : uses
+    post ||--o{ ad_spot : "ad variant"
+    ad_spot ||--o{ comment : has
+
+    %% ---- Direct messages (private inbox; v1 may render live from Zernio, persist nothing) ----
+    %% contact overlaps Outreach/CIO prospects -> decide own vs mirror later
+    brand ||--o{ contact : "known people"
+    channel ||--o{ conversation : "DM thread on"
+    contact ||--o{ conversation : participant
+    conversation ||--o{ message : "inbound + outbound"
+
+    %% ---- Listening & discovery ----
+    brand ||--o{ listening_keyword : monitors
+    listening_keyword ||--o{ listening_mention : "f5bot / reddit / X"
+    listening_mention }o--o| brand_discovery : "may surface a brand"
+    brand_discovery }o--o| brand : "promotes to competitor"
+
+    %% ---- Lifecycle ----
+    brand ||--o{ lifecycle_campaign : "onboarding / cart / revival"
+    lifecycle_campaign ||--o{ touchpoint : stages
+    touchpoint }o--o| channel : "delivered via"

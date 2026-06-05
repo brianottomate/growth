@@ -1,0 +1,27 @@
+erDiagram
+    %% ===== BRAND = the hub. Everything below belongs to one brand. =====
+    brand ||--o{ channel : "social / ad / newsletter / blog"
+    brand ||--o{ content_pillar : "strategy themes"
+    brand ||--o{ post : "master content"
+    brand ||--o{ campaign : "ad campaign / post series"
+    brand ||--o{ audience : "targeting (for ads)"
+    brand ||--o{ media_asset : "upload lake"
+
+    %% ===== ORGANIC: a post renders into one platform spot per channel =====
+    post ||--o{ platform_post : "rendered per channel"
+    post }o--o{ content_pillar : "tagged with"
+    post }o--o{ media_asset : "uses"
+    channel ||--o{ platform_post : "published to"
+    platform_post ||--o{ comment : "public replies"
+
+    %% ===== PAID: an ad spot runs a creative to an audience on an ad channel =====
+    post ||--o{ ad_spot : "ad variant of"
+    channel ||--o{ ad_spot : "ad channel runs"
+    audience ||--o{ ad_spot : targets
+    creative ||--o{ ad_spot : uses
+    media_asset ||--o{ creative : "composed into"
+    ad_spot ||--o{ comment : "public replies"
+
+    %% ===== CAMPAIGN groups either organic posts or paid ad spots =====
+    campaign ||--o{ post : "groups (post series)"
+    campaign ||--o{ ad_spot : "groups (paid)"
