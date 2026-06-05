@@ -47,35 +47,6 @@ export const attachmentTable = pgTable(
 export type Attachment = typeof attachmentTable.$inferSelect;
 export type AttachmentInsert = typeof attachmentTable.$inferInsert;
 
-// ---- APP TABLES ---------------------------------------------------
-
-export const postTable = pgTable(
-  "post",
-  (t) => ({
-    id: t
-      .text()
-      .primaryKey()
-      .$defaultFn(() => createId("pst")),
-    name: t.varchar({ length: 256 }),
-    createdById: t
-      .text()
-      .notNull()
-      .references(() => userTable.id),
-    createdAt: t
-      .timestamp({ withTimezone: true })
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: t.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
-  }),
-  (t) => [
-    index("post_created_by_idx").on(t.createdById),
-    index("post_name_idx").on(t.name),
-  ],
-);
-
-export type Post = typeof postTable.$inferSelect;
-export type PostInsert = typeof postTable.$inferInsert;
-
 // ---- RELATIONS ----------------------------------------------------
 
 export const attachmentRelations = relations(attachmentTable, ({ one }) => ({
@@ -85,17 +56,23 @@ export const attachmentRelations = relations(attachmentTable, ({ one }) => ({
   }),
 }));
 
-export const postRelations = relations(postTable, ({ one }) => ({
-  createdBy: one(userTable, {
-    fields: [postTable.createdById],
-    references: [userTable.id],
-  }),
-}));
-
 // ---- RE-EXPORT AUTH SCHEMA ----------------------------------------
 
 // Re-export everything from auth-schema for convenience
 export * from "./auth-schema";
+
+// ---- RE-EXPORT DOMAIN SCHEMAS -------------------------------------
+// Each domain lives in its own file; this barrel keeps a single import
+// surface so drizzle.config (points here) and the Better Auth augmented
+// schema (`import * as schema`) see every table. Add new domains here.
+export * from "./brand-schema";
+export * from "./channel-schema";
+export * from "./content-schema";
+export * from "./ads-schema";
+export * from "./cadence-schema";
+export * from "./leads-schema";
+export * from "./lifecycle-schema";
+export * from "./media-schema";
 
 // ---- RE-EXPORT CONSTANTS ------------------------------------------
 

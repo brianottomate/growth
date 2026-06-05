@@ -8,5 +8,8 @@ export default {
   dbCredentials: {
     url: env.DATABASE_URL,
   },
+  // `leads` lives in its own Postgres schema (see leads-schema.ts) so it stays
+  // decoupled and droppable. push/introspect must be told to manage it too.
+  schemaFilter: ["public", "leads"],
   casing: "snake_case",
 } satisfies Config;

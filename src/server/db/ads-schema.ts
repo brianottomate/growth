@@ -1,0 +1,358 @@
+import { relations } from "drizzle-orm";
+import { index, pgEnum, pgTable } from "drizzle-orm/pg-core";
+
+import { brandTable } from "./brand-schema";
+import { channelPlatformEnum, channelTable } from "./channel-schema";
+import type { MediaItem } from "./content-schema";
+import { createId } from "./utils";
+
+// NOTE: this is a read-only "launchpad" mirror — campaigns & audiences are
+// created/managed in each platform's portal (Meta/Google/OpenAI ads managers)
+// and surfaced here for overview + link-out. CRUD-from-our-app comes later.
+// Individual ad spots are not modeled yet; `campaign.adSpots` is a count.
+
+// ---- ENUMS ---------------------------------------------------------
+
+export const campaignStatusEnum = pgEnum("campaign_status", [
+  "draft",
+  "scheduled",
+  "live",
+  "paused",
+  "ended",
+]);
+export type CampaignStatus = (typeof campaignStatusEnum.enumValues)[number];
+
+export const audienceTypeEnum = pgEnum("audience_type", [
+  "segment",
+  "keyword",
+  "intent",
+  "lookalike",
+  "custom",
+]);
+export type AudienceType = (typeof audienceTypeEnum.enumValues)[number];
+
+// ---- INITIATIVE (top-level, goal-driven push across ad channels) ----
+
+/**
+ * Initiative — the CMO's strategic push ("drive leads to /list"). It declares a
+ * goal, the channels it *wants* to run on (`targetChannels`), dates, and a total
+ * budget. The per-channel `campaign` rows are the implementations; the app
+ * verifies them against `targetChannels`. The paid counterpart of a
+ * `content_post` (one intent → many platform executions).
+ */
+export const initiativeStatusEnum = pgEnum("initiative_status", [
+  "planned",
+  "active",
+  "paused",
+  "completed",
+  "archived",
+]);
+export type InitiativeStatus =
+  (typeof initiativeStatusEnum.enumValues)[number];
+
+export const initiativeTable = pgTable(
+  "initiative",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("init")),
+
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    name: t.text().notNull(),
+    slug: t.text(),
+
+    // Goal intent as a slug for now (e.g. "supply", "saas", "brand"). Promote to
+    // a `goal` table when organic content links to the same axis.
+    goal: t.text(),
+    landingUrl: t.text(), // where it drives (e.g. https://wander.com/list)
+    description: t.text(),
+    color: t.text(), // UI accent (hex), used for feed bands
+
+    status: initiativeStatusEnum().default("active").notNull(),
+
+    // Channels the CMO wants this to run on (platform slugs). The per-channel
+    // `campaign` rows are the implementations we verify against this list.
+    targetChannels: t.jsonb().$type<string[]>(),
+
+    budget: t.integer(), // total intended (whole dollars)
+
+    startAt: t.timestamp({ withTimezone: true }),
+    endAt: t.timestamp({ withTimezone: true }),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: t.timestamp(),
+  }),
+  (table) => [
+    index("initiative_brand_idx").on(table.brandId),
+    index("initiative_status_idx").on(table.status),
+  ],
+);
+
+export type Initiative = typeof initiativeTable.$inferSelect;
+export type InitiativeInsert = typeof initiativeTable.$inferInsert;
+
+// ---- CAMPAIGN ------------------------------------------------------
+
+export const campaignTable = pgTable(
+  "campaign",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("camp")),
+
+    // Canonical parent: the ad account it runs on. brandId is a denormalized
+    // convenience for brand-scoped queries (a channel's brand never changes).
+    channelId: t
+      .text()
+      .references(() => channelTable.id, { onDelete: "cascade" })
+      .notNull(),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    platform: channelPlatformEnum().notNull(), // badge; denormalized from channel
+
+    // Optional parent push this per-channel campaign implements.
+    initiativeId: t
+      .text()
+      .references(() => initiativeTable.id, { onDelete: "set null" }),
+
+    name: t.text().notNull(),
+    status: campaignStatusEnum().default("draft").notNull(),
+    objective: t.text(),
+
+    startAt: t.timestamp({ withTimezone: true }),
+    endAt: t.timestamp({ withTimezone: true }),
+
+    // Coarse launchpad rollups (whole dollars). Precise figures live in-platform.
+    budget: t.integer(),
+    spend: t.integer(),
+    adSpots: t.integer().default(0).notNull(),
+
+    // Latest metrics snapshot (rolled up from the campaign's ads) + one hero
+    // creative thumbnail, so feed/calendar can render a campaign card without
+    // touching `ad_spot`. Snapshot, not time-series.
+    stats: t.jsonb().$type<AdStats>(),
+    heroThumbnailUrl: t.text(),
+
+    externalId: t.text(), // platform campaign id
+    manageUrl: t.text(), // deep-link into the platform's manager
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("campaign_brand_idx").on(table.brandId),
+    index("campaign_channel_idx").on(table.channelId),
+    index("campaign_status_idx").on(table.status),
+    index("campaign_initiative_idx").on(table.initiativeId),
+  ],
+);
+
+export type Campaign = typeof campaignTable.$inferSelect;
+export type CampaignInsert = typeof campaignTable.$inferInsert;
+
+// ---- AD SPOT (one creative under a campaign; mirrors a Zernio Ad) ----
+
+/** Inline performance snapshot for an ad/campaign (latest, not time-series). */
+export type AdStats = {
+  spend?: number;
+  impressions?: number;
+  reach?: number;
+  clicks?: number;
+  ctr?: number;
+  conversions?: number;
+  cpc?: number;
+  cpm?: number;
+  // Value/return signals — present in Zernio's metrics; useful at campaign level.
+  roas?: number;
+  purchaseValue?: number;
+  costPerConversion?: number;
+};
+
+export const adSpotTable = pgTable(
+  "ad_spot",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("ad")),
+
+    campaignId: t
+      .text()
+      .references(() => campaignTable.id, { onDelete: "cascade" })
+      .notNull(),
+    channelId: t.text().references(() => channelTable.id, { onDelete: "set null" }),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    platform: channelPlatformEnum().notNull(),
+
+    name: t.text(),
+    status: t.text(), // raw platform status (active/paused/…); ingested as-is
+
+    // Ad set denormalized (Zernio's AdWithContext flattens it onto the ad).
+    adSetId: t.text(),
+    adSetName: t.text(),
+
+    // Creative — maps Zernio creative (image/video/thumb + body + link).
+    media: t.jsonb().$type<MediaItem[]>(),
+    body: t.text(),
+    linkUrl: t.text(),
+    thumbnailUrl: t.text(),
+
+    // Bidding / objective context.
+    platformObjective: t.text(),
+    optimizationGoal: t.text(),
+    bidStrategy: t.text(),
+
+    stats: t.jsonb().$type<AdStats>(),
+
+    externalId: t.text(), // platform ad id
+    manageUrl: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("ad_spot_campaign_idx").on(table.campaignId),
+    index("ad_spot_brand_idx").on(table.brandId),
+    index("ad_spot_status_idx").on(table.status),
+  ],
+);
+
+export type AdSpot = typeof adSpotTable.$inferSelect;
+export type AdSpotInsert = typeof adSpotTable.$inferInsert;
+
+// ---- AUDIENCE ------------------------------------------------------
+
+export const audienceTable = pgTable(
+  "audience",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("aud")),
+
+    // An audience lives in ONE ad account (channel). The brand-level view
+    // ("CA Remote Workers on Meta + Google") is N rows with the same name,
+    // deduped by name in the UI — that's the cross-channel view.
+    channelId: t
+      .text()
+      .references(() => channelTable.id, { onDelete: "cascade" })
+      .notNull(),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    name: t.text().notNull(),
+    type: audienceTypeEnum().notNull(),
+    sizeLabel: t.text(), // "~1.2M", "~40K/mo" — coarse, mirrored from platform
+
+    definition: t.jsonb(), // loose source data for later (context hints, geo, etc.)
+    manageUrl: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("audience_brand_idx").on(table.brandId),
+    index("audience_channel_idx").on(table.channelId),
+    index("audience_type_idx").on(table.type),
+  ],
+);
+
+export type Audience = typeof audienceTable.$inferSelect;
+export type AudienceInsert = typeof audienceTable.$inferInsert;
+
+// ---- RELATIONS -----------------------------------------------------
+
+export const initiativeRelations = relations(
+  initiativeTable,
+  ({ one, many }) => ({
+    brand: one(brandTable, {
+      fields: [initiativeTable.brandId],
+      references: [brandTable.id],
+    }),
+    campaigns: many(campaignTable),
+  }),
+);
+
+export const campaignRelations = relations(campaignTable, ({ one, many }) => ({
+  brand: one(brandTable, {
+    fields: [campaignTable.brandId],
+    references: [brandTable.id],
+  }),
+  channel: one(channelTable, {
+    fields: [campaignTable.channelId],
+    references: [channelTable.id],
+  }),
+  initiative: one(initiativeTable, {
+    fields: [campaignTable.initiativeId],
+    references: [initiativeTable.id],
+  }),
+  adSpots: many(adSpotTable),
+}));
+
+export const adSpotRelations = relations(adSpotTable, ({ one }) => ({
+  campaign: one(campaignTable, {
+    fields: [adSpotTable.campaignId],
+    references: [campaignTable.id],
+  }),
+  brand: one(brandTable, {
+    fields: [adSpotTable.brandId],
+    references: [brandTable.id],
+  }),
+  channel: one(channelTable, {
+    fields: [adSpotTable.channelId],
+    references: [channelTable.id],
+  }),
+}));
+
+export const audienceRelations = relations(audienceTable, ({ one }) => ({
+  brand: one(brandTable, {
+    fields: [audienceTable.brandId],
+    references: [brandTable.id],
+  }),
+  channel: one(channelTable, {
+    fields: [audienceTable.channelId],
+    references: [channelTable.id],
+  }),
+}));

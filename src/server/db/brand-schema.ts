@@ -1,0 +1,314 @@
+import { relations } from "drizzle-orm";
+import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+
+import { organizationTable, userTable } from "./auth-schema";
+import { createId } from "./utils";
+
+// ---- ENUMS ---------------------------------------------------------
+
+// A brand is either a company or a personal brand (founder, employee).
+export const brandTypeEnum = pgEnum("brand_type", ["company", "personal"]);
+export type BrandType = (typeof brandTypeEnum.enumValues)[number];
+
+// Why an owned brand tracks a reference brand.
+export const inspirationPurposeEnum = pgEnum("inspiration_purpose", [
+  "competitor", // defensive analysis
+  "inspiration", // emulation
+]);
+export type InspirationPurpose =
+  (typeof inspirationPurposeEnum.enumValues)[number];
+
+// Access-grant role hierarchy (viewer < contributor < editor < admin < owner).
+// Mirrors homi's collection access roles.
+export const accessRoleEnum = pgEnum("access_role", [
+  "viewer",
+  "contributor",
+  "editor",
+  "admin",
+  "owner",
+]);
+export type AccessRole = (typeof accessRoleEnum.enumValues)[number];
+
+// Polymorphic access subject (mirrors homi collection_access.subjectType).
+export const accessSubjectTypeEnum = pgEnum("access_subject_type", [
+  "user",
+  "organization",
+  "team",
+]);
+export type AccessSubjectType =
+  (typeof accessSubjectTypeEnum.enumValues)[number];
+
+// ---- JSONB SHAPES --------------------------------------------------
+
+// Jungian voice archetypes (used inside the fingerprint, not a DB column).
+export const BRAND_VOICE_TYPES = [
+  "hero",
+  "challenger",
+  "sage",
+  "innocent",
+  "explorer",
+  "creator",
+  "ruler",
+  "caregiver",
+  "everyman",
+  "jester",
+  "lover",
+  "magician",
+] as const;
+export type BrandVoiceType = (typeof BRAND_VOICE_TYPES)[number];
+
+export type BrandWebsiteMeta = {
+  title?: string;
+  description?: string;
+  favicon?: string;
+  ogImage?: string;
+  scrapedAt?: string; // ISO 8601
+};
+
+export type BrandIdentity = {
+  colorScheme?: "light" | "dark";
+  colors?: { primary?: string; secondary?: string; accent?: string };
+  fonts?: Array<{ family: string; weight?: number }>;
+  logo?: string | null;
+  favicon?: string | null;
+  extractedAt?: string;
+};
+
+// AI-extracted voice, used as prompt-injection context when forging content.
+export type BrandFingerprint = {
+  fingerprintText: string; // full voice description for prompt injection
+  voices: BrandVoiceType[]; // archetypes
+  extractedAt?: string;
+  postsAnalyzed?: number;
+};
+
+// Raw AI market research blob (Parallel AI etc.). Pillars get promoted to a
+// real table later; this keeps the loose source data.
+export type BrandIndustryResearch = {
+  confidence?: "low" | "medium" | "high";
+  sources?: string[];
+  analyzedAt?: string;
+  [key: string]: unknown;
+};
+
+// ---- BRAND TABLE ---------------------------------------------------
+
+/**
+ * Brand — the hub of the whole model.
+ *
+ * - Owned brand: `organizationId` is set (Wander, WanderOS, a founder's personal brand).
+ * - Reference/competitor brand: `organizationId` is NULL, populated by scraping,
+ *   linked to owners via `brandInspirationTable`.
+ *
+ * Owned-only data (campaigns, pillars, audiences, OAuth channels, lifecycle) FK to
+ * `brand` and is simply never created for reference rows. Guard "my brands" queries
+ * with `organizationId IS NOT NULL`.
+ */
+export const brandTable = pgTable(
+  "brand",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("brand")),
+
+    // NULL => reference/competitor brand (no owner).
+    organizationId: t
+      .text()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+
+    // The user who owns/manages this brand — implicit full-access owner (like
+    // homi's collection.ownerId). NULL for reference/competitor brands.
+    ownerId: t.text().references(() => userTable.id),
+
+    type: brandTypeEnum().default("company").notNull(),
+
+    // Basic info
+    name: t.text().notNull(),
+    slug: t.text(), // unique within an org for owned brands; null for references
+    tagline: t.text(), // short positioning line (e.g. "Luxury travel marketplace")
+    description: t.text(),
+    logo: t.text(),
+    website: t.text(),
+
+    // Cached aggregate (sum of channel followers) for overview cards.
+    followerCount: t.integer(),
+
+    // Enrichment (AI / scraped) — JSONB until we need to query it.
+    websiteMeta: t.jsonb().$type<BrandWebsiteMeta>(),
+    brandIdentity: t.jsonb().$type<BrandIdentity>(),
+    brandFingerprint: t.jsonb().$type<BrandFingerprint>(),
+    industryResearch: t.jsonb().$type<BrandIndustryResearch>(),
+
+    isActive: t.boolean().default(true).notNull(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: t.timestamp(),
+  }),
+  (table) => [
+    index("brand_org_id_idx").on(table.organizationId),
+    index("brand_owner_id_idx").on(table.ownerId),
+    index("brand_type_idx").on(table.type),
+    uniqueIndex("brand_org_slug_idx").on(table.organizationId, table.slug),
+  ],
+);
+
+export type Brand = typeof brandTable.$inferSelect;
+export type BrandInsert = typeof brandTable.$inferInsert;
+
+// ---- BRAND INSPIRATION (self-referencing junction) -----------------
+
+/**
+ * BrandInspiration — links an owned brand to a reference brand it tracks.
+ *
+ * Many-to-many on `brand` so one canonical competitor (e.g. Airbnb) can be
+ * referenced by several owned brands ("ref by Wander · WanderOS") without
+ * duplicating the competitor row.
+ */
+export const brandInspirationTable = pgTable(
+  "brand_inspiration",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("insp")),
+
+    // The owner doing the tracking.
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // The reference/competitor brand being tracked.
+    inspirationBrandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    purpose: inspirationPurposeEnum().default("inspiration").notNull(),
+    notes: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("brand_inspiration_brand_idx").on(table.brandId),
+    index("brand_inspiration_inspiration_idx").on(table.inspirationBrandId),
+    uniqueIndex("brand_inspiration_pair_idx").on(
+      table.brandId,
+      table.inspirationBrandId,
+    ),
+  ],
+);
+
+export type BrandInspiration = typeof brandInspirationTable.$inferSelect;
+export type BrandInspirationInsert =
+  typeof brandInspirationTable.$inferInsert;
+
+// ---- ACCESS (notion-style grants, modeled on homi collection_access) ------
+
+/**
+ * Access — grants a polymorphic subject (user / organization / team) a role on
+ * a brand. Effective access is resolved (in a future `security` service) by
+ * taking the most permissive role across a user's direct grant + their org/team
+ * grants, with `brand.ownerId` as an implicit owner.
+ */
+export const accessTable = pgTable(
+  "access",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("acc")),
+
+    // The resource being shared. Brand-scoped for now; switch to a polymorphic
+    // resourceType/resourceId pair if sub-resource grants are ever needed.
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    subjectType: accessSubjectTypeEnum().notNull(),
+    subjectId: t.text().notNull(), // user.id | organization.id | team.id
+
+    role: accessRoleEnum().default("viewer").notNull(),
+    permissions: t.jsonb(), // flexible escape hatch (matches homi)
+    label: t.text(), // optional human label for the grant
+
+    invitedBy: t.text().references(() => userTable.id),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("access_brand_idx").on(table.brandId),
+    index("access_subject_idx").on(table.subjectType, table.subjectId),
+    // One role per subject per brand.
+    uniqueIndex("access_unique_idx").on(
+      table.brandId,
+      table.subjectType,
+      table.subjectId,
+    ),
+  ],
+);
+
+export type Access = typeof accessTable.$inferSelect;
+export type AccessInsert = typeof accessTable.$inferInsert;
+
+// ---- RELATIONS -----------------------------------------------------
+
+export const brandRelations = relations(brandTable, ({ one, many }) => ({
+  organization: one(organizationTable, {
+    fields: [brandTable.organizationId],
+    references: [organizationTable.id],
+  }),
+  owner: one(userTable, {
+    fields: [brandTable.ownerId],
+    references: [userTable.id],
+  }),
+  // Reference brands this brand tracks.
+  inspirations: many(brandInspirationTable, { relationName: "owner" }),
+  // Owned brands that track this (reference) brand.
+  trackedBy: many(brandInspirationTable, { relationName: "inspiration" }),
+  // Access grants on this brand.
+  access: many(accessTable),
+}));
+
+export const brandInspirationRelations = relations(
+  brandInspirationTable,
+  ({ one }) => ({
+    brand: one(brandTable, {
+      fields: [brandInspirationTable.brandId],
+      references: [brandTable.id],
+      relationName: "owner",
+    }),
+    inspirationBrand: one(brandTable, {
+      fields: [brandInspirationTable.inspirationBrandId],
+      references: [brandTable.id],
+      relationName: "inspiration",
+    }),
+  }),
+);
+
+export const accessRelations = relations(accessTable, ({ one }) => ({
+  brand: one(brandTable, {
+    fields: [accessTable.brandId],
+    references: [brandTable.id],
+  }),
+  invitedByUser: one(userTable, {
+    fields: [accessTable.invitedBy],
+    references: [userTable.id],
+  }),
+}));
