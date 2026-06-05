@@ -1,13 +1,14 @@
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin, anonymous, username, organization } from "better-auth/plugins";
+import { admin, username, organization } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
 
 import { env } from "@/env";
 import { db } from "@/server/db";
 import * as schema from "@/server/db/schema";
+import { createId } from "@/server/db/utils";
 import { sendTransactionalEmail } from "@/server/clients/resend.client";
 import {
   trackServerEvent,
@@ -44,7 +45,9 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    // TEMPORARY (internal tool): skip email verification so teammates can sign
+    // in immediately. Flip back to `true` (and `sendOnSignUp` below) to restore.
+    requireEmailVerification: false,
     async sendResetPassword({
       user,
       url,
@@ -59,7 +62,9 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendOnSignUp: true,
+    // TEMPORARY: paired with requireEmailVerification above. Set back to `true`
+    // to resume sending verification emails on sign-up.
+    sendOnSignUp: false,
     autoSignInAfterVerification: true,
     async sendVerificationEmail({
       user,
@@ -118,50 +123,25 @@ export const auth = betterAuth({
     },
   },
   // ─────────────────────────────────────────────────
-  // Endpoint Hooks - Access to request context
-  // ─────────────────────────────────────────────────
-  // Use hooks.after when you need access to request context (headers, query params, etc.)
-  // that isn't available in databaseHooks. This runs as part of the auth flow,
-  // so there's no additional performance overhead.
-  hooks: {
-    after: createAuthMiddleware(async (ctx) => {
-      // Only handle anonymous sign-in endpoint (early return for all other endpoints)
-      if (ctx.path !== "/sign-in/anonymous") return;
-
-      const newSession = ctx.context.newSession;
-      if (!newSession?.user) return;
-
-      // Read source from custom header (passed from client via fetchOptions)
-      // This lets us track where anonymous users are coming from for analytics
-      const sourceHeader = ctx.headers?.get("x-anonymous-source");
-      const source = sourceHeader ?? "direct";
-
-      // Track anonymous user creation with specific source
-      if (newSession.user.isAnonymous) {
-        console.log(
-          `[Auth] Anonymous user created: ${newSession.user.id} (source: ${source})`,
-        );
-        // Note: No need to identify anonymous users with fake emails
-        trackServerEvent(newSession.user.id, "anonymous_user_created", {
-          source,
-        });
-      }
-    }),
-  },
-  // ─────────────────────────────────────────────────
   // Database Hooks - Lifecycle events
   // ─────────────────────────────────────────────────
   databaseHooks: {
     user: {
       create: {
+        // Internal tool: only allow @wander.com sign-ups. Runs for every user
+        // creation path (email/password + Google OAuth).
+        before: async (user) => {
+          const email = user.email?.toLowerCase() ?? "";
+          if (!email.endsWith("@wander.com")) {
+            throw new APIError("BAD_REQUEST", {
+              message:
+                "Sign-ups are restricted to @wander.com email addresses.",
+            });
+          }
+          return { data: user };
+        },
         after: async (user) => {
           try {
-            // Anonymous users are tracked in hooks.after (where we have request context)
-            if (user.isAnonymous) {
-              console.log("[Auth] Anonymous user created:", user.id);
-              return;
-            }
-
             // Track real user signup
             console.log("[Auth] User created:", user.id);
             trackServerEvent(user.id, "user_signed_up", {
@@ -174,6 +154,24 @@ export const auth = betterAuth({
               email: user.email,
               name: user.name ?? undefined,
             });
+
+            // Auto-join the Wander org so internal teammates land scoped.
+            const wanderOrg = await db.query.organizationTable.findFirst({
+              where: eq(schema.organizationTable.slug, "wander"),
+            });
+            if (wanderOrg) {
+              await db.insert(schema.memberTable).values({
+                id: createId("mbr"),
+                userId: user.id,
+                organizationId: wanderOrg.id,
+                role: "member",
+              });
+              console.log(
+                `[Auth] Added ${user.email} to Wander org as member`,
+              );
+            } else {
+              console.warn("[Auth] Wander org not found; skipped auto-join");
+            }
           } catch (error) {
             console.error("[Auth] Error in user.create.after hook:", error);
             // Don't block user creation if tracking fails
@@ -215,6 +213,19 @@ export const auth = betterAuth({
             trackServerEvent(session.userId, "user_signed_in", {
               method: "email",
             });
+
+            // Scope new sessions to the Wander org so the app loads in-context.
+            if (!session.activeOrganizationId) {
+              const wanderOrg = await db.query.organizationTable.findFirst({
+                where: eq(schema.organizationTable.slug, "wander"),
+              });
+              if (wanderOrg) {
+                await db
+                  .update(schema.sessionTable)
+                  .set({ activeOrganizationId: wanderOrg.id })
+                  .where(eq(schema.sessionTable.id, session.id));
+              }
+            }
           } catch (error) {
             console.error("[Auth] Error in session.create.after hook:", error);
           }
@@ -259,55 +270,6 @@ export const auth = betterAuth({
     admin({
       adminUserIds: [], // Add admin user IDs here when needed
       impersonationSessionDuration: 60 * 60, // 1 hour
-    }),
-    anonymous({
-      emailDomainName: "anonymous.example.com",
-      generateName: () => `Guest-${crypto.randomUUID().slice(0, 8)}`,
-      onLinkAccount: async ({ anonymousUser, newUser }) => {
-        console.log(
-          `[Auth] Transferring data from anonymous user ${anonymousUser.user.id} to ${newUser.user.id}`,
-        );
-
-        try {
-          // Import and call the transfer service
-          const { transferAnonymousUserData } =
-            await import("@/server/services/anonymous.service");
-
-          await transferAnonymousUserData(
-            anonymousUser.user.id,
-            newUser.user.id,
-          );
-
-          console.log(`[Auth] Data transfer completed successfully`);
-
-          // Calculate days between anonymous user creation and conversion
-          const anonCreatedAt = new Date(anonymousUser.user.createdAt);
-          const conversionTime = new Date(newUser.user.createdAt);
-          const daysSinceCreation = Math.floor(
-            (conversionTime.getTime() - anonCreatedAt.getTime()) /
-              (1000 * 60 * 60 * 24),
-          );
-
-          // Track the conversion event
-          trackServerEvent(newUser.user.id, "anonymous_user_converted", {
-            previousUserId: anonymousUser.user.id,
-            daysSinceCreation,
-          });
-
-          // Identify the real user (replaces anonymous profile)
-          identifyServerUser(newUser.user.id, {
-            email: newUser.user.email,
-            name: newUser.user.name ?? undefined,
-          });
-
-          console.log(
-            `[Auth] Anonymous user ${anonymousUser.user.id} converted to ${newUser.user.id}`,
-          );
-        } catch (error) {
-          console.error("[Auth] Error in onLinkAccount:", error);
-          // Don't throw - Better Auth will still complete the conversion
-        }
-      },
     }),
     // Organization plugin (NEW)
     organization({

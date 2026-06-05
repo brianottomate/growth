@@ -1,9 +1,20 @@
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import * as schema from "@/server/db/schema";
+import { createId } from "@/server/db/utils";
+import { uploadAttachment } from "@/server/services/attachment.service";
+
+// Generate a human-friendly temp password to hand out manually.
+function generateTempPassword() {
+  // 12 url-safe chars + a digit so it satisfies any min-length/complexity rule.
+  return `${randomBytes(9).toString("base64url")}7`;
+}
+
+const MAX_PHOTO_BYTES = 4.5 * 1024 * 1024; // server upload limit
 
 export const orgRouter = createTRPCRouter({
   // Get invitation details (public - used by invite page)
@@ -236,6 +247,112 @@ export const orgRouter = createTRPCRouter({
         headers: ctx.headers,
       });
       return invitation;
+    }),
+
+  // Pre-create a teammate's account (no email sent). Returns a temp password
+  // to hand out manually; they sign in and can change it later. The Better Auth
+  // user.create hooks enforce the @wander.com gate and auto-join the Wander org.
+  createPerson: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        name: z.string().min(1).max(120),
+        email: z.string().email(),
+        role: z.enum(["admin", "member"]).default("member"),
+        photo: z
+          .object({
+            base64Data: z.string(),
+            mimeType: z.string(),
+            filename: z.string(),
+          })
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = input.email.trim().toLowerCase();
+      const tempPassword = generateTempPassword();
+
+      // Create the user via the trusted server path (no headers → Better Auth
+      // skips the admin permission check). Fires the user.create before/after
+      // hooks: @wander.com gate + auto-join Wander org as "member".
+      let userId: string;
+      try {
+        const result = await ctx.authApi.createUser({
+          body: {
+            email,
+            name: input.name.trim(),
+            password: tempPassword,
+            data: {},
+          },
+        });
+        userId = result.user.id;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to create user";
+        throw new TRPCError({
+          code: message.toLowerCase().includes("already")
+            ? "CONFLICT"
+            : "BAD_REQUEST",
+          message,
+        });
+      }
+
+      // Reconcile org membership + role. The auto-join hook adds a "member" row
+      // for the Wander org; here we ensure a row for the target org at the
+      // requested role (updating the hook's row if it already exists).
+      const existing = await ctx.db.query.memberTable.findFirst({
+        where: and(
+          eq(schema.memberTable.userId, userId),
+          eq(schema.memberTable.organizationId, input.organizationId),
+        ),
+      });
+      if (existing) {
+        if (existing.role !== input.role) {
+          await ctx.db
+            .update(schema.memberTable)
+            .set({ role: input.role })
+            .where(eq(schema.memberTable.id, existing.id));
+        }
+      } else {
+        await ctx.db.insert(schema.memberTable).values({
+          id: createId("mbr"),
+          userId,
+          organizationId: input.organizationId,
+          role: input.role,
+        });
+      }
+
+      // Optional profile photo → blob, then set user.image.
+      if (input.photo) {
+        const buffer = Buffer.from(input.photo.base64Data, "base64");
+        if (buffer.length > MAX_PHOTO_BYTES) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Photo exceeds 4.5MB",
+          });
+        }
+        try {
+          const { url } = await uploadAttachment({
+            file: buffer,
+            filename: input.photo.filename,
+            originalFilename: input.photo.filename,
+            mimeType: input.photo.mimeType,
+            size: buffer.length,
+            resourceType: "user_photo",
+            resourceId: userId,
+            uploadedBy: ctx.session.user.id,
+          });
+          await ctx.db
+            .update(schema.userTable)
+            .set({ image: url })
+            .where(eq(schema.userTable.id, userId));
+        } catch (err) {
+          // Don't fail the whole creation just because the photo upload broke.
+          console.error("[createPerson] photo upload failed:", err);
+        }
+      }
+
+      return { userId, email, tempPassword };
     }),
 
   // List pending invitations
