@@ -60,6 +60,26 @@ export const env = createEnv({
     X_BEARER_TOKEN: z.string().optional(),
     // Zernio (social channel centralization + ROI)
     ZERNIO_API_KEY: z.string().optional(),
+    // Apify (actor runs for scraping/enrichment)
+    APIFY_API_KEY: z.string().optional(),
+    // Bright Data (dataset scrapes for competitor/peer social posts)
+    BRIGHT_DATA_API_KEY: z.string().optional(),
+    // HubSpot (sales CRM — per-row pull/diff/write-back; private-app token)
+    HUBSPOT_ACCESS_TOKEN_OPERATED: z.string().optional(),
+    // Lead enrichment — discovery providers (all optional; missing key skips that provider)
+    PERPLEXITY_API_KEY: z.string().optional(), // Perplexity sonar web search
+    TAVILY_API_KEY: z.string().optional(), // Tavily search/extract
+    PARALLEL_API_KEY: z.string().optional(), // Parallel.ai task/search API
+    EXA_API_KEY: z.string().optional(), // Exa neural search + contents
+    // Cloudflare media library — R2 (images/files) + Stream (video)
+    CLOUDFLARE_ACCOUNT_ID: z.string().optional(), // e.g. 026c91fc5cd3dd05f22c65e8f237ca2c
+    R2_ACCESS_KEY_ID: z.string().optional(), // R2 API token access key id
+    R2_SECRET_ACCESS_KEY: z.string().optional(), // R2 API token secret
+    R2_BUCKET: z.string().default("growth"), // dedicated growth media bucket
+    R2_PREFIX: z.string().default(""), // optional key prefix (only when sharing a bucket)
+    R2_PUBLIC_BASE_URL: z.string().url().optional(), // public domain/r2.dev URL mapped to the bucket
+    CLOUDFLARE_STREAM_TOKEN: z.string().optional(), // API token with Stream:Edit
+    CLOUDFLARE_STREAM_WEBHOOK_SECRET: z.string().optional(), // Stream webhook signing secret
   },
 
   /**
@@ -79,6 +99,11 @@ export const env = createEnv({
   client: {
     NEXT_PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
     NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(), // For analytics
+    // Cloudflare Stream customer subdomain — public (appears in page HTML), not a
+    // secret. Builds playback/thumbnail URLs. Override only if the account changes.
+    NEXT_PUBLIC_STREAM_SUBDOMAIN: z
+      .string()
+      .default("customer-qmayhafe7iottqnh"),
   },
 
   /**
@@ -135,9 +160,30 @@ export const env = createEnv({
     X_BEARER_TOKEN: process.env.X_BEARER_TOKEN,
     // Zernio
     ZERNIO_API_KEY: process.env.ZERNIO_API_KEY,
+    // Apify
+    APIFY_API_KEY: process.env.APIFY_API_KEY,
+    // Bright Data
+    BRIGHT_DATA_API_KEY: process.env.BRIGHT_DATA_API_KEY,
+    // HubSpot
+    HUBSPOT_ACCESS_TOKEN_OPERATED: process.env.HUBSPOT_ACCESS_TOKEN_OPERATED,
+    // Lead enrichment — discovery providers
+    PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY,
+    TAVILY_API_KEY: process.env.TAVILY_API_KEY,
+    PARALLEL_API_KEY: process.env.PARALLEL_API_KEY,
+    EXA_API_KEY: process.env.EXA_API_KEY,
+    // Cloudflare media
+    CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+    R2_BUCKET: process.env.R2_BUCKET,
+    R2_PREFIX: process.env.R2_PREFIX,
+    R2_PUBLIC_BASE_URL: process.env.R2_PUBLIC_BASE_URL,
+    CLOUDFLARE_STREAM_TOKEN: process.env.CLOUDFLARE_STREAM_TOKEN,
+    CLOUDFLARE_STREAM_WEBHOOK_SECRET: process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    NEXT_PUBLIC_STREAM_SUBDOMAIN: process.env.NEXT_PUBLIC_STREAM_SUBDOMAIN,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

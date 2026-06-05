@@ -70,3 +70,10 @@ test-data/
 generated-videos/
 reports/
 future-plans/
+
+# Amplitude taxonomy scripts — contain project API/secret keys, keep local
+scripts/amplitude-taxonomy/
+
+# Bright Data scrape dumps (discovery)
+scripts/.brightdata-*.json
+scripts/.social-handles-*.json
