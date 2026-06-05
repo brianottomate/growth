@@ -1,11 +1,17 @@
-import { postRouter } from "@/server/api/routers/post.router";
 import { userRouter } from "@/server/api/routers/user.router";
+import { brandRouter } from "@/server/api/routers/brand.router";
+import { channelRouter } from "@/server/api/routers/channel.router";
+import { channelSuggestionRouter } from "@/server/api/routers/channelSuggestion.router";
+import { contentRouter } from "@/server/api/routers/content.router";
 import { blobRouter } from "@/server/api/routers/blob.router";
 import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
 import { instantlyRouter } from "@/server/api/routers/instantly.router";
+import { leadsRouter } from "@/server/api/routers/leads.router";
+import { mediaRouter } from "@/server/api/routers/media.router";
 import { redditRouter } from "@/server/api/routers/reddit.router";
+import { studioRouter } from "@/server/api/routers/studio.router";
 import { twitterRouter } from "@/server/api/routers/twitter.router";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
@@ -15,14 +21,20 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  post: postRouter,
   user: userRouter,
+  brand: brandRouter,
+  channel: channelRouter,
+  channelSuggestion: channelSuggestionRouter,
+  content: contentRouter,
   blob: blobRouter,
   newsletter: newsletterRouter,
   org: orgRouter,
   outreach: outreachRouter,
   instantly: instantlyRouter,
+  leads: leadsRouter,
+  media: mediaRouter,
   reddit: redditRouter,
+  studio: studioRouter,
   twitter: twitterRouter,
 });
 
@@ -33,7 +45,6 @@ export type AppRouter = typeof appRouter;
  * Create a server-side caller for the tRPC API.
  * @example
  * const trpc = createCaller(createContext);
- * const res = await trpc.post.all();
- *       ^? Post[]
+ * const res = await trpc.user.me();
  */
 export const createCaller = createCallerFactory(appRouter);
