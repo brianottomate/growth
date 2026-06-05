@@ -21,7 +21,7 @@ export async function ZernioRecentActivity() {
   const results = await Promise.all(
     PLATFORMS.map(async (platform) => {
       try {
-        const posts = await getZernioAnalytics({ platform, fromDate, toDate });
+        const { posts } = await getZernioAnalytics({ platform, fromDate, toDate });
         return { platform, posts, error: null as string | null };
       } catch (error) {
         return {

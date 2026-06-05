@@ -1,52 +1,53 @@
+import { isZernioConfigured } from "@/server/clients/zernio.client";
+
+import { ListenItemActions } from "./ListenItemActions";
 import {
-  isZernioConfigured,
-  listAllZernioAdComments,
-  type AdCommentWithContext,
-} from "@/server/clients/zernio.client";
+  buildAdCommentContext,
+  commentTimeMs,
+  getRecentAdComments,
+  LISTENING_WINDOW_DAYS,
+} from "./zernio-listening";
 
-export async function ZernioAdComments() {
-  if (!isZernioConfigured) {
-    return null;
-  }
+export async function AdComments() {
+  if (!isZernioConfigured) return null;
 
-  let result: Awaited<ReturnType<typeof listAllZernioAdComments>>;
+  let result: Awaited<ReturnType<typeof getRecentAdComments>>;
   try {
-    result = await listAllZernioAdComments({ maxAds: 30, perAdLimit: 25 });
+    result = await getRecentAdComments();
   } catch (error) {
     return (
-      <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         <p className="font-semibold">Failed to fetch ad comments</p>
         <p className="mt-1 font-mono text-xs">
           {error instanceof Error ? error.message : String(error)}
         </p>
         <p className="mt-2 text-xs">
-          Probably <code className="font-mono">GET /v1/ads/tree</code> failing
-          — verify the ad account is wired up in Zernio.
+          Probably <code className="font-mono">GET /v1/ads/tree</code> failing —
+          verify the ad account is wired up in Zernio.
         </p>
       </div>
     );
   }
 
-  const sorted = [...result.comments].sort((a, b) => {
-    const aTime = commentTime(a)?.getTime() ?? 0;
-    const bTime = commentTime(b)?.getTime() ?? 0;
-    return bTime - aTime;
-  });
+  const sorted = [...result.comments].sort(
+    (a, b) => (commentTimeMs(b) ?? 0) - (commentTimeMs(a) ?? 0),
+  );
   const top = sorted.slice(0, 50);
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-muted-foreground">
         Scanned <span className="font-mono">{result.totalAds}</span> ad
         {result.totalAds === 1 ? "" : "s"} ·{" "}
-        <span className="font-mono">{result.comments.length}</span> total
-        comment{result.comments.length === 1 ? "" : "s"} ·{" "}
+        <span className="font-mono">{result.comments.length}</span> comment
+        {result.comments.length === 1 ? "" : "s"} in the last{" "}
+        {LISTENING_WINDOW_DAYS} days ·{" "}
         <span className="font-mono">{result.errors.length}</span> error
         {result.errors.length === 1 ? "" : "s"}
       </p>
 
       {result.errors.length > 0 ? (
-        <details className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        <details className="rounded-lg border bg-muted/50 p-3 text-xs text-muted-foreground">
           <summary className="cursor-pointer font-semibold">
             {result.errors.length} ad{result.errors.length === 1 ? "" : "s"}{" "}
             errored (likely Stories / DPA — not commentable)
@@ -65,46 +66,49 @@ export async function ZernioAdComments() {
       ) : null}
 
       {top.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">
-          No ad comments returned. Either no active ads have comments, or the
-          ad account isn&apos;t connected in Zernio.
+        <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+          No ad comments in the last {LISTENING_WINDOW_DAYS} days. Either no
+          active ads drew comments recently, or the ad account isn&apos;t
+          connected in Zernio.
         </div>
       ) : (
-        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+        <ul className="divide-y rounded-lg border bg-card">
           {top.map((c, idx) => {
             const id = c.id ?? c._id ?? idx;
             const author = c.from?.name ?? "Unknown";
             const body = (c.message ?? c.content ?? "").trim();
             const short = body.length > 280 ? `${body.slice(0, 280)}…` : body;
-            const when = commentTime(c);
+            const when = commentTimeMs(c);
             return (
               <li key={String(id)} className="px-4 py-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-foreground">
                         {author}
                       </span>
                       {when ? (
-                        <span className="text-xs text-gray-500">
-                          · {when.toLocaleDateString()}
+                        <span className="text-xs text-muted-foreground">
+                          · {new Date(when).toLocaleDateString()}
                         </span>
                       ) : null}
                       {c.parent ? (
-                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                           reply
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1 text-sm whitespace-pre-line text-gray-800">
+                    <p className="mt-1 text-sm whitespace-pre-line text-foreground/90">
                       {short || (
-                        <span className="text-gray-400 italic">(no text)</span>
+                        <span className="text-muted-foreground italic">
+                          (no text)
+                        </span>
                       )}
                     </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                       <span>
                         on ad:{" "}
-                        <span className="text-gray-700">
+                        <span className="text-foreground">
                           {c.adName ?? c.adId}
                         </span>
                       </span>
@@ -113,14 +117,15 @@ export async function ZernioAdComments() {
                           href={c.permalink}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="text-rose-600 hover:underline"
+                          className="text-primary hover:underline"
                         >
                           open ↗
                         </a>
                       ) : null}
                     </div>
+                    <ListenItemActions context={buildAdCommentContext(c)} />
                   </div>
-                  <span className="shrink-0 rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700">
+                  <span className="shrink-0 rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
                     {c.platform ?? "ads"}
                   </span>
                 </div>
@@ -131,11 +136,4 @@ export async function ZernioAdComments() {
       )}
     </div>
   );
-}
-
-function commentTime(c: AdCommentWithContext): Date | null {
-  const raw = c.createdTime ?? c.created_time ?? c.createdAt;
-  if (!raw) return null;
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? null : d;
 }

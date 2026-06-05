@@ -1,25 +1,30 @@
 import {
   isZernioConfigured,
-  listZernioCommentedPosts,
   type ZernioCommentedPost,
 } from "@/server/clients/zernio.client";
 
-export async function ZernioInbox() {
+import { ListenItemActions } from "./ListenItemActions";
+import {
+  buildPostContext,
+  getRecentCommentedPosts,
+  LISTENING_WINDOW_DAYS,
+} from "./zernio-listening";
+
+export async function Comments() {
   if (!isZernioConfigured) {
-    return null;
+    return (
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+        Zernio isn&apos;t configured (no <code className="font-mono">ZERNIO_API_KEY</code>).
+      </div>
+    );
   }
 
-  let result: Awaited<ReturnType<typeof listZernioCommentedPosts>>;
+  let result: Awaited<ReturnType<typeof getRecentCommentedPosts>>;
   try {
-    result = await listZernioCommentedPosts({
-      sortBy: "comments",
-      sortOrder: "desc",
-      minComments: 1,
-      limit: 50,
-    });
+    result = await getRecentCommentedPosts();
   } catch (error) {
     return (
-      <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
         <p className="font-semibold">Failed to fetch commented posts</p>
         <p className="mt-1 font-mono text-xs">
           {error instanceof Error ? error.message : String(error)}
@@ -30,14 +35,15 @@ export async function ZernioInbox() {
 
   if (result.posts.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">
-        No posts with comments across connected accounts.
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+        No posts published in the last {LISTENING_WINDOW_DAYS} days have comments
+        across connected accounts.
       </div>
     );
   }
 
   return (
-    <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+    <ul className="divide-y rounded-lg border bg-card">
       {result.posts.map((post, idx) => (
         <PostRow key={String(post.id ?? idx)} post={post} />
       ))}
@@ -54,40 +60,40 @@ function PostRow({ post }: { post: ZernioCommentedPost }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="text-sm font-medium text-gray-900">
+            <span className="text-sm font-medium text-foreground">
               {post.accountUsername ?? "(account)"}
             </span>
             {when ? (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-muted-foreground">
                 · {when.toLocaleDateString()}
               </span>
             ) : null}
             {post.isAd ? (
-              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-900">
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
                 ad
               </span>
             ) : null}
             {post.subreddit ? (
-              <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                 r/{post.subreddit}
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-sm whitespace-pre-line text-gray-800">
+          <p className="mt-1 text-sm whitespace-pre-line text-foreground/90">
             {short || (
-              <span className="text-gray-400 italic">(no text)</span>
+              <span className="text-muted-foreground italic">(no text)</span>
             )}
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
             <span>
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-foreground">
                 {post.commentCount ?? 0}
               </span>{" "}
               comment{(post.commentCount ?? 0) === 1 ? "" : "s"}
             </span>
             {typeof post.likeCount === "number" ? (
               <span>
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-foreground">
                   {post.likeCount}
                 </span>{" "}
                 likes
@@ -98,14 +104,15 @@ function PostRow({ post }: { post: ZernioCommentedPost }) {
                 href={post.permalink}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-rose-600 hover:underline"
+                className="text-primary hover:underline"
               >
                 open ↗
               </a>
             ) : null}
           </div>
+          <ListenItemActions context={buildPostContext(post)} />
         </div>
-        <span className="shrink-0 rounded bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-700">
+        <span className="shrink-0 rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
           {post.platform ?? "?"}
         </span>
       </div>

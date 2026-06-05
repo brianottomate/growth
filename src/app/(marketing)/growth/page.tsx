@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-
-import { RedditScanWidget } from "./RedditScanWidget";
-import { TwitterScanWidget } from "./TwitterScanWidget";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Growth",
@@ -140,9 +138,20 @@ function XSection() {
           </span>
         </div>
 
-        <TwitterScanWidget />
+        <LiveScanLink />
       </div>
     </section>
+  );
+}
+
+function LiveScanLink() {
+  return (
+    <Link
+      href="/app/listen"
+      className="mt-4 inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+    >
+      Live scanning now in Listen →
+    </Link>
   );
 }
 
@@ -175,7 +184,7 @@ function RedditSection() {
           </span>
         </div>
 
-        <RedditScanWidget />
+        <LiveScanLink />
 
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
           <div>
