@@ -31,6 +31,26 @@ export const audienceTypeEnum = pgEnum("audience_type", [
 ]);
 export type AudienceType = (typeof audienceTypeEnum.enumValues)[number];
 
+// Strategic layer for audiences — the canonical "who we want to reach"
+// (e.g. "CA remote workers"). Per-channel `audience` rows are the reality and
+// link up via the nullable `targetId` FK. Mirrors lifecycle_program.
+export const audienceTargetStatusEnum = pgEnum("audience_target_status", [
+  "idea",
+  "planned",
+  "active",
+  "retired",
+]);
+export type AudienceTargetStatus =
+  (typeof audienceTargetStatusEnum.enumValues)[number];
+
+export const audienceTargetPriorityEnum = pgEnum("audience_target_priority", [
+  "must_have",
+  "should_have",
+  "nice_to_have",
+]);
+export type AudienceTargetPriority =
+  (typeof audienceTargetPriorityEnum.enumValues)[number];
+
 // ---- INITIATIVE (top-level, goal-driven push across ad channels) ----
 
 /**
@@ -253,6 +273,57 @@ export const adSpotTable = pgTable(
 export type AdSpot = typeof adSpotTable.$inferSelect;
 export type AdSpotInsert = typeof adSpotTable.$inferInsert;
 
+// ---- AUDIENCE TARGET (the intended "who" — "what we want") ----------
+
+export const audienceTargetTable = pgTable(
+  "audience_target",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("audt")),
+
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    name: t.text().notNull(), // canonical "who", e.g. "CA remote workers"
+    description: t.text(), // why we want to reach them
+
+    type: audienceTypeEnum().notNull(),
+    status: audienceTargetStatusEnum().default("planned").notNull(),
+    priority: audienceTargetPriorityEnum().default("should_have").notNull(),
+
+    // Ad platforms we intend this audience to be live on (channelPlatform
+    // slugs). Compared against the linked `audience` rows to spot gaps.
+    intendedChannels: t.jsonb().$type<string[]>(),
+    sizeGoalLabel: t.text(), // aspirational reach, e.g. "~500K"
+
+    definition: t.jsonb(), // geo / interest hints, shared with the platform rows
+    metadata: t.jsonb(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: t.timestamp(),
+  }),
+  (table) => [
+    index("audience_target_brand_idx").on(table.brandId),
+    index("audience_target_type_idx").on(table.type),
+    index("audience_target_status_idx").on(table.status),
+  ],
+);
+
+export type AudienceTarget = typeof audienceTargetTable.$inferSelect;
+export type AudienceTargetInsert = typeof audienceTargetTable.$inferInsert;
+
 // ---- AUDIENCE ------------------------------------------------------
 
 export const audienceTable = pgTable(
@@ -275,6 +346,11 @@ export const audienceTable = pgTable(
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
+    // The strategic target this mirrored audience fulfils, if any.
+    targetId: t
+      .text()
+      .references(() => audienceTargetTable.id, { onDelete: "set null" }),
+
     name: t.text().notNull(),
     type: audienceTypeEnum().notNull(),
     sizeLabel: t.text(), // "~1.2M", "~40K/mo" — coarse, mirrored from platform
@@ -296,6 +372,7 @@ export const audienceTable = pgTable(
     index("audience_brand_idx").on(table.brandId),
     index("audience_channel_idx").on(table.channelId),
     index("audience_type_idx").on(table.type),
+    index("audience_target_idx").on(table.targetId),
   ],
 );
 
@@ -346,6 +423,17 @@ export const adSpotRelations = relations(adSpotTable, ({ one }) => ({
   }),
 }));
 
+export const audienceTargetRelations = relations(
+  audienceTargetTable,
+  ({ one, many }) => ({
+    brand: one(brandTable, {
+      fields: [audienceTargetTable.brandId],
+      references: [brandTable.id],
+    }),
+    audiences: many(audienceTable),
+  }),
+);
+
 export const audienceRelations = relations(audienceTable, ({ one }) => ({
   brand: one(brandTable, {
     fields: [audienceTable.brandId],
@@ -354,5 +442,9 @@ export const audienceRelations = relations(audienceTable, ({ one }) => ({
   channel: one(channelTable, {
     fields: [audienceTable.channelId],
     references: [channelTable.id],
+  }),
+  target: one(audienceTargetTable, {
+    fields: [audienceTable.targetId],
+    references: [audienceTargetTable.id],
   }),
 }));

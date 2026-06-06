@@ -9,6 +9,7 @@ import {
 } from "@/server/db/schema";
 import type { LifecycleRunState } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
+import { LifecycleTabs } from "./LifecycleTabs";
 
 const RUN_STATE: Record<
   LifecycleRunState,
@@ -84,21 +85,10 @@ export default async function LifecyclePage() {
       .filter((c) => c.runState === s)
       .sort((a, b) => a.name.localeCompare(b.name));
 
-  return (
+  const mirror = (
     <div>
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Lifecycle</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {campaigns.length} automations mirrored from Customer.io ·{" "}
-            <span className="text-amber-300">{cleanupCount} cleanup</span>{" "}
-            candidates · view-only
-          </p>
-        </div>
-      </div>
-
       {/* run-state summary */}
-      <div className="mt-5 flex flex-wrap gap-2 border-b pb-4">
+      <div className="mt-2 flex flex-wrap gap-2 border-b pb-4">
         {ORDER.map((s) => {
           const n = campaigns.filter((c) => c.runState === s).length;
           if (!n) return null;
@@ -195,6 +185,27 @@ export default async function LifecyclePage() {
           </section>
         );
       })}
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Lifecycle</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            What we want vs. what runs in Customer.io ·{" "}
+            <span className="text-amber-300">{cleanupCount} cleanup</span>{" "}
+            candidates
+          </p>
+        </div>
+      </div>
+
+      <LifecycleTabs
+        brands={brands.map((b) => ({ id: b.id, name: b.name }))}
+        mirror={mirror}
+        mirrorCount={campaigns.length}
+      />
     </div>
   );
 }
