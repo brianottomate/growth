@@ -1,11 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata: Metadata = {
+import { constructMetadata } from "@/lib/metadata";
+
+export const metadata = constructMetadata({
   title: "Growth",
+  eyebrow: "Experiments",
+  path: "/growth",
   description:
     "Wander growth experiments, monitoring, and tooling — work in progress.",
-};
+});
 
 export default function GrowthPage() {
   return (

@@ -77,7 +77,7 @@ export default function OnboardingPage() {
     trpc.user.completeOnboarding.mutationOptions({
       onSuccess: () => {
         toast.success("Welcome! Let's get started.");
-        router.push("/app/dashboard");
+        router.push("/app");
       },
       onError: (error) => {
         toast.error(

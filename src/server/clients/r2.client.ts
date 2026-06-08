@@ -104,6 +104,50 @@ export function r2BuildPosterKey(brandId: string, id: string, ext = "jpg"): stri
     .join("/");
 }
 
+/** Key for a user's profile photo (not brand-scoped). */
+export function r2BuildUserPhotoKey(userId: string, filename: string): string {
+  const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const safeName = filename.replace(/[^a-zA-Z0-9_.-]/g, "-");
+  return [env.R2_PREFIX, "avatars", safeId, safeName || "avatar"]
+    .filter(Boolean)
+    .join("/");
+}
+
+/**
+ * Key for a generic (non-brand) image upload — org logos, profile images, and
+ * the shared ImageUpload component. `scope` groups by surface (e.g.
+ * "organization", "user"), `id` is the owning record id for traceability.
+ */
+export function r2BuildUploadKey(
+  scope: string,
+  id: string,
+  filename: string,
+): string {
+  const safeScope = scope.replace(/[^a-zA-Z0-9_-]/g, "-") || "general";
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "-") || "misc";
+  const safeName = filename.replace(/[^a-zA-Z0-9_.-]/g, "-");
+  return [env.R2_PREFIX, "uploads", safeScope, safeId, safeName || "file"]
+    .filter(Boolean)
+    .join("/");
+}
+
+/** Server-side: PUT an in-memory buffer to R2; returns the public URL. */
+export async function r2PutBuffer(
+  key: string,
+  body: Buffer,
+  contentType: string,
+): Promise<string> {
+  await getClient().send(
+    new PutObjectCommand({
+      Bucket: env.R2_BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType || "image/jpeg",
+    }),
+  );
+  return r2PublicUrl(key);
+}
+
 /** Server-side: fetch bytes from a URL and PUT them to R2; returns public URL. */
 export async function r2PutFromUrl(key: string, sourceUrl: string): Promise<string> {
   const res = await fetch(sourceUrl);
@@ -124,7 +168,10 @@ export const R2 = {
   publicUrl: r2PublicUrl,
   buildKey: r2BuildKey,
   buildPosterKey: r2BuildPosterKey,
+  buildUserPhotoKey: r2BuildUserPhotoKey,
+  buildUploadKey: r2BuildUploadKey,
   presignPut: r2PresignPut,
+  putBuffer: r2PutBuffer,
   putFromUrl: r2PutFromUrl,
   needsRehost,
   delete: r2Delete,

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -30,6 +31,14 @@ export default async function ContentPage() {
 
   return (
     <HydrateClient>
+      <div className="mb-3 flex justify-end">
+        <Link
+          href="/app/content/groupings"
+          className="border-border hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium"
+        >
+          ✨ Suggested groupings
+        </Link>
+      </div>
       <ContentBoard
         brands={brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug }))}
       />

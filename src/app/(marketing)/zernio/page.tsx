@@ -1,14 +1,17 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+
+import { constructMetadata } from "@/lib/metadata";
 
 import { ZernioAccountsList } from "./ZernioAccountsList";
 import { ZernioRecentActivity } from "./ZernioRecentActivity";
 
-export const metadata: Metadata = {
+export const metadata = constructMetadata({
   title: "Zernio",
+  eyebrow: "Zernio",
+  path: "/zernio",
   description:
     "Unified API for Wander's owned social channels — accounts, posts, analytics.",
-};
+});
 
 export default function ZernioPage() {
   return (

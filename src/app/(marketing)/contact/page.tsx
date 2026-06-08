@@ -1,31 +1,12 @@
-import type { Metadata } from "next";
+import { constructMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
-  title: "Contact Us",
+export const metadata = constructMetadata({
+  title: "Contact",
+  eyebrow: "Get in touch",
+  path: "/contact",
   description:
-    "Get in touch with our team to learn more about our platform and how we can help you.",
-  openGraph: {
-    title: "Contact Us | Wander Growth",
-    description:
-      "Get in touch with our team to learn more about our platform and how we can help you.",
-    images: [
-      {
-        url: "/images/og/og.png",
-        width: 1200,
-        height: 630,
-        alt: "Wander Growth - Revenue Workflows",
-      },
-    ],
-    siteName: "Wander Growth",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Contact Us | Wander Growth",
-    description:
-      "Get in touch with our team to learn more about our platform and how we can help you.",
-    images: ["/images/og/og.png"],
-  },
-};
+    "Get in touch with the Wander growth team to learn more about our tooling and how we can help.",
+});
 
 export default function ContactPage() {
   return (

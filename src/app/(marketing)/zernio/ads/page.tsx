@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
-
 import {
   isZernioConfigured,
   listAllZernioAdsWithComments,
 } from "@/server/clients/zernio.client";
+import { constructMetadata } from "@/lib/metadata";
 
 import { AdsGridClient } from "./AdsGridClient";
 
-export const metadata: Metadata = {
-  title: "Zernio · Ads",
+export const metadata = constructMetadata({
+  title: "Ads",
+  eyebrow: "Zernio",
+  path: "/zernio/ads",
   description: "Historical feed of all Wander ads — creatives + comments.",
-};
+});
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;

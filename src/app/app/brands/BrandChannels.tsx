@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { ExternalLink, Plus, Settings, Trash2, X } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  Plus,
+  Settings,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +34,7 @@ import {
 import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, PLATFORM_META, platformLabel } from "@/components/channel-logos";
 import type { FollowerSnapshot } from "@/server/db/channel-schema";
+import type { SuggestionLite } from "./SuggestedChannels";
 
 export type ChannelLite = {
   id: string;
@@ -53,12 +62,21 @@ const PLATFORMS_BY_KIND: Record<string, string[]> = {
   blog: ["blog", "other"],
 };
 
-const KIND_LABEL: Record<string, string> = {
-  social: "Social",
-  ad: "Ads",
-  newsletter: "Newsletters",
-  blog: "Blog",
-};
+// Reverse lookup so an incoming suggestion's platform can be slotted into the
+// right sub-group. Discovery surfaces social profiles, so default to social.
+const KIND_BY_PLATFORM: Record<string, string> = Object.fromEntries(
+  Object.entries(PLATFORMS_BY_KIND).flatMap(([kind, platforms]) =>
+    platforms.map((p) => [p, kind]),
+  ),
+);
+
+// Display sub-groups for the unified Channels zone. Newsletter + blog collapse
+// into one "Owned" row since each brand usually has at most one of each.
+const GROUPS: { label: string; kinds: string[] }[] = [
+  { label: "Social", kinds: ["social"] },
+  { label: "Ads", kinds: ["ad"] },
+  { label: "Owned", kinds: ["newsletter", "blog"] },
+];
 
 type FormState = {
   id: string | null;
@@ -93,9 +111,11 @@ function latestCount(history: FollowerSnapshot[]): number | null {
 export function BrandChannels({
   brandId,
   channels,
+  suggestions = [],
 }: {
   brandId: string;
   channels: ChannelLite[];
+  suggestions?: SuggestionLite[];
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -103,11 +123,13 @@ export function BrandChannels({
   const [tab, setTab] = useState("details");
   const [newCount, setNewCount] = useState("");
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
 
   const onDone = () => {
     setOpen(false);
     router.refresh();
   };
+  const refresh = () => router.refresh();
 
   const createM = useMutation(
     trpc.channel.create.mutationOptions({ onSuccess: onDone }),
@@ -119,6 +141,26 @@ export function BrandChannels({
     trpc.channel.delete.mutationOptions({ onSuccess: onDone }),
   );
   const busy = createM.isPending || updateM.isPending || deleteM.isPending;
+
+  // Handle discovery + suggestion review live inline with the channels they
+  // relate to (ghost chips), so there's no detached "suggested handles" block.
+  const discoverM = useMutation(
+    trpc.channelSuggestion.discover.mutationOptions({
+      onSuccess: refresh,
+      onError: (e) => setDiscoverError(e.message),
+    }),
+  );
+  const acceptM = useMutation(
+    trpc.channelSuggestion.accept.mutationOptions({ onSuccess: refresh }),
+  );
+  const rejectM = useMutation(
+    trpc.channelSuggestion.reject.mutationOptions({ onSuccess: refresh }),
+  );
+  const suggBusyId = acceptM.isPending
+    ? acceptM.variables?.id
+    : rejectM.isPending
+      ? rejectM.variables?.id
+      : null;
 
   const openAdd = () => {
     setForm(EMPTY);
@@ -183,64 +225,163 @@ export function BrandChannels({
   const showFollowers = form.kind === "social";
   const todayISO = new Date().toISOString().slice(0, 10);
 
+  const suggestionsForGroup = (kinds: readonly string[]) =>
+    suggestions.filter((s) => kinds.includes(KIND_BY_PLATFORM[s.platform] ?? "social"));
+
+  const hasAny = channels.length > 0 || suggestions.length > 0;
+
   return (
     <div className="mt-3 flex flex-col gap-3">
-      {KINDS.map(({ value, label }) => {
-        const group = channels.filter((c) => c.kind === value);
-        if (group.length === 0) return null;
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+          Channels{channels.length > 0 && ` · ${channels.length}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground gap-1.5"
+            onClick={openAdd}
+          >
+            <Plus className="size-3.5" />
+            Add
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground gap-1.5"
+            onClick={() => {
+              setDiscoverError(null);
+              discoverM.mutate({ brandId });
+            }}
+            loading={discoverM.isPending}
+          >
+            <Sparkles className="size-3.5" />
+            {discoverM.isPending ? "Discovering…" : "Discover"}
+          </Button>
+        </div>
+      </div>
+
+      {discoverError && (
+        <p className="text-destructive text-[11px]">{discoverError}</p>
+      )}
+
+      {GROUPS.map(({ label, kinds }) => {
+        const group = channels.filter((c) => kinds.includes(c.kind));
+        const groupSuggestions = suggestionsForGroup(kinds);
+        if (group.length === 0 && groupSuggestions.length === 0) return null;
         return (
-          <div key={value}>
+          <div key={label}>
             <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wide">
-              {KIND_LABEL[value]} · {group.length}
+              {label} · {group.length + groupSuggestions.length}
             </div>
             <div className="flex flex-wrap gap-2">
-              {group.map((c) => {
+              {group.map((c) => (
+                <div
+                  key={c.id}
+                  className="hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
+                >
+                  <button
+                    onClick={() => openEdit(c)}
+                    className="flex items-center gap-2 text-left"
+                  >
+                    <ChannelLogo platform={c.platform} />
+                    <span className="flex flex-col leading-tight">
+                      <span className="text-xs font-medium">
+                        {platformLabel(c.platform)}
+                      </span>
+                      {(c.handle || c.followerCount != null) && (
+                        <span className="text-muted-foreground text-[11px]">
+                          {c.handle}
+                          {c.handle && c.followerCount != null && " · "}
+                          {c.followerCount != null &&
+                            `${followerFmt.format(c.followerCount)} followers`}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  {c.profileUrl && (
+                    <a
+                      href={c.profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open page"
+                      className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
+                    >
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                  )}
+                  {c.manageUrl && (
+                    <a
+                      href={c.manageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open manage page"
+                      className="text-muted-foreground hover:text-foreground hover:bg-background rounded p-1"
+                    >
+                      <Settings className="size-3.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+
+              {/* Pending suggestions render as dashed ghost chips alongside the
+                  real channels in their group — accept/reject inline. */}
+              {groupSuggestions.map((s) => {
+                const rowBusy = suggBusyId === s.id;
                 return (
                   <div
-                    key={c.id}
-                    className="hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
+                    key={s.id}
+                    className="border-muted-foreground/30 bg-muted/30 flex items-center gap-2 rounded-lg border border-dashed px-2 py-1.5"
                   >
-                    <button
-                      onClick={() => openEdit(c)}
-                      className="flex items-center gap-2 text-left"
-                    >
-                      <ChannelLogo platform={c.platform} />
-                      <span className="flex flex-col leading-tight">
-                        <span className="text-xs font-medium">
-                          {platformLabel(c.platform)}
-                        </span>
-                        {(c.handle || c.followerCount != null) && (
-                          <span className="text-muted-foreground text-[11px]">
-                            {c.handle}
-                            {c.handle && c.followerCount != null && " · "}
-                            {c.followerCount != null &&
-                              `${followerFmt.format(c.followerCount)} followers`}
+                    <ChannelLogo platform={s.platform} />
+                    <span className="flex flex-col leading-tight">
+                      <span className="text-xs font-medium">
+                        {platformLabel(s.platform)}
+                        {s.profileUrl ? (
+                          <a
+                            href={s.profileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground ml-1.5 font-normal"
+                          >
+                            @{s.handle}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground ml-1.5 font-normal">
+                            @{s.handle}
                           </span>
                         )}
                       </span>
-                    </button>
-                    {c.profileUrl && (
-                      <a
-                        href={c.profileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open page"
-                        className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    )}
-                    {c.manageUrl && (
-                      <a
-                        href={c.manageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open manage page"
-                        className="text-muted-foreground hover:text-foreground hover:bg-background rounded p-1"
-                      >
-                        <Settings className="size-3.5" />
-                      </a>
-                    )}
+                      <span className="text-muted-foreground text-[11px]">
+                        {s.confidence != null &&
+                          `${Math.round(s.confidence * 100)}% match`}
+                        {s.verified === true &&
+                          s.followerCount != null &&
+                          ` · ✓ ${followerFmt.format(s.followerCount)}`}
+                        {s.verified === false && " · unverified"}
+                      </span>
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive size-6"
+                      title="Reject"
+                      disabled={rowBusy}
+                      onClick={() => rejectM.mutate({ id: s.id })}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      className="size-6"
+                      title="Accept — create channel"
+                      loading={rowBusy && acceptM.isPending}
+                      disabled={rowBusy}
+                      onClick={() => acceptM.mutate({ id: s.id })}
+                    >
+                      <Check className="size-3.5" />
+                    </Button>
                   </div>
                 );
               })}
@@ -249,12 +390,13 @@ export function BrandChannels({
         );
       })}
 
-      <div>
-        <Button variant="ghost" size="sm" className="text-muted-foreground gap-1.5" onClick={openAdd}>
-          <Plus className="size-3.5" />
-          Add channel
-        </Button>
-      </div>
+      {!hasAny && (
+        <p className="text-muted-foreground text-[11px]">
+          {discoverM.isPending
+            ? "Searching the web + verifying profiles…"
+            : "No channels yet. Add one, or run Discover to find this brand's profiles."}
+        </p>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

@@ -1,19 +1,17 @@
 import "server-only";
 
-import { anthropic } from "@ai-sdk/anthropic";
-import { Output, generateText } from "ai";
-import { z } from "zod";
-
 import {
   INTENT_TAGS,
-  SUGGESTED_ACTIONS,
   type DraftPill,
   type IntentTag,
   type SuggestedAction,
 } from "@/server/services/reddit-monitor.service";
-
-const SCORING_MODEL = anthropic("claude-sonnet-4-6");
-const DRAFT_MODEL = anthropic("claude-opus-4-7");
+import {
+  draftReply,
+  scoreItems,
+  type DraftChannel,
+  type ScoringChannel,
+} from "@/server/services/triage.service";
 
 const SCORING_SYSTEM_PROMPT = `You are a growth analyst at Wander, a vacation-rental company.
 
@@ -169,54 +167,26 @@ function formatTweetForLLM(t: TweetSummary): string {
   ].join("\n");
 }
 
+const SCORING_CHANNEL: ScoringChannel<TweetSummary, IntentTag> = {
+  intentTags: INTENT_TAGS,
+  systemPrompt: SCORING_SYSTEM_PROMPT,
+  getId: (t) => t.id,
+  formatItem: formatTweetForLLM,
+  relevanceDescription:
+    "0 = noise/off-topic. 5 = adjacent operator pain. 8+ = textbook engagement opportunity.",
+};
+
 export async function scoreTweets(
   tweets: TweetSummary[],
 ): Promise<ScoredTweet[]> {
-  if (tweets.length === 0) return [];
-
-  const { output } = await generateText({
-    model: SCORING_MODEL,
-    system: SCORING_SYSTEM_PROMPT,
-    prompt: `Score each tweet below. Return one entry per tweet, using the tweet's id verbatim.\n\n${tweets
-      .map(formatTweetForLLM)
-      .join("\n---\n")}`,
-    output: Output.array({
-      element: z.object({
-        tweetId: z
-          .string()
-          .describe("The tweet id field, verbatim from the input."),
-        relevance: z
-          .number()
-          .int()
-          .min(0)
-          .max(10)
-          .describe(
-            "0 = noise/off-topic. 5 = adjacent operator pain. 8+ = textbook engagement opportunity.",
-          ),
-        intentTag: z.enum(INTENT_TAGS),
-        suggestedAction: z.enum(SUGGESTED_ACTIONS),
-        rationale: z
-          .string()
-          .describe("One concise sentence justifying the score."),
-      }),
-    }),
-  });
-
-  const byId = new Map(tweets.map((t) => [t.id, t]));
-  return output
-    .map((s) => {
-      const tweet = byId.get(s.tweetId);
-      if (!tweet) return null;
-      return {
-        tweet,
-        relevance: s.relevance,
-        intentTag: s.intentTag,
-        suggestedAction: s.suggestedAction,
-        rationale: s.rationale,
-      };
-    })
-    .filter((s): s is ScoredTweet => s !== null)
-    .sort((a, b) => b.relevance - a.relevance);
+  const { scored } = await scoreItems(SCORING_CHANNEL, tweets);
+  return scored.map((s) => ({
+    tweet: s.item,
+    relevance: s.relevance,
+    intentTag: s.intentTag,
+    suggestedAction: s.suggestedAction,
+    rationale: s.rationale,
+  }));
 }
 
 export async function scanAndScoreTweets(): Promise<{
@@ -244,6 +214,11 @@ const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
     "If you mention a Wander product, focus on Wander Operated (full-service property management).",
 };
 
+const DRAFT_CHANNEL: DraftChannel<DraftPill> = {
+  systemPrompt: DRAFT_SYSTEM_PROMPT,
+  pillInstructions: PILL_INSTRUCTIONS,
+};
+
 export async function draftTweetReplyForPost(input: {
   tweet: TweetSummary;
   intentTag: IntentTag;
@@ -251,22 +226,10 @@ export async function draftTweetReplyForPost(input: {
   pills?: DraftPill[];
   customInstructions?: string;
 }): Promise<string> {
-  const modifierLines: string[] = [];
-  for (const pill of input.pills ?? []) {
-    modifierLines.push(`- ${PILL_INSTRUCTIONS[pill]}`);
-  }
-  const custom = input.customInstructions?.trim();
-  if (custom) modifierLines.push(`- ${custom}`);
-
-  const modifiersBlock =
-    modifierLines.length > 0
-      ? `\n\nAdditional modifiers for THIS draft (override defaults where they conflict):\n${modifierLines.join("\n")}`
-      : "";
-
-  const { text } = await generateText({
-    model: DRAFT_MODEL,
-    system: DRAFT_SYSTEM_PROMPT + modifiersBlock,
-    prompt: `Tweet to reply to:
+  return draftReply(DRAFT_CHANNEL, {
+    pills: input.pills,
+    customInstructions: input.customInstructions,
+    promptBody: `Tweet to reply to:
 
 author: @${input.tweet.authorUsername}
 text: ${input.tweet.text}
@@ -277,5 +240,4 @@ Scoring context from our analyst:
 
 Draft the reply. Do NOT include any preamble like "Here's a draft:" — output the reply text directly, with no surrounding quotes.`,
   });
-  return text.trim();
 }

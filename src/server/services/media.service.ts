@@ -240,6 +240,54 @@ export async function updateMediaMeta(input: {
   return updated ?? null;
 }
 
+/**
+ * Edit an external (linked) asset — title, URL, kind, and/or thumbnail. A
+ * thumbnail can arrive as pasted/uploaded bytes (base64) or a URL we fetch +
+ * rehost server-side; either way it lands on R2 as the asset's poster. Pass
+ * `thumbnailUrl: null` (with no `thumbnail`) to clear it.
+ */
+export async function updateExternal(input: {
+  id: string;
+  brandId: string;
+  title?: string;
+  externalUrl?: string;
+  kind?: MediaKind;
+  thumbnail?: { base64Data: string; mimeType: string; filename: string };
+  thumbnailUrl?: string | null;
+}) {
+  let thumbnailUrl: string | null | undefined;
+  if (input.thumbnail) {
+    const buffer = Buffer.from(input.thumbnail.base64Data, "base64");
+    const ext = (input.thumbnail.mimeType.split("/")[1] ?? "jpg").replace(
+      /[^a-z0-9]/gi,
+      "",
+    );
+    const key = R2.buildPosterKey(input.brandId, input.id, ext || "jpg");
+    thumbnailUrl = await R2.putBuffer(key, buffer, input.thumbnail.mimeType);
+  } else if (input.thumbnailUrl) {
+    const key = R2.buildPosterKey(input.brandId, input.id);
+    thumbnailUrl = await R2.putFromUrl(key, input.thumbnailUrl);
+  } else if (input.thumbnailUrl === null) {
+    thumbnailUrl = null;
+  }
+
+  const [updated] = await db
+    .update(mediaAssetTable)
+    .set({
+      ...(input.title !== undefined && { title: input.title }),
+      ...(input.externalUrl !== undefined && {
+        externalUrl: input.externalUrl,
+        url: input.externalUrl, // mirror so "open" affordances keep working
+        sourceProvider: sourceProviderForUrl(input.externalUrl),
+      }),
+      ...(input.kind !== undefined && { kind: input.kind }),
+      ...(thumbnailUrl !== undefined && { thumbnailUrl }),
+    })
+    .where(eq(mediaAssetTable.id, input.id))
+    .returning();
+  return updated ?? null;
+}
+
 /** Soft-delete the row and best-effort-delete the underlying bytes. */
 export async function deleteMedia(id: string) {
   const asset = await getMedia(id);
@@ -269,6 +317,7 @@ export const MediaService = {
   markVideoReady,
   syncVideo,
   createExternal,
+  updateExternal,
   list: listMedia,
   get: getMedia,
   updateMeta: updateMediaMeta,

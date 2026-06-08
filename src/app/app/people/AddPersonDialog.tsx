@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Check, Copy, ImagePlus, Loader2, UserPlus } from "lucide-react";
+import { Check, Copy, Loader2, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,37 +24,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { cn } from "@/components/ui/lib/utils";
 import { useTRPC } from "@/trpc/react";
-
-const MAX_PHOTO_BYTES = 4.5 * 1024 * 1024;
-
-type Photo = { base64Data: string; mimeType: string; filename: string };
-
-function fileToPhoto(file: File): Promise<Photo> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const base64Data = result.split(",")[1] ?? "";
-      resolve({ base64Data, mimeType: file.type, filename: file.name });
-    };
-    reader.onerror = () => reject(new Error("Could not read file"));
-    reader.readAsDataURL(file);
-  });
-}
+import { PhotoPickerField, usePhotoPicker } from "./PhotoPicker";
 
 export function AddPersonDialog({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const photoPicker = usePhotoPicker();
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
-  const [photo, setPhoto] = useState<Photo | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; tempPassword: string } | null>(
     null,
   );
@@ -64,6 +45,11 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
     trpc.org.createPerson.mutationOptions({
       onSuccess: (res) => {
         setCreated({ email: res.email, tempPassword: res.tempPassword });
+        if (res.photoRequested && !res.photoSet) {
+          toast.error(
+            "Account created, but the photo couldn't be saved (check the image URL).",
+          );
+        }
         router.refresh();
       },
       onError: (err) => toast.error(err.message || "Failed to create person"),
@@ -74,20 +60,9 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
     setName("");
     setEmail("");
     setRole("member");
-    setPhoto(null);
-    setPhotoPreview(null);
+    photoPicker.reset();
     setCreated(null);
     setCopied(false);
-  }
-
-  async function handlePhoto(file: File | undefined) {
-    if (!file) return;
-    if (file.size > MAX_PHOTO_BYTES) {
-      toast.error("Photo exceeds 4.5MB");
-      return;
-    }
-    setPhoto(await fileToPhoto(file));
-    setPhotoPreview(URL.createObjectURL(file));
   }
 
   function submit() {
@@ -100,7 +75,7 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
       name: name.trim(),
       email: email.trim(),
       role,
-      ...(photo ? { photo } : {}),
+      ...photoPicker.payload,
     });
   }
 
@@ -118,7 +93,7 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
           Add person
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[440px]">
+      <DialogContent className="sm:max-w-[440px]" onPaste={photoPicker.handlePaste}>
         {created ? (
           <>
             <DialogHeader>
@@ -179,39 +154,7 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
             </DialogHeader>
 
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className={cn(
-                    "bg-muted flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border",
-                    "hover:border-primary transition-colors",
-                  )}
-                >
-                  {photoPreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={photoPreview}
-                      alt=""
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <ImagePlus className="text-muted-foreground size-5" />
-                  )}
-                </button>
-                <div className="text-muted-foreground text-xs">
-                  Optional profile photo
-                  <br />
-                  JPEG / PNG / WebP · ≤4.5MB
-                </div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/avif"
-                  className="hidden"
-                  onChange={(e) => void handlePhoto(e.target.files?.[0])}
-                />
-              </div>
+              <PhotoPickerField picker={photoPicker} />
 
               <div className="space-y-1.5">
                 <Label htmlFor="person-name">Name</Label>

@@ -1,10 +1,12 @@
-import type { Metadata } from "next";
+import { constructMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = {
+export const metadata = constructMetadata({
   title: "Brand directory",
+  eyebrow: "Brands",
+  path: "/brand",
   description:
     "Internal directory of Wander's brands, owned social accounts, ad accounts, and Reddit presence.",
-};
+});
 
 type SocialAccount = {
   platform: string;

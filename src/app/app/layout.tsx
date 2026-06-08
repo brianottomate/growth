@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { eq } from "drizzle-orm";
@@ -11,6 +12,12 @@ import {
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
+
+// The whole back-office is internal — keep every route under /app out of
+// search. Inherited by all child pages unless they override `robots`.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
@@ -33,6 +40,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         orgSlug={membership?.organization?.slug ?? undefined}
         userName={session.user.name ?? session.user.email ?? "You"}
         userEmail={session.user.email ?? ""}
+        userImage={session.user.image ?? undefined}
       />
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">

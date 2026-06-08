@@ -384,7 +384,9 @@ export const leadsRouter = createTRPCRouter({
         const props: CompanyProperties = { domain };
         for (const [k, v] of entries) {
           if (v == null) continue; // never blank-out a HubSpot field from here
-          (props[toHs[k]]) = v;
+          // every field in `toHs` targets a string-typed HubSpot prop; the cast
+          // sidesteps the `pm_company_: "Yes" | "No"` member, which is never mapped here.
+          (props as Record<keyof CompanyProperties, string>)[toHs[k]] = v;
         }
         const existing = await findCompanyByDomain(domain);
         if (existing) {

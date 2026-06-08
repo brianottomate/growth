@@ -97,7 +97,7 @@ export function OrganizationLogoUpload({
         searchParams.set("resourceId", organizationId);
 
         const response = await fetch(
-          `/api/blob/upload?${searchParams.toString()}`,
+          `/api/upload?${searchParams.toString()}`,
           {
             method: "POST",
             body: file,

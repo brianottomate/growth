@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 
+// Internal tool — keep the auth surfaces out of search. Title template and
+// branded defaults are inherited from the root layout (`@/lib/metadata`).
 export const metadata: Metadata = {
-  title: {
-    template: "%s | Wander Growth",
-    default: "Wander Growth - Revenue Workflows",
-  },
+  robots: { index: false, follow: false },
 };
 
 export default function AuthLayout({

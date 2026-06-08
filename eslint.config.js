@@ -3,13 +3,21 @@ import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 import nextPlugin from "@next/eslint-plugin-next";
 import reactPlugin from "eslint-plugin-react";
+// @ts-ignore -- no flat-config types for this plugin
+import reactHooks from "eslint-plugin-react-hooks";
 // @ts-ignore -- no types for this plugin
 import drizzle from "eslint-plugin-drizzle";
 
 export default defineConfig(
-  // Global ignores
+  // Global ignores. `scripts/amplitude-taxonomy/**` is gitignored (holds API +
+  // secret keys) and isn't part of the repo, so don't lint it.
   {
-    ignores: [".next/**", "node_modules/**", ".velite/**"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      ".velite/**",
+      "scripts/amplitude-taxonomy/**",
+    ],
   },
   // Base config for all JS/TS files
   {
@@ -17,6 +25,11 @@ export default defineConfig(
     plugins: {
       "@next/next": nextPlugin,
       react: reactPlugin,
+      // The plugin's own type isn't assignable to ESLint's Plugin type even on
+      // latest (7.1.1) — registering a rule *subset* requires this cast. The
+      // only cast-free path is consuming the whole `configs.flat.recommended`
+      // preset, which would force on v7's full React-Compiler ruleset.
+      "react-hooks": /** @type {import("eslint").ESLint.Plugin} */ (reactHooks),
     },
     rules: {
       // Next.js rules
@@ -25,6 +38,9 @@ export default defineConfig(
       // React rules
       ...reactPlugin.configs.recommended.rules,
       ...reactPlugin.configs["jsx-runtime"].rules,
+      // React Hooks rules (plugin was installed but never registered)
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
     settings: {
       react: {

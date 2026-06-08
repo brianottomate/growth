@@ -63,7 +63,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
       <div className="flex items-center gap-x-2 lg:hidden">
         {isLoggedIn ? (
           <Button variant="primary" size="xs" asChild>
-            <Link href="/app/dashboard">Dashboard</Link>
+            <Link href="/app">Dashboard</Link>
           </Button>
         ) : (
           <>
@@ -189,7 +189,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
         <ThemeToggleDropdown />
         {isLoggedIn ? (
           <Button variant="primary" size="sm" asChild>
-            <Link href="/app/dashboard">Dashboard</Link>
+            <Link href="/app">Dashboard</Link>
           </Button>
         ) : (
           <>
@@ -292,7 +292,7 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
                       asChild
                     >
                       <Link
-                        href="/app/dashboard"
+                        href="/app"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Dashboard

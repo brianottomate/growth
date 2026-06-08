@@ -116,7 +116,7 @@ export function getCallbackURL(
   }
 
   // Default signin redirect
-  let defaultUrl = "/app/dashboard";
+  let defaultUrl = "/app";
 
   // Add email param if requested
   if (includeEmailParam && includeEmail) {

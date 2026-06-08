@@ -1,0 +1,150 @@
+import { relations } from "drizzle-orm";
+import { index, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+
+import { initiativeTable } from "./ads-schema";
+import { organizationTable } from "./auth-schema";
+import { brandTable } from "./brand-schema";
+import { createId } from "./utils";
+
+/**
+ * The earned-amplification layer of a "moment" (the raised initiative).
+ *
+ * An `amplifier` is a lightweight CONTACT we recruit to boost a launch
+ * (investor, press, partner, creator, team) — NOT a brand: no channels,
+ * enrichment, or content. `amplification_target` is the per-moment row tying an
+ * amplifier to a launch with a recruitment status — the live version of the
+ * "who's reposting" spreadsheet.
+ */
+
+// One handle on a platform — a "proto-channel". Used to match a hero post's
+// retweeters for fulfillment, and to seed real channels if the amplifier
+// graduates to a brand.
+export type AmplifierHandle = { platform: string; handle: string };
+
+export const amplifierTable = pgTable(
+  "amplifier",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("amp")),
+
+    // Org-scoped rolodex — one amplifier row, reused across moments.
+    organizationId: t
+      .text()
+      .references(() => organizationTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    name: t.text().notNull(),
+    type: t.text(), // investor | press | partner | creator | team (soft)
+    handles: t.jsonb().$type<AmplifierHandle[]>().default([]),
+    notes: t.text(),
+
+    // Set if this amplifier graduated into a tracked brand (handles → channels).
+    promotedBrandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "set null" }),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: t.timestamp(),
+  }),
+  (table) => [
+    index("amplifier_org_idx").on(table.organizationId),
+    index("amplifier_type_idx").on(table.type),
+  ],
+);
+
+export type Amplifier = typeof amplifierTable.$inferSelect;
+export type AmplifierInsert = typeof amplifierTable.$inferInsert;
+
+export const amplificationTargetTable = pgTable(
+  "amplification_target",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("atgt")),
+
+    // The moment (raised initiative) and the amplifier we want to recruit.
+    momentId: t
+      .text()
+      .references(() => initiativeTable.id, { onDelete: "cascade" })
+      .notNull(),
+    amplifierId: t
+      .text()
+      .references(() => amplifierTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // planned → asked → confirmed → fulfilled (soft text). Fulfillment is
+    // auto-set by matching the hero post's retweeters against the amplifier's
+    // handles.
+    ask: t.text().default("planned").notNull(),
+    plannedAt: t.timestamp({ withTimezone: true }),
+    fulfilledAt: t.timestamp({ withTimezone: true }),
+    // Soft pointer to the platform_post that fulfilled it (no FK — avoids a
+    // cross-file cycle; resolve in app code).
+    fulfilledByPostId: t.text(),
+    notes: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("amplification_target_moment_idx").on(table.momentId),
+    index("amplification_target_amplifier_idx").on(table.amplifierId),
+    uniqueIndex("amplification_target_unique_idx").on(
+      table.momentId,
+      table.amplifierId,
+    ),
+  ],
+);
+
+export type AmplificationTarget = typeof amplificationTargetTable.$inferSelect;
+export type AmplificationTargetInsert =
+  typeof amplificationTargetTable.$inferInsert;
+
+// ---- RELATIONS -----------------------------------------------------
+
+export const amplifierRelations = relations(
+  amplifierTable,
+  ({ one, many }) => ({
+    organization: one(organizationTable, {
+      fields: [amplifierTable.organizationId],
+      references: [organizationTable.id],
+    }),
+    promotedBrand: one(brandTable, {
+      fields: [amplifierTable.promotedBrandId],
+      references: [brandTable.id],
+    }),
+    targets: many(amplificationTargetTable),
+  }),
+);
+
+export const amplificationTargetRelations = relations(
+  amplificationTargetTable,
+  ({ one }) => ({
+    moment: one(initiativeTable, {
+      fields: [amplificationTargetTable.momentId],
+      references: [initiativeTable.id],
+    }),
+    amplifier: one(amplifierTable, {
+      fields: [amplificationTargetTable.amplifierId],
+      references: [amplifierTable.id],
+    }),
+  }),
+);

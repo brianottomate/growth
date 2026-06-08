@@ -11,31 +11,35 @@ import {
   Database,
   FileText,
   Image as ImageIcon,
-  Inbox,
   Layers,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
   Mail,
   Megaphone,
+  Monitor,
+  Moon,
   Newspaper,
   Plus,
   Radar,
   Repeat,
+  Rocket,
   Rss,
   Settings,
-  Share2,
-  Snowflake,
   Sparkles,
+  Sun,
   Target,
   Users,
 } from "lucide-react";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -53,6 +57,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { useTheme } from "@/components/ui/theme";
 import { authClient } from "@/server/better-auth/client";
 import { useTRPC } from "@/trpc/react";
 
@@ -69,11 +74,11 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     label: "Workspace",
     items: [
       { label: "Brands", href: "/app/brands", icon: Building2 },
-      { label: "Channels", href: "/app/channels", icon: Share2 },
       { label: "Content", href: "/app/content", icon: FileText },
       { label: "Calendar", href: "/app/calendar", icon: Calendar },
       { label: "Feed", href: "/app/feed", icon: Rss },
       { label: "Studio", href: "/app/studio", icon: Sparkles },
+      { label: "Launch", href: "/app/launch", icon: Rocket },
     ],
   },
   {
@@ -84,16 +89,14 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Newsletters", href: "/app/newsletters", icon: Mail },
       { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
       { label: "Audiences", href: "/app/audiences", icon: Target },
-      { label: "Seasons", href: "/app/seasons", icon: Snowflake },
     ],
   },
   {
     label: "Grow",
     items: [
       { label: "Leads", href: "/app/leads", icon: Database },
-      { label: "Listen", href: "/app/listen", icon: Radar, badge: "12" },
+      { label: "Listen", href: "/app/listen", icon: Radar },
       { label: "Lifecycle", href: "/app/lifecycle", icon: Repeat },
-      { label: "Inbox", href: "/app/inbox", icon: Inbox, badge: "3" },
     ],
   },
   {
@@ -110,6 +113,7 @@ interface AppSidebarProps {
   orgSlug?: string;
   userName: string;
   userEmail: string;
+  userImage?: string;
 }
 
 export function AppSidebar({
@@ -117,11 +121,13 @@ export function AppSidebar({
   orgSlug,
   userName,
   userEmail,
+  userImage,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const trpc = useTRPC();
   const { data: orgs } = useQuery(trpc.org.list.queryOptions());
+  const { themeMode, setTheme } = useTheme();
 
   const isActive = (href: string) =>
     href === "/app" ? pathname === "/app" : pathname.startsWith(href);
@@ -137,23 +143,23 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" tooltip={orgName}>
-                  <div className="bg-primary text-primary-foreground flex aspect-square size-7 items-center justify-center rounded-md text-sm font-semibold">
-                    {orgName.slice(0, 1).toUpperCase()}
-                  </div>
-                  <div className="grid flex-1 text-left leading-tight">
-                    <span className="truncate text-sm font-semibold">
-                      {orgName}
-                    </span>
-                    <span className="text-muted-foreground truncate text-xs">
-                      Organization
-                    </span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto size-4 opacity-50" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
+            {/* Org switcher disabled: kept open={false} + non-trigger button so
+                the selector is not accessible from the frontend, but the code
+                remains intact for when multi-org support is re-enabled. */}
+            <DropdownMenu open={false}>
+              <SidebarMenuButton size="lg" tooltip={orgName} className="cursor-default">
+                <div className="bg-primary text-primary-foreground flex aspect-square size-7 items-center justify-center rounded-md text-sm font-semibold">
+                  {orgName.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="grid flex-1 text-left leading-tight">
+                  <span className="truncate text-sm font-semibold">
+                    {orgName}
+                  </span>
+                  <span className="text-muted-foreground truncate text-xs">
+                    Organization
+                  </span>
+                </div>
+              </SidebarMenuButton>
               <DropdownMenuContent align="start" side="right" className="w-56">
                 <DropdownMenuLabel className="text-muted-foreground text-xs">
                   Organizations
@@ -223,9 +229,12 @@ export function AppSidebar({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton size="lg" tooltip={userEmail}>
-                  <div className="bg-muted text-foreground flex aspect-square size-7 items-center justify-center rounded-full text-xs font-semibold">
-                    {userName.slice(0, 2).toUpperCase()}
-                  </div>
+                  <Avatar className="size-7">
+                    <AvatarImage src={userImage} alt={userName} />
+                    <AvatarFallback className="text-foreground text-xs font-semibold">
+                      {userName.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="grid flex-1 text-left leading-tight">
                     <span className="truncate text-sm font-medium">
                       {userName}
@@ -255,6 +264,27 @@ export function AppSidebar({
                     Account settings
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-muted-foreground text-xs">
+                  Theme
+                </DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={themeMode}
+                  onValueChange={(value) => setTheme(value as typeof themeMode)}
+                >
+                  <DropdownMenuRadioItem value="light" suppressHydrationWarning>
+                    <Sun className="size-4" />
+                    Light
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="dark" suppressHydrationWarning>
+                    <Moon className="size-4" />
+                    Dark
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="auto" suppressHydrationWarning>
+                    <Monitor className="size-4" />
+                    System
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="size-4" />

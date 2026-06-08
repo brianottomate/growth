@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import * as schema from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
-import { uploadAttachment } from "@/server/services/attachment.service";
+import { R2 } from "@/server/clients/r2.client";
 
 // Generate a human-friendly temp password to hand out manually.
 function generateTempPassword() {
@@ -15,6 +15,37 @@ function generateTempPassword() {
 }
 
 const MAX_PHOTO_BYTES = 4.5 * 1024 * 1024; // server upload limit
+
+type PhotoInput = {
+  photo?: { base64Data: string; mimeType: string; filename: string };
+  photoUrl?: string;
+};
+
+/**
+ * Upload a profile photo to R2 (same store as the media library). Source is
+ * either an uploaded/pasted file (base64) or a URL we fetch + rehost
+ * server-side (sidesteps CORS + hotlink expiry). Returns the public URL, or
+ * null when no source was supplied.
+ */
+async function uploadUserPhoto(
+  userId: string,
+  src: PhotoInput,
+): Promise<string | null> {
+  if (src.photo) {
+    const buffer = Buffer.from(src.photo.base64Data, "base64");
+    if (buffer.length > MAX_PHOTO_BYTES) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Photo exceeds 4.5MB" });
+    }
+    const key = R2.buildUserPhotoKey(userId, src.photo.filename);
+    return R2.putBuffer(key, buffer, src.photo.mimeType);
+  }
+  if (src.photoUrl) {
+    const ext = src.photoUrl.split(".").pop()?.slice(0, 5) ?? "jpg";
+    const key = R2.buildUserPhotoKey(userId, `avatar.${ext}`);
+    return R2.putFromUrl(key, src.photoUrl);
+  }
+  return null;
+}
 
 export const orgRouter = createTRPCRouter({
   // Get invitation details (public - used by invite page)
@@ -266,6 +297,9 @@ export const orgRouter = createTRPCRouter({
             filename: z.string(),
           })
           .optional(),
+        // Alternative to an uploaded file: fetch an existing image by URL
+        // (e.g. a Slack avatar). Fetched server-side to sidestep CORS.
+        photoUrl: z.string().url().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -322,37 +356,25 @@ export const orgRouter = createTRPCRouter({
         });
       }
 
-      // Optional profile photo → blob, then set user.image.
-      if (input.photo) {
-        const buffer = Buffer.from(input.photo.base64Data, "base64");
-        if (buffer.length > MAX_PHOTO_BYTES) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Photo exceeds 4.5MB",
-          });
-        }
-        try {
-          const { url } = await uploadAttachment({
-            file: buffer,
-            filename: input.photo.filename,
-            originalFilename: input.photo.filename,
-            mimeType: input.photo.mimeType,
-            size: buffer.length,
-            resourceType: "user_photo",
-            resourceId: userId,
-            uploadedBy: ctx.session.user.id,
-          });
+      // Optional profile photo → R2, then set user.image. Swallowed on failure
+      // so a bad photo doesn't block account creation; the flag lets the client
+      // warn. (An explicit edit later surfaces errors — see updatePerson.)
+      const photoRequested = Boolean(input.photo || input.photoUrl);
+      let photoSet = false;
+      try {
+        const url = await uploadUserPhoto(userId, input);
+        if (url) {
           await ctx.db
             .update(schema.userTable)
             .set({ image: url })
             .where(eq(schema.userTable.id, userId));
-        } catch (err) {
-          // Don't fail the whole creation just because the photo upload broke.
-          console.error("[createPerson] photo upload failed:", err);
+          photoSet = true;
         }
+      } catch (err) {
+        console.error("[createPerson] photo upload failed:", err);
       }
 
-      return { userId, email, tempPassword };
+      return { userId, email, tempPassword, photoRequested, photoSet };
     }),
 
   // List pending invitations
@@ -392,9 +414,98 @@ export const orgRouter = createTRPCRouter({
   removeMember: protectedProcedure
     .input(z.object({ memberId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // Don't let the caller remove their own membership and lock themselves out.
+      const member = await ctx.db.query.memberTable.findFirst({
+        where: eq(schema.memberTable.id, input.memberId),
+      });
+      if (member?.userId === ctx.session.user.id) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You can't remove yourself",
+        });
+      }
+
       await ctx.db
         .delete(schema.memberTable)
         .where(eq(schema.memberTable.id, input.memberId));
+
+      return { success: true };
+    }),
+
+  // Generate a fresh temp password for a member and hand it back to show once.
+  resetPassword: protectedProcedure
+    .input(z.object({ memberId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const member = await ctx.db.query.memberTable.findFirst({
+        where: eq(schema.memberTable.id, input.memberId),
+      });
+      if (!member) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+      const tempPassword = generateTempPassword();
+      // Trusted server path (no headers) → Better Auth skips the admin check,
+      // same as createPerson.
+      await ctx.authApi.setUserPassword({
+        body: { newPassword: tempPassword, userId: member.userId },
+      });
+      return { tempPassword };
+    }),
+
+  // Edit a member: name, role, and/or profile photo (one dialog).
+  updatePerson: protectedProcedure
+    .input(
+      z.object({
+        memberId: z.string(),
+        name: z.string().min(1).max(120).optional(),
+        role: z.enum(["owner", "admin", "member"]).optional(),
+        photo: z
+          .object({
+            base64Data: z.string(),
+            mimeType: z.string(),
+            filename: z.string(),
+          })
+          .optional(),
+        photoUrl: z.string().url().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const member = await ctx.db.query.memberTable.findFirst({
+        where: eq(schema.memberTable.id, input.memberId),
+      });
+      if (!member) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+      const isSelf = member.userId === ctx.session.user.id;
+
+      // Photo first → if it fails (bad URL etc.) we abort before touching
+      // name/role. Errors surface here since this is an explicit edit.
+      const url = await uploadUserPhoto(member.userId, input);
+      if (url) {
+        await ctx.db
+          .update(schema.userTable)
+          .set({ image: url })
+          .where(eq(schema.userTable.id, member.userId));
+      }
+
+      if (input.name) {
+        await ctx.db
+          .update(schema.userTable)
+          .set({ name: input.name.trim() })
+          .where(eq(schema.userTable.id, member.userId));
+      }
+
+      if (input.role && input.role !== member.role) {
+        if (isSelf) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You can't change your own role",
+          });
+        }
+        await ctx.db
+          .update(schema.memberTable)
+          .set({ role: input.role })
+          .where(eq(schema.memberTable.id, member.id));
+      }
 
       return { success: true };
     }),

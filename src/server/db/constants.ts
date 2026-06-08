@@ -29,10 +29,6 @@ export type OrganizationPlan = (typeof ORGANIZATION_PLANS)[number];
 
 // ---- APP CONSTANTS ----
 
-// Resource types for attachments
-export const RESOURCE_TYPES = ["organization", "post", "user_photo"] as const;
-export type ResourceType = (typeof RESOURCE_TYPES)[number];
-
 // Status values for invitations and other workflows
 export const STATUS_VALUES = [
   "pending",

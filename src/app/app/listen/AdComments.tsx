@@ -37,8 +37,9 @@ export async function AdComments() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Scanned <span className="font-mono">{result.totalAds}</span> ad
-        {result.totalAds === 1 ? "" : "s"} ·{" "}
+        <span className="font-mono">{result.totalAds}</span> ads ·{" "}
+        <span className="font-mono">{result.adsWithComments}</span> with comments
+        ·{" "}
         <span className="font-mono">{result.comments.length}</span> comment
         {result.comments.length === 1 ? "" : "s"} in the last{" "}
         {LISTENING_WINDOW_DAYS} days ·{" "}
@@ -53,8 +54,8 @@ export async function AdComments() {
             errored (likely Stories / DPA — not commentable)
           </summary>
           <ul className="mt-2 space-y-1">
-            {result.errors.slice(0, 10).map((err) => (
-              <li key={err.adId} className="font-mono">
+            {result.errors.slice(0, 10).map((err, i) => (
+              <li key={`${err.adId}-${i}`} className="font-mono">
                 {err.adName ?? err.adId}: {err.message}
               </li>
             ))}
@@ -108,18 +109,29 @@ export async function AdComments() {
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                       <span>
                         on ad:{" "}
-                        <span className="text-foreground">
-                          {c.adName ?? c.adId}
-                        </span>
+                        {c.adUrl ? (
+                          <a
+                            href={c.adUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="text-foreground hover:text-primary hover:underline"
+                          >
+                            {c.adName ?? c.adId} ↗
+                          </a>
+                        ) : (
+                          <span className="text-foreground">
+                            {c.adName ?? c.adId}
+                          </span>
+                        )}
                       </span>
-                      {c.permalink ? (
+                      {c.url ? (
                         <a
-                          href={c.permalink}
+                          href={c.url}
                           target="_blank"
                           rel="noreferrer noopener"
                           className="text-primary hover:underline"
                         >
-                          open ↗
+                          open comment ↗
                         </a>
                       ) : null}
                     </div>

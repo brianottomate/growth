@@ -45,6 +45,11 @@ export type ProtoEntry = {
   engagement: number; // likes + comments
   mediaUrl: string | null;
   at: string; // ISO — publishedAt ?? scheduledAt ?? createdAt
+  // Amplification (repost / quote / retweet). `externalKind` is the post's own
+  // kind; `amplifiedFromUser` is the original author we reposted/quoted.
+  externalKind: string | null;
+  externalUrl: string | null;
+  amplifiedFromUser: string | null;
 };
 
 export type ProtoCampaign = {
@@ -169,6 +174,9 @@ export async function loadFeedProtoData(): Promise<FeedProtoData | null> {
       engagement: likes + comments,
       mediaUrl: displayPoster(p.media),
       at: (p.publishedAt ?? p.scheduledAt ?? p.createdAt).toISOString(),
+      externalKind: p.externalKind,
+      externalUrl: p.externalUrl,
+      amplifiedFromUser: p.amplifiedFrom?.username ?? null,
     };
   });
 

@@ -7,8 +7,10 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  amplifierTable,
   brandTable,
   channelSuggestionTable,
+  type AmplifierHandle,
   type ChannelSuggestion,
 } from "@/server/db/schema";
 import type { channelPlatformEnum } from "@/server/db/channel-schema";
@@ -323,4 +325,55 @@ export async function discoverAndSaveSuggestions(
     enrichedBrand,
     suggestions: saved,
   };
+}
+
+// ---- AMPLIFIERS ----------------------------------------------------
+
+export type AmplifierDiscoverResult = {
+  amplifierId: string;
+  discovered: number;
+  handles: AmplifierHandle[];
+};
+
+/**
+ * Discover an amplifier's social handles — the same discovery flow as brands,
+ * pointed at a lightweight contact. Amplifiers have no website (just a name like
+ * "QED Investors" or a person), so we search by name only. Confident hits are
+ * merged straight into `amplifier.handles` (proto-channels) — no review table,
+ * matching the lightweight grain.
+ */
+export async function discoverAmplifierHandles(
+  amplifierId: string,
+  opts?: { minConfidence?: number },
+): Promise<AmplifierDiscoverResult> {
+  const amp = await db.query.amplifierTable.findFirst({
+    where: eq(amplifierTable.id, amplifierId),
+  });
+  if (!amp) throw new Error(`Amplifier ${amplifierId} not found`);
+
+  const suggestions = await discoverSocialHandles({ name: amp.name });
+  const min = opts?.minConfidence ?? 0.5;
+
+  // Merge into existing handles (dedup by platform:handle, keep what's there).
+  const byKey = new Map<string, AmplifierHandle>(
+    (amp.handles ?? []).map((h) => [
+      `${h.platform}:${h.handle.toLowerCase()}`,
+      h,
+    ]),
+  );
+  for (const s of suggestions) {
+    if (s.confidence < min) continue;
+    byKey.set(`${s.platform}:${s.handle.toLowerCase()}`, {
+      platform: s.platform,
+      handle: s.handle,
+    });
+  }
+  const handles = [...byKey.values()];
+
+  await db
+    .update(amplifierTable)
+    .set({ handles })
+    .where(eq(amplifierTable.id, amplifierId));
+
+  return { amplifierId, discovered: suggestions.length, handles };
 }

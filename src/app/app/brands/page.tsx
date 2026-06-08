@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  audienceTargetTable,
   brandInspirationTable,
   brandTable,
   channelSuggestionTable,
@@ -12,23 +14,43 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { BrandChannels, type ChannelLite } from "./BrandChannels";
+import { BrandAudiences } from "./BrandAudiences";
 import { BrandActions } from "./BrandActions";
 import { NewBrandButton } from "./NewBrandButton";
 import { TrackedBrands, type TrackedLite } from "./TrackedBrands";
 import { SuggestedChannels, type SuggestionLite } from "./SuggestedChannels";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
+const compactFmt = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
 function BrandCard({
   brand,
   channels,
   tracked,
   suggestions,
+  audienceCount,
 }: {
   brand: typeof brandTable.$inferSelect;
   channels: ChannelLite[];
   tracked: TrackedLite[];
   suggestions: SuggestionLite[];
+  audienceCount: number;
 }) {
+  const socialReach = channels
+    .filter((c) => c.kind === "social")
+    .reduce((sum, c) => sum + (c.followerCount ?? 0), 0);
+  const adCount = channels.filter((c) => c.kind === "ad").length;
+  const summary = [
+    socialReach > 0 && `${compactFmt.format(socialReach)} reach`,
+    channels.length > 0 && `${channels.length} channels`,
+    adCount > 0 && `${adCount} ad ${adCount === 1 ? "account" : "accounts"}`,
+    audienceCount > 0 &&
+      `${audienceCount} ${audienceCount === 1 ? "audience" : "audiences"}`,
+  ].filter(Boolean) as string[];
+
   return (
     <div className="bg-card rounded-2xl border p-5 shadow-sm transition-colors">
       <div className="flex items-start gap-3.5">
@@ -72,6 +94,11 @@ function BrandCard({
           {brand.tagline && (
             <p className="text-muted-foreground mt-1 text-sm">{brand.tagline}</p>
           )}
+          {summary.length > 0 && (
+            <p className="text-muted-foreground/70 mt-1 text-xs">
+              {summary.join(" · ")}
+            </p>
+          )}
         </div>
         <BrandActions
           brand={{
@@ -85,9 +112,13 @@ function BrandCard({
         />
       </div>
 
-      <BrandChannels brandId={brand.id} channels={channels} />
+      <BrandChannels
+        brandId={brand.id}
+        channels={channels}
+        suggestions={suggestions}
+      />
 
-      <SuggestedChannels brandId={brand.id} suggestions={suggestions} />
+      <BrandAudiences brandId={brand.id} brandName={brand.name} />
 
       <TrackedBrands ownerBrandId={brand.id} tracked={tracked} />
     </div>
@@ -158,6 +189,17 @@ function PeerBrandCard({
                   </span>
                 )}
               </span>
+              {c.profileUrl && (
+                <a
+                  href={c.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open page"
+                  className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
+                >
+                  <ExternalLink className="size-3.5" />
+                </a>
+              )}
             </div>
           ))}
         </div>
@@ -183,6 +225,8 @@ export default async function BrandsPage() {
 
   const brands = await db.query.brandTable.findMany({
     where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    // Earliest-created first for a deterministic order; may switch to an explicit order column later.
+    orderBy: (b, { asc }) => asc(b.createdAt),
   });
   const brandIds = brands.map((b) => b.id);
 
@@ -215,6 +259,24 @@ export default async function BrandsPage() {
         ),
       })
     : [];
+
+  // Audience-target counts per owned brand for the card summary line.
+  const audienceTargets = brandIds.length
+    ? await db.query.audienceTargetTable.findMany({
+        where: and(
+          inArray(audienceTargetTable.brandId, brandIds),
+          isNull(audienceTargetTable.deletedAt),
+        ),
+        columns: { brandId: true },
+      })
+    : [];
+  const audienceCountByBrand = new Map<string, number>();
+  for (const t of audienceTargets) {
+    audienceCountByBrand.set(
+      t.brandId,
+      (audienceCountByBrand.get(t.brandId) ?? 0) + 1,
+    );
+  }
 
   const trackedByOwner = new Map<string, TrackedLite[]>();
   // For each peer brand, which owned brands track it + with what purpose.
@@ -269,6 +331,7 @@ export default async function BrandsPage() {
       channels={channels.filter((c) => c.brandId === brand.id).map(toLite)}
       tracked={trackedByOwner.get(brand.id) ?? []}
       suggestions={suggestionsFor(brand.id)}
+      audienceCount={audienceCountByBrand.get(brand.id) ?? 0}
     />
   );
 

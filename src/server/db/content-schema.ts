@@ -170,6 +170,12 @@ export const seriesTable = pgTable(
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
+    // The strategic "moment" this series ladders up to (the raised initiative —
+    // organic series + paid campaigns + amplification targets all reference it).
+    initiativeId: t
+      .text()
+      .references(() => initiativeTable.id, { onDelete: "set null" }),
+
     name: t.text().notNull(),
     slug: t.text(), // url-safe, unique within a brand
     description: t.text(),
@@ -195,6 +201,7 @@ export const seriesTable = pgTable(
   (table) => [
     index("series_brand_idx").on(table.brandId),
     index("series_status_idx").on(table.status),
+    index("series_initiative_idx").on(table.initiativeId),
   ],
 );
 
@@ -599,6 +606,10 @@ export const seriesRelations = relations(seriesTable, ({ one, many }) => ({
   brand: one(brandTable, {
     fields: [seriesTable.brandId],
     references: [brandTable.id],
+  }),
+  initiative: one(initiativeTable, {
+    fields: [seriesTable.initiativeId],
+    references: [initiativeTable.id],
   }),
   contentPosts: many(contentPostTable),
 }));

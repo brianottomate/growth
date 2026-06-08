@@ -39,6 +39,7 @@ export const mediaKindEnum = pgEnum("media_kind", [
   "gif",
   "audio",
   "file",
+  "folder",
 ]);
 export type MediaKind = (typeof mediaKindEnum.enumValues)[number];
 

@@ -1,8 +1,15 @@
 import "server-only";
 
-import { anthropic } from "@ai-sdk/anthropic";
-import { Output, generateText } from "ai";
-import { z } from "zod";
+import {
+  SUGGESTED_ACTIONS,
+  draftReply,
+  scoreItems,
+  type DraftChannel,
+  type ScoringChannel,
+  type SuggestedAction,
+} from "@/server/services/triage.service";
+
+export { SUGGESTED_ACTIONS, type SuggestedAction };
 
 export const TIER_1_SUBREDDITS = [
   "ShortTermRentals",
@@ -13,9 +20,6 @@ export const TIER_1_SUBREDDITS = [
 
 const USER_AGENT =
   "web:wandercom-growth-reddit-monitor:0.1.0 (by /u/homi-scout-bot)";
-
-const SCORING_MODEL = anthropic("claude-sonnet-4-6");
-const DRAFT_MODEL = anthropic("claude-opus-4-7");
 
 const SCORING_SYSTEM_PROMPT = `You are a growth analyst at Wander, a vacation-rental company.
 
@@ -85,9 +89,6 @@ export const INTENT_TAGS = [
 ] as const;
 export type IntentTag = (typeof INTENT_TAGS)[number];
 
-export const SUGGESTED_ACTIONS = ["engage", "monitor", "skip"] as const;
-export type SuggestedAction = (typeof SUGGESTED_ACTIONS)[number];
-
 export interface ScoredPost {
   post: RedditPostSummary;
   relevance: number;
@@ -142,62 +143,28 @@ function formatPostForLLM(p: RedditPostSummary): string {
   ].join("\n");
 }
 
+const SCORING_CHANNEL: ScoringChannel<RedditPostSummary, IntentTag> = {
+  intentTags: INTENT_TAGS,
+  systemPrompt: SCORING_SYSTEM_PROMPT,
+  getId: (p) => p.id,
+  formatItem: formatPostForLLM,
+  relevanceDescription:
+    "0 = noise/off-topic. 5 = adjacent operator pain. 8+ = textbook insertion point where a Wander product directly solves the OP's problem.",
+  intentTagDescription:
+    "brand = direct Wander mention. high-intent = ready-to-act pain. medium-intent = evaluating tools/channels. positioning = direct booking / OTA fee discussion. operator-pain = STR ops friction, brand-adjacent. noise = off-topic.",
+};
+
 export async function scoreRedditPosts(
   posts: RedditPostSummary[],
 ): Promise<ScoredPost[]> {
-  if (posts.length === 0) return [];
-
-  const { output } = await generateText({
-    model: SCORING_MODEL,
-    system: SCORING_SYSTEM_PROMPT,
-    prompt: `Score each post below. Return one entry per post, using the post's id verbatim.\n\n${posts
-      .map(formatPostForLLM)
-      .join("\n---\n")}`,
-    output: Output.array({
-      element: z.object({
-        postId: z
-          .string()
-          .describe("The Reddit post id field, verbatim from the input."),
-        relevance: z
-          .number()
-          .int()
-          .min(0)
-          .max(10)
-          .describe(
-            "0 = noise/off-topic. 5 = adjacent operator pain. 8+ = textbook insertion point where a Wander product directly solves the OP's problem.",
-          ),
-        intentTag: z
-          .enum(INTENT_TAGS)
-          .describe(
-            "brand = direct Wander mention. high-intent = ready-to-act pain. medium-intent = evaluating tools/channels. positioning = direct booking / OTA fee discussion. operator-pain = STR ops friction, brand-adjacent. noise = off-topic.",
-          ),
-        suggestedAction: z
-          .enum(SUGGESTED_ACTIONS)
-          .describe(
-            "engage = team should comment today. monitor = revisit if comments grow. skip = ignore.",
-          ),
-        rationale: z
-          .string()
-          .describe("One concise sentence justifying the score."),
-      }),
-    }),
-  });
-
-  const byId = new Map(posts.map((p) => [p.id, p]));
-  return output
-    .map((s) => {
-      const post = byId.get(s.postId);
-      if (!post) return null;
-      return {
-        post,
-        relevance: s.relevance,
-        intentTag: s.intentTag,
-        suggestedAction: s.suggestedAction,
-        rationale: s.rationale,
-      };
-    })
-    .filter((s): s is ScoredPost => s !== null)
-    .sort((a, b) => b.relevance - a.relevance);
+  const { scored } = await scoreItems(SCORING_CHANNEL, posts);
+  return scored.map((s) => ({
+    post: s.item,
+    relevance: s.relevance,
+    intentTag: s.intentTag,
+    suggestedAction: s.suggestedAction,
+    rationale: s.rationale,
+  }));
 }
 
 export async function scanAndScore(): Promise<{
@@ -236,6 +203,11 @@ const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
     "If you mention a Wander product, focus on Wander Operated (full-service property management).",
 };
 
+const DRAFT_CHANNEL: DraftChannel<DraftPill> = {
+  systemPrompt: DRAFT_SYSTEM_PROMPT,
+  pillInstructions: PILL_INSTRUCTIONS,
+};
+
 export async function draftReplyForPost(input: {
   post: RedditPostSummary;
   intentTag: IntentTag;
@@ -245,22 +217,10 @@ export async function draftReplyForPost(input: {
 }): Promise<string> {
   const body = input.post.body.replace(/\s+/g, " ").slice(0, 1200);
 
-  const modifierLines: string[] = [];
-  for (const pill of input.pills ?? []) {
-    modifierLines.push(`- ${PILL_INSTRUCTIONS[pill]}`);
-  }
-  const custom = input.customInstructions?.trim();
-  if (custom) modifierLines.push(`- ${custom}`);
-
-  const modifiersBlock =
-    modifierLines.length > 0
-      ? `\n\nAdditional modifiers for THIS draft (override defaults where they conflict):\n${modifierLines.join("\n")}`
-      : "";
-
-  const { text } = await generateText({
-    model: DRAFT_MODEL,
-    system: DRAFT_SYSTEM_PROMPT + modifiersBlock,
-    prompt: `Reddit post to reply to:
+  return draftReply(DRAFT_CHANNEL, {
+    pills: input.pills,
+    customInstructions: input.customInstructions,
+    promptBody: `Reddit post to reply to:
 
 sub: r/${input.post.subreddit}
 title: ${input.post.title}
@@ -272,5 +232,4 @@ Scoring context from our analyst:
 
 Draft the reply. Do NOT include any preamble like "Here's a draft:" — output the reply text directly.`,
   });
-  return text.trim();
 }

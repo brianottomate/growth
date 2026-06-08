@@ -194,7 +194,8 @@ export function ProduceDrawer({
                     onClick={() =>
                       setSelected((prev) => {
                         const n = new Set(prev);
-                        n.has(k) ? n.delete(k) : n.add(k);
+                        if (n.has(k)) n.delete(k);
+                        else n.add(k);
                         return n;
                       })
                     }
@@ -225,7 +226,8 @@ export function ProduceDrawer({
                       onClick={() =>
                         setRefIds((prev) => {
                           const n = new Set(prev);
-                          n.has(r.id) ? n.delete(r.id) : n.add(r.id);
+                          if (n.has(r.id)) n.delete(r.id);
+                          else n.add(r.id);
                           return n;
                         })
                       }

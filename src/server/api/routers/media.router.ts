@@ -140,6 +140,41 @@ export const mediaRouter = createTRPCRouter({
       });
     }),
 
+  /** Edit a linked asset's title / URL / kind / thumbnail. */
+  updateExternal: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        title: z.string().max(300).optional(),
+        externalUrl: z.string().url().max(2000).optional(),
+        kind: z.enum(mediaKindEnum.enumValues).optional(),
+        thumbnail: z
+          .object({
+            base64Data: z.string(),
+            mimeType: z.string().min(1).max(120),
+            filename: z.string().min(1).max(300),
+          })
+          .optional(),
+        thumbnailUrl: z.string().url().nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const asset = await assertMediaAccess(ctx, input.id);
+      if (asset.provider !== "external") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only linked assets can be edited here",
+        });
+      }
+      if (input.thumbnail) {
+        const bytes = Buffer.byteLength(input.thumbnail.base64Data, "base64");
+        if (bytes > MAX_IMAGE_BYTES) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Thumbnail too large" });
+        }
+      }
+      return MediaService.updateExternal({ ...input, brandId: asset.brandId });
+    }),
+
   // --- shared ---
   updateMeta: protectedProcedure
     .input(

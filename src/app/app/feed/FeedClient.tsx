@@ -29,6 +29,10 @@ export type FeedEntry = {
   mediaUrl: string | null;
   at: string; // ISO — publishedAt ?? scheduledAt
   published: boolean;
+  // Amplification — `externalKind` carries repost/quote/retweet; reposting is a
+  // RELATIONSHIP, not a format. `amplifiedFromUser` is the original author.
+  externalKind: string | null;
+  amplifiedFromUser: string | null;
 };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -44,6 +48,14 @@ const VIA: Record<string, string> = {
   native: "Static publish",
   manual: "Manual",
 };
+
+// Amplification badge — a post that reposts/retweets/quotes another account.
+const amplification = (kind: string | null) =>
+  kind === "repost" || kind === "retweet"
+    ? { icon: "↻", label: "Repost" }
+    : kind === "quote"
+      ? { icon: "❝", label: "Quote" }
+      : null;
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
@@ -181,6 +193,7 @@ function FeedCard({ e }: { e: FeedEntry }) {
   };
   const stat = statLine(e.stats);
   const via = e.via ? (VIA[e.via] ?? e.via) : null;
+  const amp = amplification(e.externalKind);
 
   return (
     <div
@@ -238,6 +251,23 @@ function FeedCard({ e }: { e: FeedEntry }) {
           <span className="rounded-md bg-black/30 p-1 backdrop-blur-sm">
             <ChannelLogo platform={e.platform} className="size-4" />
           </span>
+          {amp && (
+            <span
+              title={
+                e.amplifiedFromUser
+                  ? `${amp.label} of @${e.amplifiedFromUser}`
+                  : amp.label
+              }
+              className="flex items-center gap-0.5 rounded-md bg-violet-600/85 px-1.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm"
+            >
+              <span>{amp.icon}</span>
+              {e.amplifiedFromUser && (
+                <span className="max-w-[6rem] truncate">
+                  @{e.amplifiedFromUser}
+                </span>
+              )}
+            </span>
+          )}
         </div>
         <span
           className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm ${status.cls}`}

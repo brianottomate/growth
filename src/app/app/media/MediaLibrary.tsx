@@ -10,6 +10,8 @@ import {
   ImageIcon,
   Link2,
   Loader2,
+  Pencil,
+  Rocket,
   Trash2,
   UploadCloud,
 } from "lucide-react";
@@ -30,6 +32,22 @@ import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import { useTRPC } from "@/trpc/react";
+import { EditLinkDialog } from "./EditLinkDialog";
+import { LaunchMediaDrawer, type LaunchTarget } from "./LaunchMediaDrawer";
+
+/** Collapse a media asset into the generic shape the launch flow consumes. */
+function assetToLaunchTarget(asset: MediaAsset): LaunchTarget {
+  const isExternal = asset.provider === "external";
+  return {
+    title: asset.title ?? asset.filename ?? "Untitled",
+    href: asset.externalUrl ?? asset.url,
+    // Only hand the model a URL it can actually fetch (R2 image, or a
+    // thumbnail frame). Externally-hosted originals stay link-only.
+    imageUrl: isExternal ? null : asset.kind === "image" ? asset.url : asset.thumbnailUrl,
+    kind: asset.kind,
+    sourceProvider: isExternal ? (asset.sourceProvider ?? "link") : null,
+  };
+}
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
@@ -91,6 +109,12 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   const [linkUrl, setLinkUrl] = useState("");
   const [linkTitle, setLinkTitle] = useState("");
   const [linkKind, setLinkKind] = useState<MediaKind>("video");
+
+  // "Edit link" dialog — the asset currently being edited.
+  const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
+
+  // "Launch" drawer — the media item we're steering a moment around.
+  const [launchTarget, setLaunchTarget] = useState<LaunchTarget | null>(null);
 
   const listInput = {
     brandId,
@@ -197,13 +221,15 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   const processing = (assets ?? []).filter((a) => a.status === "processing");
   useEffect(() => {
     if (processing.length === 0) return;
-    const t = setInterval(async () => {
-      let changed = false;
-      for (const a of processing) {
-        const res = await syncVideo.mutateAsync({ mediaId: a.id }).catch(() => null);
-        if (res?.status === "ready") changed = true;
-      }
-      if (changed) void invalidate();
+    const t = setInterval(() => {
+      void (async () => {
+        let changed = false;
+        for (const a of processing) {
+          const res = await syncVideo.mutateAsync({ mediaId: a.id }).catch(() => null);
+          if (res?.status === "ready") changed = true;
+        }
+        if (changed) void invalidate();
+      })();
     }, 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,6 +319,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
                     { value: "image", label: "Image" },
                     { value: "audio", label: "Audio" },
                     { value: "file", label: "File" },
+                    { value: "folder", label: "Folder" },
                   ]}
                   aria-label="Type"
                 />
@@ -330,22 +357,42 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         </div>
         <div className="flex flex-wrap gap-2">
           {EXTERNAL_LINKS.map((link) => (
-            <a
+            <div
               key={link.href}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:border-primary hover:bg-primary/5 group flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors"
+              className="hover:border-primary group flex items-center gap-2 rounded-lg border pr-1.5 transition-colors"
             >
-              <FolderOpen className="text-muted-foreground size-4 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{link.label}</p>
-                <p className="text-muted-foreground truncate text-xs">
-                  {link.description}
-                </p>
-              </div>
-              <ExternalLink className="text-muted-foreground group-hover:text-primary ml-1 size-3.5 shrink-0" />
-            </a>
+              <a
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:bg-primary/5 flex items-center gap-2 rounded-l-lg py-2 pl-3 transition-colors"
+              >
+                <FolderOpen className="text-muted-foreground size-4 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{link.label}</p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {link.description}
+                  </p>
+                </div>
+                <ExternalLink className="text-muted-foreground group-hover:text-primary ml-1 size-3.5 shrink-0" />
+              </a>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 shrink-0"
+                title="Launch this"
+                onClick={() =>
+                  setLaunchTarget({
+                    title: link.label,
+                    href: link.href,
+                    kind: "folder",
+                    sourceProvider: "google_drive",
+                  })
+                }
+              >
+                <Rocket className="size-3.5" />
+              </Button>
+            </div>
           ))}
         </div>
       </div>
@@ -401,10 +448,29 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
               key={asset.id}
               asset={asset}
               onDelete={() => deleteMedia.mutate({ id: asset.id })}
+              onEdit={
+                asset.provider === "external"
+                  ? () => setEditingAsset(asset)
+                  : undefined
+              }
+              onLaunch={() => setLaunchTarget(assetToLaunchTarget(asset))}
             />
           ))}
         </div>
       )}
+
+      <EditLinkDialog
+        asset={editingAsset}
+        open={editingAsset !== null}
+        onOpenChange={(open) => !open && setEditingAsset(null)}
+        onSaved={() => void invalidate()}
+      />
+
+      <LaunchMediaDrawer
+        brandId={brandId}
+        target={launchTarget}
+        onClose={() => setLaunchTarget(null)}
+      />
     </div>
   );
 }
@@ -412,15 +478,26 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
 function MediaCard({
   asset,
   onDelete,
+  onEdit,
+  onLaunch,
 }: {
   asset: MediaAsset;
   onDelete: () => void;
+  onEdit?: () => void;
+  onLaunch: () => void;
 }) {
   const isVideo = asset.kind === "video";
   const isExternal = asset.provider === "external";
   const externalHref = asset.externalUrl ?? asset.url;
-  const preview = isVideo ? asset.thumbnailUrl : isExternal ? null : asset.url;
-  const KindIcon = isVideo ? Film : asset.kind === "image" ? ImageIcon : FileText;
+  const preview = isVideo || isExternal ? asset.thumbnailUrl : asset.url;
+  const KindIcon =
+    asset.kind === "folder"
+      ? FolderOpen
+      : isVideo
+        ? Film
+        : asset.kind === "image"
+          ? ImageIcon
+          : FileText;
 
   return (
     <div className="group bg-muted/30 relative overflow-hidden rounded-lg border">
@@ -435,13 +512,31 @@ function MediaCard({
             href={externalHref ?? "#"}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:bg-muted/60 hover:text-foreground absolute inset-0 flex flex-col items-center justify-center gap-1.5 transition-colors"
+            className="group/link text-muted-foreground hover:text-foreground absolute inset-0 flex flex-col items-center justify-center gap-1.5 transition-colors"
           >
-            <KindIcon className="size-7" />
-            <span className="flex items-center gap-1 text-[11px]">
-              <ExternalLink className="size-3" />
-              Open link
-            </span>
+            {preview ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={preview}
+                  alt={asset.title ?? ""}
+                  className="size-full object-cover"
+                  loading="lazy"
+                />
+                <span className="absolute inset-0 flex items-center justify-center gap-1 bg-black/40 text-[11px] text-white opacity-0 transition-opacity group-hover/link:opacity-100">
+                  <ExternalLink className="size-3" />
+                  Open link
+                </span>
+              </>
+            ) : (
+              <>
+                <KindIcon className="size-7" />
+                <span className="flex items-center gap-1 text-[11px]">
+                  <ExternalLink className="size-3" />
+                  Open link
+                </span>
+              </>
+            )}
           </a>
         ) : preview ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -465,13 +560,41 @@ function MediaCard({
           {isExternal ? (asset.sourceProvider ?? "link") : asset.kind}
         </Badge>
 
-        <div className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="pointer-events-auto mr-auto size-7"
+            title="Launch this"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onLaunch();
+            }}
+          >
+            <Rocket className="size-3.5" />
+          </Button>
+          {onEdit && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className="pointer-events-auto size-7"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onEdit();
+              }}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          )}
           <Button
             size="icon"
             variant="destructive"
-            className="size-7"
+            className="pointer-events-auto size-7"
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               onDelete();
             }}
           >

@@ -69,6 +69,8 @@ export default async function FeedPage() {
     mediaUrl: displayPoster(p.media),
     at: (p.publishedAt ?? p.scheduledAt ?? p.createdAt).toISOString(),
     published: p.status === "published",
+    externalKind: p.externalKind,
+    amplifiedFromUser: p.amplifiedFrom?.username ?? null,
   }));
 
   return (

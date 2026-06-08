@@ -103,6 +103,57 @@ NOT mint fake "Sales/Leads/Traffic" initiative rows.
 
 Run: `bun --conditions react-server scripts/sync-ads.ts`.
 
+## Audiences & the ad-set gap (design note, 2026-06-05)
+
+Prompted by a Slack thread ("new 200+ Lead Lookalike audience live on Meta"). We
+inspected the live tree to see how an *audience* actually appears, and it surfaced
+a structural mismatch with our schema. **No change made yet — captured for when the
+paid/audience surfaces are built.**
+
+What the tree shows:
+
+- An "audience" is **not a top-level object**. It lives at the **ad-set** level. The
+  thread's audience appears as ad sets like `LeadForm_MinervaLookalike` /
+  `LeadForm_HubspotLookalike` *inside* `WanderOS_MetaLeadForm_Conversions`
+  (objective `OUTCOME_LEADS`) — two audiences A/B-tested in one campaign.
+- The ad set's `promotedObject.custom_event_type` (e.g. `SUBMIT_APPLICATION`,
+  `COMPLETE_REGISTRATION`) is the **executional goal**, finer than the campaign's
+  `platformObjective` (`OUTCOME_LEADS`). Goal is effectively two-level.
+- Audience names encode **seed lineage** — `Minerva*` / `Hubspot*` / `CombinedLookalikes`
+  are seeded from our lead/CRM lists (→ `leads.*`, the leads back-office).
+
+Where our model falls short:
+
+1. **No run-state on `audience`.** The whole event is a state change ("now live"),
+   but `audience` is exists-only. `/audiences` coverage treats *audience exists →
+   covered*, so a paused audience reads as covered (false positive). Meta carries
+   active/paused at the ad-set level.
+2. **No `audience ↔ campaign` link.** `audience` is a free-floating per-channel row
+   tied only to `audience_target` + `channel`. The deployment grain is the ad set
+   (which we flatten to `adSetId`/`adSetName` strings on `ad_spot`), so "which
+   campaigns is the Minerva lookalike running in?" is unanswerable today.
+3. **No seed-source link.** `audience` → its origin list (`leads.*` / HubSpot /
+   Minerva) has no FK; the "we turned our best 200+ leads into a lookalike" story
+   only lives in free-text names / `audience.definition`.
+
+**Full proposal written up in `docs/audiences-model.md`** (the `audience_placement`
+layer, lookalike seed lineage, and prompt/free-text definitions for OpenAI).
+
+Options when we pick this up (smallest → largest):
+
+- **(A) Run-state + join.** Add `audience.status` (active/paused/draft) and an
+  `audience ↔ campaign` link (join or `campaignId`); coverage becomes "target has an
+  *active* audience on each intended channel." No new ad-set table.
+- **(B) Promote ad-set to an entity.** Real `campaign → ad_set → ad_spot`; the
+  ad-set holds the audience link + optimization event. Most faithful to Meta, most
+  surface to sync.
+- **(C) Seed lineage only.** Add `audience.seedSource` + a link back to the
+  originating `leads.*` import — the strategic story, structure unchanged.
+
+Ties to the open **`goal` table** question (`ads-schema.ts:89` — "promote to a
+`goal` table when organic content links to the same axis"): the tree confirms goals
+are multi-level (campaign objective vs. ad-set conversion event).
+
 ## Throwaway inspection scripts
 
 - `scripts/zernio-ads-dump.ts` — raw tree shapes + time spread.

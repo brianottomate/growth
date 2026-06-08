@@ -44,5 +44,5 @@
     "velite.config.ts",
     "emails"
   ],
-  "exclude": ["node_modules", "generated"]
+  "exclude": ["node_modules", "generated", "scripts/amplitude-taxonomy"]
 }

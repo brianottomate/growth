@@ -430,6 +430,167 @@ export async function listZernioCommentedPosts(
   return { posts, hasMore, nextCursor };
 }
 
+// ---- DM INBOX (conversations + messages) ---------------------------
+// Verified live 2026-06-05. Conversation list is fast (~650ms); messages need
+// `accountId` (400 without). DMs flow on Instagram + Facebook for Wander.
+
+export type ZernioConversation = {
+  id?: string;
+  accountId?: string;
+  accountUsername?: string;
+  platform?: string;
+  participantId?: string;
+  participantName?: string;
+  participantUsername?: string;
+  participantPicture?: string | null;
+  lastMessage?: string; // text preview ("[Attachment]" for media)
+  updatedTime?: string;
+  status?: string;
+  unreadCount?: number;
+  url?: string; // native deep-link to the IG/FB thread
+  instagramProfile?: {
+    isFollower?: boolean;
+    isFollowing?: boolean;
+    followerCount?: number;
+    isVerified?: boolean;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
+export async function listZernioConversations(
+  options: {
+    platform?: string;
+    profileId?: string;
+    accountId?: string;
+    limit?: number;
+  } = {},
+): Promise<{ conversations: ZernioConversation[] }> {
+  const params = new URLSearchParams();
+  params.set("limit", String(Math.min(options.limit ?? 50, 100)));
+  if (options.platform) params.set("platform", options.platform);
+  if (options.profileId) params.set("profileId", options.profileId);
+  if (options.accountId) params.set("accountId", options.accountId);
+
+  const data = await zernioFetch<unknown>(
+    `/inbox/conversations?${params.toString()}`,
+  );
+  const conversations = unwrapList<ZernioConversation>(
+    data,
+    "data",
+    "conversations",
+  );
+  return { conversations };
+}
+
+// DM-capable platforms with inbox sync connected. Zernio's unfiltered
+// conversation list is recency-capped, so older-but-active channels (X DMs lag
+// IG by weeks) drop off the end. Query each explicitly to guarantee coverage.
+export const DM_PLATFORMS = ["instagram", "facebook", "twitter"] as const;
+
+/**
+ * Conversations across every DM platform, fanned out per platform (so X isn't
+ * crowded out by recent IG), de-duped by id and merged newest-first. A failure
+ * on one platform degrades to skipping it rather than failing the whole load.
+ */
+export async function listAllDmConversations(
+  options: { perPlatformLimit?: number } = {},
+): Promise<{ conversations: ZernioConversation[] }> {
+  const limit = options.perPlatformLimit ?? 50;
+  const perPlatform = await Promise.all(
+    DM_PLATFORMS.map((platform) =>
+      listZernioConversations({ platform, limit })
+        .then((r) => r.conversations)
+        .catch((error) => {
+          console.warn(`[zernio] DM conversations ${platform} failed:`, error);
+          return [] as ZernioConversation[];
+        }),
+    ),
+  );
+
+  const byId = new Map<string, ZernioConversation>();
+  for (const c of perPlatform.flat()) {
+    if (typeof c.id === "string" && !byId.has(c.id)) byId.set(c.id, c);
+  }
+  const conversations = [...byId.values()].sort((a, b) => {
+    const ta = a.updatedTime ? new Date(a.updatedTime).getTime() : 0;
+    const tb = b.updatedTime ? new Date(b.updatedTime).getTime() : 0;
+    return (Number.isNaN(tb) ? 0 : tb) - (Number.isNaN(ta) ? 0 : ta);
+  });
+  return { conversations };
+}
+
+export type ZernioMessage = {
+  id?: string;
+  conversationId?: string;
+  accountId?: string;
+  platform?: string;
+  message?: string;
+  senderId?: string;
+  senderName?: string;
+  direction?: string; // "incoming" | "outgoing"
+  createdAt?: string;
+  sentAt?: string;
+  isStoryMention?: boolean;
+  attachments?: Array<{ type?: string; url?: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+};
+
+// `accountId` is REQUIRED (400 without). Returns messages oldest→newest by
+// default; pass sortOrder="desc" for newest-first.
+export async function getZernioConversationMessages(
+  conversationId: string,
+  options: { accountId: string; limit?: number; sortOrder?: "asc" | "desc" },
+): Promise<{ messages: ZernioMessage[] }> {
+  const params = new URLSearchParams();
+  params.set("accountId", options.accountId);
+  params.set("limit", String(Math.min(options.limit ?? 50, 100)));
+  if (options.sortOrder) params.set("sortOrder", options.sortOrder);
+
+  const data = await zernioFetch<unknown>(
+    `/inbox/conversations/${encodeURIComponent(conversationId)}/messages?${params.toString()}`,
+  );
+  const messages = unwrapList<ZernioMessage>(data, "messages", "data");
+  return { messages };
+}
+
+// Individual comments on a single post (the organic drill-down). Verified live
+// 2026-06-05: `postId` is the row's `id` verbatim (native platform post id);
+// `accountId` REQUIRED. `from.isOwner` flags our own comments/replies.
+export type ZernioPostComment = {
+  id?: string;
+  message?: string;
+  from?: {
+    id?: string;
+    name?: string;
+    username?: string;
+    isOwner?: boolean;
+    [key: string]: unknown;
+  };
+  createdTime?: string;
+  likeCount?: number;
+  replyCount?: number;
+  isHidden?: boolean;
+  url?: string;
+  replies?: ZernioPostComment[];
+  [key: string]: unknown;
+};
+
+export async function getZernioPostComments(
+  postId: string,
+  options: { accountId: string; limit?: number },
+): Promise<{ comments: ZernioPostComment[] }> {
+  const params = new URLSearchParams();
+  params.set("accountId", options.accountId);
+  params.set("limit", String(Math.min(options.limit ?? 50, 100)));
+
+  const data = await zernioFetch<unknown>(
+    `/inbox/comments/${encodeURIComponent(postId)}?${params.toString()}`,
+  );
+  const comments = unwrapList<ZernioPostComment>(data, "comments", "data");
+  return { comments };
+}
+
 export type ZernioCreative = {
   effectiveObjectStoryId?: string;
   effectiveInstagramMediaId?: string;
@@ -445,9 +606,24 @@ export type ZernioCreative = {
   [key: string]: unknown;
 };
 
+// Rolled-up per-ad metrics from the ad tree (verified live 2026-06-05). The
+// `actions` map holds per-action-type counts — `actions.comment` is the comment
+// count, which lets us find ads-with-comments WITHOUT fetching every thread.
+export type ZernioAdMetrics = {
+  spend?: number;
+  impressions?: number;
+  reach?: number;
+  clicks?: number;
+  engagement?: number;
+  conversions?: number;
+  actions?: Record<string, number>;
+  [key: string]: unknown;
+};
+
 export type ZernioAd = {
   id?: string;
   _id?: string;
+  metrics?: ZernioAdMetrics;
   platformAdId?: string;
   platformAdSetId?: string;
   platformCampaignId?: string;
@@ -659,6 +835,7 @@ export type ZernioAdComment = {
   commentCount?: number;
   parent?: { id?: string };
   permalink?: string;
+  url?: string; // deep-link to the comment (e.g. instagram.com/p/…?comment_id=…)
   [key: string]: unknown;
 };
 
@@ -713,7 +890,20 @@ export type AdCommentWithContext = ZernioAdComment & {
   adId: string;
   adName?: string;
   platform?: string;
+  adUrl?: string; // link to the ad's underlying post (IG permalink / FB story)
 };
+
+// Best public link to an ad's underlying post: IG permalink, else build a
+// Facebook URL from the creative's effectiveObjectStoryId.
+function adPostUrl(ad: ZernioAd): string | undefined {
+  const ig = ad.creative?.instagramPermalinkUrl;
+  if (typeof ig === "string" && ig.length > 0) return ig;
+  const story =
+    ad.creative?.effectiveObjectStoryId ?? ad.effectiveObjectStoryId;
+  if (typeof story === "string" && story.length > 0)
+    return `https://www.facebook.com/${story}`;
+  return undefined;
+}
 
 export async function listAllZernioAdComments(options: {
   perAdLimit?: number;
@@ -722,41 +912,65 @@ export async function listAllZernioAdComments(options: {
   comments: AdCommentWithContext[];
   errors: Array<{ adId: string; adName?: string; message: string }>;
   totalAds: number;
+  adsWithComments: number;
 }> {
   const tree = await getZernioAdsTree();
 
-  const ads: Array<{ id: string; name?: string; platform?: string }> = [];
+  // Only fetch threads for ads the tree reports as having comments — the
+  // rolled-up `metrics.actions.comment` count (verified live 2026-06-05). This
+  // skips the ~1700 ads with zero comments AND covers EVERY commented ad rather
+  // than blindly slicing the first N. The count is the tree's window (~90d); the
+  // fetched comments are filtered to the listening window upstream.
+  const ads: Array<{
+    id: string;
+    name?: string;
+    platform?: string;
+    url?: string;
+  }> = [];
+  let totalAds = 0;
   for (const campaign of tree) {
     for (const adSet of campaign.adSets ?? []) {
       for (const ad of adSet.ads ?? []) {
+        totalAds++;
         const id =
           ad.id ?? ad._id ?? ad.platformAdId ?? ad.platformId ?? undefined;
-        if (typeof id === "string" && id.length > 0) {
+        const commentCount = ad.metrics?.actions?.comment ?? 0;
+        if (typeof id === "string" && id.length > 0 && commentCount > 0) {
           ads.push({
             id,
             name: ad.name,
             platform: ad.platform ?? campaign.platform,
+            url: adPostUrl(ad),
           });
         }
       }
     }
   }
 
-  const maxAds = options.maxAds ?? 30;
-  const slice = ads.slice(0, maxAds);
+  // Safety cap (rarely binds now that we've filtered to commented ads only).
+  const candidates = options.maxAds ? ads.slice(0, options.maxAds) : ads;
 
-  const results = await Promise.all(
-    slice.map(async (ad) => {
-      const res = await getZernioAdComments(ad.id, {
-        limit: options.perAdLimit ?? 25,
-      });
-      return { ad, res };
-    }),
-  );
+  // Fetch threads with bounded concurrency to stay clear of Zernio rate limits.
+  const CONCURRENCY = 8;
+  const perAdLimit = options.perAdLimit ?? 25;
+  const fetched: Array<{
+    ad: (typeof candidates)[number];
+    res: Awaited<ReturnType<typeof getZernioAdComments>>;
+  }> = [];
+  for (let i = 0; i < candidates.length; i += CONCURRENCY) {
+    const batch = candidates.slice(i, i + CONCURRENCY);
+    const batchRes = await Promise.all(
+      batch.map(async (ad) => ({
+        ad,
+        res: await getZernioAdComments(ad.id, { limit: perAdLimit }),
+      })),
+    );
+    fetched.push(...batchRes);
+  }
 
   const comments: AdCommentWithContext[] = [];
   const errors: Array<{ adId: string; adName?: string; message: string }> = [];
-  for (const { ad, res } of results) {
+  for (const { ad, res } of fetched) {
     if (res.error) {
       errors.push({ adId: ad.id, adName: ad.name, message: res.error });
       continue;
@@ -767,11 +981,12 @@ export async function listAllZernioAdComments(options: {
         adId: ad.id,
         adName: ad.name,
         platform: ad.platform ?? res.platform,
+        adUrl: ad.url,
       });
     }
   }
 
-  return { comments, errors, totalAds: ads.length };
+  return { comments, errors, totalAds, adsWithComments: ads.length };
 }
 
 // ---- ANALYTICS POST → platform_post MAPPING ------------------------

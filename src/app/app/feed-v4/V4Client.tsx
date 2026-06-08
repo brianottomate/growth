@@ -36,9 +36,19 @@ const onDay = (c: ProtoCampaign, day: string) => {
 // One initiative's presence in a brand column (its campaigns + color).
 type Track = { init: ProtoInitiative; color: string; campaigns: ProtoCampaign[] };
 
+// Amplification badge: a post that reposts/retweets/quotes another account.
+// (repost is a RELATIONSHIP, not a format — externalKind carries it.)
+const amplification = (kind: string | null) =>
+  kind === "repost" || kind === "retweet"
+    ? { icon: "↻", label: "Repost" }
+    : kind === "quote"
+      ? { icon: "❝", label: "Quote" }
+      : null;
+
 function MiniCard({ e, future }: { e: ProtoEntry; future: boolean }) {
-  return (
-    <div className="bg-card w-[11rem] shrink-0 overflow-hidden rounded-lg border">
+  const amp = amplification(e.externalKind);
+  const card = (
+    <div className="bg-card hover:border-foreground/30 w-[11rem] shrink-0 overflow-hidden rounded-lg border transition-colors">
       <div className="bg-muted relative h-20">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -54,10 +64,20 @@ function MiniCard({ e, future }: { e: ProtoEntry; future: boolean }) {
             soon
           </span>
         )}
-        {e.isSeed && (
-          <span className="absolute bottom-1.5 left-1.5 rounded-full bg-amber-500/80 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
-            Seed
+        {amp ? (
+          // Amplification ribbon — who this post amplifies.
+          <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-violet-600/85 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
+            <span>{amp.icon}</span>
+            <span className="truncate">
+              {e.amplifiedFromUser ? `@${e.amplifiedFromUser}` : amp.label}
+            </span>
           </span>
+        ) : (
+          e.isSeed && (
+            <span className="absolute bottom-1.5 left-1.5 rounded-full bg-amber-500/80 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
+              Seed
+            </span>
+          )
         )}
       </div>
       <div className="p-1.5">
@@ -71,6 +91,19 @@ function MiniCard({ e, future }: { e: ProtoEntry; future: boolean }) {
         )}
       </div>
     </div>
+  );
+  // Open the original post (or the amplified source) in a new tab.
+  return e.externalUrl ? (
+    <a
+      href={e.externalUrl}
+      target="_blank"
+      rel="noreferrer"
+      title={amp ? `${amp.label} — open ↗` : "Open ↗"}
+    >
+      {card}
+    </a>
+  ) : (
+    card
   );
 }
 

@@ -76,7 +76,7 @@ function buildStats(
   // Fallback: sum the spend across ads (other rates aren't meaningfully summable).
   let spend = 0;
   for (const a of ads) {
-    const am = a.metrics as Record<string, unknown> | undefined;
+    const am = a.metrics;
     spend += num(am?.spend) ?? 0;
   }
   return { spend };
@@ -89,7 +89,7 @@ function pickHeroThumbnail(ads: ZernioAd[]): string | undefined {
   for (const a of ads) {
     const thumb = str(a.creative?.thumbnailUrl);
     if (!thumb) continue;
-    const spend = num((a.metrics as Record<string, unknown> | undefined)?.spend) ?? 0;
+    const spend = num((a.metrics)?.spend) ?? 0;
     if (!best || spend > best.spend) best = { spend, thumb };
     const ms = adDateMs(a) ?? 0;
     if (!fallback || ms > fallback.ms) fallback = { ms, thumb };

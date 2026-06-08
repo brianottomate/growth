@@ -37,22 +37,55 @@ export function commentTimeMs(c: AdCommentWithContext): number | null {
 }
 
 /**
- * Recent commented posts across ALL connected accounts (one aggregated call).
- * `since` is computed inside the cached fn — a few minutes of drift on a 14-day
- * window is irrelevant, and it keeps the cache key stable.
+ * Organic platforms we list comments for. We deliberately DO NOT call
+ * `/inbox/comments` unscoped: probed 2026-06-05, the unscoped aggregation folds
+ * in Meta-ad comment-counts across every ad (1700+) and takes 90–127s, blowing
+ * the gateway timeout → 500 (reproducible on zernio.com's own dashboard too).
+ * Per-platform organic calls return in ~2s each. Ads have their own section
+ * (`getRecentAdComments`, via the fast ads-tree path), so scoping loses nothing.
+ */
+const ORGANIC_COMMENT_PLATFORMS = ["facebook", "instagram", "linkedin"] as const;
+
+/**
+ * Recent commented posts across the organic platforms — fanned out in parallel
+ * (one fast call each) and merged, newest first. `since` is computed inside the
+ * cached fn — a few minutes of drift on a 14-day window is irrelevant, and it
+ * keeps the cache key stable.
  */
 export const getRecentCommentedPosts = unstable_cache(
   async () => {
     const since = new Date(Date.now() - WINDOW_MS).toISOString();
-    return listZernioCommentedPosts({
-      sortBy: "date",
-      sortOrder: "desc",
-      minComments: 1,
-      since,
-      limit: 100,
-    });
+    const perPlatform = await Promise.all(
+      ORGANIC_COMMENT_PLATFORMS.map((platform) =>
+        listZernioCommentedPosts({
+          platform,
+          sortBy: "date",
+          sortOrder: "desc",
+          minComments: 1,
+          since,
+          limit: 50,
+        })
+          .then((r) => r.posts)
+          .catch((error) => {
+            console.warn(`[listen] commented posts ${platform} failed:`, error);
+            return [] as ZernioCommentedPost[];
+          }),
+      ),
+    );
+
+    const byId = new Map<string, ZernioCommentedPost>();
+    for (const post of perPlatform.flat()) {
+      const key = String(post.id ?? `${post.platform}:${post.permalink}`);
+      if (!byId.has(key)) byId.set(key, post);
+    }
+    const posts = [...byId.values()].sort(
+      (a, b) =>
+        (b.createdTime ? new Date(b.createdTime).getTime() : 0) -
+        (a.createdTime ? new Date(a.createdTime).getTime() : 0),
+    );
+    return { posts };
   },
-  ["zernio-recent-commented-posts-v1"],
+  ["zernio-recent-commented-posts-v2-organic"],
   { revalidate: CACHE_TTL_SECONDS, tags: [ZERNIO_INBOX_CACHE_TAG] },
 );
 
@@ -63,7 +96,9 @@ export const getRecentCommentedPosts = unstable_cache(
  */
 export const getRecentAdComments = unstable_cache(
   async () => {
-    const res = await listAllZernioAdComments({ maxAds: 40, perAdLimit: 25 });
+    // No maxAds cap — listAllZernioAdComments now fetches threads only for ads
+    // the tree flags as having comments, so this covers every commented ad.
+    const res = await listAllZernioAdComments({ perAdLimit: 25 });
     const cutoff = Date.now() - WINDOW_MS;
     const comments = res.comments.filter((c) => {
       const t = commentTimeMs(c);

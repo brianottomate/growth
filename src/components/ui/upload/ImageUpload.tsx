@@ -2,7 +2,6 @@
 
 import React, { useCallback, useRef, useState } from "react";
 import Image from "next/image";
-import { upload } from "@vercel/blob/client";
 import { Camera, Download, Eye, Loader2, Trash2, X } from "lucide-react";
 
 import { cn } from "../lib/utils";
@@ -45,8 +44,7 @@ export interface ImageUploadResult {
 }
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const DEFAULT_MAX_SIZE = 10 * 1024 * 1024; // 10MB for images
-const SERVER_MAX_SIZE = 4.5 * 1024 * 1024; // 4.5MB
+const DEFAULT_MAX_SIZE = 4.5 * 1024 * 1024; // 4.5MB (upload endpoint limit)
 
 export function ImageUpload({
   onUploadComplete,
@@ -56,7 +54,6 @@ export function ImageUpload({
   existingImages = [],
   maxImages = 10,
   maxSize = DEFAULT_MAX_SIZE,
-  uploadMode = "auto",
   resourceType,
   resourceId,
   disabled = false,
@@ -125,66 +122,33 @@ export function ImageUpload({
 
       const alt = `${file.name.split(".")[0]} image`;
 
-      if (
-        uploadMode === "server" ||
-        (uploadMode === "auto" && file.size <= SERVER_MAX_SIZE)
-      ) {
-        // Server upload
-        const searchParams = new URLSearchParams();
-        searchParams.set("filename", file.name);
-        searchParams.set("alt", alt);
-        if (resourceType) searchParams.set("resourceType", resourceType);
-        if (resourceId) searchParams.set("resourceId", resourceId);
+      // Upload to R2 via the generic upload endpoint.
+      const searchParams = new URLSearchParams();
+      searchParams.set("filename", file.name);
+      searchParams.set("alt", alt);
+      if (resourceType) searchParams.set("resourceType", resourceType);
+      if (resourceId) searchParams.set("resourceId", resourceId);
 
-        const response = await fetch(
-          `/api/blob/upload?${searchParams.toString()}`,
-          {
-            method: "POST",
-            body: file,
-          },
-        );
+      const response = await fetch(`/api/upload?${searchParams.toString()}`, {
+        method: "POST",
+        body: file,
+      });
 
-        if (!response.ok) {
-          const error = (await response.json()) as { error?: string };
-          throw new Error(error.error || "Upload failed");
-        }
-
-        const result = (await response.json()) as ImageUploadResult;
-        return {
-          ...result,
-          alt,
-          width: dimensions.width,
-          height: dimensions.height,
-          order: images.length,
-        };
-      } else {
-        // Client upload
-        const clientPayload = {
-          resourceType,
-          resourceId,
-          alt,
-        };
-
-        const result = await upload(file.name, file, {
-          access: "public",
-          handleUploadUrl: "/api/blob/client-upload",
-          clientPayload: JSON.stringify(clientPayload),
-        });
-
-        return {
-          url: result.url,
-          pathname: result.pathname,
-          contentType: result.contentType || file.type,
-          size: file.size,
-          filename: file.name,
-          alt,
-          width: dimensions.width,
-          height: dimensions.height,
-          order: images.length,
-        };
+      if (!response.ok) {
+        const error = (await response.json()) as { error?: string };
+        throw new Error(error.error || "Upload failed");
       }
+
+      const result = (await response.json()) as ImageUploadResult;
+      return {
+        ...result,
+        alt,
+        width: dimensions.width,
+        height: dimensions.height,
+        order: images.length,
+      };
     },
-    [uploadMode, resourceType, resourceId, images.length, getImageDimensions],
+    [resourceType, resourceId, images.length, getImageDimensions],
   );
 
   // Handle image upload
@@ -505,13 +469,6 @@ export function ImageUpload({
         </div>
       )}
 
-      {/* Upload Progress Info */}
-      {uploadMode === "auto" && (
-        <p className="text-muted-foreground text-center text-xs">
-          Images under 4.5MB use fast server upload, larger images use direct
-          upload
-        </p>
-      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const KINDS = [
   { value: "social", label: "Social" },
@@ -83,6 +84,8 @@ export default async function OverviewPage() {
 
   const brands = await db.query.brandTable.findMany({
     where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    // Earliest-created first for a deterministic order; may switch to an explicit order column later.
+    orderBy: (b, { asc }) => asc(b.createdAt),
   });
   const brandIds = brands.map((b) => b.id);
 
@@ -125,9 +128,27 @@ export default async function OverviewPage() {
   }
   const tracked = [...trackedMap.values()];
 
+  const user = session.user;
+  const firstName = user.name?.split(" ")[0] ?? null;
+
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <h1 className="text-2xl font-semibold tracking-tight">{org.name}</h1>
+      <div className="flex items-center gap-4">
+        <Avatar className="size-14">
+          <AvatarImage src={user.image ?? undefined} alt={user.name ?? "You"} />
+          <AvatarFallback className="text-lg font-semibold">
+            {(user.name ?? user.email ?? "U").slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Welcome{firstName ? `, ${firstName}` : ""}!
+          </h1>
+          <p className="text-muted-foreground mt-0.5 text-sm">{user.email}</p>
+        </div>
+      </div>
+
+      <h2 className="mt-10 text-xl font-semibold tracking-tight">{org.name}</h2>
       <p className="text-muted-foreground mt-1 text-sm">
         Organization · {org.plan} plan · {brands.length} brands · {channels.length} channels ·{" "}
         {tracked.length} tracked

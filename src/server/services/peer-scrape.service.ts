@@ -118,7 +118,10 @@ export function mapXRecord(rec: Raw, brandId: string): Mapped | null {
   const fmt = classifyFormatFromFields("x", rec);
   const quoted = (rec.quoted_post ?? {}) as Raw;
   const isRepost = rec.is_repost === true;
-  const isQuote = !isRepost && !!rec.quoted_post;
+  // BD returns an (empty) quoted_post object on every tweet — only a real quote
+  // carries an id. (NB: BD X discovery is blind to reposts anyway; X
+  // amplification comes from the X API via ingestXViaApi.)
+  const isQuote = !isRepost && !!str(quoted.id);
   const externalKind = isRepost ? "repost" : isQuote ? "quote" : "tweet";
 
   const insert: PlatformPostInsert = {
@@ -376,49 +379,81 @@ export async function ingestXViaApi(opts: {
   skipTemplate?: boolean;
 }): Promise<ProcessResult> {
   const user = await getXUserByUsername(opts.handle);
+  // KEEP replies — self-replies are how THREADS chain (referenced_tweets
+  // type=replied_to). We reconstruct the chain below and drop only
+  // conversational replies to OTHER accounts.
   const { tweets, media } = await getAllXUserTweets({
     userId: user.id,
-    excludeRetweets: false, // KEEP retweets — they carry the amplification edge
-    excludeReplies: true,
+    excludeRetweets: false, // retweets carry the amplification edge
+    excludeReplies: false, // replies carry the thread chain
     maxPages: opts.maxPages ?? 3,
   });
 
-  const mapped: Mapped[] = tweets.map((tweet) => {
+  // Pre-assign ids so a self-reply can point at its parent in the same run.
+  const idByTweet = new Map<string, string>();
+  for (const t of tweets) idByTweet.set(t.id, createId("pp"));
+
+  const threadLinks: { childId: string; parentId: string }[] = [];
+  const mapped: Mapped[] = [];
+
+  for (const tweet of tweets) {
+    const refs = tweet.referenced_tweets ?? [];
+    const ampRef = refs.find(
+      (r) => r.type === "retweeted" || r.type === "quoted",
+    );
+    const replyRef = refs.find((r) => r.type === "replied_to");
+    const selfReply = replyRef && idByTweet.has(replyRef.id);
+
+    // Drop conversational replies to others (a reply whose parent isn't ours
+    // and which isn't a retweet/quote) — that's noise, not content.
+    if (replyRef && !selfReply && !ampRef) continue;
+
     const base = mapXTweetToPlatformPost(tweet, media, {
       brandId: opts.brandId,
       username: user.username,
     });
     const mediaItems = base.media ?? [];
     const hasVideo = mediaItems.some((m) => m.type === "video");
-    const ref = tweet.referenced_tweets?.find(
-      (r) => r.type === "retweeted" || r.type === "quoted",
-    );
     const externalKind =
-      ref?.type === "retweeted"
+      ampRef?.type === "retweeted"
         ? "repost"
-        : ref?.type === "quoted"
+        : ampRef?.type === "quoted"
           ? "quote"
           : "tweet";
+    const id = idByTweet.get(tweet.id)!;
+    if (selfReply) {
+      threadLinks.push({ childId: id, parentId: idByTweet.get(replyRef.id)! });
+    }
     const insert: PlatformPostInsert = {
       ...base,
-      id: createId("pp"),
+      id,
       format: hasVideo ? "x.video" : "x.tweet",
       archetype: hasVideo ? "video_short" : "text",
       externalKind,
-      amplifiedFrom: ref ? { externalId: ref.id, platform: "x" } : undefined,
+      amplifiedFrom: ampRef ? { externalId: ampRef.id, platform: "x" } : undefined,
     };
-    return {
+    mapped.push({
       insert,
       raw: { videos: hasVideo ? [{}] : [], text: tweet.text },
       cover: mediaItems.find((m) => m.type === "image")?.url,
-    };
-  });
+    });
+  }
 
-  return processMapped({
+  const result = await processMapped({
     brandId: opts.brandId,
     platform: "x",
     mapped,
     scanned: tweets.length,
     skipTemplate: opts.skipTemplate,
   });
+
+  // Link threads AFTER insert (rows exist now → no self-FK ordering issue).
+  for (const { childId, parentId } of threadLinks) {
+    await db
+      .update(platformPostTable)
+      .set({ parentPlatformPostId: parentId })
+      .where(eq(platformPostTable.id, childId));
+  }
+
+  return result;
 }
