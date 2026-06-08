@@ -13,6 +13,7 @@ import {
   commitMomentBlueprint,
   generateMomentBlueprint,
   momentBlueprintSchema,
+  momentSlotSchema,
 } from "@/server/services/plan-moment.service";
 
 /**
@@ -31,6 +32,14 @@ export const momentRouter = createTRPCRouter({
         imageUrls: z.array(z.string()).optional(),
         goal: z.string().optional(),
         scaleHint: z.enum(["single", "arc"]).optional(),
+        refine: z
+          .object({
+            keepSlots: z.array(momentSlotSchema),
+            blanks: z.number().int().min(0).optional(),
+            drop: z.array(z.string()).optional(),
+            steer: z.string().optional(),
+          })
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -46,6 +55,7 @@ export const momentRouter = createTRPCRouter({
         imageUrls: input.imageUrls,
         goal: input.goal,
         scaleHint: input.scaleHint,
+        refine: input.refine,
       });
     }),
 

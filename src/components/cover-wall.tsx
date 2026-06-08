@@ -89,7 +89,7 @@ export function CoverWall({ items }: { items: CoverItem[] }) {
                 {it.stat ? ` · ${it.stat}` : ""}
               </div>
               {it.subtitle && (
-                <p className="text-muted-foreground/80 mt-1 line-clamp-2 text-[11px] leading-snug">
+                <p className="text-muted-foreground mt-1 line-clamp-2 text-[11px] leading-snug">
                   {it.subtitle}
                 </p>
               )}

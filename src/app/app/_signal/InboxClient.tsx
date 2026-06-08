@@ -51,6 +51,19 @@ function ageLabel(iso?: string): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
+// Whether we owe a reply — derived from platform state, no persistence. If the
+// last message is incoming, it's our turn. Preview-only cards (no thread
+// prefetched, e.g. older X DMs) fall back to unread count.
+function deriveNeedsReply(
+  messages: ThreadMessage[],
+  c: ZernioConversation,
+): boolean {
+  if (messages.length > 0) {
+    return messages[messages.length - 1]?.direction === "incoming";
+  }
+  return (c.unreadCount ?? 0) > 0;
+}
+
 export function InboxClient({
   initialItems,
 }: {
@@ -65,15 +78,33 @@ export function InboxClient({
     return m;
   }, [triage.data]);
 
-  const items = useMemo(() => {
-    const list = initialItems.filter((i) => typeof i.conversation.id === "string");
-    if (scores.size === 0) return list;
-    return [...list].sort(
-      (a, b) =>
-        (scores.get(b.conversation.id!)?.relevance ?? -1) -
-        (scores.get(a.conversation.id!)?.relevance ?? -1),
-    );
-  }, [initialItems, scores]);
+  // Pull in ALL conversations in the window (replied or not); flag which still
+  // need a reply so we can lens + sort on it without dropping anything.
+  const enriched = useMemo(
+    () =>
+      initialItems
+        .filter((i) => typeof i.conversation.id === "string")
+        .map((i) => ({
+          ...i,
+          needsReply: deriveNeedsReply(i.messages, i.conversation),
+        })),
+    [initialItems],
+  );
+
+  // Needs-reply first, then triage relevance. The relevance term is a no-op
+  // until "Triage now" runs, so the stable sort preserves the loader's recency
+  // order within each group.
+  const items = useMemo(
+    () =>
+      [...enriched].sort((a, b) => {
+        if (a.needsReply !== b.needsReply) return a.needsReply ? -1 : 1;
+        return (
+          (scores.get(b.conversation.id!)?.relevance ?? -1) -
+          (scores.get(a.conversation.id!)?.relevance ?? -1)
+        );
+      }),
+    [enriched, scores],
+  );
 
   // Quick platform ("portal") filter — counts per platform present in the list.
   const platforms = useMemo(() => {
@@ -86,14 +117,21 @@ export function InboxClient({
   }, [items]);
 
   const [platform, setPlatform] = useState<string>("all");
+  const [needsReplyOnly, setNeedsReplyOnly] = useState(false);
 
-  const visibleItems = useMemo(
-    () =>
+  const needsReplyCount = useMemo(
+    () => items.filter((i) => i.needsReply).length,
+    [items],
+  );
+
+  const visibleItems = useMemo(() => {
+    let list =
       platform === "all"
         ? items
-        : items.filter((i) => (i.conversation.platform ?? "other") === platform),
-    [items, platform],
-  );
+        : items.filter((i) => (i.conversation.platform ?? "other") === platform);
+    if (needsReplyOnly) list = list.filter((i) => i.needsReply);
+    return list;
+  }, [items, platform, needsReplyOnly]);
 
   const engage = triage.data?.scored.filter((s) => s.suggestedAction === "engage").length ?? 0;
   const monitor = triage.data?.scored.filter((s) => s.suggestedAction === "monitor").length ?? 0;
@@ -109,6 +147,18 @@ export function InboxClient({
               ? ` · triaged: ${engage} engage · ${monitor} monitor`
               : ""}
           </p>
+          <button
+            type="button"
+            onClick={() => setNeedsReplyOnly((v) => !v)}
+            aria-pressed={needsReplyOnly}
+            className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+              needsReplyOnly
+                ? "border-amber-500 bg-amber-500/15 text-amber-400"
+                : "bg-background text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            Needs reply ({needsReplyCount})
+          </button>
           <a
             href={LINKEDIN_INBOX_URL}
             target="_blank"
@@ -166,6 +216,7 @@ export function InboxClient({
               <ConversationCard
                 conversation={item.conversation}
                 messages={item.messages}
+                needsReply={item.needsReply}
                 score={scores.get(item.conversation.id!)}
               />
             </li>
@@ -179,10 +230,12 @@ export function InboxClient({
 function ConversationCard({
   conversation: c,
   messages,
+  needsReply,
   score,
 }: {
   conversation: ZernioConversation;
   messages: ThreadMessage[];
+  needsReply: boolean;
   score?: Scored;
 }) {
   const trpc = useTRPC();
@@ -238,6 +291,11 @@ function ConversationCard({
               </span>
             ) : null}
             <span className="text-xs text-muted-foreground">· {ageLabel(c.updatedTime)}</span>
+            {needsReply ? (
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-medium text-amber-400">
+                Needs reply
+              </span>
+            ) : null}
             {c.unreadCount ? (
               <span className="rounded bg-primary/15 px-1.5 py-0.5 text-xs text-primary">
                 {c.unreadCount} unread

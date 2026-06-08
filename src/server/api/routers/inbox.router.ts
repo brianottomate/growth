@@ -14,6 +14,12 @@ import {
   triageConversations,
   type ConversationInput,
 } from "@/server/services/inbox-triage.service";
+import {
+  COMMENT_DRAFT_PILLS,
+  COMMENT_INTENT_TAGS,
+  draftCommentReply,
+  triageComments,
+} from "@/server/services/comment-triage.service";
 
 export const inboxRouter = {
   /**
@@ -53,6 +59,47 @@ export const inboxRouter = {
         { accountId: input.accountId, limit: input.limit ?? 50 },
       );
       return { messages };
+    }),
+
+  /**
+   * On-demand triage of organic comments. The client passes the loaded comment
+   * set (id + text + post context); we score intent/priority. Ephemeral.
+   */
+  triageComments: protectedProcedure
+    .input(
+      z.object({
+        comments: z.array(
+          z.object({
+            id: z.string(),
+            platform: z.string().optional(),
+            author: z.string().optional(),
+            postContent: z.string().optional(),
+            message: z.string(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return triageComments(input.comments);
+    }),
+
+  /** On-demand reply draft for a single comment. Ephemeral. */
+  draftCommentReply: protectedProcedure
+    .input(
+      z.object({
+        platform: z.string().optional(),
+        author: z.string().optional(),
+        postContent: z.string().optional(),
+        message: z.string(),
+        intentTag: z.enum(COMMENT_INTENT_TAGS).optional(),
+        rationale: z.string().optional(),
+        pills: z.array(z.enum(COMMENT_DRAFT_PILLS)).optional(),
+        customInstructions: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const draft = await draftCommentReply(input);
+      return { draft };
     }),
 
   /** Individual comments on a single organic post (the Comments drill-down). */

@@ -91,6 +91,26 @@ export type BrandIndustryResearch = {
   [key: string]: unknown;
 };
 
+// Named external links surfaced on the brand card — the app becomes the index
+// (where you go to find things) while the linked tool (a tracker Sheet, a Notion
+// doc, a dashboard) stays the system-of-record. `url` is optional so a link can
+// be dropped as a placeholder ("this brand should have a podcast tracker") and
+// filled in later; a label-only entry reads as a pending to-do.
+export const BRAND_LINK_CATEGORIES = [
+  "sheet",
+  "doc",
+  "dashboard",
+  "design",
+  "other",
+] as const;
+export type BrandLinkCategory = (typeof BRAND_LINK_CATEGORIES)[number];
+
+export type BrandLink = {
+  label: string; // required — the only thing you must provide
+  url?: string; // fill in later
+  category?: BrandLinkCategory; // drives the chip icon; auto-detected from the URL
+};
+
 // ---- BRAND TABLE ---------------------------------------------------
 
 /**
@@ -139,6 +159,9 @@ export const brandTable = pgTable(
     brandIdentity: t.jsonb().$type<BrandIdentity>(),
     brandFingerprint: t.jsonb().$type<BrandFingerprint>(),
     industryResearch: t.jsonb().$type<BrandIndustryResearch>(),
+
+    // Named external links (tracker Sheets, docs, dashboards) shown on the card.
+    links: t.jsonb().$type<BrandLink[]>().default([]),
 
     isActive: t.boolean().default(true).notNull(),
 

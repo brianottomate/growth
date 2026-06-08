@@ -3,12 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 
+import { useTRPC } from "@/trpc/react";
 import { ProduceDrawer } from "@/app/app/studio/ProduceDrawer";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { SimpleSelect } from "@/components/ui/select";
+import {
+  AssigneeButton,
+  useSelfAssignHotkey,
+  type Member,
+} from "@/components/assignment/assignee";
 import {
   Tooltip,
   TooltipContent,
@@ -23,6 +30,7 @@ export type CalEntry = {
   id: string;
   brandId: string;
   brandName: string;
+  tracked?: boolean; // a competitor/inspiration brand we scrape, not our own
   platform: string;
   contentPostId: string | null;
   title: string | null;
@@ -33,8 +41,21 @@ export type CalEntry = {
   status: string;
   isSeed: boolean;
   externalUrl: string | null;
+  mediaUrl: string | null;
   handle: string | null;
   at: string; // ISO — effective day (published ?? scheduled ?? planned ?? created)
+  ideaOwner: Member | null; // content_post owner (the piece's DRI)
+  spotOwner: Member | null; // platform_post owner (this channel spot)
+};
+
+// Assignment wiring threaded into the day dialog (the calendar's assign surface).
+export type CalAssign = {
+  members: Member[];
+  currentUserId: string;
+  ideaOwnerOf: (e: CalEntry) => Member | null;
+  spotOwnerOf: (e: CalEntry) => Member | null;
+  assignIdea: (contentPostId: string, ownerId: string | null) => void;
+  assignSpot: (platformPostId: string, ownerId: string | null) => void;
 };
 
 // ---- date helpers (local-time, to avoid UTC off-by-one) ------------------
@@ -149,11 +170,15 @@ type YearMode = "months" | "detailed" | "heatmap";
 export function CalendarClient({
   entries,
   brands,
+  members,
+  currentUserId,
   nowISO,
   initial,
 }: {
   entries: CalEntry[];
   brands: { id: string; name: string; slug: string | null }[];
+  members: Member[];
+  currentUserId: string;
   nowISO: string;
   initial?: {
     brandId?: string;
@@ -165,17 +190,55 @@ export function CalendarClient({
   const now = useMemo(() => new Date(nowISO), [nowISO]);
   const todayKey = keyOf(now);
   const router = useRouter();
+  const trpc = useTRPC();
 
-  const [zoom, setZoom] = useState<Zoom>("month");
-  const [yearMode, setYearMode] = useState<YearMode>("months");
+  // Default to the Year · Detailed view; a Studio-wheel deep-link that targets a
+  // specific month still opens the focused Month zoom.
+  const [zoom, setZoom] = useState<Zoom>(initial?.month != null ? "month" : "year");
+  const [yearMode, setYearMode] = useState<YearMode>("detailed");
   const [year, setYear] = useState(initial?.year ?? now.getFullYear());
   const [month, setMonth] = useState(initial?.month ?? now.getMonth());
   const [brandFilter, setBrandFilter] = useState(initial?.brandId ?? "all");
   const [pillarFilter, setPillarFilter] = useState(initial?.pillar ?? "all");
+  const [mineOnly, setMineOnly] = useState(false);
   const [dayDetail, setDayDetail] = useState<{ key: string; date: Date } | null>(null);
   const [produceDate, setProduceDate] = useState<string | null>(null);
 
   const { ref, style } = useFullBleed();
+
+  // Optimistic owner overrides (idea keyed by contentPostId, spot by entry id).
+  const [ideaOverrides, setIdeaOverrides] = useState<Record<string, Member | null>>({});
+  const [spotOverrides, setSpotOverrides] = useState<Record<string, Member | null>>({});
+  const setOwner = useMutation(
+    trpc.content.setOwner.mutationOptions({ onSettled: () => router.refresh() }),
+  );
+  const setSpotOwner = useMutation(
+    trpc.content.setSpotOwner.mutationOptions({ onSettled: () => router.refresh() }),
+  );
+  const memberById = (id: string | null) =>
+    id ? (members.find((m) => m.id === id) ?? null) : null;
+  const assign: CalAssign = useMemo(
+    () => ({
+      members,
+      currentUserId,
+      ideaOwnerOf: (e) =>
+        e.contentPostId && e.contentPostId in ideaOverrides
+          ? ideaOverrides[e.contentPostId]!
+          : e.ideaOwner,
+      spotOwnerOf: (e) => (e.id in spotOverrides ? spotOverrides[e.id]! : e.spotOwner),
+      assignIdea: (contentPostId, ownerId) => {
+        setIdeaOverrides((p) => ({ ...p, [contentPostId]: memberById(ownerId) }));
+        setOwner.mutate({ contentPostId, ownerId });
+      },
+      assignSpot: (platformPostId, ownerId) => {
+        setSpotOverrides((p) => ({ ...p, [platformPostId]: memberById(ownerId) }));
+        setSpotOwner.mutate({ platformPostId, ownerId });
+      },
+    }),
+    // memberById is derived from members; overrides drive re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [members, currentUserId, ideaOverrides, spotOverrides, setOwner, setSpotOwner],
+  );
 
   const selectedBrand = brands.find((b) => b.id === brandFilter) ?? null;
   // Producing needs a concrete brand; fall back to the first when "all brands".
@@ -194,9 +257,15 @@ export function CalendarClient({
       entries.filter((e) => {
         if (brandFilter !== "all" && e.brandId !== brandFilter) return false;
         if (pillarFilter !== "all" && e.pillar !== pillarFilter) return false;
+        if (
+          mineOnly &&
+          assign.ideaOwnerOf(e)?.id !== currentUserId &&
+          assign.spotOwnerOf(e)?.id !== currentUserId
+        )
+          return false;
         return true;
       }),
-    [entries, brandFilter, pillarFilter],
+    [entries, brandFilter, pillarFilter, mineOnly, assign, currentUserId],
   );
 
   // Day-keyed index — the single source both views read from.
@@ -260,6 +329,18 @@ export function CalendarClient({
             size="sm"
             aria-label="Pillar"
           />
+
+          <button
+            onClick={() => setMineOnly((v) => !v)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              mineOnly
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:bg-accent",
+            )}
+          >
+            Mine
+          </button>
 
           <span className="bg-border mx-1 h-5 w-px" />
 
@@ -327,7 +408,6 @@ export function CalendarClient({
             year={year}
             month={month}
             byDay={byDay}
-            keyDates={keyDates}
             todayKey={todayKey}
             onDayClick={(date) => setDayDetail({ key: keyOf(date), date })}
           />
@@ -343,7 +423,6 @@ export function CalendarClient({
           <YearMonthsDetailed
             year={year}
             byDay={byDay}
-            keyDates={keyDates}
             todayKey={todayKey}
             onDayClick={(date) => setDayDetail({ key: keyOf(date), date })}
             onMonthClick={(mo) => openMonth(year, mo)}
@@ -356,6 +435,7 @@ export function CalendarClient({
       <DayDetailDialog
         date={dayDetail?.date ?? null}
         entries={dayDetail ? (byDay.get(dayDetail.key) ?? []) : []}
+        assign={assign}
         onClose={() => setDayDetail(null)}
         onProduce={(date) => {
           setDayDetail(null);
@@ -378,28 +458,48 @@ export function CalendarClient({
   );
 }
 
-// ---- Month view ----------------------------------------------------------
+// ---- Month grid (shared by the Month zoom and the Year · Detailed view) ----
 
+/** One full-fidelity month calendar — media-thumbnail chips, 3 per day. Used at
+ * full width by the Month zoom and 2-up (with a header) by the Year · Detailed
+ * grid, so both views render identically. */
 function MonthGrid({
   year,
   month,
   byDay,
-  keyDates,
   todayKey,
   onDayClick,
+  header,
 }: {
   year: number;
   month: number;
   byDay: Map<string, CalEntry[]>;
-  keyDates: Map<string, { emoji: string; name: string }>;
   todayKey: string;
   onDayClick: (date: Date) => void;
+  // When present, renders a clickable month-name bar with the post total —
+  // used by the Year · Detailed grid; the Month zoom omits it.
+  header?: { name: string; total: number; onMonthClick: () => void };
 }) {
   const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
 
   return (
     <div className="overflow-hidden rounded-xl border">
-      <div className="bg-muted/30 text-muted-foreground grid grid-cols-7 border-b text-[11px] font-medium">
+      {header && (
+        <div className="bg-muted/30 flex items-center justify-between border-b px-2.5 py-1.5">
+          <button
+            onClick={header.onMonthClick}
+            className="text-sm font-semibold hover:underline"
+          >
+            {header.name}
+          </button>
+          {header.total > 0 && (
+            <span className="text-muted-foreground text-[11px] tabular-nums">
+              {header.total}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="text-muted-foreground bg-muted/30 grid grid-cols-7 border-b text-[11px] font-medium">
         {WEEKDAYS.map((w) => (
           <div key={w} className="px-2 py-1.5">
             {w}
@@ -411,7 +511,6 @@ function MonthGrid({
           const k = keyOf(date);
           const inMonth = date.getMonth() === month;
           const isToday = k === todayKey;
-          const kd = keyDates.get(k);
           const groups = groupDay(byDay.get(k) ?? []);
           const shown = groups.slice(0, 3);
           const extra = groups.length - shown.length;
@@ -435,14 +534,6 @@ function MonthGrid({
                 >
                   {date.getDate()}
                 </span>
-                {kd && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-xs leading-none">{kd.emoji}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{kd.name}</TooltipContent>
-                  </Tooltip>
-                )}
               </div>
               <div className="flex flex-col gap-1">
                 {shown.map((g) => (
@@ -465,42 +556,45 @@ function MonthGrid({
 function ContentChip({ g }: { g: DayGroup }) {
   const pillar = g.pillarSlug ? PILLAR_BY_SLUG[g.pillarSlug] : null;
   const status = g.entries[0]?.status ?? "draft";
+  const platform = g.entries[0]?.platform ?? "";
+  const media = g.entries.find((e) => e.mediaUrl)?.mediaUrl ?? null;
   const label =
-    g.title ?? g.entries[0]?.text ?? platformLabel(g.entries[0]?.platform ?? "");
+    g.title ?? g.entries[0]?.text ?? platformLabel(platform);
   return (
     <span
-      className="bg-card flex items-center gap-1 overflow-hidden rounded border px-1 py-0.5 text-[11px]"
+      className="bg-card flex items-center gap-1.5 overflow-hidden rounded-md border p-1 text-xs"
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
       title={label}
     >
-      <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[status] ?? "bg-slate-400")} />
-      <span className="truncate">{label}</span>
-      {g.entries.length > 1 && (
-        <span className="text-muted-foreground shrink-0 tabular-nums">
-          ×{g.entries.length}
+      <span className="bg-muted relative size-8 shrink-0 overflow-hidden rounded">
+        {media ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={media} alt="" className="size-full object-cover" />
+        ) : (
+          <span className="text-muted-foreground flex size-full items-center justify-center">
+            <ChannelLogo platform={platform} className="size-4" />
+          </span>
+        )}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate leading-tight">{label}</span>
+        <span className="flex items-center gap-1 leading-none">
+          <span
+            className={cn(
+              "size-1.5 shrink-0 rounded-full",
+              STATUS_DOT[status] ?? "bg-slate-400",
+            )}
+          />
+          <span className="text-muted-foreground truncate text-[10px] capitalize">
+            {status}
+          </span>
+          {g.entries.length > 1 && (
+            <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
+              ×{g.entries.length}
+            </span>
+          )}
         </span>
-      )}
-    </span>
-  );
-}
-
-/** Denser chip for the year · detailed view, where day cells are narrow. */
-function CompactChip({ g }: { g: DayGroup }) {
-  const pillar = g.pillarSlug ? PILLAR_BY_SLUG[g.pillarSlug] : null;
-  const status = g.entries[0]?.status ?? "draft";
-  const label =
-    g.title ?? g.entries[0]?.text ?? platformLabel(g.entries[0]?.platform ?? "");
-  return (
-    <span
-      className="bg-card flex items-center gap-1 overflow-hidden rounded-[3px] border px-1 py-px text-[10px] leading-tight"
-      style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
-      title={label}
-    >
-      <span className={cn("size-1 shrink-0 rounded-full", STATUS_DOT[status] ?? "bg-slate-400")} />
-      <span className="truncate">{label}</span>
-      {g.entries.length > 1 && (
-        <span className="text-muted-foreground shrink-0 tabular-nums">×{g.entries.length}</span>
-      )}
+      </span>
     </span>
   );
 }
@@ -577,7 +671,7 @@ function MiniMonth({
       </div>
       <div className="grid grid-cols-7 gap-[3px]">
         {WEEKDAYS.map((w) => (
-          <span key={w} className="text-muted-foreground/60 text-center text-[8px]">
+          <span key={w} className="text-muted-foreground text-center text-[9px]">
             {w[0]}
           </span>
         ))}
@@ -641,33 +735,46 @@ function MiniMonth({
   );
 }
 
-// ---- Year · Detailed (12 month grids with content chips) ------------------
+// ---- Year · Detailed (12 month grids — the same MonthGrid, compact density) -
+
+/** Post count for a month — drives the Detailed header badge. */
+function useMonthTotal(
+  year: number,
+  month: number,
+  byDay: Map<string, CalEntry[]>,
+) {
+  const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
+  return useMemo(() => {
+    let n = 0;
+    for (const week of weeks)
+      for (const d of week)
+        if (d.getMonth() === month) n += byDay.get(keyOf(d))?.length ?? 0;
+    return n;
+  }, [weeks, month, byDay]);
+}
 
 function YearMonthsDetailed({
   year,
   byDay,
-  keyDates,
   todayKey,
   onDayClick,
   onMonthClick,
 }: {
   year: number;
   byDay: Map<string, CalEntry[]>;
-  keyDates: Map<string, { emoji: string; name: string }>;
   todayKey: string;
   onDayClick: (date: Date) => void;
   onMonthClick: (month: number) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       {MONTHS.map((name, mo) => (
-        <DetailedMiniMonth
+        <DetailedMonth
           key={mo}
           name={name}
           year={year}
           month={mo}
           byDay={byDay}
-          keyDates={keyDates}
           todayKey={todayKey}
           onDayClick={onDayClick}
           onMonthClick={() => onMonthClick(mo)}
@@ -677,12 +784,11 @@ function YearMonthsDetailed({
   );
 }
 
-function DetailedMiniMonth({
+function DetailedMonth({
   name,
   year,
   month,
   byDay,
-  keyDates,
   todayKey,
   onDayClick,
   onMonthClick,
@@ -691,88 +797,20 @@ function DetailedMiniMonth({
   year: number;
   month: number;
   byDay: Map<string, CalEntry[]>;
-  keyDates: Map<string, { emoji: string; name: string }>;
   todayKey: string;
   onDayClick: (date: Date) => void;
   onMonthClick: () => void;
 }) {
-  const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
-  const total = useMemo(() => {
-    let n = 0;
-    for (const week of weeks)
-      for (const d of week)
-        if (d.getMonth() === month) n += byDay.get(keyOf(d))?.length ?? 0;
-    return n;
-  }, [weeks, month, byDay]);
-
+  const total = useMonthTotal(year, month, byDay);
   return (
-    <div className="overflow-hidden rounded-xl border">
-      <div className="bg-muted/30 flex items-center justify-between border-b px-2.5 py-1.5">
-        <button onClick={onMonthClick} className="text-sm font-semibold hover:underline">
-          {name}
-        </button>
-        {total > 0 && (
-          <span className="text-muted-foreground text-[11px] tabular-nums">{total}</span>
-        )}
-      </div>
-      <div className="bg-muted/20 text-muted-foreground grid grid-cols-7 border-b text-[9px] font-medium">
-        {WEEKDAYS.map((w) => (
-          <div key={w} className="px-1 py-0.5">
-            {w[0]}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7">
-        {weeks.flat().map((date) => {
-          const k = keyOf(date);
-          const inMonth = date.getMonth() === month;
-          const isToday = k === todayKey;
-          const kd = keyDates.get(k);
-          const groups = groupDay(byDay.get(k) ?? []);
-          const shown = groups.slice(0, 2);
-          const extra = groups.length - shown.length;
-          return (
-            <button
-              key={k}
-              onClick={() => onDayClick(date)}
-              className={cn(
-                "group hover:bg-accent/30 flex min-h-16 flex-col gap-0.5 border-b border-r p-1 text-left transition-colors [&:nth-child(7n)]:border-r-0",
-                !inMonth && "bg-muted/20 opacity-40",
-              )}
-            >
-              <div className="flex items-center gap-0.5">
-                <span
-                  className={cn(
-                    "flex size-4 items-center justify-center rounded-full text-[9px] tabular-nums",
-                    isToday
-                      ? "bg-foreground text-background font-semibold"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {date.getDate()}
-                </span>
-                {kd && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-[10px] leading-none">{kd.emoji}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{kd.name}</TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-              <div className="flex flex-col gap-0.5">
-                {shown.map((g) => (
-                  <CompactChip key={g.key} g={g} />
-                ))}
-                {extra > 0 && (
-                  <span className="text-muted-foreground px-0.5 text-[9px]">+{extra}</span>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <MonthGrid
+      year={year}
+      month={month}
+      byDay={byDay}
+      todayKey={todayKey}
+      onDayClick={onDayClick}
+      header={{ name, total, onMonthClick }}
+    />
   );
 }
 
@@ -871,11 +909,13 @@ function Heatmap({
 function DayDetailDialog({
   date,
   entries,
+  assign,
   onClose,
   onProduce,
 }: {
   date: Date | null;
   entries: CalEntry[];
+  assign: CalAssign;
   onClose: () => void;
   onProduce: (date: Date) => void;
 }) {
@@ -912,59 +952,100 @@ function DayDetailDialog({
         </p>
       ) : (
         <div className="flex flex-col gap-3">
-          {groups.map((g) => {
-            const pillar = g.pillarSlug ? PILLAR_BY_SLUG[g.pillarSlug] : null;
-            return (
-              <div
-                key={g.key}
-                className="rounded-lg border p-3"
-                style={pillar ? { borderLeft: `3px solid ${pillar.color}` } : undefined}
-              >
-                <div className="mb-1.5 flex items-center gap-2">
-                  {g.contentPostId ? (
-                    <Link
-                      href={`/app/content/${g.contentPostId}`}
-                      className="text-sm font-medium hover:underline"
-                    >
-                      {g.title ?? "Untitled"}
-                    </Link>
-                  ) : (
-                    <span className="text-sm font-medium">{g.title ?? "Standalone post"}</span>
-                  )}
-                  {pillar && (
-                    <span className="text-muted-foreground text-xs">{pillar.name}</span>
-                  )}
-                  <span className="text-muted-foreground ml-auto text-xs">
-                    {g.entries[0]?.brandName}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {g.entries.map((e) => (
-                    <div key={e.id} className="flex items-center gap-2 text-xs">
-                      <ChannelLogo platform={e.platform} className="size-4 shrink-0" />
-                      <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[e.status] ?? "bg-slate-400")} />
-                      <span className="text-muted-foreground capitalize">{e.status}</span>
-                      {e.text && <span className="truncate">· {e.text}</span>}
-                      {e.externalUrl && (
-                        <a
-                          href={e.externalUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(ev) => ev.stopPropagation()}
-                          className="text-muted-foreground hover:text-foreground ml-auto shrink-0"
-                        >
-                          ↗
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+          {groups.map((g) => (
+            <DayGroupBlock key={g.key} g={g} assign={assign} />
+          ))}
         </div>
       )}
     </SimpleDialog>
+  );
+}
+
+/** One content piece in the day dialog: idea owner on the header (hover+Space
+ *  self-toggles it), spot owner on each platform row. */
+function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
+  const pillar = g.pillarSlug ? PILLAR_BY_SLUG[g.pillarSlug] : null;
+  const first = g.entries[0];
+  const tracked = first?.tracked ?? false;
+  const ideaOwner = first ? assign.ideaOwnerOf(first) : null;
+  // Hover + Space self-toggles the idea owner (only our own, real pieces).
+  const hover = useSelfAssignHotkey({
+    ownerId: ideaOwner?.id ?? null,
+    currentUserId: assign.currentUserId,
+    onChange: (ownerId) =>
+      g.contentPostId && assign.assignIdea(g.contentPostId, ownerId),
+    enabled: !!g.contentPostId && !tracked,
+  });
+  return (
+    <div
+      {...hover}
+      className="rounded-lg border p-3"
+      style={pillar ? { borderLeft: `3px solid ${pillar.color}` } : undefined}
+    >
+      <div className="mb-1.5 flex items-center gap-2">
+        {g.contentPostId ? (
+          <Link
+            href={`/app/content/${g.contentPostId}`}
+            className="min-w-0 truncate text-sm font-medium hover:underline"
+          >
+            {g.title ?? "Untitled"}
+          </Link>
+        ) : (
+          <span className="min-w-0 truncate text-sm font-medium">
+            {g.title ?? "Standalone post"}
+          </span>
+        )}
+        {pillar && (
+          <span className="text-muted-foreground shrink-0 text-xs">{pillar.name}</span>
+        )}
+        <span className="text-muted-foreground ml-auto shrink-0 text-xs">
+          {first?.brandName}
+        </span>
+        {g.contentPostId && !tracked && (
+          <AssigneeButton
+            value={ideaOwner}
+            members={assign.members}
+            currentUserId={assign.currentUserId}
+            onChange={(ownerId) => assign.assignIdea(g.contentPostId!, ownerId)}
+            size="sm"
+            label="Assign owner"
+          />
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {g.entries.map((e) => (
+          <div key={e.id} className="flex items-center gap-2 text-xs">
+            <ChannelLogo platform={e.platform} className="size-4 shrink-0" />
+            <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[e.status] ?? "bg-slate-400")} />
+            <span className="text-muted-foreground shrink-0 capitalize">{e.status}</span>
+            {e.text && <span className="min-w-0 flex-1 truncate">· {e.text}</span>}
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              {e.externalUrl && (
+                <a
+                  href={e.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(ev) => ev.stopPropagation()}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  ↗
+                </a>
+              )}
+              {!e.tracked && (
+                <AssigneeButton
+                  value={assign.spotOwnerOf(e)}
+                  members={assign.members}
+                  currentUserId={assign.currentUserId}
+                  onChange={(ownerId) => assign.assignSpot(e.id, ownerId)}
+                  size="sm"
+                  label="Assign this channel"
+                />
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

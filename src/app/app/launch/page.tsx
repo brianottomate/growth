@@ -6,9 +6,16 @@ import { brandTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { LaunchClient } from "./LaunchClient";
 
-export default async function LaunchPage() {
+export default async function LaunchPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
+
+  const sp = await searchParams;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
   const membership = await db.query.memberTable.findFirst({
     where: eq(memberTable.userId, session.user.id),
@@ -24,5 +31,22 @@ export default async function LaunchPage() {
     columns: { id: true, name: true },
   });
 
-  return <LaunchClient brands={brands.map((b) => ({ id: b.id, name: b.name }))} />;
+  const reqBrandId = one(sp.brandId);
+  // `img` can repeat (e.g. a Timeline selection of several posts → reference
+  // frames), so collect every value rather than just the first.
+  const imgs = sp.img ? (Array.isArray(sp.img) ? sp.img : [sp.img]) : undefined;
+  const initial = {
+    // Only honor a brandId that's actually in this org's list.
+    brandId: brands.some((b) => b.id === reqBrandId) ? reqBrandId : undefined,
+    name: one(sp.name),
+    prompt: one(sp.prompt),
+    imageUrls: imgs,
+  };
+
+  return (
+    <LaunchClient
+      brands={brands.map((b) => ({ id: b.id, name: b.name }))}
+      initial={initial}
+    />
+  );
 }

@@ -35,6 +35,9 @@ import { createId } from "@/server/db/utils";
 
 // ---- raw record + mapping ------------------------------------------
 
+/** Platforms with a Bright Data dataset mapper wired into this pipeline. */
+export type ScrapePlatform = "linkedin" | "x" | "instagram" | "facebook";
+
 type Raw = Record<string, unknown>;
 
 const str = (v: unknown): string | undefined =>
@@ -161,12 +164,100 @@ export function mapXRecord(rec: Raw, brandId: string): Mapped | null {
   return { insert, raw: rec, cover: media.find((m) => m.type === "image")?.url };
 }
 
+export function mapInstagramRecord(rec: Raw, brandId: string): Mapped | null {
+  // Items come from the IG-profile dataset's nested posts[] (flattened upstream).
+  if (rec.error || !str(rec.id)) return null;
+
+  const imageUrl = str(rec.image_url);
+  const videoUrl = str(rec.video_url);
+  const media: MediaItem[] = [];
+  if (videoUrl) media.push({ url: videoUrl, type: "video", thumbnail: imageUrl });
+  else if (imageUrl) media.push({ url: imageUrl, type: "image" });
+
+  const fmt = classifyFormatFromFields("instagram", rec);
+  const insert: PlatformPostInsert = {
+    id: createId("pp"),
+    brandId,
+    platform: "instagram",
+    username: str(rec.account),
+    source: "scraped",
+    status: "published",
+    format: fmt.format,
+    archetype: fmt.archetype,
+    text: str(rec.caption),
+    media: media.length ? media : undefined,
+    stats: { likes: num(rec.likes), comments: num(rec.comments) },
+    externalId: str(rec.id),
+    externalUrl: str(rec.url),
+    externalKind: "post",
+    publishedAt: str(rec.datetime) ? new Date(str(rec.datetime)!) : undefined,
+    scrapedAt: new Date(),
+    metadata: {
+      hashtags: rec.post_hashtags,
+      contentType: rec.content_type,
+      location: rec.location,
+    },
+  };
+  return { insert, raw: rec, cover: imageUrl };
+}
+
+export function mapFacebookRecord(rec: Raw, brandId: string): Mapped | null {
+  if (rec.error || !str(rec.post_id)) return null;
+
+  const media: MediaItem[] = [];
+  for (const a of arr(rec.attachments)) {
+    const url = urlOf(a);
+    if (url) {
+      const type = (a as Raw)?.type === "Video" ? "video" : "image";
+      media.push({ url, type });
+    }
+  }
+  if (!media.length) {
+    const img =
+      str(rec.post_image) ?? str(rec.post_external_image) ?? str(rec.header_image);
+    if (img) media.push({ url: img, type: "image" });
+  }
+
+  const fmt = classifyFormatFromFields("facebook", rec);
+  const insert: PlatformPostInsert = {
+    id: createId("pp"),
+    brandId,
+    platform: "facebook",
+    username: str(rec.page_name) ?? str(rec.profile_handle),
+    source: "scraped",
+    status: "published",
+    format: fmt.format,
+    archetype: fmt.archetype,
+    text: str(rec.content),
+    media: media.length ? media : undefined,
+    stats: {
+      likes: num(rec.likes) ?? num((rec.num_likes_type as Raw)?.num),
+      comments: num(rec.num_comments),
+      shares: num(rec.num_shares),
+      views: num(rec.video_view_count) ?? num(rec.play_count),
+    },
+    externalId: str(rec.post_id),
+    externalUrl: str(rec.url),
+    externalKind: "post",
+    publishedAt: str(rec.date_posted) ? new Date(str(rec.date_posted)!) : undefined,
+    scrapedAt: new Date(),
+    metadata: {
+      hashtags: rec.hashtags,
+      reactions: rec.count_reactions_type,
+      isSponsored: rec.is_sponsored,
+    },
+  };
+  return { insert, raw: rec, cover: media.find((m) => m.type === "image")?.url };
+}
+
 const MAPPERS: Record<
-  string,
+  ScrapePlatform,
   (rec: Raw, brandId: string) => Mapped | null
 > = {
   linkedin: mapLinkedInRecord,
   x: mapXRecord,
+  instagram: mapInstagramRecord,
+  facebook: mapFacebookRecord,
 };
 
 // ---- process: dedup → insert → suggest -----------------------------
@@ -182,15 +273,23 @@ export type ProcessResult = {
 
 export async function processRecords(opts: {
   brandId: string;
-  platform: "linkedin" | "x";
+  platform: ScrapePlatform;
   records: Raw[];
   skipTemplate?: boolean;
+  /** Drop dated posts older than this — the hard 30-day bound. */
+  cutoff?: Date;
 }): Promise<ProcessResult> {
   const map = MAPPERS[opts.platform];
   if (!map) throw new Error(`no mapper for ${opts.platform}`);
-  const mapped = opts.records
+  let mapped = opts.records
     .map((r) => map(r, opts.brandId))
     .filter((m): m is Mapped => m !== null);
+  if (opts.cutoff) {
+    const c = opts.cutoff;
+    mapped = mapped.filter(
+      (m) => !m.insert.publishedAt || m.insert.publishedAt >= c,
+    );
+  }
   return processMapped({
     brandId: opts.brandId,
     platform: opts.platform,
@@ -204,7 +303,7 @@ export async function processRecords(opts: {
  *  Shared by the Bright Data path (processRecords) and the X API path. */
 async function processMapped(opts: {
   brandId: string;
-  platform: "linkedin" | "x";
+  platform: ScrapePlatform;
   mapped: Mapped[];
   scanned: number;
   skipTemplate?: boolean;
@@ -306,12 +405,17 @@ async function processMapped(opts: {
 
 // ---- scrape + process ----------------------------------------------
 
-const SCRAPER_KEY = { linkedin: "linkedinPosts", x: "xPosts" } as const;
+const SCRAPER_KEY = {
+  linkedin: "linkedinPosts",
+  x: "xPosts",
+  instagram: "instagramProfile",
+  facebook: "facebookPosts",
+} as const;
 
 /** Resolve a brand's profile URL for a platform from its channel row. */
 export async function profileUrlForBrand(
   brandId: string,
-  platform: "linkedin" | "x",
+  platform: ScrapePlatform,
 ): Promise<string | null> {
   const [chan] = await db
     .select({ url: channelTable.profileUrl, handle: channelTable.handle })
@@ -328,27 +432,53 @@ export async function profileUrlForBrand(
 
 export async function scrapeAndSuggest(opts: {
   brandId: string;
-  platform: "linkedin" | "x";
+  platform: ScrapePlatform;
   profileUrl: string;
   limit?: number;
+  /** How many days back to keep (hard bound, default 30). */
+  sinceDays?: number;
   skipTemplate?: boolean;
 }): Promise<ProcessResult> {
+  const limit = opts.limit ?? 30;
+  const sinceDays = opts.sinceDays ?? 30;
+  const cutoff = new Date(Date.now() - sinceDays * 86_400_000);
+
   // LinkedIn posts dataset discovers by company_url by default; a personal
   // profile (/in/) needs discover_by=profile_url.
   const query =
     opts.platform === "linkedin" && opts.profileUrl.includes("/in/")
       ? { discover_by: "profile_url" }
       : undefined;
-  const records = (await runScrape(
-    SCRAPER_KEY[opts.platform],
-    [{ url: opts.profileUrl }],
-    { limitPerInput: opts.limit, query },
-  )) as Raw[];
+
+  // Caps are per-dataset: the LinkedIn/X post crawlers take `limit_per_input`;
+  // Facebook caps via `num_of_posts` in the input row; the IG-profile dataset
+  // takes NEITHER — passing limit_per_input returns 0 rows — it just yields the
+  // profile's recent posts (≤12), which the cutoff filter then bounds.
+  const usesLimitParam =
+    opts.platform === "linkedin" || opts.platform === "x";
+  const inputRow: Record<string, unknown> = { url: opts.profileUrl };
+  if (opts.platform === "facebook") inputRow.num_of_posts = limit;
+
+  let records = (await runScrape(SCRAPER_KEY[opts.platform], [inputRow], {
+    limitPerInput: usesLimitParam ? limit : undefined,
+    query,
+  })) as Raw[];
+
+  // The IG-profile dataset returns ONE profile object with a nested posts[];
+  // flatten to per-post records and carry the profile handle onto each.
+  if (opts.platform === "instagram") {
+    records = records.flatMap((rec) => {
+      const account = str(rec.account);
+      return (arr(rec.posts) as Raw[]).map((p) => ({ account, ...p }));
+    });
+  }
+
   return processRecords({
     brandId: opts.brandId,
     platform: opts.platform,
     records,
     skipTemplate: opts.skipTemplate,
+    cutoff,
   });
 }
 

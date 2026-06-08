@@ -26,8 +26,9 @@ export default async function ContentPage() {
     columns: { id: true, name: true, slug: true },
   });
 
-  // Initial (unfiltered) board for instant hydration.
+  // Initial (unfiltered) board + the assignee roster, for instant hydration.
   prefetch(trpc.content.board.queryOptions({}));
+  prefetch(trpc.content.assignableMembers.queryOptions());
 
   return (
     <HydrateClient>
@@ -41,6 +42,7 @@ export default async function ContentPage() {
       </div>
       <ContentBoard
         brands={brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug }))}
+        currentUserId={session.user.id}
       />
     </HydrateClient>
   );

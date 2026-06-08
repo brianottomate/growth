@@ -11,8 +11,6 @@ import {
   FingerPrintIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
-import { BarChart3 } from "lucide-react";
-
 import { Button } from "@wandercom/design-system-web/ui/button";
 import { Heading } from "@wandercom/design-system-web/ui/heading";
 import { Text } from "@wandercom/design-system-web/ui/text";
@@ -215,12 +213,9 @@ export default function HeaderClient({ navigation }: HeaderClientProps) {
             <div className="flex items-center justify-between">
               <Link
                 href="/"
-                className="flex items-center space-x-2"
+                className="flex items-center"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <div className="bg-surface-secondary border-secondary flex size-6 items-center justify-center rounded-md border">
-                  <BarChart3 className="text-primary size-4" />
-                </div>
                 <Heading variant="headline-sm" asChild className="text-xl">
                   <span>Wander</span>
                 </Heading>

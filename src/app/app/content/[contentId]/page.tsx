@@ -7,6 +7,12 @@ import { contentPostTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
+import { IdeaOwnerControl, SpotOwnerControl } from "./OwnerControls";
+
+const memberCols = { id: true, name: true, image: true } as const;
+const toMember = (
+  u: { id: string; name: string | null; image: string | null } | null | undefined,
+) => (u ? { id: u.id, name: u.name, image: u.image } : null);
 
 const STATUS: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -67,11 +73,28 @@ export default async function ContentDetailPage({
 
   const content = await db.query.contentPostTable.findFirst({
     where: eq(contentPostTable.id, contentId),
-    with: { brand: true, series: true, platformPosts: true, owner: true },
+    with: {
+      brand: true,
+      series: true,
+      platformPosts: { with: { owner: { columns: memberCols } } },
+      owner: { columns: memberCols },
+    },
   });
   if (!content || content.brand?.organizationId !== org.id || content.deletedAt) {
     notFound();
   }
+
+  // Org roster for the assignee pickers.
+  const members = (
+    await db.query.memberTable.findMany({
+      where: eq(memberTable.organizationId, org.id),
+      with: { user: { columns: memberCols } },
+    })
+  )
+    .map((m) => m.user)
+    .filter((u): u is NonNullable<typeof u> => !!u)
+    .map((u) => ({ id: u.id, name: u.name, image: u.image }))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 
   const pillar = content.pillar ? PILLAR_BY_SLUG[content.pillar] : null;
 
@@ -137,6 +160,14 @@ export default async function ContentDetailPage({
             AI
           </span>
         )}
+        <div className="ml-auto">
+          <IdeaOwnerControl
+            contentPostId={content.id}
+            initialOwner={toMember(content.owner)}
+            members={members}
+            currentUserId={session.user.id}
+          />
+        </div>
       </div>
       <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-2 text-sm">
         <Link
@@ -221,11 +252,19 @@ export default async function ContentDetailPage({
                     </span>
                   )}
                   <StatusBadge status={p.status} />
+                  <div className="ml-auto">
+                    <SpotOwnerControl
+                      platformPostId={p.id}
+                      initialOwner={toMember(p.owner)}
+                      members={members}
+                      currentUserId={session.user.id}
+                    />
+                  </div>
                 </div>
                 {p.text && (
                   <p className="text-muted-foreground mt-1 text-sm">{p.text}</p>
                 )}
-                <div className="text-muted-foreground/70 mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
                   <span>{fmtWhen(when)}</span>
                   {s.likes != null && <span>· {fmt(s.likes)} likes</span>}
                   {s.views != null && <span>· {fmt(s.views)} views</span>}
@@ -285,7 +324,7 @@ export default async function ContentDetailPage({
         {totals.comments > 0
           ? `${fmt(totals.comments)} comments across all platforms.`
           : "No comments yet."}{" "}
-        <span className="text-muted-foreground/70">
+        <span className="text-muted-foreground">
           Full comment threads arrive with the listening / inbox work.
         </span>
       </p>

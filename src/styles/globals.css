@@ -647,7 +647,7 @@
   --color-popover: var(--color-surface-modal);
   --color-popover-foreground: var(--color-primary);
   --color-muted: var(--color-surface-tertiary);
-  --color-muted-foreground: var(--color-neutral-550);
+  --color-muted-foreground: var(--muted-foreground-l);
   --color-accent: var(--color-surface-tertiary);
   --color-accent-foreground: var(--color-primary);
   --color-secondary-foreground: var(--color-primary);
@@ -665,4 +665,22 @@
   --color-sidebar-accent-foreground: var(--color-primary);
   --color-sidebar-border: var(--color-border-primary);
   --color-sidebar-ring: var(--color-border-blue);
+}
+
+/* ---- dark-mode legibility: lift muted text ---------------------------
+   `--color-muted-foreground` drives nearly all the secondary/dim text in the
+   app (websites, taglines, summaries, group labels, handles, follower counts,
+   nav). On near-black dark surfaces, neutral-550 (oklch 0.4997) was too low
+   contrast. Lift it to neutral-450 (oklch 0.647) in dark only; light keeps the
+   original. Routed through `--muted-foreground-l` because the color tokens
+   live in an `@theme inline` block — values are inlined into the generated
+   utilities (e.g. `text-muted-foreground`), so redefining `--color-muted-
+   foreground` directly would never reach them. The indirection variable is
+   what actually flips per theme. */
+:root,
+[data-theme="light"] {
+  --muted-foreground-l: var(--color-neutral-550);
+}
+[data-theme="dark"] {
+  --muted-foreground-l: var(--color-neutral-450);
 }

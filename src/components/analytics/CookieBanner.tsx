@@ -13,7 +13,6 @@ interface CookieBannerProps {
   onAccept: () => void;
   onDecline: () => void;
   description?: string;
-  learnMoreHref?: string;
   className?: string;
 }
 
@@ -22,7 +21,6 @@ export const CookieBanner = ({
   onAccept,
   onDecline,
   description = "We use cookies to improve your experience and analyze site usage. By continuing, you accept our use of cookies.",
-  learnMoreHref = "/privacy",
   className,
 }: CookieBannerProps) => {
   const [isAnimatingOut, setIsAnimatingOut] = React.useState(false);
@@ -72,12 +70,6 @@ export const CookieBanner = ({
             By clicking <span className="font-medium">&quot;Accept&quot;</span>,
             you agree to our use of cookies.
           </Text>
-          <a
-            href={learnMoreHref}
-            className="text-primary inline-block text-sm underline underline-offset-4 hover:no-underline"
-          >
-            Learn more
-          </a>
         </div>
         <div className="mt-6 flex gap-2">
           <Button

@@ -18,7 +18,7 @@ import {
 
 import type { MediaAsset, MediaKind } from "@/server/db/schema";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -33,20 +33,43 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import { useTRPC } from "@/trpc/react";
 import { EditLinkDialog } from "./EditLinkDialog";
-import { LaunchMediaDrawer, type LaunchTarget } from "./LaunchMediaDrawer";
+import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
+/**
+ * Build a deep-link to the launch planner with this media prefilled as the hero
+ * creative. No separate drawer — /launch owns the whole generate→review→commit
+ * flow; we just hand it a brief + (when we host one) a reference image.
+ */
+function launchHref(opts: {
+  brandId: string;
+  title: string;
+  href: string | null;
+  imageUrl?: string | null;
+  kind: string;
+  sourceProvider?: string | null;
+}): string {
+  const ref = [
+    `Hero creative: "${opts.title}" (${opts.kind}${opts.sourceProvider ? `, ${opts.sourceProvider}` : ""}).`,
+    opts.href ? `Link: ${opts.href}` : null,
+    "Plan how to launch this piece across channels.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const params = new URLSearchParams({ brandId: opts.brandId, name: opts.title, prompt: ref });
+  if (opts.imageUrl) params.set("img", opts.imageUrl);
+  return `/app/launch?${params.toString()}`;
+}
 
-/** Collapse a media asset into the generic shape the launch flow consumes. */
-function assetToLaunchTarget(asset: MediaAsset): LaunchTarget {
+/** Deep-link for a media asset (only hand the model a URL it can actually fetch). */
+function assetLaunchHref(asset: MediaAsset, brandId: string): string {
   const isExternal = asset.provider === "external";
-  return {
+  return launchHref({
+    brandId,
     title: asset.title ?? asset.filename ?? "Untitled",
     href: asset.externalUrl ?? asset.url,
-    // Only hand the model a URL it can actually fetch (R2 image, or a
-    // thumbnail frame). Externally-hosted originals stay link-only.
     imageUrl: isExternal ? null : asset.kind === "image" ? asset.url : asset.thumbnailUrl,
     kind: asset.kind,
     sourceProvider: isExternal ? (asset.sourceProvider ?? "link") : null,
-  };
+  });
 }
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
@@ -55,20 +78,6 @@ const ACCEPT = [...IMAGE_TYPES, ...VIDEO_TYPES].join(",");
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB (R2)
 
 type Brand = { id: string; name: string; logo: string | null };
-
-// Hard-coded external creative libraries (Drive folders, etc.). Add more here.
-const EXTERNAL_LINKS: { label: string; description: string; href: string }[] = [
-  {
-    label: "Customer Stories",
-    description: "Per-property b-roll & story footage (Drive)",
-    href: "https://drive.google.com/drive/folders/1sjmJgCjcS6Fe4qBZKBw00X_E_YGakeHD",
-  },
-  {
-    label: "WanderOS (Sahil)",
-    description: "Raw footage, music, SFX & VFX (Drive)",
-    href: "https://drive.google.com/drive/folders/14nXr2vp5nhRpBGzW74RewdPDdXHXh7Yr",
-  },
-];
 
 const KIND_FILTERS: { value: string; label: string }[] = [
   { value: "all", label: "All media" },
@@ -109,12 +118,11 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   const [linkUrl, setLinkUrl] = useState("");
   const [linkTitle, setLinkTitle] = useState("");
   const [linkKind, setLinkKind] = useState<MediaKind>("video");
+  const linkThumb = usePhotoPicker();
 
   // "Edit link" dialog — the asset currently being edited.
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
 
-  // "Launch" drawer — the media item we're steering a moment around.
-  const [launchTarget, setLaunchTarget] = useState<LaunchTarget | null>(null);
 
   const listInput = {
     brandId,
@@ -132,14 +140,38 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   const finalizeUpload = useMutation(trpc.media.finalizeUpload.mutationOptions());
   const createVideoUpload = useMutation(trpc.media.createVideoUpload.mutationOptions());
   const syncVideo = useMutation(trpc.media.syncVideo.mutationOptions());
+  const finalizeLinkCreate = () => {
+    toast.success("Link added");
+    setLinkOpen(false);
+    setLinkUrl("");
+    setLinkTitle("");
+    linkThumb.reset();
+    void invalidate();
+  };
+
+  // A pasted/uploaded thumbnail can't go in until the asset row exists, so we
+  // create the link first, then run a quick updateExternal to attach it.
+  const updateThumb = useMutation(
+    trpc.media.updateExternal.mutationOptions({
+      onSuccess: () => finalizeLinkCreate(),
+      // The link itself was created — only the thumbnail failed; still finish.
+      onError: (e) => {
+        toast.error(`Link added, but thumbnail failed: ${e.message}`);
+        finalizeLinkCreate();
+      },
+    }),
+  );
   const createExternal = useMutation(
     trpc.media.createExternal.mutationOptions({
-      onSuccess: () => {
-        toast.success("Link added");
-        setLinkOpen(false);
-        setLinkUrl("");
-        setLinkTitle("");
-        void invalidate();
+      onSuccess: (created) => {
+        const p = linkThumb.payload;
+        if ("photo" in p) {
+          updateThumb.mutate({ id: created.id, thumbnail: p.photo });
+        } else if ("photoUrl" in p) {
+          updateThumb.mutate({ id: created.id, thumbnailUrl: p.photoUrl });
+        } else {
+          finalizeLinkCreate();
+        }
       },
       onError: (e) => toast.error(e.message),
     }),
@@ -281,7 +313,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
       </div>
 
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
-        <DialogContent>
+        <DialogContent onPaste={linkThumb.handlePaste}>
           <DialogHeader>
             <DialogTitle>Link an external file</DialogTitle>
           </DialogHeader>
@@ -291,6 +323,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
               master (e.g. a heavy working video). Cut-downs you publish get hosted
               separately and can link back to this as their source.
             </p>
+            <PhotoPickerField picker={linkThumb} />
             <div className="flex flex-col gap-1.5">
               <Label>Link</Label>
               <Input
@@ -327,12 +360,19 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setLinkOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                linkThumb.reset();
+                setLinkOpen(false);
+              }}
+            >
               Cancel
             </Button>
             <Button
               size="sm"
-              loading={createExternal.isPending}
+              loading={createExternal.isPending || updateThumb.isPending}
               disabled={!linkUrl.trim()}
               onClick={() =>
                 createExternal.mutate({
@@ -348,54 +388,6 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Hard-coded links to external creative libraries */}
-      <div className="space-y-2">
-        <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
-          <FolderOpen className="size-3.5" />
-          Links
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {EXTERNAL_LINKS.map((link) => (
-            <div
-              key={link.href}
-              className="hover:border-primary group flex items-center gap-2 rounded-lg border pr-1.5 transition-colors"
-            >
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:bg-primary/5 flex items-center gap-2 rounded-l-lg py-2 pl-3 transition-colors"
-              >
-                <FolderOpen className="text-muted-foreground size-4 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{link.label}</p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {link.description}
-                  </p>
-                </div>
-                <ExternalLink className="text-muted-foreground group-hover:text-primary ml-1 size-3.5 shrink-0" />
-              </a>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7 shrink-0"
-                title="Launch this"
-                onClick={() =>
-                  setLaunchTarget({
-                    title: link.label,
-                    href: link.href,
-                    kind: "folder",
-                    sourceProvider: "google_drive",
-                  })
-                }
-              >
-                <Rocket className="size-3.5" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Dropzone */}
       <div
@@ -453,7 +445,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
                   ? () => setEditingAsset(asset)
                   : undefined
               }
-              onLaunch={() => setLaunchTarget(assetToLaunchTarget(asset))}
+              launchHref={assetLaunchHref(asset, brandId)}
             />
           ))}
         </div>
@@ -465,12 +457,6 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         onOpenChange={(open) => !open && setEditingAsset(null)}
         onSaved={() => void invalidate()}
       />
-
-      <LaunchMediaDrawer
-        brandId={brandId}
-        target={launchTarget}
-        onClose={() => setLaunchTarget(null)}
-      />
     </div>
   );
 }
@@ -479,12 +465,12 @@ function MediaCard({
   asset,
   onDelete,
   onEdit,
-  onLaunch,
+  launchHref,
 }: {
   asset: MediaAsset;
   onDelete: () => void;
   onEdit?: () => void;
-  onLaunch: () => void;
+  launchHref: string;
 }) {
   const isVideo = asset.kind === "video";
   const isExternal = asset.provider === "external";
@@ -561,19 +547,15 @@ function MediaCard({
         </Badge>
 
         <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button
+          <ButtonLink
             size="icon"
             variant="secondary"
             className="pointer-events-auto mr-auto size-7"
             title="Launch this"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onLaunch();
-            }}
+            href={launchHref}
           >
             <Rocket className="size-3.5" />
-          </Button>
+          </ButtonLink>
           {onEdit && (
             <Button
               size="icon"

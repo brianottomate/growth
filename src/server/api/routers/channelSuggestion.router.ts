@@ -13,6 +13,10 @@ import {
 import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
 import { discoverAndSaveSuggestions } from "@/server/services/social-discovery.service";
+import {
+  profileUrlForBrand,
+  scrapeAndSuggest,
+} from "@/server/services/peer-scrape.service";
 
 type Ctx = { db: typeof db; session: { user: { id: string } } };
 
@@ -73,6 +77,37 @@ export const channelSuggestionRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
       return discoverAndSaveSuggestions(input.brandId, { verify: true });
+    }),
+
+  /**
+   * On-demand Bright Data scrape of a brand's recent posts for one platform
+   * (≤30 days) into platform_post + pending content_suggestion rows. Idempotent:
+   * dedups by externalId, so re-runs only ingest new posts. Works for peer
+   * brands (the access check mirrors discover/accept).
+   */
+  scrapePosts: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        platform: z.enum(["instagram", "facebook", "linkedin", "x"]),
+        sinceDays: z.number().int().min(1).max(30).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      const profileUrl = await profileUrlForBrand(input.brandId, input.platform);
+      if (!profileUrl) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `No ${input.platform} page link on this brand — add the channel's page URL first.`,
+        });
+      }
+      return scrapeAndSuggest({
+        brandId: input.brandId,
+        platform: input.platform,
+        profileUrl,
+        sinceDays: input.sinceDays ?? 30,
+      });
     }),
 
   /** Accept a suggestion → create the channel + mark accepted. */

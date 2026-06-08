@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, max } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -11,14 +11,17 @@ import {
   channelSuggestionTable,
   channelTable,
   memberTable,
+  platformPostTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { BrandChannels, type ChannelLite } from "./BrandChannels";
 import { BrandAudiences } from "./BrandAudiences";
+import { BrandLinks } from "./BrandLinks";
 import { BrandActions } from "./BrandActions";
 import { NewBrandButton } from "./NewBrandButton";
 import { TrackedBrands, type TrackedLite } from "./TrackedBrands";
 import { SuggestedChannels, type SuggestionLite } from "./SuggestedChannels";
+import { PeerScrapeButton } from "./PeerScrapeButton";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
 const compactFmt = new Intl.NumberFormat("en-US", {
@@ -32,12 +35,16 @@ function BrandCard({
   tracked,
   suggestions,
   audienceCount,
+  postCount,
+  postCountByPlatform,
 }: {
   brand: typeof brandTable.$inferSelect;
   channels: ChannelLite[];
   tracked: TrackedLite[];
   suggestions: SuggestionLite[];
   audienceCount: number;
+  postCount: number;
+  postCountByPlatform: Record<string, number>;
 }) {
   const socialReach = channels
     .filter((c) => c.kind === "social")
@@ -49,6 +56,7 @@ function BrandCard({
     adCount > 0 && `${adCount} ad ${adCount === 1 ? "account" : "accounts"}`,
     audienceCount > 0 &&
       `${audienceCount} ${audienceCount === 1 ? "audience" : "audiences"}`,
+    postCount > 0 && `${compactFmt.format(postCount)} posts`,
   ].filter(Boolean) as string[];
 
   return (
@@ -95,7 +103,7 @@ function BrandCard({
             <p className="text-muted-foreground mt-1 text-sm">{brand.tagline}</p>
           )}
           {summary.length > 0 && (
-            <p className="text-muted-foreground/70 mt-1 text-xs">
+            <p className="text-muted-foreground mt-1 text-xs">
               {summary.join(" · ")}
             </p>
           )}
@@ -116,7 +124,10 @@ function BrandCard({
         brandId={brand.id}
         channels={channels}
         suggestions={suggestions}
+        postCountByPlatform={postCountByPlatform}
       />
+
+      <BrandLinks brandId={brand.id} links={brand.links ?? []} />
 
       <BrandAudiences brandId={brand.id} brandName={brand.name} />
 
@@ -135,12 +146,29 @@ function PeerBrandCard({
   channels,
   trackedByLabel,
   suggestions,
+  postCount,
+  lastScraped,
+  postCountByPlatform,
 }: {
   brand: typeof brandTable.$inferSelect;
   channels: ChannelLite[];
   trackedByLabel: string;
   suggestions: SuggestionLite[];
+  postCount: number;
+  lastScraped: string | null;
+  postCountByPlatform: Record<string, number>;
 }) {
+  const scrapeSummary =
+    postCount > 0
+      ? `${compactFmt.format(postCount)} scraped${
+          lastScraped
+            ? ` · last ${new Date(lastScraped).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })}`
+            : ""
+        }`
+      : null;
   return (
     <div className="bg-card rounded-2xl border p-5 shadow-sm">
       <div className="flex items-start gap-3.5">
@@ -170,22 +198,36 @@ function PeerBrandCard({
           {brand.tagline && (
             <p className="text-muted-foreground mt-1 text-sm">{brand.tagline}</p>
           )}
+          {scrapeSummary && (
+            <p className="text-muted-foreground mt-1 text-xs">{scrapeSummary}</p>
+          )}
         </div>
+        <PeerScrapeButton
+          brandId={brand.id}
+          channels={channels.map((c) => ({
+            platform: c.platform,
+            profileUrl: c.profileUrl,
+          }))}
+        />
       </div>
 
       {channels.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {channels.map((c) => (
+          {channels.map((c) => {
+            const posts = postCountByPlatform[c.platform] ?? 0;
+            return (
             <div key={c.id} className="flex items-center gap-2 rounded-lg border px-2 py-1.5">
               <ChannelLogo platform={c.platform} />
               <span className="flex flex-col leading-tight">
                 <span className="text-xs font-medium">{platformLabel(c.platform)}</span>
-                {(c.handle || c.followerCount != null) && (
+                {(c.handle || c.followerCount != null || posts > 0) && (
                   <span className="text-muted-foreground text-[11px]">
                     {c.handle}
                     {c.handle && c.followerCount != null && " · "}
                     {c.followerCount != null &&
                       `${new Intl.NumberFormat("en-US").format(c.followerCount)} followers`}
+                    {posts > 0 &&
+                      `${c.handle || c.followerCount != null ? " · " : ""}${posts} ${posts === 1 ? "post" : "posts"}`}
                   </span>
                 )}
               </span>
@@ -201,7 +243,8 @@ function PeerBrandCard({
                 </a>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -278,6 +321,47 @@ export default async function BrandsPage() {
     );
   }
 
+  // Saved platform_post rollup per brand × platform (excl. seed demo rows).
+  // Powers the brand-total summary AND the per-provider count on each channel
+  // chip. Owned cards read it as corpus size; peer cards as scrape feedback.
+  const postRollup = allBrandIds.length
+    ? await db
+        .select({
+          brandId: platformPostTable.brandId,
+          platform: platformPostTable.platform,
+          posts: count(),
+          lastScraped: max(platformPostTable.scrapedAt),
+        })
+        .from(platformPostTable)
+        .where(
+          and(
+            inArray(platformPostTable.brandId, allBrandIds),
+            eq(platformPostTable.isSeed, false),
+          ),
+        )
+        .groupBy(platformPostTable.brandId, platformPostTable.platform)
+    : [];
+  const postCountByBrand = new Map<string, number>();
+  const lastScrapedByBrand = new Map<string, Date>();
+  // Per-platform: `${brandId}:${platform}` → count.
+  const postCountByBrandPlatform = new Map<string, number>();
+  for (const r of postRollup) {
+    postCountByBrand.set(r.brandId, (postCountByBrand.get(r.brandId) ?? 0) + r.posts);
+    postCountByBrandPlatform.set(`${r.brandId}:${r.platform}`, r.posts);
+    if (r.lastScraped) {
+      const cur = lastScrapedByBrand.get(r.brandId);
+      if (!cur || r.lastScraped > cur) lastScrapedByBrand.set(r.brandId, r.lastScraped);
+    }
+  }
+  const postCountsForBrand = (brandId: string): Record<string, number> => {
+    const out: Record<string, number> = {};
+    const prefix = `${brandId}:`;
+    for (const [k, v] of postCountByBrandPlatform) {
+      if (k.startsWith(prefix)) out[k.slice(prefix.length)] = v;
+    }
+    return out;
+  };
+
   const trackedByOwner = new Map<string, TrackedLite[]>();
   // For each peer brand, which owned brands track it + with what purpose.
   const peerTrackedBy = new Map<string, string[]>();
@@ -332,6 +416,8 @@ export default async function BrandsPage() {
       tracked={trackedByOwner.get(brand.id) ?? []}
       suggestions={suggestionsFor(brand.id)}
       audienceCount={audienceCountByBrand.get(brand.id) ?? 0}
+      postCount={postCountByBrand.get(brand.id) ?? 0}
+      postCountByPlatform={postCountsForBrand(brand.id)}
     />
   );
 
@@ -387,6 +473,9 @@ export default async function BrandsPage() {
                 channels={channels.filter((c) => c.brandId === brand.id).map(toLite)}
                 trackedByLabel={(peerTrackedBy.get(brand.id) ?? []).join(" · ")}
                 suggestions={suggestionsFor(brand.id)}
+                postCount={postCountByBrand.get(brand.id) ?? 0}
+                lastScraped={lastScrapedByBrand.get(brand.id)?.toISOString() ?? null}
+                postCountByPlatform={postCountsForBrand(brand.id)}
               />
             ))}
           </div>

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 
@@ -143,18 +142,6 @@ export default function NewsletterCTA() {
           )}
 
           {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
-
-          <p className="mt-4 text-sm leading-6 text-gray-400">
-            We care about your data. Read our{" "}
-            <Link
-              href="/privacy"
-              target="_blank"
-              className="font-semibold text-white hover:text-gray-200"
-            >
-              privacy&nbsp;policy
-            </Link>
-            .
-          </p>
         </form>
       )}
 

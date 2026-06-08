@@ -185,7 +185,7 @@ export default async function NewslettersPage({
         })}
       </div>
 
-      <p className="text-muted-foreground/70 mt-3 text-xs">
+      <p className="text-muted-foreground mt-3 text-xs">
         Topics (General · Destinations · Location Recommendations) — coming soon,
         from Customer.io subscription topics.
       </p>
@@ -258,7 +258,7 @@ export default async function NewslettersPage({
                   <span className="text-muted-foreground w-16 shrink-0 text-right text-xs tabular-nums">
                     {openRate != null ? pct(s?.opened ?? 0, s?.delivered ?? 0) : "—"}
                   </span>
-                  <span className="text-muted-foreground/60 w-4 shrink-0 text-right text-xs">
+                  <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
                     ↗
                   </span>
                 </Link>

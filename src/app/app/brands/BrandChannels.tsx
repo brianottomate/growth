@@ -112,10 +112,12 @@ export function BrandChannels({
   brandId,
   channels,
   suggestions = [],
+  postCountByPlatform = {},
 }: {
   brandId: string;
   channels: ChannelLite[];
   suggestions?: SuggestionLite[];
+  postCountByPlatform?: Record<string, number>;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -276,7 +278,9 @@ export function BrandChannels({
               {label} · {group.length + groupSuggestions.length}
             </div>
             <div className="flex flex-wrap gap-2">
-              {group.map((c) => (
+              {group.map((c) => {
+                const posts = postCountByPlatform[c.platform] ?? 0;
+                return (
                 <div
                   key={c.id}
                   className="hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
@@ -290,12 +294,14 @@ export function BrandChannels({
                       <span className="text-xs font-medium">
                         {platformLabel(c.platform)}
                       </span>
-                      {(c.handle || c.followerCount != null) && (
+                      {(c.handle || c.followerCount != null || posts > 0) && (
                         <span className="text-muted-foreground text-[11px]">
                           {c.handle}
                           {c.handle && c.followerCount != null && " · "}
                           {c.followerCount != null &&
                             `${followerFmt.format(c.followerCount)} followers`}
+                          {posts > 0 &&
+                            `${c.handle || c.followerCount != null ? " · " : ""}${posts} ${posts === 1 ? "post" : "posts"}`}
                         </span>
                       )}
                     </span>
@@ -323,7 +329,8 @@ export function BrandChannels({
                     </a>
                   )}
                 </div>
-              ))}
+                );
+              })}
 
               {/* Pending suggestions render as dashed ghost chips alongside the
                   real channels in their group — accept/reject inline. */}

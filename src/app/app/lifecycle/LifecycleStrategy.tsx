@@ -190,7 +190,7 @@ export function LifecycleStrategy({
                     </p>
                   )}
                   {p.intendedTrigger && (
-                    <div className="text-muted-foreground/80 mt-1.5 text-[11px]">
+                    <div className="text-muted-foreground mt-1.5 text-[11px]">
                       ⚡ {p.intendedTrigger}
                     </div>
                   )}

@@ -142,7 +142,7 @@ export function AudienceStrategy({
                       {t.description}
                     </p>
                   )}
-                  <div className="text-muted-foreground/80 mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                  <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
                     {t.sizeGoalLabel && <span>goal {t.sizeGoalLabel}</span>}
                     {(t.intendedChannels ?? []).map((c) => {
                       const missing = t.missingChannels.includes(c);

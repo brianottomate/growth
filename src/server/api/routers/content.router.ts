@@ -34,6 +34,31 @@ async function orgContext(ctx: Ctx) {
   return { org, brands };
 }
 
+/**
+ * Ownership is org-scoped, not admin-gated: anyone in the org can (re)assign
+ * any piece, and `ownerId === self` is the self-assign path. This resolves the
+ * org behind a content_post / platform_post and asserts the caller is a member.
+ */
+async function assertOrgMember(ctx: Ctx, orgId: string | null | undefined) {
+  const membership = orgId
+    ? await ctx.db.query.memberTable.findFirst({
+        where: and(
+          eq(memberTable.userId, ctx.session.user.id),
+          eq(memberTable.organizationId, orgId),
+        ),
+      })
+    : null;
+  if (!orgId || !membership) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this content" });
+  }
+}
+
+/** The minimal person shape every assignment surface renders (avatar + name). */
+export type Member = { id: string; name: string | null; image: string | null };
+const toMember = (
+  u: { id: string; name: string | null; image: string | null } | null | undefined,
+): Member | null => (u ? { id: u.id, name: u.name, image: u.image } : null);
+
 const statusEnum = z.enum(contentStatusEnum.enumValues);
 
 export const contentRouter = createTRPCRouter({
@@ -57,13 +82,18 @@ export const contentRouter = createTRPCRouter({
       if (input.brandId) brandIds = brandIds.filter((id) => id === input.brandId);
       if (!brandIds.length) return [];
 
+      const memberCols = { id: true, name: true, image: true } as const;
       const posts = await ctx.db.query.contentPostTable.findMany({
         where: and(
           inArray(contentPostTable.brandId, brandIds),
           isNull(contentPostTable.deletedAt),
           input.pillar ? eq(contentPostTable.pillar, input.pillar) : undefined,
         ),
-        with: { platformPosts: true, series: true },
+        with: {
+          platformPosts: { with: { owner: { columns: memberCols } } },
+          series: true,
+          owner: { columns: memberCols },
+        },
         orderBy: [desc(contentPostTable.updatedAt)],
       });
       const brandName = new Map(brands.map((b) => [b.id, b.name]));
@@ -79,6 +109,15 @@ export const contentRouter = createTRPCRouter({
           },
           { likes: 0, views: 0 },
         );
+        // Distinct spot owners (the avatar-stack over the platform-icon row).
+        const spotOwners = [
+          ...new Map<string, Member>(
+            c.platformPosts
+              .map((p) => p.owner)
+              .filter((o): o is NonNullable<typeof o> => !!o)
+              .map((o) => [o.id, { id: o.id, name: o.name, image: o.image }]),
+          ).values(),
+        ];
         return {
           id: c.id,
           title: c.title,
@@ -94,6 +133,8 @@ export const contentRouter = createTRPCRouter({
           likes: totals.likes,
           views: totals.views,
           plannedAt: c.plannedAt ? c.plannedAt.toISOString() : null,
+          owner: toMember(c.owner),
+          spotOwners,
         };
       });
     }),
@@ -127,6 +168,62 @@ export const contentRouter = createTRPCRouter({
         .where(eq(contentPostTable.id, input.id));
 
       return { id: input.id, status: input.status };
+    }),
+
+  /** Org roster for the assignee picker — everyone who can own a piece/spot. */
+  assignableMembers: protectedProcedure.query(async ({ ctx }): Promise<Member[]> => {
+    const { org } = await orgContext(ctx);
+    if (!org) return [];
+    const members = await ctx.db.query.memberTable.findMany({
+      where: eq(memberTable.organizationId, org.id),
+      with: { user: { columns: { id: true, name: true, image: true } } },
+    });
+    return members
+      .map((m) => toMember(m.user))
+      .filter((m): m is Member => m !== null)
+      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  }),
+
+  /**
+   * Assign / clear the idea-level owner (DRI). `ownerId: null` disowns.
+   * Self-assign is just `ownerId === session.user.id`; no admin gate.
+   */
+  setOwner: protectedProcedure
+    .input(z.object({ contentPostId: z.string(), ownerId: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const content = await ctx.db.query.contentPostTable.findFirst({
+        where: eq(contentPostTable.id, input.contentPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, content.brand?.organizationId);
+
+      await ctx.db
+        .update(contentPostTable)
+        .set({ ownerId: input.ownerId })
+        .where(eq(contentPostTable.id, input.contentPostId));
+      return { id: input.contentPostId, ownerId: input.ownerId };
+    }),
+
+  /**
+   * Assign / clear a per-spot owner (`platform_post.ownerId`) — channel access
+   * differs per person, so a spot can be owned independently of the idea.
+   */
+  setSpotOwner: protectedProcedure
+    .input(z.object({ platformPostId: z.string(), ownerId: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+
+      await ctx.db
+        .update(platformPostTable)
+        .set({ ownerId: input.ownerId })
+        .where(eq(platformPostTable.id, input.platformPostId));
+      return { id: input.platformPostId, ownerId: input.ownerId };
     }),
 
   /**
@@ -338,5 +435,93 @@ export const contentRouter = createTRPCRouter({
         .where(eq(contentSuggestionTable.id, input.id));
 
       return { id: input.id, status: "accepted" as const, contentPostId: cp?.id };
+    }),
+
+  /**
+   * Manually group selected platform_posts into one content_post idea — the
+   * "send a Feed/Timeline selection to a grouping" path (human counterpart to
+   * the AI `groupingSuggestions` flow). `single` makes one idea whose members
+   * are renderings/amplifications; `series` makes a series + one idea per post.
+   */
+  createGrouping: protectedProcedure
+    .input(
+      z.object({
+        platformPostIds: z.array(z.string()).min(1),
+        title: z.string().trim().min(1).optional(),
+        unit: z.enum(["single", "series"]).default("single"),
+        theme: z.string().trim().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { org, brands } = await orgContext(ctx);
+      if (!org) throw new TRPCError({ code: "FORBIDDEN" });
+      const ownedIds = new Set(brands.map((b) => b.id));
+
+      const posts = await ctx.db.query.platformPostTable.findMany({
+        where: inArray(platformPostTable.id, input.platformPostIds),
+        columns: { id: true, brandId: true, text: true, publishedAt: true },
+      });
+      if (!posts.length) throw new TRPCError({ code: "NOT_FOUND" });
+      // The grouping must touch at least one brand the caller owns.
+      if (!posts.some((p) => ownedIds.has(p.brandId))) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      // Idea is per-brand; anchor it to an owned brand among the selection.
+      const brandId = posts.find((p) => ownedIds.has(p.brandId))!.brandId;
+
+      if (input.unit === "series") {
+        const dates = posts
+          .map((p) => p.publishedAt)
+          .filter((d): d is Date => !!d)
+          .sort((a, b) => a.getTime() - b.getTime());
+        const [series] = await ctx.db
+          .insert(seriesTable)
+          .values({
+            brandId,
+            name: input.title ?? "Series",
+            theme: input.theme,
+            status: "active",
+            startAt: dates[0],
+            endAt: dates[dates.length - 1],
+          })
+          .returning({ id: seriesTable.id });
+        for (const p of posts) {
+          const [cp] = await ctx.db
+            .insert(contentPostTable)
+            .values({
+              brandId,
+              title: p.text?.slice(0, 100).replace(/\s+/g, " ").trim() ?? null,
+              status: "draft",
+              origin: "human",
+              seriesId: series?.id,
+            })
+            .returning({ id: contentPostTable.id });
+          if (cp) {
+            await ctx.db
+              .update(platformPostTable)
+              .set({ contentPostId: cp.id })
+              .where(eq(platformPostTable.id, p.id));
+          }
+        }
+        return { seriesId: series?.id, count: posts.length };
+      }
+
+      const [cp] = await ctx.db
+        .insert(contentPostTable)
+        .values({
+          brandId,
+          title: input.title ?? "Grouped content",
+          status: "draft",
+          origin: "human",
+          metadata: input.theme ? { theme: input.theme } : undefined,
+        })
+        .returning({ id: contentPostTable.id });
+      if (cp) {
+        await ctx.db
+          .update(platformPostTable)
+          .set({ contentPostId: cp.id })
+          .where(inArray(platformPostTable.id, input.platformPostIds));
+      }
+      return { contentPostId: cp?.id, count: posts.length };
     }),
 });

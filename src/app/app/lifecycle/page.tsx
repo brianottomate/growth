@@ -159,7 +159,7 @@ export default async function LifecyclePage() {
                             {c.touchpoints.length === 1 ? "" : "s"}
                           </span>
                         )}
-                        <span className="text-muted-foreground/70">
+                        <span className="text-muted-foreground">
                           {c.externalKind === "transactional"
                             ? "transactional"
                             : "campaign"}{" "}

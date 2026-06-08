@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { BarChart3 } from "lucide-react";
 
 import { cn } from "@/components/ui";
 import { Heading } from "@wandercom/design-system-web/ui/heading";
@@ -29,7 +28,7 @@ const navigation = {
     },
   ],
   callsToAction: [],
-  simple: [{ name: "Blog", href: "/blog" }],
+  simple: [],
 };
 
 interface HeaderProps {
@@ -57,10 +56,7 @@ export default function Header({
       >
         {/* Logo Section */}
         <div className="flex lg:flex-1">
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="bg-surface-secondary border-secondary flex size-6 items-center justify-center rounded-md border">
-              <BarChart3 className="text-primary size-4" />
-            </div>
+          <Link href="/" className="flex items-center">
             <Heading variant="headline-sm" asChild className="text-xl">
               <span>Wander</span>
             </Heading>

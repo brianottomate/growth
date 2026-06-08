@@ -29,6 +29,36 @@ import { FORMAT_ARCHETYPES, TEMPLATE_STARTERS } from "@/server/content/formats";
 
 const MODEL = "claude-sonnet-4-6";
 
+export const momentSlotSchema = z.object({
+  title: z.string(),
+  dayOffset: z
+    .number()
+    .describe("days relative to launch day (0); negative = before"),
+  slotKind: z
+    .string()
+    .describe(
+      "'anchored' ONLY for hard date-pinned beats (teaser, announcement, recap). 'freeflow' for reactive/optional/amplification beats you'll slot opportunistically.",
+    ),
+  isThread: z.boolean().optional(),
+  spots: z
+    .array(
+      z.object({
+        platform: z.string().describe("x, instagram, linkedin, blog, newsletter, …"),
+        format: z.string().describe("concrete format id, e.g. x.thread, instagram.reel"),
+        archetype: z.string().describe(`one of: ${FORMAT_ARCHETYPES.join(", ")}`),
+        template: z.string().optional().describe(TEMPLATE_STARTERS.slice(0, 5).join(", ")),
+      }),
+    )
+    .describe("channel renderings for this slot (one piece, many channels)"),
+  rationale: z.string().optional(),
+});
+
+export const amplifierAskSchema = z.object({
+  name: z.string(),
+  type: z.string().describe("investor | press | partner | creator | team"),
+  why: z.string().optional(),
+});
+
 export const momentBlueprintSchema = z.object({
   verdict: z
     .string()
@@ -45,43 +75,20 @@ export const momentBlueprintSchema = z.object({
   seriesName: z.string().optional().describe("series name (only for scale=arc)"),
   theme: z.string().optional(),
   slots: z
-    .array(
-      z.object({
-        title: z.string(),
-        dayOffset: z
-          .number()
-          .describe("days relative to launch day (0); negative = before"),
-        slotKind: z
-          .string()
-          .describe(
-            "'anchored' ONLY for hard date-pinned beats (teaser, announcement, recap). 'freeflow' for reactive/optional/amplification beats you'll slot opportunistically.",
-          ),
-        isThread: z.boolean().optional(),
-        spots: z
-          .array(
-            z.object({
-              platform: z.string().describe("x, instagram, linkedin, blog, newsletter, …"),
-              format: z.string().describe("concrete format id, e.g. x.thread, instagram.reel"),
-              archetype: z.string().describe(`one of: ${FORMAT_ARCHETYPES.join(", ")}`),
-              template: z.string().optional().describe(TEMPLATE_STARTERS.slice(0, 5).join(", ")),
-            }),
-          )
-          .describe("channel renderings for this slot (one piece, many channels)"),
-        rationale: z.string().optional(),
-      }),
-    )
+    .array(momentSlotSchema)
     .describe("the launch arc as slots, ordered by dayOffset (empty if verdict=campaign)"),
   amplifierAsks: z
-    .array(
-      z.object({
-        name: z.string(),
-        type: z.string().describe("investor | press | partner | creator | team"),
-        why: z.string().optional(),
-      }),
-    )
+    .array(amplifierAskSchema)
     .describe("amplifiers to recruit (by role if no names; empty for small/campaign)"),
+  missing: z
+    .string()
+    .optional()
+    .describe(
+      "one or two sentences on what the plan does NOT cover — channels left unused, a cadence gap, beats you'd expect but didn't include. Honest self-critique, not a summary.",
+    ),
 });
 
+export type MomentSlot = z.infer<typeof momentSlotSchema>;
 export type MomentBlueprint = z.infer<typeof momentBlueprintSchema>;
 
 const SYSTEM = `You are a head of growth scoping a coordinated content MOMENT for a brand.
@@ -98,7 +105,16 @@ Then the SCALE:
 If reference images/brief are given, treat them as the HERO creative and plan its distribution around it.
 
 slotKind: "anchored" ONLY for hard date-pinned beats; "freeflow" for the reactive/optional/amplification beats. Don't mark everything anchored.
-Keep it tight and high-signal — never 30 slots.`;
+Keep it tight and high-signal — never 30 slots.
+Always fill in "missing": an honest note on what you did NOT cover (a channel left out, a cadence gap, a beat you'd expect).`;
+
+/** A pinned beat the operator wants reproduced verbatim during a refine. */
+export type RefineInput = {
+  keepSlots: MomentSlot[];
+  blanks?: number; // number of NEW empty beats the operator asked you to fill
+  drop?: string[]; // titles of beats the operator rejected — don't re-introduce
+  steer?: string;
+};
 
 export async function generateMomentBlueprint(opts: {
   brandName: string;
@@ -108,7 +124,28 @@ export async function generateMomentBlueprint(opts: {
   imageUrls?: string[];
   goal?: string;
   scaleHint?: "single" | "arc";
+  refine?: RefineInput;
 }): Promise<MomentBlueprint> {
+  const refine = opts.refine;
+  const refineSection = refine
+    ? [
+        `\nREFINE MODE — you are REVISING an existing plan, not starting fresh.`,
+        refine.keepSlots.length
+          ? `LOCKED beats — reproduce each EXACTLY (same title, dayOffset, slotKind, spots) and build the plan around them, keeping them in the final slots array:\n${JSON.stringify(refine.keepSlots, null, 2)}`
+          : `No beats are locked — you may re-propose the whole arc.`,
+        refine.blanks
+          ? `The operator added ${refine.blanks} BLANK beat(s) — invent ${refine.blanks} new, distinct beat(s) to fill them, coherent with the locked ones.`
+          : null,
+        refine.drop?.length
+          ? `The operator REJECTED these beats — do NOT re-introduce them or close variants:\n${refine.drop.map((t) => `- ${t}`).join("\n")}`
+          : null,
+        `Re-propose any non-locked beats as needed for a coherent arc. Do NOT drop or alter the locked beats.`,
+        refine.steer ? `Operator steer (follow this closely): ${refine.steer}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : null;
+
   const textParts = [
     `Brand: ${opts.brandName}${opts.brandTagline ? ` — ${opts.brandTagline}` : ""}`,
     opts.name ? `Moment name: "${opts.name}"` : null,
@@ -123,6 +160,7 @@ export async function generateMomentBlueprint(opts: {
       ? `(${opts.imageUrls.length} reference image(s) attached — use as the hero creative.)`
       : null,
     `Launch day = day 0.`,
+    refineSection,
   ]
     .filter(Boolean)
     .join("\n");

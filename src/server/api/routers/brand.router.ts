@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   type Brand,
+  BRAND_LINK_CATEGORIES,
   brandInspirationTable,
   brandTable,
   brandTypeEnum,
@@ -229,6 +230,15 @@ export const brandRouter = createTRPCRouter({
         description: z.string().trim().max(5000).optional(),
         website: z.string().trim().max(2000).optional(),
         logo: z.string().trim().max(2000).optional(),
+        links: z
+          .array(
+            z.object({
+              label: z.string().trim().min(1).max(200),
+              url: z.string().trim().max(2000).optional(),
+              category: z.enum(BRAND_LINK_CATEGORIES).optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -245,6 +255,7 @@ export const brandRouter = createTRPCRouter({
             website: normalizeWebsite(input.website),
           }),
           ...(input.logo !== undefined && { logo: input.logo || null }),
+          ...(input.links !== undefined && { links: input.links }),
         })
         .where(eq(brandTable.id, input.id))
         .returning();

@@ -7,30 +7,70 @@ import { useMutation } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/react";
 import { BlueprintReview, type Blueprint } from "./BlueprintReview";
 
+// yyyy-mm-dd in LOCAL time (what <input type="date"> expects).
+const toDateInput = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const DATE_PRESETS: { label: string; get: () => Date }[] = [
+  { label: "Today", get: () => new Date() },
+  {
+    label: "Tomorrow",
+    get: () => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d;
+    },
+  },
+  {
+    label: "Next week",
+    get: () => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      return d;
+    },
+  },
+  {
+    label: "Next month",
+    get: () => {
+      const d = new Date();
+      d.setMonth(d.getMonth() + 1);
+      return d;
+    },
+  },
+];
+
 export function LaunchClient({
   brands,
+  initial,
 }: {
   brands: { id: string; name: string }[];
+  initial?: {
+    brandId?: string;
+    name?: string;
+    prompt?: string;
+    imageUrls?: string[];
+  };
 }) {
   const trpc = useTRPC();
-  const [name, setName] = useState("");
-  const [brandId, setBrandId] = useState(brands[0]?.id ?? "");
+  // Seed from a deep-link (e.g. "Launch" from /media) when present.
+  const [name, setName] = useState(initial?.name ?? "");
+  const [brandId, setBrandId] = useState(initial?.brandId ?? brands[0]?.id ?? "");
   const [launchDate, setLaunchDate] = useState("");
   const [goal, setGoal] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [imageText, setImageText] = useState("");
+  const [prompt, setPrompt] = useState(initial?.prompt ?? "");
+  const [imageText, setImageText] = useState(initial?.imageUrls?.join(" ") ?? "");
 
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
-  const [removedSlots, setRemovedSlots] = useState<Set<number>>(new Set());
-  const [removedAmps, setRemovedAmps] = useState<Set<number>>(new Set());
+  // The committable edit reported by the remix builder (slots/amplifiers after
+  // pins/removes). Null until the builder reports — then mirrors the blueprint.
+  const [edited, setEdited] = useState<{
+    slots: Blueprint["slots"];
+    amplifierAsks: Blueprint["amplifierAsks"];
+  } | null>(null);
 
   const generate = useMutation(
     trpc.moment.generate.mutationOptions({
-      onSuccess: (bp) => {
-        setBlueprint(bp);
-        setRemovedSlots(new Set());
-        setRemovedAmps(new Set());
-      },
+      onSuccess: (bp) => setBlueprint(bp),
     }),
   );
   const commit = useMutation(trpc.moment.commit.mutationOptions());
@@ -40,29 +80,31 @@ export function LaunchClient({
     .map((s) => s.trim())
     .filter(Boolean);
 
+  // Shared input for both first-generate and refine/regenerate.
+  const baseGenInput = () => ({
+    brandId,
+    name: name.trim() || undefined,
+    prompt: prompt.trim() || undefined,
+    imageUrls: imageUrls.length ? imageUrls : undefined,
+    goal: goal.trim() || undefined,
+  });
+
   const canGenerate = brandId && (name.trim() || prompt.trim()) && !generate.isPending;
   const isCampaign = blueprint?.verdict === "campaign";
   const canCommit =
     blueprint && !isCampaign && name.trim() && launchDate && !commit.isPending;
 
-  const toggle = (set: Set<number>, i: number, fn: (s: Set<number>) => void) => {
-    const next = new Set(set);
-    if (next.has(i)) next.delete(i);
-    else next.add(i);
-    fn(next);
-  };
-
   const doCommit = () => {
     if (!blueprint) return;
+    const eff = edited ?? {
+      slots: blueprint.slots,
+      amplifierAsks: blueprint.amplifierAsks,
+    };
     commit.mutate({
       brandId,
       name: name.trim(),
       launchDateISO: new Date(launchDate).toISOString(),
-      blueprint: {
-        ...blueprint,
-        slots: blueprint.slots.filter((_, i) => !removedSlots.has(i)),
-        amplifierAsks: blueprint.amplifierAsks.filter((_, i) => !removedAmps.has(i)),
-      },
+      blueprint: { ...blueprint, slots: eff.slots, amplifierAsks: eff.amplifierAsks },
     });
   };
 
@@ -118,6 +160,27 @@ export function LaunchClient({
             />
           </label>
         </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-muted-foreground text-xs">Launch date:</span>
+          {DATE_PRESETS.map((p) => {
+            const value = toDateInput(p.get());
+            const active = launchDate === value;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => setLaunchDate(value)}
+                className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                  active
+                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
         <label className="block">
           <span className="text-muted-foreground text-xs">
             Prompt / brief (what’s happening, the assets, the ask)
@@ -144,15 +207,7 @@ export function LaunchClient({
         <div className="flex justify-end">
           <button
             disabled={!canGenerate}
-            onClick={() =>
-              generate.mutate({
-                brandId,
-                name: name.trim() || undefined,
-                prompt: prompt.trim() || undefined,
-                imageUrls: imageUrls.length ? imageUrls : undefined,
-                goal: goal.trim() || undefined,
-              })
-            }
+            onClick={() => generate.mutate(baseGenInput())}
             className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             {generate.isPending ? "Generating…" : "✨ Generate shape"}
@@ -183,10 +238,9 @@ export function LaunchClient({
         <div className="mt-6">
           <BlueprintReview
             blueprint={blueprint}
-            removedSlots={removedSlots}
-            removedAmps={removedAmps}
-            onToggleSlot={(i) => toggle(removedSlots, i, setRemovedSlots)}
-            onToggleAmp={(i) => toggle(removedAmps, i, setRemovedAmps)}
+            onEdited={setEdited}
+            onRegenerate={(refine) => generate.mutate({ ...baseGenInput(), refine })}
+            regenerating={generate.isPending}
           />
 
           <div className="mt-5 flex items-center gap-3">

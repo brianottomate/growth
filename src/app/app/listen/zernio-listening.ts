@@ -4,9 +4,11 @@ import { unstable_cache } from "next/cache";
 
 import {
   type AdCommentWithContext,
+  getZernioPostComments,
   listAllZernioAdComments,
   listZernioCommentedPosts,
   type ZernioCommentedPost,
+  type ZernioPostComment,
 } from "@/server/clients/zernio.client";
 
 /**
@@ -107,6 +109,95 @@ export const getRecentAdComments = unstable_cache(
     return { ...res, comments, recentCount: comments.length };
   },
   ["zernio-recent-ad-comments-v1"],
+  { revalidate: CACHE_TTL_SECONDS, tags: [ZERNIO_INBOX_CACHE_TAG] },
+);
+
+// ---- Organic comments, eager ------------------------------------------------
+// We pull every commented post's actual comments up front (not lazily on
+// expand) so the whole set can be triaged and given a needs-reply lens. Per-post
+// `getZernioPostComments` is the FAST path — do NOT swap it for the unscoped
+// `/inbox/comments` aggregation (the 90–127s timeout documented above).
+
+/** A single top-level organic comment with its post context + reply state. */
+export interface OrganicCommentItem {
+  comment: ZernioPostComment;
+  post: ZernioCommentedPost;
+  needsReply: boolean;
+}
+
+const COMMENT_FETCH_CONCURRENCY = 6;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        results[index] = await fn(items[index]!);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+function commentCreatedMs(c: ZernioPostComment): number {
+  const t = c.createdTime ? new Date(c.createdTime).getTime() : 0;
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/**
+ * Every recent organic comment across owned posts, flattened to one item per
+ * top-level non-owner comment, with `needsReply` derived from whether we've
+ * already replied (an owner reply nested under it). Sorted needs-reply first.
+ */
+export const getRecentOrganicComments = unstable_cache(
+  async (): Promise<{ comments: OrganicCommentItem[] }> => {
+    const { posts } = await getRecentCommentedPosts();
+    const drillable = posts.filter((p) => p.id && p.accountId);
+
+    const perPost = await mapWithConcurrency(
+      drillable,
+      COMMENT_FETCH_CONCURRENCY,
+      async (post) => {
+        try {
+          const { comments } = await getZernioPostComments(String(post.id), {
+            accountId: String(post.accountId),
+            limit: 50,
+          });
+          return { post, comments };
+        } catch (error) {
+          console.warn(`[listen] comments for post ${post.id} failed:`, error);
+          return { post, comments: [] as ZernioPostComment[] };
+        }
+      },
+    );
+
+    const items: OrganicCommentItem[] = [];
+    for (const { post, comments } of perPost) {
+      for (const comment of comments) {
+        if (comment.from?.isOwner) continue; // our own comment — context, not an item
+        const repliedByUs = (comment.replies ?? []).some(
+          (r) => r.from?.isOwner === true,
+        );
+        items.push({ comment, post, needsReply: !repliedByUs });
+      }
+    }
+
+    items.sort((a, b) => {
+      if (a.needsReply !== b.needsReply) return a.needsReply ? -1 : 1;
+      return commentCreatedMs(b.comment) - commentCreatedMs(a.comment);
+    });
+
+    return { comments: items };
+  },
+  ["zernio-organic-comments-v1"],
   { revalidate: CACHE_TTL_SECONDS, tags: [ZERNIO_INBOX_CACHE_TAG] },
 );
 

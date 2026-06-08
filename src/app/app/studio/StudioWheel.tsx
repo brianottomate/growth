@@ -237,7 +237,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
               {/* Paid lane */}
               <Lane label="Campaigns" color="#f59e0b" muted>
                 {(data?.initiatives ?? []).length === 0 ? (
-                  <span className="text-muted-foreground/60 absolute left-2 top-1/2 -translate-y-1/2 text-[11px]">
+                  <span className="text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 text-[11px]">
                     No campaigns this year
                   </span>
                 ) : (

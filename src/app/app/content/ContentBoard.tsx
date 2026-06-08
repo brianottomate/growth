@@ -19,11 +19,25 @@ import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleSelect } from "@/components/ui/select";
 import { cn } from "@/components/ui/lib/utils";
+import {
+  AssigneeButton,
+  AvatarStack,
+  OwnerAvatar,
+  useSelfAssignHotkey,
+  type Member,
+} from "@/components/assignment/assignee";
 import { PILLARS, PILLAR_BY_SLUG } from "@/lib/pillars";
 import type { ContentStatus } from "@/server/db/schema";
 import type { RouterOutputs } from "@/trpc/react";
 
 type Card = RouterOutputs["content"]["board"][number];
+
+// Threaded through the board to the cards so each can assign its idea owner.
+type Assign = {
+  members: Member[];
+  currentUserId: string;
+  onAssign: (cardId: string, ownerId: string | null) => void;
+};
 
 // Active editorial pipeline, left → right. `rejected` / `archived` are terminal
 // and intentionally off the board (they'd just be noise in the daily flow).
@@ -52,8 +66,10 @@ const fmt = (n: number) =>
 
 export function ContentBoard({
   brands,
+  currentUserId,
 }: {
   brands: { id: string; name: string; slug: string | null }[];
+  currentUserId: string;
 }) {
   const trpc = useTRPC();
   const qc = useQueryClient();
@@ -61,6 +77,7 @@ export function ContentBoard({
 
   const [brandFilter, setBrandFilter] = useState("all");
   const [pillarFilter, setPillarFilter] = useState("all");
+  const [mineOnly, setMineOnly] = useState(false);
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   // A real drag should not also "click" the card open afterwards.
   const suppressClick = useRef(false);
@@ -84,6 +101,9 @@ export function ContentBoard({
 
   const boardOptions = trpc.content.board.queryOptions(input);
   const { data: cards = [], isLoading } = useQuery(boardOptions);
+  const { data: members = [] } = useQuery(
+    trpc.content.assignableMembers.queryOptions(),
+  );
 
   const setStatus = useMutation(
     trpc.content.setStatus.mutationOptions({
@@ -103,12 +123,50 @@ export function ContentBoard({
     }),
   );
 
+  const setOwner = useMutation(
+    trpc.content.setOwner.mutationOptions({
+      onMutate: async ({ contentPostId, ownerId }) => {
+        const key = boardOptions.queryKey;
+        await qc.cancelQueries({ queryKey: key });
+        const prev = qc.getQueryData<Card[]>(key);
+        const owner = ownerId ? (members.find((m) => m.id === ownerId) ?? null) : null;
+        qc.setQueryData<Card[]>(key, (old) =>
+          old?.map((c) => (c.id === contentPostId ? { ...c, owner } : c)),
+        );
+        return { prev, key };
+      },
+      onError: (_e, _v, context) => {
+        if (context?.prev) qc.setQueryData(context.key, context.prev);
+      },
+      onSettled: () => qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
+    }),
+  );
+
+  const assign: Assign = {
+    members,
+    currentUserId,
+    onAssign: (cardId, ownerId) =>
+      setOwner.mutate({ contentPostId: cardId, ownerId }),
+  };
+
+  const visible = useMemo(
+    () =>
+      mineOnly
+        ? cards.filter(
+            (c) =>
+              c.owner?.id === currentUserId ||
+              c.spotOwners.some((o) => o.id === currentUserId),
+          )
+        : cards,
+    [cards, mineOnly, currentUserId],
+  );
+
   const byStatus = useMemo(() => {
     const m = new Map<string, Card[]>();
     for (const col of COLUMNS) m.set(col.status, []);
-    for (const c of cards) m.get(c.status)?.push(c);
+    for (const c of visible) m.get(c.status)?.push(c);
     return m;
-  }, [cards]);
+  }, [visible]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -143,11 +201,22 @@ export function ContentBoard({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Content</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {cards.length} {cards.length === 1 ? "idea" : "ideas"} · drag to move
-            through the pipeline
+            {visible.length} {visible.length === 1 ? "idea" : "ideas"} · drag to
+            move through the pipeline
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setMineOnly((v) => !v)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              mineOnly
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:bg-accent",
+            )}
+          >
+            Mine
+          </button>
           <SimpleSelect
             value={brandFilter}
             onValueChange={(v) => {
@@ -185,6 +254,7 @@ export function ContentBoard({
               cards={byStatus.get(col.status) ?? []}
               onOpen={openCard}
               loading={isLoading}
+              assign={assign}
             />
           ))}
         </div>
@@ -202,12 +272,14 @@ function Column({
   cards,
   onOpen,
   loading,
+  assign,
 }: {
   status: string;
   label: string;
   cards: Card[];
   onOpen: (id: string) => void;
   loading: boolean;
+  assign: Assign;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
@@ -227,10 +299,10 @@ function Column({
         )}
       >
         {cards.map((c) => (
-          <DraggableCard key={c.id} card={c} onOpen={onOpen} />
+          <DraggableCard key={c.id} card={c} onOpen={onOpen} assign={assign} />
         ))}
         {cards.length === 0 && (
-          <div className="text-muted-foreground/50 px-1 py-6 text-center text-xs">
+          <div className="text-muted-foreground px-1 py-6 text-center text-xs">
             {loading ? "Loading…" : "Nothing here"}
           </div>
         )}
@@ -242,27 +314,44 @@ function Column({
 function DraggableCard({
   card,
   onOpen,
+  assign,
 }: {
   card: Card;
   onOpen: (id: string) => void;
+  assign: Assign;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: card.id,
+  });
+  // Hover + Space self-toggles the idea owner (Trello-style).
+  const hover = useSelfAssignHotkey({
+    ownerId: card.owner?.id ?? null,
+    currentUserId: assign.currentUserId,
+    onChange: (ownerId) => assign.onAssign(card.id, ownerId),
   });
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      {...hover}
       onClick={() => onOpen(card.id)}
       className={cn("cursor-grab touch-none", isDragging && "opacity-40")}
     >
-      <ContentCardBody card={card} />
+      <ContentCardBody card={card} assign={assign} />
     </div>
   );
 }
 
-function ContentCardBody({ card, dragging }: { card: Card; dragging?: boolean }) {
+function ContentCardBody({
+  card,
+  dragging,
+  assign,
+}: {
+  card: Card;
+  dragging?: boolean;
+  assign?: Assign;
+}) {
   const pillar = card.pillar ? PILLAR_BY_SLUG[card.pillar] : null;
   const reach =
     card.views > 0
@@ -317,6 +406,9 @@ function ContentCardBody({ card, dragging }: { card: Card; dragging?: boolean })
       <div className="text-muted-foreground mt-2 flex items-center gap-2 text-[11px]">
         <span className="truncate">{card.brandName}</span>
         <span className="ml-auto flex items-center gap-1">
+          {card.spotOwners.length > 0 && (
+            <AvatarStack members={card.spotOwners} size="sm" />
+          )}
           {card.platforms.slice(0, 4).map((p) => (
             <span key={p} title={platformLabel(p)}>
               <ChannelLogo platform={p} className="size-3.5" />
@@ -325,14 +417,29 @@ function ContentCardBody({ card, dragging }: { card: Card; dragging?: boolean })
         </span>
       </div>
 
-      {(card.postCount > 0 || reach) && (
-        <div className="text-muted-foreground/70 mt-1.5 flex items-center gap-2 text-[11px] tabular-nums">
-          <span>
-            {card.postCount} post{card.postCount === 1 ? "" : "s"}
-          </span>
-          {reach && <span>· {reach}</span>}
+      <div className="mt-1.5 flex items-center gap-2">
+        {(card.postCount > 0 || reach) && (
+          <div className="text-muted-foreground flex items-center gap-2 text-[11px] tabular-nums">
+            <span>
+              {card.postCount} post{card.postCount === 1 ? "" : "s"}
+            </span>
+            {reach && <span>· {reach}</span>}
+          </div>
+        )}
+        <div className="ml-auto">
+          {assign ? (
+            <AssigneeButton
+              value={card.owner}
+              members={assign.members}
+              currentUserId={assign.currentUserId}
+              onChange={(ownerId) => assign.onAssign(card.id, ownerId)}
+              size="md"
+            />
+          ) : (
+            <OwnerAvatar member={card.owner} size="md" />
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

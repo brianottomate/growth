@@ -113,7 +113,7 @@ export default async function BlogArticlePage({
         </a>
       </div>
 
-      <p className="text-muted-foreground/70 mt-6 text-xs">
+      <p className="text-muted-foreground mt-6 text-xs">
         Full body + per-post analytics are surfaced via the links above for now;
         in-app rendering and stats can come later.
       </p>

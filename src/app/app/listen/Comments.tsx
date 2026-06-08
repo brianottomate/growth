@@ -1,7 +1,10 @@
 import { isZernioConfigured } from "@/server/clients/zernio.client";
 
-import { CommentPostList } from "./CommentPostList";
-import { getRecentCommentedPosts, LISTENING_WINDOW_DAYS } from "./zernio-listening";
+import { CommentList } from "./CommentList";
+import {
+  getRecentOrganicComments,
+  LISTENING_WINDOW_DAYS,
+} from "./zernio-listening";
 
 export async function Comments() {
   if (!isZernioConfigured) {
@@ -12,13 +15,13 @@ export async function Comments() {
     );
   }
 
-  let result: Awaited<ReturnType<typeof getRecentCommentedPosts>>;
+  let result: Awaited<ReturnType<typeof getRecentOrganicComments>>;
   try {
-    result = await getRecentCommentedPosts();
+    result = await getRecentOrganicComments();
   } catch (error) {
     return (
       <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-        <p className="font-semibold">Failed to fetch commented posts</p>
+        <p className="font-semibold">Failed to fetch comments</p>
         <p className="mt-1 font-mono text-xs">
           {error instanceof Error ? error.message : String(error)}
         </p>
@@ -26,14 +29,14 @@ export async function Comments() {
     );
   }
 
-  if (result.posts.length === 0) {
+  if (result.comments.length === 0) {
     return (
       <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-        No posts published in the last {LISTENING_WINDOW_DAYS} days have comments
+        No comments on posts published in the last {LISTENING_WINDOW_DAYS} days
         across connected accounts.
       </div>
     );
   }
 
-  return <CommentPostList posts={result.posts} />;
+  return <CommentList items={result.comments} />;
 }

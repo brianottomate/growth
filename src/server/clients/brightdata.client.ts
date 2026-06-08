@@ -88,11 +88,18 @@ function parseRecords(text: string): unknown[] {
 }
 
 /**
- * Run a registered scraper to completion and return its records. Handles the
- * sync (200 → data) and async (202 → snapshot poll) cases transparently.
+ * Run a registered scraper to completion and return its records.
+ *
+ * Uses the async `/trigger` endpoint (returns a snapshot_id we poll) for ALL
+ * datasets — the sync `/scrape` endpoint is unreliable here: it ECONNRESETs on
+ * slow profile crawls (IG) and rejects some datasets outright. `/trigger` is the
+ * robust path for both fast and slow datasets.
  *
  * `limitPerInput` caps records per input URL — the main cost lever for the
  * post crawlers (e.g. X can return 750+ tweets unbounded).
+ *
+ * Throws if EVERY returned record is a crawler error (e.g. a dataset that's
+ * down), so callers surface a real failure instead of silently ingesting zero.
  */
 export async function runScrape(
   key: ScraperKey,
@@ -112,18 +119,30 @@ export async function runScrape(
     ...(opts?.limitPerInput ? { limit_per_input: String(opts.limitPerInput) } : {}),
   });
 
-  const res = await fetch(`${BASE}/scrape?${qs.toString()}`, {
+  const res = await fetch(`${BASE}/trigger?${qs.toString()}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ input }),
+    body: JSON.stringify(input),
   });
   if (!res.ok) {
     throw new Error(`Bright Data ${key} ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
 
-  const records = parseRecords(await res.text());
-  const snapshotId = (records[0] as { snapshot_id?: string } | undefined)?.snapshot_id;
-  if (snapshotId) return pollSnapshot(snapshotId, token);
+  const trigger = (await res.json()) as { snapshot_id?: string };
+  if (!trigger.snapshot_id) {
+    throw new Error(`Bright Data ${key}: no snapshot_id from trigger`);
+  }
+  const records = await pollSnapshot(trigger.snapshot_id, token);
+
+  // A dataset that's down returns only error rows ({error, error_code}). Real
+  // runs can carry one leading error row + good rows — only throw if ALL fail.
+  if (
+    records.length > 0 &&
+    records.every((r) => !!(r as { error?: unknown })?.error)
+  ) {
+    const msg = (records[0] as { error?: string }).error ?? "unknown error";
+    throw new Error(`Bright Data ${key}: ${msg}`);
+  }
   return records;
 }
 

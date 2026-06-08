@@ -355,11 +355,11 @@ export function EnrichDrawer({
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">{f.label}:</span>
                           <span className="font-medium">{f.proposed ?? "—"}</span>
-                          <span className="text-muted-foreground/60 text-[10px]">
+                          <span className="text-muted-foreground text-[10px]">
                             {f.source} · {f.confidence}
                           </span>
                         </div>
-                        <div className="text-muted-foreground/70 text-[10px]">
+                        <div className="text-muted-foreground text-[10px]">
                           ours: {f.ours ?? "—"} · hs: {f.hubspot ?? "—"} · web:{" "}
                           {f.web ?? "—"} — {f.reasoning}
                         </div>

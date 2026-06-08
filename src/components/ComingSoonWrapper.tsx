@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Check, Lock } from "lucide-react";
-import Link from "next/link";
 
 import { useNewsletter } from "@/hooks/useNewsletter";
 import type { TopicKey } from "@/server/clients/resend.client";
@@ -181,18 +180,6 @@ export function ComingSoonWrapper({
           )}
 
           {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}
-
-          <p className="mt-4 text-sm leading-6 text-gray-400">
-            We care about your data. Read our{" "}
-            <Link
-              href="/privacy"
-              target="_blank"
-              className="font-semibold text-white hover:text-gray-200"
-            >
-              privacy&nbsp;policy
-            </Link>
-            .
-          </p>
         </form>
       )}
 

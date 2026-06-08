@@ -1,18 +1,80 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createContext, useContext, useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 
+import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleDialog } from "@/components/ui/dialog";
+import {
+  AssigneeButton,
+  useSelfAssignHotkey,
+  type Member,
+} from "@/components/assignment/assignee";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { useFullBleed } from "@/lib/use-full-bleed";
+
+/** Card media with a graceful fallback. Scraped IG/peer thumbnails live on
+ *  signed CDN URLs that EXPIRE, so an `<img>` that loaded once 404s later — on
+ *  error we drop to the text-forward / logo panel instead of a broken image.
+ *  (Durable fix = re-host scraped media to R2 at scrape time.) */
+function FeedMedia({
+  mediaUrl,
+  text,
+  platform,
+}: {
+  mediaUrl: string | null;
+  text: string | null;
+  platform: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (mediaUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={mediaUrl}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-full w-full object-cover"
+      />
+    );
+  }
+  return (
+    <div className="from-muted to-muted/30 flex h-full w-full items-center bg-gradient-to-br px-3 pb-2 pt-9">
+      {text ? (
+        <p className="text-foreground/80 line-clamp-4 text-[13px] font-medium leading-snug">
+          {text}
+        </p>
+      ) : (
+        <ChannelLogo platform={platform} className="m-auto size-8 opacity-30" />
+      )}
+    </div>
+  );
+}
+
+/** Detail-dialog media — hides itself if the (expiring) URL fails to load. */
+function DetailMedia({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      className="bg-muted max-h-[55vh] w-full rounded-lg object-contain"
+    />
+  );
+}
 
 export type FeedEntry = {
   id: string;
   brandId: string;
   brandName: string;
   brandLogo: string | null;
+  tracked?: boolean; // a competitor/inspiration brand we scrape, not our own
   platform: string;
   handle: string | null;
   contentPostId: string | null;
@@ -33,6 +95,7 @@ export type FeedEntry = {
   // RELATIONSHIP, not a format. `amplifiedFromUser` is the original author.
   externalKind: string | null;
   amplifiedFromUser: string | null;
+  owner: Member | null; // per-spot owner (feed cards are platform_posts)
 };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -183,8 +246,28 @@ function NowMarker({ now }: { now: number }) {
 // without threading a callback through every intermediate component.
 const SpotlightContext = createContext<(e: FeedEntry) => void>(() => undefined);
 
+// Same idea for assignment — the picker + self-toggle reach the cards without
+// prop-drilling through groups/days. `ownerOf` applies optimistic overrides.
+type AssignCtx = {
+  members: Member[];
+  currentUserId: string;
+  ownerOf: (e: FeedEntry) => Member | null;
+  assign: (platformPostId: string, ownerId: string | null) => void;
+} | null;
+const AssignContext = createContext<AssignCtx>(null);
+
 function FeedCard({ e }: { e: FeedEntry }) {
   const openSpotlight = useContext(SpotlightContext);
+  const assignCtx = useContext(AssignContext);
+  const owner = assignCtx ? assignCtx.ownerOf(e) : e.owner;
+  // Only our own posts are assignable — tracked/competitor posts aren't ours.
+  const assignable = assignCtx && !e.tracked;
+  const hover = useSelfAssignHotkey({
+    ownerId: owner?.id ?? null,
+    currentUserId: assignCtx?.currentUserId ?? "",
+    onChange: (ownerId) => assignCtx?.assign(e.id, ownerId),
+    enabled: !!assignable,
+  });
   const t = new Date(e.at);
   const pillar = e.pillar ? PILLAR_BY_SLUG[e.pillar] : null;
   const status = STATUS[e.status] ?? {
@@ -201,11 +284,14 @@ function FeedCard({ e }: { e: FeedEntry }) {
       tabIndex={0}
       onClick={() => openSpotlight(e)}
       onKeyDown={(ev) => {
-        if (ev.key === "Enter" || ev.key === " ") {
+        // Space is reserved for self-assign (see useSelfAssignHotkey); Enter
+        // opens the spotlight.
+        if (ev.key === "Enter") {
           ev.preventDefault();
           openSpotlight(e);
         }
       }}
+      {...hover}
       className={`bg-card hover:border-foreground/30 focus-visible:ring-ring flex w-64 flex-none cursor-pointer flex-col overflow-hidden rounded-xl border transition-colors focus:outline-none focus-visible:ring-2 ${
         e.published ? "opacity-90" : ""
       }`}
@@ -214,27 +300,7 @@ function FeedCard({ e }: { e: FeedEntry }) {
           (renderable) media, e.g. text-only updates, reshares, or media on a
           hotlink-blocked CDN. */}
       <div className="bg-muted relative h-36">
-        {e.mediaUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={e.mediaUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="from-muted to-muted/30 flex h-full w-full items-center bg-gradient-to-br px-3 pb-2 pt-9">
-            {e.text ? (
-              <p className="text-foreground/80 line-clamp-4 text-[13px] font-medium leading-snug">
-                {e.text}
-              </p>
-            ) : (
-              <ChannelLogo
-                platform={e.platform}
-                className="m-auto size-8 opacity-30"
-              />
-            )}
-          </div>
-        )}
+        <FeedMedia mediaUrl={e.mediaUrl} text={e.text} platform={e.platform} />
         <div className="absolute left-2 top-2 flex items-center gap-1">
           {e.brandLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -251,6 +317,14 @@ function FeedCard({ e }: { e: FeedEntry }) {
           <span className="rounded-md bg-black/30 p-1 backdrop-blur-sm">
             <ChannelLogo platform={e.platform} className="size-4" />
           </span>
+          {e.tracked && (
+            <span
+              title="Tracked brand — scraped, not ours"
+              className="rounded-md bg-amber-500/85 px-1.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm"
+            >
+              tracked
+            </span>
+          )}
           {amp && (
             <span
               title={
@@ -324,9 +398,18 @@ function FeedCard({ e }: { e: FeedEntry }) {
           )}
           <span className="flex-1" />
           {stat && <span className="tabular-nums">{stat}</span>}
+          {assignable && assignCtx && (
+            <AssigneeButton
+              value={owner}
+              members={assignCtx.members}
+              currentUserId={assignCtx.currentUserId}
+              onChange={(ownerId) => assignCtx.assign(e.id, ownerId)}
+              size="sm"
+            />
+          )}
         </div>
         {via && (
-          <div className="text-muted-foreground/70 text-[10px]">via {via}</div>
+          <div className="text-muted-foreground text-[10px]">via {via}</div>
         )}
       </div>
     </div>
@@ -363,7 +446,7 @@ function ContentGroupBox({ g }: { g: ContentGroup }) {
             {g.seriesName}
           </span>
         )}
-        <span className="text-muted-foreground/70 shrink-0">
+        <span className="text-muted-foreground shrink-0">
           {g.entries.length}{" "}
           {g.entries.length === 1 ? "platform" : "platforms"}
         </span>
@@ -380,21 +463,54 @@ function ContentGroupBox({ g }: { g: ContentGroup }) {
 export function FeedClient({
   entries,
   brands,
+  members,
+  currentUserId,
   nowISO,
 }: {
   entries: FeedEntry[];
   brands: { id: string; name: string }[];
+  members: Member[];
+  currentUserId: string;
   nowISO: string;
 }) {
   const now = new Date(nowISO).getTime();
   const todayKey = dayKey(new Date(nowISO));
+  const trpc = useTRPC();
+  const router = useRouter();
 
   const [brandFilter, setBrandFilter] = useState("all");
   const [channelFilter, setChannelFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "organic" | "paid">("all");
   const [view, setView] = useState<"grouped" | "all">("grouped");
+  const [mineOnly, setMineOnly] = useState(false);
   const [spot, setSpot] = useState<FeedEntry | null>(null);
   const { ref, style } = useFullBleed();
+
+  // Optimistic owner overrides keyed by platform_post id (server is the source
+  // of truth; router.refresh() reconciles after the mutation settles).
+  const [overrides, setOverrides] = useState<Record<string, Member | null>>({});
+  const setSpotOwner = useMutation(
+    trpc.content.setSpotOwner.mutationOptions({
+      onSettled: () => router.refresh(),
+    }),
+  );
+  const assignCtx = useMemo(
+    () => ({
+      members,
+      currentUserId,
+      ownerOf: (e: FeedEntry) => (e.id in overrides ? overrides[e.id]! : e.owner),
+      assign: (platformPostId: string, ownerId: string | null) => {
+        setOverrides((prev) => ({
+          ...prev,
+          [platformPostId]: ownerId
+            ? (members.find((m) => m.id === ownerId) ?? null)
+            : null,
+        }));
+        setSpotOwner.mutate({ platformPostId, ownerId });
+      },
+    }),
+    [members, currentUserId, overrides, setSpotOwner],
+  );
 
   const platforms = useMemo(
     () => [...new Set(entries.map((e) => e.platform))],
@@ -407,9 +523,10 @@ export function FeedClient({
         if (brandFilter !== "all" && e.brandId !== brandFilter) return false;
         if (channelFilter !== "all" && e.platform !== channelFilter) return false;
         if (typeFilter === "paid") return false; // no ad spots yet
+        if (mineOnly && assignCtx.ownerOf(e)?.id !== currentUserId) return false;
         return true;
       }),
-    [entries, brandFilter, channelFilter, typeFilter],
+    [entries, brandFilter, channelFilter, typeFilter, mineOnly, assignCtx, currentUserId],
   );
 
   // Group by day, newest day first; within a day, chronological (morning → evening).
@@ -434,6 +551,7 @@ export function FeedClient({
 
   return (
     <SpotlightContext.Provider value={setSpot}>
+    <AssignContext.Provider value={assignCtx}>
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Feed</h1>
       <p className="text-muted-foreground mt-1 text-sm">
@@ -478,6 +596,9 @@ export function FeedClient({
           </FilterPill>
         ))}
         <span className="flex-1" />
+        <FilterPill active={mineOnly} onClick={() => setMineOnly((v) => !v)}>
+          Mine
+        </FilterPill>
         <Segmented
           value={view}
           onChange={setView}
@@ -568,6 +689,7 @@ export function FeedClient({
       </div>
       <SpotlightDialog entry={spot} onClose={() => setSpot(null)} />
     </div>
+    </AssignContext.Provider>
     </SpotlightContext.Provider>
   );
 }
@@ -593,12 +715,7 @@ function SpotlightDialog({
       {entry && (
         <div className="flex flex-col gap-4">
           {entry.mediaUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={entry.mediaUrl}
-              alt=""
-              className="bg-muted max-h-[55vh] w-full rounded-lg object-contain"
-            />
+            <DetailMedia src={entry.mediaUrl} />
           )}
           <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
             <ChannelLogo platform={entry.platform} className="size-4" />

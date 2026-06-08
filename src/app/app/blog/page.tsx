@@ -195,7 +195,7 @@ export default async function BlogPage({
                       </span>
                     ))}
                   </span>
-                  <span className="text-muted-foreground/60 w-4 shrink-0 text-right text-xs">↗</span>
+                  <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">↗</span>
                 </Link>
               ))}
             </div>
