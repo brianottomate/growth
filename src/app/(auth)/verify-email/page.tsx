@@ -73,7 +73,7 @@ function VerifyEmailContent() {
       <div className="flex w-full max-w-sm flex-col gap-6">
         <div className="flex justify-center">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold">Native</span>
+            <span className="text-xl font-bold">Wander Growth</span>
           </Link>
         </div>
 

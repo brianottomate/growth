@@ -15,7 +15,7 @@ export default function SignInPage() {
       <div className="flex w-full max-w-sm flex-col gap-6 md:max-w-3xl">
         <div className="flex justify-center">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold">Native</span>
+            <span className="text-xl font-bold">Wander Growth</span>
           </Link>
         </div>
         <Suspense fallback={<div className="min-h-[400px]" />}>

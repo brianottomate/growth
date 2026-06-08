@@ -246,6 +246,7 @@ export const auth = betterAuth({
   trustedOrigins: [
     "http://localhost:3000",
     "https://kristianeboe-65.beta.localcan.dev",
+    "https://growth-red.vercel.app",
     // Add your production domains and ngrok/localcan.dev tunnels here when deploying
     // Example: "https://yourapp.com", "https://yourapp-staging.localcan.dev"
   ],

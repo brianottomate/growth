@@ -122,7 +122,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
             <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
               <Building2 className="size-4" />
             </div>
-            <span className="text-xl font-bold">Your App</span>
+            <span className="text-xl font-bold">Wander Growth</span>
           </Link>
         </div>
         <div className="flex flex-1 items-center justify-center">
