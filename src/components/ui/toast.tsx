@@ -4,17 +4,18 @@ import type { ToasterProps } from "sonner";
 import { Toaster as Sonner, toast } from "sonner";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  // Default to "light" theme to avoid dependency on ThemeProvider
-  // This allows Toaster to work in marketing/auth routes without ThemeProvider
+  // Feed Sonner the wandercom design-system tokens directly. These are real,
+  // theme-aware custom properties emitted by the tokens package (so the toast
+  // follows the active data-theme), unlike the shadcn `--popover`/`--border`
+  // aliases, which live in an `@theme inline` block and don't resolve at runtime.
   return (
     <Sonner
-      theme="light"
       className="toaster group"
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
+          "--normal-bg": "var(--color-surface-modal)",
+          "--normal-text": "var(--color-primary)",
+          "--normal-border": "var(--color-border-primary)",
         } as React.CSSProperties
       }
       {...props}

@@ -443,9 +443,12 @@ export const orgRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
       }
       const tempPassword = generateTempPassword();
-      // Trusted server path (no headers) → Better Auth skips the admin check,
-      // same as createPerson.
+      // Unlike createUser, the admin-plugin setUserPassword endpoint is guarded
+      // by a session middleware, so the "trusted server path (no headers)"
+      // trick throws FORBIDDEN. Forward the caller's headers — the caller must
+      // be a Better Auth admin (user.role === "admin").
       await ctx.authApi.setUserPassword({
+        headers: ctx.headers,
         body: { newPassword: tempPassword, userId: member.userId },
       });
       return { tempPassword };
