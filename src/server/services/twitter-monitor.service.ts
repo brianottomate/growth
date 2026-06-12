@@ -12,6 +12,7 @@ import {
   type DraftChannel,
   type ScoringChannel,
 } from "@/server/services/triage.service";
+import { X_WATCHLIST } from "@/lib/x-watchlist";
 
 const SCORING_SYSTEM_PROMPT = `You are a growth analyst at Wander, a vacation-rental company.
 
@@ -64,6 +65,7 @@ interface RawUser {
   id: string;
   name: string;
   username: string;
+  public_metrics?: { followers_count?: number };
 }
 
 interface RawSearchResponse {
@@ -83,6 +85,8 @@ export interface TweetSummary {
   likeCount: number;
   replyCount: number;
   retweetCount: number;
+  viewCount: number;
+  authorFollowers: number;
 }
 
 export interface ScoredTweet {
@@ -93,18 +97,12 @@ export interface ScoredTweet {
   rationale: string;
 }
 
-// Brand + STR pain phrases combined into one X recent-search query.
-// Keep this list aligned with the Reddit keyword filter.
-const SEARCH_QUERY = [
-  '"wander.com"',
-  '"WanderOS"',
-  '"Wander Sites"',
-  '"Wander Operated"',
-  '"fire my property manager"',
-  '"Airbnb alternative"',
-  '"direct booking site"',
-  '"OTA fees"',
-].join(" OR ");
+// Brand + STR pain phrases combined into one X recent-search query. The term
+// groups live in src/lib/x-watchlist.ts so the /app/listen X tab renders the
+// same watchlist that drives this scan.
+const SEARCH_QUERY = X_WATCHLIST.flatMap((g) => g.terms)
+  .map((t) => `"${t}"`)
+  .join(" OR ");
 
 const FULL_QUERY = `(${SEARCH_QUERY}) -is:retweet lang:en`;
 
@@ -122,7 +120,7 @@ export async function searchRecentTweets(): Promise<TweetSummary[]> {
     "created_at,public_metrics,author_id,lang",
   );
   url.searchParams.set("expansions", "author_id");
-  url.searchParams.set("user.fields", "username,name");
+  url.searchParams.set("user.fields", "username,name,public_metrics");
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${bearer}` },
@@ -153,6 +151,8 @@ export async function searchRecentTweets(): Promise<TweetSummary[]> {
       likeCount: t.public_metrics?.like_count ?? 0,
       replyCount: t.public_metrics?.reply_count ?? 0,
       retweetCount: t.public_metrics?.retweet_count ?? 0,
+      viewCount: t.public_metrics?.impression_count ?? 0,
+      authorFollowers: user?.public_metrics?.followers_count ?? 0,
     };
   });
 }
@@ -220,7 +220,7 @@ const DRAFT_CHANNEL: DraftChannel<DraftPill> = {
 };
 
 export async function draftTweetReplyForPost(input: {
-  tweet: TweetSummary;
+  tweet: Pick<TweetSummary, "authorUsername" | "text">;
   intentTag: IntentTag;
   rationale: string;
   pills?: DraftPill[];

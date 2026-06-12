@@ -2,13 +2,14 @@
 
 import { useState, type ReactNode } from "react";
 
-export type SignalTabId = "all" | "dms" | "comments" | "mentions";
+export type SignalTabId = "all" | "dms" | "comments" | "mentions" | "x";
 
 const TABS: { id: SignalTabId; label: string }[] = [
   { id: "all", label: "All" },
   { id: "dms", label: "DMs" },
   { id: "comments", label: "Comments" },
   { id: "mentions", label: "Mentions" },
+  { id: "x", label: "X" },
 ];
 
 export function SignalTabs({
@@ -19,8 +20,13 @@ export function SignalTabs({
   defaultTab: SignalTabId;
   // Each section is rendered once; shown when its tab is active (or on "All").
   // We toggle visibility (not mount) so triage results / expanded threads
-  // survive tab switches.
-  sections: { tab: Exclude<SignalTabId, "all">; node: ReactNode }[];
+  // survive tab switches. `exclusive` sections are full rooms of their own and
+  // stay out of the "All" overview.
+  sections: {
+    tab: Exclude<SignalTabId, "all">;
+    node: ReactNode;
+    exclusive?: boolean;
+  }[];
   // Cross-channel overview shown only on the "All" tab, above the sections.
   overview?: ReactNode;
 }) {
@@ -48,7 +54,14 @@ export function SignalTabs({
       <div className="space-y-10">
         {overview ? <div hidden={active !== "all"}>{overview}</div> : null}
         {sections.map((s, i) => (
-          <div key={i} hidden={active !== "all" && active !== s.tab}>
+          <div
+            key={i}
+            hidden={
+              s.exclusive
+                ? active !== s.tab
+                : active !== "all" && active !== s.tab
+            }
+          >
             {s.node}
           </div>
         ))}

@@ -5,7 +5,7 @@ import { isZernioConfigured } from "@/server/clients/zernio.client";
 import { AdComments } from "../listen/AdComments";
 import { Comments } from "../listen/Comments";
 import { RedditScanWidget } from "../listen/RedditScanWidget";
-import { TwitterScanWidget } from "../listen/TwitterScanWidget";
+import { XListening } from "../listen/XListening";
 import { conversationReplyUrl } from "./conversation-url";
 import { getRecentConversationsWithThreads } from "./inbox-data";
 import { InboxClient } from "./InboxClient";
@@ -26,7 +26,11 @@ export function SignalHub({
   title: string;
   subtitle: string;
 }) {
-  const sections: { tab: Exclude<SignalTabId, "all">; node: ReactNode }[] = [
+  const sections: {
+    tab: Exclude<SignalTabId, "all">;
+    node: ReactNode;
+    exclusive?: boolean;
+  }[] = [
     {
       tab: "dms",
       node: (
@@ -78,15 +82,11 @@ export function SignalHub({
       ),
     },
     {
-      tab: "mentions",
-      node: (
-        <Section
-          title="X / Twitter"
-          blurb="On-demand AI scan of brand + STR pain phrases from the last 7 days, scored for intent."
-        >
-          <TwitterScanWidget />
-        </Section>
-      ),
+      // X gets its own room — watchlist-driven scan, term highlighting,
+      // velocity, and the 270-char composer. Kept out of the "All" overview.
+      tab: "x",
+      exclusive: true,
+      node: <XListening />,
     },
     {
       tab: "mentions",
