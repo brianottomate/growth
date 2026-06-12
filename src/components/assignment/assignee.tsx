@@ -225,6 +225,90 @@ export function AssigneeButton({
 }
 
 /**
+ * Multi-select assignees — an avatar stack that opens a member list where each
+ * row toggles membership (the popover stays open so you can pick several).
+ * `value` is the current set; `onChange` gets the full new list of ids.
+ */
+export function MultiAssigneeButton({
+  value,
+  members,
+  currentUserId,
+  onChange,
+  size = "sm",
+}: {
+  value: Member[];
+  members: Member[];
+  currentUserId: string;
+  onChange: (userIds: string[]) => void;
+  size?: Size;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = new Set(value.map((m) => m.id));
+  const ordered = [...members].sort((a, b) =>
+    a.id === currentUserId ? -1 : b.id === currentUserId ? 1 : 0,
+  );
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    onChange([...next]);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        aria-label="Assignees"
+        className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {value.length ? (
+          <AvatarStack members={value} size={size} />
+        ) : (
+          <OwnerAvatar member={null} size={size} />
+        )}
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-56 p-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Command>
+          <CommandInput placeholder="Assign people…" />
+          <CommandList>
+            <CommandEmpty>No people found.</CommandEmpty>
+            <CommandGroup>
+              {ordered.map((m) => (
+                <CommandItem
+                  key={m.id}
+                  value={`${m.name ?? ""} ${m.id}`}
+                  onSelect={() => toggle(m.id)}
+                  className="gap-2"
+                >
+                  <OwnerAvatar member={m} size="sm" />
+                  <span className="truncate">{m.name ?? "Unknown"}</span>
+                  {m.id === currentUserId && (
+                    <span className="text-muted-foreground ml-auto text-xs">you</span>
+                  )}
+                  {selected.has(m.id) && (
+                    <span
+                      className={cn(
+                        "text-foreground text-xs",
+                        m.id === currentUserId ? "" : "ml-auto",
+                      )}
+                    >
+                      ✓
+                    </span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
  * Trello-style self-assign: while the host is hovered, Space toggles the
  * current user as owner (own ⇄ disown). Returns hover handlers to spread on the
  * card/row root. Ignores Space typed into inputs or with modifier keys.

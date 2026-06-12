@@ -1,10 +1,12 @@
 import { z } from "zod";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   brandTable,
+  contentAssigneeTable,
+  contentCommentTable,
   contentPostTable,
   contentStatusEnum,
   contentSuggestionTable,
@@ -93,6 +95,7 @@ export const contentRouter = createTRPCRouter({
           platformPosts: { with: { owner: { columns: memberCols } } },
           series: true,
           owner: { columns: memberCols },
+          assignees: { with: { user: { columns: memberCols } } },
         },
         orderBy: [desc(contentPostTable.updatedAt)],
       });
@@ -134,6 +137,9 @@ export const contentRouter = createTRPCRouter({
           views: totals.views,
           plannedAt: c.plannedAt ? c.plannedAt.toISOString() : null,
           owner: toMember(c.owner),
+          assignees: c.assignees
+            .map((a) => toMember(a.user))
+            .filter((m): m is Member => m !== null),
           spotOwners,
         };
       });
@@ -203,6 +209,32 @@ export const contentRouter = createTRPCRouter({
         .set({ ownerId: input.ownerId })
         .where(eq(contentPostTable.id, input.contentPostId));
       return { id: input.contentPostId, ownerId: input.ownerId };
+    }),
+
+  /**
+   * Replace the set of collaborators on an idea (beyond the lead `ownerId`).
+   * Designer + copywriter + approver, etc. Idempotent: pass the full list.
+   */
+  setAssignees: protectedProcedure
+    .input(z.object({ contentPostId: z.string(), userIds: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      const content = await ctx.db.query.contentPostTable.findFirst({
+        where: eq(contentPostTable.id, input.contentPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, content.brand?.organizationId);
+
+      const ids = [...new Set(input.userIds)];
+      await ctx.db
+        .delete(contentAssigneeTable)
+        .where(eq(contentAssigneeTable.contentPostId, input.contentPostId));
+      if (ids.length) {
+        await ctx.db.insert(contentAssigneeTable).values(
+          ids.map((userId) => ({ contentPostId: input.contentPostId, userId })),
+        );
+      }
+      return { id: input.contentPostId, userIds: ids };
     }),
 
   /**
@@ -523,5 +555,62 @@ export const contentRouter = createTRPCRouter({
           .where(inArray(platformPostTable.id, input.platformPostIds));
       }
       return { contentPostId: cp?.id, count: posts.length };
+    }),
+
+  // ---- Comments (light per-idea discussion) ----------------------------
+  comments: protectedProcedure
+    .input(z.object({ contentPostId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db.query.contentCommentTable.findMany({
+        where: and(
+          eq(contentCommentTable.contentPostId, input.contentPostId),
+          isNull(contentCommentTable.deletedAt),
+        ),
+        with: { author: { columns: { id: true, name: true, image: true } } },
+        orderBy: [asc(contentCommentTable.createdAt)],
+      });
+      return rows.map((r) => ({
+        id: r.id,
+        body: r.body,
+        createdAt: r.createdAt.toISOString(),
+        authorId: r.authorId,
+        author: toMember(r.author),
+      }));
+    }),
+
+  addComment: protectedProcedure
+    .input(z.object({ contentPostId: z.string(), body: z.string().trim().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const content = await ctx.db.query.contentPostTable.findFirst({
+        where: eq(contentPostTable.id, input.contentPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, content.brand?.organizationId);
+      const [row] = await ctx.db
+        .insert(contentCommentTable)
+        .values({
+          contentPostId: input.contentPostId,
+          authorId: ctx.session.user.id,
+          body: input.body,
+        })
+        .returning({ id: contentCommentTable.id });
+      return { id: row?.id };
+    }),
+
+  deleteComment: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const c = await ctx.db.query.contentCommentTable.findFirst({
+        where: eq(contentCommentTable.id, input.id),
+      });
+      if (!c) throw new TRPCError({ code: "NOT_FOUND" });
+      if (c.authorId !== ctx.session.user.id)
+        throw new TRPCError({ code: "FORBIDDEN", message: "Not your comment" });
+      await ctx.db
+        .update(contentCommentTable)
+        .set({ deletedAt: new Date() })
+        .where(eq(contentCommentTable.id, input.id));
+      return { id: input.id };
     }),
 });

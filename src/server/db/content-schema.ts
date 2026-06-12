@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { index, pgEnum, pgTable } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, primaryKey } from "drizzle-orm/pg-core";
 
 import { initiativeTable } from "./ads-schema";
 import { userTable } from "./auth-schema";
@@ -305,6 +305,75 @@ export const contentPostTable = pgTable(
 export type ContentPost = typeof contentPostTable.$inferSelect;
 export type ContentPostInsert = typeof contentPostTable.$inferInsert;
 
+// ---- CONTENT ASSIGNEES (collaborators beyond the lead owner) -------
+//
+// `content_post.ownerId` stays the lead / DRI (single). This join adds the
+// other responsible people (designer + copywriter + approver, …) without
+// disturbing the single-owner reads on the Feed/Calendar/board.
+export const contentAssigneeTable = pgTable(
+  "content_assignee",
+  (t) => ({
+    contentPostId: t
+      .text()
+      .references(() => contentPostTable.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: t
+      .text()
+      .references(() => userTable.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    primaryKey({ columns: [table.contentPostId, table.userId] }),
+    index("content_assignee_user_idx").on(table.userId),
+  ],
+);
+export type ContentAssignee = typeof contentAssigneeTable.$inferSelect;
+
+// ---- CONTENT COMMENT (light per-idea / per-spot discussion) ---------
+//
+// Exactly one of contentPostId / platformPostId is set (app-enforced): a
+// comment hangs off an idea OR a specific channel spot. v1 wires content_post;
+// platformPostId is present so per-spot threads can light up later.
+export const contentCommentTable = pgTable(
+  "content_comment",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("cmt")),
+    contentPostId: t
+      .text()
+      .references(() => contentPostTable.id, { onDelete: "cascade" }),
+    platformPostId: t
+      .text()
+      .references((): AnyPgColumn => platformPostTable.id, { onDelete: "cascade" }),
+    authorId: t
+      .text()
+      .references(() => userTable.id)
+      .notNull(),
+    body: t.text().notNull(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: t.timestamp(),
+  }),
+  (table) => [
+    index("content_comment_content_idx").on(table.contentPostId),
+    index("content_comment_platform_idx").on(table.platformPostId),
+  ],
+);
+export type ContentComment = typeof contentCommentTable.$inferSelect;
+
 // ---- PLATFORM POST (the per-channel rendering / "platform spot") ----
 
 /**
@@ -599,6 +668,40 @@ export const contentPostRelations = relations(
       relationName: "content_post_creator",
     }),
     platformPosts: many(platformPostTable),
+    assignees: many(contentAssigneeTable),
+    comments: many(contentCommentTable),
+  }),
+);
+
+export const contentCommentRelations = relations(
+  contentCommentTable,
+  ({ one }) => ({
+    contentPost: one(contentPostTable, {
+      fields: [contentCommentTable.contentPostId],
+      references: [contentPostTable.id],
+    }),
+    platformPost: one(platformPostTable, {
+      fields: [contentCommentTable.platformPostId],
+      references: [platformPostTable.id],
+    }),
+    author: one(userTable, {
+      fields: [contentCommentTable.authorId],
+      references: [userTable.id],
+    }),
+  }),
+);
+
+export const contentAssigneeRelations = relations(
+  contentAssigneeTable,
+  ({ one }) => ({
+    contentPost: one(contentPostTable, {
+      fields: [contentAssigneeTable.contentPostId],
+      references: [contentPostTable.id],
+    }),
+    user: one(userTable, {
+      fields: [contentAssigneeTable.userId],
+      references: [userTable.id],
+    }),
   }),
 );
 

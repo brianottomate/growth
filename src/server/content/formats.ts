@@ -53,6 +53,14 @@ export const TEMPLATE_STARTERS = [
   "testimonial",
   "how_to",
   "data_viz",
+  // From the team's calendar vocabulary (best-of-both; iterate as ours wins).
+  "pov", // "POV: your group chat finally agreed…"
+  "talking_head", // host-to-camera guide
+  "comparison", // "Wander vs hotel" split
+  "road_trip", // route/drive narrative
+  "guest_story", // post-stay customer story
+  "destination_guide", // "48 hours in…", local edits
+  "founder_pov", // origin / why-we-built-this
 ] as const;
 export type TemplateStarter = (typeof TEMPLATE_STARTERS)[number];
 
@@ -116,6 +124,10 @@ export const PLATFORM_FORMATS: PlatformFormat[] = [
   // Threads
   { id: "threads.post", platform: "threads", archetype: "text", label: "Post", media: { kinds: ["image", "video"] }, text: { max: 500 } },
   { id: "threads.thread", platform: "threads", archetype: "thread", label: "Thread", sequence: true, media: { kinds: ["image", "video"] }, text: { max: 500 } },
+
+  // Pinterest (heavy in the content calendar — pins + idea pins + boards)
+  { id: "pinterest.pin", platform: "pinterest", archetype: "image", label: "Pin", surface: "feed", media: { kinds: ["image"], min: 1, max: 1, aspectRatios: ["2:3"] } },
+  { id: "pinterest.idea_pin", platform: "pinterest", archetype: "carousel", label: "Idea Pin", media: { kinds: ["image", "video"], min: 1, max: 20, aspectRatios: ["9:16"] } },
 
   // Owned surfaces
   { id: "newsletter.broadcast", platform: "newsletter", archetype: "article", label: "Newsletter Issue", media: { kinds: ["image"] } },

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pin, Plus, RotateCw, Undo2, X } from "lucide-react";
 
 import { ChannelLogo } from "@/components/channel-logos";
+import { cn } from "@/components/ui/lib/utils";
 import { type RouterOutputs } from "@/trpc/react";
 
 export type Blueprint = RouterOutputs["moment"]["generate"];
@@ -30,6 +31,102 @@ type WorkingSlot =
   | { id: number; kind: "real"; slot: Slot; pinned: boolean; removed: boolean }
   | { id: number; kind: "blank" };
 
+/** A slot rendered as a calendar chip — kind tag + platform spots + title. */
+function BlueprintSlotChip({ slot }: { slot: Slot }) {
+  const platforms = [...new Set(slot.spots.map((s) => s.platform))];
+  return (
+    <div className="bg-card rounded-md border p-1.5">
+      <div className="mb-1 flex items-center gap-1">
+        <span
+          className={cn(
+            "rounded px-1 py-0.5 text-[9px] font-medium",
+            KIND_CLS[slot.slotKind ?? ""] ?? "bg-muted text-muted-foreground",
+          )}
+        >
+          {slot.slotKind}
+        </span>
+        <span className="ml-auto flex gap-0.5">
+          {platforms.slice(0, 4).map((p) => (
+            <ChannelLogo key={p} platform={p} className="size-3" />
+          ))}
+        </span>
+      </div>
+      <p className="line-clamp-2 text-[11px] leading-tight">{slot.title}</p>
+    </div>
+  );
+}
+
+/** Calendar view of the proposed slots — one column per day across the arc,
+ *  placed on launchDate + dayOffset (launch day highlighted). Read-only; the
+ *  list view is where you pin/blank/remove. */
+function BlueprintCalendar({
+  slots,
+  launchDate,
+}: {
+  slots: Slot[];
+  launchDate: string;
+}) {
+  const base = launchDate ? new Date(`${launchDate}T00:00:00`) : new Date();
+  const offsets = slots.map((s) => s.dayOffset);
+  const min = Math.min(0, ...offsets);
+  const max = Math.max(0, ...offsets);
+  const byOffset = new Map<number, Slot[]>();
+  for (const s of slots)
+    (byOffset.get(s.dayOffset) ?? byOffset.set(s.dayOffset, []).get(s.dayOffset)!).push(s);
+  const dateOf = (o: number) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + o);
+    return d;
+  };
+  const cols: number[] = [];
+  for (let o = min; o <= max; o++) cols.push(o);
+  return (
+    <div className="mt-3 overflow-x-auto pb-1">
+      <div className="flex min-w-max gap-2">
+        {cols.map((o) => {
+          const d = dateOf(o);
+          const isLaunch = o === 0;
+          const here = byOffset.get(o) ?? [];
+          return (
+            <div
+              key={o}
+              className={cn(
+                "w-40 shrink-0 rounded-lg border p-2",
+                isLaunch ? "border-emerald-500/40 bg-emerald-500/5" : "border-border",
+              )}
+            >
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <span className="text-xs font-medium">
+                  {d.toLocaleDateString([], {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+                <span
+                  className={cn(
+                    "text-[10px]",
+                    isLaunch ? "font-medium text-emerald-400" : "text-muted-foreground",
+                  )}
+                >
+                  {isLaunch ? "launch" : rel(o)}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {here.length === 0 ? (
+                  <span className="text-muted-foreground/40 text-[11px]">—</span>
+                ) : (
+                  here.map((s, i) => <BlueprintSlotChip key={i} slot={s} />)
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Remix slot-builder — the shared review surface for /launch and the media
  * launch drawer. Pin the beats you're sure of, blank the ones you want
@@ -39,15 +136,18 @@ type WorkingSlot =
  */
 export function BlueprintReview({
   blueprint,
+  launchDate,
   onEdited,
   onRegenerate,
   regenerating,
 }: {
   blueprint: Blueprint;
+  launchDate: string;
   onEdited: (edited: { slots: Slot[]; amplifierAsks: AmplifierAsk[] }) => void;
   onRegenerate: (payload: RefinePayload) => void;
   regenerating: boolean;
 }) {
+  const [view, setView] = useState<"list" | "calendar">("list");
   const idRef = useRef(0);
   const nextId = () => (idRef.current += 1);
 
@@ -116,12 +216,28 @@ export function BlueprintReview({
 
   return (
     <div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold">Proposed shape</h2>
         <span className="text-muted-foreground text-xs">
           {blueprint.scale} · {effectiveSlots.length} slots · {effectiveAmps.length}{" "}
           amplifiers · not saved yet
         </span>
+        <div className="border-border ml-auto flex overflow-hidden rounded-full border">
+          {(["list", "calendar"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={cn(
+                "px-2.5 py-0.5 text-xs font-medium capitalize transition-colors",
+                view === v
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:bg-accent",
+              )}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </div>
       {blueprint.verdictReason && (
         <p className="text-muted-foreground mt-0.5 text-xs">{blueprint.verdictReason}</p>
@@ -134,12 +250,14 @@ export function BlueprintReview({
         </p>
       )}
 
-      <p className="text-muted-foreground mt-3 text-[11px]">
-        📌 Pin the beats you&apos;re sure of, add blanks for new beats, then
-        regenerate — pinned beats stay put, the rest gets re-proposed.
-      </p>
+      {view === "list" ? (
+        <>
+          <p className="text-muted-foreground mt-3 text-[11px]">
+            📌 Pin the beats you&apos;re sure of, add blanks for new beats, then
+            regenerate — pinned beats stay put, the rest gets re-proposed.
+          </p>
 
-      <div className="mt-2">
+          <div className="mt-2">
         {slots.map((s) =>
           s.kind === "blank" ? (
             <div
@@ -169,7 +287,11 @@ export function BlueprintReview({
             />
           ),
         )}
-      </div>
+          </div>
+        </>
+      ) : (
+        <BlueprintCalendar slots={effectiveSlots} launchDate={launchDate} />
+      )}
 
       {/* Remix controls */}
       <div className="mt-3 space-y-2">

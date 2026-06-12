@@ -5,12 +5,18 @@ import { db } from "@/server/db";
 import {
   brandInspirationTable,
   brandTable,
+  contentSuggestionTable,
   memberTable,
   platformPostTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { displayPoster } from "@/lib/utils/media";
-import { V5Client, type V5Brand, type V5Entry } from "./V5Client";
+import {
+  V5Client,
+  type V5Brand,
+  type V5Entry,
+  type V5Suggestion,
+} from "./V5Client";
 
 /**
  * Feed v5 — the swimlane Timeline. The "absorb / compare" surface: every owned
@@ -83,6 +89,36 @@ export default async function FeedV5Page() {
       })
     : [];
 
+  // Pending AI grouping proposals for owned brands — surfaced as dashed
+  // "Inferred" trays on the timeline (the in-context alternative to /grouping).
+  const suggestionRows = ownedIds.length
+    ? await db.query.contentSuggestionTable.findMany({
+        where: and(
+          eq(contentSuggestionTable.kind, "grouping"),
+          eq(contentSuggestionTable.status, "pending"),
+          inArray(contentSuggestionTable.brandId, ownedIds),
+        ),
+      })
+    : [];
+  type Proposed = {
+    unit?: string;
+    title?: string;
+    groupKind?: string;
+    memberPostIds?: string[];
+  };
+  const suggestions: V5Suggestion[] = suggestionRows
+    .map((s) => {
+      const p = (s.proposed ?? {}) as Proposed;
+      return {
+        id: s.id,
+        title: p.title ?? "Grouping",
+        groupKind: p.groupKind ?? "group",
+        unit: p.unit === "series" ? ("series" as const) : ("single" as const),
+        memberIds: p.memberPostIds ?? [],
+      };
+    })
+    .filter((s) => s.memberIds.length > 1);
+
   const entries: V5Entry[] = posts.map((p) => {
     const b = roleById.get(p.brandId);
     return {
@@ -92,6 +128,8 @@ export default async function FeedV5Page() {
       brandLogo: b?.logo ?? null,
       role: b?.role ?? "owned",
       platform: p.platform,
+      format: p.format,
+      archetype: p.archetype,
       handle: p.username,
       contentPostId: p.contentPostId,
       title: p.contentPost?.title ?? null,
@@ -111,6 +149,11 @@ export default async function FeedV5Page() {
   });
 
   return (
-    <V5Client brands={brands} entries={entries} nowISO={new Date().toISOString()} />
+    <V5Client
+      brands={brands}
+      entries={entries}
+      suggestions={suggestions}
+      nowISO={new Date().toISOString()}
+    />
   );
 }

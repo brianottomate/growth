@@ -56,7 +56,7 @@ function launchHref(opts: {
     .join(" ");
   const params = new URLSearchParams({ brandId: opts.brandId, name: opts.title, prompt: ref });
   if (opts.imageUrl) params.set("img", opts.imageUrl);
-  return `/app/launch?${params.toString()}`;
+  return `/app/plan?${params.toString()}`;
 }
 
 /** Deep-link for a media asset (only hand the model a URL it can actually fetch). */

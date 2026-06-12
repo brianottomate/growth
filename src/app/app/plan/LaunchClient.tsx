@@ -110,7 +110,7 @@ export function LaunchClient({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Launch planner</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Plan a moment</h1>
       <p className="text-muted-foreground mt-1 text-sm">
         Describe a moment — a Series C launch, or just “here’s our new hero
         video, get it out there.” Generate the shape, edit it, then save.
@@ -238,6 +238,7 @@ export function LaunchClient({
         <div className="mt-6">
           <BlueprintReview
             blueprint={blueprint}
+            launchDate={launchDate}
             onEdited={setEdited}
             onRegenerate={(refine) => generate.mutate({ ...baseGenInput(), refine })}
             regenerating={generate.isPending}

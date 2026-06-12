@@ -54,6 +54,48 @@ export const PILLARS: Pillar[] = [
     color: "oklch(0.68 0.04 280)",
     brandSlug: "wander",
   },
+  // Canonical strategy pillars from the team's social content calendar (the
+  // source of truth going forward). Colors mirror the sheet's legend.
+  {
+    slug: "timely-travel",
+    name: "Timely Travel",
+    description:
+      "Seasonal demand capture — capture intent at peak planning moments.",
+    color: "oklch(0.72 0.14 150)", // green
+    brandSlug: "wander",
+  },
+  {
+    slug: "travel-discovery",
+    name: "Travel Discovery",
+    description:
+      "Utility content — itineraries, guides, destination inspo; drives saves.",
+    color: "oklch(0.7 0.13 235)", // blue
+    brandSlug: "wander",
+  },
+  {
+    slug: "brand-trust",
+    name: "Brand & Trust",
+    description:
+      "Humanize the brand — founder POV, home approval, customer stories.",
+    color: "oklch(0.72 0.03 250)", // neutral
+    brandSlug: "wander",
+  },
+  {
+    slug: "entertainment",
+    name: "Entertainment",
+    description:
+      "Top-of-funnel reach — trend-native, POV, humor, aspirational B-roll.",
+    color: "oklch(0.76 0.13 65)", // orange
+    brandSlug: "wander",
+  },
+  {
+    slug: "insider-community",
+    name: "Insider Community",
+    description:
+      "Loyalty & conversion — polls, ManyChat triggers, early access.",
+    color: "oklch(0.66 0.16 300)", // purple
+    brandSlug: "wander",
+  },
   // WanderOS (operator / host hub)
   {
     slug: "for-hosts",

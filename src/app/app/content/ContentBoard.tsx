@@ -22,6 +22,7 @@ import { cn } from "@/components/ui/lib/utils";
 import {
   AssigneeButton,
   AvatarStack,
+  MultiAssigneeButton,
   OwnerAvatar,
   useSelfAssignHotkey,
   type Member,
@@ -37,6 +38,7 @@ type Assign = {
   members: Member[];
   currentUserId: string;
   onAssign: (cardId: string, ownerId: string | null) => void;
+  onSetAssignees: (cardId: string, userIds: string[]) => void;
 };
 
 // Active editorial pipeline, left → right. `rejected` / `archived` are terminal
@@ -60,6 +62,30 @@ const DOT: Record<string, string> = {
   rejected: "bg-rose-500",
   archived: "bg-muted-foreground",
 };
+
+const STATUS_LABEL: Record<string, string> = {
+  slot: "Slot",
+  draft: "Draft",
+  discovered: "Discovered",
+  pending_review: "In review",
+  approved: "Approved",
+  scheduled: "Scheduled",
+  published: "Published",
+  rejected: "Rejected",
+  archived: "Archived",
+};
+// Pipeline order for the List view sort.
+const STATUS_ORDER = [
+  "discovered",
+  "draft",
+  "pending_review",
+  "approved",
+  "scheduled",
+  "published",
+  "slot",
+  "rejected",
+  "archived",
+];
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
@@ -142,12 +168,37 @@ export function ContentBoard({
     }),
   );
 
+  const setAssignees = useMutation(
+    trpc.content.setAssignees.mutationOptions({
+      onMutate: async ({ contentPostId, userIds }) => {
+        const key = boardOptions.queryKey;
+        await qc.cancelQueries({ queryKey: key });
+        const prev = qc.getQueryData<Card[]>(key);
+        const assignees = userIds
+          .map((id) => members.find((m) => m.id === id))
+          .filter((m): m is Member => !!m);
+        qc.setQueryData<Card[]>(key, (old) =>
+          old?.map((c) => (c.id === contentPostId ? { ...c, assignees } : c)),
+        );
+        return { prev, key };
+      },
+      onError: (_e, _v, context) => {
+        if (context?.prev) qc.setQueryData(context.key, context.prev);
+      },
+      onSettled: () => qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
+    }),
+  );
+
   const assign: Assign = {
     members,
     currentUserId,
     onAssign: (cardId, ownerId) =>
       setOwner.mutate({ contentPostId: cardId, ownerId }),
+    onSetAssignees: (cardId, userIds) =>
+      setAssignees.mutate({ contentPostId: cardId, userIds }),
   };
+
+  const [view, setView] = useState<"board" | "list">("board");
 
   const visible = useMemo(
     () =>
@@ -201,11 +252,27 @@ export function ContentBoard({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Content</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {visible.length} {visible.length === 1 ? "idea" : "ideas"} · drag to
-            move through the pipeline
+            {visible.length} {visible.length === 1 ? "idea" : "ideas"}
+            {view === "board" ? " · drag to move through the pipeline" : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="border-border flex overflow-hidden rounded-full border">
+            {(["board", "list"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={cn(
+                  "px-3 py-1 text-xs font-medium capitalize transition-colors",
+                  view === v
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
           <button
             onClick={() => setMineOnly((v) => !v)}
             className={cn(
@@ -243,25 +310,130 @@ export function ContentBoard({
         </div>
       </div>
 
-      {/* Board */}
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className="mt-5 flex flex-1 gap-3 overflow-x-auto pb-4">
-          {COLUMNS.map((col) => (
-            <Column
-              key={col.status}
-              status={col.status}
-              label={col.label}
-              cards={byStatus.get(col.status) ?? []}
-              onOpen={openCard}
-              loading={isLoading}
-              assign={assign}
-            />
-          ))}
+      {/* Board / List */}
+      {view === "list" ? (
+        <ContentList cards={visible} onOpen={openCard} assign={assign} loading={isLoading} />
+      ) : (
+        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <div className="mt-5 flex flex-1 gap-3 overflow-x-auto pb-4">
+            {COLUMNS.map((col) => (
+              <Column
+                key={col.status}
+                status={col.status}
+                label={col.label}
+                cards={byStatus.get(col.status) ?? []}
+                onOpen={openCard}
+                loading={isLoading}
+                assign={assign}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeCard ? <ContentCardBody card={activeCard} dragging /> : null}
+          </DragOverlay>
+        </DndContext>
+      )}
+    </div>
+  );
+}
+
+/** Execution-focused list view: deadline → status → title → metadata, one row
+ *  per idea (the feedback's recommended visual hierarchy). */
+function ContentList({
+  cards,
+  onOpen,
+  assign,
+  loading,
+}: {
+  cards: Card[];
+  onOpen: (id: string) => void;
+  assign: Assign;
+  loading: boolean;
+}) {
+  const sorted = useMemo(
+    () =>
+      [...cards].sort((a, b) => {
+        const s = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+        if (s !== 0) return s;
+        return (b.plannedAt ?? "").localeCompare(a.plannedAt ?? "");
+      }),
+    [cards],
+  );
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+
+  return (
+    <div className="mt-5 overflow-x-auto rounded-xl border">
+      {/* header */}
+      <div className="text-muted-foreground bg-muted/30 flex items-center gap-3 border-b px-3 py-2 text-[11px] font-medium uppercase tracking-wide">
+        <span className="w-16 shrink-0">Date</span>
+        <span className="w-24 shrink-0">Status</span>
+        <span className="min-w-0 flex-1">Title</span>
+        <span className="w-28 shrink-0">Brand</span>
+        <span className="w-20 shrink-0">Channels</span>
+        <span className="w-16 shrink-0 text-right">Reach</span>
+        <span className="w-16 shrink-0 text-right">Who</span>
+      </div>
+      {sorted.length === 0 && (
+        <div className="text-muted-foreground px-3 py-10 text-center text-sm">
+          {loading ? "Loading…" : "Nothing here"}
         </div>
-        <DragOverlay>
-          {activeCard ? <ContentCardBody card={activeCard} dragging /> : null}
-        </DragOverlay>
-      </DndContext>
+      )}
+      {sorted.map((c) => {
+        const pillar = c.pillar ? PILLAR_BY_SLUG[c.pillar] : null;
+        const reach =
+          c.views > 0 ? `${fmt(c.views)}` : c.likes > 0 ? `${fmt(c.likes)}♥` : null;
+        return (
+          <div
+            key={c.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpen(c.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onOpen(c.id);
+            }}
+            className="hover:bg-accent/40 flex cursor-pointer items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0"
+            style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
+          >
+            <span className="text-muted-foreground w-16 shrink-0 text-xs tabular-nums">
+              {c.plannedAt ? fmtDate(c.plannedAt) : "—"}
+            </span>
+            <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs">
+              <span className={cn("size-2 shrink-0 rounded-full", DOT[c.status])} />
+              <span className="truncate">{STATUS_LABEL[c.status] ?? c.status}</span>
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              {c.title ?? "Untitled"}
+            </span>
+            <span className="text-muted-foreground w-28 shrink-0 truncate text-xs">
+              {c.brandName}
+            </span>
+            <span className="flex w-20 shrink-0 items-center gap-1">
+              {c.platforms.slice(0, 4).map((p) => (
+                <ChannelLogo key={p} platform={p} className="size-3.5" />
+              ))}
+            </span>
+            <span className="text-muted-foreground w-16 shrink-0 text-right text-xs tabular-nums">
+              {reach ?? ""}
+            </span>
+            <span className="flex w-16 shrink-0 items-center justify-end gap-1">
+              {c.assignees.length > 0 && <AvatarStack members={c.assignees} size="sm" />}
+              {assign ? (
+                <AssigneeButton
+                  value={c.owner}
+                  members={assign.members}
+                  currentUserId={assign.currentUserId}
+                  onChange={(ownerId) => assign.onAssign(c.id, ownerId)}
+                  size="sm"
+                  label="Assign lead"
+                />
+              ) : (
+                <OwnerAvatar member={c.owner} size="sm" />
+              )}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -426,7 +598,16 @@ function ContentCardBody({
             {reach && <span>· {reach}</span>}
           </div>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1.5">
+          {assign && (
+            <MultiAssigneeButton
+              value={card.assignees}
+              members={assign.members}
+              currentUserId={assign.currentUserId}
+              onChange={(userIds) => assign.onSetAssignees(card.id, userIds)}
+              size="sm"
+            />
+          )}
           {assign ? (
             <AssigneeButton
               value={card.owner}
@@ -434,6 +615,7 @@ function ContentCardBody({
               currentUserId={assign.currentUserId}
               onChange={(ownerId) => assign.onAssign(card.id, ownerId)}
               size="md"
+              label="Assign lead"
             />
           ) : (
             <OwnerAvatar member={card.owner} size="md" />

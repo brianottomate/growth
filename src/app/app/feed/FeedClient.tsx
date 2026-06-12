@@ -317,14 +317,6 @@ function FeedCard({ e }: { e: FeedEntry }) {
           <span className="rounded-md bg-black/30 p-1 backdrop-blur-sm">
             <ChannelLogo platform={e.platform} className="size-4" />
           </span>
-          {e.tracked && (
-            <span
-              title="Tracked brand — scraped, not ours"
-              className="rounded-md bg-amber-500/85 px-1.5 py-1 text-[10px] font-medium text-white backdrop-blur-sm"
-            >
-              tracked
-            </span>
-          )}
           {amp && (
             <span
               title={
@@ -460,6 +452,86 @@ function ContentGroupBox({ g }: { g: ContentGroup }) {
   );
 }
 
+type BrandGroup = {
+  brandId: string;
+  brandName: string;
+  brandLogo: string | null;
+  entries: FeedEntry[];
+};
+
+/** A brand's posts within a day — a labelled horizontal row. Honors the
+ *  grouped/all view and keeps the per-row "now" marker for today. */
+function BrandRow({
+  bg,
+  view,
+  now,
+  today,
+}: {
+  bg: BrandGroup;
+  view: "grouped" | "all";
+  now: number;
+  today: boolean;
+}) {
+  const groups = view === "grouped" ? groupByContent(bg.entries) : [];
+  const nowGroupIdx =
+    today && view === "grouped"
+      ? (() => {
+          const i = groups.findIndex((g) => g.at > now);
+          return i === -1 ? groups.length : i;
+        })()
+      : -1;
+  const nowIdx =
+    today && view === "all"
+      ? (() => {
+          const i = bg.entries.findIndex((e) => new Date(e.at).getTime() > now);
+          return i === -1 ? bg.entries.length : i;
+        })()
+      : -1;
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-1.5">
+        {bg.brandLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={bg.brandLogo} alt="" className="size-5 rounded object-cover" />
+        ) : (
+          <span className="bg-muted flex size-5 items-center justify-center rounded text-[9px] font-semibold">
+            {bg.brandName.slice(0, 2)}
+          </span>
+        )}
+        <span className="text-sm font-medium">{bg.brandName}</span>
+        <span className="text-muted-foreground text-[11px] tabular-nums">
+          {bg.entries.length}
+        </span>
+      </div>
+      {view === "grouped" ? (
+        <div className="flex items-start gap-4 overflow-x-auto pb-3">
+          {groups.map((g, i) => (
+            <span key={g.key} className="contents">
+              {i === nowGroupIdx && <NowMarker now={now} />}
+              {g.contentPostId ? (
+                <ContentGroupBox g={g} />
+              ) : (
+                g.entries.map((e) => <FeedCard key={e.id} e={e} />)
+              )}
+            </span>
+          ))}
+          {nowGroupIdx === groups.length && <NowMarker now={now} />}
+        </div>
+      ) : (
+        <div className="flex items-stretch gap-3 overflow-x-auto pb-3">
+          {bg.entries.map((e, i) => (
+            <span key={e.id} className="contents">
+              {i === nowIdx && <NowMarker now={now} />}
+              <FeedCard e={e} />
+            </span>
+          ))}
+          {nowIdx === bg.entries.length && <NowMarker now={now} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FeedClient({
   entries,
   brands,
@@ -529,25 +601,37 @@ export function FeedClient({
     [entries, brandFilter, channelFilter, typeFilter, mineOnly, assignCtx, currentUserId],
   );
 
-  // Group by day, newest day first; within a day, chronological (morning → evening).
+  // Group by day (newest first); within a day, sub-group by brand (owned-first,
+  // following the brand-filter order); within a brand, chronological.
   const days = useMemo(() => {
+    const brandOrder = new Map(brands.map((b, i) => [b.id, i] as const));
     const byDay = new Map<string, FeedEntry[]>();
     for (const e of filtered) {
       const k = dayKey(new Date(e.at));
-      const list = byDay.get(k) ?? [];
-      list.push(e);
-      byDay.set(k, list);
+      (byDay.get(k) ?? byDay.set(k, []).get(k)!).push(e);
     }
     return [...byDay.entries()]
       .sort((a, b) => b[0].localeCompare(a[0])) // newest day first
-      .map(([k, list]) => ({
-        key: k,
-        today: k === todayKey,
-        entries: list.sort(
-          (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
-        ),
-      }));
-  }, [filtered, todayKey]);
+      .map(([k, list]) => {
+        const byBrand = new Map<string, FeedEntry[]>();
+        for (const e of list)
+          (byBrand.get(e.brandId) ?? byBrand.set(e.brandId, []).get(e.brandId)!).push(e);
+        const brandGroups = [...byBrand.entries()]
+          .sort(
+            (a, b) =>
+              (brandOrder.get(a[0]) ?? 999) - (brandOrder.get(b[0]) ?? 999),
+          )
+          .map(([brandId, items]) => ({
+            brandId,
+            brandName: items[0]!.brandName,
+            brandLogo: items[0]!.brandLogo,
+            entries: items.sort(
+              (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
+            ),
+          }));
+        return { key: k, today: k === todayKey, count: list.length, brandGroups };
+      });
+  }, [filtered, todayKey, brands]);
 
   return (
     <SpotlightContext.Provider value={setSpot}>
@@ -620,71 +704,38 @@ export function FeedClient({
           Nothing for these filters.
         </div>
       ) : (
-        days.map((d) => {
-          const groups = view === "grouped" ? groupByContent(d.entries) : [];
-          const nowGroupIdx =
-            d.today && view === "grouped"
-              ? (() => {
-                  const i = groups.findIndex((g) => g.at > now);
-                  return i === -1 ? groups.length : i;
-                })()
-              : -1;
-          const nowIdx =
-            d.today && view === "all"
-              ? (() => {
-                  const i = d.entries.findIndex(
-                    (e) => new Date(e.at).getTime() > now,
-                  );
-                  return i === -1 ? d.entries.length : i;
-                })()
-              : -1;
-          return (
-            <div key={d.key} className="mt-6">
-              <div className="mb-2.5 flex items-center gap-3">
-                <span
-                  className={`text-xs font-semibold ${
-                    d.today
-                      ? "bg-foreground text-background rounded-full px-2.5 py-1"
-                      : "text-foreground"
-                  }`}
-                >
-                  {fmtDay(new Date(d.key))}
-                  {d.today ? " · today" : ""}
-                </span>
-                <span className="bg-border h-px flex-1" />
-                <span className="text-muted-foreground text-[11px]">
-                  {d.entries.length} item{d.entries.length === 1 ? "" : "s"}
-                </span>
-              </div>
-
-              {view === "grouped" ? (
-                <div className="flex items-start gap-4 overflow-x-auto pb-3">
-                  {groups.map((g, i) => (
-                    <span key={g.key} className="contents">
-                      {i === nowGroupIdx && <NowMarker now={now} />}
-                      {g.contentPostId ? (
-                        <ContentGroupBox g={g} />
-                      ) : (
-                        g.entries.map((e) => <FeedCard key={e.id} e={e} />)
-                      )}
-                    </span>
-                  ))}
-                  {nowGroupIdx === groups.length && <NowMarker now={now} />}
-                </div>
-              ) : (
-                <div className="flex items-stretch gap-3 overflow-x-auto pb-3">
-                  {d.entries.map((e, i) => (
-                    <span key={e.id} className="contents">
-                      {i === nowIdx && <NowMarker now={now} />}
-                      <FeedCard e={e} />
-                    </span>
-                  ))}
-                  {nowIdx === d.entries.length && <NowMarker now={now} />}
-                </div>
-              )}
+        days.map((d) => (
+          <div key={d.key} className="mt-6">
+            <div className="mb-2.5 flex items-center gap-3">
+              <span
+                className={`text-xs font-semibold ${
+                  d.today
+                    ? "bg-foreground text-background rounded-full px-2.5 py-1"
+                    : "text-foreground"
+                }`}
+              >
+                {fmtDay(new Date(d.key))}
+                {d.today ? " · today" : ""}
+              </span>
+              <span className="bg-border h-px flex-1" />
+              <span className="text-muted-foreground text-[11px]">
+                {d.count} item{d.count === 1 ? "" : "s"}
+              </span>
             </div>
-          );
-        })
+
+            <div className="space-y-4">
+              {d.brandGroups.map((bg) => (
+                <BrandRow
+                  key={bg.brandId}
+                  bg={bg}
+                  view={view}
+                  now={now}
+                  today={d.today}
+                />
+              ))}
+            </div>
+          </div>
+        ))
       )}
       </div>
       <SpotlightDialog entry={spot} onClose={() => setSpot(null)} />

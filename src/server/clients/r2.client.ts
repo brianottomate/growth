@@ -83,9 +83,10 @@ export async function r2Delete(key: string): Promise<void> {
 // ---- POSTER RE-HOSTING --------------------------------------------
 // Some platforms hand us media URLs we can't serve long-term: TikTok posters
 // are signed and expire within ~a day; Facebook's fbcdn blocks hotlinking
-// outright. We copy those into R2 (under a dedicated `posters/` folder) so feed
-// thumbnails keep working. Mirrors displayPoster's BLOCKED_HOSTS.
-const REHOST_HOST_PATTERNS = ["fbcdn.net", "tiktokcdn"];
+// outright; Instagram's scontent.cdninstagram.com URLs are signed and expire
+// within ~weeks (the main source of broken feed thumbnails). We copy those into
+// R2 (under a dedicated `posters/` folder) so feed thumbnails keep working.
+const REHOST_HOST_PATTERNS = ["fbcdn.net", "tiktokcdn", "cdninstagram"];
 
 /** True if a media URL is on an expiring/blocked host and should be re-hosted. */
 export function needsRehost(url: string): boolean {

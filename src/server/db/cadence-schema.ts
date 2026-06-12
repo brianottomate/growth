@@ -86,6 +86,53 @@ export const cadenceTargetTable = pgTable(
 export type CadenceTarget = typeof cadenceTargetTable.$inferSelect;
 export type CadenceTargetInsert = typeof cadenceTargetTable.$inferInsert;
 
+// ---- MIX TARGET ----------------------------------------------------
+//
+// The content-mix ratios (the sheet's "Content Mix Ratios": 25% Discovery,
+// 25% Inspiration, …). A different axis from cadence_target (archetype counts):
+// this is the desired PILLAR distribution per brand/period, the target the
+// feed-v5 strategy row reads against (observed pillar mix vs intended).
+export const mixTargetTable = pgTable(
+  "mix_target",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("mix")),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    pillar: t.text().notNull(), // pillar slug (lib/pillars)
+    targetPct: t.integer().notNull(), // 0..100
+    period: cadencePeriodEnum().notNull(),
+    isActive: t.boolean().default(true).notNull(),
+    notes: t.text(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("mix_target_brand_idx").on(table.brandId),
+    uniqueIndex("mix_target_unique_idx").on(table.brandId, table.pillar, table.period),
+  ],
+);
+export type MixTarget = typeof mixTargetTable.$inferSelect;
+export type MixTargetInsert = typeof mixTargetTable.$inferInsert;
+
+export const mixTargetRelations = relations(mixTargetTable, ({ one }) => ({
+  brand: one(brandTable, {
+    fields: [mixTargetTable.brandId],
+    references: [brandTable.id],
+  }),
+}));
+
 // ---- RELATIONS -----------------------------------------------------
 
 export const cadenceTargetRelations = relations(

@@ -8,6 +8,7 @@ import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { IdeaOwnerControl, SpotOwnerControl } from "./OwnerControls";
+import { CommentThread } from "./CommentThread";
 
 const memberCols = { id: true, name: true, image: true } as const;
 const toMember = (
@@ -316,18 +317,16 @@ export default async function ContentDetailPage({
         </>
       )}
 
-      {/* comments — deferred per content-schema (counts live in stats for now) */}
-      <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold uppercase tracking-wider">
-        Comments
+      {/* Team discussion on this idea (audience comment counts live in stats). */}
+      <h2 className="text-muted-foreground mt-8 mb-1 text-xs font-semibold uppercase tracking-wider">
+        Discussion
       </h2>
-      <p className="text-muted-foreground text-sm">
-        {totals.comments > 0
-          ? `${fmt(totals.comments)} comments across all platforms.`
-          : "No comments yet."}{" "}
-        <span className="text-muted-foreground">
-          Full comment threads arrive with the listening / inbox work.
-        </span>
-      </p>
+      {totals.comments > 0 && (
+        <p className="text-muted-foreground mb-1 text-xs">
+          {fmt(totals.comments)} audience comments across platforms.
+        </p>
+      )}
+      <CommentThread contentPostId={content.id} currentUserId={session.user.id} />
     </div>
   );
 }

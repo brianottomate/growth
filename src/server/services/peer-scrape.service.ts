@@ -352,7 +352,6 @@ async function processMapped(opts: {
       fields: m.raw,
       imageUrl: m.cover,
       text: m.insert.text ?? undefined,
-      skipTemplate: opts.skipTemplate,
     });
     await db.insert(contentSuggestionTable).values({
       brandId: opts.brandId,

@@ -24,6 +24,7 @@ import {
   Radar,
   Repeat,
   Rocket,
+  Radio,
   Rss,
   Rows3,
   Settings,
@@ -79,8 +80,9 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Calendar", href: "/app/calendar", icon: Calendar },
       { label: "Feed", href: "/app/feed", icon: Rss },
       { label: "Timeline", href: "/app/feed-v5", icon: Rows3 },
+      { label: "Channels", href: "/app/channels", icon: Radio },
       { label: "Studio", href: "/app/studio", icon: Sparkles },
-      { label: "Launch", href: "/app/launch", icon: Rocket },
+      { label: "Plan", href: "/app/plan", icon: Rocket },
     ],
   },
   {

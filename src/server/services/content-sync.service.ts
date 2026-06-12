@@ -94,6 +94,8 @@ async function pullZernioPlatform(
 export async function syncWanderContent(options?: {
   brandSlug?: string;
   monthsBack?: number;
+  /** If set, overrides monthsBack — pull only the last N days. */
+  daysBack?: number;
 }): Promise<{
   brandId: string;
   candidates: number;
@@ -124,7 +126,11 @@ export async function syncWanderContent(options?: {
 
   const toDate = new Date();
   const fromDate = new Date(toDate);
-  fromDate.setUTCMonth(fromDate.getUTCMonth() - monthsBack);
+  if (options?.daysBack != null) {
+    fromDate.setUTCDate(fromDate.getUTCDate() - options.daysBack);
+  } else {
+    fromDate.setUTCMonth(fromDate.getUTCMonth() - monthsBack);
+  }
   const iso = (d: Date) => d.toISOString().slice(0, 10);
 
   const rows: PlatformPostInsert[] = [];
