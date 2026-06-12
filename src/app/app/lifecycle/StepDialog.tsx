@@ -25,6 +25,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import type {
   LifecycleStepStatus,
+  LifecycleStepSystem,
   TouchpointChannel,
 } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
@@ -35,10 +36,13 @@ export type StepDraft = {
   name: string;
   channel: TouchpointChannel;
   status: LifecycleStepStatus;
+  system?: LifecycleStepSystem | null;
   delayMinutes?: number | null;
   subject?: string | null;
   url?: string | null;
   campaignId?: string | null;
+  parentStepId?: string | null;
+  branchLabel?: string | null;
 };
 
 type DelayUnit = "minutes" | "hours" | "days";
@@ -68,6 +72,17 @@ const STATUSES: [LifecycleStepStatus, string][] = [
   ["missing", "Missing"],
 ];
 
+const SYSTEMS: [LifecycleStepSystem, string][] = [
+  ["customerio", "Customer.io"],
+  ["resend", "Resend (in-app email)"],
+  ["postmark", "Postmark (product email)"],
+  ["outreach", "Outreach"],
+  ["amplitude", "Amplitude"],
+  ["system", "Product / backend"],
+  ["human", "Human (BDR / concierge)"],
+  ["other", "Other"],
+];
+
 const CHANNELS: [TouchpointChannel, string][] = [
   ["email", "Email"],
   ["bdr_task", "BDR task"],
@@ -86,12 +101,15 @@ export function StepDialog({
   onOpenChange,
   programId,
   campaigns,
+  steps,
   initial,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   programId: string;
   campaigns: { id: string; name: string }[];
+  /** Sibling steps of the program — candidates for "branches from". */
+  steps: { id: string; name: string }[];
   initial?: StepDraft;
 }) {
   const trpc = useTRPC();
@@ -111,6 +129,11 @@ export function StepDialog({
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
   const [campaignId, setCampaignId] = useState(initial?.campaignId ?? NONE);
+  const [system, setSystem] = useState(initial?.system ?? NONE);
+  const [parentStepId, setParentStepId] = useState(
+    initial?.parentStepId ?? NONE,
+  );
+  const [branchLabel, setBranchLabel] = useState(initial?.branchLabel ?? "");
 
   useEffect(() => {
     if (!open) return;
@@ -123,6 +146,9 @@ export function StepDialog({
     setSubject(initial?.subject ?? "");
     setUrl(initial?.url ?? "");
     setCampaignId(initial?.campaignId ?? NONE);
+    setSystem(initial?.system ?? NONE);
+    setParentStepId(initial?.parentStepId ?? NONE);
+    setBranchLabel(initial?.branchLabel ?? "");
   }, [open, initial]);
 
   const invalidate = () =>
@@ -158,10 +184,13 @@ export function StepDialog({
       name: name.trim(),
       channel,
       status,
+      system: system === NONE ? null : (system as LifecycleStepSystem),
       delayMinutes,
       subject: subject.trim() || null,
       url: url.trim() || null,
       campaignId: campaignId === NONE ? null : campaignId,
+      parentStepId: parentStepId === NONE ? null : parentStepId,
+      branchLabel: parentStepId === NONE ? null : branchLabel.trim() || null,
     };
     if (isEdit && initial?.id) {
       update.mutate({ id: initial.id, ...shared });
@@ -269,14 +298,63 @@ export function StepDialog({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="step-url">Resource URL</Label>
-            <Input
-              id="step-url"
-              value={url ?? ""}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://… (Notion doc, CIO action, brief)"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>System</Label>
+              <Select value={system} onValueChange={setSystem}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Untagged" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Untagged</SelectItem>
+                  {SYSTEMS.map(([v, l]) => (
+                    <SelectItem key={v} value={v}>
+                      {l}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="step-url">Resource URL</Label>
+              <Input
+                id="step-url"
+                value={url ?? ""}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://… (CIO action, sequence)"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Branches from</Label>
+              <Select value={parentStepId} onValueChange={setParentStepId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Main path" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Main path</SelectItem>
+                  {steps
+                    .filter((s) => s.id !== initial?.id)
+                    .map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="step-branch">Branch condition</Label>
+              <Input
+                id="step-branch"
+                value={branchLabel}
+                onChange={(e) => setBranchLabel(e.target.value)}
+                placeholder="no reply after 3d"
+                disabled={parentStepId === NONE}
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">

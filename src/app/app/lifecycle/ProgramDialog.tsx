@@ -28,6 +28,7 @@ import type {
   LifecycleKind,
   LifecycleProgramPriority,
   LifecycleProgramStatus,
+  LifecycleWorkspace,
   TouchpointChannel,
 } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
@@ -40,6 +41,7 @@ export type ProgramDraft = {
   kind: LifecycleKind;
   status: LifecycleProgramStatus;
   priority: LifecycleProgramPriority;
+  workspace?: LifecycleWorkspace;
   intendedTrigger?: string | null;
   intendedChannels?: TouchpointChannel[] | null;
   targetTouchpoints?: number | null;
@@ -69,6 +71,12 @@ const PRIORITIES = [
   ["nice_to_have", "Nice to have"],
 ] as const;
 
+const WORKSPACES = [
+  ["marketplace", "Marketplace"],
+  ["os", "WanderOS"],
+  ["shared", "Shared"],
+] as const;
+
 const CHANNELS: TouchpointChannel[] = [
   "email",
   "sms",
@@ -95,7 +103,9 @@ export function ProgramDialog({
   const queryClient = useQueryClient();
   const isEdit = Boolean(initial?.id);
 
-  const [brandId, setBrandId] = useState(initial?.brandId ?? brands[0]?.id ?? "");
+  const [brandId, setBrandId] = useState(
+    initial?.brandId ?? brands[0]?.id ?? "",
+  );
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [kind, setKind] = useState<LifecycleKind>(initial?.kind ?? "other");
@@ -104,6 +114,9 @@ export function ProgramDialog({
   );
   const [priority, setPriority] = useState<LifecycleProgramPriority>(
     initial?.priority ?? "should_have",
+  );
+  const [workspace, setWorkspace] = useState<LifecycleWorkspace>(
+    initial?.workspace ?? "marketplace",
   );
   const [intendedTrigger, setIntendedTrigger] = useState(
     initial?.intendedTrigger ?? "",
@@ -124,10 +137,13 @@ export function ProgramDialog({
     setKind(initial?.kind ?? "other");
     setStatus(initial?.status ?? "planned");
     setPriority(initial?.priority ?? "should_have");
+    setWorkspace(initial?.workspace ?? "marketplace");
     setIntendedTrigger(initial?.intendedTrigger ?? "");
     setChannels(initial?.intendedChannels ?? []);
     setTargetTouchpoints(
-      initial?.targetTouchpoints != null ? String(initial.targetTouchpoints) : "",
+      initial?.targetTouchpoints != null
+        ? String(initial.targetTouchpoints)
+        : "",
     );
   }, [open, initial, brands]);
 
@@ -164,6 +180,7 @@ export function ProgramDialog({
       kind,
       status,
       priority,
+      workspace,
       intendedTrigger: intendedTrigger.trim() || null,
       intendedChannels: channels,
       targetTouchpoints: targetTouchpoints ? Number(targetTouchpoints) : null,
@@ -232,7 +249,25 @@ export function ProgramDialog({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Workspace</Label>
+              <Select
+                value={workspace}
+                onValueChange={(v) => setWorkspace(v as LifecycleWorkspace)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WORKSPACES.map(([v, l]) => (
+                    <SelectItem key={v} value={v}>
+                      {l}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label>Kind</Label>
               <Select
@@ -255,9 +290,7 @@ export function ProgramDialog({
               <Label>Status</Label>
               <Select
                 value={status}
-                onValueChange={(v) =>
-                  setStatus(v as LifecycleProgramStatus)
-                }
+                onValueChange={(v) => setStatus(v as LifecycleProgramStatus)}
               >
                 <SelectTrigger>
                   <SelectValue />

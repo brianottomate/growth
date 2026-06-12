@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { brandTable } from "./brand-schema";
 import { channelTable, deliveryProviderEnum } from "./channel-schema";
@@ -40,6 +40,33 @@ export const lifecycleRunStateEnum = pgEnum("lifecycle_run_state", [
 ]);
 export type LifecycleRunState =
   (typeof lifecycleRunStateEnum.enumValues)[number];
+
+// Which product line a journey belongs to. Slugs match the tracking plan's
+// workspaces (tracking/packages/core: marketplace | os) so lifecycle programs
+// can later be joined against tracked events for trigger validation.
+export const lifecycleWorkspaceEnum = pgEnum("lifecycle_workspace", [
+  "marketplace", // traveler-side (wander.com marketplace)
+  "os", // WanderOS / host-side
+  "shared", // spans both (e.g. transactional auth emails)
+]);
+export type LifecycleWorkspace =
+  (typeof lifecycleWorkspaceEnum.enumValues)[number];
+
+// Which external system a step lives on / is delivered by. The strategy layer
+// only *tags* this (plus an optional `url` link-out) — no sync dependency.
+// Mirrors the ToolId taxonomy in data/message-streams.ts.
+export const lifecycleStepSystemEnum = pgEnum("lifecycle_step_system", [
+  "customerio",
+  "resend", // in-app email (growth app and friends)
+  "postmark", // product notification email (monolith os-notifications)
+  "outreach",
+  "amplitude",
+  "system", // product/backend (in-app surfaces, webhooks, push)
+  "human", // BDR / concierge / manual touch
+  "other",
+]);
+export type LifecycleStepSystem =
+  (typeof lifecycleStepSystemEnum.enumValues)[number];
 
 // Delivery surface for a touchpoint.
 export const touchpointChannelEnum = pgEnum("touchpoint_channel", [
@@ -124,6 +151,7 @@ export const lifecycleProgramTable = pgTable(
     kind: lifecycleKindEnum().default("other").notNull(),
     status: lifecycleProgramStatusEnum().default("planned").notNull(),
     priority: lifecycleProgramPriorityEnum().default("should_have").notNull(),
+    workspace: lifecycleWorkspaceEnum().default("marketplace").notNull(),
 
     // The trigger we *want* this to fire on (e.g. "host_signed_up"). Compared
     // against the linked campaigns' actual `triggerEvent` to spot drift.
@@ -150,12 +178,12 @@ export const lifecycleProgramTable = pgTable(
     index("lifecycle_program_brand_idx").on(table.brandId),
     index("lifecycle_program_kind_idx").on(table.kind),
     index("lifecycle_program_status_idx").on(table.status),
+    index("lifecycle_program_workspace_idx").on(table.workspace),
   ],
 );
 
 export type LifecycleProgram = typeof lifecycleProgramTable.$inferSelect;
-export type LifecycleProgramInsert =
-  typeof lifecycleProgramTable.$inferInsert;
+export type LifecycleProgramInsert = typeof lifecycleProgramTable.$inferInsert;
 
 // ---- LIFECYCLE PROGRAM STEP (an intended touchpoint we author by hand) ----
 //
@@ -181,6 +209,9 @@ export const lifecycleProgramStepTable = pgTable(
     name: t.text().notNull(), // e.g. "Welcome email", "BDR intro call"
     channel: touchpointChannelEnum().default("email").notNull(),
     status: lifecycleStepStatusEnum().default("planned").notNull(),
+    // Where this step lives / who delivers it (CIO, Outreach, a human…).
+    // Null = untagged. Pair with `url` for the manual link-out tie.
+    system: lifecycleStepSystemEnum(),
     position: t.integer().default(0).notNull(),
     // Offset from journey start, normalized to minutes (0 = immediately).
     // Steps render/sort by this; the timeline is absolute ("Day 0/2/5").
@@ -190,6 +221,17 @@ export const lifecycleProgramStepTable = pgTable(
     delayLabel: t.text(),
     subject: t.text(), // email subject / message gist
     url: t.text(), // optional link out to where the resource is defined
+
+    // Branching: a step with a parent hangs off that step as a conditional
+    // branch (activity-diagram style) instead of sitting on the main spine.
+    // Roots (parent null) ordered by delay/position form the happy path.
+    parentStepId: t
+      .text()
+      .references((): AnyPgColumn => lifecycleProgramStepTable.id, {
+        onDelete: "set null",
+      }),
+    // The branch condition, shown on the edge ("no open after 3d").
+    branchLabel: t.text(),
 
     // Optional: the mirrored CIO campaign that actually sends this step.
     campaignId: t
@@ -206,9 +248,7 @@ export const lifecycleProgramStepTable = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   }),
-  (table) => [
-    index("lifecycle_program_step_program_idx").on(table.programId),
-  ],
+  (table) => [index("lifecycle_program_step_program_idx").on(table.programId)],
 );
 
 export type LifecycleProgramStep =
@@ -276,7 +316,10 @@ export const lifecycleCampaignTable = pgTable(
     index("lifecycle_campaign_kind_idx").on(table.kind),
     index("lifecycle_campaign_run_state_idx").on(table.runState),
     index("lifecycle_campaign_cleanup_idx").on(table.cleanupStatus),
-    index("lifecycle_campaign_external_idx").on(table.provider, table.externalId),
+    index("lifecycle_campaign_external_idx").on(
+      table.provider,
+      table.externalId,
+    ),
   ],
 );
 
@@ -319,9 +362,7 @@ export const lifecycleTouchpointTable = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
   }),
-  (table) => [
-    index("lifecycle_touchpoint_campaign_idx").on(table.campaignId),
-  ],
+  (table) => [index("lifecycle_touchpoint_campaign_idx").on(table.campaignId)],
 );
 
 export type LifecycleTouchpoint = typeof lifecycleTouchpointTable.$inferSelect;
@@ -343,7 +384,7 @@ export const lifecycleProgramRelations = relations(
 
 export const lifecycleProgramStepRelations = relations(
   lifecycleProgramStepTable,
-  ({ one }) => ({
+  ({ one, many }) => ({
     program: one(lifecycleProgramTable, {
       fields: [lifecycleProgramStepTable.programId],
       references: [lifecycleProgramTable.id],
@@ -351,6 +392,14 @@ export const lifecycleProgramStepRelations = relations(
     campaign: one(lifecycleCampaignTable, {
       fields: [lifecycleProgramStepTable.campaignId],
       references: [lifecycleCampaignTable.id],
+    }),
+    parent: one(lifecycleProgramStepTable, {
+      fields: [lifecycleProgramStepTable.parentStepId],
+      references: [lifecycleProgramStepTable.id],
+      relationName: "stepBranches",
+    }),
+    branches: many(lifecycleProgramStepTable, {
+      relationName: "stepBranches",
     }),
   }),
 );
