@@ -106,6 +106,48 @@ export function SignalHub({
         </Section>
       ),
     },
+    {
+      // LLM / AI Search listening — track how Wander appears in ChatGPT,
+      // Perplexity, Gemini, AI Overviews, etc. Separate from social listening
+      // because the surface is AI model outputs, not human conversations.
+      //
+      // Candidate tools:
+      //   - Peec.ai   — AI Search Analytics (ChatGPT, Perplexity, Gemini, AI Overviews, Copilot)
+      //                 2000+ marketing teams, MCP integration, API access
+      //                 https://peec.ai/pricing
+      //
+      // Social listening tools (for the mentions/x tabs, not here):
+      //   - Mentionkit — AI-first, 7 platforms (Reddit, X, LinkedIn, TikTok, Bluesky, YouTube, HN)
+      //                  AI relevance scoring, comment drafting, MCP server, API/webhooks
+      //                  https://mentionkit.com/pricing
+      //   - Buska      — Broadest coverage (16-33+ sources incl. Pinterest, Telegram, WhatsApp)
+      //                  AI Reply Studio, ICP profiles, API-only pricing available
+      //                  Starter $49/mo, Growth $99/mo, Scale $249/mo
+      //                  https://www.buska.io/pricing
+      //   - Syften     — Reddit/HN focused, boolean filters, Slack-first, $40/mo Standard
+      //   - F5Bot      — Free Reddit/HN safety net (already integrated above)
+      //   - Alertmouse — Rand Fishkin, $10/mo, web/news/social
+      //   - Octolens   — LinkedIn keyword monitoring, $119/mo, API/webhook/MCP
+      tab: "llm",
+      exclusive: true,
+      node: (
+        <Section
+          title="LLM listening"
+          blurb="Track how Wander appears in AI search results — ChatGPT, Perplexity, Gemini, AI Overviews. Coming soon."
+        >
+          <div className="rounded-lg border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
+            <p className="font-medium">🤖 AI Search visibility tracking</p>
+            <p className="mt-2">
+              Monitor how AI models mention and recommend Wander in their responses.
+              <br />
+              Evaluate{" "}
+              <a href="https://peec.ai" target="_blank" rel="noreferrer noopener" className="underline hover:text-foreground">Peec.ai</a>
+              {" "}for integration.
+            </p>
+          </div>
+        </Section>
+      ),
+    },
   ];
 
   return (

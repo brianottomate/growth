@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Listen",
 };
 
-const TABS: SignalTabId[] = ["all", "dms", "comments", "mentions", "x"];
+const TABS: SignalTabId[] = ["all", "dms", "comments", "mentions", "x", "llm"];
 
 // The single unified inbound surface. `?tab=` deep-links a tab (e.g. the
 // /app/inbox redirect lands on ?tab=dms); defaults to the "All" overview.
