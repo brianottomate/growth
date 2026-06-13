@@ -107,6 +107,72 @@ export function SignalHub({
       ),
     },
     {
+      tab: "mentions",
+      node: (
+        <Section
+          title="Listening tools"
+          blurb="External SoMe listening services to evaluate or integrate. Social monitoring + LLM brand visibility."
+        >
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Social listening
+            </h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ToolCard
+                name="Mentionkit"
+                href="https://mentionkit.com/pricing"
+                description="AI-first. 7 platforms (Reddit, X, LinkedIn, TikTok, Bluesky, YouTube, HN). AI scoring, comment drafts, MCP server, API/webhooks. Auto-keywords from landing page."
+                tag="14-day trial"
+              />
+              <ToolCard
+                name="Buska"
+                href="https://www.buska.io/pricing"
+                description="Broadest coverage: 16–33+ sources incl. Pinterest, Telegram, WhatsApp. AI Reply Studio, ICP profiles. API-only pricing available ($50/1K credits)."
+                tag="from $49/mo"
+              />
+              <ToolCard
+                name="Syften"
+                href="https://syften.com"
+                description="Reddit/HN focused. Boolean filters, Slack-first, <1 min delivery. Solid but basic — no AI scoring or drafts."
+                tag="from $20/mo"
+                dimmed
+              />
+              <ToolCard
+                name="Alertmouse"
+                href="https://alertmouse.com"
+                description='By Rand Fishkin (Moz/SparkToro). "What Google Alerts should be" — social + web, better filtering.'
+                tag="$10/mo"
+              />
+              <ToolCard
+                name="Octolens"
+                href="https://octolens.com"
+                description="Only credible LinkedIn keyword monitoring with API/webhook/MCP. Pricey but fills a real gap."
+                tag="$119/mo"
+              />
+              <ToolCard
+                name="F5Bot"
+                href="https://f5bot.com"
+                description="Free Reddit/HN/Lobsters alerts. Already integrated above. Pipe via Resend inbound webhook for real-time processing."
+                tag="free ✓"
+              />
+            </div>
+
+            <h3 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              LLM / AI search visibility
+            </h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ToolCard
+                name="Peec.ai"
+                href="https://peec.ai/pricing"
+                description="Track brand visibility in ChatGPT, Perplexity, Gemini, AI Overviews, Copilot. 2000+ marketing teams. MCP + API."
+                tag="evaluate"
+              />
+            </div>
+          </div>
+        </Section>
+      ),
+    },
+    {
       // LLM / AI Search listening — track how Wander appears in ChatGPT,
       // Perplexity, Gemini, AI Overviews, etc. Separate from social listening
       // because the surface is AI model outputs, not human conversations.
@@ -139,11 +205,10 @@ export function SignalHub({
             <p className="font-medium">🤖 AI Search visibility tracking</p>
             <p className="mt-2">
               Monitor how AI models mention and recommend Wander in their responses.
-              <br />
-              Evaluate{" "}
-              <a href="https://peec.ai" target="_blank" rel="noreferrer noopener" className="underline hover:text-foreground">Peec.ai</a>
-              {" "}for integration.
             </p>
+            <div className="mt-4 inline-flex gap-2">
+              <ToolLink href="https://peec.ai/pricing" label="Peec.ai" tag="AI Search Analytics" />
+            </div>
           </div>
         </Section>
       ),
@@ -243,5 +308,65 @@ function Loading({ label }: { label: string }) {
     <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
       Loading {label}…
     </div>
+  );
+}
+
+function ToolCard({
+  name,
+  href,
+  description,
+  tag,
+  dimmed,
+}: {
+  name: string;
+  href: string;
+  description: string;
+  tag: string;
+  dimmed?: boolean;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className={`group rounded-lg border bg-card p-3 text-sm transition-colors hover:bg-accent ${
+        dimmed ? "opacity-60" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-foreground group-hover:underline">
+          {name} ↗
+        </span>
+        <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {tag}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+    </a>
+  );
+}
+
+function ToolLink({
+  href,
+  label,
+  tag,
+}: {
+  href: string;
+  label: string;
+  tag: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+    >
+      {label}
+      <span className="rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+        {tag}
+      </span>
+      ↗
+    </a>
   );
 }
