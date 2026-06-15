@@ -4,6 +4,7 @@ import { isZernioConfigured } from "@/server/clients/zernio.client";
 
 import { AdComments } from "../listen/AdComments";
 import { Comments } from "../listen/Comments";
+import { ListeningStrategy } from "../listen/ListeningStrategy";
 import { MentionsFeed } from "../listen/MentionsFeed";
 import { RedditScanWidget } from "../listen/RedditScanWidget";
 import { XListening } from "../listen/XListening";
@@ -236,6 +237,21 @@ export function SignalHub({
               <ToolLink href="https://peec.ai/pricing" label="Peec.ai" tag="AI Search Analytics" />
             </div>
           </div>
+        </Section>
+      ),
+    },
+    {
+      // The strategic view: the evolvable brand listening "story" + the
+      // per-source config rows (platform · acquisition · trigger · adapter).
+      // Its own room — config, not an inbound feed.
+      tab: "strategy",
+      exclusive: true,
+      node: (
+        <Section
+          title="Listening strategy"
+          blurb="The brain behind every scan and reply: the shared brand story (what's signal + how we reply) and the per-source config. Edit it live — no deploy."
+        >
+          <ListeningStrategy />
         </Section>
       ),
     },

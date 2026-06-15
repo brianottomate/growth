@@ -13,6 +13,7 @@ import { outreachRouter } from "@/server/api/routers/outreach.router";
 import { instantlyRouter } from "@/server/api/routers/instantly.router";
 import { leadsRouter } from "@/server/api/routers/leads.router";
 import { lifecycleRouter } from "@/server/api/routers/lifecycle.router";
+import { listeningRouter } from "@/server/api/routers/listening.router";
 import { mediaRouter } from "@/server/api/routers/media.router";
 import { mentionRouter } from "@/server/api/routers/mention.router";
 import { momentRouter } from "@/server/api/routers/moment.router";
@@ -42,6 +43,7 @@ export const appRouter = createTRPCRouter({
   instantly: instantlyRouter,
   leads: leadsRouter,
   lifecycle: lifecycleRouter,
+  listening: listeningRouter,
   media: mediaRouter,
   mention: mentionRouter,
   moment: momentRouter,

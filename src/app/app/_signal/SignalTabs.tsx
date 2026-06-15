@@ -2,7 +2,14 @@
 
 import { useState, type ReactNode } from "react";
 
-export type SignalTabId = "all" | "dms" | "comments" | "mentions" | "x" | "llm";
+export type SignalTabId =
+  | "all"
+  | "dms"
+  | "comments"
+  | "mentions"
+  | "x"
+  | "llm"
+  | "strategy";
 
 const TABS: { id: SignalTabId; label: string }[] = [
   { id: "all", label: "All" },
@@ -11,6 +18,7 @@ const TABS: { id: SignalTabId; label: string }[] = [
   { id: "mentions", label: "Mentions" },
   { id: "x", label: "X" },
   { id: "llm", label: "LLM" },
+  { id: "strategy", label: "Strategy" },
 ];
 
 export function SignalTabs({
