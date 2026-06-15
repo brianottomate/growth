@@ -14,6 +14,7 @@ import { instantlyRouter } from "@/server/api/routers/instantly.router";
 import { leadsRouter } from "@/server/api/routers/leads.router";
 import { lifecycleRouter } from "@/server/api/routers/lifecycle.router";
 import { mediaRouter } from "@/server/api/routers/media.router";
+import { mentionRouter } from "@/server/api/routers/mention.router";
 import { momentRouter } from "@/server/api/routers/moment.router";
 import { redditRouter } from "@/server/api/routers/reddit.router";
 import { studioRouter } from "@/server/api/routers/studio.router";
@@ -42,6 +43,7 @@ export const appRouter = createTRPCRouter({
   leads: leadsRouter,
   lifecycle: lifecycleRouter,
   media: mediaRouter,
+  mention: mentionRouter,
   moment: momentRouter,
   reddit: redditRouter,
   studio: studioRouter,

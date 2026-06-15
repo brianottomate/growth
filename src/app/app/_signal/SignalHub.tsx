@@ -4,6 +4,7 @@ import { isZernioConfigured } from "@/server/clients/zernio.client";
 
 import { AdComments } from "../listen/AdComments";
 import { Comments } from "../listen/Comments";
+import { MentionsFeed } from "../listen/MentionsFeed";
 import { RedditScanWidget } from "../listen/RedditScanWidget";
 import { XListening } from "../listen/XListening";
 import { conversationReplyUrl } from "./conversation-url";
@@ -92,16 +93,17 @@ export function SignalHub({
       tab: "mentions",
       node: (
         <Section
-          title="Keyword alerts"
-          blurb="F5Bot emails when Wander terms appear on Reddit / Hacker News / Lobsters."
+          title="Keyword mentions"
+          blurb="F5Bot alerts (Reddit / Hacker News / Lobsters), forwarded via Resend, AI-extracted and scored. Mark engaged or skip — status is saved."
         >
+          <MentionsFeed />
           <a
             href="https://f5bot.com/dash"
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="mt-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
           >
-            Open F5Bot dashboard ↗
+            Manage keywords in F5Bot ↗
           </a>
         </Section>
       ),
