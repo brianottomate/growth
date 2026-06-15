@@ -12,6 +12,7 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ProgramFlow } from "./ProgramFlow";
+import { StepBodies } from "./StepBodies";
 import { ExportToClaudeButton } from "./ExportToClaudeButton";
 
 const WORKSPACE_LABEL: Record<string, string> = {
@@ -59,7 +60,7 @@ export default async function ProgramFlowPage({
   if (!membership) notFound();
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col pb-8">
       <div className="flex items-start justify-between">
         <div>
           <Link
@@ -119,6 +120,17 @@ export default async function ProgramFlowPage({
           campaign: s.campaign
             ? { name: s.campaign.name, runState: s.campaign.runState }
             : null,
+        }))}
+      />
+
+      <StepBodies
+        steps={program.steps.map((s) => ({
+          id: s.id,
+          name: s.name,
+          subject: s.subject,
+          body: s.body,
+          delayMinutes: s.delayMinutes,
+          delayLabel: s.delayLabel,
         }))}
       />
     </div>

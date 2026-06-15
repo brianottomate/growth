@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ChevronDown,
+  ChevronRight,
   CornerDownRight,
   ExternalLink,
   Pencil,
@@ -10,6 +12,7 @@ import {
   Trash2,
   Workflow,
 } from "lucide-react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -155,9 +158,28 @@ export function LifecycleStrategy({
   const [stepProgramId, setStepProgramId] = useState("");
   const [editingStep, setEditingStep] = useState<StepDraft>();
   // Workspace filter, plus a cross-cutting "outbound" (sales) filter on kind.
-  const [wsFilter, setWsFilter] = useState<
-    "all" | LifecycleWorkspace | "outbound"
-  >("all");
+  // Persisted + enforced in ?filter= via nuqs (invalid values fall back to "all").
+  const [wsFilter, setWsFilter] = useQueryState(
+    "filter",
+    parseAsStringLiteral([
+      "all",
+      "marketplace",
+      "os",
+      "shared",
+      "outbound",
+    ] as const).withDefault("all"),
+  );
+
+  // Step bodies expanded inline (by step id), so you can read/copy without the
+  // edit dialog. One set across programs — step ids are globally unique.
+  const [openBodies, setOpenBodies] = useState<Set<string>>(new Set());
+  const toggleBody = (id: string) =>
+    setOpenBodies((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const invalidate = () =>
     queryClient.invalidateQueries(trpc.lifecycle.overview.queryOptions());
@@ -244,7 +266,7 @@ export function LifecycleStrategy({
           <button
             key={v}
             type="button"
-            onClick={() => setWsFilter(v)}
+            onClick={() => void setWsFilter(v)}
             className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
               wsFilter === v
                 ? "border-primary bg-primary/15 text-primary"
@@ -358,106 +380,176 @@ export function LifecycleStrategy({
               {/* Authored steps — the intended journey (branches indented) */}
               <div className="mt-3 space-y-1.5 border-t pt-3">
                 {(() => {
+                  const bodyStepIds = p.steps
+                    .filter((s) => s.subject || s.body)
+                    .map((s) => s.id);
+                  const allOpen =
+                    bodyStepIds.length > 0 &&
+                    bodyStepIds.every((id) => openBodies.has(id));
+                  const toggleAll = () =>
+                    setOpenBodies((prev) => {
+                      const next = new Set(prev);
+                      if (allOpen) bodyStepIds.forEach((id) => next.delete(id));
+                      else bodyStepIds.forEach((id) => next.add(id));
+                      return next;
+                    });
                   let mainIdx = 0;
-                  return flattenSteps(p.steps).map(({ step: s, depth }) => (
-                    <div
-                      key={s.id}
-                      className="bg-background/50 group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5"
-                      style={depth > 0 ? { marginLeft: depth * 24 } : undefined}
-                    >
-                      {depth === 0 ? (
-                        <span className="text-muted-foreground w-4 text-center text-[11px] tabular-nums">
-                          {++mainIdx}
-                        </span>
-                      ) : (
-                        <CornerDownRight className="text-muted-foreground size-3.5 w-4 shrink-0" />
+                  return (
+                    <>
+                      {bodyStepIds.length > 0 && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={toggleAll}
+                            className="text-muted-foreground hover:text-foreground text-[11px]"
+                          >
+                            {allOpen ? "Collapse all" : "Open all bodies"}
+                          </button>
+                        </div>
                       )}
-                      <span
-                        className={`size-2 shrink-0 rounded-full ${(STEP_STATUS[s.status] ?? STEP_STATUS.planned).dot}`}
-                        title={
-                          (STEP_STATUS[s.status] ?? STEP_STATUS.planned).title
-                        }
-                      />
-                      <span className="border-border text-muted-foreground rounded border px-1.5 py-0.5 text-[10px] font-medium">
-                        {CHANNEL_LABEL[s.channel] ?? s.channel}
-                      </span>
-                      {s.system && (
-                        <span className="bg-accent rounded px-1.5 py-0.5 text-[10px] font-medium">
-                          {SYSTEM_LABEL[s.system] ?? s.system}
-                        </span>
-                      )}
-                      <span className="truncate text-sm">{s.name}</span>
-                      {depth > 0 && s.branchLabel && (
-                        <span className="text-muted-foreground rounded border border-dashed px-1.5 py-0.5 text-[10px] italic">
-                          {s.branchLabel}
-                        </span>
-                      )}
-                      {formatDelay(s.delayMinutes, s.delayLabel) && (
-                        <span className="text-muted-foreground text-[11px]">
-                          {formatDelay(s.delayMinutes, s.delayLabel)}
-                        </span>
-                      )}
-                      {s.url && (
-                        <a
-                          href={s.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground"
-                          title={s.url}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="size-3" />
-                        </a>
-                      )}
-                      {s.campaign && (
-                        <span
-                          className="text-muted-foreground ml-1 flex items-center gap-1 text-[10px]"
-                          title={`Delivered by ${s.campaign.name}`}
-                        >
-                          <span
-                            className={`size-1.5 rounded-full ${RUN_DOT[s.campaign.runState] ?? "bg-muted-foreground"}`}
-                          />
-                          via CIO
-                        </span>
-                      )}
-                      <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-6"
-                          onClick={() => {
-                            setStepProgramId(p.id);
-                            setEditingStep({
-                              id: s.id,
-                              programId: p.id,
-                              name: s.name,
-                              channel: s.channel,
-                              status: s.status,
-                              system: s.system,
-                              delayMinutes: s.delayMinutes,
-                              subject: s.subject,
-                              body: s.body,
-                              url: s.url,
-                              campaignId: s.campaignId,
-                              parentStepId: s.parentStepId,
-                              branchLabel: s.branchLabel,
-                            });
-                            setStepOpen(true);
-                          }}
-                        >
-                          <Pencil className="size-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-6"
-                          onClick={() => removeStep.mutate({ id: s.id })}
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ));
+                      {flattenSteps(p.steps).map(({ step: s, depth }) => {
+                        const hasContent = Boolean(s.subject || s.body);
+                        const open = openBodies.has(s.id);
+                        return (
+                          <div
+                            key={s.id}
+                            style={
+                              depth > 0
+                                ? { marginLeft: depth * 24 }
+                                : undefined
+                            }
+                          >
+                            <div className="bg-background/50 group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5">
+                              {depth === 0 ? (
+                                <span className="text-muted-foreground w-4 text-center text-[11px] tabular-nums">
+                                  {++mainIdx}
+                                </span>
+                              ) : (
+                                <CornerDownRight className="text-muted-foreground size-3.5 w-4 shrink-0" />
+                              )}
+                              <span
+                                className={`size-2 shrink-0 rounded-full ${(STEP_STATUS[s.status] ?? STEP_STATUS.planned).dot}`}
+                                title={
+                                  (STEP_STATUS[s.status] ?? STEP_STATUS.planned)
+                                    .title
+                                }
+                              />
+                              <span className="border-border text-muted-foreground rounded border px-1.5 py-0.5 text-[10px] font-medium">
+                                {CHANNEL_LABEL[s.channel] ?? s.channel}
+                              </span>
+                              {s.system && (
+                                <span className="bg-accent rounded px-1.5 py-0.5 text-[10px] font-medium">
+                                  {SYSTEM_LABEL[s.system] ?? s.system}
+                                </span>
+                              )}
+                              {hasContent ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleBody(s.id)}
+                                  className="hover:text-foreground flex min-w-0 items-center gap-1 text-left text-sm"
+                                  title="Show subject + body"
+                                >
+                                  {open ? (
+                                    <ChevronDown className="size-3 shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="size-3 shrink-0" />
+                                  )}
+                                  <span className="truncate">{s.name}</span>
+                                </button>
+                              ) : (
+                                <span className="truncate text-sm">
+                                  {s.name}
+                                </span>
+                              )}
+                              {depth > 0 && s.branchLabel && (
+                                <span className="text-muted-foreground rounded border border-dashed px-1.5 py-0.5 text-[10px] italic">
+                                  {s.branchLabel}
+                                </span>
+                              )}
+                              {formatDelay(s.delayMinutes, s.delayLabel) && (
+                                <span className="text-muted-foreground text-[11px]">
+                                  {formatDelay(s.delayMinutes, s.delayLabel)}
+                                </span>
+                              )}
+                              {s.url && (
+                                <a
+                                  href={s.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-foreground"
+                                  title={s.url}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="size-3" />
+                                </a>
+                              )}
+                              {s.campaign && (
+                                <span
+                                  className="text-muted-foreground ml-1 flex items-center gap-1 text-[10px]"
+                                  title={`Delivered by ${s.campaign.name}`}
+                                >
+                                  <span
+                                    className={`size-1.5 rounded-full ${RUN_DOT[s.campaign.runState] ?? "bg-muted-foreground"}`}
+                                  />
+                                  via CIO
+                                </span>
+                              )}
+                              <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-6"
+                                  onClick={() => {
+                                    setStepProgramId(p.id);
+                                    setEditingStep({
+                                      id: s.id,
+                                      programId: p.id,
+                                      name: s.name,
+                                      channel: s.channel,
+                                      status: s.status,
+                                      system: s.system,
+                                      delayMinutes: s.delayMinutes,
+                                      subject: s.subject,
+                                      body: s.body,
+                                      url: s.url,
+                                      campaignId: s.campaignId,
+                                      parentStepId: s.parentStepId,
+                                      branchLabel: s.branchLabel,
+                                    });
+                                    setStepOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="size-3" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-6"
+                                  onClick={() => removeStep.mutate({ id: s.id })}
+                                >
+                                  <Trash2 className="size-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            {open && hasContent && (
+                              <div className="bg-background/30 mt-1 ml-6 rounded-lg border px-3 py-2 text-xs">
+                                {s.subject && (
+                                  <div className="text-foreground/90 font-medium">
+                                    Subject: {s.subject}
+                                  </div>
+                                )}
+                                {s.body && (
+                                  <pre className="text-muted-foreground mt-1 font-sans whitespace-pre-wrap">
+                                    {s.body}
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
                 })()}
 
                 <Button
