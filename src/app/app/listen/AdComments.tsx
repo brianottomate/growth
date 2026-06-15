@@ -75,7 +75,7 @@ export async function AdComments() {
       ) : (
         <ul className="divide-y rounded-lg border bg-card">
           {top.map((c, idx) => {
-            const id = c.id ?? c._id ?? idx;
+            const id = c.id ?? c._id ?? `idx-${idx}`;
             const author = c.from?.name ?? "Unknown";
             const body = (c.message ?? c.content ?? "").trim();
             const short = body.length > 280 ? `${body.slice(0, 280)}…` : body;

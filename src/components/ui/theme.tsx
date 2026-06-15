@@ -112,7 +112,16 @@ const ThemeContext = React.createContext<ThemeContextProps | undefined>(
 );
 
 export function ThemeProvider({ children }: React.PropsWithChildren) {
-  const [themeMode, setThemeMode] = React.useState(getStoredThemeMode);
+  // Initialize deterministically so the server-rendered HTML and the first
+  // client render agree (both "dark"). Reading localStorage during the initial
+  // render would diverge from the server and cause a hydration mismatch — the
+  // visible CSS is already correct pre-hydration via `themeDetectorScript`.
+  const [themeMode, setThemeMode] = React.useState<ThemeMode>("dark");
+
+  // After mount, sync to the real stored preference.
+  React.useEffect(() => {
+    setThemeMode(getStoredThemeMode());
+  }, []);
 
   React.useEffect(() => {
     if (themeMode !== "auto") return;

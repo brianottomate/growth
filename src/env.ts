@@ -80,6 +80,7 @@ export const env = createEnv({
     R2_PUBLIC_BASE_URL: z.string().url().optional(), // public domain/r2.dev URL mapped to the bucket
     CLOUDFLARE_STREAM_TOKEN: z.string().optional(), // API token with Stream:Edit
     CLOUDFLARE_STREAM_WEBHOOK_SECRET: z.string().optional(), // Stream webhook signing secret
+    RESEND_WEBHOOK_SECRET: z.string().optional(), // Resend inbound webhook signing secret (whsec_…)
   },
 
   /**
@@ -180,6 +181,7 @@ export const env = createEnv({
     R2_PUBLIC_BASE_URL: process.env.R2_PUBLIC_BASE_URL,
     CLOUDFLARE_STREAM_TOKEN: process.env.CLOUDFLARE_STREAM_TOKEN,
     CLOUDFLARE_STREAM_WEBHOOK_SECRET: process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
+    RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

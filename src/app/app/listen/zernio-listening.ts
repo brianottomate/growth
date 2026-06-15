@@ -102,10 +102,26 @@ export const getRecentAdComments = unstable_cache(
     // the tree flags as having comments, so this covers every commented ad.
     const res = await listAllZernioAdComments({ perAdLimit: 25 });
     const cutoff = Date.now() - WINDOW_MS;
-    const comments = res.comments.filter((c) => {
+    const inWindow = res.comments.filter((c) => {
       const t = commentTimeMs(c);
       return t === null || t >= cutoff;
     });
+
+    // The same underlying FB/IG comment surfaces once per ad creative that
+    // points at its post (multiple ads can share one post), so the ad tree
+    // returns duplicate comment ids. Dedup by comment id — keep the first
+    // occurrence (its adName is as good as any). Comments without an id are
+    // kept as-is (each is a distinct object).
+    const seen = new Set<string>();
+    const comments = inWindow.filter((c) => {
+      const id = c.id ?? c._id;
+      if (id == null) return true;
+      const key = String(id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     return { ...res, comments, recentCount: comments.length };
   },
   ["zernio-recent-ad-comments-v1"],

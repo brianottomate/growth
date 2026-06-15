@@ -15,4 +15,5 @@ export * from "./amplification-schema";
 export * from "./cadence-schema";
 export * from "./leads-schema";
 export * from "./lifecycle-schema";
+export * from "./listening-schema";
 export * from "./media-schema";

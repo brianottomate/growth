@@ -6,6 +6,7 @@ import { channelRouter } from "@/server/api/routers/channel.router";
 import { channelSuggestionRouter } from "@/server/api/routers/channelSuggestion.router";
 import { contentRouter } from "@/server/api/routers/content.router";
 import { inboxRouter } from "@/server/api/routers/inbox.router";
+import { initiativeRouter } from "@/server/api/routers/initiative.router";
 import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
@@ -33,6 +34,7 @@ export const appRouter = createTRPCRouter({
   channelSuggestion: channelSuggestionRouter,
   content: contentRouter,
   inbox: inboxRouter,
+  initiative: initiativeRouter,
   newsletter: newsletterRouter,
   org: orgRouter,
   outreach: outreachRouter,

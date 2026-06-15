@@ -4,7 +4,7 @@
 // terms aligned with the Reddit keyword filter.
 
 export interface XWatchlistGroup {
-  id: "brand" | "pain" | "thesis";
+  id: "brand" | "competitors" | "pain" | "thesis";
   name: string;
   terms: readonly string[];
   // Static Tailwind classes (literal strings so the scanner picks them up).
@@ -25,9 +25,25 @@ export const X_WATCHLIST: readonly XWatchlistGroup[] = [
     activeCardClass: "border-emerald-500/40 bg-emerald-500/5",
   },
   {
+    id: "competitors",
+    name: "Competitors",
+    terms: ["Hostaway", "Guesty", "OwnerRez", "Hospitable", "Lodgify"],
+    dotClass: "bg-rose-500",
+    textClass: "text-rose-400",
+    markClass: "rounded-[3px] bg-rose-500/15 px-0.5 text-inherit",
+    activeCardClass: "border-rose-500/40 bg-rose-500/5",
+  },
+  {
     id: "pain",
     name: "STR pain",
-    terms: ["fire my property manager", "OTA fees"],
+    terms: [
+      "fire my property manager",
+      "OTA fees",
+      "OTA commission",
+      "Airbnb fees too high",
+      "switching from Airbnb",
+      "tired of OTAs",
+    ],
     dotClass: "bg-amber-500",
     textClass: "text-amber-400",
     markClass: "rounded-[3px] bg-amber-500/15 px-0.5 text-inherit",
@@ -36,7 +52,13 @@ export const X_WATCHLIST: readonly XWatchlistGroup[] = [
   {
     id: "thesis",
     name: "Direct booking",
-    terms: ["Airbnb alternative", "direct booking site"],
+    terms: [
+      "Airbnb alternative",
+      "direct booking site",
+      "direct booking platform",
+      "own booking website",
+      "need my own website",
+    ],
     dotClass: "bg-purple-500",
     textClass: "text-purple-400",
     markClass: "rounded-[3px] bg-purple-500/15 px-0.5 text-inherit",

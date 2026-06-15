@@ -27,7 +27,12 @@ Wander has three products relevant to this scoring task:
 You are scoring tweets so the marketing team knows where to engage in real
 time. Tweets are short — be liberal about asking yourself what the OP probably
 means. Reserve relevance 8+ for tweets where a Wander product directly solves
-the OP's problem and a reply would add value to the thread.`;
+the OP's problem and a reply would add value to the thread.
+
+Key competitors (mentions are high-signal):
+- Hostaway, Guesty, OwnerRez, Hospitable, Lodgify, Streamline, Escapia
+- Tweets complaining about or comparing these competitors are prime
+  engagement opportunities.`;
 
 const DRAFT_SYSTEM_PROMPT = `You write Twitter / X reply drafts for the Wander
 growth team. Reddit etiquette doesn't apply here; tweets are short, casual,

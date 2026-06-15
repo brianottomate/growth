@@ -12,10 +12,16 @@ import {
 export { SUGGESTED_ACTIONS, type SuggestedAction };
 
 export const TIER_1_SUBREDDITS = [
+  // Core STR operator communities
   "ShortTermRentals",
   "AirbnbHosts",
   "VRBOHosts",
   "PropertyManagement",
+  // Adjacent — operators earlier in their journey
+  "airbnb",
+  "vrbo",
+  "realestateinvesting",
+  "Landlord",
 ];
 
 const USER_AGENT =
@@ -35,7 +41,17 @@ You are scoring Reddit posts from STR-operator subreddits so the marketing team
 knows where to engage in real time. Most posts will be noise (tenant placement,
 maintenance, geography-specific tax questions, generic complaints) — be
 discerning. Reserve relevance 8+ for posts where a Wander product genuinely
-solves the OP's problem and engaging would add value to the thread.`;
+solves the OP's problem and engaging would add value to the thread.
+
+Key competitors to watch for (mentions of these are high-signal):
+- Hostaway, Guesty, OwnerRez, Hospitable, Lodgify, Streamline, Escapia
+- Posts complaining about or switching from these competitors are prime
+  engagement opportunities for Wander.
+
+High-intent language to watch for:
+- "alternative to [competitor]", "switching from", "looking for",
+  "anyone using", "vs", "recommend", "OTA fees", "direct booking"
+- These indicate active evaluation — score them higher.`;
 
 const DRAFT_SYSTEM_PROMPT = `You write Reddit reply drafts for the Wander
 growth team. Reddit punishes self-promotion, so every reply must:
