@@ -19,6 +19,7 @@ import "@xyflow/react/dist/style.css";
 import { ExternalLink, Zap } from "lucide-react";
 
 import { applyDagreLayout } from "@/components/flow/dagre-layout";
+import { useTheme } from "@/components/ui/theme";
 import type {
   LifecycleRunState,
   LifecycleStepStatus,
@@ -260,6 +261,7 @@ export function ProgramFlow({
   program: { name: string; intendedTrigger: string | null };
   steps: FlowStep[];
 }) {
+  const { resolvedTheme } = useTheme();
   const { nodes, edges } = useMemo(
     () => buildGraph(program, steps),
     [program, steps],
@@ -283,6 +285,7 @@ export function ProgramFlow({
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            colorMode={resolvedTheme}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             minZoom={0.3}
