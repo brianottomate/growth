@@ -201,7 +201,7 @@ function buildGraph(
       id: s.id,
       type: "step",
       position: { x: 0, y: 0 },
-      data: s as unknown as Record<string, unknown>,
+      data: s,
     });
   }
 
@@ -215,8 +215,8 @@ function buildGraph(
         source: prev,
         target: r.id,
         label: formatDelay(r.delayMinutes, r.delayLabel) ?? undefined,
-        labelStyle: { fontSize: 10, fill: "var(--muted-foreground)" },
-        labelBgStyle: { fill: "var(--card)" },
+        labelStyle: { fontSize: 10, fill: "var(--color-muted-foreground)" },
+        labelBgStyle: { fill: "var(--color-card)" },
         style: { strokeWidth: 1.5 },
       });
     }
@@ -232,8 +232,8 @@ function buildGraph(
       source: s.parentStepId!,
       target: s.id,
       label: s.branchLabel ?? undefined,
-      labelStyle: { fontSize: 10, fill: "var(--muted-foreground)" },
-      labelBgStyle: { fill: "var(--card)" },
+      labelStyle: { fontSize: 10, fill: "var(--color-muted-foreground)" },
+      labelBgStyle: { fill: "var(--color-card)" },
       style: { strokeWidth: 1.5, strokeDasharray: "5 4" },
       animated: true,
     });

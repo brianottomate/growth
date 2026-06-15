@@ -42,6 +42,7 @@ const KIND_LABEL: Record<string, string> = {
   transactional: "Transactional",
   behavioral: "Behavioral",
   broadcast: "Broadcast",
+  outbound: "Outbound",
   other: "Other",
 };
 
@@ -153,7 +154,10 @@ export function LifecycleStrategy({
   const [stepOpen, setStepOpen] = useState(false);
   const [stepProgramId, setStepProgramId] = useState("");
   const [editingStep, setEditingStep] = useState<StepDraft>();
-  const [wsFilter, setWsFilter] = useState<"all" | LifecycleWorkspace>("all");
+  // Workspace filter, plus a cross-cutting "outbound" (sales) filter on kind.
+  const [wsFilter, setWsFilter] = useState<
+    "all" | LifecycleWorkspace | "outbound"
+  >("all");
 
   const invalidate = () =>
     queryClient.invalidateQueries(trpc.lifecycle.overview.queryOptions());
@@ -186,11 +190,14 @@ export function LifecycleStrategy({
   const programs =
     wsFilter === "all"
       ? allPrograms
-      : allPrograms.filter((p) => p.workspace === wsFilter);
+      : wsFilter === "outbound"
+        ? allPrograms.filter((p) => p.kind === "outbound")
+        : allPrograms.filter((p) => p.workspace === wsFilter);
   const campaigns = data?.campaigns ?? [];
   const gaps = programs.filter((p) => p.coverage === "gap").length;
   const wsCount = (ws: LifecycleWorkspace) =>
     allPrograms.filter((p) => p.workspace === ws).length;
+  const outboundCount = allPrograms.filter((p) => p.kind === "outbound").length;
 
   function openCreateProgram() {
     setEditingProgram(undefined);
@@ -231,6 +238,7 @@ export function LifecycleStrategy({
             ["marketplace", `Marketplace · ${wsCount("marketplace")}`],
             ["os", `WanderOS · ${wsCount("os")}`],
             ["shared", `Shared · ${wsCount("shared")}`],
+            ["outbound", `Outbound · ${outboundCount}`],
           ] as const
         ).map(([v, l]) => (
           <button
