@@ -157,6 +157,12 @@ export function SignalHub({
                 description="Free Reddit/HN/Lobsters alerts. Already integrated above. Pipe via Resend inbound webhook for real-time processing."
                 tag="free ✓"
               />
+              <ToolCard
+                name="Reddit Insights"
+                href="https://chromewebstore.google.com/detail/reddit-insights/oehlhkdmigpcpcjkpfklbmnppiddhgfi"
+                description="Chrome extension that shows account age, karma, and activity inline on any Reddit profile/post — spot the bad eggs (brand-new low-karma accounts, karma farmers) before engaging. Manual vet for now until we wire author trust signals into the feed."
+                tag="Chrome · free"
+              />
             </div>
 
             <h3 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -167,6 +173,24 @@ export function SignalHub({
                 name="Peec.ai"
                 href="https://peec.ai/pricing"
                 description="Track brand visibility in ChatGPT, Perplexity, Gemini, AI Overviews, Copilot. 2000+ marketing teams. MCP + API."
+                tag="evaluate"
+              />
+              <ToolCard
+                name="Profound"
+                href="https://www.tryprofound.com/"
+                description="Answer Engine Optimization platform. Tracks brand presence and citations across ChatGPT, Perplexity, Gemini, Copilot; agent analytics + conversation insights. Enterprise-leaning."
+                tag="evaluate"
+              />
+              <ToolCard
+                name="PromptWatch"
+                href="https://promptwatch.com"
+                description="Monitor how your brand shows up across LLM answers — prompt-level tracking, share-of-voice, competitor comparison."
+                tag="evaluate"
+              />
+              <ToolCard
+                name="Semrush"
+                href="https://semrush.com"
+                description="SEO incumbent with an AI Toolkit / AI visibility layer — tracks brand mentions and sentiment across ChatGPT, Perplexity, Gemini, AI Overviews. Useful if we already lean on Semrush for SEO."
                 tag="evaluate"
               />
             </div>
