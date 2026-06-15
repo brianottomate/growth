@@ -15,6 +15,13 @@ import {
   identifyServerUser,
 } from "@/server/services/analytics.service";
 
+// External collaborators allowed past the @wander.com sign-up gate. Keep this
+// short and intentional — each entry is a deliberate exception. Lowercase only
+// (emails are normalized before the check).
+const ALLOWED_EXTERNAL_EMAILS = new Set<string>([
+  "hashimwarren@gmail.com", // Hashim Warren
+]);
+
 export const auth = betterAuth({
   // Base URL for auth links (verification emails, password reset, etc.)
   // Falls back to VERCEL_URL in preview/production, or localhost in development
@@ -132,7 +139,7 @@ export const auth = betterAuth({
         // creation path (email/password + Google OAuth).
         before: async (user) => {
           const email = user.email?.toLowerCase() ?? "";
-          if (!email.endsWith("@wander.com")) {
+          if (!email.endsWith("@wander.com") && !ALLOWED_EXTERNAL_EMAILS.has(email)) {
             throw new APIError("BAD_REQUEST", {
               message:
                 "Sign-ups are restricted to @wander.com email addresses.",
