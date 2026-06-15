@@ -53,6 +53,7 @@ export type ConnectionStatus =
 export const deliveryProviderEnum = pgEnum("delivery_provider", [
   "zernio",
   "customerio",
+  "instantly",
   "native",
   "manual",
 ]);

@@ -12,6 +12,7 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ProgramFlow } from "./ProgramFlow";
+import { ExportToClaudeButton } from "./ExportToClaudeButton";
 
 const WORKSPACE_LABEL: Record<string, string> = {
   marketplace: "Marketplace",
@@ -78,6 +79,24 @@ export default async function ProgramFlowPage({
             {program.description ? ` — ${program.description}` : ""}
           </p>
         </div>
+        <ExportToClaudeButton
+          program={{
+            name: program.name,
+            description: program.description,
+            kind: program.kind,
+            workspace: program.workspace,
+            intendedTrigger: program.intendedTrigger,
+          }}
+          steps={program.steps.map((s) => ({
+            name: s.name,
+            delayMinutes: s.delayMinutes,
+            delayLabel: s.delayLabel,
+            channel: s.channel,
+            system: s.system,
+            subject: s.subject,
+            body: s.body,
+          }))}
+        />
       </div>
 
       <ProgramFlow

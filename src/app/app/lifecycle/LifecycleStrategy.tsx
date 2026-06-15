@@ -428,6 +428,7 @@ export function LifecycleStrategy({
                               system: s.system,
                               delayMinutes: s.delayMinutes,
                               subject: s.subject,
+                              body: s.body,
                               url: s.url,
                               campaignId: s.campaignId,
                               parentStepId: s.parentStepId,

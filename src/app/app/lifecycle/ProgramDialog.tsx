@@ -55,6 +55,7 @@ const KINDS = [
   ["transactional", "Transactional"],
   ["behavioral", "Behavioral"],
   ["broadcast", "Broadcast"],
+  ["outbound", "Outbound (cold prospecting)"],
   ["other", "Other"],
 ] as const;
 

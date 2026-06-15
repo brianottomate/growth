@@ -23,6 +23,7 @@ export const lifecycleKindEnum = pgEnum("lifecycle_kind", [
   "transactional",
   "behavioral",
   "broadcast",
+  "outbound", // cold prospecting / sales outreach (Instantly, BDR sequences)
   "other",
 ]);
 export type LifecycleKind = (typeof lifecycleKindEnum.enumValues)[number];
@@ -60,6 +61,7 @@ export const lifecycleStepSystemEnum = pgEnum("lifecycle_step_system", [
   "resend", // in-app email (growth app and friends)
   "postmark", // product notification email (monolith os-notifications)
   "outreach",
+  "instantly", // cold-email sequences (leads prospecting)
   "amplitude",
   "system", // product/backend (in-app surfaces, webhooks, push)
   "human", // BDR / concierge / manual touch
@@ -220,6 +222,7 @@ export const lifecycleProgramStepTable = pgTable(
     // Dormant — no UI yet; derived label from delayMinutes is shown when null.
     delayLabel: t.text(),
     subject: t.text(), // email subject / message gist
+    body: t.text(), // the actual authored copy (markdown/HTML) — the spec we review & ship
     url: t.text(), // optional link out to where the resource is defined
 
     // Branching: a step with a parent hangs off that step as a conditional

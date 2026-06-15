@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ export type StepDraft = {
   system?: LifecycleStepSystem | null;
   delayMinutes?: number | null;
   subject?: string | null;
+  body?: string | null;
   url?: string | null;
   campaignId?: string | null;
   parentStepId?: string | null;
@@ -77,6 +79,7 @@ const SYSTEMS: [LifecycleStepSystem, string][] = [
   ["resend", "Resend (in-app email)"],
   ["postmark", "Postmark (product email)"],
   ["outreach", "Outreach"],
+  ["instantly", "Instantly (cold email)"],
   ["amplitude", "Amplitude"],
   ["system", "Product / backend"],
   ["human", "Human (BDR / concierge)"],
@@ -127,6 +130,7 @@ export function StepDialog({
   const [delayAmount, setDelayAmount] = useState(initialDelay.amount);
   const [delayUnit, setDelayUnit] = useState<DelayUnit>(initialDelay.unit);
   const [subject, setSubject] = useState(initial?.subject ?? "");
+  const [body, setBody] = useState(initial?.body ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
   const [campaignId, setCampaignId] = useState(initial?.campaignId ?? NONE);
   const [system, setSystem] = useState(initial?.system ?? NONE);
@@ -144,6 +148,7 @@ export function StepDialog({
     setDelayAmount(d.amount);
     setDelayUnit(d.unit);
     setSubject(initial?.subject ?? "");
+    setBody(initial?.body ?? "");
     setUrl(initial?.url ?? "");
     setCampaignId(initial?.campaignId ?? NONE);
     setSystem(initial?.system ?? NONE);
@@ -187,6 +192,7 @@ export function StepDialog({
       system: system === NONE ? null : (system as LifecycleStepSystem),
       delayMinutes,
       subject: subject.trim() || null,
+      body: body.trim() || null,
       url: url.trim() || null,
       campaignId: campaignId === NONE ? null : campaignId,
       parentStepId: parentStepId === NONE ? null : parentStepId,
@@ -296,6 +302,20 @@ export function StepDialog({
                 placeholder="Welcome to Wander"
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="step-body">Copy</Label>
+            <Textarea
+              id="step-body"
+              value={body ?? ""}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={
+                "The actual email copy. Merge tags like {{firstName}} / {{companyName}} render in Instantly."
+              }
+              rows={6}
+              className="font-mono text-xs"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -122,6 +122,7 @@ const stepFields = {
   delayMinutes: z.number().int().min(0).max(525600).nullish(), // ≤ 1 year
   delayLabel: z.string().max(100).nullish(),
   subject: z.string().max(500).nullish(),
+  body: z.string().max(20000).nullish(),
   url: z.string().max(2000).nullish(),
   campaignId: z.string().nullish(),
   parentStepId: z.string().nullish(),
