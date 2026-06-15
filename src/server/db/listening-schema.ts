@@ -1,5 +1,11 @@
-import { index, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { brandTable } from "./brand-schema";
+import {
+  type ChannelFingerprint,
+  channelPlatformEnum,
+  channelTable,
+} from "./channel-schema";
 import { createId } from "./utils";
 
 // ---- SOCIAL LISTENING: MENTIONS ------------------------------------
@@ -101,3 +107,114 @@ export const mentionTable = pgTable(
 
 export type Mention = typeof mentionTable.$inferSelect;
 export type MentionInsert = typeof mentionTable.$inferInsert;
+
+// ---- SOCIAL LISTENING: SOURCE CONFIG -------------------------------
+//
+// `listening_source` is the strategic unit: one row = one configured place we
+// listen. It replaces the scattered hardcoded constants (TIER_1_SUBREDDITS,
+// X_WATCHLIST, ORGANIC_COMMENT_PLATFORMS) one at a time. Crucially it holds
+// CONFIG ONLY — results always land in `mention` (F5Bot already proves that
+// path; scheduled scans will write there too).
+//
+// Behaviour is the cross-product of FOUR independent axes (no conflated "mode"):
+//   platform     — the SURFACE (reuses channelPlatformEnum; market & owned share it)
+//   acquisition  — the SHAPE  (keyword_search | owned_inbound | provider_alert)  ← market-vs-owned lives here
+//   trigger      — the CADENCE (on_demand | scheduled[+cron] | webhook)
+//   adapter      — the CONNECTOR (free-text slug, like mention.provider) — new providers are zero-migration
+//
+// e.g. X = keyword_search · scheduled · "x-search"; F5Bot = provider_alert ·
+// webhook · "f5bot"; Reddit = keyword_search · on_demand (flip to scheduled
+// later by changing one field, no migration).
+
+export const acquisitionShapeEnum = pgEnum("acquisition_shape", [
+  "keyword_search", // build a query over an external market surface (Reddit/X/LinkedIn/Pinterest)
+  "owned_inbound", // DMs / comments on an owned account (IG/FB/LI)
+  "provider_alert", // a provider pushes hits to us (F5Bot today)
+]);
+export type AcquisitionShape =
+  (typeof acquisitionShapeEnum.enumValues)[number];
+
+export const listeningTriggerEnum = pgEnum("listening_trigger", [
+  "on_demand", // a "Scan now" button
+  "scheduled", // a cron picks it up (uses scheduleCron)
+  "webhook", // a provider pushes (F5Bot via Resend inbound)
+]);
+export type ListeningTrigger =
+  (typeof listeningTriggerEnum.enumValues)[number];
+
+/** Source-specific targeting. Typed jsonb so each adapter shapes its own config. */
+export type ListeningSourceConfig = {
+  subreddits?: string[]; // reddit
+  keywords?: string[]; // x / linkedin / pinterest terms
+  watchlistGroups?: { id: string; name: string; terms: string[] }[]; // x
+  windowDays?: number;
+  ignoreList?: string[]; // e.g. F5Bot ad-block senders
+  maxResults?: number;
+};
+
+export const listeningSourceTable = pgTable(
+  "listening_source",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("lsrc")),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    // Stable slug — idempotent seeds + stable references. (label is display-only.)
+    key: t.text().notNull(),
+
+    // --- the four axes ---
+    platform: channelPlatformEnum().notNull(),
+    acquisition: acquisitionShapeEnum().notNull(),
+    trigger: listeningTriggerEnum().notNull(),
+    scheduleCron: t.text(), // only when trigger = scheduled
+    adapter: t.text().notNull(), // connector slug, e.g. "reddit-json", "x-search", "f5bot"
+
+    // --- targeting / voice / judgment ---
+    config: t.jsonb().$type<ListeningSourceConfig>().default({}),
+    // Per-source voice override — reuses the publishing fingerprint shape
+    // (append, or replace the brand voice when overridesBrand is set).
+    voiceOverride: t.jsonb().$type<ChannelFingerprint>(),
+    signalNotes: t.text(), // per-source judgment layered over brand.brandListeningStory
+
+    // --- the market-vs-owned link ---
+    // Owned-inbound points at the publishing channel; null for market listening.
+    channelId: t
+      .text()
+      .references(() => channelTable.id, { onDelete: "set null" }),
+
+    // --- ops + parallel-run migration ---
+    label: t.text(),
+    isActive: t.boolean().default(true).notNull(),
+    // Parallel-run flag: while true, read config for comparison but DON'T let it
+    // drive the live scan. Flip to false to make this row authoritative, then the
+    // hardcoded constant can be deleted.
+    shadow: t.boolean().default(true).notNull(),
+    lastScanAt: t.timestamp(),
+    nextScanAt: t.timestamp(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("listening_source_brand_key_uq").on(table.brandId, table.key),
+    index("listening_source_active_trigger_idx").on(
+      table.isActive,
+      table.trigger,
+    ),
+    index("listening_source_brand_idx").on(table.brandId),
+  ],
+);
+
+export type ListeningSource = typeof listeningSourceTable.$inferSelect;
+export type ListeningSourceInsert = typeof listeningSourceTable.$inferInsert;

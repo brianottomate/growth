@@ -82,6 +82,19 @@ export type BrandFingerprint = {
   postsAnalyzed?: number;
 };
 
+// The shared listening "story" — the WHAT-is-signal judgment + reply guidance,
+// reused across every listening source (the sibling of the publishing
+// fingerprint). VOICE is NOT duplicated here: it's read from brandFingerprint
+// (posting voice == replying voice). This carries only the listening-specific
+// judgment that's currently copy-pasted into each monitor's system prompt.
+export type BrandListeningStory = {
+  signalGuidance: string; // what counts as high/low signal; what's worth engaging
+  replyGuidance: string; // how we reply — etiquette + the "Wander Test"
+  productBoilerplate?: string; // the WanderOS / Sites / Operated framing
+  updatedBy?: string;
+  updatedAt?: string;
+};
+
 // Raw AI market research blob (Parallel AI etc.). Pillars get promoted to a
 // real table later; this keeps the loose source data.
 export type BrandIndustryResearch = {
@@ -158,6 +171,8 @@ export const brandTable = pgTable(
     websiteMeta: t.jsonb().$type<BrandWebsiteMeta>(),
     brandIdentity: t.jsonb().$type<BrandIdentity>(),
     brandFingerprint: t.jsonb().$type<BrandFingerprint>(),
+    // Shared listening judgment + reply guidance (voice still from brandFingerprint).
+    brandListeningStory: t.jsonb().$type<BrandListeningStory>(),
     industryResearch: t.jsonb().$type<BrandIndustryResearch>(),
 
     // Named external links (tracker Sheets, docs, dashboards) shown on the card.

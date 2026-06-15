@@ -28,6 +28,9 @@ export const channelPlatformEnum = pgEnum("channel_platform", [
   "threads",
   "reddit",
   "pinterest",
+  // listening-only surfaces (no owned channel; used by listening_source.platform)
+  "hackernews",
+  "lobsters",
   // ads
   "google_ads",
   "meta_ads",
