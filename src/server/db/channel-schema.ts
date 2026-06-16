@@ -59,6 +59,7 @@ export const deliveryProviderEnum = pgEnum("delivery_provider", [
   "instantly",
   "native",
   "manual",
+  "email_forward", // forwarded inbound email (e.g. a competitor newsletter we subscribed to)
 ]);
 export type DeliveryProvider =
   (typeof deliveryProviderEnum.enumValues)[number];

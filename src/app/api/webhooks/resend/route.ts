@@ -4,12 +4,15 @@ import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { resend } from "@/server/clients/resend.client";
 import { ingestF5BotEmail } from "@/server/services/f5bot.service";
+import { ingestInspirationEmail } from "@/server/services/inspiration-newsletter.service";
 
 // Resend inbound webhook. Fires `email.received` when mail lands on our
 // receiving domain (e.g. f5bot@lexaomo.resend.app). The webhook payload carries
 // only METADATA — no body — so we fetch the full email via the Received API.
-// We route by recipient local-part: f5bot@… → the F5Bot pipeline. Add more
-// providers by pointing them at <provider>@… and branching below.
+// We route by recipient local-part:
+//   f5bot@…             → the F5Bot keyword-alert pipeline
+//   inspo+<brand>@…     → competitor-newsletter ingest (token names the brand)
+// Add more providers by pointing them at <provider>@… and branching below.
 
 interface ResendInboundEvent {
   type: string;
@@ -81,7 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     `[resend-webhook] fetched ${emailId}: html=${full.html?.length ?? 0}b text=${full.text?.length ?? 0}b`,
   );
 
-  // Route by recipient local-part. Today only f5bot; this is the fan-out point.
+  // Route by recipient local-part. This is the fan-out point.
   const recipient = to.join(",").toLowerCase();
   if (recipient.includes("f5bot")) {
     try {
@@ -95,6 +98,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`[resend-webhook] f5bot ingest:`, result);
     } catch (err) {
       console.error(`[resend-webhook] f5bot ingest failed for ${emailId}:`, err);
+    }
+  } else if (recipient.includes("inspo")) {
+    try {
+      const result = await ingestInspirationEmail({
+        id: emailId,
+        recipients: to,
+        from: full.from ?? event.data?.from ?? null,
+        subject: full.subject ?? event.data?.subject ?? "",
+        text: full.text,
+        html: full.html,
+        receivedAt: full.created_at ?? event.created_at,
+      });
+      console.log(`[resend-webhook] inspiration ingest:`, result);
+    } catch (err) {
+      console.error(`[resend-webhook] inspiration ingest failed for ${emailId}:`, err);
     }
   } else {
     console.log(`[resend-webhook] no handler for recipient "${recipient}" — ignored`);
