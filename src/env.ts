@@ -23,7 +23,7 @@ export const env = createEnv({
     ADMIN_TOKEN: z.string().min(32), // Require strong token (32+ chars)
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
-    FIRECRAWL_API_KEY: z.string().optional(), // For web scraping
+    FIRECRAWL_API_KEY: z.string().min(1), // For web scraping
     OUTREACH_S2S_GUID: z.string().optional(), // For Outreach S2S auth
     OUTREACH_PRIVATE_KEY: z.string().optional(), // For Outreach S2S JWT signing
     OUTREACH_INSTALL_ID: z.string().optional(), // For Outreach app installation
@@ -51,6 +51,7 @@ export const env = createEnv({
     META_AD_ACCOUNT_ID: z.string().optional(), // Meta ad account ID (e.g. act_885632...)
     // Instantly.ai (cold email outreach)
     INSTANTLY_API_KEY: z.string().optional(), // Instantly API v2 key (Bearer auth)
+    INSTANTLY_WEBHOOK_SECRET: z.string().optional(), // Shared secret sent as a header on Instantly webhooks
     // Minerva (lead enrichment)
     MINERVA_API_URL: z.string().url().default("https://api.minerva.io"), // Minerva API base URL (v2 default)
     MINERVA_API_KEY: z.string().min(1).optional(), // Minerva API key (x-api-key)
@@ -152,6 +153,7 @@ export const env = createEnv({
     META_AD_ACCOUNT_ID: process.env.META_AD_ACCOUNT_ID,
     // Instantly
     INSTANTLY_API_KEY: process.env.INSTANTLY_API_KEY,
+    INSTANTLY_WEBHOOK_SECRET: process.env.INSTANTLY_WEBHOOK_SECRET,
     // Minerva
     MINERVA_API_URL: process.env.MINERVA_API_URL,
     MINERVA_API_KEY: process.env.MINERVA_API_KEY,
