@@ -2,7 +2,7 @@ import "server-only";
 
 import { anthropic } from "@ai-sdk/anthropic";
 import { Output, generateText } from "ai";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/env";
@@ -10,6 +10,7 @@ import { r2PutBuffer } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
 import {
   brandTable,
+  channelTable,
   platformPostTable,
   type PlatformPostInsert,
 } from "@/server/db/schema";
@@ -141,6 +142,20 @@ export async function ingestInspirationEmail(email: {
 
   const receivedAt = email.receivedAt ? new Date(email.receivedAt) : new Date();
 
+  // Hang the issue off the brand's newsletter channel if one's been provisioned
+  // (brand.trackNewsletter). Optional — scraped peers can run channelId null.
+  const [channel] = await db
+    .select({ id: channelTable.id })
+    .from(channelTable)
+    .where(
+      and(
+        eq(channelTable.brandId, brand.id),
+        eq(channelTable.kind, "newsletter"),
+        isNull(channelTable.deletedAt),
+      ),
+    )
+    .limit(1);
+
   // Archive the rendered body to R2 (the inspiration artifact). Best-effort:
   // without storage we still capture the issue's metadata/extraction.
   let externalUrl: string | undefined;
@@ -178,6 +193,7 @@ export async function ingestInspirationEmail(email: {
   const insert: PlatformPostInsert = {
     id: createId("pp"),
     brandId: brand.id,
+    channelId: channel?.id,
     platform: "newsletter",
     username: email.from ?? undefined,
     source: "scraped",

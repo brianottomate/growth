@@ -9,11 +9,13 @@ import {
   brandInspirationTable,
   brandTable,
   brandTypeEnum,
+  channelTable,
   inspirationPurposeEnum,
   memberTable,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
+import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 
 type Ctx = {
@@ -316,5 +318,70 @@ export const brandRouter = createTRPCRouter({
         .delete(brandInspirationTable)
         .where(eq(brandInspirationTable.id, input.inspirationId));
       return { id: input.inspirationId };
+    }),
+
+  /**
+   * Start capturing a brand's newsletter. Provisions (or reuses) a newsletter
+   * `channel` on the brand whose handle is the per-brand inbound address; you
+   * subscribe to the competitor's newsletter with that address and forwarded
+   * issues land as platform_posts on this brand (see
+   * inspiration-newsletter.service.ts). The address token is the brand id, so
+   * the binding is created up front — ingest is a deterministic lookup.
+   */
+  trackNewsletter: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      const address = inspirationAddress(input.brandId);
+
+      const existing = await ctx.db.query.channelTable.findFirst({
+        where: and(
+          eq(channelTable.brandId, input.brandId),
+          eq(channelTable.kind, "newsletter"),
+          isNull(channelTable.deletedAt),
+        ),
+      });
+      if (existing) {
+        if (existing.handle !== address) {
+          await ctx.db
+            .update(channelTable)
+            .set({ handle: address, isActive: true })
+            .where(eq(channelTable.id, existing.id));
+        }
+        return { channelId: existing.id, address, created: false };
+      }
+
+      const [channel] = await ctx.db
+        .insert(channelTable)
+        .values({
+          id: createId("chan"),
+          brandId: input.brandId,
+          kind: "newsletter",
+          platform: "newsletter",
+          displayName: "Newsletter",
+          handle: address,
+          defaultProvider: "email_forward",
+        })
+        .returning();
+      return { channelId: channel!.id, address, created: true };
+    }),
+
+  /** Stop capturing a brand's newsletter — soft-delete the channel. Already
+   *  ingested issues are kept. */
+  untrackNewsletter: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      await ctx.db
+        .update(channelTable)
+        .set({ deletedAt: new Date(), isActive: false })
+        .where(
+          and(
+            eq(channelTable.brandId, input.brandId),
+            eq(channelTable.kind, "newsletter"),
+            isNull(channelTable.deletedAt),
+          ),
+        );
+      return { brandId: input.brandId };
     }),
 });
