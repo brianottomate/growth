@@ -1,27 +1,28 @@
 import "server-only";
 
+import { loadListeningContext } from "@/server/services/listening-config.service";
 import {
   SUGGESTED_ACTIONS,
+  composeListeningSystemPrompt,
   draftReply,
   scoreItems,
-  type DraftChannel,
   type ScoringChannel,
   type SuggestedAction,
 } from "@/server/services/triage.service";
 
 export { SUGGESTED_ACTIONS, type SuggestedAction };
 
-export const TIER_1_SUBREDDITS = [
-  // Core STR operator communities
+// Adapter slug for this source's listening_source row (subreddits + voice live there).
+const ADAPTER = "reddit-json";
+
+// Safety net only — the live subreddit list comes from listening_source. If the
+// row is missing/empty we degrade to these core subs and warn (never silently
+// scan nothing).
+const FALLBACK_SUBREDDITS = [
   "ShortTermRentals",
   "AirbnbHosts",
   "VRBOHosts",
   "PropertyManagement",
-  // Adjacent — operators earlier in their journey
-  "airbnb",
-  "vrbo",
-  "realestateinvesting",
-  "Landlord",
 ];
 
 const USER_AGENT =
@@ -53,23 +54,26 @@ High-intent language to watch for:
   "anyone using", "vs", "recommend", "OTA fees", "direct booking"
 - These indicate active evaluation — score them higher.`;
 
-const DRAFT_SYSTEM_PROMPT = `You write Reddit reply drafts for the Wander
-growth team. Reddit punishes self-promotion, so every reply must:
+// Reddit-specific reply MECHANICS only. Voice + product framing + the Wander
+// Test now come from the brand listening story (composed in at draft time).
+const DRAFT_MECHANICS = `Reddit reply mechanics — Reddit punishes self-promotion, so every reply must:
 
 1. Open by genuinely answering the OP's question or engaging with their
    problem. No pitch in the first paragraph.
 2. Disclose Wander affiliation plainly ("I work at Wander, so take this with
    a grain of salt"). Disclosure is non-negotiable on Reddit.
-3. Mention WanderOS / Wander Sites / Wander Operated only when it directly
-   solves the OP's problem, and only as a single sentence at the end. Never
-   link to wander.com — leave that to the OP to ask for.
+3. Mention a Wander product only when it directly solves the OP's problem, and
+   only as a single sentence at the end. Never link to wander.com — leave that
+   to the OP to ask for.
 4. Use the tone of an experienced operator, not marketing. Concrete,
    first-person, humble. No exclamation points.
 5. Stay under 150 words.
 
 If the post is a critical brand mention or operator complaint about Wander,
-the reply should acknowledge the issue directly, apologize on behalf of the
-team, offer to help, and skip any product pitch.`;
+acknowledge the issue directly, apologize on behalf of the team, offer to help,
+and skip any product pitch.
+
+Output the reply text directly — no preamble like "Here's a draft:".`;
 
 interface RedditPostData {
   id: string;
@@ -113,11 +117,24 @@ export interface ScoredPost {
   rationale: string;
 }
 
+/** Subreddits to scan — read from the listening_source config, with a fallback. */
+async function loadSubreddits(): Promise<string[]> {
+  const { sourceConfig } = await loadListeningContext(ADAPTER);
+  const subs = sourceConfig?.subreddits ?? [];
+  if (subs.length === 0) {
+    console.warn(
+      `[reddit-monitor] listening_source "${ADAPTER}" has no subreddits configured; using fallback`,
+    );
+    return FALLBACK_SUBREDDITS;
+  }
+  return subs;
+}
+
 async function fetchSubreddit(sub: string): Promise<RedditPostData[]> {
-  const res = await fetch(
-    `https://www.reddit.com/r/${sub}/new.json?limit=25`,
-    { headers: { "User-Agent": USER_AGENT }, cache: "no-store" },
-  );
+  const res = await fetch(`https://www.reddit.com/r/${sub}/new.json?limit=25`, {
+    headers: { "User-Agent": USER_AGENT },
+    cache: "no-store",
+  });
   if (!res.ok) {
     console.warn(
       `[reddit-monitor] r/${sub} fetch failed: ${res.status} ${res.statusText}`,
@@ -144,8 +161,9 @@ function toSummary(p: RedditPostData): RedditPostSummary {
   };
 }
 
-export async function fetchTier1Posts(): Promise<RedditPostSummary[]> {
-  const fetched = await Promise.all(TIER_1_SUBREDDITS.map(fetchSubreddit));
+export async function fetchConfiguredPosts(): Promise<RedditPostSummary[]> {
+  const subs = await loadSubreddits();
+  const fetched = await Promise.all(subs.map(fetchSubreddit));
   return fetched.flat().map(toSummary);
 }
 
@@ -155,7 +173,9 @@ function formatPostForLLM(p: RedditPostSummary): string {
     `id: ${p.id}`,
     `sub: r/${p.subreddit}`,
     `title: ${p.title}`,
-    body ? `body: ${body}${p.body.length > 600 ? "…" : ""}` : "body: (link post)",
+    body
+      ? `body: ${body}${p.body.length > 600 ? "…" : ""}`
+      : "body: (link post)",
   ].join("\n");
 }
 
@@ -187,7 +207,7 @@ export async function scanAndScore(): Promise<{
   scored: ScoredPost[];
   totalFetched: number;
 }> {
-  const posts = await fetchTier1Posts();
+  const posts = await fetchConfiguredPosts();
   const scored = await scoreRedditPosts(posts);
   return { scored, totalFetched: posts.length };
 }
@@ -219,11 +239,6 @@ const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
     "If you mention a Wander product, focus on Wander Operated (full-service property management).",
 };
 
-const DRAFT_CHANNEL: DraftChannel<DraftPill> = {
-  systemPrompt: DRAFT_SYSTEM_PROMPT,
-  pillInstructions: PILL_INSTRUCTIONS,
-};
-
 export async function draftReplyForPost(input: {
   post: RedditPostSummary;
   intentTag: IntentTag;
@@ -233,10 +248,24 @@ export async function draftReplyForPost(input: {
 }): Promise<string> {
   const body = input.post.body.replace(/\s+/g, " ").slice(0, 1200);
 
-  return draftReply(DRAFT_CHANNEL, {
-    pills: input.pills,
-    customInstructions: input.customInstructions,
-    promptBody: `Reddit post to reply to:
+  // Compose the system prompt from the evolvable brand voice + listening story
+  // (+ any per-source override), layered over the Reddit mechanics.
+  const ctx = await loadListeningContext(ADAPTER);
+  const systemPrompt = composeListeningSystemPrompt({
+    brandVoice: ctx.brandVoice,
+    story: ctx.story,
+    voiceOverride: ctx.voiceOverride,
+    signalNotes: ctx.signalNotes,
+    channelMechanics: DRAFT_MECHANICS,
+    mode: "draft",
+  });
+
+  return draftReply(
+    { systemPrompt, pillInstructions: PILL_INSTRUCTIONS },
+    {
+      pills: input.pills,
+      customInstructions: input.customInstructions,
+      promptBody: `Reddit post to reply to:
 
 sub: r/${input.post.subreddit}
 title: ${input.post.title}
@@ -246,6 +275,7 @@ Scoring context from our analyst:
 - intent tag: ${input.intentTag}
 - rationale: ${input.rationale}
 
-Draft the reply. Do NOT include any preamble like "Here's a draft:" — output the reply text directly.`,
-  });
+Draft the reply.`,
+    },
+  );
 }

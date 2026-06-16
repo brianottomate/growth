@@ -16,12 +16,25 @@ import {
   listeningSourceTable,
   type ListeningSourceInsert,
 } from "@/server/db/schema";
-import { TIER_1_SUBREDDITS } from "@/server/services/reddit-monitor.service";
+
+// Initial subreddit list (now lives in the listening_source row; this seed is
+// the one-time mirror of the previously-hardcoded constant).
+const INITIAL_SUBREDDITS = [
+  "ShortTermRentals",
+  "AirbnbHosts",
+  "VRBOHosts",
+  "PropertyManagement",
+  "airbnb",
+  "vrbo",
+  "realestateinvesting",
+  "Landlord",
+];
 
 const brand = await db.query.brandTable.findFirst({
   where: eq(brandTable.slug, "wander"),
 });
-if (!brand) throw new Error("No brand with slug 'wander' found — adjust the lookup.");
+if (!brand)
+  throw new Error("No brand with slug 'wander' found — adjust the lookup.");
 console.log(`[seed-listening] brand: ${brand.name} (${brand.id})`);
 
 // ---- Shared brand listening story (voice still comes from brandFingerprint) ----
@@ -44,7 +57,9 @@ if (!brand.brandListeningStory) {
     .where(eq(brandTable.id, brand.id));
   console.log("[seed-listening] seeded brand.brandListeningStory");
 } else {
-  console.log("[seed-listening] brand.brandListeningStory already set — left as-is");
+  console.log(
+    "[seed-listening] brand.brandListeningStory already set — left as-is",
+  );
 }
 
 // ---- Listening source rows (mirror today's hardcoded constants) ----
@@ -57,8 +72,8 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "reddit-json",
     label: "Reddit — STR operator subs",
-    config: { subreddits: [...TIER_1_SUBREDDITS] },
-    shadow: true, // mirrors TIER_1_SUBREDDITS; retire that constant once verified
+    config: { subreddits: [...INITIAL_SUBREDDITS] },
+    shadow: false, // retired: reddit-monitor now reads subreddits from this row
   },
   {
     brandId: brand.id,

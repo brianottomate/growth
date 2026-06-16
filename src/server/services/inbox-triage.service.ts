@@ -1,10 +1,11 @@
 import "server-only";
 
+import { loadListeningContext } from "@/server/services/listening-config.service";
 import {
   SUGGESTED_ACTIONS,
+  composeListeningSystemPrompt,
   draftReply,
   scoreItems,
-  type DraftChannel,
   type ScoringChannel,
   type SuggestedAction,
 } from "@/server/services/triage.service";
@@ -28,8 +29,9 @@ concrete partnership/UGC proposal. Existing-customer complaints are important to
 (route to support). Use the participant's follower count / verified status only as
 weak social-proof signal, not the main driver — the message intent matters most.`;
 
-const DRAFT_SYSTEM_PROMPT = `You write first-reply drafts for Wander's social DMs.
-${WANDER_CONTEXT}
+// DM-specific reply MECHANICS only — voice + product framing come from the
+// brand listening story, composed in at draft time.
+const DRAFT_SYSTEM_PROMPT = `DM reply mechanics — first-reply drafts for Wander's social DMs.
 
 Rules:
 1. Warm, human, concise — this is a 1:1 DM, not a post. No marketing voice.
@@ -38,7 +40,7 @@ Rules:
 4. For complaints: acknowledge, apologize, offer to help, no pitch.
 5. Never invent specifics (pricing, availability). Keep it short.
 This is a DRAFT for a human to review and send from Zernio — do not add greetings
-boilerplate like "Best regards".`;
+boilerplate like "Best regards". Output the reply text only.`;
 
 export const DM_INTENT_TAGS = [
   "sales-lead",
@@ -80,7 +82,9 @@ function formatConversationForLLM(c: ConversationInput): string {
     `from: ${c.participantName ?? "?"}${c.participantUsername ? ` (@${c.participantUsername})` : ""}`,
   ];
   if (typeof c.followerCount === "number")
-    lines.push(`followers: ${c.followerCount}${c.isVerified ? " · verified" : ""}`);
+    lines.push(
+      `followers: ${c.followerCount}${c.isVerified ? " · verified" : ""}`,
+    );
   if (c.unreadCount) lines.push(`unread: ${c.unreadCount}`);
   lines.push(
     `last message: ${(c.lastMessage ?? "").replace(/\s+/g, " ").slice(0, 400) || "(none / attachment only)"}`,
@@ -131,14 +135,10 @@ const PILL_INSTRUCTIONS: Record<DmDraftPill, string> = {
   "no-pitch": "Do not mention any Wander product — pure helpful reply.",
   "lead-with-question": "Open with a clarifying question.",
   warm: "Extra warm and personal in tone.",
-  "focus-wanderos": "If mentioning a product, focus on WanderOS (direct booking).",
+  "focus-wanderos":
+    "If mentioning a product, focus on WanderOS (direct booking).",
   "focus-sites": "If mentioning a product, focus on Wander Sites.",
   "focus-operated": "If mentioning a product, focus on Wander Operated.",
-};
-
-const DRAFT_CHANNEL: DraftChannel<DmDraftPill> = {
-  systemPrompt: DRAFT_SYSTEM_PROMPT,
-  pillInstructions: PILL_INSTRUCTIONS,
 };
 
 export async function draftDmReply(input: {
@@ -150,21 +150,34 @@ export async function draftDmReply(input: {
   pills?: DmDraftPill[];
   customInstructions?: string;
 }): Promise<string> {
-  return draftReply(DRAFT_CHANNEL, {
-    pills: input.pills,
-    customInstructions: input.customInstructions,
-    promptBody: [
-      `Platform: ${input.platform ?? "instagram"} DM`,
-      `Person: ${input.participantName ?? "the sender"}`,
-      input.intentTag ? `Triaged as: ${input.intentTag}` : null,
-      input.rationale ? `Analyst note: ${input.rationale}` : null,
-      "",
-      "Conversation so far (oldest first):",
-      input.thread || "(no prior messages / attachment only)",
-      "",
-      "Write the reply draft only.",
-    ]
-      .filter((l) => l !== null)
-      .join("\n"),
+  const ctx = await loadListeningContext("zernio-dms");
+  const systemPrompt = composeListeningSystemPrompt({
+    brandVoice: ctx.brandVoice,
+    story: ctx.story,
+    voiceOverride: ctx.voiceOverride,
+    signalNotes: ctx.signalNotes,
+    channelMechanics: DRAFT_SYSTEM_PROMPT,
+    mode: "draft",
   });
+
+  return draftReply(
+    { systemPrompt, pillInstructions: PILL_INSTRUCTIONS },
+    {
+      pills: input.pills,
+      customInstructions: input.customInstructions,
+      promptBody: [
+        `Platform: ${input.platform ?? "instagram"} DM`,
+        `Person: ${input.participantName ?? "the sender"}`,
+        input.intentTag ? `Triaged as: ${input.intentTag}` : null,
+        input.rationale ? `Analyst note: ${input.rationale}` : null,
+        "",
+        "Conversation so far (oldest first):",
+        input.thread || "(no prior messages / attachment only)",
+        "",
+        "Write the reply draft only.",
+      ]
+        .filter((l) => l !== null)
+        .join("\n"),
+    },
+  );
 }

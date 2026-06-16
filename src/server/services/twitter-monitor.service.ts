@@ -6,10 +6,11 @@ import {
   type IntentTag,
   type SuggestedAction,
 } from "@/server/services/reddit-monitor.service";
+import { loadListeningContext } from "@/server/services/listening-config.service";
 import {
+  composeListeningSystemPrompt,
   draftReply,
   scoreItems,
-  type DraftChannel,
   type ScoringChannel,
 } from "@/server/services/triage.service";
 import { X_WATCHLIST } from "@/lib/x-watchlist";
@@ -219,11 +220,6 @@ const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
     "If you mention a Wander product, focus on Wander Operated (full-service property management).",
 };
 
-const DRAFT_CHANNEL: DraftChannel<DraftPill> = {
-  systemPrompt: DRAFT_SYSTEM_PROMPT,
-  pillInstructions: PILL_INSTRUCTIONS,
-};
-
 export async function draftTweetReplyForPost(input: {
   tweet: Pick<TweetSummary, "authorUsername" | "text">;
   intentTag: IntentTag;
@@ -231,10 +227,22 @@ export async function draftTweetReplyForPost(input: {
   pills?: DraftPill[];
   customInstructions?: string;
 }): Promise<string> {
-  return draftReply(DRAFT_CHANNEL, {
-    pills: input.pills,
-    customInstructions: input.customInstructions,
-    promptBody: `Tweet to reply to:
+  const ctx = await loadListeningContext("x-search");
+  const systemPrompt = composeListeningSystemPrompt({
+    brandVoice: ctx.brandVoice,
+    story: ctx.story,
+    voiceOverride: ctx.voiceOverride,
+    signalNotes: ctx.signalNotes,
+    channelMechanics: DRAFT_SYSTEM_PROMPT,
+    mode: "draft",
+  });
+
+  return draftReply(
+    { systemPrompt, pillInstructions: PILL_INSTRUCTIONS },
+    {
+      pills: input.pills,
+      customInstructions: input.customInstructions,
+      promptBody: `Tweet to reply to:
 
 author: @${input.tweet.authorUsername}
 text: ${input.tweet.text}
@@ -244,5 +252,6 @@ Scoring context from our analyst:
 - rationale: ${input.rationale}
 
 Draft the reply. Do NOT include any preamble like "Here's a draft:" — output the reply text directly, with no surrounding quotes.`,
-  });
+    },
+  );
 }

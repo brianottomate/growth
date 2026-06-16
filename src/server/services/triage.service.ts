@@ -82,7 +82,9 @@ export async function scoreItems<TItem, TIntent extends string>(
           .int()
           .min(0)
           .max(10)
-          .describe(channel.relevanceDescription ?? DEFAULT_RELEVANCE_DESCRIPTION),
+          .describe(
+            channel.relevanceDescription ?? DEFAULT_RELEVANCE_DESCRIPTION,
+          ),
         intentTag: channel.intentTagDescription
           ? z.enum(channel.intentTags).describe(channel.intentTagDescription)
           : z.enum(channel.intentTags),
@@ -159,9 +161,9 @@ export async function draftReply<TPill extends string>(
 //
 // The single place a listening system prompt is assembled from the evolvable
 // brand "story" + per-source overrides + the hardcoded channel mechanics. This
-// is what lets the brain evolve in the DB instead of across five copied
-// constants. Not yet swapped into the live scans (that's the per-source retire
-// step) — available so each channel can migrate onto it one at a time.
+// is what lets the brain evolve in the DB instead of across copied constants.
+// Used by every reply-DRAFT path (Reddit / X / DMs / comments). Scoring prompts
+// still carry their own static signal context for now (a later retire).
 //
 //   brand voice (fingerprint)                      ← shared, single source of truth
 //   + per-source voice override (append OR replace)
@@ -180,26 +182,35 @@ export function composeListeningSystemPrompt(input: {
   signalNotes?: string | null;
   /** Hardcoded per-channel format rules (char caps, output schema, etiquette). */
   channelMechanics: string;
+  /**
+   * "draft" (default) → voice + reply guidance (for writing replies).
+   * "score" → signal guidance (for relevance scoring). Selects which parts of
+   * the story are relevant so we don't pollute one task with the other's rules.
+   */
+  mode?: "draft" | "score";
 }): string {
+  const mode = input.mode ?? "draft";
   const blocks: string[] = [];
 
-  // Voice: an override either replaces the brand voice or layers on top of it.
-  const override = input.voiceOverride?.fingerprintText?.trim();
-  const brandVoice = input.brandVoice?.trim();
-  if (override && input.voiceOverride?.overridesBrand) {
-    blocks.push(`VOICE:\n${override}`);
-  } else {
-    const voice = [brandVoice, override].filter(Boolean).join("\n\n");
-    if (voice) blocks.push(`VOICE:\n${voice}`);
+  // Voice only matters for writing replies, not for scoring relevance.
+  if (mode === "draft") {
+    const override = input.voiceOverride?.fingerprintText?.trim();
+    const brandVoice = input.brandVoice?.trim();
+    if (override && input.voiceOverride?.overridesBrand) {
+      blocks.push(`VOICE:\n${override}`);
+    } else {
+      const voice = [brandVoice, override].filter(Boolean).join("\n\n");
+      if (voice) blocks.push(`VOICE:\n${voice}`);
+    }
   }
 
   if (input.story?.productBoilerplate?.trim()) {
     blocks.push(input.story.productBoilerplate.trim());
   }
-  if (input.story?.signalGuidance?.trim()) {
+  if (mode === "score" && input.story?.signalGuidance?.trim()) {
     blocks.push(`WHAT COUNTS AS SIGNAL:\n${input.story.signalGuidance.trim()}`);
   }
-  if (input.story?.replyGuidance?.trim()) {
+  if (mode === "draft" && input.story?.replyGuidance?.trim()) {
     blocks.push(`HOW WE REPLY:\n${input.story.replyGuidance.trim()}`);
   }
   if (input.signalNotes?.trim()) {

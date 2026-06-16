@@ -1,9 +1,10 @@
 import "server-only";
 
+import { loadListeningContext } from "@/server/services/listening-config.service";
 import {
+  composeListeningSystemPrompt,
   draftReply,
   scoreItems,
-  type DraftChannel,
   type ScoringChannel,
   type SuggestedAction,
 } from "@/server/services/triage.service";
@@ -109,11 +110,6 @@ const PILL_INSTRUCTIONS: Record<CommentDraftPill, string> = {
   "answer-question": "Directly answer the question the commenter asked.",
 };
 
-const DRAFT_CHANNEL: DraftChannel<CommentDraftPill> = {
-  systemPrompt: DRAFT_SYSTEM_PROMPT,
-  pillInstructions: PILL_INSTRUCTIONS,
-};
-
 export async function draftCommentReply(input: {
   platform?: string;
   author?: string;
@@ -124,19 +120,32 @@ export async function draftCommentReply(input: {
   pills?: CommentDraftPill[];
   customInstructions?: string;
 }): Promise<string> {
-  return draftReply(DRAFT_CHANNEL, {
-    pills: input.pills,
-    customInstructions: input.customInstructions,
-    promptBody: [
-      `Platform: ${input.platform ?? "?"}`,
-      `Our post: "${(input.postContent ?? "").slice(0, 300) || "(no text)"}"`,
-      `Comment by ${input.author ?? "the commenter"}: "${input.message || "(no text)"}"`,
-      input.intentTag ? `Triaged as: ${input.intentTag}` : null,
-      input.rationale ? `Analyst note: ${input.rationale}` : null,
-      "",
-      "Write the reply draft only.",
-    ]
-      .filter((l) => l !== null)
-      .join("\n"),
+  const ctx = await loadListeningContext("zernio-comments");
+  const systemPrompt = composeListeningSystemPrompt({
+    brandVoice: ctx.brandVoice,
+    story: ctx.story,
+    voiceOverride: ctx.voiceOverride,
+    signalNotes: ctx.signalNotes,
+    channelMechanics: DRAFT_SYSTEM_PROMPT,
+    mode: "draft",
   });
+
+  return draftReply(
+    { systemPrompt, pillInstructions: PILL_INSTRUCTIONS },
+    {
+      pills: input.pills,
+      customInstructions: input.customInstructions,
+      promptBody: [
+        `Platform: ${input.platform ?? "?"}`,
+        `Our post: "${(input.postContent ?? "").slice(0, 300) || "(no text)"}"`,
+        `Comment by ${input.author ?? "the commenter"}: "${input.message || "(no text)"}"`,
+        input.intentTag ? `Triaged as: ${input.intentTag}` : null,
+        input.rationale ? `Analyst note: ${input.rationale}` : null,
+        "",
+        "Write the reply draft only.",
+      ]
+        .filter((l) => l !== null)
+        .join("\n"),
+    },
+  );
 }
