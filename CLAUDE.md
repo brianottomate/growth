@@ -48,15 +48,18 @@ One-off scripts live in `scripts/` (run via `bun run scripts/<file>.ts`) and
 Next.js 16 (App Router, React 19) · tRPC v11 + TanStack Query (SuperJSON) · Drizzle ORM on
 Neon Postgres · Better Auth (organization/admin/username plugins) · Tailwind CSS 4 + Radix ·
 Velite for MDX · React Email + Resend · Vercel (deploy, Blob, Cron) · Vercel AI SDK +
-Anthropic. Deployed on Vercel as the `wander/growth` project.
+Anthropic. Deployed on Vercel as the **`wanderdev/growth`** project (org slug is
+`wanderdev`, not `wander` — `vercel list` needs the linked project, not `wander/growth`).
 
 ## Architecture
 
 ### tRPC
 
 - Routers live in `src/server/api/routers/*.router.ts` and must be registered in
-  `src/server/api/root.ts` (`appRouter`). Current routers: user, brand, channel, blob,
-  newsletter, org, outreach, instantly, leads, reddit, twitter.
+  `src/server/api/root.ts` (`appRouter`). Current routers: user, amplifier, audience,
+  brand, channel, channelSuggestion, content, inbox, initiative, newsletter, org,
+  outreach, instantly, leads, lifecycle, listening, media, mention, moment, reddit,
+  studio, twitter. (Blob is a route handler under `api/blob`, not a tRPC router.)
 - Procedures (`src/server/api/trpc.ts`): `publicProcedure`, `protectedProcedure`
   (requires session), `adminProcedure` (admin in prod, unrestricted in dev).
 - Context exposes `session`, `db`, and the Better Auth `authApi`.
@@ -70,11 +73,15 @@ Schema is split by domain under `src/server/db/`:
 |------|--------|
 | `auth-schema.ts` | Better Auth: user, session, account, verification + organization, member, team, team_member, invitation |
 | `brand-schema.ts` | brand, brand_inspiration, access (Notion-style grants) |
-| `channel-schema.ts` | channel (per-brand social/marketing channels) |
-| `content-schema.ts` | series, content_post (planned/internal), platform_post (published, synced from platforms) |
-| `ads-schema.ts` | initiative, campaign, ad_spot, audience |
+| `channel-schema.ts` | channel (per-brand social/marketing channels), channel_suggestion |
+| `content-schema.ts` | series, content_post (planned/internal), platform_post + platform_post_link (published, synced), content_assignee, content_comment, content_suggestion |
+| `ads-schema.ts` | initiative, campaign, ad_spot, audience, audience_target (intent layer) |
+| `amplification-schema.ts` | amplifier (influencers/partners), amplification_target |
+| `cadence-schema.ts` | cadence_target, mix_target (observed/target cadence + format mix) |
+| `listening-schema.ts` | mention (persisted social mentions), listening_source (evolvable per-channel config) |
+| `media-schema.ts` | media_asset (R2 images / Cloudflare Stream video) |
 | `leads-schema.ts` | **separate `leads` Postgres schema** — lead_domain, lead_contact, lead_import |
-| `lifecycle-schema.ts` | lifecycle_campaign, lifecycle_touchpoint |
+| `lifecycle-schema.ts` | lifecycle_program + lifecycle_program_step (intent), lifecycle_campaign, lifecycle_touchpoint (mirrored CIO/outbound) |
 | `schema.ts` | attachment table + **barrel that re-exports every domain file** |
 
 **Critical:** `schema.ts` must `export *` every domain file. `drizzle.config.ts` points at
@@ -125,14 +132,26 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 - `/api/cron/reddit` — hourly (Reddit monitor)
 
 Other API routes: `api/trpc`, `api/auth/[...all]`, `api/blob`, `api/webhooks`,
-`api/instantly`, `api/outreach`, `api/workflows`, `api/og`, `api/admin`.
+`api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
+`api/outreach`, `api/workflows`, `api/og`, `api/admin`, `api/plan/chat` (plan-agent
+streaming endpoint).
+
+### AI agents (`src/server/ai/`)
+
+The plan-agent (`src/server/ai/plan-agent/` — persona + tools) is the repo's tool-use
+agent, surfaced as the Form|Chat toggle on `/plan` and served from `api/plan/chat`. Per
+house convention, all AI calls use `generateText`/`streamText` + `Output.object` — never
+`generateObject`/`streamObject`.
 
 ### Frontend
 
 - `src/app/(marketing)/` — public pages (home, blog, brand, zernio, design-system, contact).
-- `src/app/app/` — authed back-office (brands, content, leads, lifecycle, channels/feed,
-  newsletters, pillars, dashboard, org, account, onboarding). Several `feed*` variants are
-  in-progress prototypes.
+- `src/app/app/` — authed back-office: brands, content, leads, lifecycle, channels,
+  newsletters, pillars, dashboard, org, account, onboarding, plus the newer surfaces
+  `plan` (organic authoring + Form|Chat AI agent), `studio` (content wheel), `media`
+  (asset library), `listen` (social listening + reply drafts), `inbox`, `campaigns`,
+  `audiences`, `people`, `calendar`. `feed-v5` is the live swimlane timeline; older
+  `feed*` variants are retired/in-progress prototypes.
 - UI components in `src/components/ui/` are shadcn/Radix-based.
 - **Styling bridge:** `src/styles/globals.css` maps wandercom design-system tokens
   (`@wandercom/design-system-*`) into shadcn variables. Theming is via a `data-theme`

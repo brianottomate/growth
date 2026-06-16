@@ -9,7 +9,9 @@ import {
   Check,
   ChevronsUpDown,
   Database,
+  Ear,
   FileText,
+  Gauge,
   Image as ImageIcon,
   Layers,
   LayoutDashboard,
@@ -100,6 +102,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { label: "Leads", href: "/app/leads", icon: Database },
       { label: "Listen", href: "/app/listen", icon: Radar },
+      { label: "Listen v2", href: "/app/listen-v2", icon: Ear },
       { label: "Lifecycle", href: "/app/lifecycle", icon: Repeat },
     ],
   },
@@ -109,6 +112,10 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Media", href: "/app/media", icon: ImageIcon },
       { label: "People", href: "/app/people", icon: Users },
     ],
+  },
+  {
+    label: "System",
+    items: [{ label: "Engineering", href: "/app/engineering", icon: Gauge }],
   },
 ];
 

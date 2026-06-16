@@ -2,6 +2,7 @@ import { userRouter } from "@/server/api/routers/user.router";
 import { amplifierRouter } from "@/server/api/routers/amplifier.router";
 import { audienceRouter } from "@/server/api/routers/audience.router";
 import { brandRouter } from "@/server/api/routers/brand.router";
+import { cadenceRouter } from "@/server/api/routers/cadence.router";
 import { channelRouter } from "@/server/api/routers/channel.router";
 import { channelSuggestionRouter } from "@/server/api/routers/channelSuggestion.router";
 import { contentRouter } from "@/server/api/routers/content.router";
@@ -32,6 +33,7 @@ export const appRouter = createTRPCRouter({
   amplifier: amplifierRouter,
   audience: audienceRouter,
   brand: brandRouter,
+  cadence: cadenceRouter,
   channel: channelRouter,
   channelSuggestion: channelSuggestionRouter,
   content: contentRouter,

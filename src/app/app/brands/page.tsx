@@ -77,7 +77,16 @@ function BrandCard({
         )}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-base font-semibold">{brand.name}</span>
+            {brand.slug ? (
+              <Link
+                href={`/app/brands/${brand.slug}`}
+                className="text-base font-semibold hover:underline"
+              >
+                {brand.name}
+              </Link>
+            ) : (
+              <span className="text-base font-semibold">{brand.name}</span>
+            )}
             <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium">
               {brand.type}
             </span>
@@ -92,12 +101,20 @@ function BrandCard({
               </a>
             )}
             {brand.slug && (
-              <Link
-                href={`/app/brands/${brand.slug}/ads`}
-                className="text-foreground text-xs hover:underline"
-              >
-                Ads ↗
-              </Link>
+              <>
+                <Link
+                  href={`/app/brands/${brand.slug}`}
+                  className="text-foreground text-xs hover:underline"
+                >
+                  Strategy ↗
+                </Link>
+                <Link
+                  href={`/app/brands/${brand.slug}/ads`}
+                  className="text-foreground text-xs hover:underline"
+                >
+                  Ads ↗
+                </Link>
+              </>
             )}
           </div>
           {brand.tagline && (

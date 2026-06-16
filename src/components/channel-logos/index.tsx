@@ -43,6 +43,8 @@ export const PLATFORM_META: Record<string, { name: string; code: string }> = {
   tiktok: { name: "TikTok", code: "TK" },
   youtube: { name: "YouTube", code: "YT" },
   reddit: { name: "Reddit", code: "RD" },
+  hackernews: { name: "Hacker News", code: "HN" },
+  lobsters: { name: "Lobsters", code: "LO" },
   pinterest: { name: "Pinterest", code: "PIN" },
   threads: { name: "Threads", code: "TH" },
   google_ads: { name: "Google Ads", code: "GA" },

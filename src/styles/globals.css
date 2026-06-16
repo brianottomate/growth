@@ -684,3 +684,72 @@
 [data-theme="dark"] {
   --muted-foreground-l: var(--color-neutral-450);
 }
+
+/* ── Strategy redesign utilities (from claude.ai/design "Strategy — redesign")
+   Scoped, reusable pill buttons / hover rows / target sliders. Uses tokens that
+   exist in this bridge (--color-primary/secondary/surface-*). ── */
+.lg-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 550;
+  background: transparent;
+  color: var(--color-secondary, currentColor);
+  border: 1px solid color-mix(in oklab, currentColor 20%, transparent);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+  white-space: nowrap;
+}
+.lg-pill:hover {
+  border-color: color-mix(in oklab, currentColor 38%, transparent);
+}
+.lg-pill:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.lg-pill-on {
+  background: var(--color-primary);
+  color: var(--color-surface-primary);
+  border-color: var(--color-primary);
+}
+
+.st-row {
+  transition: background 110ms ease;
+}
+.st-row:hover {
+  background: var(--color-surface-tertiary);
+}
+
+.st-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-surface-tertiary);
+  outline: none;
+}
+.st-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+.st-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-primary);
+  cursor: pointer;
+}
