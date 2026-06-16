@@ -6,19 +6,20 @@
  * The eventual product flow is: discover → suggest → human confirms → create
  * `channel` rows on the (peer or owned) brand.
  *
- * Mirrors `lead-discovery.service.ts`: fan out to every configured provider,
- * each wrapped so one failure never sinks the rest; skip unconfigured ones.
+ * Mirrors `social-discovery.service.ts`: fan out to every configured provider
+ * (each wrapped so one failure never sinks the rest), then paste the raw
+ * evidence into one Claude call — no regex pre-pass.
  *
  *   bun run scripts/discover-social-handles.ts                       # Airbnb
  *   bun run scripts/discover-social-handles.ts "Vrbo" https://vrbo.com
  *
  * Stages:
- *   1. Firecrawl-scrape the site → regex social links (high precision).
+ *   1. Firecrawl-scrape the site → markdown.
  *   2. Tavily + Parallel + Perplexity → official profile URLs (fills gaps).
- *   3. Claude consolidates candidates → one suggestion per platform w/ confidence.
+ *   3. Claude reads the labelled evidence → one suggestion per platform w/ confidence.
  */
 
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 
@@ -30,6 +31,9 @@ import {
   isTavilyConfigured,
   isParallelConfigured,
   isPerplexityConfigured,
+  type TavilyResult,
+  type ParallelResult,
+  type PerplexityResult,
 } from "@/server/clients/search-providers.client";
 import { isClaudeConfigured } from "@/server/clients/claude.client";
 
@@ -38,44 +42,6 @@ const PLATFORMS = [
   "linkedin", "instagram", "x", "facebook", "youtube", "tiktok", "threads",
   "reddit", "pinterest",
 ] as const;
-type Platform = (typeof PLATFORMS)[number];
-
-// Match a profile URL per platform and capture the handle/slug.
-const PATTERNS: Array<{ platform: Platform; re: RegExp }> = [
-  { platform: "linkedin", re: /linkedin\.com\/(?:company|in|school)\/([A-Za-z0-9._%-]+)/i },
-  { platform: "instagram", re: /instagram\.com\/([A-Za-z0-9._]+)/i },
-  { platform: "x", re: /(?:twitter|x)\.com\/([A-Za-z0-9_]+)/i },
-  { platform: "facebook", re: /facebook\.com\/([A-Za-z0-9.]+)/i },
-  { platform: "youtube", re: /youtube\.com\/(?:@|c\/|channel\/|user\/)?([A-Za-z0-9._-]+)/i },
-  { platform: "tiktok", re: /tiktok\.com\/@([A-Za-z0-9._]+)/i },
-  { platform: "threads", re: /threads\.(?:net|com)\/@([A-Za-z0-9._]+)/i },
-  { platform: "reddit", re: /reddit\.com\/(?:r|user)\/([A-Za-z0-9._-]+)/i },
-  { platform: "pinterest", re: /pinterest\.[a-z.]+\/([A-Za-z0-9._-]+)/i },
-];
-
-// URL path segments that are platform chrome, never a real handle.
-const STOP = new Set([
-  "share", "sharer", "intent", "home", "login", "signup", "watch", "p", "reel",
-  "explore", "hashtag", "about", "help", "privacy", "terms", "tr", "embed",
-]);
-
-type Candidate = { platform: Platform; handle: string; url: string; source: string };
-
-function extractCandidates(text: string, source: string): Candidate[] {
-  if (!text) return [];
-  const urls = text.match(/https?:\/\/[^\s)"'<>]+/gi) ?? [];
-  const out: Candidate[] = [];
-  for (const raw of urls) {
-    for (const { platform, re } of PATTERNS) {
-      const m = re.exec(raw);
-      if (m?.[1] && !STOP.has(m[1].toLowerCase())) {
-        out.push({ platform, handle: m[1], url: raw.replace(/[).,]+$/, ""), source });
-        break;
-      }
-    }
-  }
-  return out;
-}
 
 // One configured-provider attempt, wrapped so failure is isolated.
 async function envelope<T>(
@@ -91,15 +57,46 @@ async function envelope<T>(
   }
 }
 
+// ---- evidence formatting (paste raw text, don't pre-extract) ----------
+const clip = (s: string, max: number) =>
+  s.length > max ? `${s.slice(0, max)}…[truncated]` : s;
+
+const sourceBlock = (label: string, body: string) =>
+  `=== SOURCE: ${label} ===\n${body.trim()}`;
+
+function formatTavily(r: TavilyResult): string {
+  const head = r.answer ? `answer: ${r.answer}\n` : "";
+  return (
+    head +
+    r.results.map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.content, 500)}`).join("\n")
+  );
+}
+
+function formatParallel(r: ParallelResult): string {
+  return r.results
+    .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.excerpts.join(" "), 500)}`)
+    .join("\n");
+}
+
+function formatPerplexity(r: PerplexityResult): string {
+  const cites = r.citations.length
+    ? `\ncitations:\n${r.citations.map((c) => `- ${c}`).join("\n")}`
+    : "";
+  return clip(r.content, 4_000) + cites;
+}
+
 const SUGGESTION_SCHEMA = z.object({
   suggestions: z.array(
     z.object({
       platform: z.enum(PLATFORMS),
       handle: z.string().describe("the account handle/slug, no @ and no URL"),
-      profileUrl: z.string().describe("canonical public profile URL"),
+      profileUrl: z.string().describe("canonical public profile URL, exactly as it appears in the evidence"),
       confidence: z.number().min(0).max(1),
       isOfficial: z.boolean().describe("the brand's own primary account (not a fan/regional/employee page)"),
       reasoning: z.string().describe("one short sentence"),
+      sources: z
+        .array(z.string())
+        .describe("which labelled sources (website/tavily/parallel/perplexity) the handle appears in"),
     }),
   ),
 });
@@ -109,7 +106,7 @@ async function main() {
   const website = process.argv[3] ?? "https://airbnb.com";
   console.log(`\nDiscovering social handles for "${name}" (${website})\n`);
 
-  const candidates: Candidate[] = [];
+  const blocks: string[] = [];
   const skipped: string[] = [];
 
   // --- Stage 1: website scrape ---
@@ -118,67 +115,72 @@ async function main() {
     return r?.markdown ?? "";
   });
   if (site.skipped) skipped.push("firecrawl");
-  if (site.ok && site.value) candidates.push(...extractCandidates(site.value, "website"));
+  if (site.ok && site.value) blocks.push(sourceBlock("website", clip(site.value, 8_000)));
 
   // --- Stage 2: search providers (fan out) ---
   const query = `Official social media profile URLs for "${name}" (${website}): LinkedIn, Instagram, X/Twitter, Facebook, TikTok, YouTube, Threads. Give full profile URLs.`;
-  const providers = await Promise.all([
+  const [tav, par, perp] = await Promise.all([
     envelope("tavily", isTavilyConfigured, () => tavilySearch(`${name} official social media accounts`)),
     envelope("parallel", isParallelConfigured, () => parallelSearch(query, [`${name} official social profiles`])),
     envelope("perplexity", isPerplexityConfigured, () => perplexitySearch(query)),
   ]);
 
-  for (const p of providers) {
-    if (p.skipped) { skipped.push(p.name); continue; }
-    if (!p.ok || !p.value) { console.log(`  ⚠ ${p.name}: ${p.error}`); continue; }
-    const v = p.value as Record<string, unknown>;
-    // Pull URLs from result rows + any answer/content text.
-    const blob = JSON.stringify(v);
-    candidates.push(...extractCandidates(blob, p.name));
+  if (tav.skipped) skipped.push("tavily");
+  else if (!tav.ok || !tav.value) console.log(`  ⚠ tavily: ${tav.error}`);
+  else blocks.push(sourceBlock("tavily", formatTavily(tav.value)));
+
+  if (par.skipped) skipped.push("parallel");
+  else if (!par.ok || !par.value) console.log(`  ⚠ parallel: ${par.error}`);
+  else blocks.push(sourceBlock("parallel", formatParallel(par.value)));
+
+  if (perp.skipped) skipped.push("perplexity");
+  else if (!perp.ok || !perp.value) console.log(`  ⚠ perplexity: ${perp.error}`);
+  else blocks.push(sourceBlock("perplexity", formatPerplexity(perp.value)));
+
+  console.log(`Evidence gathered from ${blocks.length} source(s):`);
+  for (const b of blocks) {
+    const label = /=== SOURCE: (.+?) ===/.exec(b)?.[1] ?? "?";
+    console.log(`  ${label.padEnd(18)} ${b.length} chars`);
+  }
+  if (skipped.length) console.log(`\nskipped (unconfigured): ${skipped.join(", ")}`);
+  if (!blocks.length) {
+    console.log("\nNo evidence gathered — nothing to consolidate.");
+    return;
   }
 
-  // Dedup raw candidates for display.
-  const seen = new Set<string>();
-  const uniq = candidates.filter((c) => {
-    const k = `${c.platform}:${c.handle.toLowerCase()}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-
-  console.log(`Raw candidates (${uniq.length}) from ${[...new Set(uniq.map((c) => c.source))].join(", ") || "none"}:`);
-  for (const c of uniq) console.log(`  ${c.platform.padEnd(10)} @${c.handle.padEnd(24)} ${c.url}  [${c.source}]`);
-  if (skipped.length) console.log(`\nskipped (unconfigured): ${skipped.join(", ")}`);
-
-  // --- Stage 3: Claude consolidation ---
+  // --- Stage 3: Claude reads the evidence ---
   if (!isClaudeConfigured) {
-    console.log("\n(Claude not configured — raw candidates only.)");
+    console.log("\n(Claude not configured — evidence only.)");
     return;
   }
   console.log("\nConsolidating with Claude…");
-  const { object } = await generateObject({
+  const { output } = await generateText({
     model: anthropic("claude-sonnet-4-6"),
-    schema: SUGGESTION_SCHEMA,
+    output: Output.object({ schema: SUGGESTION_SCHEMA }),
     prompt:
       `Brand: "${name}" — ${website}\n\n` +
-      `Candidate social URLs found (platform | handle | url | source):\n` +
-      uniq.map((c) => `${c.platform} | @${c.handle} | ${c.url} | ${c.source}`).join("\n") +
-      `\n\nReturn the single best OFFICIAL profile per platform. Drop fan pages, ` +
-      `regional sub-accounts, employee profiles, and platform chrome (share/intent/etc). ` +
-      `If a platform has no credible candidate, omit it. Confidence reflects how sure ` +
-      `you are it's the brand's primary official account.`,
+      `Below is search-result and page text from multiple labelled sources. ` +
+      `Extract the single best OFFICIAL social profile per platform ` +
+      `(${PLATFORMS.join(", ")}).\n` +
+      `Rules:\n` +
+      `- Only return a handle/URL that ACTUALLY appears in the evidence below — never guess or invent.\n` +
+      `- Drop fan pages, regional sub-accounts, employee profiles, and platform chrome (share/intent/etc).\n` +
+      `- Omit a platform with no credible candidate.\n` +
+      `- confidence = how sure it's the brand's primary official account.\n` +
+      `- sources = which labelled sources the handle appears in.\n\n` +
+      blocks.join("\n\n"),
   });
 
   console.log("\n=== SUGGESTIONS (for review → confirm → create channel) ===");
-  for (const s of object.suggestions.sort((a, b) => b.confidence - a.confidence)) {
+  for (const s of output.suggestions.sort((a, b) => b.confidence - a.confidence)) {
     const flag = s.isOfficial ? "✓" : "?";
     console.log(`  ${flag} ${s.platform.padEnd(10)} @${s.handle.padEnd(22)} ${(s.confidence * 100).toFixed(0)}%  ${s.profileUrl}`);
-    console.log(`      ${s.reasoning}`);
+    console.log(`      ${s.reasoning}  [${s.sources.join(", ")}]`);
   }
 
   const fs = await import("node:fs");
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  fs.writeFileSync(`scripts/.social-handles-${slug}.json`, JSON.stringify({ name, website, candidates: uniq, suggestions: object.suggestions }, null, 2));
+  fs.writeFileSync(`scripts/.social-handles-${slug}.json`, JSON.stringify({ name, website, evidence: blocks, suggestions: output.suggestions }, null, 2));
   console.log(`\nWritten to scripts/.social-handles-${slug}.json`);
 }
 

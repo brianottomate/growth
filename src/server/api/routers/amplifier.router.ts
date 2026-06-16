@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -35,7 +35,10 @@ export const amplifierRouter = createTRPCRouter({
     const org = await orgIdFor(ctx);
     if (!org) return [];
     return ctx.db.query.amplifierTable.findMany({
-      where: eq(amplifierTable.organizationId, org),
+      where: and(
+        eq(amplifierTable.organizationId, org),
+        isNull(amplifierTable.deletedAt),
+      ),
       orderBy: [desc(amplifierTable.createdAt)],
     });
   }),
@@ -61,6 +64,52 @@ export const amplifierRouter = createTRPCRouter({
         })
         .returning();
       return a;
+    }),
+
+  /** Edit a rolodex amplifier (name / type / handles / notes). */
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).optional(),
+        type: z.string().optional(),
+        handles: z.array(handleSchema).optional(),
+        notes: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const org = await orgIdFor(ctx);
+      if (!org) throw new TRPCError({ code: "FORBIDDEN" });
+      const { id, ...patch } = input;
+      const [a] = await ctx.db
+        .update(amplifierTable)
+        .set(patch)
+        .where(
+          and(
+            eq(amplifierTable.id, id),
+            eq(amplifierTable.organizationId, org),
+          ),
+        )
+        .returning();
+      return a;
+    }),
+
+  /** Soft-delete a rolodex amplifier (keeps past moment history intact). */
+  remove: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const org = await orgIdFor(ctx);
+      if (!org) throw new TRPCError({ code: "FORBIDDEN" });
+      await ctx.db
+        .update(amplifierTable)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(amplifierTable.id, input.id),
+            eq(amplifierTable.organizationId, org),
+          ),
+        );
+      return { ok: true };
     }),
 
   /** Discover the amplifier's social handles (same flow as brands). */
@@ -97,6 +146,39 @@ export const amplifierRouter = createTRPCRouter({
       ctx.db.query.amplificationTargetTable.findMany({
         where: eq(amplificationTargetTable.momentId, input.momentId),
         with: { amplifier: true },
+        orderBy: [desc(amplificationTargetTable.createdAt)],
       }),
     ),
+
+  /** Advance/rewind the recruitment status of a target. */
+  setTargetAsk: protectedProcedure
+    .input(
+      z.object({
+        targetId: z.string(),
+        ask: z.enum(["planned", "asked", "confirmed", "fulfilled"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [t] = await ctx.db
+        .update(amplificationTargetTable)
+        .set({
+          ask: input.ask,
+          // Stamp/clear fulfillment when toggled by hand (the retweet-matcher
+          // sets fulfilledByPostId separately).
+          fulfilledAt: input.ask === "fulfilled" ? new Date() : null,
+        })
+        .where(eq(amplificationTargetTable.id, input.targetId))
+        .returning();
+      return t;
+    }),
+
+  /** Drop an amplifier from a moment (leaves the rolodex row intact). */
+  removeTarget: protectedProcedure
+    .input(z.object({ targetId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .delete(amplificationTargetTable)
+        .where(eq(amplificationTargetTable.id, input.targetId));
+      return { ok: true };
+    }),
 });

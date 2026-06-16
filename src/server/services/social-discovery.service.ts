@@ -1,6 +1,6 @@
 import "server-only";
 
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
@@ -22,6 +22,9 @@ import {
   isTavilyConfigured,
   isParallelConfigured,
   isPerplexityConfigured,
+  type TavilyResult,
+  type ParallelResult,
+  type PerplexityResult,
 } from "@/server/clients/search-providers.client";
 import { isClaudeConfigured } from "@/server/clients/claude.client";
 import { canVerify, verifyProfile } from "@/server/clients/brightdata.client";
@@ -34,39 +37,34 @@ const DISCOVER_PLATFORMS = [
 ] as const;
 type DiscoverPlatform = (typeof DISCOVER_PLATFORMS)[number];
 
-const PATTERNS: Array<{ platform: DiscoverPlatform; re: RegExp }> = [
-  { platform: "linkedin", re: /linkedin\.com\/(?:company|in|school)\/([A-Za-z0-9._%-]+)/i },
-  { platform: "instagram", re: /instagram\.com\/([A-Za-z0-9._]+)/i },
-  { platform: "x", re: /(?:twitter|x)\.com\/([A-Za-z0-9_]+)/i },
-  { platform: "facebook", re: /facebook\.com\/([A-Za-z0-9.]+)/i },
-  { platform: "youtube", re: /youtube\.com\/(?:@|c\/|channel\/|user\/)?([A-Za-z0-9._-]+)/i },
-  { platform: "tiktok", re: /tiktok\.com\/@([A-Za-z0-9._]+)/i },
-  { platform: "threads", re: /threads\.(?:net|com)\/@([A-Za-z0-9._]+)/i },
-  { platform: "reddit", re: /reddit\.com\/(?:r|user)\/([A-Za-z0-9._-]+)/i },
-  { platform: "pinterest", re: /pinterest\.[a-z.]+\/([A-Za-z0-9._-]+)/i },
-];
+// Cap a source's text so a single fat result can't blow the context budget.
+const clip = (s: string, max: number) =>
+  s.length > max ? `${s.slice(0, max)}…[truncated]` : s;
 
-const STOP = new Set([
-  "share", "sharer", "intent", "home", "login", "signup", "watch", "p", "reel",
-  "explore", "hashtag", "about", "help", "privacy", "terms", "tr", "embed",
-]);
+const sourceBlock = (label: string, body: string) =>
+  `=== SOURCE: ${label} ===\n${body.trim()}`;
 
-type Candidate = { platform: DiscoverPlatform; handle: string; url: string; source: string };
+function formatTavily(r: TavilyResult): string {
+  const head = r.answer ? `answer: ${r.answer}\n` : "";
+  return (
+    head +
+    r.results
+      .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.content, 500)}`)
+      .join("\n")
+  );
+}
 
-function extractCandidates(text: string, source: string): Candidate[] {
-  if (!text) return [];
-  const urls = text.match(/https?:\/\/[^\s)"'<>]+/gi) ?? [];
-  const out: Candidate[] = [];
-  for (const raw of urls) {
-    for (const { platform, re } of PATTERNS) {
-      const m = re.exec(raw);
-      if (m?.[1] && !STOP.has(m[1].toLowerCase())) {
-        out.push({ platform, handle: m[1], url: raw.replace(/[).,]+$/, ""), source });
-        break;
-      }
-    }
-  }
-  return out;
+function formatParallel(r: ParallelResult): string {
+  return r.results
+    .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.excerpts.join(" "), 500)}`)
+    .join("\n");
+}
+
+function formatPerplexity(r: PerplexityResult): string {
+  const cites = r.citations.length
+    ? `\ncitations:\n${r.citations.map((c) => `- ${c}`).join("\n")}`
+    : "";
+  return clip(r.content, 4_000) + cites;
 }
 
 async function envelope<T>(
@@ -95,19 +93,26 @@ const SCHEMA = z.object({
   suggestions: z.array(
     z.object({
       platform: z.enum(DISCOVER_PLATFORMS),
-      handle: z.string(),
-      profileUrl: z.string(),
+      handle: z.string().describe("Handle only, no leading @ and no URL"),
+      profileUrl: z.string().describe("Full profile URL exactly as it appears in the evidence"),
       confidence: z.number().min(0).max(1),
       isOfficial: z.boolean(),
       reasoning: z.string(),
+      sources: z
+        .array(z.string())
+        .describe("Which labelled sources (website/tavily/parallel/perplexity) this handle appears in"),
     }),
   ),
 });
 
 /**
  * Discover a brand's official social handles: scrape its site + fan out to the
- * search providers, then let Claude consolidate the noisy candidate set into one
- * best official handle per platform. Returns ranked suggestions (not persisted).
+ * search providers (deterministically — we know which to hit), then paste that
+ * raw evidence into one Claude call that extracts the best official handle per
+ * platform. No regex pre-pass — the model reads the same text a human would, so
+ * it catches plain-text @mentions, not just clean profile URLs. Grounding comes
+ * from instructing it to only return handles present in the evidence. Returns
+ * ranked suggestions (not persisted).
  */
 export async function discoverSocialHandles(input: {
   name: string;
@@ -115,7 +120,7 @@ export async function discoverSocialHandles(input: {
 }): Promise<SocialSuggestion[]> {
   if (!isClaudeConfigured) throw new Error("Claude not configured — discovery needs it.");
   const { name, website } = input;
-  const candidates: Candidate[] = [];
+  const blocks: string[] = [];
 
   // Stage 1: website scrape.
   if (website) {
@@ -123,7 +128,7 @@ export async function discoverSocialHandles(input: {
       const r = await scrapeUrl({ url: website, formats: ["markdown"] });
       return r?.markdown ?? "";
     });
-    if (md) candidates.push(...extractCandidates(md, "website"));
+    if (md) blocks.push(sourceBlock("website", clip(md, 8_000)));
   }
 
   // Stage 2: search providers (fan out, each isolated).
@@ -133,44 +138,36 @@ export async function discoverSocialHandles(input: {
     envelope(isParallelConfigured, () => parallelSearch(query, [`${name} official social profiles`])),
     envelope(isPerplexityConfigured, () => perplexitySearch(query)),
   ]);
-  if (tav) candidates.push(...extractCandidates(JSON.stringify(tav), "tavily"));
-  if (par) candidates.push(...extractCandidates(JSON.stringify(par), "parallel"));
-  if (perp) candidates.push(...extractCandidates(JSON.stringify(perp), "perplexity"));
+  if (tav) blocks.push(sourceBlock("tavily", formatTavily(tav)));
+  if (par) blocks.push(sourceBlock("parallel", formatParallel(par)));
+  if (perp) blocks.push(sourceBlock("perplexity", formatPerplexity(perp)));
 
-  // Dedup candidates, tracking which sources surfaced each.
-  const bySlug = new Map<string, Candidate & { sources: Set<string> }>();
-  for (const c of candidates) {
-    const k = `${c.platform}:${c.handle.toLowerCase()}`;
-    const ex = bySlug.get(k);
-    if (ex) ex.sources.add(c.source);
-    else bySlug.set(k, { ...c, sources: new Set([c.source]) });
-  }
-  const uniq = [...bySlug.values()];
-  if (!uniq.length) return [];
+  if (!blocks.length) return [];
 
-  // Stage 3: Claude consolidation.
-  const { object } = await generateObject({
+  // Stage 3: Claude reads the evidence and returns one official handle per platform.
+  const { output } = await generateText({
     model: anthropic("claude-sonnet-4-6"),
-    schema: SCHEMA,
+    output: Output.object({ schema: SCHEMA }),
     prompt:
       `Brand: "${name}"${website ? ` — ${website}` : ""}\n\n` +
-      `Candidate social URLs (platform | handle | url | sources):\n` +
-      uniq.map((c) => `${c.platform} | @${c.handle} | ${c.url} | ${[...c.sources].join(",")}`).join("\n") +
-      `\n\nReturn the single best OFFICIAL profile per platform. Drop fan pages, ` +
-      `regional sub-accounts, employee profiles, and platform chrome (share/intent/etc). ` +
-      `Omit a platform with no credible candidate. Confidence = how sure it's the brand's primary official account.`,
+      `Below is search-result and page text from multiple labelled sources. ` +
+      `Extract the single best OFFICIAL social profile per platform ` +
+      `(${DISCOVER_PLATFORMS.join(", ")}).\n` +
+      `Rules:\n` +
+      `- Only return a handle/URL that ACTUALLY appears in the evidence below — never guess or invent.\n` +
+      `- Drop fan pages, regional sub-accounts, employee profiles, and platform chrome (share/intent/etc).\n` +
+      `- Omit a platform with no credible candidate.\n` +
+      `- confidence = how sure it's the brand's primary official account.\n` +
+      `- sources = which labelled sources the handle appears in.\n\n` +
+      blocks.join("\n\n"),
   });
 
-  // Normalize the handle (Claude sometimes returns a leading @) and attach the
-  // sources we observed for it.
-  return object.suggestions.map((s) => {
-    const handle = s.handle.replace(/^@+/, "").trim();
-    return {
-      ...s,
-      handle,
-      sources: [...(bySlug.get(`${s.platform}:${handle.toLowerCase()}`)?.sources ?? [])],
-    };
-  });
+  // Normalize the handle (the model sometimes returns a leading @).
+  return output.suggestions.map((s) => ({
+    ...s,
+    handle: s.handle.replace(/^@+/, "").trim(),
+    sources: s.sources ?? [],
+  }));
 }
 
 export type DiscoverAndSaveResult = {

@@ -22,6 +22,7 @@ import { NewBrandButton } from "./NewBrandButton";
 import { TrackedBrands, type TrackedLite } from "./TrackedBrands";
 import { SuggestedChannels, type SuggestionLite } from "./SuggestedChannels";
 import { PeerScrapeButton } from "./PeerScrapeButton";
+import { AmplifierRolodex } from "./AmplifierRolodex";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
 const compactFmt = new Intl.NumberFormat("en-US", {
@@ -481,6 +482,8 @@ export default async function BrandsPage() {
           </div>
         </>
       )}
+
+      <AmplifierRolodex />
     </div>
   );
 }

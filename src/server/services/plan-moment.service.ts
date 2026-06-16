@@ -16,6 +16,7 @@ import {
   type TargetSpot,
 } from "@/server/db/schema";
 import { FORMAT_ARCHETYPES, TEMPLATE_STARTERS } from "@/server/content/formats";
+import { scrapeBasicContent } from "@/server/clients/firecrawl.client";
 
 /**
  * Plan a MOMENT — the forward, generative inverse of retroactive grouping.
@@ -115,6 +116,56 @@ export type RefineInput = {
   drop?: string[]; // titles of beats the operator rejected — don't re-introduce
   steer?: string;
 };
+
+/**
+ * Turn raw pasted sources — a press-release URL, a landing page, image URLs —
+ * into planner input. A page URL gets scraped to markdown (the planner model
+ * can't fetch URLs itself); an image URL passes straight through as hero
+ * creative. The first page title seeds the moment name; its og:image becomes a
+ * reference image. Run ONCE up front so refine/regenerate never re-scrape.
+ */
+export type IngestedSources = {
+  name?: string;
+  brief: string;
+  imageUrls: string[];
+};
+
+const IMAGE_URL_RE = /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i;
+const MAX_BRIEF_CHARS = 6_000;
+
+export async function ingestSources(sources: string[]): Promise<IngestedSources> {
+  const imageUrls: string[] = [];
+  const briefs: string[] = [];
+  let name: string | undefined;
+
+  for (const raw of sources) {
+    const url = raw.trim();
+    if (!url) continue;
+    if (IMAGE_URL_RE.test(url)) {
+      imageUrls.push(url);
+      continue;
+    }
+    const page = await scrapeBasicContent({ url });
+    if (!page) {
+      briefs.push(`Source: ${url} (could not be fetched)`);
+      continue;
+    }
+    const title = page.title ?? (page.metadata?.ogTitle as string | undefined);
+    if (title && !name) name = title;
+    const body = (page.content ?? "").slice(0, MAX_BRIEF_CHARS);
+    briefs.push(
+      [`Source: ${url}`, title ? `Title: ${title}` : null, body]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    const og =
+      (page.metadata?.ogImage as string | undefined) ??
+      (page.metadata?.["og:image"] as string | undefined);
+    if (og) imageUrls.push(og);
+  }
+
+  return { name, brief: briefs.join("\n\n---\n\n"), imageUrls };
+}
 
 export async function generateMomentBlueprint(opts: {
   brandName: string;

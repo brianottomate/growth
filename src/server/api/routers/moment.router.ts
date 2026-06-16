@@ -12,6 +12,7 @@ import {
 import {
   commitMomentBlueprint,
   generateMomentBlueprint,
+  ingestSources,
   momentBlueprintSchema,
   momentSlotSchema,
 } from "@/server/services/plan-moment.service";
@@ -22,6 +23,15 @@ import {
  * `get` reads a committed moment back. Step 2 (drafting slots) reuses Studio.
  */
 export const momentRouter = createTRPCRouter({
+  /**
+   * Phase 0 (optional): turn pasted sources — a press release / landing-page
+   * URL, image URLs — into planner input (name + brief + reference images).
+   * Run once up front; the planner model can't fetch URLs itself. Persists NOTHING.
+   */
+  ingest: protectedProcedure
+    .input(z.object({ sources: z.array(z.string()).min(1) }))
+    .mutation(async ({ input }) => ingestSources(input.sources)),
+
   /** Phase 1: propose a shape from a name/prompt/images. Persists NOTHING. */
   generate: protectedProcedure
     .input(

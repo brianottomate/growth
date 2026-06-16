@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
 import { BlueprintReview, type Blueprint } from "./BlueprintReview";
+import { PlanChat, type PlanDraft } from "./PlanChat";
 
 // yyyy-mm-dd in LOCAL time (what <input type="date"> expects).
 const toDateInput = (d: Date) =>
@@ -52,6 +53,8 @@ export function LaunchClient({
   };
 }) {
   const trpc = useTRPC();
+  // Two ways to produce a blueprint: the structured Form, or the chat agent.
+  const [mode, setMode] = useState<"form" | "chat">("form");
   // Seed from a deep-link (e.g. "Launch" from /media) when present.
   const [name, setName] = useState(initial?.name ?? "");
   const [brandId, setBrandId] = useState(initial?.brandId ?? brands[0]?.id ?? "");
@@ -59,6 +62,9 @@ export function LaunchClient({
   const [goal, setGoal] = useState("");
   const [prompt, setPrompt] = useState(initial?.prompt ?? "");
   const [imageText, setImageText] = useState(initial?.imageUrls?.join(" ") ?? "");
+  // Primary input: paste a link (press release, landing page) and/or image URLs.
+  // On generate these are scraped/passed through into name/brief/images first.
+  const [sources, setSources] = useState("");
 
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
   // The committable edit reported by the remix builder (slots/amplifiers after
@@ -73,9 +79,14 @@ export function LaunchClient({
       onSuccess: (bp) => setBlueprint(bp),
     }),
   );
+  const ingest = useMutation(trpc.moment.ingest.mutationOptions());
   const commit = useMutation(trpc.moment.commit.mutationOptions());
 
   const imageUrls = imageText
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const sourceList = sources
     .split(/\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -89,7 +100,36 @@ export function LaunchClient({
     goal: goal.trim() || undefined,
   });
 
-  const canGenerate = brandId && (name.trim() || prompt.trim()) && !generate.isPending;
+  const busy = generate.isPending || ingest.isPending;
+
+  // Pasted links/images ARE the input: scrape any page URLs into a brief +
+  // reference images (run once), merge with whatever's typed, then generate.
+  // Subsequent refine/regenerate reuse the populated fields — no re-scrape.
+  const handleGenerate = async () => {
+    let input = baseGenInput();
+    if (sourceList.length) {
+      const res = await ingest.mutateAsync({ sources: sourceList });
+      const mergedName = name.trim() || res.name || "";
+      const mergedPrompt = [prompt.trim(), res.brief].filter(Boolean).join("\n\n");
+      const mergedImages = [...imageUrls, ...res.imageUrls];
+      // Reflect the ingest into the editable fields so the operator can tweak.
+      if (!name.trim() && res.name) setName(res.name);
+      if (res.brief) setPrompt(mergedPrompt);
+      if (res.imageUrls.length) setImageText(mergedImages.join(" "));
+      setSources(""); // consumed — don't re-scrape on refine
+      input = {
+        brandId,
+        name: mergedName || undefined,
+        prompt: mergedPrompt || undefined,
+        imageUrls: mergedImages.length ? mergedImages : undefined,
+        goal: goal.trim() || undefined,
+      };
+    }
+    generate.mutate(input);
+  };
+
+  const canGenerate =
+    brandId && (name.trim() || prompt.trim() || sourceList.length > 0) && !busy;
   const isCampaign = blueprint?.verdict === "campaign";
   const canCommit =
     blueprint && !isCampaign && name.trim() && launchDate && !commit.isPending;
@@ -108,15 +148,63 @@ export function LaunchClient({
     });
   };
 
+  // The chat agent drafted a blueprint → lift it into the shared review/Save
+  // panel, adopting the brand it planned for and seeding the name if empty.
+  const onDraft = useCallback((draft: PlanDraft) => {
+    setBlueprint(draft.blueprint);
+    setEdited(null);
+    if (draft.brandId) setBrandId(draft.brandId);
+    const nm = draft.name ?? draft.blueprint.seriesName;
+    if (nm) setName((cur) => cur.trim() || nm);
+  }, []);
+
+  const selectedBrandName = brands.find((b) => b.id === brandId)?.name;
+
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-2xl font-semibold tracking-tight">Plan a moment</h1>
       <p className="text-muted-foreground mt-1 text-sm">
-        Describe a moment — a Series C launch, or just “here’s our new hero
-        video, get it out there.” Generate the shape, edit it, then save.
+        Paste a link — a press release, a landing page — and/or image URLs, and
+        that’s your input. We’ll read it, propose the shape, then you edit and save.
+        Or just describe the moment below.
       </p>
 
-      <div className="bg-card mt-5 space-y-3 rounded-xl border p-4">
+      {/* Two ways in to the same blueprint: the structured Form, or the agent. */}
+      <div className="mt-4 inline-flex rounded-lg border p-0.5 text-sm">
+        {(["form", "chat"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`rounded-md px-3 py-1 transition-colors ${
+              mode === m
+                ? "bg-emerald-600 font-medium text-white"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {m === "form" ? "Form" : "Chat"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "form" && (
+        <div className="bg-card mt-3 space-y-3 rounded-xl border p-4">
+          <label className="block">
+            <span className="text-muted-foreground text-xs">
+              Paste a link or image URL — this is your brief
+            </span>
+          <textarea
+            value={sources}
+            onChange={(e) => setSources(e.target.value)}
+            rows={2}
+            placeholder="https://propertymanagementinc.com/pmi-news/…wanderos-partnership   https://…/hero.jpg"
+            className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+          />
+          <span className="text-muted-foreground/70 mt-1 block text-[11px]">
+            Page links are read for context; image links are used as hero
+            creative. Fills the fields below — tweak before generating if you like.
+          </span>
+        </label>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex-1">
             <span className="text-muted-foreground text-xs">Moment</span>
@@ -207,13 +295,55 @@ export function LaunchClient({
         <div className="flex justify-end">
           <button
             disabled={!canGenerate}
-            onClick={() => generate.mutate(baseGenInput())}
+            onClick={handleGenerate}
             className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {generate.isPending ? "Generating…" : "✨ Generate shape"}
+            {ingest.isPending
+              ? "Reading link…"
+              : generate.isPending
+                ? "Generating…"
+                : "✨ Generate shape"}
           </button>
         </div>
-      </div>
+        </div>
+      )}
+
+      {mode === "chat" && (
+        <div className="bg-card mt-3 space-y-3 rounded-xl border p-4">
+          {/* Brand + launch date still come from the operator; the agent
+              drafts the shape, then saving uses these below. */}
+          <div className="flex flex-wrap items-end gap-3">
+            <label>
+              <span className="text-muted-foreground text-xs">Brand</span>
+              <select
+                value={brandId}
+                onChange={(e) => setBrandId(e.target.value)}
+                className="border-border bg-background mt-1 block rounded-md border px-2 py-1.5 text-sm"
+              >
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="text-muted-foreground text-xs">Launch date</span>
+              <input
+                type="date"
+                value={launchDate}
+                onChange={(e) => setLaunchDate(e.target.value)}
+                className="border-border bg-background mt-1 block rounded-md border px-2 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+          <PlanChat
+            selectedBrandId={brandId || undefined}
+            selectedBrandName={selectedBrandName}
+            onDraft={onDraft}
+          />
+        </div>
+      )}
 
       {/* Verdict: ads-only → send to Campaigns. */}
       {isCampaign && (

@@ -26,6 +26,7 @@ import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { useTRPC } from "@/trpc/react";
 import { CampaignDialog } from "../CampaignDialog";
 import { fmtRange, STATUS_META } from "../CampaignsClient";
+import { MomentAmplifiers } from "./MomentAmplifiers";
 
 const CONTENT_STATUS_LABEL: Record<string, string> = {
   slot: "Slot",
@@ -265,6 +266,9 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
           </div>
         )}
       </section>
+
+      {/* ---- amplifiers (earned reach) -------------------------------- */}
+      <MomentAmplifiers momentId={initiativeId} />
 
       <CampaignDialog
         open={editOpen}
