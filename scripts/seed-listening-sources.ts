@@ -1,8 +1,7 @@
 /**
- * Phase-1 listening config seed. ADDITIVE and idempotent — changes no runtime
- * behaviour (rows are shadow=true, read for comparison only until each hardcoded
- * constant is retired). Mirrors today's constants into listening_source rows and
- * seeds the shared brand listening story.
+ * Listening config seed. ADDITIVE and idempotent — mirrors today's constants
+ * into listening_source rows (which are authoritative: scans + reply drafts
+ * read their config from here) and seeds the shared brand listening story.
  *
  * Run: bun --conditions react-server run scripts/seed-listening-sources.ts
  */
@@ -73,7 +72,6 @@ const rows: ListeningSourceInsert[] = [
     adapter: "reddit-json",
     label: "Reddit — STR operator subs",
     config: { subreddits: [...INITIAL_SUBREDDITS] },
-    shadow: false, // retired: reddit-monitor now reads subreddits from this row
   },
   {
     brandId: brand.id,
@@ -89,9 +87,7 @@ const rows: ListeningSourceInsert[] = [
         name: g.name,
         terms: [...g.terms],
       })),
-    },
-    shadow: true,
-  },
+    },  },
   {
     brandId: brand.id,
     key: "f5bot",
@@ -101,7 +97,6 @@ const rows: ListeningSourceInsert[] = [
     adapter: "f5bot",
     label: "F5Bot keyword alerts (Reddit / HN / Lobsters)",
     config: {},
-    shadow: false, // already the live path — not being compared against a constant
   },
   {
     brandId: brand.id,
@@ -111,9 +106,7 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-dms",
     label: "DMs (Zernio)",
-    config: {},
-    shadow: true,
-  },
+    config: {},  },
   {
     brandId: brand.id,
     key: "zernio-comments-ig",
@@ -122,9 +115,7 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-comments",
     label: "Comments — Instagram",
-    config: {},
-    shadow: true,
-  },
+    config: {},  },
   {
     brandId: brand.id,
     key: "zernio-comments-fb",
@@ -133,9 +124,7 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-comments",
     label: "Comments — Facebook",
-    config: {},
-    shadow: true,
-  },
+    config: {},  },
   {
     brandId: brand.id,
     key: "zernio-comments-li",
@@ -144,9 +133,7 @@ const rows: ListeningSourceInsert[] = [
     trigger: "on_demand",
     adapter: "zernio-comments",
     label: "Comments — LinkedIn",
-    config: {},
-    shadow: true,
-  },
+    config: {},  },
 ];
 
 const inserted = await db

@@ -3,7 +3,11 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
-import { MENTION_STATUSES, mentionTable } from "@/server/db/listening-schema";
+import {
+  MENTION_SOURCES,
+  MENTION_STATUSES,
+  mentionTable,
+} from "@/server/db/listening-schema";
 
 import { protectedProcedure } from "../trpc";
 
@@ -18,6 +22,8 @@ export const mentionRouter = {
     .input(
       z
         .object({
+          // Scope to one surface (e.g. "reddit" for the Reddit room). Omit for all.
+          source: z.enum(MENTION_SOURCES).optional(),
           includeSkipped: z.boolean().default(false),
           limit: z.number().int().min(1).max(500).default(200),
         })
@@ -27,6 +33,9 @@ export const mentionRouter = {
       const rows = await db
         .select()
         .from(mentionTable)
+        .where(
+          input?.source ? eq(mentionTable.source, input.source) : undefined,
+        )
         .orderBy(desc(mentionTable.receivedAt))
         .limit(input?.limit ?? 200);
       const mentions = input?.includeSkipped

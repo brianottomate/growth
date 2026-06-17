@@ -132,7 +132,7 @@ export function SourceDialog({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
-        toast.success("Source added (starts in shadow — flip to live when ready)");
+        toast.success("Source added");
       },
       onError: (e) => toast.error(e.message || "Failed to add source"),
     }),
@@ -212,8 +212,7 @@ export function SourceDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit source" : "Add a source to monitor"}</DialogTitle>
           <DialogDescription>
-            One place we listen. New sources start in <em>shadow</em> (read for
-            comparison, doesn&apos;t drive live scans) until you flip them live.
+            One place we listen — its config drives the scans and reply drafts.
           </DialogDescription>
         </DialogHeader>
 

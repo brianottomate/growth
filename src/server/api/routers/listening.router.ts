@@ -116,7 +116,6 @@ export const listeningRouter = {
         patch: z.object({
           label: z.string().nullable().optional(),
           isActive: z.boolean().optional(),
-          shadow: z.boolean().optional(),
           signalNotes: z.string().nullable().optional(),
           trigger: z.enum(["on_demand", "scheduled", "webhook"]).optional(),
           scheduleCron: z.string().nullable().optional(),
@@ -134,8 +133,7 @@ export const listeningRouter = {
       return updated ?? null;
     }),
 
-  /** Define a new place we listen. New sources start in `shadow` (read-only,
-   * doesn't drive live scans) until explicitly flipped to live. */
+  /** Define a new place we listen. Its config drives scans + reply drafts immediately. */
   createSource: protectedProcedure
     .input(
       z.object({
@@ -169,8 +167,6 @@ export const listeningRouter = {
           signalNotes: input.signalNotes?.trim() || null,
           config: input.config ?? {},
           voiceOverride: input.voiceOverride ?? null,
-          // New rows are read-only until vetted — they don't drive live scans.
-          shadow: true,
           isActive: true,
         })
         .returning();

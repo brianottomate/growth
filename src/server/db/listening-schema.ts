@@ -186,13 +186,9 @@ export const listeningSourceTable = pgTable(
       .text()
       .references(() => channelTable.id, { onDelete: "set null" }),
 
-    // --- ops + parallel-run migration ---
+    // --- ops ---
     label: t.text(),
     isActive: t.boolean().default(true).notNull(),
-    // Parallel-run flag: while true, read config for comparison but DON'T let it
-    // drive the live scan. Flip to false to make this row authoritative, then the
-    // hardcoded constant can be deleted.
-    shadow: t.boolean().default(true).notNull(),
     lastScanAt: t.timestamp(),
     nextScanAt: t.timestamp(),
 

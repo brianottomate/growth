@@ -187,7 +187,6 @@ function SourceCard({ source }: { source: Source }) {
 
   const [label, setLabel] = useState(source.label ?? "");
   const [isActive, setActive] = useState(source.isActive);
-  const [shadow, setShadow] = useState(source.shadow);
   const [trigger, setTrigger] = useState(source.trigger);
   const [scheduleCron, setCron] = useState(source.scheduleCron ?? "");
   const [signalNotes, setNotes] = useState(source.signalNotes ?? "");
@@ -211,8 +210,7 @@ function SourceCard({ source }: { source: Source }) {
   // Keep local state in sync if the row is refetched after save.
   useEffect(() => {
     setActive(source.isActive);
-    setShadow(source.shadow);
-  }, [source.isActive, source.shadow]);
+  }, [source.isActive]);
 
   const handleSave = () => {
     const config: Record<string, unknown> = {};
@@ -235,7 +233,6 @@ function SourceCard({ source }: { source: Source }) {
       patch: {
         label: label.trim() || null,
         isActive,
-        shadow,
         trigger,
         scheduleCron: trigger === "scheduled" ? scheduleCron.trim() || null : null,
         signalNotes: signalNotes.trim() || null,
@@ -254,12 +251,6 @@ function SourceCard({ source }: { source: Source }) {
         <Badge muted>{source.acquisition}</Badge>
         <Badge muted>{source.adapter}</Badge>
         <Toggle on={isActive} onClick={() => setActive((v) => !v)} label="Active" />
-        <Toggle
-          on={!shadow}
-          onClick={() => setShadow((v) => !v)}
-          label={shadow ? "Shadow" : "Live"}
-          tone={shadow ? "amber" : "emerald"}
-        />
         <span className="ml-auto" />
         <button
           type="button"
