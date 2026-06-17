@@ -19,6 +19,7 @@ import { mediaRouter } from "@/server/api/routers/media.router";
 import { mentionRouter } from "@/server/api/routers/mention.router";
 import { momentRouter } from "@/server/api/routers/moment.router";
 import { redditRouter } from "@/server/api/routers/reddit.router";
+import { rescheduleRouter } from "@/server/api/routers/reschedule.router";
 import { studioRouter } from "@/server/api/routers/studio.router";
 import { twitterRouter } from "@/server/api/routers/twitter.router";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
@@ -50,6 +51,7 @@ export const appRouter = createTRPCRouter({
   mention: mentionRouter,
   moment: momentRouter,
   reddit: redditRouter,
+  reschedule: rescheduleRouter,
   studio: studioRouter,
   twitter: twitterRouter,
 });

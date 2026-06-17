@@ -18,6 +18,8 @@ import {
 import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleSelect } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MessageSquare } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils";
 import {
   AssigneeButton,
@@ -30,6 +32,8 @@ import {
 import { PILLARS, PILLAR_BY_SLUG } from "@/lib/pillars";
 import type { ContentStatus } from "@/server/db/schema";
 import type { RouterOutputs } from "@/trpc/react";
+import { ContentCalendar } from "./ContentCalendar";
+import { ReshuffleDialog } from "./ReshuffleDialog";
 
 type Card = RouterOutputs["content"]["board"][number];
 
@@ -103,6 +107,7 @@ export function ContentBoard({
 
   const [brandFilter, setBrandFilter] = useState("all");
   const [pillarFilter, setPillarFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [mineOnly, setMineOnly] = useState(false);
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   // A real drag should not also "click" the card open afterwards.
@@ -198,19 +203,78 @@ export function ContentBoard({
       setAssignees.mutate({ contentPostId: cardId, userIds }),
   };
 
-  const [view, setView] = useState<"board" | "list">("board");
-
-  const visible = useMemo(
-    () =>
-      mineOnly
-        ? cards.filter(
-            (c) =>
-              c.owner?.id === currentUserId ||
-              c.spotOwners.some((o) => o.id === currentUserId),
-          )
-        : cards,
-    [cards, mineOnly, currentUserId],
+  // Inline "+ Add idea" creates under the filtered brand (or the first owned).
+  const createBrandId =
+    brandFilter !== "all" ? brandFilter : (brands[0]?.id ?? null);
+  const createIdea = useMutation(
+    trpc.content.create.mutationOptions({
+      onSettled: () => qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
+    }),
   );
+  const onCreate = (title: string, plannedAt?: string) => {
+    if (!createBrandId) return;
+    createIdea.mutate({
+      brandId: createBrandId,
+      title,
+      plannedAt,
+      pillar: pillarFilter !== "all" ? pillarFilter : undefined,
+    });
+  };
+
+  // List is the team's default surface; Board is the strategist's lens;
+  // Schedule is the date-first manual posting worklist.
+  const [view, setView] = useState<"board" | "list" | "schedule" | "calendar">("list");
+  const [reshuffleOpen, setReshuffleOpen] = useState(false);
+
+  const visible = useMemo(() => {
+    let out = cards;
+    if (statusFilter !== "all") out = out.filter((c) => c.status === statusFilter);
+    if (mineOnly)
+      out = out.filter(
+        (c) =>
+          c.owner?.id === currentUserId ||
+          c.spotOwners.some((o) => o.id === currentUserId),
+      );
+    return out;
+  }, [cards, statusFilter, mineOnly, currentUserId]);
+
+  // Status options reflect what's actually present, in pipeline order.
+  const statusOptions = useMemo(() => {
+    const present = [...new Set(cards.map((c) => c.status))].sort(
+      (a, b) => STATUS_ORDER.indexOf(a) - STATUS_ORDER.indexOf(b),
+    );
+    return [
+      { value: "all", label: "All statuses" },
+      ...present.map((s) => ({ value: s, label: STATUS_LABEL[s] ?? s })),
+    ];
+  }, [cards]);
+
+  // Schedule view (spot-level, date-first) — fetched lazily when active.
+  const scheduleOpts = trpc.content.schedule.queryOptions({
+    brandId: brandFilter !== "all" ? brandFilter : undefined,
+    pillar: pillarFilter !== "all" ? pillarFilter : undefined,
+  });
+  const { data: scheduleRows = [], isLoading: scheduleLoading } = useQuery({
+    ...scheduleOpts,
+    enabled: view === "schedule" || view === "calendar",
+  });
+  const scheduleVisible = useMemo(
+    () =>
+      scheduleRows.filter((r) => {
+        if (statusFilter !== "all" && r.status !== statusFilter) return false;
+        if (mineOnly && r.owner?.id !== currentUserId && r.spotOwner?.id !== currentUserId)
+          return false;
+        return true;
+      }),
+    [scheduleRows, statusFilter, mineOnly, currentUserId],
+  );
+  const invalidateSchedule = () =>
+    qc.invalidateQueries({ queryKey: scheduleOpts.queryKey });
+  const setSpotSchedule = useMutation(
+    trpc.content.setSpotSchedule.mutationOptions({ onSettled: invalidateSchedule }),
+  );
+  const onReschedule = (spotId: string, dateISO: string) =>
+    setSpotSchedule.mutate({ platformPostId: spotId, scheduledAt: dateISO });
 
   const byStatus = useMemo(() => {
     const m = new Map<string, Card[]>();
@@ -258,7 +322,7 @@ export function ContentBoard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="border-border flex overflow-hidden rounded-full border">
-            {(["board", "list"] as const).map((v) => (
+            {(["list", "board", "schedule", "calendar"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -273,6 +337,14 @@ export function ContentBoard({
               </button>
             ))}
           </div>
+          {(view === "schedule" || view === "calendar") && createBrandId && (
+            <button
+              onClick={() => setReshuffleOpen(true)}
+              className="border-border hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+            >
+              ✨ Reshuffle
+            </button>
+          )}
           <button
             onClick={() => setMineOnly((v) => !v)}
             className={cn(
@@ -307,12 +379,42 @@ export function ContentBoard({
             size="sm"
             aria-label="Pillar"
           />
+          <SimpleSelect
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+            options={statusOptions}
+            size="sm"
+            aria-label="Status"
+          />
         </div>
       </div>
 
-      {/* Board / List */}
+      {/* List / Board / Schedule */}
       {view === "list" ? (
-        <ContentList cards={visible} onOpen={openCard} assign={assign} loading={isLoading} />
+        <ContentList
+          cards={visible}
+          onOpen={openCard}
+          assign={assign}
+          loading={isLoading}
+          onCreate={onCreate}
+          canAdd={!!createBrandId}
+          onCommentChange={() =>
+            qc.invalidateQueries({ queryKey: boardOptions.queryKey })
+          }
+        />
+      ) : view === "schedule" ? (
+        <ScheduleView
+          rows={scheduleVisible}
+          loading={scheduleLoading}
+          onOpen={openCard}
+          onChanged={invalidateSchedule}
+        />
+      ) : view === "calendar" ? (
+        <ContentCalendar
+          rows={scheduleVisible}
+          onReschedule={onReschedule}
+          onOpen={openCard}
+        />
       ) : (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <div className="mt-5 flex flex-1 gap-3 overflow-x-auto pb-4">
@@ -333,107 +435,670 @@ export function ContentBoard({
           </DragOverlay>
         </DndContext>
       )}
+
+      {createBrandId && (
+        <ReshuffleDialog
+          brandId={createBrandId}
+          year={new Date().getFullYear()}
+          open={reshuffleOpen}
+          onClose={() => setReshuffleOpen(false)}
+          onApplied={() => {
+            void invalidateSchedule();
+            void qc.invalidateQueries({ queryKey: boardOptions.queryKey });
+          }}
+        />
+      )}
     </div>
   );
 }
 
-/** Execution-focused list view: deadline → status → title → metadata, one row
- *  per idea (the feedback's recommended visual hierarchy). */
+type GroupBy = "week" | "status" | "pillar" | "series";
+
+const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: "week", label: "Week" },
+  { value: "status", label: "Status" },
+  { value: "pillar", label: "Pillar" },
+  { value: "series", label: "Series" },
+];
+
+const DAY_MS = 86_400_000;
+/** Monday of the week containing `iso` (local time, week starts Monday). */
+function mondayOf(iso: string): Date {
+  const d = new Date(iso);
+  const back = (d.getDay() + 6) % 7;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - back);
+}
+function weekRange(monday: Date): string {
+  const end = new Date(monday.getTime() + 6 * DAY_MS);
+  const f = (x: Date) => x.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${f(monday)} – ${f(end)}`;
+}
+
+/** The sheet-killer: one scannable line per idea, grouped (by week by default).
+ *  No spreadsheet grid — the brief lives on the detail screen; this is triage:
+ *  glance the title + hook + pillar + channels, reassign, or add a new idea. */
 function ContentList({
   cards,
   onOpen,
   assign,
   loading,
+  onCreate,
+  canAdd,
+  onCommentChange,
 }: {
   cards: Card[];
   onOpen: (id: string) => void;
   assign: Assign;
   loading: boolean;
+  onCreate: (title: string, plannedAt?: string) => void;
+  canAdd: boolean;
+  onCommentChange: () => void;
 }) {
-  const sorted = useMemo(
-    () =>
-      [...cards].sort((a, b) => {
-        const s = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
-        if (s !== 0) return s;
-        return (b.plannedAt ?? "").localeCompare(a.plannedAt ?? "");
-      }),
-    [cards],
-  );
-  const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+  const [groupBy, setGroupBy] = useState<GroupBy>("week");
+
+  const groups = useMemo(() => {
+    type G = {
+      key: string;
+      label: string;
+      sort: number;
+      weekStartISO?: string;
+      cards: Card[];
+    };
+    const map = new Map<string, G>();
+    const push = (
+      key: string,
+      label: string,
+      sort: number,
+      c: Card,
+      weekStartISO?: string,
+    ) => {
+      const g = map.get(key);
+      if (g) g.cards.push(c);
+      else map.set(key, { key, label, sort, weekStartISO, cards: [c] });
+    };
+    for (const c of cards) {
+      if (groupBy === "week") {
+        if (c.plannedAt) {
+          const mon = mondayOf(c.plannedAt);
+          push(`w${mon.getTime()}`, weekRange(mon), mon.getTime(), c, mon.toISOString());
+        } else push("none", "Unscheduled", Number.MAX_SAFE_INTEGER, c);
+      } else if (groupBy === "status") {
+        push(c.status, STATUS_LABEL[c.status] ?? c.status, STATUS_ORDER.indexOf(c.status), c);
+      } else if (groupBy === "pillar") {
+        const name = c.pillar ? (PILLAR_BY_SLUG[c.pillar]?.name ?? c.pillar) : "No pillar";
+        push(c.pillar ?? "none", name, c.pillar ? 0 : 1, c);
+      } else {
+        push(c.seriesName ?? "none", c.seriesName ?? "No series", c.seriesName ? 0 : 1, c);
+      }
+    }
+    const arr = [...map.values()].sort(
+      (a, b) => a.sort - b.sort || a.label.localeCompare(b.label),
+    );
+    for (const g of arr)
+      g.cards.sort((a, b) => (a.plannedAt ?? "").localeCompare(b.plannedAt ?? ""));
+    return arr;
+  }, [cards, groupBy]);
 
   return (
-    <div className="mt-5 overflow-x-auto rounded-xl border">
-      {/* header */}
-      <div className="text-muted-foreground bg-muted/30 flex items-center gap-3 border-b px-3 py-2 text-[11px] font-medium uppercase tracking-wide">
-        <span className="w-16 shrink-0">Date</span>
-        <span className="w-24 shrink-0">Status</span>
-        <span className="min-w-0 flex-1">Title</span>
-        <span className="w-28 shrink-0">Brand</span>
-        <span className="w-20 shrink-0">Channels</span>
-        <span className="w-16 shrink-0 text-right">Reach</span>
-        <span className="w-16 shrink-0 text-right">Who</span>
+    <div className="mt-5">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-muted-foreground text-xs font-medium">Group by</span>
+        <div className="border-border flex overflow-hidden rounded-full border">
+          {GROUP_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => setGroupBy(o.value)}
+              className={cn(
+                "px-2.5 py-1 text-xs font-medium transition-colors",
+                groupBy === o.value
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:bg-accent",
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
       </div>
-      {sorted.length === 0 && (
-        <div className="text-muted-foreground px-3 py-10 text-center text-sm">
-          {loading ? "Loading…" : "Nothing here"}
+
+      {groups.length === 0 && (
+        <div className="text-muted-foreground rounded-xl border px-3 py-12 text-center text-sm">
+          {loading ? "Loading…" : "No ideas yet"}
         </div>
       )}
-      {sorted.map((c) => {
-        const pillar = c.pillar ? PILLAR_BY_SLUG[c.pillar] : null;
-        const reach =
-          c.views > 0 ? `${fmt(c.views)}` : c.likes > 0 ? `${fmt(c.likes)}♥` : null;
-        return (
-          <div
-            key={c.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpen(c.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onOpen(c.id);
-            }}
-            className="hover:bg-accent/40 flex cursor-pointer items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0"
-            style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
-          >
-            <span className="text-muted-foreground w-16 shrink-0 text-xs tabular-nums">
-              {c.plannedAt ? fmtDate(c.plannedAt) : "—"}
-            </span>
-            <span className="flex w-24 shrink-0 items-center gap-1.5 text-xs">
-              <span className={cn("size-2 shrink-0 rounded-full", DOT[c.status])} />
-              <span className="truncate">{STATUS_LABEL[c.status] ?? c.status}</span>
-            </span>
-            <span className="min-w-0 flex-1 truncate font-medium">
-              {c.title ?? "Untitled"}
-            </span>
-            <span className="text-muted-foreground w-28 shrink-0 truncate text-xs">
-              {c.brandName}
-            </span>
-            <span className="flex w-20 shrink-0 items-center gap-1">
-              {c.platforms.slice(0, 4).map((p) => (
-                <ChannelLogo key={p} platform={p} className="size-3.5" />
-              ))}
-            </span>
-            <span className="text-muted-foreground w-16 shrink-0 text-right text-xs tabular-nums">
-              {reach ?? ""}
-            </span>
-            <span className="flex w-16 shrink-0 items-center justify-end gap-1">
-              {c.assignees.length > 0 && <AvatarStack members={c.assignees} size="sm" />}
-              {assign ? (
-                <AssigneeButton
-                  value={c.owner}
-                  members={assign.members}
-                  currentUserId={assign.currentUserId}
-                  onChange={(ownerId) => assign.onAssign(c.id, ownerId)}
-                  size="sm"
-                  label="Assign lead"
+
+      <div className="flex flex-col gap-5">
+        {groups.map((g) => (
+          <section key={g.key}>
+            <div className="mb-1.5 flex items-center gap-2 px-1">
+              <h3 className="text-sm font-semibold">{g.label}</h3>
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {g.cards.length}
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-xl border">
+              {g.cards.map((c) => (
+                <ListRow
+                  key={c.id}
+                  card={c}
+                  onOpen={onOpen}
+                  assign={assign}
+                  onCommentChange={onCommentChange}
                 />
-              ) : (
-                <OwnerAvatar member={c.owner} size="sm" />
+              ))}
+              {canAdd && groupBy === "week" && (
+                <InlineAdd onCreate={(title) => onCreate(title, g.weekStartISO)} />
               )}
-            </span>
-          </div>
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ListRow({
+  card: c,
+  onOpen,
+  assign,
+  onCommentChange,
+}: {
+  card: Card;
+  onOpen: (id: string) => void;
+  assign: Assign;
+  onCommentChange: () => void;
+}) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const pillar = c.pillar ? PILLAR_BY_SLUG[c.pillar] : null;
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+  return (
+    <div
+      className="border-b last:border-b-0"
+      style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onOpen(c.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onOpen(c.id);
+        }}
+        className="hover:bg-accent/40 group flex cursor-pointer items-center gap-3 px-3 py-2.5"
+      >
+        <span
+          className={cn("size-2 shrink-0 rounded-full", DOT[c.status])}
+          title={STATUS_LABEL[c.status] ?? c.status}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">{c.title ?? "Untitled"}</div>
+          {c.hook && (
+            <div className="text-muted-foreground truncate text-xs">{c.hook}</div>
+          )}
+        </div>
+        {c.seriesName && (
+          <span
+            className="hidden shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium sm:inline"
+            style={{
+              background: `${c.seriesColor ?? "#64748b"}22`,
+              color: c.seriesColor ?? "#94a3b8",
+            }}
+          >
+            {c.seriesName}
+          </span>
+        )}
+        <span className="flex w-16 shrink-0 items-center justify-end gap-1">
+          {c.platforms.slice(0, 4).map((p) => (
+            <ChannelLogo key={p} platform={p} className="size-3.5" />
+          ))}
+        </span>
+        <span className="text-muted-foreground w-14 shrink-0 text-right text-xs tabular-nums">
+          {c.plannedAt ? fmtDate(c.plannedAt) : "—"}
+        </span>
+        <span
+          className="flex shrink-0 items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CommentChip
+            count={c.commentCount}
+            last={c.lastComment}
+            active={commentsOpen}
+            onToggle={() => setCommentsOpen((o) => !o)}
+          />
+          {c.assignees.length > 0 && <AvatarStack members={c.assignees} size="sm" />}
+          <AssigneeButton
+            value={c.owner}
+            members={assign.members}
+            currentUserId={assign.currentUserId}
+            onChange={(ownerId) => assign.onAssign(c.id, ownerId)}
+            size="sm"
+            label="Assign lead"
+          />
+        </span>
+      </div>
+      {commentsOpen && (
+        <InlineCommentThread
+          contentPostId={c.id}
+          currentUserId={assign.currentUserId}
+          onOpen={() => onOpen(c.id)}
+          onChanged={onCommentChange}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Comment badge: count + hover preview; click toggles the inline thread. */
+function CommentChip({
+  count,
+  last,
+  active,
+  onToggle,
+}: {
+  count: number;
+  last: Card["lastComment"];
+  active: boolean;
+  onToggle: () => void;
+}) {
+  const btn = (
+    <button
+      onClick={onToggle}
+      aria-label="Comments"
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] transition-colors",
+        active
+          ? "bg-accent text-foreground"
+          : count > 0
+            ? "text-muted-foreground hover:bg-accent"
+            : "text-muted-foreground/30 hover:text-muted-foreground",
+      )}
+    >
+      <MessageSquare className="size-3.5" />
+      {count > 0 && <span className="tabular-nums">{count}</span>}
+    </button>
+  );
+  if (!last) return btn;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{btn}</TooltipTrigger>
+      <TooltipContent>
+        <span className="font-medium">{last.author ?? "Someone"}</span>
+        <span className="text-muted-foreground block max-w-[220px] truncate text-xs">
+          {last.body}
+        </span>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Inline reply thread under a List row — reuses the existing comment procs. */
+function InlineCommentThread({
+  contentPostId,
+  currentUserId,
+  onOpen,
+  onChanged,
+}: {
+  contentPostId: string;
+  currentUserId: string;
+  onOpen: () => void;
+  onChanged: () => void;
+}) {
+  const trpc = useTRPC();
+  const qc = useQueryClient();
+  const opts = trpc.content.comments.queryOptions({ contentPostId });
+  const { data: comments = [], isLoading } = useQuery(opts);
+  const [body, setBody] = useState("");
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: opts.queryKey });
+    onChanged();
+  };
+  const add = useMutation(
+    trpc.content.addComment.mutationOptions({
+      onSuccess: () => {
+        setBody("");
+        invalidate();
+      },
+    }),
+  );
+  const del = useMutation(
+    trpc.content.deleteComment.mutationOptions({ onSuccess: invalidate }),
+  );
+  const submit = () => {
+    const t = body.trim();
+    if (t) add.mutate({ contentPostId, body: t });
+  };
+  return (
+    <div className="bg-muted/20 border-t px-3 py-2.5">
+      {isLoading ? (
+        <p className="text-muted-foreground text-xs">Loading…</p>
+      ) : comments.length === 0 ? (
+        <p className="text-muted-foreground mb-2 text-xs">No comments yet.</p>
+      ) : (
+        <div className="mb-2 flex flex-col gap-2">
+          {comments.map((cm) => (
+            <div key={cm.id} className="flex items-start gap-2 text-xs">
+              <OwnerAvatar member={cm.author} size="sm" />
+              <div className="min-w-0 flex-1">
+                <span className="font-medium">{cm.author?.name ?? "Someone"}</span>
+                <span className="text-muted-foreground">
+                  {" · "}
+                  {new Date(cm.createdAt).toLocaleDateString([], {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+                <p className="text-foreground/90 whitespace-pre-wrap">{cm.body}</p>
+              </div>
+              {cm.authorId === currentUserId && (
+                <button
+                  onClick={() => del.mutate({ id: cm.id })}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Delete comment"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+          placeholder="Reply…"
+          className="bg-background focus:ring-ring/40 flex-1 rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
+        />
+        <button
+          onClick={submit}
+          disabled={!body.trim() || add.isPending}
+          className="bg-foreground text-background rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+        >
+          Send
+        </button>
+        <button
+          onClick={onOpen}
+          className="text-muted-foreground hover:text-foreground text-xs underline"
+        >
+          Open ↗
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Inline capture at the bottom of a week group — Enter to add, Esc to cancel. */
+function InlineAdd({ onCreate }: { onCreate: (title: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const submit = () => {
+    const t = value.trim();
+    if (t) onCreate(t);
+    setValue("");
+    setOpen(false);
+  };
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-muted-foreground hover:bg-accent/40 hover:text-foreground flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
+      >
+        <span className="text-base leading-none">+</span> Add idea
+      </button>
+    );
+  }
+  return (
+    <div className="px-3 py-1.5">
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+          if (e.key === "Escape") {
+            setValue("");
+            setOpen(false);
+          }
+        }}
+        onBlur={submit}
+        placeholder="New idea…"
+        className="bg-background focus:ring-ring/40 w-full rounded-md border px-2 py-1 text-sm outline-none focus:ring-2"
+      />
+    </div>
+  );
+}
+
+// ---- Schedule view (date-first manual posting worklist) -------------------
+
+type SchedRow = RouterOutputs["content"]["schedule"][number];
+const schedDayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+/** Spot-level agenda grouped by ship day — what the team posts, per channel,
+ *  per day. Each row expands to the copyable caption + assets + mark-done. */
+function ScheduleView({
+  rows,
+  loading,
+  onOpen,
+  onChanged,
+}: {
+  rows: SchedRow[];
+  loading: boolean;
+  onOpen: (id: string) => void;
+  onChanged: () => void;
+}) {
+  const { days, undated } = useMemo(() => {
+    const map = new Map<string, { key: string; date: Date; rows: SchedRow[] }>();
+    const undated: SchedRow[] = [];
+    for (const r of rows) {
+      if (!r.at) {
+        undated.push(r);
+        continue;
+      }
+      const d = new Date(r.at);
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const k = schedDayKey(day);
+      const g = map.get(k);
+      if (g) g.rows.push(r);
+      else map.set(k, { key: k, date: day, rows: [r] });
+    }
+    const days = [...map.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
+    return { days, undated };
+  }, [rows]);
+
+  if (!loading && rows.length === 0) {
+    return (
+      <div className="text-muted-foreground mt-5 rounded-xl border px-3 py-12 text-center text-sm">
+        Nothing scheduled
+      </div>
+    );
+  }
+
+  const now = new Date();
+  const todayK = schedDayKey(now);
+  const todayTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  return (
+    <div className="mt-5 flex flex-col gap-4">
+      {loading && rows.length === 0 && (
+        <div className="text-muted-foreground text-sm">Loading…</div>
+      )}
+      {days.map((g) => {
+        const isToday = g.key === todayK;
+        const isPast = g.date.getTime() < todayTime;
+        return (
+          <section key={g.key}>
+            <div className="mb-1.5 flex items-center gap-2 px-1">
+              <h3 className={cn("text-sm font-semibold", isPast && "text-muted-foreground")}>
+                {g.date.toLocaleDateString([], {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </h3>
+              {isToday && (
+                <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                  Today
+                </span>
+              )}
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {g.rows.length}
+              </span>
+            </div>
+            <div className={cn("flex flex-col gap-2", isPast && "opacity-60")}>
+              {g.rows.map((r) => (
+                <ScheduleRow key={r.id} row={r} onOpen={onOpen} onChanged={onChanged} />
+              ))}
+            </div>
+          </section>
         );
       })}
+      {undated.length > 0 && (
+        <section>
+          <div className="mb-1.5 flex items-center gap-2 px-1">
+            <h3 className="text-muted-foreground text-sm font-semibold">No date yet</h3>
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {undated.length}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {undated.map((r) => (
+              <ScheduleRow key={r.id} row={r} onOpen={onOpen} onChanged={onChanged} />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function ScheduleRow({
+  row,
+  onOpen,
+  onChanged,
+}: {
+  row: SchedRow;
+  onOpen: (id: string) => void;
+  onChanged: () => void;
+}) {
+  const trpc = useTRPC();
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const setStatus = useMutation(
+    trpc.content.setSpotStatus.mutationOptions({ onSettled: onChanged }),
+  );
+  const done = row.status === "published";
+  const time = row.at
+    ? new Date(row.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
+  const copyText = [row.hook, row.caption, row.cta].filter(Boolean).join("\n\n");
+
+  return (
+    <div className="bg-card rounded-xl border">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <ChannelLogo platform={row.platform} className="size-5 shrink-0" />
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div
+            className={cn(
+              "truncate text-sm font-medium",
+              done && "text-muted-foreground line-through",
+            )}
+          >
+            {row.title ?? "Untitled"}
+          </div>
+          {row.hook && (
+            <div className="text-muted-foreground truncate text-xs">{row.hook}</div>
+          )}
+        </button>
+        {time && (
+          <span className="text-muted-foreground hidden shrink-0 text-xs tabular-nums sm:inline">
+            {time}
+          </span>
+        )}
+        <span className={cn("size-2 shrink-0 rounded-full", DOT[row.status])} />
+        {row.owner && <OwnerAvatar member={row.owner} size="sm" />}
+        <button
+          onClick={() =>
+            setStatus.mutate({
+              platformPostId: row.id,
+              status: done ? "scheduled" : "published",
+            })
+          }
+          className={cn(
+            "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+            done
+              ? "border-emerald-500/40 text-emerald-400"
+              : "border-border text-muted-foreground hover:bg-accent",
+          )}
+        >
+          {done ? "✓ Done" : "Mark done"}
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-2 border-t px-3 py-2.5">
+          {copyText && (
+            <div className="flex items-start gap-2">
+              <p className="text-muted-foreground min-w-0 flex-1 whitespace-pre-wrap text-sm">
+                {copyText}
+              </p>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(copyText);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                }}
+                className="border-border hover:bg-accent shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium"
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            {row.mediaUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={row.mediaUrl}
+                alt=""
+                className="size-10 rounded-md border object-cover"
+              />
+            )}
+            {(row.assetLinks ?? []).map((url, i) => (
+              <a
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border text-muted-foreground hover:text-foreground hover:bg-accent rounded-md border px-1.5 py-0.5 transition-colors"
+              >
+                ↗ Asset{(row.assetLinks?.length ?? 0) > 1 ? ` ${i + 1}` : ""}
+              </a>
+            ))}
+            {row.externalUrl && (
+              <a
+                href={row.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground underline"
+              >
+                Open ↗
+              </a>
+            )}
+            {row.contentPostId && (
+              <button
+                onClick={() => onOpen(row.contentPostId!)}
+                className="text-muted-foreground hover:text-foreground ml-auto underline"
+              >
+                Open idea →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

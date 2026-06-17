@@ -250,6 +250,20 @@ export const contentPostTable = pgTable(
     // Promote to a content_pillar FK when the Pillars screen needs CRUD.
     pillar: t.text(),
 
+    // ---- Editorial brief (the team's content-calendar columns) -------------
+    // Written ONCE at the idea level and inherited by every platform spot, so
+    // the hook / caption / CTA aren't retyped per channel (the spreadsheet's
+    // core failure mode). The concrete format + assets are per-spot, below.
+    hook: t.text(), // the scroll-stopping first line
+    captionDirection: t.text(), // caption / copy direction for the spots
+    visualDirection: t.text(), // what the visuals should be (a brief, not assets)
+    ctaText: t.text(), // the call-to-action, e.g. "Comment ESCAPE before these go"
+    // Optional comment-trigger keyword that fulfils the CTA (ManyChat et al.).
+    // Vendor-agnostic on purpose: presence == a keyword-triggered CTA; the tool
+    // that fulfils it is an integration detail, never named in the model.
+    ctaKeyword: t.text(),
+    kpi: t.text(), // the primary KPI this piece is going for
+
     // Intended placement on the Studio year wheel, before the piece is
     // scheduled. Null => derive position from series dates or earliest
     // platform_post.scheduledAt.
@@ -439,6 +453,10 @@ export const platformPostTable = pgTable(
 
     text: t.text(),
     media: t.jsonb().$type<MediaItem[]>(),
+    // External asset links (e.g. Google Drive folders) for this spot. The team
+    // produces in Drive; `media` (R2/Stream) is for assets WE host. Keeping the
+    // Drive URLs means we don't force an asset migration to kill the sheet.
+    assetLinks: t.jsonb().$type<string[]>(),
     stats: t.jsonb().$type<PostStats>(), // inline latest snapshot, not time-series
 
     externalId: t.text(),
