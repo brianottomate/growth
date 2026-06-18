@@ -5,10 +5,11 @@ import { and, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/server/db";
 import { contentPostTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
-import { IdeaOwnerControl, SpotOwnerControl } from "./OwnerControls";
+import { IdeaOwnerControl } from "./OwnerControls";
 import { CommentThread } from "./CommentThread";
+import { AddSpotControl, BriefEditor } from "./IdeaControls";
+import { SpotCard } from "./SpotCard";
 
 const memberCols = { id: true, name: true, image: true } as const;
 const toMember = (
@@ -26,23 +27,8 @@ const STATUS: Record<string, string> = {
   archived: "bg-muted text-muted-foreground",
 };
 
-const VIA: Record<string, string> = {
-  zernio: "Zernio",
-  customerio: "Customer.io",
-  native: "Static publish",
-  manual: "Manual",
-};
-
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
-
-const fmtWhen = (d: Date) =>
-  d.toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 function StatusBadge({ status }: { status: string }) {
   return (
@@ -205,11 +191,19 @@ export default async function ContentDetailPage({
         )}
       </div>
 
-      {content.body && (
-        <p className="text-muted-foreground mt-4 max-w-2xl text-sm leading-relaxed">
-          {content.body}
-        </p>
-      )}
+      <BriefEditor
+        contentPostId={content.id}
+        initial={{
+          hook: content.hook,
+          captionDirection: content.captionDirection,
+          visualDirection: content.visualDirection,
+          ctaText: content.ctaText,
+          ctaKeyword: content.ctaKeyword,
+          kpi: content.kpi,
+        }}
+        status={content.status}
+        plannedAtISO={content.plannedAt ? content.plannedAt.toISOString() : null}
+      />
 
       {/* aggregate analytics */}
       {metrics.length > 0 && (
@@ -232,61 +226,39 @@ export default async function ContentDetailPage({
         Platform posts · {posts.length}
       </h2>
       <div className="flex flex-col gap-2.5">
-        {posts.map((p) => {
-          const when = p.publishedAt ?? p.scheduledAt ?? p.createdAt;
-          const s = (p.stats) ?? {};
-          const via = p.provider ? (VIA[p.provider] ?? p.provider) : null;
-          return (
-            <div
-              key={p.id}
-              className="bg-card flex items-start gap-3 rounded-xl border p-3.5"
-            >
-              <ChannelLogo platform={p.platform} className="size-7" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold">
-                    {platformLabel(p.platform)}
-                  </span>
-                  {p.username && (
-                    <span className="text-muted-foreground text-xs">
-                      {p.username}
-                    </span>
-                  )}
-                  <StatusBadge status={p.status} />
-                  <div className="ml-auto">
-                    <SpotOwnerControl
-                      platformPostId={p.id}
-                      initialOwner={toMember(p.owner)}
-                      members={members}
-                      currentUserId={session.user.id}
-                    />
-                  </div>
-                </div>
-                {p.text && (
-                  <p className="text-muted-foreground mt-1 text-sm">{p.text}</p>
-                )}
-                <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
-                  <span>{fmtWhen(when)}</span>
-                  {s.likes != null && <span>· {fmt(s.likes)} likes</span>}
-                  {s.views != null && <span>· {fmt(s.views)} views</span>}
-                  {s.comments != null && <span>· {fmt(s.comments)} comments</span>}
-                  {via && <span>· via {via}</span>}
-                  {p.externalUrl && (
-                    <a
-                      href={p.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-foreground underline"
-                    >
-                      Open ↗
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {posts.map((p) => (
+          <SpotCard
+            key={p.id}
+            brandId={content.brandId}
+            members={members}
+            currentUserId={session.user.id}
+            spot={{
+              id: p.id,
+              platform: p.platform,
+              format: p.format,
+              archetype: p.archetype,
+              template: p.template,
+              status: p.status,
+              source: p.source,
+              username: p.username,
+              text: p.text,
+              externalUrl: p.externalUrl,
+              provider: p.provider,
+              scheduledAtISO: p.scheduledAt ? p.scheduledAt.toISOString() : null,
+              publishedAtISO: p.publishedAt ? p.publishedAt.toISOString() : null,
+              assetLinks: p.assetLinks,
+              media: p.media,
+              stats: p.stats,
+              owner: toMember(p.owner),
+            }}
+          />
+        ))}
       </div>
+
+      <AddSpotControl
+        contentPostId={content.id}
+        existingPlatforms={posts.map((p) => p.platform)}
+      />
 
       {/* series siblings */}
       {content.series && (
