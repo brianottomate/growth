@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Pencil, Plus } from "lucide-react";
+import { ArrowRight, Check, Pencil, Plus } from "lucide-react";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -118,6 +118,13 @@ export function Sources({
 }
 
 function SourceCard({ source, onEdit }: { source: Source; onEdit: () => void }) {
+  // Latest "confirmed live in the provider" date across this source's alert terms.
+  const verifiedDates = (source.config?.alertTerms ?? [])
+    .map((t) => t.verifiedAt)
+    .filter((d): d is string => Boolean(d))
+    .sort();
+  const verifiedAt = verifiedDates.at(-1) ?? null;
+
   return (
     <article className="bg-card rounded-xl border p-4">
       <div className="flex items-start gap-3">
@@ -127,6 +134,7 @@ function SourceCard({ source, onEdit }: { source: Source; onEdit: () => void }) 
             <span className="text-foreground text-sm font-medium">
               {source.label ?? platformLabel(source.platform)}
             </span>
+            {verifiedAt && <VerifiedBadge date={verifiedAt} />}
             {!source.isActive && <StatusBadge tone="muted" label="Paused" />}
           </div>
 
@@ -164,6 +172,7 @@ function Watching({ source }: { source: Source }) {
   const chips: string[] = [];
   if (cfg.subreddits?.length) chips.push(...cfg.subreddits.map((s) => `r/${s}`));
   if (cfg.keywords?.length) chips.push(...cfg.keywords);
+  if (cfg.alertTerms?.length) chips.push(...cfg.alertTerms.map((t) => `“${t.term}”`));
   if (cfg.watchlistGroups?.length)
     chips.push(
       ...cfg.watchlistGroups.map((g) => `${g.name} (${g.terms.length})`),
@@ -197,6 +206,23 @@ function Watching({ source }: { source: Source }) {
         </span>
       )}
     </div>
+  );
+}
+
+function VerifiedBadge({ date }: { date: string }) {
+  const label = new Date(date).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return (
+    <span
+      title="Confirmed live in the provider (F5Bot)"
+      className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400"
+    >
+      <Check className="size-3" />
+      Verified · {label}
+    </span>
   );
 }
 

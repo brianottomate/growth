@@ -28,6 +28,16 @@ const StorySchema = z.object({
 const SourceConfigSchema = z.object({
   subreddits: z.array(z.string()).optional(),
   keywords: z.array(z.string()).optional(),
+  alertTerms: z
+    .array(
+      z.object({
+        term: z.string(),
+        flags: z.array(z.string()).optional(),
+        enabled: z.boolean().optional(),
+        verifiedAt: z.string().optional(),
+      }),
+    )
+    .optional(),
   watchlistGroups: z
     .array(
       z.object({

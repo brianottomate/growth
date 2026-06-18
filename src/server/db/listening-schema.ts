@@ -1,5 +1,6 @@
 import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { userTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
 import {
   type ChannelFingerprint,
@@ -81,6 +82,14 @@ export const mentionTable = pgTable(
     rationale: t.text(),
     status: t.text().$type<MentionStatus>().notNull().default("new"),
 
+    // ---- Assignment / triage audit ----
+    // Reuses the content owner model, but a mention is an atomic action (one
+    // person replies once), so: a single claimer + who-resolved-it, NOT a
+    // multi-assignee join.
+    assigneeId: t.text().references(() => userTable.id), // who claimed it ("mine")
+    resolvedById: t.text().references(() => userTable.id), // who marked engaged/skipped
+    resolvedAt: t.timestamp(),
+
     // ---- Provenance ----
     sourceEmailId: t.text(), // Resend received-email id this came from
     raw: t.jsonb(), // full parsed payload / extraction output
@@ -102,6 +111,7 @@ export const mentionTable = pgTable(
     index("mention_status_idx").on(table.status),
     index("mention_provider_idx").on(table.provider),
     index("mention_received_at_idx").on(table.receivedAt),
+    index("mention_assignee_idx").on(table.assigneeId),
   ],
 );
 
@@ -142,10 +152,22 @@ export const listeningTriggerEnum = pgEnum("listening_trigger", [
 export type ListeningTrigger =
   (typeof listeningTriggerEnum.enumValues)[number];
 
+// A keyword alert as configured in a provider (F5Bot today, Mentionkit later).
+// This is the INTENT — "what we want to monitor" — mirrored from the provider's
+// own config. `verifiedAt` records when we last confirmed it's actually live in
+// the channel, so the strategy view can show a "verified · <date>" badge.
+export type ListeningAlertTerm = {
+  term: string;
+  flags?: string[]; // provider matching flags, e.g. F5Bot "whole" | "only-reddit" | "no-comments"
+  enabled?: boolean; // mirrors the provider's enabled state
+  verifiedAt?: string; // ISO date we last confirmed this term is live in the channel
+};
+
 /** Source-specific targeting. Typed jsonb so each adapter shapes its own config. */
 export type ListeningSourceConfig = {
   subreddits?: string[]; // reddit
   keywords?: string[]; // x / linkedin / pinterest terms
+  alertTerms?: ListeningAlertTerm[]; // provider_alert terms (F5Bot) — intent + verified state
   watchlistGroups?: { id: string; name: string; terms: string[] }[]; // x
   windowDays?: number;
   ignoreList?: string[]; // e.g. F5Bot ad-block senders

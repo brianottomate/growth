@@ -5,13 +5,14 @@
  *
  * Run: bun --conditions react-server run scripts/seed-listening-sources.ts
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { X_WATCHLIST } from "@/lib/x-watchlist";
 import { db } from "@/server/db";
 import {
   type BrandListeningStory,
   brandTable,
+  type ListeningAlertTerm,
   listeningSourceTable,
   type ListeningSourceInsert,
 } from "@/server/db/schema";
@@ -27,6 +28,22 @@ const INITIAL_SUBREDDITS = [
   "vrbo",
   "realestateinvesting",
   "Landlord",
+];
+
+// F5Bot alert terms — MIRRORED from the live F5Bot dashboard (the source of
+// truth). Keep this list in sync with F5Bot; `verifiedAt` is bumped whenever we
+// confirm alignment. F5Bot is one channel; if we move to Mentionkit the terms
+// move with us. Casing + flags match the F5Bot config exactly.
+const F5BOT_VERIFIED_AT = "2026-06-17";
+const F5BOT_ALERT_TERMS: ListeningAlertTerm[] = [
+  { term: "airbnb alternatives", flags: ["whole", "only-reddit", "no-comments"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  { term: "direct booking site", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  { term: "fire my property manager", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  { term: "wander listed", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  { term: "wander operated", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  { term: "wander sites", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  { term: "wander.com", flags: [], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
+  { term: "wanderos", flags: ["whole", "only-reddit"], enabled: true, verifiedAt: F5BOT_VERIFIED_AT },
 ];
 
 const brand = await db.query.brandTable.findFirst({
@@ -96,7 +113,7 @@ const rows: ListeningSourceInsert[] = [
     trigger: "webhook",
     adapter: "f5bot",
     label: "F5Bot keyword alerts (Reddit / HN / Lobsters)",
-    config: {},
+    config: { alertTerms: F5BOT_ALERT_TERMS },
   },
   {
     brandId: brand.id,
@@ -144,5 +161,21 @@ const inserted = await db
 
 console.log(
   `[seed-listening] inserted ${inserted.length}/${rows.length} listening_source rows (rest already existed)`,
+);
+
+// Align the F5Bot alert terms even when the row already existed (onConflictDoNothing
+// skips updates) — F5Bot's dashboard is the source of truth, so we always mirror it.
+const [aligned] = await db
+  .update(listeningSourceTable)
+  .set({ config: { alertTerms: F5BOT_ALERT_TERMS } })
+  .where(
+    and(
+      eq(listeningSourceTable.brandId, brand.id),
+      eq(listeningSourceTable.key, "f5bot"),
+    ),
+  )
+  .returning();
+console.log(
+  `[seed-listening] aligned F5Bot alert terms: ${aligned ? F5BOT_ALERT_TERMS.length : 0} terms (verified ${F5BOT_VERIFIED_AT})`,
 );
 process.exit(0);

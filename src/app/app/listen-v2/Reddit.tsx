@@ -5,8 +5,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 
 import { ListenItemActions } from "@/app/app/listen/ListenItemActions";
+import {
+  AssigneeButton,
+  OwnerAvatar,
+  type Member,
+} from "@/components/assignment/assignee";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
+import { authClient } from "@/server/better-auth/client";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
 type Mention = RouterOutputs["mention"]["list"]["mentions"][number];
@@ -70,6 +76,21 @@ export function Reddit() {
         ),
     }),
   );
+  const assign = useMutation(
+    trpc.mention.assign.mutationOptions({
+      onSuccess: () =>
+        void queryClient.invalidateQueries(
+          trpc.mention.list.queryOptions(LIST_INPUT),
+        ),
+    }),
+  );
+
+  // Reuse the content org-member list + Better Auth session for claiming.
+  const { data: members = [] } = useQuery(
+    trpc.content.assignableMembers.queryOptions(),
+  );
+  const { data: session } = authClient.useSession();
+  const currentUserId = session?.user.id ?? "";
 
   const all = useMemo(() => data?.mentions ?? [], [data]);
 
@@ -113,6 +134,8 @@ export function Reddit() {
   const lastReceived = all[0]?.receivedAt;
   const onState = (id: string, status: "engaged" | "skipped" | "new") =>
     setStatus.mutate({ id, status });
+  const onAssign = (id: string, userId: string | null) =>
+    assign.mutate({ id, userId });
 
   const toggle = (f: Filter) =>
     setFilter((prev) =>
@@ -175,21 +198,21 @@ export function Reddit() {
           {act.length > 0 && (
             <QueueGroup label="Act today" count={act.length} tone="emerald">
               {act.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} />
+                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
               ))}
             </QueueGroup>
           )}
           {monitor.length > 0 && (
             <QueueGroup label="Monitor — revisit" count={monitor.length} tone="amber">
               {monitor.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} />
+                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
               ))}
             </QueueGroup>
           )}
           {handled.length > 0 && (
             <QueueGroup label="Handled" count={handled.length} tone="muted">
               {handled.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} />
+                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
               ))}
             </QueueGroup>
           )}
@@ -206,7 +229,7 @@ export function Reddit() {
                 <div className="mt-3">
                   <QueueGroup label="Skipped" count={skipped.length} tone="muted">
                     {skipped.map((m) => (
-                      <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} />
+                      <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
                     ))}
                   </QueueGroup>
                 </div>
@@ -312,14 +335,22 @@ function RedditCard({
   m,
   onState,
   pending,
+  members,
+  currentUserId,
+  onAssign,
 }: {
   m: Mention;
   onState: (id: string, status: "engaged" | "skipped" | "new") => void;
   pending: boolean;
+  members: Member[];
+  currentUserId: string;
+  onAssign: (id: string, userId: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const intent = intentMeta(m.intentTag);
   const handled = m.status === "engaged" || m.status === "skipped";
+  const assignee = members.find((x) => x.id === m.assigneeId) ?? null;
+  const resolver = members.find((x) => x.id === m.resolvedById) ?? null;
 
   const provLabel = PROVIDER_LABEL[m.provider] ?? m.provider;
   const provDetail = m.keyword
@@ -378,16 +409,18 @@ function RedditCard({
               {m.relevance}/10
             </span>
           )}
-          {m.sourceType === "comment" && (
-            <span className="text-muted-foreground ml-auto text-[10px]">comment</span>
-          )}
-          <ChevronDown
-            className={cn(
-              "text-muted-foreground size-3.5 transition-transform",
-              m.sourceType === "comment" ? "" : "ml-auto",
-              open && "rotate-180",
+          <span className="ml-auto flex items-center gap-2">
+            {assignee && <OwnerAvatar member={assignee} size="sm" />}
+            {m.sourceType === "comment" && (
+              <span className="text-muted-foreground text-[10px]">comment</span>
             )}
-          />
+            <ChevronDown
+              className={cn(
+                "text-muted-foreground size-3.5 transition-transform",
+                open && "rotate-180",
+              )}
+            />
+          </span>
         </span>
 
         <span className="text-sm leading-snug font-medium">
@@ -410,6 +443,13 @@ function RedditCard({
         <div className="flex flex-col gap-2.5 px-4 pb-3">
           {m.rationale && (
             <p className="text-muted-foreground text-xs italic">{m.rationale}</p>
+          )}
+          {handled && (
+            <p className="text-muted-foreground text-[11px]">
+              {m.status === "engaged" ? "Engaged" : "Skipped"}
+              {resolver ? ` by ${resolver.name ?? "someone"}` : ""}
+              {m.resolvedAt ? ` · ${relTime(m.resolvedAt)} ago` : ""}
+            </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
             {!handled ? (
@@ -444,6 +484,16 @@ function RedditCard({
             >
               Open on Reddit ↗
             </a>
+            <span className="ml-auto flex items-center gap-1.5">
+              <span className="text-muted-foreground text-[11px]">Owner</span>
+              <AssigneeButton
+                value={assignee}
+                members={members}
+                currentUserId={currentUserId}
+                onChange={(userId) => onAssign(m.id, userId)}
+                size="sm"
+              />
+            </span>
           </div>
           <ListenItemActions context={context} />
         </div>

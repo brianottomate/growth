@@ -46,10 +46,29 @@ export const mentionRouter = {
 
   setStatus: protectedProcedure
     .input(z.object({ id: z.string(), status: z.enum(MENTION_STATUSES) }))
+    .mutation(async ({ input, ctx }) => {
+      // Engaged/skipped record WHO resolved it + when; reopening ("new") clears
+      // the audit so it reads as untouched again.
+      const resolving = input.status !== "new";
+      const [updated] = await db
+        .update(mentionTable)
+        .set({
+          status: input.status,
+          resolvedById: resolving ? ctx.session.user.id : null,
+          resolvedAt: resolving ? new Date() : null,
+        })
+        .where(eq(mentionTable.id, input.id))
+        .returning();
+      return updated ?? null;
+    }),
+
+  /** Claim/assign a mention to a teammate (null = unclaim). Drives "my queue". */
+  assign: protectedProcedure
+    .input(z.object({ id: z.string(), userId: z.string().nullable() }))
     .mutation(async ({ input }) => {
       const [updated] = await db
         .update(mentionTable)
-        .set({ status: input.status })
+        .set({ assigneeId: input.userId })
         .where(eq(mentionTable.id, input.id))
         .returning();
       return updated ?? null;
