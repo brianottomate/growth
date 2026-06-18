@@ -178,6 +178,53 @@ export async function findCompanyByDomain(
   return { id: found.id, values };
 }
 
+/**
+ * Batch-find companies by domain using the `IN` operator — one search per chunk
+ * of domains instead of one request per domain (the search API has a low
+ * per-second limit, so one-at-a-time gets rate-limited fast). Returns a map
+ * keyed by lowercased domain; domains with no HubSpot company are simply absent.
+ */
+export async function findCompaniesByDomains(
+  domains: string[],
+): Promise<Map<string, HubspotCompany>> {
+  const out = new Map<string, HubspotCompany>();
+  const CHUNK = 80; // stay under HubSpot's per-search value cap
+  for (let i = 0; i < domains.length; i += CHUNK) {
+    const chunk = domains.slice(i, i + CHUNK);
+    let after: string | undefined;
+    do {
+      const result = await client().crm.companies.searchApi.doSearch({
+        filterGroups: [
+          {
+            filters: [
+              {
+                propertyName: "domain",
+                operator: FilterOperatorEnum.In,
+                values: chunk,
+              },
+            ],
+          },
+        ],
+        properties: [...COMPANY_CORE_PROPERTIES],
+        limit: 100,
+        after,
+        sorts: [],
+      });
+      for (const found of result.results) {
+        const values = {} as Record<CompanyCoreProperty, string | null>;
+        for (const prop of COMPANY_CORE_PROPERTIES) {
+          values[prop] = (found.properties?.[prop] as string | undefined) ?? null;
+        }
+        if (values.domain) {
+          out.set(values.domain.toLowerCase(), { id: found.id, values });
+        }
+      }
+      after = result.paging?.next?.after;
+    } while (after);
+  }
+  return out;
+}
+
 /** Contacts associated with a company (decision-makers for the merge view). */
 export async function getCompanyContacts(
   companyId: string,

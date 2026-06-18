@@ -442,3 +442,124 @@ export interface EmailVerificationResponse {
   credits?: number | null;
   credits_used?: number | null;
 }
+
+// =====================================================
+// CAMPAIGN CREATION (POST /api/v2/campaigns)
+// =====================================================
+
+export interface CampaignScheduleEntry {
+  name: string;
+  timing: { from: string; to: string }; // "HH:MM" 24h
+  days: Record<string, boolean>; // keys "0"-"6" (Sun-Sat)
+  timezone: string; // IANA, e.g. "America/New_York"
+}
+
+export interface CampaignSchedule {
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string;
+  schedules: CampaignScheduleEntry[]; // min 1
+}
+
+export interface CampaignSequenceVariant {
+  subject: string;
+  body: string;
+  v_disabled?: boolean;
+}
+
+export interface CampaignSequenceStep {
+  type: "email"; // only supported type
+  delay: number; // days to wait AFTER this step before the next one
+  delay_unit?: "days";
+  variants: CampaignSequenceVariant[]; // min 1
+}
+
+/** Only the first sequence is used by Instantly; put all steps in sequences[0]. */
+export interface CampaignSequence {
+  steps: CampaignSequenceStep[];
+}
+
+export interface CreateCampaignRequest {
+  name: string;
+  campaign_schedule: CampaignSchedule;
+  sequences?: CampaignSequence[];
+  email_list?: string[]; // sender mailboxes
+  daily_limit?: number;
+  link_tracking?: boolean;
+  open_tracking?: boolean;
+  stop_on_reply?: boolean;
+  stop_on_auto_reply?: boolean;
+  text_only?: boolean;
+  pl_value?: number;
+  is_evergreen?: boolean;
+  email_gap?: number;
+  random_wait_max?: number;
+  daily_max_leads?: number;
+}
+
+// =====================================================
+// EMAILS / UNIBOX (GET /api/v2/emails, POST /api/v2/emails/reply)
+// =====================================================
+
+/** ue_type: what kind of email row this is. */
+export const EMAIL_UE_TYPE = {
+  CAMPAIGN_SENT: 1,
+  RECEIVED: 2,
+  SENT: 3,
+  SCHEDULED: 4,
+} as const;
+export type EmailUeType = (typeof EMAIL_UE_TYPE)[keyof typeof EMAIL_UE_TYPE];
+
+export interface InstantlyEmailBody {
+  text?: string | null;
+  html?: string | null;
+}
+
+export interface InstantlyEmail {
+  id: string;
+  thread_id: string | null;
+  subject: string | null;
+  /** Only populated when listed with preview_only=false (or fetched by id). */
+  body: InstantlyEmailBody | null;
+  from_address_email: string | null;
+  to_address_email_list: string | null;
+  cc_address_email_list: string | null;
+  timestamp_created: string;
+  ue_type: EmailUeType | number;
+  campaign_id: string | null;
+  list_id: string | null;
+  lead: string | null;
+  eaccount: string | null;
+  is_unread: number; // 0 | 1
+}
+
+export interface ListEmailsRequest {
+  limit?: number; // 1-100
+  starting_after?: string;
+  campaign_id?: string;
+  eaccount?: string;
+  email_type?: "received" | "sent" | "manual";
+  preview_only?: boolean; // false → include full body
+  lead?: string; // lead email to filter by
+  latest_of_thread?: boolean;
+}
+
+export interface ListEmailsResponse {
+  items: InstantlyEmail[];
+  next_starting_after: string | null;
+}
+
+export interface ReplyToEmailRequest {
+  reply_to_uuid: string; // id of the email being replied to
+  eaccount: string; // sending mailbox
+  subject: string;
+  body: { html?: string; text?: string };
+  additional_recipients?: string[];
+  cc_address_email_list?: string;
+  bcc_address_email_list?: string;
+  reminder_ts?: string;
+  assigned_to?: string;
+}
+
+export interface UnreadCountResponse {
+  count: number;
+}

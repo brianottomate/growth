@@ -18,6 +18,12 @@ import type {
   UpdateLeadInterestStatusRequest,
   UpdateLeadInterestStatusResponse,
   EmailVerificationResponse,
+  CreateCampaignRequest,
+  InstantlyEmail,
+  ListEmailsRequest,
+  ListEmailsResponse,
+  ReplyToEmailRequest,
+  UnreadCountResponse,
 } from "./instantly.types";
 
 // =====================================================
@@ -115,15 +121,20 @@ async function instantlyRequest<T>(
     ? endpoint
     : `${INSTANTLY_API_BASE}${endpoint}`;
 
-  const headers = getAuthHeaders();
+  const mergedHeaders: Record<string, string> = {
+    ...getAuthHeaders(),
+    ...(options.headers as Record<string, string> | undefined),
+  };
+  // Instantly (Fastify) rejects requests that declare a JSON content-type but
+  // send no body (e.g. DELETE) — drop the header when there's nothing to send.
+  if (options.body == null) {
+    delete mergedHeaders["Content-Type"];
+  }
 
   try {
     const response = await fetch(url, {
       ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
+      headers: mergedHeaders,
     });
 
     if (!response.ok) {
@@ -396,6 +407,29 @@ export async function listCampaigns(params?: {
 }
 
 /**
+ * Create a campaign (starts as DRAFT — does not send until launched).
+ *
+ * `sequences` accepts an array but Instantly only uses the first element, so
+ * put all steps in `sequences[0].steps`. Each step's `delay` is the number of
+ * days to wait AFTER that step before the next one fires.
+ */
+export async function createCampaign(
+  params: CreateCampaignRequest,
+): Promise<InstantlyCampaign> {
+  return instantlyRequest<InstantlyCampaign>("/campaigns", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+/**
+ * Delete a campaign by ID.
+ */
+export async function deleteCampaign(id: string): Promise<void> {
+  await instantlyRequest<void>(`/campaigns/${id}`, { method: "DELETE" });
+}
+
+/**
  * Get a single campaign by ID.
  */
 export async function getCampaign(
@@ -511,6 +545,92 @@ export async function listAccounts(params?: {
   return instantlyRequest<ListAccountsResponse>(
     `/accounts${qs ? `?${qs}` : ""}`,
   );
+}
+
+// =====================================================
+// EMAILS / UNIBOX
+// =====================================================
+
+/**
+ * List emails (the Unibox). Pass `preview_only: false` to include the full
+ * body (text + html). Note: this endpoint is rate-limited to 20 req/min.
+ */
+export async function listEmails(
+  params?: ListEmailsRequest,
+): Promise<ListEmailsResponse> {
+  const sp = new URLSearchParams();
+  if (params?.limit) sp.set("limit", String(params.limit));
+  if (params?.starting_after) sp.set("starting_after", params.starting_after);
+  if (params?.campaign_id) sp.set("campaign_id", params.campaign_id);
+  if (params?.eaccount) sp.set("eaccount", params.eaccount);
+  if (params?.email_type) sp.set("email_type", params.email_type);
+  if (params?.preview_only !== undefined)
+    sp.set("preview_only", String(params.preview_only));
+  if (params?.lead) sp.set("lead", params.lead);
+  if (params?.latest_of_thread !== undefined)
+    sp.set("latest_of_thread", String(params.latest_of_thread));
+  const qs = sp.toString();
+  return instantlyRequest<ListEmailsResponse>(`/emails${qs ? `?${qs}` : ""}`);
+}
+
+/**
+ * Get a single email (with full body) by ID.
+ */
+export async function getEmail(id: string): Promise<InstantlyEmail | null> {
+  try {
+    return await instantlyRequest<InstantlyEmail>(`/emails/${id}`);
+  } catch (error) {
+    if (error instanceof InstantlyError && error.statusCode === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Count unread emails in the Unibox.
+ */
+export async function getUnreadCount(): Promise<UnreadCountResponse> {
+  return instantlyRequest<UnreadCountResponse>("/emails/unread/count");
+}
+
+/**
+ * Reply to an email (sends from `eaccount`). Use to answer a prospect's reply
+ * — or to route the conversation to a real person via `assigned_to`.
+ */
+export async function replyToEmail(
+  params: ReplyToEmailRequest,
+): Promise<InstantlyEmail> {
+  return instantlyRequest<InstantlyEmail>("/emails/reply", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+/**
+ * Convenience: pull all received replies for a campaign, WITH full body text.
+ * This is the path to surfacing replies in-app / routing them to a real person.
+ */
+export async function getCampaignReplies(
+  campaignId: string,
+  opts?: { maxPages?: number },
+): Promise<InstantlyEmail[]> {
+  const out: InstantlyEmail[] = [];
+  let cursor: string | undefined;
+  const maxPages = opts?.maxPages ?? 20;
+  for (let p = 0; p < maxPages; p++) {
+    const res = await listEmails({
+      campaign_id: campaignId,
+      email_type: "received",
+      preview_only: false,
+      limit: 100,
+      ...(cursor ? { starting_after: cursor } : {}),
+    });
+    out.push(...res.items);
+    if (!res.next_starting_after || res.items.length === 0) break;
+    cursor = res.next_starting_after;
+  }
+  return out;
 }
 
 // =====================================================
