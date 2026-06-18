@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Check,
+  Copy,
   ExternalLink,
   GitMerge,
   Loader2,
@@ -19,7 +20,39 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTRPC } from "@/trpc/react";
+import { useTRPC, type RouterOutputs } from "@/trpc/react";
+
+/** A row from the leads list — what the table passes into the drawer. */
+export type LeadRow = RouterOutputs["leads"]["listDomains"]["items"][number];
+
+/**
+ * "We THINK it's in HubSpot" marker — reflects our ingested `in_hubspot` flag,
+ * NOT a live check. The flag is from a CSV snapshot and is ~30% stale (see the
+ * net-new audit), hence the "?" — the live truth comes from "Pull from HubSpot".
+ */
+export function HsMarker({
+  inHubspot,
+  leadStatus,
+}: {
+  inHubspot: boolean;
+  leadStatus?: string | null;
+}) {
+  return inHubspot ? (
+    <span
+      title={`We think this is already in HubSpot${leadStatus ? ` (${leadStatus})` : ""} — from the CSV snapshot, may be stale. Verify with "Pull from HubSpot".`}
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-medium text-orange-300"
+    >
+      ● in HubSpot?
+    </span>
+  ) : (
+    <span
+      title="Not in our CRM snapshot — likely net-new. Verify with 'Pull from HubSpot'."
+      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
+    >
+      ○ net-new?
+    </span>
+  );
+}
 
 function Json({ value }: { value: unknown }) {
   return (
@@ -30,15 +63,16 @@ function Json({ value }: { value: unknown }) {
 }
 
 export function EnrichDrawer({
-  domain,
+  lead,
   open,
   onOpenChange,
 }: {
-  domain: string | null;
+  lead: LeadRow | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const trpc = useTRPC();
+  const domain = lead?.domain ?? null;
   const enrich = useMutation(trpc.leads.enrich.mutationOptions());
   const hubspot = useMutation(trpc.leads.pullFromHubspot.mutationOptions());
   const merge = useMutation(trpc.leads.proposeMerge.mutationOptions());
@@ -51,7 +85,13 @@ export function EnrichDrawer({
     if (merge.data) {
       setChecked(
         Object.fromEntries(
-          merge.data.fields.map((f) => [f.key, f.proposed != null]),
+          // Don't pre-tick a placeholder pregen URL — it's a template, not a
+          // real site; auto-writing it (especially to HubSpot) persists junk.
+          merge.data.fields.map((f) => [
+            f.key,
+            f.proposed != null &&
+              !String(f.proposed).includes("PREGEN_URL_PATTERN"),
+          ]),
         ),
       );
     }
@@ -85,6 +125,98 @@ export function EnrichDrawer({
     });
   };
 
+  // ── Copy a single pasteable blob of everything loaded in this drawer, so it
+  // can be dropped into a Claude Code chat for analysis. Includes only the
+  // sections that have actually been run (HubSpot pull / enrich / merge). ──
+  const [copied, setCopied] = useState(false);
+  const hasContext = !!(hubspot.data ?? enrich.data ?? merge.data);
+
+  // No HubSpot company for this domain — confirmed by a live pull, or implied by
+  // the merge proposal carrying no HubSpot values. Drives the net-new affordances
+  // in the merge section (relabel the write button, drop the empty "hs:" tokens).
+  const hsCompanyMissing =
+    (hubspot.data?.configured === true && !hubspot.data.hubspot) ||
+    (!!merge.data && merge.data.fields.every((f) => f.hubspot == null));
+
+  // The drawer is a single reused instance — opening a different row only swaps
+  // the `lead` prop, it does NOT remount. Without this, the previous lead's
+  // (in-memory) mutation results would linger and show as stale data. Clear them
+  // whenever a new lead is opened. Reset only on open (skip the null/close
+  // transition) so results don't flicker away mid close-animation.
+  useEffect(() => {
+    if (!domain) return;
+    enrich.reset();
+    hubspot.reset();
+    merge.reset();
+    apply.reset();
+    setChecked({});
+    setCopied(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domain]);
+
+  const buildContext = (): string => {
+    const out: string[] = [`# Lead context — ${domain}`, ""];
+
+    const ex = enrich.data?.extraction.structured;
+    if (ex) {
+      out.push(
+        `**Web signals:** pregenFit \`${ex.pregenFit?.score ?? "?"}\` · tier \`${ex.icpTierGuess ?? "?"}\` · confidence \`${ex.confidence ?? "?"}\` · fed by ${enrich.data?.extraction.providersUsed.join(", ") || "—"}`,
+        "",
+      );
+    }
+
+    if (hubspot.data) {
+      out.push("## HubSpot comparison");
+      if (hubspot.data.configured === false) out.push("_HubSpot not configured._");
+      else if (!hubspot.data.hubspot)
+        out.push("_No HubSpot company for this domain — net-new._");
+      else out.push(`Record: ${hubspot.data.hubspot.url}`);
+      out.push("```json", JSON.stringify(hubspot.data, null, 2), "```", "");
+    }
+
+    if (enrich.data) {
+      out.push(
+        "## Web enrichment — extraction (synthesized)",
+        "```json",
+        JSON.stringify(enrich.data.extraction.structured, null, 2),
+        "```",
+        "",
+        "## Web enrichment — discovery (raw evidence)",
+        "```json",
+        JSON.stringify(enrich.data.discovery, null, 2),
+        "```",
+        "",
+      );
+    }
+
+    if (merge.data) {
+      out.push(
+        "## Merge proposal",
+        "```json",
+        JSON.stringify(merge.data, null, 2),
+        "```",
+        "",
+      );
+    }
+
+    if (!hasContext)
+      out.push(
+        '_Nothing run yet — click "Pull from HubSpot", "Run enrichment", and/or "Propose merge" first, then copy._',
+      );
+
+    return out.join("\n");
+  };
+
+  const copyContext = async () => {
+    try {
+      await navigator.clipboard.writeText(buildContext());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — ignore */
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-0 overflow-hidden sm:max-w-2xl">
@@ -101,6 +233,75 @@ export function EnrichDrawer({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
+          {/* What you clicked — basic info from our row, before any enrichment. */}
+          {lead && (
+            <div className="bg-muted/30 mt-2 rounded-lg border p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">
+                    {lead.companyName ?? lead.domain}
+                  </div>
+                  <div className="text-muted-foreground text-[11px]">
+                    {[lead.city, lead.state, lead.country]
+                      .filter(Boolean)
+                      .join(", ") || "location unknown"}
+                  </div>
+                </div>
+                <HsMarker
+                  inHubspot={lead.inHubspot}
+                  leadStatus={lead.hubspotLeadStatus}
+                />
+              </div>
+              <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                <span>
+                  PMS:{" "}
+                  <b className="text-foreground">{lead.pms ?? "—"}</b>
+                  {lead.isIntegratedPms ? " · integrated" : ""}
+                </span>
+                <span>
+                  Units (stored):{" "}
+                  <b className="text-foreground">{lead.unitCount ?? "—"}</b>
+                </span>
+                <span>
+                  Tier:{" "}
+                  <b className="text-foreground">
+                    {lead.sourceTier ?? lead.computedTier ?? "—"}
+                  </b>
+                </span>
+                {lead.pregenStatus && (
+                  <span>
+                    Site:{" "}
+                    <b className="text-foreground">{lead.pregenStatus}</b>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Copy everything loaded here as one markdown blob for analysis. */}
+          <div className="mt-2 flex justify-end">
+            <button
+              onClick={copyContext}
+              disabled={!hasContext}
+              title={
+                hasContext
+                  ? "Copy HubSpot + enrichment + merge as markdown"
+                  : "Run a pull/enrichment first"
+              }
+              className="border-border text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium disabled:opacity-40"
+            >
+              {copied ? (
+                <>
+                  <Check className="size-3.5 text-emerald-400" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3.5" /> Copy context
+                </>
+              )}
+            </button>
+          </div>
+
           {/* ── HubSpot: live pull + diff against our row (read-only) ── */}
           <div className="mt-2 rounded-lg border p-3">
             <div className="flex items-center justify-between">
@@ -360,13 +561,23 @@ export function EnrichDrawer({
                           </span>
                         </div>
                         <div className="text-muted-foreground text-[10px]">
-                          ours: {f.ours ?? "—"} · hs: {f.hubspot ?? "—"} · web:{" "}
-                          {f.web ?? "—"} — {f.reasoning}
+                          ours: {f.ours ?? "—"}
+                          {f.hubspot != null ? ` · hs: ${f.hubspot}` : ""}
+                          {f.web != null ? ` · web: ${f.web}` : ""} —{" "}
+                          {f.reasoning}
                         </div>
                       </div>
                     </label>
                   ))}
                 </div>
+
+                {hsCompanyMissing && (
+                  <p className="mt-3 rounded-md border border-orange-500/20 bg-orange-500/5 p-2 text-[11px] text-orange-300/90">
+                    No HubSpot company for this domain — “Create in HubSpot” adds
+                    a new record. Only do this for a lead you mean to hand to
+                    sales.
+                  </p>
+                )}
 
                 <div className="mt-3 flex items-center gap-2">
                   <button
@@ -381,7 +592,7 @@ export function EnrichDrawer({
                     disabled={apply.isPending}
                     className="rounded-md bg-orange-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-500 disabled:opacity-50"
                   >
-                    Write to HubSpot
+                    {hsCompanyMissing ? "Create in HubSpot" : "Write to HubSpot"}
                   </button>
                   {apply.isPending && (
                     <Loader2 className="size-4 animate-spin" />

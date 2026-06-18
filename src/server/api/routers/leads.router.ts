@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gte, ilike, isNull, or, sql } from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -65,6 +65,20 @@ export const leadsRouter = createTRPCRouter({
         untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot} and not ${leadDomainTable.inPregen})::int`,
         // pre-send guard: pregen domains already known to the CRM
         pregenInCrm: sql<number>`count(*) filter (where ${leadDomainTable.inPregen} and ${leadDomainTable.inHubspot})::int`,
+        // net-new sendable target: not in CRM, live rental site, has a credible
+        // contact (real name OR corporate email). Mirrors the `netNew` list filter.
+        netNew: sql<number>`count(*) filter (where
+          not ${leadDomainTable.inHubspot}
+          and not ${leadDomainTable.hasHubspotDeal}
+          and not ${leadDomainTable.isExistingCustomer}
+          and not ${leadDomainTable.excludeFromOutreach}
+          and ${leadDomainTable.pregenStatus} = 'LIVE_RENTAL'
+          and exists (
+            select 1 from leads.contact c
+            where c.domain_id = ${leadDomainTable.id} and c.deleted_at is null
+              and (c.first_name is not null or c.last_name is not null
+                   or c.email !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')
+          ))::int`,
       })
       .from(leadDomainTable);
 
@@ -106,6 +120,8 @@ export const leadsRouter = createTRPCRouter({
         pms: z.string().optional(),
         hasPregenSite: z.boolean().optional(),
         integratedPmsOnly: z.boolean().optional(),
+        // net-new sendable target: not in CRM, LIVE_RENTAL, has a credible contact.
+        netNew: z.boolean().optional(),
         minUnits: z.number().int().nonnegative().optional(),
         sort: z.enum(["composite", "units", "domain", "updated"]).default("units"),
         dir: z.enum(["asc", "desc"]).default("desc"),
@@ -129,6 +145,29 @@ export const leadsRouter = createTRPCRouter({
         conds.push(sql`${leadDomainTable.pregenSiteUrl} is not null`);
       if (input.integratedPmsOnly)
         conds.push(eq(leadDomainTable.isIntegratedPms, true));
+      if (input.netNew) {
+        // The "first send" cut: never entered the CRM, their current site is a
+        // live rental site (ICP), and we have at least one credible contact.
+        conds.push(
+          eq(leadDomainTable.inHubspot, false),
+          eq(leadDomainTable.hasHubspotDeal, false),
+          eq(leadDomainTable.isExistingCustomer, false),
+          eq(leadDomainTable.excludeFromOutreach, false),
+          eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
+          exists(
+            ctx.db
+              .select({ one: sql`1` })
+              .from(leadContactTable)
+              .where(
+                and(
+                  eq(leadContactTable.domainId, leadDomainTable.id),
+                  isNull(leadContactTable.deletedAt),
+                  sql`(${leadContactTable.firstName} is not null or ${leadContactTable.lastName} is not null or ${leadContactTable.email} !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')`,
+                ),
+              ),
+          ),
+        );
+      }
       if (input.minUnits != null)
         conds.push(gte(leadDomainTable.unitCount, input.minUnits));
 
@@ -146,6 +185,8 @@ export const leadsRouter = createTRPCRouter({
           domain: leadDomainTable.domain,
           companyName: leadDomainTable.companyName,
           country: leadDomainTable.country,
+          state: leadDomainTable.state,
+          city: leadDomainTable.city,
           pms: leadDomainTable.pms,
           isIntegratedPms: leadDomainTable.isIntegratedPms,
           unitCount: leadDomainTable.unitCount,

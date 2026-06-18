@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
-import { EnrichDrawer } from "./EnrichDrawer";
+import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
 
 const SOURCE_BADGE: Record<string, string> = {
   builtwith: "bg-slate-500/15 text-slate-300",
@@ -72,9 +72,10 @@ export function LeadsClient() {
   const [pms, setPms] = useState<string | undefined>(undefined);
   const [integratedOnly, setIntegratedOnly] = useState(false);
   const [hasPregen, setHasPregen] = useState(false);
+  const [netNew, setNetNew] = useState(false);
   const [sort, setSort] = useState<"units" | "composite" | "domain" | "updated">("units");
   const [page, setPage] = useState(0);
-  const [enrichDomain, setEnrichDomain] = useState<string | null>(null);
+  const [enrichLead, setEnrichLead] = useState<LeadRow | null>(null);
 
   const limit = 50;
 
@@ -89,6 +90,7 @@ export function LeadsClient() {
         pms,
         integratedPmsOnly: integratedOnly || undefined,
         hasPregenSite: hasPregen || undefined,
+        netNew: netNew || undefined,
         sort,
         dir: sort === "domain" ? "asc" : "desc",
         limit,
@@ -176,6 +178,10 @@ export function LeadsClient() {
         <Pill active={hasPregen} onClick={() => { setHasPregen((v) => !v); resetPage(); }}>
           Has pregen site
         </Pill>
+        <span className="bg-border mx-1 h-4 w-px" />
+        <Pill active={netNew} onClick={() => { setNetNew((v) => !v); resetPage(); }}>
+          🎯 Net-new target{s ? ` · ${fmt(s.netNew)}` : ""}
+        </Pill>
         <span className="flex-1" />
         <select
           value={sort}
@@ -191,7 +197,9 @@ export function LeadsClient() {
 
       {/* result count */}
       <div className="text-muted-foreground mt-3 text-xs">
-        {list.data ? `${fmt(list.data.total)} matching domains` : "Loading…"}
+        {list.data
+          ? `${fmt(list.data.total)} matching domains · click a row to inspect & enrich`
+          : "Loading…"}
       </div>
 
       {/* table */}
@@ -204,19 +212,24 @@ export function LeadsClient() {
               <th className="border-b px-3 py-2 font-medium">PMS</th>
               <th className="border-b px-3 py-2 text-right font-medium">Units</th>
               <th className="border-b px-3 py-2 font-medium">Tier</th>
+              <th className="border-b px-3 py-2 font-medium">CRM</th>
               <th className="border-b px-3 py-2 font-medium">Sources</th>
               <th className="border-b px-3 py-2 font-medium">Pregen</th>
-              <th className="border-b px-3 py-2 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {list.data?.items.map((d) => (
-              <tr key={d.id} className="hover:bg-accent/30">
+              <tr
+                key={d.id}
+                onClick={() => setEnrichLead(d)}
+                className="hover:bg-accent/30 cursor-pointer"
+              >
                 <td className="border-b py-2 pr-3 font-medium">
                   <a
                     href={`https://${d.domain}`}
                     target="_blank"
                     rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     className="inline-flex items-center gap-1 hover:underline"
                   >
                     {d.domain}
@@ -247,6 +260,12 @@ export function LeadsClient() {
                   {d.sourceTier ?? "—"}
                 </td>
                 <td className="border-b px-3 py-2">
+                  <HsMarker
+                    inHubspot={d.inHubspot}
+                    leadStatus={d.hubspotLeadStatus}
+                  />
+                </td>
+                <td className="border-b px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     {(["builtwith", "hubspot", "pregen", "instantly"] as SourceKey[])
                       .filter((sk) =>
@@ -274,16 +293,6 @@ export function LeadsClient() {
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
-                </td>
-                <td className="border-b px-3 py-2 text-right">
-                  <button
-                    onClick={() => setEnrichDomain(d.domain)}
-                    title="Enrich (inspect)"
-                    className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
-                  >
-                    <Sparkles className="size-3" />
-                    Enrich
-                  </button>
                 </td>
               </tr>
             ))}
@@ -324,9 +333,9 @@ export function LeadsClient() {
       )}
 
       <EnrichDrawer
-        domain={enrichDomain}
-        open={enrichDomain !== null}
-        onOpenChange={(o) => !o && setEnrichDomain(null)}
+        lead={enrichLead}
+        open={enrichLead !== null}
+        onOpenChange={(o) => !o && setEnrichLead(null)}
       />
     </div>
   );
