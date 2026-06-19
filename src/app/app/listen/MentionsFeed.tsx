@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
@@ -124,6 +125,20 @@ function MentionCard({ mention: m }: { mention: Mention }) {
     }),
   );
 
+  const [editingReply, setEditingReply] = useState(false);
+  const [replyUrl, setReplyUrl] = useState(m.replyUrl ?? "");
+  const [replyNote, setReplyNote] = useState(m.replyNote ?? "");
+
+  const saveReply = () => {
+    setStatus.mutate({
+      id: m.id,
+      status: "engaged",
+      replyUrl: replyUrl.trim() || null,
+      replyNote: replyNote.trim() || null,
+    });
+    setEditingReply(false);
+  };
+
   const style = m.suggestedAction
     ? ACTION_STYLES[m.suggestedAction]
     : undefined;
@@ -231,10 +246,66 @@ function MentionCard({ mention: m }: { mention: Mention }) {
         >
           Open ↗
         </a>
-        {m.status === "engaged" && (
-          <span className="text-xs font-medium text-emerald-400">✓ engaged</span>
-        )}
+        {m.status === "engaged" &&
+          (m.replyUrl ? (
+            <a
+              href={m.replyUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-xs font-medium text-emerald-400 hover:text-emerald-300"
+              title={m.replyNote ?? undefined}
+            >
+              ✓ replied ↗
+            </a>
+          ) : (
+            <span className="text-xs font-medium text-emerald-400">
+              ✓ engaged
+            </span>
+          ))}
+        <button
+          type="button"
+          onClick={() => setEditingReply((v) => !v)}
+          className="text-xs text-muted-foreground hover:text-primary"
+        >
+          {m.replyUrl ? "edit reply" : "＋ reply link"}
+        </button>
       </div>
+
+      {editingReply && (
+        <div className="mt-2 space-y-2 rounded-lg border bg-background/50 p-3">
+          <input
+            type="url"
+            value={replyUrl}
+            onChange={(e) => setReplyUrl(e.target.value)}
+            placeholder="Permalink to our reply (e.g. https://reddit.com/r/vrbo/comments/…)"
+            className="w-full rounded-md border bg-background px-2 py-1 text-xs"
+          />
+          <input
+            type="text"
+            value={replyNote}
+            onChange={(e) => setReplyNote(e.target.value)}
+            placeholder="Note (optional) — e.g. replied by Hashim, Wander brand acct"
+            className="w-full rounded-md border bg-background px-2 py-1 text-xs"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={setStatus.isPending}
+              onClick={saveReply}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              Save reply
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingReply(false)}
+              className="rounded-md border bg-background px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <ListenItemActions context={context} />
     </article>

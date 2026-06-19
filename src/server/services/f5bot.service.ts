@@ -13,6 +13,7 @@ import {
   mentionTable,
 } from "@/server/db/listening-schema";
 
+import { postMentionsToRadio } from "./listening-notify.service";
 import { type ScoringChannel, scoreItems } from "./triage.service";
 
 // F5Bot pipeline: a forwarded F5Bot alert email lands on the Resend inbound
@@ -204,6 +205,7 @@ export async function ingestF5BotEmail(email: {
 
   // Best-effort scoring — never fail the ingest (or the webhook) on a scoring error.
   let scored = 0;
+  let scoredMentions: Mention[] = [];
   try {
     const { scored: results } = await scoreItems(mentionScoringChannel, inserted);
     await Promise.all(
@@ -220,6 +222,15 @@ export async function ingestF5BotEmail(email: {
       ),
     );
     scored = results.length;
+    // Carry the fresh scores onto the persisted rows so the radio notifier can
+    // gate on suggestedAction without re-reading the DB.
+    scoredMentions = results.map((r) => ({
+      ...r.item,
+      relevance: r.relevance,
+      intentTag: r.intentTag,
+      suggestedAction: r.suggestedAction,
+      rationale: r.rationale,
+    }));
     console.log(
       `[f5bot] scored ${scored} mention(s):`,
       results.map((r) => ({
@@ -232,6 +243,11 @@ export async function ingestF5BotEmail(email: {
   } catch (error) {
     console.error("[f5bot] scoring failed (mentions still saved):", error);
   }
+
+  // Broadcast engage-worthy mentions to #radio-social-listening. Best-effort:
+  // postMentionsToRadio never throws, and an empty list (scoring failed) is a
+  // no-op — so a Slack issue can't fail the ingest or the webhook.
+  await postMentionsToRadio(scoredMentions);
 
   return { extracted: extracted.length, inserted: inserted.length, scored };
 }

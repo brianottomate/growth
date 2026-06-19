@@ -82,6 +82,10 @@ export const env = createEnv({
     CLOUDFLARE_STREAM_TOKEN: z.string().optional(), // API token with Stream:Edit
     CLOUDFLARE_STREAM_WEBHOOK_SECRET: z.string().optional(), // Stream webhook signing secret
     RESEND_WEBHOOK_SECRET: z.string().optional(), // Resend inbound webhook signing secret (whsec_…)
+    // Slack — reuses the shared wandercom Slack app bot token. Posts to channel
+    // IDs via chat.postMessage (#radio-social-listening, etc.). Missing → posts
+    // are skipped (no-op), never an error.
+    SLACK_API_TOKEN: z.string().optional(), // Bot token (xoxb-…)
   },
 
   /**
@@ -184,6 +188,7 @@ export const env = createEnv({
     CLOUDFLARE_STREAM_TOKEN: process.env.CLOUDFLARE_STREAM_TOKEN,
     CLOUDFLARE_STREAM_WEBHOOK_SECRET: process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
     RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
+    SLACK_API_TOKEN: process.env.SLACK_API_TOKEN,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

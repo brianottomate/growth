@@ -90,6 +90,13 @@ export const mentionTable = pgTable(
     resolvedById: t.text().references(() => userTable.id), // who marked engaged/skipped
     resolvedAt: t.timestamp(),
 
+    // ---- Proof of work (optional) ----
+    // Where we actually replied (permalink to our comment) + a free-text note
+    // (who replied / what we said). Not metrics — just "we handled it, here's
+    // where". null until someone attaches a reply; cleared if reopened to "new".
+    replyUrl: t.text(),
+    replyNote: t.text(),
+
     // ---- Provenance ----
     sourceEmailId: t.text(), // Resend received-email id this came from
     raw: t.jsonb(), // full parsed payload / extraction output

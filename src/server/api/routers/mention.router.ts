@@ -45,18 +45,43 @@ export const mentionRouter = {
     }),
 
   setStatus: protectedProcedure
-    .input(z.object({ id: z.string(), status: z.enum(MENTION_STATUSES) }))
+    .input(
+      z.object({
+        id: z.string(),
+        status: z.enum(MENTION_STATUSES),
+        // Optional "we replied here" trail. Sending these on an already-engaged
+        // mention just attaches the link after the fact. Lenient on URL shape so
+        // pasting a reddit share link never bounces. null = clear.
+        replyUrl: z.string().trim().nullish(),
+        replyNote: z.string().trim().max(2000).nullish(),
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       // Engaged/skipped record WHO resolved it + when; reopening ("new") clears
       // the audit so it reads as untouched again.
       const resolving = input.status !== "new";
+
+      const patch: Partial<typeof mentionTable.$inferInsert> = {
+        status: input.status,
+        resolvedById: resolving ? ctx.session.user.id : null,
+        resolvedAt: resolving ? new Date() : null,
+      };
+
+      if (!resolving) {
+        // Reopening wipes the reply trail too — reads as untouched again.
+        patch.replyUrl = null;
+        patch.replyNote = null;
+      } else {
+        // Only overwrite when the caller provided a value (undefined = leave
+        // as-is, so a plain "Mark engaged" never clobbers an existing link).
+        if (input.replyUrl !== undefined) patch.replyUrl = input.replyUrl || null;
+        if (input.replyNote !== undefined)
+          patch.replyNote = input.replyNote || null;
+      }
+
       const [updated] = await db
         .update(mentionTable)
-        .set({
-          status: input.status,
-          resolvedById: resolving ? ctx.session.user.id : null,
-          resolvedAt: resolving ? new Date() : null,
-        })
+        .set(patch)
         .where(eq(mentionTable.id, input.id))
         .returning();
       return updated ?? null;

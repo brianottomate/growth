@@ -1,4 +1,4 @@
-import { envSelect } from "@/env";
+import { env, envSelect } from "@/env";
 
 // =====================================================
 // WEBHOOK CONFIGURATION
@@ -281,6 +281,76 @@ export async function sendErrorNotification(params: {
           ]),
     ],
   });
+}
+
+// =====================================================
+// BOT-TOKEN POSTING (chat.postMessage by channel ID)
+// =====================================================
+//
+// Mirrors wander.com's `postOnSlack` (src/features/postOnSlack): posts to a
+// specific channel ID using the shared wandercom Slack app bot token. Use this —
+// not the incoming-webhook helpers above — whenever you need to target a channel
+// by ID, e.g. the #radio-* lead/listening channels (incoming webhooks are bound
+// to one channel at creation and can't take a channel ID). The bot must be
+// invited to the target channel. Outside production every post is redirected to
+// #radio-slack-testing so dev/preview never pings a live channel — the same
+// guard wander.com uses.
+
+interface PostOnSlackMessage {
+  text: string;
+  channel: string;
+  blocks?: SlackBlock[];
+  thread_ts?: string;
+}
+
+/**
+ * Post to a Slack channel by ID via chat.postMessage. Best-effort: returns a
+ * result object instead of throwing, so a Slack hiccup never breaks the caller's
+ * main flow (mention ingestion, lead routing, …).
+ */
+export async function postOnSlack(
+  message: PostOnSlackMessage,
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!env.SLACK_API_TOKEN) {
+    console.warn("⚠️ [Slack] SLACK_API_TOKEN not set — skipping post");
+    return { success: false, error: "SLACK_API_TOKEN not set" };
+  }
+
+  const channel = envSelect({
+    prod: message.channel,
+    test: "radio-slack-testing",
+  });
+
+  try {
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: `Bearer ${env.SLACK_API_TOKEN}`,
+      },
+      body: JSON.stringify({
+        text: message.text,
+        blocks: message.blocks,
+        thread_ts: message.thread_ts,
+        channel,
+      }),
+    });
+
+    // Slack returns HTTP 200 with { ok: false, error } on logical failures
+    // (bad channel, not_in_channel, invalid_auth), so check both.
+    const data = (await response.json()) as { ok: boolean; error?: string };
+    if (!response.ok || !data.ok) {
+      console.error("❌ [Slack] chat.postMessage failed:", data);
+      return { success: false, error: data.error ?? `HTTP ${response.status}` };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("❌ [Slack] Error posting message:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }
 
 // =====================================================
