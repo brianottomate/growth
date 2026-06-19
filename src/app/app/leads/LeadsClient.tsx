@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQueryState } from "nuqs";
 import { ExternalLink } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
@@ -77,6 +78,8 @@ export function LeadsClient() {
   const [sort, setSort] = useState<"units" | "composite" | "domain" | "updated">("units");
   const [page, setPage] = useState(0);
   const [enrichLead, setEnrichLead] = useState<LeadRow | null>(null);
+  // Deep-link: ?lead=<domain> opens that lead's drawer (shareable / bookmarkable).
+  const [leadParam, setLeadParam] = useQueryState("lead");
 
   const limit = 50;
 
@@ -101,6 +104,23 @@ export function LeadsClient() {
       { placeholderData: keepPreviousData },
     ),
   );
+
+  // Resolve a deep-linked lead (?lead=domain) that isn't already open — search
+  // for it so the drawer opens even when the lead is outside the current filter.
+  const deepLink = useQuery(
+    trpc.leads.listDomains.queryOptions(
+      { q: leadParam ?? "", limit: 5 },
+      { enabled: !!leadParam && enrichLead?.domain !== leadParam },
+    ),
+  );
+  useEffect(() => {
+    if (!leadParam || enrichLead?.domain === leadParam) return;
+    const item = [
+      ...(list.data?.items ?? []),
+      ...(deepLink.data?.items ?? []),
+    ].find((i) => i.domain === leadParam);
+    if (item) setEnrichLead(item);
+  }, [leadParam, enrichLead, list.data, deepLink.data]);
 
   const resetPage = () => setPage(0);
   const s = stats.data;
@@ -226,7 +246,10 @@ export function LeadsClient() {
             {list.data?.items.map((d) => (
               <tr
                 key={d.id}
-                onClick={() => setEnrichLead(d)}
+                onClick={() => {
+                  setEnrichLead(d);
+                  void setLeadParam(d.domain);
+                }}
                 className="hover:bg-accent/30 cursor-pointer"
               >
                 <td className="border-b py-2 pr-3 font-medium">
@@ -338,7 +361,12 @@ export function LeadsClient() {
       <EnrichDrawer
         lead={enrichLead}
         open={enrichLead !== null}
-        onOpenChange={(o) => !o && setEnrichLead(null)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEnrichLead(null);
+            void setLeadParam(null);
+          }
+        }}
       />
     </div>
   );
