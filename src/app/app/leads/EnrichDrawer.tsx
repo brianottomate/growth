@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Check,
   Copy,
@@ -24,6 +24,28 @@ import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
 /** A row from the leads list — what the table passes into the drawer. */
 export type LeadRow = RouterOutputs["leads"]["listDomains"]["items"][number];
+
+// Decision-maker pick heuristic — mirrors the send-list builder's titleScore so
+// the drawer's "would send" stars match who'd actually get emailed.
+const FREEMAIL = /@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\./i;
+const ROLE_EMAIL =
+  /^(info|hello|contact|admin|office|support|reservations|bookings|stay|frontdesk|sales)@/i;
+function contactScore(c: {
+  firstName: string | null;
+  lastName: string | null;
+  jobTitle: string | null;
+  email: string;
+}): number {
+  let s = 0;
+  const t = c.jobTitle ?? "";
+  if (/owner|founder|ceo|president|principal|partner/i.test(t)) s += 30;
+  else if (/director|vp|vice|general manager|\bgm\b|coo|cmo|head/i.test(t)) s += 20;
+  else if (t) s += 10;
+  if (c.firstName ?? c.lastName) s += 5;
+  if (!FREEMAIL.test(c.email)) s += 15;
+  if (ROLE_EMAIL.test(c.email)) s -= 25;
+  return s;
+}
 
 /**
  * "We THINK it's in HubSpot" marker — reflects our ingested `in_hubspot` flag,
@@ -77,6 +99,17 @@ export function EnrichDrawer({
   const hubspot = useMutation(trpc.leads.pullFromHubspot.mutationOptions());
   const merge = useMutation(trpc.leads.proposeMerge.mutationOptions());
   const apply = useMutation(trpc.leads.applyMerge.mutationOptions());
+
+  // Our own contacts for this domain (the people we'd actually email), ranked.
+  const detail = useQuery(
+    trpc.leads.getDomain.queryOptions(
+      { id: lead?.id ?? "" },
+      { enabled: open && !!lead?.id },
+    ),
+  );
+  const rankedContacts = [...(detail.data?.contacts ?? [])].sort(
+    (a, b) => contactScore(b) - contactScore(a),
+  );
 
   // Which proposed fields are checked for write. Initialized when a proposal
   // arrives: everything with a non-null proposed value.
@@ -275,6 +308,42 @@ export function EnrichDrawer({
                   </span>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Our contacts for this domain — who we'd actually email. */}
+          {rankedContacts.length > 0 && (
+            <div className="mt-2 rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Contacts ({rankedContacts.length})
+                </span>
+                <span className="text-muted-foreground text-[11px]">
+                  ★ = would send (top 3 by title/email)
+                </span>
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {rankedContacts.slice(0, 8).map((c, i) => (
+                  <div key={c.id} className="text-xs">
+                    <div className="flex items-center gap-1.5">
+                      {i < 3 && <span title="picked to send">★</span>}
+                      <span className="font-medium">
+                        {[c.firstName, c.lastName].filter(Boolean).join(" ") ||
+                          "(no name)"}
+                      </span>
+                      {c.jobTitle && (
+                        <span className="text-muted-foreground">· {c.jobTitle}</span>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground truncate">{c.email}</div>
+                  </div>
+                ))}
+              </div>
+              {rankedContacts.length > 8 && (
+                <div className="text-muted-foreground mt-1.5 text-[11px]">
+                  +{rankedContacts.length - 8} more
+                </div>
+              )}
             </div>
           )}
 

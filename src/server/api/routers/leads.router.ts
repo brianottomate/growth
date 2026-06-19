@@ -1,5 +1,17 @@
 import { z } from "zod";
-import { and, asc, desc, eq, exists, gte, ilike, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -35,6 +47,33 @@ import { TRPCError } from "@trpc/server";
  * are fetched per-domain in the detail view.
  */
 
+// First cold-outbound test cohort (the "SEND-20"): the middle band of the
+// enriched net-new ranking — high pregen-fit but smaller operators, so we don't
+// burn the best prospects on iteration 1. Hardcoded for this one-off batch; when
+// batches become routine this should become a `send_batch` column / cohort tag.
+const SEND_BATCH_1 = [
+  "cityninestay.com",
+  "sunsetrentals1.com",
+  "sdurbanvacationrentals.com",
+  "pkpropertiestn.net",
+  "sunshineandcoastlinerentals.com",
+  "fleursdepoirier.com",
+  "snowandsand.com",
+  "resort-stay.com",
+  "grandcaymancondos.net",
+  "beachhotelcndo.com",
+  "fripprentals.com",
+  "ybgroup.es",
+  "sweethomes.co.nz",
+  "elkrapidsbeachresort.com",
+  "bookcobblestonecreek.ca",
+  "hummingbird.villas",
+  "a12properties.com",
+  "chesapeakebayvacations.com",
+  "stkittsandnevisvacation.com",
+  "casavaleta.com",
+] as const;
+
 const SOURCE_COLUMN = {
   builtwith: leadDomainTable.inBuiltwith,
   hubspot: leadDomainTable.inHubspot,
@@ -65,22 +104,37 @@ export const leadsRouter = createTRPCRouter({
         untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot} and not ${leadDomainTable.inPregen})::int`,
         // pre-send guard: pregen domains already known to the CRM
         pregenInCrm: sql<number>`count(*) filter (where ${leadDomainTable.inPregen} and ${leadDomainTable.inHubspot})::int`,
-        // net-new sendable target: not in CRM, live rental site, has a credible
-        // contact (real name OR corporate email). Mirrors the `netNew` list filter.
-        netNew: sql<number>`count(*) filter (where
-          not ${leadDomainTable.inHubspot}
-          and not ${leadDomainTable.hasHubspotDeal}
-          and not ${leadDomainTable.isExistingCustomer}
-          and not ${leadDomainTable.excludeFromOutreach}
-          and ${leadDomainTable.pregenStatus} = 'LIVE_RENTAL'
-          and exists (
-            select 1 from leads.contact c
-            where c.domain_id = ${leadDomainTable.id} and c.deleted_at is null
-              and (c.first_name is not null or c.last_name is not null
-                   or c.email !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')
-          ))::int`,
       })
       .from(leadDomainTable);
+
+    // Net-new sendable target — counted with the SAME exists() the list filter
+    // uses. A correlated EXISTS folded into a multi-aggregate count(*) FILTER
+    // renders unreliably under Drizzle (came back 0), so the pill badge and the
+    // filtered list must share this exact predicate to stay in agreement.
+    const [netNewRow] = await ctx.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(leadDomainTable)
+      .where(
+        and(
+          eq(leadDomainTable.inHubspot, false),
+          eq(leadDomainTable.hasHubspotDeal, false),
+          eq(leadDomainTable.isExistingCustomer, false),
+          eq(leadDomainTable.excludeFromOutreach, false),
+          eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
+          exists(
+            ctx.db
+              .select({ one: sql`1` })
+              .from(leadContactTable)
+              .where(
+                and(
+                  eq(leadContactTable.domainId, leadDomainTable.id),
+                  isNull(leadContactTable.deletedAt),
+                  sql`(${leadContactTable.firstName} is not null or ${leadContactTable.lastName} is not null or ${leadContactTable.email} !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')`,
+                ),
+              ),
+          ),
+        ),
+      );
 
     const [contacts] = await ctx.db
       .select({ count: sql<number>`count(*)::int` })
@@ -105,6 +159,7 @@ export const leadsRouter = createTRPCRouter({
 
     return {
       ...totals,
+      netNew: netNewRow?.count ?? 0,
       contacts: contacts?.count ?? 0,
       topPms,
       imports,
@@ -122,6 +177,8 @@ export const leadsRouter = createTRPCRouter({
         integratedPmsOnly: z.boolean().optional(),
         // net-new sendable target: not in CRM, LIVE_RENTAL, has a credible contact.
         netNew: z.boolean().optional(),
+        // the first cold-outbound test cohort (SEND_BATCH_1).
+        sendBatch: z.boolean().optional(),
         minUnits: z.number().int().nonnegative().optional(),
         sort: z.enum(["composite", "units", "domain", "updated"]).default("units"),
         dir: z.enum(["asc", "desc"]).default("desc"),
@@ -168,6 +225,8 @@ export const leadsRouter = createTRPCRouter({
           ),
         );
       }
+      if (input.sendBatch)
+        conds.push(inArray(leadDomainTable.domain, [...SEND_BATCH_1]));
       if (input.minUnits != null)
         conds.push(gte(leadDomainTable.unitCount, input.minUnits));
 
@@ -213,8 +272,31 @@ export const leadsRouter = createTRPCRouter({
         .where(where);
       const total = totalRow?.total ?? 0;
 
+      // Contact counts for this page — a separate grouped query, NOT a correlated
+      // subquery in the select (those render unreliably here; see the netNew fix).
+      const ids = items.map((i) => i.id);
+      const counts = ids.length
+        ? await ctx.db
+            .select({
+              domainId: leadContactTable.domainId,
+              n: sql<number>`count(*)::int`,
+            })
+            .from(leadContactTable)
+            .where(
+              and(
+                inArray(leadContactTable.domainId, ids),
+                isNull(leadContactTable.deletedAt),
+              ),
+            )
+            .groupBy(leadContactTable.domainId)
+        : [];
+      const countMap = new Map(counts.map((c) => [c.domainId, c.n]));
+
       return {
-        items,
+        items: items.map((i) => ({
+          ...i,
+          contactCount: countMap.get(i.id) ?? 0,
+        })),
         total,
         hasMore: input.offset + items.length < total,
       };

@@ -73,6 +73,7 @@ export function LeadsClient() {
   const [integratedOnly, setIntegratedOnly] = useState(false);
   const [hasPregen, setHasPregen] = useState(false);
   const [netNew, setNetNew] = useState(false);
+  const [sendBatch, setSendBatch] = useState(false);
   const [sort, setSort] = useState<"units" | "composite" | "domain" | "updated">("units");
   const [page, setPage] = useState(0);
   const [enrichLead, setEnrichLead] = useState<LeadRow | null>(null);
@@ -91,6 +92,7 @@ export function LeadsClient() {
         integratedPmsOnly: integratedOnly || undefined,
         hasPregenSite: hasPregen || undefined,
         netNew: netNew || undefined,
+        sendBatch: sendBatch || undefined,
         sort,
         dir: sort === "domain" ? "asc" : "desc",
         limit,
@@ -182,6 +184,9 @@ export function LeadsClient() {
         <Pill active={netNew} onClick={() => { setNetNew((v) => !v); resetPage(); }}>
           🎯 Net-new target{s ? ` · ${fmt(s.netNew)}` : ""}
         </Pill>
+        <Pill active={sendBatch} onClick={() => { setSendBatch((v) => !v); resetPage(); }}>
+          🚀 Send-20
+        </Pill>
         <span className="flex-1" />
         <select
           value={sort}
@@ -211,10 +216,10 @@ export function LeadsClient() {
               <th className="border-b px-3 py-2 font-medium">Company</th>
               <th className="border-b px-3 py-2 font-medium">PMS</th>
               <th className="border-b px-3 py-2 text-right font-medium">Units</th>
+              <th className="border-b px-3 py-2 text-right font-medium">Contacts</th>
               <th className="border-b px-3 py-2 font-medium">Tier</th>
               <th className="border-b px-3 py-2 font-medium">CRM</th>
               <th className="border-b px-3 py-2 font-medium">Sources</th>
-              <th className="border-b px-3 py-2 font-medium">Pregen</th>
             </tr>
           </thead>
           <tbody>
@@ -256,6 +261,11 @@ export function LeadsClient() {
                 <td className="border-b px-3 py-2 text-right tabular-nums">
                   {fmt(d.unitCount)}
                 </td>
+                <td className="border-b px-3 py-2 text-right tabular-nums">
+                  <span className={d.contactCount > 0 ? "" : "text-muted-foreground"}>
+                    {d.contactCount}
+                  </span>
+                </td>
                 <td className="text-muted-foreground border-b px-3 py-2 text-xs">
                   {d.sourceTier ?? "—"}
                 </td>
@@ -286,13 +296,6 @@ export function LeadsClient() {
                         </span>
                       ))}
                   </div>
-                </td>
-                <td className="border-b px-3 py-2 text-xs">
-                  {d.pregenSiteUrl ? (
-                    <span className="text-emerald-300">{d.pregenStatus ?? "ready"}</span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
                 </td>
               </tr>
             ))}
