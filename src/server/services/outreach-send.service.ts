@@ -45,9 +45,11 @@ async function ensurePersonalizedCampaign(): Promise<string> {
     end_date: fmt(new Date(today.getTime() + 60 * 86_400_000)),
     schedules: [
       {
+        // Always-on so sends fire immediately (matches the test campaigns). For
+        // real prospects we'll likely narrow to business hours per timezone.
         name: "Always on",
-        timing: { from: "09:00", to: "17:00" },
-        days: { "0": false, "1": true, "2": true, "3": true, "4": true, "5": true, "6": false },
+        timing: { from: "00:00", to: "23:59" },
+        days: { "0": true, "1": true, "2": true, "3": true, "4": true, "5": true, "6": true },
         timezone: "America/Detroit",
       },
     ],
@@ -111,7 +113,9 @@ export async function queueOutreach(
     campaign_id: campaignId,
     leads: [{ email: recipientEmail, custom_variables }],
     skip_if_in_campaign: true,
-    verify_leads_on_import: true,
+    // NOT verifying on import — verification parks leads in a queue so they never
+    // enter the sequence. (Add a separate verification pass later if bounces bite.)
+    verify_leads_on_import: false,
   });
   const leadId = res.created_leads?.[0]?.id ?? null;
 
