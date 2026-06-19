@@ -6,10 +6,12 @@ import { ArrowRight, Check, Pencil, Plus } from "lucide-react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
+import { subredditNames } from "@/lib/subreddit";
 import type { AcquisitionShape } from "@/server/db/schema";
 import { type RouterOutputs } from "@/trpc/react";
 
 import { SourceDialog } from "./SourceDialog";
+import { SubredditProfiles } from "./SubredditProfiles";
 
 type Overview = RouterOutputs["listening"]["overview"];
 type Source = Overview["sources"][number];
@@ -162,6 +164,12 @@ function SourceCard({ source, onEdit }: { source: Source; onEdit: () => void }) 
           </Button>
         </div>
       </div>
+
+      {/* Per-subreddit AI evaluation + voice overrides — Reddit market sources only. */}
+      {source.platform === "reddit" &&
+        source.acquisition === "keyword_search" && (
+          <SubredditProfiles source={source} />
+        )}
     </article>
   );
 }
@@ -170,7 +178,8 @@ function SourceCard({ source, onEdit }: { source: Source; onEdit: () => void }) 
 function Watching({ source }: { source: Source }) {
   const cfg = source.config ?? {};
   const chips: string[] = [];
-  if (cfg.subreddits?.length) chips.push(...cfg.subreddits.map((s) => `r/${s}`));
+  if (cfg.subreddits?.length)
+    chips.push(...subredditNames(cfg.subreddits).map((s) => `r/${s}`));
   if (cfg.keywords?.length) chips.push(...cfg.keywords);
   if (cfg.alertTerms?.length) chips.push(...cfg.alertTerms.map((t) => `“${t.term}”`));
   if (cfg.watchlistGroups?.length)

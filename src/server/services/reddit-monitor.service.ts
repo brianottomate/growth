@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  normalizeSubreddits,
+  type SubredditProfile,
+} from "@/server/db/listening-schema";
 import { loadListeningContext } from "@/server/services/listening-config.service";
 import {
   SUGGESTED_ACTIONS,
@@ -52,7 +56,13 @@ Key competitors to watch for (mentions of these are high-signal):
 High-intent language to watch for:
 - "alternative to [competitor]", "switching from", "looking for",
   "anyone using", "vs", "recommend", "OTA fees", "direct booking"
-- These indicate active evaluation — score them higher.`;
+- These indicate active evaluation — score them higher.
+
+Some items carry a "sub posture" line — our standing, AI-evaluated read on that
+subreddit's fit and the risk of replying as a disclosed vendor. Weight it: a sub
+with stance=avoid, or flagged anti-vendor / anti-AI / bot-policed, should pull
+suggestedAction toward monitor or skip even when the post itself is on-topic —
+engaging there costs us more than it returns.`;
 
 // Reddit-specific reply MECHANICS only. Voice + product framing + the Wander
 // Test now come from the brand listening story (composed in at draft time).
@@ -117,10 +127,16 @@ export interface ScoredPost {
   rationale: string;
 }
 
-/** Subreddits to scan — read from the listening_source config, with a fallback. */
+/**
+ * Subreddits to scan — read from the listening_source config (normalized from
+ * the legacy string[] or the richer profile objects), skipping any explicitly
+ * disabled, with a fallback so we never silently scan nothing.
+ */
 async function loadSubreddits(): Promise<string[]> {
   const { sourceConfig } = await loadListeningContext(ADAPTER);
-  const subs = sourceConfig?.subreddits ?? [];
+  const subs = normalizeSubreddits(sourceConfig?.subreddits)
+    .filter((s) => s.enabled !== false)
+    .map((s) => s.name);
   if (subs.length === 0) {
     console.warn(
       `[reddit-monitor] listening_source "${ADAPTER}" has no subreddits configured; using fallback`,
@@ -128,6 +144,17 @@ async function loadSubreddits(): Promise<string[]> {
     return FALLBACK_SUBREDDITS;
   }
   return subs;
+}
+
+/** Per-subreddit profiles keyed by lowercased name, for scoring + drafting. */
+async function loadSubredditProfiles(): Promise<Map<string, SubredditProfile>> {
+  const { sourceConfig } = await loadListeningContext(ADAPTER);
+  return new Map(
+    normalizeSubreddits(sourceConfig?.subreddits).map((s) => [
+      s.name.toLowerCase(),
+      s,
+    ]),
+  );
 }
 
 async function fetchSubreddit(sub: string): Promise<RedditPostData[]> {
@@ -167,23 +194,39 @@ export async function fetchConfiguredPosts(): Promise<RedditPostSummary[]> {
   return fetched.flat().map(toSummary);
 }
 
-function formatPostForLLM(p: RedditPostSummary): string {
+function formatPostForLLM(
+  p: RedditPostSummary,
+  profile?: SubredditProfile,
+): string {
   const body = p.body.replace(/\s+/g, " ").slice(0, 600);
+  const posture =
+    profile && (profile.stance ?? profile.riskFlags?.length)
+      ? `sub posture: stance=${profile.stance ?? "?"}${
+          profile.riskFlags?.length
+            ? `, risks=${profile.riskFlags.join("/")}`
+            : ""
+        }`
+      : null;
   return [
     `id: ${p.id}`,
     `sub: r/${p.subreddit}`,
+    posture,
     `title: ${p.title}`,
     body
       ? `body: ${body}${p.body.length > 600 ? "…" : ""}`
       : "body: (link post)",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
-const SCORING_CHANNEL: ScoringChannel<RedditPostSummary, IntentTag> = {
+const SCORING_CHANNEL: Omit<
+  ScoringChannel<RedditPostSummary, IntentTag>,
+  "formatItem"
+> = {
   intentTags: INTENT_TAGS,
   systemPrompt: SCORING_SYSTEM_PROMPT,
   getId: (p) => p.id,
-  formatItem: formatPostForLLM,
   relevanceDescription:
     "0 = noise/off-topic. 5 = adjacent operator pain. 8+ = textbook insertion point where a Wander product directly solves the OP's problem.",
   intentTagDescription:
@@ -193,7 +236,14 @@ const SCORING_CHANNEL: ScoringChannel<RedditPostSummary, IntentTag> = {
 export async function scoreRedditPosts(
   posts: RedditPostSummary[],
 ): Promise<ScoredPost[]> {
-  const { scored } = await scoreItems(SCORING_CHANNEL, posts);
+  // Fold each post's subreddit posture into its scoring block so the model can
+  // down-weight on-topic posts in subs we've judged hostile/low-fit.
+  const profiles = await loadSubredditProfiles();
+  const channel: ScoringChannel<RedditPostSummary, IntentTag> = {
+    ...SCORING_CHANNEL,
+    formatItem: (p) => formatPostForLLM(p, profiles.get(p.subreddit.toLowerCase())),
+  };
+  const { scored } = await scoreItems(channel, posts);
   return scored.map((s) => ({
     post: s.item,
     relevance: s.relevance,
@@ -249,13 +299,20 @@ export async function draftReplyForPost(input: {
   const body = input.post.body.replace(/\s+/g, " ").slice(0, 1200);
 
   // Compose the system prompt from the evolvable brand voice + listening story
-  // (+ any per-source override), layered over the Reddit mechanics.
+  // (+ any per-source override + the post's per-subreddit profile), layered over
+  // the Reddit mechanics. The subreddit profile is the tightest layer — it's
+  // what keeps a reply inside r/X's actual rules.
   const ctx = await loadListeningContext(ADAPTER);
+  const subreddit =
+    normalizeSubreddits(ctx.sourceConfig?.subreddits).find(
+      (s) => s.name.toLowerCase() === input.post.subreddit.toLowerCase(),
+    ) ?? null;
   const systemPrompt = composeListeningSystemPrompt({
     brandVoice: ctx.brandVoice,
     story: ctx.story,
     voiceOverride: ctx.voiceOverride,
     signalNotes: ctx.signalNotes,
+    subreddit,
     channelMechanics: DRAFT_MECHANICS,
     mode: "draft",
   });

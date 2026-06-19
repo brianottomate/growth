@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { reconcileSubreddits, subredditNames } from "@/lib/subreddit";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
 type Overview = RouterOutputs["listening"]["overview"];
@@ -191,7 +192,7 @@ function SourceCard({ source }: { source: Source }) {
   const [scheduleCron, setCron] = useState(source.scheduleCron ?? "");
   const [signalNotes, setNotes] = useState(source.signalNotes ?? "");
   const [subreddits, setSubreddits] = useState(
-    arrToLines(source.config?.subreddits),
+    arrToLines(subredditNames(source.config?.subreddits)),
   );
   const [keywords, setKeywords] = useState(arrToLines(source.config?.keywords));
   const [groups, setGroups] = useState(
@@ -214,7 +215,11 @@ function SourceCard({ source }: { source: Source }) {
 
   const handleSave = () => {
     const config: Record<string, unknown> = {};
-    if (source.config?.subreddits) config.subreddits = linesToArr(subreddits);
+    if (source.config?.subreddits)
+      config.subreddits = reconcileSubreddits(
+        source.config.subreddits,
+        linesToArr(subreddits),
+      );
     if (source.config?.keywords) config.keywords = linesToArr(keywords);
     if (source.config?.watchlistGroups)
       config.watchlistGroups = groups.map((g) => ({

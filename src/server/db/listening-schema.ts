@@ -8,6 +8,26 @@ import {
   channelTable,
 } from "./channel-schema";
 import { createId } from "./utils";
+// Subreddit profile shape lives in a client-safe lib (so client components can
+// import it without bundling this Drizzle schema). Re-exported here for server
+// callers that already import subreddit helpers from the listening schema.
+import {
+  normalizeSubreddit,
+  normalizeSubreddits,
+  SUBREDDIT_STANCES,
+  subredditName,
+  type SubredditEntry,
+  type SubredditProfile,
+  type SubredditStance,
+} from "../../lib/subreddit";
+
+export {
+  normalizeSubreddit,
+  normalizeSubreddits,
+  SUBREDDIT_STANCES,
+  subredditName,
+};
+export type { SubredditEntry, SubredditProfile, SubredditStance };
 
 // ---- SOCIAL LISTENING: MENTIONS ------------------------------------
 //
@@ -96,6 +116,11 @@ export const mentionTable = pgTable(
     // where". null until someone attaches a reply; cleared if reopened to "new".
     replyUrl: t.text(),
     replyNote: t.text(),
+    // The reasoned disposition — WHY we engaged or (more often) passed. Distinct
+    // from replyNote: this is the judgment, especially "we deliberately did NOT
+    // engage, because X", so the team + future scans/agents learn from it.
+    // Cleared on reopen. The spar agent's recordDecision writes here.
+    decisionNote: t.text(),
 
     // ---- Provenance ----
     sourceEmailId: t.text(), // Resend received-email id this came from
@@ -172,7 +197,7 @@ export type ListeningAlertTerm = {
 
 /** Source-specific targeting. Typed jsonb so each adapter shapes its own config. */
 export type ListeningSourceConfig = {
-  subreddits?: string[]; // reddit
+  subreddits?: SubredditEntry[]; // reddit — names (legacy) or full profiles
   keywords?: string[]; // x / linkedin / pinterest terms
   alertTerms?: ListeningAlertTerm[]; // provider_alert terms (F5Bot) — intent + verified state
   watchlistGroups?: { id: string; name: string; terms: string[] }[]; // x

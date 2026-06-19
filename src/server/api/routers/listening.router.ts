@@ -9,8 +9,12 @@ import {
   acquisitionShapeEnum,
   listeningSourceTable,
   listeningTriggerEnum,
+  normalizeSubreddits,
+  SUBREDDIT_STANCES,
+  type SubredditProfile,
 } from "@/server/db/listening-schema";
 import { createId } from "@/server/db/utils";
+import { evaluateSubreddit as evaluateSubredditProfile } from "@/server/services/subreddit-eval.service";
 
 import { protectedProcedure } from "../trpc";
 
@@ -25,8 +29,23 @@ const StorySchema = z.object({
   productBoilerplate: z.string().optional(),
 });
 
+const SubredditProfileSchema = z.object({
+  name: z.string().min(1),
+  enabled: z.boolean().optional(),
+  stance: z.enum(SUBREDDIT_STANCES).optional(),
+  cultureSummary: z.string().optional(),
+  riskFlags: z.array(z.string()).optional(),
+  sanctionedPath: z.string().optional(),
+  subscribers: z.number().optional(),
+  evaluatedAt: z.string().optional(),
+  evaluatedModel: z.string().optional(),
+  voiceNotes: z.string().optional(),
+  signalNotes: z.string().optional(),
+});
+
 const SourceConfigSchema = z.object({
-  subreddits: z.array(z.string()).optional(),
+  // Either bare names (legacy) or full profiles — read via normalizeSubreddits.
+  subreddits: z.array(z.union([z.string(), SubredditProfileSchema])).optional(),
   keywords: z.array(z.string()).optional(),
   alertTerms: z
     .array(
@@ -67,6 +86,47 @@ const TriggerSchema = z.enum(listeningTriggerEnum.enumValues);
 
 function resolveBrand() {
   return db.query.brandTable.findFirst({ where: eq(brandTable.slug, "wander") });
+}
+
+/**
+ * Read-merge-write a single subreddit profile inside a source's jsonb config.
+ * `compute` receives the existing profile (or null) and returns the next one, so
+ * callers decide their own merge policy (evaluate preserves human voice notes;
+ * edit overwrites with the submitted profile). Returns the merged profile, or
+ * null if the source is gone. `remove` (compute → null) drops the entry.
+ */
+async function mutateSubreddit(
+  sourceId: string,
+  name: string,
+  compute: (prev: SubredditProfile | null) => SubredditProfile | null,
+): Promise<SubredditProfile | null> {
+  const [source] = await db
+    .select({ config: listeningSourceTable.config })
+    .from(listeningSourceTable)
+    .where(eq(listeningSourceTable.id, sourceId))
+    .limit(1);
+  if (!source) return null;
+
+  const existing = normalizeSubreddits(source.config?.subreddits);
+  const idx = existing.findIndex(
+    (s) => s.name.toLowerCase() === name.toLowerCase(),
+  );
+  const next = compute(idx >= 0 ? existing[idx]! : null);
+
+  let list: SubredditProfile[];
+  if (next === null) {
+    list = existing.filter((_, i) => i !== idx);
+  } else if (idx >= 0) {
+    list = existing.map((s, i) => (i === idx ? next : s));
+  } else {
+    list = [...existing, next];
+  }
+
+  await db
+    .update(listeningSourceTable)
+    .set({ config: { ...(source.config ?? {}), subreddits: list } })
+    .where(eq(listeningSourceTable.id, sourceId));
+  return next;
 }
 
 // A stable, human-ish slug for listening_source.key, made collision-safe with a
@@ -190,5 +250,44 @@ export const listeningRouter = {
         .delete(listeningSourceTable)
         .where(eq(listeningSourceTable.id, input.id));
       return { id: input.id };
+    }),
+
+  // ---- Per-subreddit profiles (config.subreddits[]) -----------------------
+
+  /**
+   * AI-evaluate a subreddit (culture, risk, sanctioned path, stance + starter
+   * voice/signal notes) and store the profile on the source. Re-runnable; a
+   * re-eval refreshes the AI-evaluated fields but preserves any human-edited
+   * voice/signal notes and the enabled flag.
+   */
+  evaluateSubreddit: protectedProcedure
+    .input(z.object({ sourceId: z.string(), name: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const fresh = await evaluateSubredditProfile(input.name);
+      return mutateSubreddit(input.sourceId, fresh.name, (prev) => ({
+        ...fresh,
+        enabled: prev?.enabled ?? fresh.enabled,
+        voiceNotes: prev?.voiceNotes ?? fresh.voiceNotes,
+        signalNotes: prev?.signalNotes ?? fresh.signalNotes,
+      }));
+    }),
+
+  /** Upsert a subreddit profile from the editor (manual edits win). */
+  setSubredditProfile: protectedProcedure
+    .input(z.object({ sourceId: z.string(), profile: SubredditProfileSchema }))
+    .mutation(async ({ input }) => {
+      return mutateSubreddit(input.sourceId, input.profile.name, (prev) => ({
+        ...(prev ?? {}),
+        ...input.profile,
+        name: prev?.name ?? input.profile.name,
+      }));
+    }),
+
+  /** Drop a subreddit from a source. */
+  removeSubreddit: protectedProcedure
+    .input(z.object({ sourceId: z.string(), name: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      await mutateSubreddit(input.sourceId, input.name, () => null);
+      return { name: input.name };
     }),
 } satisfies TRPCRouterRecord;

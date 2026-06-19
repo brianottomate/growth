@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { BrandListeningStory } from "@/server/db/brand-schema";
 import type { ChannelFingerprint } from "@/server/db/channel-schema";
+import type { SubredditProfile } from "@/server/db/listening-schema";
 
 /**
  * Shared triage engine. Every inbound surface (DMs, Reddit, X, …) scores a batch
@@ -180,6 +181,12 @@ export function composeListeningSystemPrompt(input: {
   voiceOverride?: ChannelFingerprint | null;
   /** listening_source.signalNotes — per-source judgment layered on the story. */
   signalNotes?: string | null;
+  /**
+   * Per-SUBREDDIT profile (config.subreddits[]) — the most specific layer. Its
+   * stance/risk/sanctioned-path is what keeps a reply from breaking r/X's rules;
+   * its voice/signal notes refine the brand voice for that one room.
+   */
+  subreddit?: SubredditProfile | null;
   /** Hardcoded per-channel format rules (char caps, output schema, etiquette). */
   channelMechanics: string;
   /**
@@ -216,6 +223,25 @@ export function composeListeningSystemPrompt(input: {
   if (input.signalNotes?.trim()) {
     blocks.push(`FOR THIS SOURCE SPECIFICALLY:\n${input.signalNotes.trim()}`);
   }
+
+  // Per-subreddit posture — the tightest layer. Risk/stance/sanctioned-path
+  // always apply (they gate whether we engage at all); voice/signal notes are
+  // mode-specific so we don't pollute scoring with reply-voice or vice versa.
+  const sub = input.subreddit;
+  if (sub) {
+    const lines: string[] = [`SUBREDDIT — r/${sub.name}:`];
+    if (sub.stance) lines.push(`Engagement stance: ${sub.stance}.`);
+    if (sub.riskFlags?.length) lines.push(`Risks: ${sub.riskFlags.join(", ")}.`);
+    if (sub.sanctionedPath)
+      lines.push(`Sanctioned path: ${sub.sanctionedPath}.`);
+    if (sub.cultureSummary) lines.push(sub.cultureSummary.trim());
+    if (mode === "score" && sub.signalNotes?.trim())
+      lines.push(`What counts as signal here: ${sub.signalNotes.trim()}`);
+    if (mode === "draft" && sub.voiceNotes?.trim())
+      lines.push(`Voice here: ${sub.voiceNotes.trim()}`);
+    blocks.push(lines.join("\n"));
+  }
+
   blocks.push(input.channelMechanics.trim());
 
   return blocks.join("\n\n");

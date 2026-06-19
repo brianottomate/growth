@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { platformLabel } from "@/components/channel-logos";
+import { reconcileSubreddits, subredditNames } from "@/lib/subreddit";
 import type {
   AcquisitionShape,
   ChannelPlatform,
@@ -111,12 +112,12 @@ export function SourceDialog({
   useEffect(() => {
     if (!open) return;
     setLabel(initial?.label ?? "");
-    setPlatform((initial?.platform as ChannelPlatform) ?? "reddit");
-    setAcquisition((initial?.acquisition as AcquisitionShape) ?? "keyword_search");
-    setTrigger((initial?.trigger as ListeningTrigger) ?? "on_demand");
+    setPlatform(initial?.platform ?? "reddit");
+    setAcquisition(initial?.acquisition ?? "keyword_search");
+    setTrigger(initial?.trigger ?? "on_demand");
     setScheduleCron(initial?.scheduleCron ?? "");
     setAdapter(initial?.adapter ?? "");
-    setSubreddits(arrToLines(initial?.config?.subreddits));
+    setSubreddits(arrToLines(subredditNames(initial?.config?.subreddits)));
     setKeywords(arrToLines(initial?.config?.keywords));
     setSignalNotes(initial?.signalNotes ?? "");
     setVoiceText(initial?.voiceOverride?.fingerprintText ?? "");
@@ -163,7 +164,13 @@ export function SourceDialog({
 
   function buildConfig(): ListeningSourceConfig {
     const config: ListeningSourceConfig = { ...(initial?.config ?? {}) };
-    if (isKeywordSearch && isReddit) config.subreddits = linesToArr(subreddits);
+    // Reconcile against existing entries so editing the names list never drops
+    // the AI-evaluated profiles attached to surviving subreddits.
+    if (isKeywordSearch && isReddit)
+      config.subreddits = reconcileSubreddits(
+        initial?.config?.subreddits,
+        linesToArr(subreddits),
+      );
     if (isKeywordSearch && !isReddit) config.keywords = linesToArr(keywords);
     return config;
   }
