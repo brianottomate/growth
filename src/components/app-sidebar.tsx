@@ -19,6 +19,7 @@ import {
   type LucideIcon,
   Mail,
   Megaphone,
+  MessageSquare,
   Monitor,
   Moon,
   Newspaper,
@@ -73,7 +74,12 @@ type NavItem = {
 };
 
 const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
-  { items: [{ label: "Overview", href: "/app", icon: LayoutDashboard }] },
+  {
+    items: [
+      { label: "Overview", href: "/app/overview", icon: MessageSquare },
+      { label: "Dashboard", href: "/app", icon: LayoutDashboard },
+    ],
+  },
   {
     label: "Workspace",
     items: [
