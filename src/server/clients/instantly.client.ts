@@ -430,6 +430,52 @@ export async function deleteCampaign(id: string): Promise<void> {
 }
 
 /**
+ * Update a campaign (PATCH) — e.g. repoint `email_list` to a connected mailbox.
+ */
+export async function updateCampaign(
+  id: string,
+  params: Partial<CreateCampaignRequest> & Record<string, unknown>,
+): Promise<InstantlyCampaign> {
+  return instantlyRequest<InstantlyCampaign>(`/campaigns/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(params),
+  });
+}
+
+/**
+ * Activate (launch) a campaign — it starts sending per its schedule.
+ */
+export async function activateCampaign(id: string): Promise<unknown> {
+  return instantlyRequest(`/campaigns/${id}/activate`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Pause a campaign — stops sending; resumable via `activateCampaign`.
+ */
+export async function pauseCampaign(id: string): Promise<unknown> {
+  return instantlyRequest(`/campaigns/${id}/pause`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+/**
+ * Update a connected email account (PATCH) — e.g. set the mailbox signature.
+ */
+export async function updateAccount(
+  email: string,
+  params: Record<string, unknown>,
+): Promise<unknown> {
+  return instantlyRequest(`/accounts/${encodeURIComponent(email)}`, {
+    method: "PATCH",
+    body: JSON.stringify(params),
+  });
+}
+
+/**
  * Get a single campaign by ID.
  */
 export async function getCampaign(

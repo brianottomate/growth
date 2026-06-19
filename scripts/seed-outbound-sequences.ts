@@ -35,12 +35,17 @@ const BRAND_ID = "brand_BvLx3xvsfaMvvr4k"; // WanderOS
 const OLD_EMILY_PROGRAM_ID = "lp_fNGKtAvHTYvjaKx7"; // "WanderOS Pre-Gen Cold Outbound" (Emily) — superseded
 
 // ---- Sending identity ------------------------------------------------------
-// Pretend Kristian is the supply rep for now. To switch to James Caswell later,
-// change this block and re-run — the bodies regenerate from it.
+// Sticking with the warmed Emily mailbox identity (the From: is "Emily at
+// Wander"), so the signature must be Emily too — a Kristian sig from an Emily
+// inbox reads as a mismatch. Real replies hand off to a senior rep.
 const SENDER = {
-  first: "Kristian",
-  sign: "Kristian\nWander",
-  // James: { first: "James", sign: "James Caswell\nSr. Account Executive · Wander" }
+  first: "Emily",
+  // Warm sign-off only. The formal contact block (name / title / logo) lives as
+  // the mailbox-level signature on the Emily account in Instantly, so it
+  // auto-appends to every send without double-signing the body. (HTML kept in
+  // docs/cold-outbound-playbook.md.)
+  sign: "Emily",
+  // Kristian/James personas available if a matching mailbox is ever connected.
 };
 const TEST_EMAIL_BASE = "kristian.e.boe"; // +seqA/+seqB/+seqC@gmail.com aliases all land here
 

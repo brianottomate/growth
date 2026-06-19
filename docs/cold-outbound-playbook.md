@@ -86,6 +86,15 @@ Our purchased/appended contact list is **mostly mis-associated freemail junk**:
 - **Reply routing:** keep replies in the Instantly Unibox (preserves stop-on-reply +
   deliverability), alert Kristian via the reply webhook. NOT reply-to personal email.
 
+## Email signature (Emily)
+Set as the **mailbox-level signature** on the Emily account in Instantly (auto-
+appends; bodies sign off with just "Emily" so we don't double-sign). Adapted from
+Kristian's template: name "Emily Collins", title "Account Executive", phone
+dropped (no Emily line), email matched to the From address (`emily@trywanderos.com`
+— swap to `emily@wander.com` if that inbox is real). Note: a logo-image HTML sig is
+fine for warm/personalized sends, but a lighter text sig often delivers better on
+pure-cold variants. HTML lives in this repo via the seed-script comment + here.
+
 ## State / next steps
 - ✅ Net-new pill (450), Send-20 pill, enrich-drawer (company info, contacts w/ ★ picks,
   Copy context, CRM marker), HubSpot scrub, 100 enriched, contact deep-dive.

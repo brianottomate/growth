@@ -18,12 +18,15 @@ import {
   leadContactTable,
   leadDomainTable,
   leadImportTable,
+  leadOutreachTable,
 } from "@/server/db/leads-schema";
 import { discoverDomain } from "@/server/services/lead-discovery.service";
 import {
   extractFromDiscovery,
   LeadEnrichmentSchema,
 } from "@/server/services/lead-extraction.service";
+import { generateOutreachDraft } from "@/server/services/lead-outreach.service";
+import { queueOutreach } from "@/server/services/outreach-send.service";
 import {
   proposeMerge,
   MERGEABLE_FIELDS,
@@ -316,7 +319,13 @@ export const leadsRouter = createTRPCRouter({
         .where(eq(leadContactTable.domainId, input.id))
         .orderBy(asc(leadContactTable.email))
         .limit(200);
-      return { domain, contacts };
+      const [outreach] = await ctx.db
+        .select()
+        .from(leadOutreachTable)
+        .where(eq(leadOutreachTable.domainId, input.id))
+        .orderBy(desc(leadOutreachTable.createdAt))
+        .limit(1);
+      return { domain, contacts, outreach: outreach ?? null };
     }),
 
   // ---- Manual enrichment (inspect-only; no DB write yet) ----
@@ -342,6 +351,81 @@ export const leadsRouter = createTRPCRouter({
       const discovery = await discoverDomain(input.domain);
       const extraction = await extractFromDiscovery(discovery);
       return { discovery, extraction };
+    }),
+
+  // Generate a bespoke, personalized cold sequence for ONE lead from its
+  // enrichment + the WanderOS hook strategy. Stored as a DRAFT on
+  // enrichment.outreachDraft for human review before it's ever sent.
+  generateOutreach: protectedProcedure
+    .input(
+      z.object({
+        domainId: z.string(),
+        // Optional operator steer: free-text context injected into the prompt
+        // (e.g. "pretend this is a 200-unit luxury PM" for a demo).
+        steer: z.string().trim().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+      }
+      const { draft, model } = await generateOutreachDraft(row.domain, {
+        steer: input.steer,
+      });
+      // Replace any prior *unsent* draft for this domain; keep sent/approved history.
+      await ctx.db
+        .delete(leadOutreachTable)
+        .where(
+          and(
+            eq(leadOutreachTable.domainId, input.domainId),
+            eq(leadOutreachTable.status, "draft"),
+          ),
+        );
+      const [created] = await ctx.db
+        .insert(leadOutreachTable)
+        .values({
+          domainId: row.id,
+          domain: row.domain,
+          status: "draft",
+          angle: draft.angle,
+          personalizedOn: draft.personalizedOn,
+          steps: draft.steps,
+          model,
+        })
+        .returning();
+      return created!;
+    }),
+
+  // Push a lead's draft into the shared headless "Personalized" Instantly
+  // campaign as custom variables (does NOT activate — nothing sends until that
+  // campaign is launched). Recipient = the scraped corporate email, or override.
+  queueOutreach: protectedProcedure
+    .input(
+      z.object({
+        domainId: z.string(),
+        recipientEmail: z.string().email().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+      }
+      const channel = (row.enrichment as { contactChannel?: { bestEmail?: string } } | null)
+        ?.contactChannel;
+      const recipient = input.recipientEmail ?? channel?.bestEmail;
+      if (!recipient) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "No recipient email — run the contact resolver or pass one explicitly",
+        });
+      }
+      return queueOutreach(input.domainId, recipient);
     }),
 
   // Pull the live HubSpot company (+contacts) for a domain and diff it against

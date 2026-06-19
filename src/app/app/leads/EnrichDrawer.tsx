@@ -25,6 +25,9 @@ import { useTRPC, type RouterOutputs } from "@/trpc/react";
 /** A row from the leads list — what the table passes into the drawer. */
 export type LeadRow = RouterOutputs["leads"]["listDomains"]["items"][number];
 
+/** The AI-generated personalized sequence draft. */
+type OutreachDraftView = RouterOutputs["leads"]["generateOutreach"];
+
 // Decision-maker pick heuristic — mirrors the send-list builder's titleScore so
 // the drawer's "would send" stars match who'd actually get emailed.
 const FREEMAIL = /@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\./i;
@@ -99,6 +102,8 @@ export function EnrichDrawer({
   const hubspot = useMutation(trpc.leads.pullFromHubspot.mutationOptions());
   const merge = useMutation(trpc.leads.proposeMerge.mutationOptions());
   const apply = useMutation(trpc.leads.applyMerge.mutationOptions());
+  const outreach = useMutation(trpc.leads.generateOutreach.mutationOptions());
+  const queue = useMutation(trpc.leads.queueOutreach.mutationOptions());
 
   // Our own contacts for this domain (the people we'd actually email), ranked.
   const detail = useQuery(
@@ -110,6 +115,18 @@ export function EnrichDrawer({
   const rankedContacts = [...(detail.data?.contacts ?? [])].sort(
     (a, b) => contactScore(b) - contactScore(a),
   );
+
+  // The personalized sequence — freshly generated this session, or a stored
+  // draft from a previous run (enrichment.outreachDraft).
+  const outreachDraft: OutreachDraftView | undefined =
+    outreach.data ?? detail.data?.outreach ?? undefined;
+  const recipientEmail = (
+    detail.data?.domain.enrichment as unknown as
+      | { contactChannel?: { bestEmail?: string } }
+      | null
+      | undefined
+  )?.contactChannel?.bestEmail;
+  const isQueued = !!queue.data || outreachDraft?.status === "queued";
 
   // Which proposed fields are checked for write. Initialized when a proposal
   // arrives: everything with a non-null proposed value.
@@ -162,6 +179,7 @@ export function EnrichDrawer({
   // can be dropped into a Claude Code chat for analysis. Includes only the
   // sections that have actually been run (HubSpot pull / enrich / merge). ──
   const [copied, setCopied] = useState(false);
+  const [steer, setSteer] = useState("");
   const hasContext = !!(hubspot.data ?? enrich.data ?? merge.data);
 
   // No HubSpot company for this domain — confirmed by a live pull, or implied by
@@ -182,8 +200,11 @@ export function EnrichDrawer({
     hubspot.reset();
     merge.reset();
     apply.reset();
+    outreach.reset();
+    queue.reset();
     setChecked({});
     setCopied(false);
+    setSteer("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain]);
 
@@ -346,6 +367,119 @@ export function EnrichDrawer({
               )}
             </div>
           )}
+
+          {/* ✦ Personalized outreach — bespoke sequence from the enrichment. */}
+          <div className="mt-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">✦ Personalized outreach</span>
+              <button
+                onClick={() =>
+                  lead &&
+                  outreach.mutate({
+                    domainId: lead.id,
+                    steer: steer.trim() || undefined,
+                  })
+                }
+                disabled={outreach.isPending || !lead}
+                className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                {outreach.isPending ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" /> Generating…
+                  </>
+                ) : outreachDraft ? (
+                  "Regenerate"
+                ) : (
+                  "Generate sequence"
+                )}
+              </button>
+            </div>
+
+            <textarea
+              value={steer}
+              onChange={(e) => setSteer(e.target.value)}
+              placeholder="Steer the AI (optional) — e.g. “pretend this is a 200-unit luxury PM in Aspen”, or notes about the person"
+              rows={2}
+              className="border-border bg-background focus:ring-ring mt-2 w-full rounded-md border px-2 py-1.5 text-[11px] focus:ring-1 focus:outline-none"
+            />
+
+            {outreach.error && (
+              <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">
+                {outreach.error.message}
+              </div>
+            )}
+
+            {!outreachDraft && !outreach.isPending && (
+              <p className="text-muted-foreground mt-1 text-[11px]">
+                Writes a bespoke 4-touch sequence for this company from its
+                enrichment. Draft only — review before sending.
+              </p>
+            )}
+
+            {outreachDraft && (
+              <div className="mt-2 space-y-2">
+                <p className="text-[11px]">
+                  <span className="text-muted-foreground">Angle:</span>{" "}
+                  {outreachDraft.angle}
+                </p>
+                {(outreachDraft.personalizedOn?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {(outreachDraft.personalizedOn ?? []).map((p, i) => (
+                      <span
+                        key={i}
+                        className="bg-muted rounded px-1.5 py-0.5 text-[10px]"
+                      >
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {(outreachDraft.steps ?? []).map((s, i) => (
+                  <div key={i} className="rounded-md border p-2">
+                    <div className="text-muted-foreground text-[10px] font-medium">
+                      Step {i + 1} ·{" "}
+                      {s.delayDays === 0 ? "day 0" : `day ${s.delayDays}`}
+                      {s.subject ? ` · ${s.subject}` : " · (in-thread reply)"}
+                    </div>
+                    <pre className="mt-1 font-sans text-xs leading-relaxed whitespace-pre-wrap">
+                      {s.body}
+                    </pre>
+                  </div>
+                ))}
+
+                <div className="flex items-center gap-2 border-t pt-2">
+                  <button
+                    onClick={() => lead && queue.mutate({ domainId: lead.id })}
+                    disabled={queue.isPending || isQueued || !lead}
+                    className="rounded-md bg-violet-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+                  >
+                    {queue.isPending
+                      ? "Queuing…"
+                      : isQueued
+                        ? "Queued ✓"
+                        : "Queue to Instantly"}
+                  </button>
+                  <span className="text-muted-foreground text-[11px]">
+                    {recipientEmail
+                      ? `→ ${recipientEmail}`
+                      : "no corporate email — run resolver"}{" "}
+                    · draft, won&apos;t send until launched
+                  </span>
+                </div>
+                {queue.error && (
+                  <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300">
+                    {queue.error.message}
+                  </div>
+                )}
+                {queue.data && (
+                  <div className="text-[11px] text-emerald-400">
+                    Queued to “WanderOS Personalized” (draft). Launch that
+                    campaign in Instantly to send.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Copy everything loaded here as one markdown blob for analysis. */}
           <div className="mt-2 flex justify-end">

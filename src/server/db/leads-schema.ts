@@ -279,6 +279,74 @@ export const leadImportTable = leadsSchema.table(
 export type LeadImport = typeof leadImportTable.$inferSelect;
 export type LeadImportInsert = typeof leadImportTable.$inferInsert;
 
+// ---- LEAD OUTREACH (per-lead personalized sequences) ---------------
+//
+// The per-lead "meal": a bespoke, AI-generated cold sequence for ONE domain,
+// built from its enrichment + a lifecycle "recipe" (strategic intent). Lives in
+// the leads domain on purpose — high cardinality belongs here, NOT as thousands
+// of lifecycle_program rows. `programId` is a soft reference to the lifecycle
+// strategy used (no cross-schema FK; lifecycle lives in `public`).
+
+export const leadOutreachStatusEnum = leadsSchema.enum("lead_outreach_status", [
+  "draft", // AI-generated, awaiting human review
+  "approved", // human-approved, ready to queue
+  "queued", // pushed to Instantly
+  "sent", // first step sent
+  "replied", // prospect replied
+  "skipped", // dropped
+]);
+export type LeadOutreachStatus =
+  (typeof leadOutreachStatusEnum.enumValues)[number];
+
+export type OutreachStep = {
+  subject: string | null; // null for in-thread follow-ups
+  body: string;
+  delayDays: number;
+};
+
+export const leadOutreachTable = leadsSchema.table(
+  "outreach",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("lo")),
+    domainId: t
+      .text()
+      .references(() => leadDomainTable.id, { onDelete: "cascade" })
+      .notNull(),
+    domain: t.text().notNull(),
+    contactId: t
+      .text()
+      .references(() => leadContactTable.id, { onDelete: "set null" }),
+    programId: t.text(), // soft ref to the lifecycle strategy/recipe used
+    status: leadOutreachStatusEnum().default("draft").notNull(),
+    angle: t.text(),
+    personalizedOn: t.jsonb().$type<string[]>(),
+    steps: t.jsonb().$type<OutreachStep[]>(),
+    model: t.text(),
+    // Instantly linkage once queued/sent.
+    instantlyCampaignId: t.text(),
+    instantlyLeadId: t.text(),
+    sentAt: t.timestamp(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("lead_outreach_domain_id_idx").on(table.domainId),
+    index("lead_outreach_status_idx").on(table.status),
+  ],
+);
+export type LeadOutreach = typeof leadOutreachTable.$inferSelect;
+export type LeadOutreachInsert = typeof leadOutreachTable.$inferInsert;
+
 // ---- RELATIONS -----------------------------------------------------
 
 export const leadDomainRelations = relations(leadDomainTable, ({ many }) => ({
