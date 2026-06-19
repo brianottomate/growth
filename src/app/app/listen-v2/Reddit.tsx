@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MessagesSquare } from "lucide-react";
 
 import { ListenItemActions } from "@/app/app/listen/ListenItemActions";
+import { SparPanel } from "./SparPanel";
 import {
   AssigneeButton,
   OwnerAvatar,
@@ -67,6 +68,9 @@ export function Reddit() {
 
   const [filter, setFilter] = useState<Filter>(null);
   const [showSkipped, setShowSkipped] = useState(false);
+  // IDs engaged during this session — kept pinned in their original bucket (see
+  // bucketing below) so the card doesn't yank down to "Handled" mid-triage.
+  const [justEngaged, setJustEngaged] = useState<Set<string>>(() => new Set());
 
   const setStatus = useMutation(
     trpc.mention.setStatus.mutationOptions({
@@ -121,25 +125,52 @@ export function Reddit() {
     !filter ||
     (filter.type === "sub" ? m.subreddit === filter.value : m.keyword === filter.value);
 
-  const open = all.filter((m) => m.status !== "skipped" && m.status !== "engaged" && matches(m));
+  // A just-engaged item stays in its original Act/Monitor bucket (so you can
+  // paste the reply link right where you were); it falls into Handled only on
+  // the next load, when `justEngaged` is empty again.
+  const open = all.filter(
+    (m) =>
+      m.status !== "skipped" &&
+      (m.status !== "engaged" || justEngaged.has(m.id)) &&
+      matches(m),
+  );
   const act = open
     .filter((m) => m.suggestedAction === "engage")
     .sort(byRelevance);
   const monitor = open
     .filter((m) => m.suggestedAction !== "engage")
     .sort(byRelevance);
-  const handled = all.filter((m) => m.status === "engaged" && matches(m));
+  const handled = all.filter(
+    (m) => m.status === "engaged" && !justEngaged.has(m.id) && matches(m),
+  );
   const skipped = all.filter((m) => m.status === "skipped" && matches(m));
 
   const lastReceived = all[0]?.receivedAt;
-  const onState = (id: string, status: "engaged" | "skipped" | "new") =>
-    setStatus.mutate({ id, status });
+  const onState = (
+    id: string,
+    status: "engaged" | "skipped" | "new",
+    reply?: { replyUrl: string | null; replyNote: string | null },
+  ) => {
+    setStatus.mutate({ id, status, ...reply });
+    setJustEngaged((prev) => {
+      const next = new Set(prev);
+      // Pin on engage; unpin on reopen/skip so it can leave the bucket.
+      if (status === "engaged") next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
   const onAssign = (id: string, userId: string | null) =>
     assign.mutate({ id, userId });
+  // Refresh the queue after the spar agent records a decision out-of-band.
+  const refetch = () =>
+    void queryClient.invalidateQueries(
+      trpc.mention.list.queryOptions(LIST_INPUT),
+    );
 
   const toggle = (f: Filter) =>
     setFilter((prev) =>
-      prev && f && prev.type === f.type && prev.value === f.value ? null : f,
+      prev && prev.type === f?.type && prev.value === f.value ? null : f,
     );
 
   return (
@@ -198,21 +229,21 @@ export function Reddit() {
           {act.length > 0 && (
             <QueueGroup label="Act today" count={act.length} tone="emerald">
               {act.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
+                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
               ))}
             </QueueGroup>
           )}
           {monitor.length > 0 && (
             <QueueGroup label="Monitor — revisit" count={monitor.length} tone="amber">
               {monitor.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
+                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
               ))}
             </QueueGroup>
           )}
           {handled.length > 0 && (
             <QueueGroup label="Handled" count={handled.length} tone="muted">
               {handled.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
+                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
               ))}
             </QueueGroup>
           )}
@@ -229,7 +260,7 @@ export function Reddit() {
                 <div className="mt-3">
                   <QueueGroup label="Skipped" count={skipped.length} tone="muted">
                     {skipped.map((m) => (
-                      <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} />
+                      <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
                     ))}
                   </QueueGroup>
                 </div>
@@ -338,19 +369,46 @@ function RedditCard({
   members,
   currentUserId,
   onAssign,
+  onRefetch,
 }: {
   m: Mention;
-  onState: (id: string, status: "engaged" | "skipped" | "new") => void;
+  onState: (
+    id: string,
+    status: "engaged" | "skipped" | "new",
+    reply?: { replyUrl: string | null; replyNote: string | null },
+  ) => void;
   pending: boolean;
   members: Member[];
   currentUserId: string;
   onAssign: (id: string, userId: string | null) => void;
+  onRefetch: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [sparOpen, setSparOpen] = useState(false);
   const intent = intentMeta(m.intentTag);
   const handled = m.status === "engaged" || m.status === "skipped";
+  const engaged = m.status === "engaged";
   const assignee = members.find((x) => x.id === m.assigneeId) ?? null;
   const resolver = members.find((x) => x.id === m.resolvedById) ?? null;
+
+  // Proof-of-work: where we replied + an optional note. "Mark engaged" reveals
+  // this inline so you can drop the permalink (e.g. Hashim's comment) in place.
+  const [editingReply, setEditingReply] = useState(false);
+  const [replyUrl, setReplyUrl] = useState(m.replyUrl ?? "");
+  const [replyNote, setReplyNote] = useState(m.replyNote ?? "");
+
+  const markEngaged = () => {
+    onState(m.id, "engaged");
+    setEditingReply(true);
+    setOpen(true);
+  };
+  const saveReply = () => {
+    onState(m.id, "engaged", {
+      replyUrl: replyUrl.trim() || null,
+      replyNote: replyNote.trim() || null,
+    });
+    setEditingReply(false);
+  };
 
   const provLabel = PROVIDER_LABEL[m.provider] ?? m.provider;
   const provDetail = m.keyword
@@ -381,7 +439,7 @@ function RedditCard({
     .join("\n");
 
   return (
-    <div className={cn("transition-opacity", handled && "opacity-55")}>
+    <div className={cn("transition-opacity", handled && !open && "opacity-55")}>
       <button
         onClick={() => setOpen((v) => !v)}
         className="hover:bg-accent/30 flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors"
@@ -451,10 +509,15 @@ function RedditCard({
               {m.resolvedAt ? ` · ${relTime(m.resolvedAt)} ago` : ""}
             </p>
           )}
+          {m.decisionNote && (
+            <p className="border-muted-foreground/30 text-muted-foreground border-l-2 pl-2 text-xs italic">
+              {m.decisionNote}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {!handled ? (
               <>
-                <Button size="sm" disabled={pending} onClick={() => onState(m.id, "engaged")}>
+                <Button size="sm" disabled={pending} onClick={markEngaged}>
                   Mark engaged
                 </Button>
                 <Button
@@ -484,6 +547,39 @@ function RedditCard({
             >
               Open on Reddit ↗
             </a>
+            <button
+              type="button"
+              onClick={() => setSparOpen(true)}
+              className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs"
+            >
+              <MessagesSquare className="size-3.5" />
+              Spar
+            </button>
+            {engaged &&
+              (m.replyUrl ? (
+                <a
+                  href={m.replyUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                  title={m.replyNote ?? undefined}
+                >
+                  ✓ replied ↗
+                </a>
+              ) : (
+                <span className="text-xs font-medium text-emerald-400">
+                  ✓ engaged
+                </span>
+              ))}
+            {engaged && (
+              <button
+                type="button"
+                onClick={() => setEditingReply((v) => !v)}
+                className="text-muted-foreground hover:text-primary text-xs"
+              >
+                {m.replyUrl ? "edit reply" : "＋ reply link"}
+              </button>
+            )}
             <span className="ml-auto flex items-center gap-1.5">
               <span className="text-muted-foreground text-[11px]">Owner</span>
               <AssigneeButton
@@ -495,8 +591,50 @@ function RedditCard({
               />
             </span>
           </div>
-          <ListenItemActions context={context} />
+
+          {editingReply && (
+            <div className="bg-background/40 flex flex-col gap-2 rounded-lg border p-3">
+              <input
+                type="url"
+                value={replyUrl}
+                onChange={(e) => setReplyUrl(e.target.value)}
+                placeholder="Permalink to our reply (e.g. https://reddit.com/r/vrbo/comments/…)"
+                className="bg-background w-full rounded-md border px-2 py-1 text-xs"
+              />
+              <input
+                type="text"
+                value={replyNote}
+                onChange={(e) => setReplyNote(e.target.value)}
+                placeholder="Note (optional) — e.g. replied by Hashim, Wander brand acct"
+                className="bg-background w-full rounded-md border px-2 py-1 text-xs"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" disabled={pending} onClick={saveReply}>
+                  Save reply
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingReply(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <ListenItemActions context={context} mentionId={m.id} />
         </div>
+      )}
+
+      {sparOpen && (
+        <SparPanel
+          mentionId={m.id}
+          mentionTitle={m.title ?? m.snippet ?? "(untitled)"}
+          open={sparOpen}
+          onOpenChange={setSparOpen}
+          onDecisionRecorded={onRefetch}
+        />
       )}
     </div>
   );

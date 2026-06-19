@@ -2,12 +2,14 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { envSelect } from "@/env";
 import { db } from "@/server/db";
 import {
   MENTION_SOURCES,
   MENTION_STATUSES,
   mentionTable,
 } from "@/server/db/listening-schema";
+import { postMentionToRadio } from "@/server/services/listening-notify.service";
 
 import { protectedProcedure } from "../trpc";
 
@@ -54,6 +56,8 @@ export const mentionRouter = {
         // pasting a reddit share link never bounces. null = clear.
         replyUrl: z.string().trim().nullish(),
         replyNote: z.string().trim().max(2000).nullish(),
+        // The reasoned "why" for this disposition (esp. a pass). null = clear.
+        decisionNote: z.string().trim().max(4000).nullish(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -68,15 +72,18 @@ export const mentionRouter = {
       };
 
       if (!resolving) {
-        // Reopening wipes the reply trail too — reads as untouched again.
+        // Reopening wipes the reply + decision trail too — reads as untouched.
         patch.replyUrl = null;
         patch.replyNote = null;
+        patch.decisionNote = null;
       } else {
         // Only overwrite when the caller provided a value (undefined = leave
         // as-is, so a plain "Mark engaged" never clobbers an existing link).
         if (input.replyUrl !== undefined) patch.replyUrl = input.replyUrl || null;
         if (input.replyNote !== undefined)
           patch.replyNote = input.replyNote || null;
+        if (input.decisionNote !== undefined)
+          patch.decisionNote = input.decisionNote || null;
       }
 
       const [updated] = await db
@@ -85,6 +92,34 @@ export const mentionRouter = {
         .where(eq(mentionTable.id, input.id))
         .returning();
       return updated ?? null;
+    }),
+
+  /**
+   * Fire this mention at #radio-social-listening on demand — a manual smoke test
+   * of the Slack broadcast path. Force-sends regardless of the engage filter, and
+   * outside prod `postOnSlack` redirects to #radio-slack-testing. Returns the
+   * target channel so the UI can say where it landed, or the Slack error
+   * (missing token, not_in_channel, …) so the dev sees what to fix.
+   */
+  testSlack: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      const channel = envSelect({
+        prod: "#radio-social-listening",
+        test: "#radio-slack-testing",
+      });
+
+      const [mention] = await db
+        .select()
+        .from(mentionTable)
+        .where(eq(mentionTable.id, input.id))
+        .limit(1);
+      if (!mention) return { success: false as const, error: "Mention not found" };
+
+      const result = await postMentionToRadio(mention);
+      return result.success
+        ? { success: true as const, channel }
+        : { success: false as const, error: result.error };
     }),
 
   /** Claim/assign a mention to a teammate (null = unclaim). Drives "my queue". */

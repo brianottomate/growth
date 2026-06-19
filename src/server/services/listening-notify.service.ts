@@ -56,6 +56,21 @@ function buildBlocks(m: Mention) {
 }
 
 /**
+ * Post a single mention to #radio-social-listening. Bypasses the engage filter —
+ * the caller decides whether it's worth sending (ingest gates via
+ * `postMentionsToRadio`; the "Test → Slack" button intentionally forces a send so
+ * the team can verify the plumbing on any row). Best-effort: returns the
+ * postOnSlack result instead of throwing.
+ */
+export function postMentionToRadio(m: Mention) {
+  return postOnSlack({
+    text: `New ${sourceLabel(m)} mention${m.keyword ? ` for "${m.keyword}"` : ""}`,
+    channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
+    blocks: buildBlocks(m),
+  });
+}
+
+/**
  * Broadcast engage-worthy mentions to #radio-social-listening. Best-effort and
  * never throws — a Slack failure must not fail mention ingestion. An empty list
  * (e.g. scoring failed upstream) is a no-op. Returns the count actually posted.
@@ -66,11 +81,7 @@ export async function postMentionsToRadio(mentions: Mention[]): Promise<number> 
 
   let posted = 0;
   for (const m of worth) {
-    const result = await postOnSlack({
-      text: `New ${sourceLabel(m)} mention${m.keyword ? ` for "${m.keyword}"` : ""}`,
-      channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
-      blocks: buildBlocks(m),
-    });
+    const result = await postMentionToRadio(m);
     if (result.success) posted += 1;
   }
 
