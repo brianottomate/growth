@@ -7,6 +7,7 @@
 @import "tw-animate-css";
 @import "@wandercom/design-system-tokens/tailwind.css";
 @import "@wandercom/design-system-web/styles.css";
+@import "streamdown/styles.css"; /* markdown rendering in the /plan chat (Streamdown) */
 
 @custom-variant dark (&:is(.dark *));
 

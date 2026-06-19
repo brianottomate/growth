@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { Streamdown } from "streamdown";
 
 import type { Blueprint } from "./BlueprintReview";
 
@@ -100,26 +101,44 @@ export function PlanChat({
             read it and propose a shape, then you edit and save it below.
           </p>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className="space-y-2">
-            <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
-              {m.role === "user" ? "You" : "Planner"}
+        {messages.map((m, mi) => {
+          // Animate only the last text part of the assistant message that's
+          // still streaming — same rule Homi's MessageList uses.
+          const isLast = mi === messages.length - 1;
+          const streaming = status === "streaming" && isLast && m.role !== "user";
+          let lastTextIdx = -1;
+          m.parts.forEach((p, idx) => {
+            if (p.type === "text") lastTextIdx = idx;
+          });
+
+          return (
+            <div key={m.id} className="space-y-2">
+              <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                {m.role === "user" ? "You" : "Planner"}
+              </div>
+              {m.parts.map((part, i) => {
+                if (part.type === "text") {
+                  // The agent streams markdown prose — render it as such
+                  // (headings, lists, links, code) instead of raw text.
+                  return (
+                    <Streamdown
+                      key={i}
+                      animated={{ animation: "blurIn", duration: 80 }}
+                      isAnimating={streaming && i === lastTextIdx}
+                      className="text-sm leading-relaxed"
+                    >
+                      {part.text}
+                    </Streamdown>
+                  );
+                }
+                if (isToolPart(part)) {
+                  return <ToolCard key={i} part={part} />;
+                }
+                return null;
+              })}
             </div>
-            {m.parts.map((part, i) => {
-              if (part.type === "text") {
-                return (
-                  <p key={i} className="text-sm whitespace-pre-wrap">
-                    {part.text}
-                  </p>
-                );
-              }
-              if (isToolPart(part)) {
-                return <ToolCard key={i} part={part} />;
-              }
-              return null;
-            })}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <form onSubmit={submit} className="flex items-end gap-2">
