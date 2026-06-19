@@ -256,7 +256,8 @@ export function V5Client({
   const [cellMode, setCellMode] = useState<"content" | "channel">("content");
   // Creative (default) vs Performance (engagement overlay) lens.
   const [metricsMode, setMetricsMode] = useState<"creative" | "performance">("creative");
-  // Time window: ALL of the future + N months of past. "Load older" adds 3mo.
+  // Time window: N months of past (the timeline is retrospective — no future).
+  // "Load older" adds 3mo.
   const [pastMonths, setPastMonths] = useState(2);
   const [statusFilter, setStatusFilter] = useState("all");
   const [channelFilter, setChannelFilter] = useState("all");

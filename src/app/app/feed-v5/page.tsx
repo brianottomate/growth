@@ -20,8 +20,10 @@ import {
 
 /**
  * Feed v5 — the swimlane Timeline. The "absorb / compare" surface: every owned
- * and tracked brand's shipped + scheduled posts on a shared time axis, grouped
- * into lanes (brand / pillar / channel). Select pieces to send into Launch or
+ * and tracked brand's *shipped* posts on a shared time axis, grouped into lanes
+ * (brand / pillar / channel). Retrospective by design — its value is comparing
+ * us against peers, and we can't see peers' future, so future/scheduled work is
+ * excluded here (that lives in /content). Select pieces to send into Launch or
  * a Grouping. Replaces the feed-v2/v3/v4 prototypes.
  */
 export default async function FeedV5Page() {
@@ -70,7 +72,9 @@ export default async function FeedV5Page() {
   const allIds = brands.map((b) => b.id);
   const roleById = new Map(brands.map((b) => [b.id, b] as const));
 
-  // A spot enters the Timeline once it has a ship time (scheduled) or published.
+  // Retrospective only: a spot enters the Timeline once it has actually shipped
+  // (publishedAt set). Future/scheduled work is excluded — peers have no
+  // comparable future, so it would be apples-to-nothing here.
   const posts = allIds.length
     ? await db.query.platformPostTable.findMany({
         where: and(
@@ -80,10 +84,7 @@ export default async function FeedV5Page() {
             eq(platformPostTable.isSeed, false),
             sql`${platformPostTable.metadata}->>'seedBatch' = 'week-jun-2026'`,
           ),
-          or(
-            isNotNull(platformPostTable.publishedAt),
-            isNotNull(platformPostTable.scheduledAt),
-          ),
+          isNotNull(platformPostTable.publishedAt),
         ),
         with: { contentPost: { with: { series: true } } },
       })
