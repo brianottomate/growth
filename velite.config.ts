@@ -90,6 +90,32 @@ const posts = defineCollection({
     })),
 });
 
+// Playbooks — the knowledge base the AI agents ground replies in: product
+// reference (transcripts, landing-page copy) and reply/engagement methodology.
+// `body` is RAW markdown because it's injected into LLM system prompts, not
+// rendered. Mirrors capient's IR playbook collection.
+const playbooks = defineCollection({
+  name: "Playbook",
+  pattern: "playbooks/**/*.md",
+  schema: s
+    .object({
+      id: s.string(),
+      title: s.string(),
+      kind: s
+        .enum(["product-reference", "reply-guide", "positioning"])
+        .default("reply-guide")
+        .describe(
+          "product-reference = what Wander is/says (transcripts, landing pages). reply-guide = how we engage. positioning = competitive/market framing.",
+        ),
+      summary: s.string().max(280),
+      sourceUrl: s.string().optional(),
+      tags: s.array(s.string()).default([]),
+      // Raw markdown — injected verbatim into LLM prompts + offered as copyables.
+      body: s.raw(),
+    })
+    .transform((data) => ({ ...data, slug: data.id })),
+});
+
 export default defineConfig({
   root: "content",
   output: {
@@ -99,7 +125,7 @@ export default defineConfig({
     name: "[name]-[hash:6].[ext]",
     clean: true,
   },
-  collections: { posts },
+  collections: { posts, playbooks },
   mdx: {
     // We can add remark/rehype plugins here if needed in the future
   },
