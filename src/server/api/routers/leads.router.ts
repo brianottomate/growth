@@ -26,7 +26,10 @@ import {
   LeadEnrichmentSchema,
 } from "@/server/services/lead-extraction.service";
 import { generateOutreachDraft } from "@/server/services/lead-outreach.service";
-import { queueOutreach } from "@/server/services/outreach-send.service";
+import {
+  queueOutreach,
+  launchPersonalizedCampaign,
+} from "@/server/services/outreach-send.service";
 import {
   proposeMerge,
   MERGEABLE_FIELDS,
@@ -427,6 +430,12 @@ export const leadsRouter = createTRPCRouter({
       }
       return queueOutreach(input.domainId, recipient);
     }),
+
+  // Activate the shared personalized campaign from the app — sends to everyone
+  // currently queued in it. Campaign-level (not per lead).
+  launchOutreachCampaign: protectedProcedure.mutation(async () => {
+    return launchPersonalizedCampaign();
+  }),
 
   // Pull the live HubSpot company (+contacts) for a domain and diff it against
   // our row. READ-ONLY — no writes. Returns { configured:false } if no token.

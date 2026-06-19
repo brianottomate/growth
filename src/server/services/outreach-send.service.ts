@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { leadOutreachTable } from "@/server/db/leads-schema";
 import {
+  activateCampaign,
   addLeadsBulk,
   createCampaign,
   listCampaigns,
@@ -120,4 +121,20 @@ export async function queueOutreach(
     .where(eq(leadOutreachTable.id, row.id));
 
   return { campaignId, leadId, recipient: recipientEmail };
+}
+
+/**
+ * Activate the shared personalized campaign — everyone currently queued in it
+ * starts sending per the schedule. Campaign-level action (not per lead).
+ */
+export async function launchPersonalizedCampaign(): Promise<{
+  campaignId: string;
+}> {
+  const existing = await listCampaigns({ search: CAMPAIGN_NAME, limit: 10 });
+  const found = existing.items.find((c) => c.name === CAMPAIGN_NAME);
+  if (!found) {
+    throw new Error("Personalized campaign doesn't exist yet — queue a lead first");
+  }
+  await activateCampaign(found.id);
+  return { campaignId: found.id };
 }

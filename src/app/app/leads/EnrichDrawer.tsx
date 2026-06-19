@@ -104,6 +104,7 @@ export function EnrichDrawer({
   const apply = useMutation(trpc.leads.applyMerge.mutationOptions());
   const outreach = useMutation(trpc.leads.generateOutreach.mutationOptions());
   const queue = useMutation(trpc.leads.queueOutreach.mutationOptions());
+  const launch = useMutation(trpc.leads.launchOutreachCampaign.mutationOptions());
 
   // Our own contacts for this domain (the people we'd actually email), ranked.
   const detail = useQuery(
@@ -126,7 +127,6 @@ export function EnrichDrawer({
       | null
       | undefined
   )?.contactChannel?.bestEmail;
-  const isQueued = !!queue.data || outreachDraft?.status === "queued";
 
   // Which proposed fields are checked for write. Initialized when a proposal
   // arrives: everything with a non-null proposed value.
@@ -180,6 +180,7 @@ export function EnrichDrawer({
   // sections that have actually been run (HubSpot pull / enrich / merge). ──
   const [copied, setCopied] = useState(false);
   const [steer, setSteer] = useState("");
+  const [recipientOverride, setRecipientOverride] = useState("");
   const hasContext = !!(hubspot.data ?? enrich.data ?? merge.data);
 
   // No HubSpot company for this domain — confirmed by a live pull, or implied by
@@ -202,9 +203,11 @@ export function EnrichDrawer({
     apply.reset();
     outreach.reset();
     queue.reset();
+    launch.reset();
     setChecked({});
     setCopied(false);
     setSteer("");
+    setRecipientOverride("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain]);
 
@@ -447,36 +450,61 @@ export function EnrichDrawer({
                   </div>
                 ))}
 
-                <div className="flex items-center gap-2 border-t pt-2">
-                  <button
-                    onClick={() => lead && queue.mutate({ domainId: lead.id })}
-                    disabled={queue.isPending || isQueued || !lead}
-                    className="rounded-md bg-violet-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
-                  >
-                    {queue.isPending
-                      ? "Queuing…"
-                      : isQueued
-                        ? "Queued ✓"
-                        : "Queue to Instantly"}
-                  </button>
-                  <span className="text-muted-foreground text-[11px]">
-                    {recipientEmail
-                      ? `→ ${recipientEmail}`
-                      : "no corporate email — run resolver"}{" "}
-                    · draft, won&apos;t send until launched
-                  </span>
+                <div className="space-y-2 border-t pt-2">
+                  <input
+                    type="email"
+                    value={recipientOverride}
+                    onChange={(e) => setRecipientOverride(e.target.value)}
+                    placeholder={
+                      recipientEmail
+                        ? `${recipientEmail} — default; edit to send to yourself / Kyle`
+                        : "recipient email (no corporate one found)"
+                    }
+                    className="border-border bg-background focus:ring-ring w-full rounded-md border px-2 py-1 text-[11px] focus:ring-1 focus:outline-none"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        lead &&
+                        queue.mutate({
+                          domainId: lead.id,
+                          recipientEmail: recipientOverride.trim() || undefined,
+                        })
+                      }
+                      disabled={queue.isPending || !lead}
+                      className="rounded-md bg-violet-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+                    >
+                      {queue.isPending ? "Queuing…" : "Queue to Instantly"}
+                    </button>
+                    <button
+                      onClick={() => launch.mutate()}
+                      disabled={launch.isPending}
+                      className="rounded-md border border-violet-500/40 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/10 disabled:opacity-50"
+                    >
+                      {launch.isPending ? "Launching…" : "Launch campaign"}
+                    </button>
+                  </div>
+                  <p className="text-muted-foreground text-[10px]">
+                    Queue adds this lead to the shared “WanderOS Personalized”
+                    draft campaign at the address above. Launch activates that
+                    campaign → everyone currently queued starts sending.
+                  </p>
+                  {(queue.error ?? launch.error) && (
+                    <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300">
+                      {queue.error?.message ?? launch.error?.message}
+                    </div>
+                  )}
+                  {queue.data && (
+                    <div className="text-[11px] text-emerald-400">
+                      Queued → {queue.data.recipient}
+                    </div>
+                  )}
+                  {launch.data && (
+                    <div className="text-[11px] text-emerald-400">
+                      Campaign launched — queued leads send shortly.
+                    </div>
+                  )}
                 </div>
-                {queue.error && (
-                  <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300">
-                    {queue.error.message}
-                  </div>
-                )}
-                {queue.data && (
-                  <div className="text-[11px] text-emerald-400">
-                    Queued to “WanderOS Personalized” (draft). Launch that
-                    campaign in Instantly to send.
-                  </div>
-                )}
               </div>
             )}
           </div>
