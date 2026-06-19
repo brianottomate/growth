@@ -221,9 +221,12 @@ export function ContentBoard({
     });
   };
 
-  // List is the team's default surface; Board is the strategist's lens;
-  // Schedule is the date-first manual posting worklist.
-  const [view, setView] = useState<"board" | "list" | "schedule" | "calendar">("list");
+  // List is the team's default surface; Board is the strategist's lens; Week is
+  // the tactical "what's coming up this week" lens; Schedule is the full
+  // date-first manual posting worklist.
+  const [view, setView] = useState<
+    "board" | "list" | "week" | "schedule" | "calendar"
+  >("list");
   const [reshuffleOpen, setReshuffleOpen] = useState(false);
 
   const visible = useMemo(() => {
@@ -256,7 +259,7 @@ export function ContentBoard({
   });
   const { data: scheduleRows = [], isLoading: scheduleLoading } = useQuery({
     ...scheduleOpts,
-    enabled: view === "schedule" || view === "calendar",
+    enabled: view === "schedule" || view === "calendar" || view === "week",
   });
   const scheduleVisible = useMemo(
     () =>
@@ -322,7 +325,7 @@ export function ContentBoard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="border-border flex overflow-hidden rounded-full border">
-            {(["list", "board", "schedule", "calendar"] as const).map((v) => (
+            {(["list", "board", "week", "schedule", "calendar"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -401,6 +404,13 @@ export function ContentBoard({
           onCommentChange={() =>
             qc.invalidateQueries({ queryKey: boardOptions.queryKey })
           }
+        />
+      ) : view === "week" ? (
+        <WeekView
+          rows={scheduleVisible}
+          loading={scheduleLoading}
+          onOpen={openCard}
+          onChanged={invalidateSchedule}
         />
       ) : view === "schedule" ? (
         <ScheduleView
@@ -876,6 +886,120 @@ function InlineAdd({ onCreate }: { onCreate: (title: string) => void }) {
 type SchedRow = RouterOutputs["content"]["schedule"][number];
 const schedDayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
+/** Tactical week lens — one Mon–Sun week, all 7 days shown (gaps included) so
+ *  the team sees the week's shape at a glance: what ships when, where the holes
+ *  are. Prev/next/This-week navigation; rows reuse the Schedule worklist row
+ *  (expand → copyable brief + assets + mark-done). */
+function WeekView({
+  rows,
+  loading,
+  onOpen,
+  onChanged,
+}: {
+  rows: SchedRow[];
+  loading: boolean;
+  onOpen: (id: string) => void;
+  onChanged: () => void;
+}) {
+  const [offset, setOffset] = useState(0); // weeks from the current week
+
+  const { days, label, total } = useMemo(() => {
+    const now = new Date();
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + offset * 7);
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      return { key: schedDayKey(date), date, rows: [] as SchedRow[] };
+    });
+    const byKey = new Map(days.map((d) => [d.key, d]));
+    let total = 0;
+    for (const r of rows) {
+      if (!r.at) continue;
+      const d = new Date(r.at);
+      const day = byKey.get(
+        schedDayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate())),
+      );
+      if (day) {
+        day.rows.push(r);
+        total++;
+      }
+    }
+    const end = days[6]!.date;
+    const f = (x: Date) =>
+      x.toLocaleDateString([], { month: "short", day: "numeric" });
+    return { days, label: `${f(monday)} – ${f(end)}`, total };
+  }, [rows, offset]);
+
+  const todayKey = schedDayKey(new Date());
+  const navBtn =
+    "border-border text-muted-foreground hover:bg-accent rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40";
+
+  return (
+    <div className="mt-5">
+      <div className="mb-3 flex items-center gap-2">
+        <button onClick={() => setOffset((o) => o - 1)} className={navBtn} aria-label="Previous week">
+          ←
+        </button>
+        <button
+          onClick={() => setOffset(0)}
+          disabled={offset === 0}
+          className={navBtn}
+        >
+          This week
+        </button>
+        <button onClick={() => setOffset((o) => o + 1)} className={navBtn} aria-label="Next week">
+          →
+        </button>
+        <span className="ml-1 text-sm font-semibold">{label}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {total} {total === 1 ? "post" : "posts"}
+          {loading ? " · loading…" : ""}
+        </span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {days.map((d) => {
+          const isToday = d.key === todayKey;
+          return (
+            <section key={d.key}>
+              <div className="mb-1.5 flex items-center gap-2 px-1">
+                <h3 className="text-sm font-semibold">
+                  {d.date.toLocaleDateString([], {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </h3>
+                {isToday && (
+                  <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                    Today
+                  </span>
+                )}
+                {d.rows.length > 0 && (
+                  <span className="text-muted-foreground text-xs tabular-nums">
+                    {d.rows.length}
+                  </span>
+                )}
+              </div>
+              {d.rows.length === 0 ? (
+                <div className="text-muted-foreground/60 px-1 pb-1 text-xs">
+                  Nothing planned
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {d.rows.map((r) => (
+                    <ScheduleRow key={r.id} row={r} onOpen={onOpen} onChanged={onChanged} />
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** Spot-level agenda grouped by ship day — what the team posts, per channel,
  *  per day. Each row expands to the copyable caption + assets + mark-done. */
 function ScheduleView({
@@ -889,6 +1013,10 @@ function ScheduleView({
   onOpen: (id: string) => void;
   onChanged: () => void;
 }) {
+  // Past days are posted-and-done; default to hiding them so the worklist opens
+  // on today + upcoming rather than a wall of completed items.
+  const [showPast, setShowPast] = useState(false);
+
   const { days, undated } = useMemo(() => {
     const map = new Map<string, { key: string; date: Date; rows: SchedRow[] }>();
     const undated: SchedRow[] = [];
@@ -919,13 +1047,34 @@ function ScheduleView({
   const now = new Date();
   const todayK = schedDayKey(now);
   const todayTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const pastDays = days.filter((g) => g.date.getTime() < todayTime);
+  const shownDays = showPast
+    ? days
+    : days.filter((g) => g.date.getTime() >= todayTime);
 
   return (
     <div className="mt-5 flex flex-col gap-4">
       {loading && rows.length === 0 && (
         <div className="text-muted-foreground text-sm">Loading…</div>
       )}
-      {days.map((g) => {
+      {pastDays.length > 0 && (
+        <div className="flex">
+          <button
+            onClick={() => setShowPast((v) => !v)}
+            className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+          >
+            {showPast
+              ? "Hide past"
+              : `Show ${pastDays.length} earlier ${pastDays.length === 1 ? "day" : "days"}`}
+          </button>
+        </div>
+      )}
+      {shownDays.length === 0 && undated.length === 0 && (
+        <div className="text-muted-foreground rounded-xl border px-3 py-12 text-center text-sm">
+          Nothing upcoming
+        </div>
+      )}
+      {shownDays.map((g) => {
         const isToday = g.key === todayK;
         const isPast = g.date.getTime() < todayTime;
         return (
@@ -1006,7 +1155,7 @@ function ScheduleRow({
           <div
             className={cn(
               "truncate text-sm font-medium",
-              done && "text-muted-foreground line-through",
+              done && "text-muted-foreground",
             )}
           >
             {row.title ?? "Untitled"}
