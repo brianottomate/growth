@@ -27,6 +27,12 @@ import {
 } from "@/server/services/lead-extraction.service";
 import { generateOutreachDraft } from "@/server/services/lead-outreach.service";
 import {
+  parseContactChannel,
+  resolveContactChannel,
+  scoreLeadChannel,
+  type StoredLeadContact,
+} from "@/server/services/lead-channel.service";
+import {
   queueOutreach,
   launchPersonalizedCampaign,
 } from "@/server/services/outreach-send.service";
@@ -177,7 +183,9 @@ export const leadsRouter = createTRPCRouter({
     .input(
       z.object({
         q: z.string().trim().optional(),
-        source: z.enum(["builtwith", "hubspot", "pregen", "instantly"]).optional(),
+        source: z
+          .enum(["builtwith", "hubspot", "pregen", "instantly"])
+          .optional(),
         pms: z.string().optional(),
         hasPregenSite: z.boolean().optional(),
         integratedPmsOnly: z.boolean().optional(),
@@ -186,7 +194,9 @@ export const leadsRouter = createTRPCRouter({
         // the first cold-outbound test cohort (SEND_BATCH_1).
         sendBatch: z.boolean().optional(),
         minUnits: z.number().int().nonnegative().optional(),
-        sort: z.enum(["composite", "units", "domain", "updated"]).default("units"),
+        sort: z
+          .enum(["composite", "units", "domain", "updated"])
+          .default("units"),
         dir: z.enum(["asc", "desc"]).default("desc"),
         limit: z.number().int().min(1).max(100).default(50),
         offset: z.number().int().nonnegative().default(0),
@@ -339,7 +349,9 @@ export const leadsRouter = createTRPCRouter({
       z.object({
         domain: z.string().trim().min(1),
         only: z
-          .array(z.enum(["firecrawl", "perplexity", "tavily", "parallel", "exa"]))
+          .array(
+            z.enum(["firecrawl", "perplexity", "tavily", "parallel", "exa"]),
+          )
           .optional(),
       }),
     )
@@ -419,13 +431,15 @@ export const leadsRouter = createTRPCRouter({
       if (!row) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
       }
-      const channel = (row.enrichment as { contactChannel?: { bestEmail?: string } } | null)
-        ?.contactChannel;
+      const channel = (
+        row.enrichment as { contactChannel?: { bestEmail?: string } } | null
+      )?.contactChannel;
       const recipient = input.recipientEmail ?? channel?.bestEmail;
       if (!recipient) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "No recipient email — run the contact resolver or pass one explicitly",
+          message:
+            "No recipient email — run the contact resolver or pass one explicitly",
         });
       }
       return queueOutreach(input.domainId, recipient);
@@ -560,7 +574,10 @@ export const leadsRouter = createTRPCRouter({
       const entries = Object.entries(input.fields).filter(([k]) =>
         valid.has(k),
       ) as [MergeableField, string | null][];
-      const result: { db: boolean; hubspot: "updated" | "created" | "skipped" } = {
+      const result: {
+        db: boolean;
+        hubspot: "updated" | "created" | "skipped";
+      } = {
         db: false,
         hubspot: "skipped",
       };
@@ -615,6 +632,202 @@ export const leadsRouter = createTRPCRouter({
       }
 
       return result;
+    }),
+
+  // Narrow operator queue for the first real send: enriched, net-new domains
+  // with channel evidence + latest generated sequence side-by-side.
+  sendReview: protectedProcedure
+    .input(
+      z.object({
+        q: z.string().trim().optional(),
+        verdict: z.enum(["send", "review", "form", "skip"]).optional(),
+        route: z.enum(["instantly", "form", "none"]).optional(),
+        hasDraft: z.boolean().optional(),
+        limit: z.number().int().min(1).max(100).default(50),
+        offset: z.number().int().nonnegative().default(0),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const conds = [
+        eq(leadDomainTable.inHubspot, false),
+        eq(leadDomainTable.hasHubspotDeal, false),
+        eq(leadDomainTable.isExistingCustomer, false),
+        eq(leadDomainTable.excludeFromOutreach, false),
+        eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
+        isNull(leadDomainTable.deletedAt),
+        sql`${leadDomainTable.scorePregenPotential} is not null`,
+      ];
+
+      if (input.q) {
+        conds.push(
+          or(
+            ilike(leadDomainTable.domain, `%${input.q}%`),
+            ilike(leadDomainTable.companyName, `%${input.q}%`),
+          )!,
+        );
+      }
+
+      const where = and(...conds);
+      const domains = await ctx.db
+        .select({
+          id: leadDomainTable.id,
+          domain: leadDomainTable.domain,
+          companyName: leadDomainTable.companyName,
+          country: leadDomainTable.country,
+          state: leadDomainTable.state,
+          city: leadDomainTable.city,
+          pms: leadDomainTable.pms,
+          unitEstimate: leadDomainTable.unitEstimate,
+          unitConfidence: leadDomainTable.unitConfidence,
+          scorePregenPotential: leadDomainTable.scorePregenPotential,
+          scoreLeadQuality: leadDomainTable.scoreLeadQuality,
+          sourceTier: leadDomainTable.sourceTier,
+          enrichment: leadDomainTable.enrichment,
+        })
+        .from(leadDomainTable)
+        .where(where)
+        .orderBy(
+          sql`${leadDomainTable.scorePregenPotential} desc nulls last`,
+          sql`${leadDomainTable.unitEstimate} desc nulls last`,
+          asc(leadDomainTable.domain),
+        )
+        // Fetch a wider candidate window so computed route/verdict filters still
+        // have room without turning this into an all-table application scan.
+        .limit(Math.min(input.limit * 4, 200))
+        .offset(input.offset);
+
+      const ids = domains.map((d) => d.id);
+      const contacts = ids.length
+        ? await ctx.db
+            .select({
+              id: leadContactTable.id,
+              domainId: leadContactTable.domainId,
+              email: leadContactTable.email,
+              firstName: leadContactTable.firstName,
+              lastName: leadContactTable.lastName,
+              jobTitle: leadContactTable.jobTitle,
+              verificationStatus: leadContactTable.verificationStatus,
+            })
+            .from(leadContactTable)
+            .where(
+              and(
+                inArray(leadContactTable.domainId, ids),
+                isNull(leadContactTable.deletedAt),
+              ),
+            )
+        : [];
+      const contactsByDomain = new Map<string, StoredLeadContact[]>();
+      for (const contact of contacts) {
+        const list = contactsByDomain.get(contact.domainId) ?? [];
+        list.push(contact);
+        contactsByDomain.set(contact.domainId, list);
+      }
+
+      const outreachRows = ids.length
+        ? await ctx.db
+            .select()
+            .from(leadOutreachTable)
+            .where(inArray(leadOutreachTable.domainId, ids))
+            .orderBy(desc(leadOutreachTable.createdAt))
+        : [];
+      const latestOutreach = new Map<string, (typeof outreachRows)[number]>();
+      for (const outreach of outreachRows) {
+        if (!latestOutreach.has(outreach.domainId)) {
+          latestOutreach.set(outreach.domainId, outreach);
+        }
+      }
+
+      let items = domains.map((domain) => {
+        const contactChannel = parseContactChannel(
+          (domain.enrichment as { contactChannel?: unknown } | null)
+            ?.contactChannel,
+        );
+        const scored = scoreLeadChannel({
+          domain: domain.domain,
+          contactChannel,
+          contacts: contactsByDomain.get(domain.id) ?? [],
+        });
+        const outreach = latestOutreach.get(domain.id) ?? null;
+        return {
+          ...domain,
+          enrichment: undefined,
+          contactChannel,
+          channelScore: scored,
+          contactCount: contactsByDomain.get(domain.id)?.length ?? 0,
+          outreach,
+        };
+      });
+
+      if (input.verdict) {
+        items = items.filter(
+          (item) => item.channelScore.verdict === input.verdict,
+        );
+      }
+      if (input.route) {
+        items = items.filter((item) => item.channelScore.route === input.route);
+      }
+      if (input.hasDraft != null) {
+        items = items.filter(
+          (item) => Boolean(item.outreach) === input.hasDraft,
+        );
+      }
+
+      return {
+        items: items.slice(0, input.limit),
+        hasMore: domains.length === Math.min(input.limit * 4, 200),
+      };
+    }),
+
+  resolveChannel: protectedProcedure
+    .input(z.object({ domainId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+      }
+
+      const contactChannel = await resolveContactChannel({
+        domain: row.domain,
+        companyName: row.companyName,
+      });
+      await ctx.db
+        .update(leadDomainTable)
+        .set({
+          enrichment: sql`coalesce(${leadDomainTable.enrichment}, '{}'::jsonb) || ${JSON.stringify(
+            {
+              contactChannel,
+            },
+          )}::jsonb`,
+        })
+        .where(eq(leadDomainTable.id, row.id));
+
+      const contacts = await ctx.db
+        .select({
+          id: leadContactTable.id,
+          email: leadContactTable.email,
+          firstName: leadContactTable.firstName,
+          lastName: leadContactTable.lastName,
+          jobTitle: leadContactTable.jobTitle,
+          verificationStatus: leadContactTable.verificationStatus,
+        })
+        .from(leadContactTable)
+        .where(
+          and(
+            eq(leadContactTable.domainId, row.id),
+            isNull(leadContactTable.deletedAt),
+          ),
+        );
+
+      return {
+        contactChannel,
+        channelScore: scoreLeadChannel({
+          domain: row.domain,
+          contactChannel,
+          contacts,
+        }),
+      };
     }),
 
   // Distinct PMS values for the filter dropdown.

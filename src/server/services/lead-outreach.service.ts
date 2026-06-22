@@ -70,10 +70,36 @@ const osLink = (domain: string) =>
   `https://www.wander.com/os?utm_source=cold_email&utm_medium=outbound&utm_campaign=personalized_v1&utm_content=${encodeURIComponent(domain)}`;
 const OS_LINK_RE = /(https?:\/\/)?(www\.)?wander\.com\/os\S*/gi;
 
+type ExtractionContext = {
+  company?: {
+    brandName?: string;
+    description?: string;
+    serviceAreas?: string[];
+  };
+  pms?: {
+    detected?: string;
+  };
+  portfolio?: {
+    propertyTypes?: string[];
+  };
+  brand?: {
+    voice?: string;
+    hasOnlineBooking?: boolean;
+  };
+  pregenFit?: {
+    rationale?: string;
+    signals?: string[];
+  };
+  redFlags?: string[];
+};
+
+type LeadEnrichmentContext = {
+  extraction?: ExtractionContext;
+};
+
 function buildContext(row: typeof leadDomainTable.$inferSelect, contactName: string | null): string {
-  const e = (row.enrichment ?? {}) as Record<string, any>;
-  const ex = e.extraction ?? {};
-  const cc = e.contactChannel ?? {};
+  const enrichment = (row.enrichment ?? {}) as LeadEnrichmentContext;
+  const ex = enrichment.extraction ?? {};
   const lines: string[] = [
     `Domain: ${row.domain}`,
     `Company: ${row.companyName ?? ex?.company?.brandName ?? "(unknown)"}`,

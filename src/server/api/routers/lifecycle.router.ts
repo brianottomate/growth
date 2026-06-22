@@ -147,7 +147,7 @@ async function assertValidParent(
     where: eq(lifecycleProgramStepTable.id, parentStepId),
     columns: { id: true, programId: true },
   });
-  if (!parent || parent.programId !== programId) {
+  if (parent?.programId !== programId) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Branch parent must be a step of the same program",

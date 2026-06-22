@@ -524,7 +524,7 @@ export interface InstantlyEmail {
   to_address_email_list: string | null;
   cc_address_email_list: string | null;
   timestamp_created: string;
-  ue_type: EmailUeType | number;
+  ue_type: number;
   campaign_id: string | null;
   list_id: string | null;
   lead: string | null;

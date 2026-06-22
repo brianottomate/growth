@@ -99,23 +99,29 @@ const programs = await db
 for (const program of programs) {
   const meta = (program.metadata as Record<string, unknown> | null) ?? {};
   const variant = meta.variant as string | undefined;
+  const existingCampaignId =
+    typeof meta.instantlyTestCampaignId === "string"
+      ? meta.instantlyTestCampaignId
+      : typeof meta.instantlyTestCampaignId === "number"
+        ? String(meta.instantlyTestCampaignId)
+        : null;
   if (!variant || !(variant in VARIANT_TEXT_ONLY)) {
     console.log(`skip "${program.name}" (no A/B/C variant in metadata)`);
     continue;
   }
-  if (meta.instantlyTestCampaignId && !FORCE) {
+  if (existingCampaignId && !FORCE) {
     console.log(
-      `skip ${variant}: already has campaign ${String(meta.instantlyTestCampaignId)} (use --force to recreate)`,
+      `skip ${variant}: already has campaign ${existingCampaignId} (use --force to recreate)`,
     );
     continue;
   }
-  if (meta.instantlyTestCampaignId && FORCE) {
+  if (existingCampaignId && FORCE) {
     try {
-      await deleteCampaign(String(meta.instantlyTestCampaignId));
-      console.log(`  deleted old campaign ${String(meta.instantlyTestCampaignId)}`);
+      await deleteCampaign(existingCampaignId);
+      console.log(`  deleted old campaign ${existingCampaignId}`);
     } catch (e) {
       console.warn(
-        `  could not delete old campaign ${String(meta.instantlyTestCampaignId)}: ${e instanceof Error ? e.message : String(e)}`,
+        `  could not delete old campaign ${existingCampaignId}: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }
@@ -130,7 +136,7 @@ for (const program of programs) {
   const seqSteps = steps.map((s, i) => {
     const next = steps[i + 1];
     const gapDays =
-      next && next.delayMinutes != null && s.delayMinutes != null
+      next?.delayMinutes != null && s.delayMinutes != null
         ? Math.round((next.delayMinutes - s.delayMinutes) / 1440)
         : 0;
     const body = textOnly ? (s.body ?? "") : toHtml(s.body ?? "");

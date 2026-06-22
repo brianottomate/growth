@@ -406,7 +406,11 @@ export function V5Client({
   const toggleSelect = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
 
@@ -528,7 +532,11 @@ export function V5Client({
               onClick={() =>
                 setBrandSel((prev) => {
                   const next = new Set(prev);
-                  next.has(b.id) ? next.delete(b.id) : next.add(b.id);
+                  if (next.has(b.id)) {
+                    next.delete(b.id);
+                  } else {
+                    next.add(b.id);
+                  }
                   return next;
                 })
               }
@@ -589,8 +597,7 @@ export function V5Client({
                 const date = new Date(`${dk}T00:00:00`);
                 const prev = i > 0 ? new Date(`${days[i - 1]}T00:00:00`) : null;
                 const newMonth =
-                  !prev ||
-                  prev.getMonth() !== date.getMonth() ||
+                  prev?.getMonth() !== date.getMonth() ||
                   prev.getFullYear() !== date.getFullYear();
                 const isToday = dk === dayKeyOf(now);
                 // A week ends (its strategy subtotal renders below) when the

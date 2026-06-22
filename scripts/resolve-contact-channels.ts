@@ -110,7 +110,7 @@ const domains = await db
 
 console.log(`Resolving contact channels for ${domains.length} enriched net-new domains…`);
 
-const results: Resolved[] = new Array(domains.length);
+const results = new Array<Resolved>(domains.length);
 let cursor = 0;
 let done = 0;
 async function worker() {

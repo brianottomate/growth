@@ -146,7 +146,7 @@ function classifyUrl(url: string): string {
     path.startsWith("/states") ||
     path.startsWith("/vacation-rentals") ||
     /^\/luxury-[\w-]+-vacation-rentals/.test(path) ||
-    /^\/vacation-rentals-near-/.test(path)
+    path.startsWith("/vacation-rentals-near-")
   )
     return "destinations-themed";
 
@@ -278,18 +278,14 @@ function extractMeta(tag: string, html: string): string | null {
 }
 
 function extractTitle(html: string): string | null {
-  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
   return match?.[1]?.trim() ?? null;
 }
 
 function extractCanonical(html: string): string | null {
-  const match = html.match(
-    /<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*?)["']/i,
-  );
+  const match = /<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*?)["']/i.exec(html);
   if (match) return match[1] ?? null;
-  const match2 = html.match(
-    /<link[^>]*href=["']([^"']*?)["'][^>]*rel=["']canonical["']/i,
-  );
+  const match2 = /<link[^>]*href=["']([^"']*?)["'][^>]*rel=["']canonical["']/i.exec(html);
   return match2?.[1] ?? null;
 }
 
@@ -833,7 +829,7 @@ function OgThumb({
   className?: string;
 }) {
   if (src) {
-    // eslint-disable-next-line @next/next/no-img-element
+
     return (
       <img
         src={src}

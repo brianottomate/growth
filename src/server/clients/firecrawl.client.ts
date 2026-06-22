@@ -12,7 +12,7 @@ import { env } from "@/env";
  * @see https://docs.firecrawl.dev
  */
 export const firecrawl = new Firecrawl({
-  apiKey: env.FIRECRAWL_API_KEY!,
+  apiKey: env.FIRECRAWL_API_KEY,
 });
 
 export const isFirecrawlConfigured = !!env.FIRECRAWL_API_KEY;

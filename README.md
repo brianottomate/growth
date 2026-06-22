@@ -1,210 +1,175 @@
-# Jetpack
+# Wander Growth
 
-> A modern Next.js SaaS starter template
+Wander Growth is the internal growth command center and lead/outreach operations app for Wander.
 
-A production-ready Next.js application template with authentication, database, payments, email, and more.
+It started from the Jetpack/T3 SaaS starter, but the center of gravity is now Wander-specific: brand and content operations, campaign planning, lifecycle programs, social listening, media management, lead enrichment, and Customer.io/Outreach/Instantly workflows.
 
-## Features
+## What This App Does
 
-- 🔐 **Authentication** - Better Auth with email/password, OAuth, and admin features
-- 📊 **Database** - Drizzle ORM with PostgreSQL (Neon)
-- 🎨 **UI Components** - Beautiful Radix UI components with Tailwind CSS
-- 📝 **Blog System** - MDX blog with Velite
-- 💳 **Payments** - LemonSqueezy integration ready
-- 📧 **Email** - Resend integration with React Email templates
-- 🤖 **AI Ready** - Anthropic AI SDK integrated
-- 📁 **File Storage** - Vercel Blob integration
-- 🔒 **Type Safety** - Full TypeScript with tRPC for end-to-end type safety
+- Gives the growth team an operational workspace for brands, channels, content, campaigns, newsletters, lifecycle programs, media, mentions, and leads.
+- Syncs and enriches lead data across Customer.io, BigQuery, Minerva, Outreach, HubSpot, and Instantly.
+- Runs scheduled growth jobs on Vercel Cron for Meta, Reddit/listening, and comprehensive growth syncs.
+- Stores durable growth assets in Neon/Postgres with Drizzle ORM and exposes app workflows through tRPC and Next.js route handlers.
+- Provides AI-assisted planning and overview surfaces for growth operations.
 
-## Quick Start
+## Core Stack
 
-### Development
+- **Framework**: Next.js 16, App Router, React 19
+- **Runtime/package manager**: Bun
+- **Database**: Neon Postgres with Drizzle ORM
+- **API layer**: tRPC v11 with TanStack Query
+- **Auth**: Better Auth with organization support
+- **Styling**: Tailwind CSS 4, Radix UI, Wander design-system packages
+- **Content**: Velite/MDX for marketing/blog content
+- **Email**: Resend and React Email
+- **Storage/media**: Cloudflare R2 and Cloudflare Stream
+- **Integrations**: Customer.io, Outreach, Instantly, BigQuery, HubSpot, Meta, Reddit/X/listening providers, Slack
+
+## Main Product Areas
+
+### Growth Command Center
+
+The protected app lives under `src/app/app`. Important surfaces include:
+
+- `/app` - operational overview
+- `/app/brands` - owned and tracked brands
+- `/app/channels` - social, paid, newsletter, blog, and lifecycle channels
+- `/app/content`, `/app/calendar`, `/app/feed`, `/app/studio` - content operations
+- `/app/campaigns` - initiatives and paid/organic campaign planning
+- `/app/lifecycle` - lifecycle programs and touchpoints
+- `/app/listen` and `/app/listen-v2` - social listening and response workflows
+- `/app/leads` - outbound lead database and enrichment workflows
+- `/app/media` - R2/Stream-backed media library
+
+### Lead And Outreach Ops
+
+The `leads` Postgres schema is the high-volume outbound data model:
+
+- `leads.domain` - one row per normalized company/domain
+- `leads.contact` - many contacts per domain
+- `leads.import` - import audit records
+- `leads.outreach` - generated/sent outreach records
+
+The core Customer.io to Outreach workflow is:
+
+- Route handler: `src/app/api/workflows/cio-to-outreach/route.ts`
+- Shared webhook handler: `src/server/services/cio-to-outreach-workflow.service.ts`
+- Sync orchestration: `src/server/services/sync.service.ts`
+- Outreach mapping and BDR assignment: `src/server/services/outreach/`
+
+### Social Listening
+
+Social listening is spread across durable tables, routers, route handlers, and services:
+
+- Tables: `src/server/db/listening-schema.ts`
+- Routers: `src/server/api/routers/listening.router.ts`, `reddit.router.ts`, `twitter.router.ts`, `mention.router.ts`
+- App surfaces: `src/app/app/listen/`, `src/app/app/listen-v2/`, `src/app/app/_signal/`
+- Cron: `src/app/api/cron/reddit/route.ts`
+- Services: `src/server/services/reddit-monitor.service.ts`, `twitter-monitor.service.ts`, `listening-config.service.ts`, `listening-notify.service.ts`, `comment-triage.service.ts`, `triage.service.ts`
+
+## Development
+
+Use Bun. Do not use npm or yarn for this repo.
 
 ```bash
-# Install dependencies
 bun install
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your values
-
-# Run database migrations
-bun run db:push
-
-# Start development server
 bun dev
 ```
 
-Visit `http://localhost:3000`
-
-## Tech Stack
-
-This is a [T3 Stack](https://create.t3.gg/) project with:
-
-- [Next.js 16](https://nextjs.org) - React framework with App Router
-- [React 19](https://react.dev) - UI library
-- [TypeScript](https://www.typescriptlang.org) - Type safety
-- [Drizzle ORM](https://orm.drizzle.team) - Database ORM
-- [Tailwind CSS 4](https://tailwindcss.com) - Styling
-- [tRPC](https://trpc.io) - Type-safe API layer
-- [Better Auth](https://better-auth.com) - Authentication
-- [TanStack Query](https://tanstack.com/query) - Data fetching
-- [Radix UI](https://www.radix-ui.com) - Headless UI components
-- [Velite](https://velite.js.org) - Content management for MDX
-- [React Email](https://react.email) - Email templates
-- [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) - File storage
-- [Resend](https://resend.com) - Email delivery
-- [LemonSqueezy](https://lemonsqueezy.com) - Payments (optional)
-
-## Project Structure
-
-```text
-src/
-├── app/                    # Next.js app router
-│   ├── (auth)/            # Auth pages (signin, signup, etc.)
-│   ├── (marketing)/       # Public marketing pages
-│   ├── app/               # Protected app pages
-│   └── api/               # API routes
-├── server/                # Backend logic
-│   ├── api/               # tRPC routers
-│   ├── db/                # Database schema & queries
-│   └── services/          # Business logic services
-├── components/            # React components
-│   ├── ui/                # Reusable UI components
-│   └── mdx/               # MDX components for blog
-├── lib/                   # Shared utilities
-└── hooks/                 # Custom React hooks
-
-emails/                    # Email templates
-```
-
-## Key Commands
+Useful commands:
 
 ```bash
-# Development
-bun dev                    # Start dev server
-bun run build              # Build for production
-bun start                  # Start production server
-
-# Database
-bun run db:generate        # Generate migrations
-bun run db:migrate         # Run migrations
-bun run db:push            # Push schema changes
-bun run db:studio          # Open Drizzle Studio
-
-# Code Quality
-bun run typecheck          # Type check
-bun run lint               # Lint code
-bun run lint:fix           # Fix lint issues
-bun run format:check       # Check formatting
-bun run format:write       # Format code
-
-# Other
-bun run email:dev          # Preview emails
-bun run velite:dev         # Watch MDX content
+bun run check          # ESLint + TypeScript
+bun run typecheck      # TypeScript only
+bun run lint           # ESLint only
+bun run format:check   # Prettier check
+bun run format:write   # Prettier write
+bun run build          # Velite build + Next build
 ```
 
-## Environment Variables
+Database commands:
 
-See [.env.example](.env.example) for required environment variables.
+```bash
+bun run db:push        # Push schema changes for development
+bun run db:generate    # Generate migrations
+bun run db:migrate     # Run migrations
+bun run db:studio      # Open Drizzle Studio
+```
 
-Key variables:
+Other local tools:
 
-- `DATABASE_URL` - PostgreSQL connection string
-- `BETTER_AUTH_SECRET` - Auth secret (generate with `openssl rand -base64 32`)
-- `NEXT_PUBLIC_BASE_URL` - Your app URL
-- `RESEND_API_KEY` - Email delivery (optional)
-- `ANTHROPIC_API_KEY` - AI features (optional)
+```bash
+bun run velite:dev     # Watch MDX content
+bun run email:dev      # Preview React Email templates
+```
 
-## Documentation
+## Local Database Connection
 
-- **[CLAUDE.md](CLAUDE.md)** - Developer guide for working with this codebase
-- **[CLEANUP_NOTES.md](CLEANUP_NOTES.md)** - Template cleanup notes
+The app reads `DATABASE_URL` from `.env` through Bun/Next env loading. Prefer Bun for reading the local env file instead of `source .env`, because secrets can contain shell-sensitive characters.
 
-## Core Features
+Connect with `psql`:
 
-### Authentication
+```bash
+DATABASE_URL="$(bun --print 'process.env.DATABASE_URL')"
+psql "$DATABASE_URL"
+```
 
-Built with Better Auth including:
+Quick inspection commands:
 
-- Email/password authentication
-- Email verification
-- Password reset
-- Username system
-- Anonymous users support
-- Admin roles and user banning
-- Session impersonation
+```bash
+DATABASE_URL="$(bun --print 'process.env.DATABASE_URL')"
+psql "$DATABASE_URL" -c "\dn"
+psql "$DATABASE_URL" -c "\dt public.*"
+psql "$DATABASE_URL" -c "\dt leads.*"
+```
 
-### Onboarding
+The expected app schemas are:
 
-Simple multi-step onboarding flow demonstrating:
+- `public` - auth, organizations, brands, content, campaigns, lifecycle, listening, media
+- `leads` - outbound lead domains, contacts, imports, and outreach records
 
-- Progress indicator with step tracking
-- Client-side timezone detection (via Intl API)
-- Server-side geo detection (Vercel headers in production)
-- Type-safe form validation with Zod
-- Shared schema between frontend and backend
+## Environment Notes
 
-The onboarding is intentionally simplified as a template pattern. Customize the steps and fields in:
+Environment variables are validated in `src/env.ts`. Many integrations are optional and gracefully skipped when their keys are missing, but core development requires at least the database and required app secrets.
 
-- [src/lib/validators/onboarding.ts](src/lib/validators/onboarding.ts) - Zod schema
-- [src/app/app/onboarding/page.tsx](src/app/app/onboarding/page.tsx) - Frontend UI
-- [src/server/api/routers/userRouter.ts](src/server/api/routers/userRouter.ts) - Backend mutation
+Important categories:
 
-### Database
+- Auth/app: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `ADMIN_TOKEN`, `OPENAI_API_KEY`, `FIRECRAWL_API_KEY`
+- Customer.io/Outreach sync: `CUSTOMER_IO_*`, `CUSTOMERIO_WEBHOOK_*`, `OUTREACH_*`, `BIGQUERY_*`, `MINERVA_*`
+- Outbound and CRM: `INSTANTLY_*`, `HUBSPOT_ACCESS_TOKEN_OPERATED`
+- Media: `CLOUDFLARE_*`, `R2_*`
+- Listening and notifications: `X_*`, `APIFY_API_KEY`, `BRIGHT_DATA_API_KEY`, `SLACK_API_TOKEN`
 
-Drizzle ORM with PostgreSQL provides:
+## Architecture Notes
 
-- Type-safe database queries
-- Automatic migrations
-- Relation management
-- Database studio for viewing data
+- tRPC routers are registered in `src/server/api/root.ts`.
+- Database schema exports are centralized in `src/server/db/schema.ts`.
+- Domain schemas live in `src/server/db/*-schema.ts`.
+- Business logic belongs in `src/server/services/`.
+- Provider clients belong in `src/server/clients/`.
+- Sensitive server-only code should use `import "server-only"`.
+- New user-facing app features should follow existing protected route patterns under `src/app/app`.
 
-### Blog System
+## Project Docs
 
-MDX-based blog with:
+Useful planning and architecture docs:
 
-- Velite for content processing
-- Syntax highlighting
-- Reading time calculation
-- SEO optimization
-- Draft posts support
+- `docs/growth-product-architecture-map.md`
+- `docs/growth-platform-progress.md`
+- `docs/customerio-integration.md`
+- `docs/cio-assignment-repair-runbook.md`
+- `docs/growth-cutover-workflows.md`
+- `docs/tracking/TRACKING_PLAN.md`
 
-### Email System
+## Starter Heritage
 
-React Email templates with:
+This repo still uses the Jetpack/T3 foundation:
 
-- Type-safe email components
-- Preview server for development
-- Resend integration for delivery
-- Beautiful responsive templates
+- Better Auth user/session/account/organization tables
+- Drizzle with Neon Postgres
+- tRPC procedures and routers
+- Tailwind/Radix component primitives
+- Velite MDX blog support
+- React Email and Resend support
 
-### File Storage
-
-Vercel Blob integration for:
-
-- Image uploads
-- Document storage
-- Automatic CDN distribution
-- Presigned URLs
-
-## Deployment
-
-Deploy to Vercel with one click or follow these guides:
-
-- [Vercel Deployment](https://create.t3.gg/en/deployment/vercel)
-- [Docker Deployment](https://create.t3.gg/en/deployment/docker)
-
-Make sure to set all environment variables in your deployment platform.
-
-## Learn More
-
-- [T3 Stack Documentation](https://create.t3.gg/)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Better Auth Documentation](https://better-auth.com)
-- [Drizzle ORM Documentation](https://orm.drizzle.team)
-- [tRPC Documentation](https://trpc.io)
-
-## License
-
-MIT
+Treat that as the technical substrate. The product itself is Wander Growth.

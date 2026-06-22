@@ -38,7 +38,7 @@ export function CommentThread({
     trpc.content.addComment.mutationOptions({
       onSuccess: () => {
         setBody("");
-        invalidate();
+        void invalidate();
       },
     }),
   );

@@ -106,7 +106,7 @@ export const cadenceRouter = createTRPCRouter({
         where: eq(channelTable.id, input.channelId),
         columns: { id: true, brandId: true, platform: true },
       });
-      if (!channel || channel.brandId !== input.brandId) {
+      if (channel?.brandId !== input.brandId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Channel does not belong to this brand",

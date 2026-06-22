@@ -7,6 +7,7 @@ import {
   Building2,
   Calendar,
   Check,
+  ClipboardCheck,
   ChevronsUpDown,
   Database,
   Ear,
@@ -71,6 +72,7 @@ type NavItem = {
   href: string;
   icon: LucideIcon;
   badge?: string;
+  exact?: boolean;
 };
 
 const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
@@ -106,7 +108,12 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Grow",
     items: [
-      { label: "Leads", href: "/app/leads", icon: Database },
+      { label: "Leads", href: "/app/leads", icon: Database, exact: true },
+      {
+        label: "Send review",
+        href: "/app/leads/send-review",
+        icon: ClipboardCheck,
+      },
       { label: "Listen", href: "/app/listen", icon: Radar },
       { label: "Listen v2", href: "/app/listen-v2", icon: Ear },
       { label: "Lifecycle", href: "/app/lifecycle", icon: Repeat },
@@ -146,8 +153,10 @@ export function AppSidebar({
   const { data: orgs } = useQuery(trpc.org.list.queryOptions());
   const { themeMode, setTheme } = useTheme();
 
-  const isActive = (href: string) =>
-    href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+  const isActive = (item: NavItem) =>
+    item.href === "/app" || item.exact
+      ? pathname === item.href
+      : pathname.startsWith(item.href);
 
   const handleSignOut = async () => {
     await authClient.signOut();
@@ -164,7 +173,11 @@ export function AppSidebar({
                 the selector is not accessible from the frontend, but the code
                 remains intact for when multi-org support is re-enabled. */}
             <DropdownMenu open={false}>
-              <SidebarMenuButton size="lg" tooltip={orgName} className="cursor-default">
+              <SidebarMenuButton
+                size="lg"
+                tooltip={orgName}
+                className="cursor-default"
+              >
                 <div className="bg-primary text-primary-foreground flex aspect-square size-7 items-center justify-center rounded-md text-sm font-semibold">
                   {orgName.slice(0, 1).toUpperCase()}
                 </div>
@@ -214,14 +227,16 @@ export function AppSidebar({
       <SidebarContent>
         {NAV_GROUPS.map((group, i) => (
           <SidebarGroup key={group.label ?? `group-${i}`}>
-            {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+            {group.label && (
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            )}
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={isActive(item.href)}
+                      isActive={isActive(item)}
                       tooltip={item.label}
                     >
                       <Link href={item.href}>

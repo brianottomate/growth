@@ -119,7 +119,7 @@ Caption / text: ${input.text ?? "(none)"}`;
   // Validate the format against the registry — drop a hallucinated id but keep
   // the archetype (which we trust as the mechanic).
   const def = output.format ? getPlatformFormat(output.format) : undefined;
-  const format = def && def.platform === input.platform ? output.format : undefined;
+  const format = def?.platform === input.platform ? output.format : undefined;
   const archetype = format
     ? archetypeForFormat(format)
     : isArchetype(output.archetype)
