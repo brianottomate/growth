@@ -8,11 +8,12 @@ import { useTRPC } from "@/trpc/react";
 
 import { XListening } from "@/app/app/listen/XListening";
 
+import { Instagram } from "./Instagram";
 import { Playbook } from "./Playbook";
 import { Reddit } from "./Reddit";
 import { Sources } from "./Sources";
 
-const TAB_IDS = ["monitor", "reddit", "x", "playbook"] as const;
+const TAB_IDS = ["monitor", "reddit", "instagram", "x", "playbook"] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 export function ListenV2({ defaultTab }: { defaultTab: TabId }) {
@@ -55,6 +56,7 @@ export function ListenV2({ defaultTab }: { defaultTab: TabId }) {
       <TabsList>
         <TabsTrigger value="monitor">What we monitor</TabsTrigger>
         <TabsTrigger value="reddit">Reddit</TabsTrigger>
+        <TabsTrigger value="instagram">Instagram</TabsTrigger>
         <TabsTrigger value="x">X</TabsTrigger>
         <TabsTrigger value="playbook">Playbook</TabsTrigger>
       </TabsList>
@@ -65,6 +67,10 @@ export function ListenV2({ defaultTab }: { defaultTab: TabId }) {
 
       <TabsContent value="reddit">
         <Reddit />
+      </TabsContent>
+
+      <TabsContent value="instagram">
+        <Instagram />
       </TabsContent>
 
       <TabsContent value="x">

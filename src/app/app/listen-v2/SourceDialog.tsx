@@ -31,6 +31,7 @@ import type {
   ChannelPlatform,
   ListeningSourceConfig,
   ListeningTrigger,
+  WatchedAccount,
 } from "@/server/db/schema";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
@@ -54,9 +55,21 @@ const LISTENING_PLATFORMS: ChannelPlatform[] = [
 
 const ACQUISITIONS: [AcquisitionShape, string, string][] = [
   ["keyword_search", "Market — keyword search", "Search public conversations for signal"],
+  ["account_watch", "Market — account watch", "Monitor specific accounts' posts (Instagram)"],
   ["owned_inbound", "Owned — inbound", "DMs & comments on our own accounts"],
   ["provider_alert", "Provider — pushed alerts", "A third-party tool pushes matches to us"],
 ];
+
+/** Parse one watchlist line (@handle / handle / profile URL) into an account. */
+function parseAccount(line: string): WatchedAccount | null {
+  const t = line.trim();
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) {
+    return { url: t, handle: /instagram\.com\/([^/?#]+)/i.exec(t)?.[1] };
+  }
+  const handle = t.replace(/^@/, "");
+  return { url: `https://www.instagram.com/${handle}/`, handle };
+}
 
 const TRIGGERS: [ListeningTrigger, string][] = [
   ["on_demand", "On demand (Scan now)"],
@@ -75,6 +88,7 @@ function deriveAdapter(
 ): string {
   if (acquisition === "provider_alert") return "f5bot";
   if (acquisition === "owned_inbound") return "zernio-comments";
+  if (acquisition === "account_watch") return `${platform}-account-watch`;
   if (platform === "reddit") return "reddit-json";
   if (platform === "x") return "x-search";
   return `${platform}-search`;
@@ -104,6 +118,7 @@ export function SourceDialog({
   const [adapter, setAdapter] = useState("");
   const [subreddits, setSubreddits] = useState("");
   const [keywords, setKeywords] = useState("");
+  const [accounts, setAccounts] = useState("");
   const [signalNotes, setSignalNotes] = useState("");
   const [voiceText, setVoiceText] = useState("");
   const [overridesBrand, setOverridesBrand] = useState(false);
@@ -119,6 +134,11 @@ export function SourceDialog({
     setAdapter(initial?.adapter ?? "");
     setSubreddits(arrToLines(subredditNames(initial?.config?.subreddits)));
     setKeywords(arrToLines(initial?.config?.keywords));
+    setAccounts(
+      arrToLines(
+        (initial?.config?.accounts ?? []).map((a) => a.handle ?? a.url),
+      ),
+    );
     setSignalNotes(initial?.signalNotes ?? "");
     setVoiceText(initial?.voiceOverride?.fingerprintText ?? "");
     setOverridesBrand(initial?.voiceOverride?.overridesBrand ?? false);
@@ -160,6 +180,7 @@ export function SourceDialog({
   const pending = create.isPending || update.isPending || remove.isPending;
 
   const isKeywordSearch = acquisition === "keyword_search";
+  const isAccountWatch = acquisition === "account_watch";
   const isReddit = platform === "reddit";
 
   function buildConfig(): ListeningSourceConfig {
@@ -172,6 +193,10 @@ export function SourceDialog({
         linesToArr(subreddits),
       );
     if (isKeywordSearch && !isReddit) config.keywords = linesToArr(keywords);
+    if (isAccountWatch)
+      config.accounts = linesToArr(accounts)
+        .map(parseAccount)
+        .filter((a): a is WatchedAccount => a !== null);
     return config;
   }
 
@@ -289,8 +314,26 @@ export function SourceDialog({
             </div>
           )}
 
-          {/* What we watch — only meaningful for keyword search. */}
-          {isKeywordSearch ? (
+          {/* What we watch — keyword terms, or a curated account list. */}
+          {isAccountWatch ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="src-accounts">
+                Accounts — one @handle or profile URL per line
+              </Label>
+              <Textarea
+                id="src-accounts"
+                value={accounts}
+                onChange={(e) => setAccounts(e.target.value)}
+                rows={4}
+                className="font-mono text-xs"
+                placeholder={"whowhatwear\ncondenasttraveler\nhttps://www.instagram.com/architecturaldigest/"}
+              />
+              <p className="text-muted-foreground text-[11px]">
+                Their recent posts are scanned daily; relevant ones surface in the
+                Instagram queue with a drafted comment.
+              </p>
+            </div>
+          ) : isKeywordSearch ? (
             isReddit ? (
               <div className="space-y-1.5">
                 <Label htmlFor="src-subs">Subreddits (one per line, no r/)</Label>

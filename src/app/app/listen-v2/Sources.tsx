@@ -25,6 +25,12 @@ const GROUPS: { key: AcquisitionShape; title: string; blurb: string }[] = [
     blurb: "Public conversations we search for signal — Reddit, X, and more.",
   },
   {
+    key: "account_watch",
+    title: "Account watch",
+    blurb:
+      "Tastemaker / creator accounts we monitor to engage on their posts (Instagram).",
+  },
+  {
     key: "owned_inbound",
     title: "Owned inbound",
     blurb: "DMs and comments on our own accounts.",
@@ -42,6 +48,7 @@ const GROUPS: { key: AcquisitionShape; title: string; blurb: string }[] = [
  * tab once it exists.
  */
 function listeningSurfaceHref(s: Source): string {
+  if (s.acquisition === "account_watch") return "/app/listen-v2?tab=instagram";
   if (s.acquisition === "owned_inbound") {
     return s.adapter === "zernio-dms"
       ? "/app/listen?tab=dms"
@@ -186,6 +193,8 @@ function Watching({ source }: { source: Source }) {
     chips.push(
       ...cfg.watchlistGroups.map((g) => `${g.name} (${g.terms.length})`),
     );
+  if (cfg.accounts?.length)
+    chips.push(...cfg.accounts.map((a) => `@${a.handle ?? a.label ?? a.url}`));
 
   if (chips.length === 0) {
     const fallback =

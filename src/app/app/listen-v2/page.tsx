@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Listen v2",
 };
 
-const TABS = ["monitor", "reddit", "x", "playbook"] as const;
+const TABS = ["monitor", "reddit", "instagram", "x", "playbook"] as const;
 type TabId = (typeof TABS)[number];
 
 /**

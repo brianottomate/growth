@@ -14,6 +14,7 @@ import {
   type SubredditProfile,
 } from "@/server/db/listening-schema";
 import { createId } from "@/server/db/utils";
+import { scanAccountWatchSources } from "@/server/services/instagram-watch.service";
 import { evaluateSubreddit as evaluateSubredditProfile } from "@/server/services/subreddit-eval.service";
 
 import { protectedProcedure } from "../trpc";
@@ -63,6 +64,17 @@ const SourceConfigSchema = z.object({
         id: z.string(),
         name: z.string(),
         terms: z.array(z.string()),
+      }),
+    )
+    .optional(),
+  accounts: z
+    .array(
+      z.object({
+        url: z.string(),
+        handle: z.string().optional(),
+        label: z.string().optional(),
+        followers: z.number().optional(),
+        verifiedAt: z.string().optional(),
       }),
     )
     .optional(),
@@ -250,6 +262,18 @@ export const listeningRouter = {
         .delete(listeningSourceTable)
         .where(eq(listeningSourceTable.id, input.id));
       return { id: input.id };
+    }),
+
+  /**
+   * Run an account-watch scan on demand (the Instagram tab's "Scan now"). Pulls
+   * each watched account's recent posts, scores + drafts comments, and writes
+   * the keepers as `mention` rows. Omit `sourceId` to scan all active account_watch
+   * sources (what the daily cron does). Blocks on the Bright Data crawl (~60-90s).
+   */
+  scanAccountWatch: protectedProcedure
+    .input(z.object({ sourceId: z.string().optional() }).optional())
+    .mutation(async ({ input }) => {
+      return scanAccountWatchSources({ sourceId: input?.sourceId });
     }),
 
   // ---- Per-subreddit profiles (config.subreddits[]) -----------------------

@@ -44,7 +44,7 @@ export type { SubredditEntry, SubredditProfile, SubredditStance };
 // it's a lean landing table for one push-based source, not a refactor of the
 // existing pull surfaces (DMs/comments/X live in cache/localStorage for now).
 
-export const MENTION_PROVIDERS = ["f5bot"] as const;
+export const MENTION_PROVIDERS = ["f5bot", "brightdata"] as const;
 export type MentionProvider = (typeof MENTION_PROVIDERS)[number];
 
 export const MENTION_SOURCES = [
@@ -52,6 +52,7 @@ export const MENTION_SOURCES = [
   "hackernews",
   "lobsters",
   "twitter",
+  "instagram",
   "other",
 ] as const;
 export type MentionSource = (typeof MENTION_SOURCES)[number];
@@ -100,6 +101,11 @@ export const mentionTable = pgTable(
     intentTag: t.text(),
     suggestedAction: t.text(), // engage | monitor | skip
     rationale: t.text(),
+    // AI-drafted reply/comment to act on (pre-engagement). For account-watch
+    // (Instagram) this is the "short clever public comment" suggestion; null
+    // until a scan drafts one. The human edits/copies it before posting —
+    // proof-of-work (where we actually replied) still lands in replyUrl/replyNote.
+    suggestedReply: t.text(),
     status: t.text().$type<MentionStatus>().notNull().default("new"),
 
     // ---- Assignment / triage audit ----
@@ -172,6 +178,9 @@ export const acquisitionShapeEnum = pgEnum("acquisition_shape", [
   "keyword_search", // build a query over an external market surface (Reddit/X/LinkedIn/Pinterest)
   "owned_inbound", // DMs / comments on an owned account (IG/FB/LI)
   "provider_alert", // a provider pushes hits to us (F5Bot today)
+  "account_watch", // monitor a curated set of EXTERNAL accounts' posts (IG today). No
+  // keyword surface exists for IG, so the watchlist of accounts IS the query;
+  // relevant posts land in `mention` as engagement opportunities (config.accounts).
 ]);
 export type AcquisitionShape =
   (typeof acquisitionShapeEnum.enumValues)[number];
@@ -195,12 +204,22 @@ export type ListeningAlertTerm = {
   verifiedAt?: string; // ISO date we last confirmed this term is live in the channel
 };
 
+// One external account we watch under an account_watch source (IG today).
+export type WatchedAccount = {
+  url: string; // canonical profile URL we scrape (e.g. https://www.instagram.com/whowhatwear/)
+  handle?: string; // @handle — display + dedup/facet key (mention.keyword)
+  label?: string; // friendly name (e.g. "Who What Wear")
+  followers?: number; // last verified follower count
+  verifiedAt?: string; // ISO date we last confirmed the profile resolves
+};
+
 /** Source-specific targeting. Typed jsonb so each adapter shapes its own config. */
 export type ListeningSourceConfig = {
   subreddits?: SubredditEntry[]; // reddit — names (legacy) or full profiles
   keywords?: string[]; // x / linkedin / pinterest terms
   alertTerms?: ListeningAlertTerm[]; // provider_alert terms (F5Bot) — intent + verified state
   watchlistGroups?: { id: string; name: string; terms: string[] }[]; // x
+  accounts?: WatchedAccount[]; // account_watch — external creators/publishers we monitor (IG)
   windowDays?: number;
   ignoreList?: string[]; // e.g. F5Bot ad-block senders
   maxResults?: number;
