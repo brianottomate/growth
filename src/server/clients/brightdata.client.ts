@@ -22,6 +22,7 @@ const BASE = "https://api.brightdata.com/datasets/v3";
 type ScraperKey =
   | "linkedinPosts"
   | "linkedinProfile"
+  | "linkedinPersonProfile"
   | "instagramProfile"
   | "instagramPost"
   | "xPosts"
@@ -38,7 +39,10 @@ const SCRAPERS: Record<ScraperKey, ScraperDef> = {
     datasetId: "gd_lyy3tktm25m4avu764",
     query: { type: "discover_new", discover_by: "company_url" },
   },
+  // Company/school/showcase pages — rejects personal /in/ URLs.
   linkedinProfile: { datasetId: "gd_l1vikfnt1wgvvqz95w" },
+  // People profiles (/in/…) — the trust-layer person lookup.
+  linkedinPersonProfile: { datasetId: "gd_l1viktl72bvl7bjuj0" },
   instagramProfile: { datasetId: "gd_l1vikfch901nx3by4" },
   instagramPost: { datasetId: "gd_lk5ns7kz21pck8jpis" },
   xPosts: {
@@ -58,9 +62,13 @@ function requireToken(): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function pollSnapshot(snapshotId: string, token: string): Promise<unknown[]> {
+async function pollSnapshot(
+  snapshotId: string,
+  token: string,
+  maxAttempts = 120,
+): Promise<unknown[]> {
   const auth = { Authorization: `Bearer ${token}` };
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < maxAttempts; i++) {
     const prog = (await fetch(`${BASE}/progress/${snapshotId}`, { headers: auth }).then(
       (r) => r.json(),
     )) as { status?: string };
@@ -104,7 +112,11 @@ function parseRecords(text: string): unknown[] {
 export async function runScrape(
   key: ScraperKey,
   input: Array<Record<string, unknown>>,
-  opts?: { limitPerInput?: number; query?: Record<string, string> },
+  opts?: {
+    limitPerInput?: number;
+    query?: Record<string, string>;
+    maxPollAttempts?: number;
+  },
 ): Promise<unknown[]> {
   const token = requireToken();
   const def = SCRAPERS[key];
@@ -132,7 +144,11 @@ export async function runScrape(
   if (!trigger.snapshot_id) {
     throw new Error(`Bright Data ${key}: no snapshot_id from trigger`);
   }
-  const records = await pollSnapshot(trigger.snapshot_id, token);
+  const records = await pollSnapshot(
+    trigger.snapshot_id,
+    token,
+    opts?.maxPollAttempts,
+  );
 
   // A dataset that's down returns only error rows ({error, error_code}). Real
   // runs can carry one leading error row + good rows — only throw if ALL fail.
@@ -228,7 +244,12 @@ export type LinkedinProfile = {
 export async function scrapeLinkedinProfile(
   url: string,
 ): Promise<LinkedinProfile | null> {
-  const records = await runScrape("linkedinProfile", [{ url }]);
+  // People-profile dataset (not the company one). Bounded poll (~2min) so a
+  // slow profile doesn't hang the inline verify mutation — caller treats a
+  // null/timeout as "couldn't confirm" rather than failing the whole row.
+  const records = await runScrape("linkedinPersonProfile", [{ url }], {
+    maxPollAttempts: 24,
+  });
   const rec = records.find(
     (r) => r && typeof r === "object" && !(r as { error?: unknown }).error,
   ) as Record<string, unknown> | undefined;
