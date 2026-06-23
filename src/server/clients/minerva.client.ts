@@ -277,6 +277,64 @@ export async function enrichByEmail(
   }
 }
 
+export interface MinervaContactGeo {
+  isMatch: boolean;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  confidence?: number | null;
+  // Surfaced from the resolve step — the only bridge we have to a LinkedIn
+  // profile URL (no LinkedIn URLs are stored on contacts). Used opportunistically
+  // by the trust layer to confirm current employer via Bright Data.
+  linkedinUrl?: string | null;
+}
+
+/**
+ * Trust-layer geo validator: resolve a (freemail) email to a person, then pull
+ * their top address. Per the cold-outbound playbook, Minerva's real job here is
+ * geo-validation/junk-detection — it matches ~42% of freemails but often places
+ * them in the wrong city, so a mismatch is a downgrade signal, not a source.
+ */
+export async function verifyContactGeo(
+  email: string,
+): Promise<MinervaContactGeo | null> {
+  if (!isMinervaConfigured) return null;
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  try {
+    const resolveData = await postResolveV2({
+      records: [{ record_id: normalizedEmail, emails: [normalizedEmail] }],
+    });
+    const resolveResult = resolveData.results?.[0];
+    const linkedinUrl = resolveResult?.linkedin_url ?? null;
+    const pid = resolveResult?.is_match ? resolveResult.minerva_pid : null;
+    if (!pid) {
+      return { isMatch: false, linkedinUrl };
+    }
+
+    const data = await postEnrichV2({
+      records: [{ record_id: normalizedEmail, minerva_pid: pid }],
+      return_fields: ["address_history"],
+    });
+    const result = data.results?.[0];
+    const topAddress = getTopAddress(result?.address_history);
+
+    return {
+      isMatch: !!result?.is_match,
+      city: topAddress?.address_city ?? null,
+      state: topAddress?.address_state ?? null,
+      postalCode: topAddress?.address_zipcode ?? null,
+      confidence: normalizeScore(result?.match_score) ?? null,
+      linkedinUrl,
+    };
+  } catch (error) {
+    console.error("❌ [Minerva] verifyContactGeo failed:", error);
+    return null;
+  }
+}
+
 /**
  * Enrich phone number for a lead (last-resort fallback).
  *

@@ -209,3 +209,46 @@ export async function verifyProfile(
   if (!rec) return { exists: false };
   return cfg.extract(rec);
 }
+
+// ---- LINKEDIN PERSON PROFILE (trust layer) -------------------------
+
+export type LinkedinProfile = {
+  url: string;
+  name: string | null;
+  currentCompany: string | null;
+  city: string | null;
+};
+
+/**
+ * Scrape a LinkedIn *person* profile and extract their current employer, so the
+ * trust layer can confirm "does this person actually work here?". The dataset
+ * keys vary by record, so current-company is read defensively (object → flat
+ * field → first experience entry). Returns null when the profile can't be read.
+ */
+export async function scrapeLinkedinProfile(
+  url: string,
+): Promise<LinkedinProfile | null> {
+  const records = await runScrape("linkedinProfile", [{ url }]);
+  const rec = records.find(
+    (r) => r && typeof r === "object" && !(r as { error?: unknown }).error,
+  ) as Record<string, unknown> | undefined;
+  if (!rec) return null;
+
+  let currentCompany: string | null = null;
+  const cc = rec.current_company;
+  if (cc && typeof cc === "object") {
+    currentCompany = (cc as { name?: string }).name ?? null;
+  } else if (typeof rec.current_company_name === "string") {
+    currentCompany = rec.current_company_name;
+  } else if (Array.isArray(rec.experience) && rec.experience.length > 0) {
+    const first = rec.experience[0] as { company?: string };
+    currentCompany = first?.company ?? null;
+  }
+
+  return {
+    url,
+    name: typeof rec.name === "string" ? rec.name : null,
+    currentCompany,
+    city: typeof rec.city === "string" ? rec.city : null,
+  };
+}

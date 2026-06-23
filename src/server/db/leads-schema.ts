@@ -170,6 +170,33 @@ export type LeadDomainInsert = typeof leadDomainTable.$inferInsert;
 // ---- LEAD CONTACT --------------------------------------------------
 
 /**
+ * Person-verification evidence — the "trust layer". Re-runnable, droppable
+ * (lives on the contact, not a separate table). Minerva is the geo-validator
+ * (does this person plausibly live where the company operates?); Bright Data
+ * LinkedIn is the opportunistic confirmer (does this person actually work
+ * here?), only fired when a profile URL surfaces via Minerva's resolve step.
+ * Written by `lead-verify.service.ts`; consumed by `scoreStoredContact`.
+ */
+export type LeadContactVerification = {
+  verifiedAt: string; // ISO
+  // "match" / "mismatch" / "unknown" (could not resolve / no company geo).
+  geoMatch: "match" | "mismatch" | "unknown";
+  companyMatch: "match" | "mismatch" | "unknown";
+  minerva?: {
+    isMatch: boolean;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+    confidence?: number | null; // 0-1
+  };
+  linkedin?: {
+    url: string;
+    currentCompany?: string | null;
+    scrapedAt: string;
+  };
+};
+
+/**
  * A person at a domain (the Instantly upload grain). Many per `lead_domain`.
  * Engagement metrics sync back from Instantly so scoring can react to it.
  */
@@ -198,6 +225,10 @@ export const leadContactTable = leadsSchema.table(
 
     // Deliverability (Instantly / Minerva verification).
     verificationStatus: t.text(),
+
+    // Person-verification evidence (Minerva geo + Bright Data LinkedIn).
+    // Re-runnable trust layer — see lead-verify.service.ts.
+    verification: t.jsonb().$type<LeadContactVerification>(),
 
     // Instantly linkage (this is the projection — source of truth stays here).
     instantlyLeadId: t.text(),

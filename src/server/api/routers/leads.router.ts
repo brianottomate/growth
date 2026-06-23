@@ -27,11 +27,14 @@ import {
 } from "@/server/services/lead-extraction.service";
 import { generateOutreachDraft } from "@/server/services/lead-outreach.service";
 import {
+  isFreemailEmail,
   parseContactChannel,
   resolveContactChannel,
   scoreLeadChannel,
   type StoredLeadContact,
 } from "@/server/services/lead-channel.service";
+import { verifyContactPerson } from "@/server/services/lead-verify.service";
+import { isMinervaConfigured } from "@/server/clients/minerva.client";
 import {
   queueOutreach,
   launchPersonalizedCampaign,
@@ -707,6 +710,7 @@ export const leadsRouter = createTRPCRouter({
               lastName: leadContactTable.lastName,
               jobTitle: leadContactTable.jobTitle,
               verificationStatus: leadContactTable.verificationStatus,
+              verification: leadContactTable.verification,
             })
             .from(leadContactTable)
             .where(
@@ -811,6 +815,7 @@ export const leadsRouter = createTRPCRouter({
           lastName: leadContactTable.lastName,
           jobTitle: leadContactTable.jobTitle,
           verificationStatus: leadContactTable.verificationStatus,
+          verification: leadContactTable.verification,
         })
         .from(leadContactTable)
         .where(
@@ -826,6 +831,92 @@ export const leadsRouter = createTRPCRouter({
           domain: row.domain,
           contactChannel,
           contacts,
+        }),
+      };
+    }),
+
+  // Trust layer: run Minerva geo (+ opportunistic Bright Data LinkedIn) over a
+  // domain's freemail contacts, persist the evidence, and return the rescored
+  // channel. Capped per call — these are paid, per-contact external lookups.
+  verifyDomainContacts: protectedProcedure
+    .input(
+      z.object({
+        domainId: z.string(),
+        limit: z.number().int().min(1).max(20).default(8),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+      }
+
+      const company = {
+        name: row.companyName,
+        domain: row.domain,
+        city: row.city,
+        state: row.state,
+        country: row.country,
+      };
+
+      const contacts = await ctx.db
+        .select({
+          id: leadContactTable.id,
+          email: leadContactTable.email,
+          firstName: leadContactTable.firstName,
+          lastName: leadContactTable.lastName,
+          jobTitle: leadContactTable.jobTitle,
+          verificationStatus: leadContactTable.verificationStatus,
+          verification: leadContactTable.verification,
+        })
+        .from(leadContactTable)
+        .where(
+          and(
+            eq(leadContactTable.domainId, row.id),
+            isNull(leadContactTable.deletedAt),
+          ),
+        );
+
+      const byId = new Map<string, StoredLeadContact>(
+        contacts.map((c) => [c.id, { ...c }]),
+      );
+
+      // Only spend lookups on freemail contacts — the corporate/role inboxes are
+      // already trustworthy from the site-scrape. Highest current score first.
+      const toVerify = contacts
+        .filter((c) => isFreemailEmail(c.email))
+        .slice(0, input.limit);
+
+      let verified = 0;
+      for (const contact of toVerify) {
+        const verification = await verifyContactPerson({
+          email: contact.email,
+          company,
+        });
+        if (!verification) continue;
+        await ctx.db
+          .update(leadContactTable)
+          .set({ verification })
+          .where(eq(leadContactTable.id, contact.id));
+        const local = byId.get(contact.id);
+        if (local) local.verification = verification;
+        verified++;
+      }
+
+      const contactChannel = parseContactChannel(
+        (row.enrichment as { contactChannel?: unknown } | null)?.contactChannel,
+      );
+
+      return {
+        attempted: toVerify.length,
+        verified,
+        minervaConfigured: isMinervaConfigured,
+        channelScore: scoreLeadChannel({
+          domain: row.domain,
+          contactChannel,
+          contacts: [...byId.values()],
         }),
       };
     }),

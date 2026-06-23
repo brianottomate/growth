@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { LeadContactVerification } from "@/server/db/leads-schema";
+
 export type LeadChannelRoute = "instantly" | "form" | "none";
 export type LeadChannelVerdict = "send" | "review" | "form" | "skip";
 
@@ -10,6 +12,8 @@ export type StoredLeadContact = {
   lastName: string | null;
   jobTitle: string | null;
   verificationStatus?: string | null;
+  // Person-verification evidence from the trust layer (Minerva geo + LinkedIn).
+  verification?: LeadContactVerification | null;
 };
 
 export type ResolvedContactChannel = {
@@ -61,6 +65,11 @@ const TIMEOUT_MS = 10_000;
 
 function isFreemail(email: string): boolean {
   return FREEMAIL.test(email);
+}
+
+/** Public freemail check — used to pick which contacts are worth verifying. */
+export function isFreemailEmail(email: string): boolean {
+  return isFreemail(email);
 }
 
 function isCorporateForDomain(email: string, domain: string): boolean {
@@ -219,6 +228,36 @@ export function scoreStoredContact(
   }
   if (contact.verificationStatus) {
     reasons.push(`verification: ${contact.verificationStatus}`);
+  }
+
+  // Trust layer: person-verification evidence (Minerva geo + LinkedIn).
+  // Geo match is the primary promoter — the playbook's rule is "send only where
+  // Minerva geo matches the company area". A mismatch is a *soft* downgrade, not
+  // a hard block: STR owners are frequently remote from their rentals.
+  const v = contact.verification;
+  if (v) {
+    if (v.geoMatch === "match") {
+      score += 35;
+      reasons.push("Minerva geo matches company area");
+    } else if (v.geoMatch === "mismatch") {
+      score -= 25;
+      const where = v.minerva?.city ?? v.minerva?.state ?? "another area";
+      risks.push(`person appears to be in ${where}`);
+    } else if (v.minerva && !v.minerva.isMatch) {
+      risks.push("Minerva could not resolve this person");
+    }
+
+    if (v.companyMatch === "match") {
+      score += 30;
+      reasons.push("LinkedIn current company matches");
+    } else if (v.companyMatch === "mismatch") {
+      score -= 20;
+      risks.push(
+        v.linkedin?.currentCompany
+          ? `LinkedIn shows a different employer (${v.linkedin.currentCompany})`
+          : "LinkedIn shows a different employer",
+      );
+    }
   }
 
   return {

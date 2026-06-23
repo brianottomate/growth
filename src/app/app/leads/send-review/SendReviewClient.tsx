@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
@@ -149,14 +150,18 @@ function ReviewRowItem({
   row,
   onResolve,
   onGenerate,
+  onVerify,
   resolving,
   generating,
+  verifying,
 }: {
   row: ReviewRow;
   onResolve: (domainId: string) => void;
   onGenerate: (domainId: string) => void;
+  onVerify: (domainId: string) => void;
   resolving: boolean;
   generating: boolean;
+  verifying: boolean;
 }) {
   const bestEmail = row.channelScore.bestEmail;
   const location = [row.city, row.state, row.country]
@@ -289,6 +294,19 @@ function ReviewRowItem({
               )}
               {row.outreach ? "Regenerate sequence" : "Generate sequence"}
             </button>
+            <button
+              onClick={() => onVerify(row.id)}
+              disabled={verifying}
+              title="Minerva geo + LinkedIn check on freemail contacts"
+              className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+            >
+              {verifying ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="size-3.5" />
+              )}
+              Verify people
+            </button>
           </div>
         </div>
 
@@ -338,6 +356,11 @@ export function SendReviewClient() {
   );
   const generate = useMutation(
     trpc.leads.generateOutreach.mutationOptions({
+      onSuccess: invalidate,
+    }),
+  );
+  const verify = useMutation(
+    trpc.leads.verifyDomainContacts.mutationOptions({
       onSuccess: invalidate,
     }),
   );
@@ -420,8 +443,12 @@ export function SendReviewClient() {
           generating={
             generate.isPending && generate.variables?.domainId === row.id
           }
+          verifying={
+            verify.isPending && verify.variables?.domainId === row.id
+          }
           onResolve={(domainId) => resolve.mutate({ domainId })}
           onGenerate={(domainId) => generate.mutate({ domainId })}
+          onVerify={(domainId) => verify.mutate({ domainId })}
         />
       ))}
 
