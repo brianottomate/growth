@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
@@ -30,11 +31,51 @@ type Route = "instantly" | "form" | "none";
 const fmt = (n: number | null | undefined) =>
   n == null ? "-" : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`;
 
-const verdictStyles: Record<Verdict, string> = {
-  send: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-  review: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-  form: "border-sky-500/30 bg-sky-500/10 text-sky-300",
-  skip: "border-red-500/30 bg-red-500/10 text-red-300",
+// Verdict drives the whole row's visual language: a colored left rail, the
+// score-ring border, the plain-language verb, and the badge. Skip is neutral
+// grey (not red) — a skip isn't an error, it's just "not this one".
+type VerdictTheme = {
+  rail: string;
+  border: string;
+  text: string;
+  badge: string;
+  verb: string;
+  Icon: LucideIcon;
+};
+
+const verdictTheme: Record<Verdict, VerdictTheme> = {
+  send: {
+    rail: "bg-emerald-500",
+    border: "border-emerald-500",
+    text: "text-emerald-400",
+    badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    verb: "Send now",
+    Icon: CheckCircle2,
+  },
+  review: {
+    rail: "bg-amber-500",
+    border: "border-amber-500",
+    text: "text-amber-400",
+    badge: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    verb: "Needs a look",
+    Icon: Mail,
+  },
+  form: {
+    rail: "bg-sky-500",
+    border: "border-sky-500",
+    text: "text-sky-400",
+    badge: "border-sky-500/30 bg-sky-500/10 text-sky-300",
+    verb: "Use contact form",
+    Icon: FileText,
+  },
+  skip: {
+    rail: "bg-muted-foreground/40",
+    border: "border-muted-foreground/50",
+    text: "text-muted-foreground",
+    badge: "border-border bg-muted text-muted-foreground",
+    verb: "Skip",
+    Icon: ShieldAlert,
+  },
 };
 
 function Pill({
@@ -57,24 +98,6 @@ function Pill({
     >
       {children}
     </button>
-  );
-}
-
-function ScoreBadge({ row }: { row: ReviewRow }) {
-  const verdict = row.channelScore.verdict;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${verdictStyles[verdict]}`}
-    >
-      {verdict === "send" ? (
-        <CheckCircle2 className="size-3" />
-      ) : verdict === "skip" ? (
-        <ShieldAlert className="size-3" />
-      ) : (
-        <Mail className="size-3" />
-      )}
-      {verdict} · {row.channelScore.score}
-    </span>
   );
 }
 
@@ -168,16 +191,38 @@ function ReviewRowItem({
     .filter(Boolean)
     .join(", ");
 
+  const theme = verdictTheme[row.channelScore.verdict];
+
   return (
-    <section className="border-border border-t py-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,1.2fr)]">
-        <div className="min-w-0 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+    <section className="bg-card mb-3.5 flex overflow-hidden rounded-xl border">
+      <span className={`w-1 shrink-0 ${theme.rail}`} aria-hidden />
+      <div className="min-w-0 flex-1 space-y-5 p-5">
+        {/* decision header — the verdict is the hero */}
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
+          <div className="flex min-w-0 gap-3.5">
+            <div
+              className={`grid size-11 shrink-0 place-items-center rounded-full border-2 ${theme.border}`}
+            >
+              <span className="text-foreground text-base font-medium tabular-nums">
+                {row.channelScore.score}
+              </span>
+            </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
+                <span className={`text-sm font-medium ${theme.text}`}>
+                  {theme.verb}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${theme.badge}`}
+                >
+                  <theme.Icon className="size-3" />
+                  {row.channelScore.verdict}
+                </span>
+              </div>
+              <div className="mt-1 flex min-w-0 items-center gap-1.5">
                 <Link
                   href={`/app/leads?lead=${encodeURIComponent(row.domain)}`}
-                  className="font-semibold hover:underline"
+                  className="truncate font-medium hover:underline"
                 >
                   {row.domain}
                 </Link>
@@ -185,142 +230,149 @@ function ReviewRowItem({
                   href={`https://${row.domain}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground shrink-0"
                 >
                   <ArrowUpRight className="size-3.5" />
                 </a>
-                <ScoreBadge row={row} />
-              </div>
-              <div className="text-muted-foreground mt-0.5 text-xs">
-                {row.companyName ?? "Unknown company"}
-                {location ? ` · ${location}` : ""}
-              </div>
-            </div>
-            <div className="text-muted-foreground text-right text-xs tabular-nums">
-              <div>fit {fmt(row.scorePregenPotential)}</div>
-              <div>
-                units {fmt(row.unitEstimate)}
-                {row.unitConfidence ? ` · ${row.unitConfidence}` : ""}
+                <span className="text-muted-foreground truncate text-xs">
+                  · {row.companyName ?? "Unknown company"}
+                  {location ? ` · ${location}` : ""}
+                </span>
               </div>
             </div>
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="text-muted-foreground shrink-0 text-right text-xs tabular-nums">
+            <div>fit {fmt(row.scorePregenPotential)}</div>
             <div>
-              <div className="text-muted-foreground text-[11px] font-medium">
-                Selected channel
-              </div>
-              <div className="mt-1 text-sm">
-                {bestEmail ? (
-                  <span className="font-medium">{bestEmail}</span>
-                ) : row.channelScore.route === "form" ? (
-                  <span className="font-medium">Contact form</span>
-                ) : (
-                  <span className="text-muted-foreground">Not resolved</span>
-                )}
-              </div>
-              <div className="text-muted-foreground mt-0.5 text-[11px]">
-                {row.channelScore.route} · {row.contactCount} stored contacts
-              </div>
+              units {fmt(row.unitEstimate)}
+              {row.unitConfidence ? ` · ${row.unitConfidence}` : ""}
             </div>
-            <div>
-              <div className="text-muted-foreground text-[11px] font-medium">
-                Evidence
-              </div>
-              <div className="mt-1">
-                <EvidenceList row={row} />
-              </div>
-            </div>
-          </div>
-
-          {row.channelScore.candidates.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="text-muted-foreground text-left">
-                  <tr>
-                    <th className="py-1 pr-3 font-medium">Candidate</th>
-                    <th className="px-3 py-1 font-medium">Source</th>
-                    <th className="px-3 py-1 text-right font-medium">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {row.channelScore.candidates.slice(0, 4).map((candidate) => (
-                    <tr key={`${candidate.kind}-${candidate.email}`}>
-                      <td className="border-t py-1 pr-3">
-                        <div className="font-medium">{candidate.email}</div>
-                        {(candidate.name || candidate.title) && (
-                          <div className="text-muted-foreground">
-                            {[candidate.name, candidate.title]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </div>
-                        )}
-                      </td>
-                      <td className="text-muted-foreground border-t px-3 py-1">
-                        {candidate.kind}
-                      </td>
-                      <td className="border-t px-3 py-1 text-right tabular-nums">
-                        {candidate.score}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => onResolve(row.id)}
-              disabled={resolving}
-              className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-            >
-              {resolving ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="size-3.5" />
-              )}
-              Resolve channel
-            </button>
-            <button
-              onClick={() => onGenerate(row.id)}
-              disabled={generating}
-              className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-            >
-              {generating ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="size-3.5" />
-              )}
-              {row.outreach ? "Regenerate sequence" : "Generate sequence"}
-            </button>
-            <button
-              onClick={() => onVerify(row.id)}
-              disabled={verifying}
-              title="Minerva geo + LinkedIn check on freemail contacts"
-              className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
-            >
-              {verifying ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <ShieldCheck className="size-3.5" />
-              )}
-              Verify people
-            </button>
           </div>
         </div>
 
-        <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-            <FileText className="size-4" />
-            Sequence
-            {row.outreach?.status && (
-              <span className="text-muted-foreground text-xs font-normal">
-                {row.outreach.status}
-              </span>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,1.15fr)]">
+          <div className="min-w-0 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <div className="text-muted-foreground text-[11px] font-medium">
+                  Selected channel
+                </div>
+                <div className="mt-1 text-sm">
+                  {bestEmail ? (
+                    <span className="font-medium">{bestEmail}</span>
+                  ) : row.channelScore.route === "form" ? (
+                    <span className="font-medium">Contact form</span>
+                  ) : (
+                    <span className="text-muted-foreground">Not resolved</span>
+                  )}
+                </div>
+                <div className="text-muted-foreground mt-0.5 text-[11px]">
+                  {row.channelScore.route} · {row.contactCount} stored contacts
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-[11px] font-medium">
+                  Evidence
+                </div>
+                <div className="mt-1">
+                  <EvidenceList row={row} />
+                </div>
+              </div>
+            </div>
+
+            {row.channelScore.candidates.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="text-muted-foreground text-left">
+                    <tr>
+                      <th className="py-1 pr-3 font-medium">Candidate</th>
+                      <th className="px-3 py-1 font-medium">Source</th>
+                      <th className="px-3 py-1 text-right font-medium">
+                        Score
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {row.channelScore.candidates
+                      .slice(0, 4)
+                      .map((candidate) => (
+                        <tr key={`${candidate.kind}-${candidate.email}`}>
+                          <td className="border-t py-1 pr-3">
+                            <div className="font-medium">{candidate.email}</div>
+                            {(candidate.name || candidate.title) && (
+                              <div className="text-muted-foreground">
+                                {[candidate.name, candidate.title]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </div>
+                            )}
+                          </td>
+                          <td className="text-muted-foreground border-t px-3 py-1">
+                            {candidate.kind}
+                          </td>
+                          <td className="border-t px-3 py-1 text-right tabular-nums">
+                            {candidate.score}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             )}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => onResolve(row.id)}
+                disabled={resolving}
+                className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                {resolving ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3.5" />
+                )}
+                Resolve channel
+              </button>
+              <button
+                onClick={() => onGenerate(row.id)}
+                disabled={generating}
+                className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                {generating ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3.5" />
+                )}
+                {row.outreach ? "Regenerate sequence" : "Generate sequence"}
+              </button>
+              <button
+                onClick={() => onVerify(row.id)}
+                disabled={verifying}
+                title="Minerva geo + LinkedIn check on freemail contacts"
+                className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              >
+                {verifying ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <ShieldCheck className="size-3.5" />
+                )}
+                Verify people
+              </button>
+            </div>
           </div>
-          <SequencePreview row={row} />
+
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <FileText className="size-4" />
+              Sequence
+              {row.outreach?.status && (
+                <span className="text-muted-foreground text-xs font-normal">
+                  {row.outreach.status}
+                </span>
+              )}
+            </div>
+            <SequencePreview row={row} />
+          </div>
         </div>
       </div>
     </section>
@@ -366,13 +418,11 @@ export function SendReviewClient() {
   );
 
   return (
-    <div>
+    <div className="mx-auto max-w-[1100px]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Send review
-            </h1>
+          <div className="flex items-baseline gap-2.5">
+            <h1 className="text-3xl font-medium tracking-tight">Send review</h1>
             <Link
               href="/app/leads"
               className="text-muted-foreground text-xs hover:underline"
@@ -380,8 +430,9 @@ export function SendReviewClient() {
               Leads
             </Link>
           </div>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Enriched net-new domains with channel confidence and draft sequences.
+          <p className="text-muted-foreground mt-2 text-sm">
+            Enriched net-new domains with channel confidence and draft
+            sequences.
           </p>
         </div>
         <div className="text-muted-foreground text-right text-xs">
@@ -443,9 +494,7 @@ export function SendReviewClient() {
           generating={
             generate.isPending && generate.variables?.domainId === row.id
           }
-          verifying={
-            verify.isPending && verify.variables?.domainId === row.id
-          }
+          verifying={verify.isPending && verify.variables?.domainId === row.id}
           onResolve={(domainId) => resolve.mutate({ domainId })}
           onGenerate={(domainId) => generate.mutate({ domainId })}
           onVerify={(domainId) => verify.mutate({ domainId })}
