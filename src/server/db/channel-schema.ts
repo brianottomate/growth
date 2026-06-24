@@ -35,6 +35,8 @@ export const channelPlatformEnum = pgEnum("channel_platform", [
   "google_ads",
   "meta_ads",
   "openai_ads",
+  "reddit_ads",
+  "linkedin_ads",
   // owned content surfaces
   "newsletter",
   "blog",

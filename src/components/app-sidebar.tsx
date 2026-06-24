@@ -24,6 +24,7 @@ import {
   Monitor,
   Moon,
   Newspaper,
+  Crosshair,
   Plus,
   Radar,
   Repeat,
@@ -103,6 +104,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Newsletters", href: "/app/newsletters", icon: Mail },
       { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
       { label: "Audiences", href: "/app/audiences", icon: Target },
+      { label: "Ads", href: "/app/ads", icon: Crosshair },
     ],
   },
   {

@@ -50,6 +50,8 @@ export const PLATFORM_META: Record<string, { name: string; code: string }> = {
   google_ads: { name: "Google Ads", code: "GA" },
   meta_ads: { name: "Meta Ads", code: "MA" },
   openai_ads: { name: "OpenAI Ads", code: "AI" },
+  reddit_ads: { name: "Reddit Ads", code: "RA" },
+  linkedin_ads: { name: "LinkedIn Ads", code: "LA" },
   newsletter: { name: "Newsletter", code: "NL" },
   blog: { name: "Blog", code: "BL" },
   other: { name: "Other", code: "··" },

@@ -6,6 +6,7 @@ import { cadenceRouter } from "@/server/api/routers/cadence.router";
 import { channelRouter } from "@/server/api/routers/channel.router";
 import { channelSuggestionRouter } from "@/server/api/routers/channelSuggestion.router";
 import { contentRouter } from "@/server/api/routers/content.router";
+import { conversionRouter } from "@/server/api/routers/conversion.router";
 import { inboxRouter } from "@/server/api/routers/inbox.router";
 import { initiativeRouter } from "@/server/api/routers/initiative.router";
 import { newsletterRouter } from "@/server/api/routers/newsletter.router";
@@ -38,6 +39,7 @@ export const appRouter = createTRPCRouter({
   channel: channelRouter,
   channelSuggestion: channelSuggestionRouter,
   content: contentRouter,
+  conversion: conversionRouter,
   inbox: inboxRouter,
   initiative: initiativeRouter,
   newsletter: newsletterRouter,

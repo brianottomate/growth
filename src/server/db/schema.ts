@@ -11,6 +11,7 @@ export * from "./brand-schema";
 export * from "./channel-schema";
 export * from "./content-schema";
 export * from "./ads-schema";
+export * from "./conversions-schema";
 export * from "./amplification-schema";
 export * from "./cadence-schema";
 export * from "./leads-schema";
