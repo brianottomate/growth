@@ -28,7 +28,8 @@ export type CapabilityDomain =
   | "brands"
   | "content"
   | "leads"
-  | "listening";
+  | "listening"
+  | "ads";
 
 export interface Capability<
   I extends z.ZodTypeAny = z.ZodTypeAny,

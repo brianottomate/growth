@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AnyCapability } from "./types";
+import { adsScope, topAds } from "./ads";
 import { listBrands } from "./brands";
 import { contentPipelineSummary, upcomingContent } from "./content";
 import { leadsSummary } from "./leads";
@@ -23,4 +24,7 @@ export const OVERVIEW_CAPABILITIES: AnyCapability[] = [
   upcomingContent,
   leadsSummary,
   recentMentions,
+  // Ads: scope FIRST (cheap lay-of-the-land), then drill with topAds.
+  adsScope,
+  topAds,
 ];

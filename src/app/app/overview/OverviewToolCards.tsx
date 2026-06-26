@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   CalendarClock,
@@ -9,13 +11,18 @@ import {
   Layers,
   Loader2,
   type LucideIcon,
+  Megaphone,
   MessageCircle,
   Radio,
   Sparkles,
+  Target,
+  TrendingUp,
   Users,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CopyButton } from "@/components/copy-button";
+import { type RouterInputs, type RouterOutputs, useTRPC } from "@/trpc/react";
 
 /**
  * Typed result cards for the /overview assistant's read-only tools.
@@ -90,6 +97,69 @@ export interface MentionsOutput {
     status: string;
     receivedAt: string | null;
   }[];
+}
+
+// Ads — mirror src/server/services/ads-analytics.service.ts return shapes.
+type AdsBucket = {
+  key: string;
+  ads: number;
+  impressions: number;
+  clicks: number;
+  engagement: number;
+  spend: number;
+  ctr: number; // 0..1
+};
+
+export interface AdsScopeOutput {
+  window: { fromDate: string; toDate: string };
+  account: { id?: string; name?: string };
+  totals: {
+    ads: number;
+    allAds: number;
+    impressions: number;
+    clicks: number;
+    ctr: number; // 0..1
+    spend: number;
+    engagement: number;
+    conversions: number;
+  };
+  byMonth: { month: string; ads: number; impressions: number; clicks: number; spend: number }[];
+  byObjective: AdsBucket[];
+  byDestination: AdsBucket[];
+  flags: { hasAuditAds: boolean; hasOsAds: boolean };
+}
+
+export interface RankedAd {
+  id: string;
+  name: string | null;
+  campaign: string | null;
+  objective: string;
+  destination: string;
+  status: string | null;
+  link: string | null;
+  thumbnailUrl: string | null;
+  created: string | null;
+  impressions: number;
+  clicks: number;
+  ctr: number; // percent
+  engagement: number;
+  spend: number;
+  conversions: number;
+  cpc: number;
+  body: string;
+}
+
+export interface AdsRankedOutput {
+  window: { fromDate: string; toDate: string };
+  filters: {
+    objective?: string;
+    destination?: string;
+    status: string;
+    metric: string;
+    limit: number;
+  };
+  matched: number;
+  ads: RankedAd[];
 }
 
 // ── Shared primitives ──────────────────────────────────────────────────────
@@ -502,6 +572,378 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
               </li>
             );
           })}
+        </ul>
+      )}
+    </ToolCard>
+  );
+}
+
+// ── Ads cards ──────────────────────────────────────────────────────────────
+
+const OBJECTIVE_LABEL: Record<string, string> = {
+  OUTCOME_SALES: "Sales · consumer",
+  OUTCOME_LEADS: "Leads · PM/WanderOS",
+  OUTCOME_AWARENESS: "Awareness",
+  OUTCOME_TRAFFIC: "Traffic",
+  OUTCOME_ENGAGEMENT: "Engagement",
+  OUTCOME_APP_PROMOTION: "App promotion",
+  POST_ENGAGEMENT: "Post engagement",
+  "(none)": "Uncategorized",
+};
+const objectiveLabel = (o: string) => OBJECTIVE_LABEL[o] ?? o;
+
+const DESTINATION_LABEL: Record<string, string> = {
+  audit: "Audit",
+  os: "WanderOS · /os",
+  list: "List",
+  marketplace: "Marketplace",
+  "other-link": "Other link",
+  "lead-form": "Lead form · on-Meta",
+  engagement: "Engagement",
+  unknown: "No link surfaced",
+};
+const destinationLabel = (d: string) => DESTINATION_LABEL[d] ?? d;
+
+const METRIC_LABEL: Record<string, string> = {
+  impressions: "impressions",
+  clicks: "clicks",
+  ctr: "CTR",
+  engagement: "engagement",
+  spend: "spend",
+};
+
+const fmtUsd = (n: number) =>
+  n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${fmtNum(Math.round(n))}`;
+
+const fmtPct = (ratio: number) => `${(ratio * 100).toFixed(2)}%`;
+
+const fmtMonth = (ym: string) => {
+  const [y, m] = ym.split("-");
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  if (Number.isNaN(d.getTime())) return ym;
+  return d.toLocaleDateString("en-US", { month: "short" }) + ` '${y?.slice(2)}`;
+};
+
+const fmtWindow = (w: { fromDate: string; toDate: string }) => {
+  const f = new Date(w.fromDate);
+  const t = new Date(w.toDate);
+  const opt: Intl.DateTimeFormatOptions = { month: "short", year: "numeric" };
+  return `${f.toLocaleDateString("en-US", opt)} – ${t.toLocaleDateString("en-US", opt)}`;
+};
+
+/** label · bar · value/CTR row, reused for objective + destination breakdowns. */
+function BreakdownBars({
+  rows,
+  label,
+  max,
+}: {
+  rows: AdsBucket[];
+  label: (key: string) => string;
+  max: number;
+}) {
+  return (
+    <div className="space-y-1.5">
+      {rows.map((r) => (
+        <div key={r.key} className="flex items-center gap-2 text-xs">
+          <span className="w-32 shrink-0 truncate">{label(r.key)}</span>
+          <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+            <div
+              className="bg-primary/60 h-full rounded-full"
+              style={{ width: `${(r.impressions / max) * 100}%` }}
+            />
+          </div>
+          <span className="text-muted-foreground w-28 shrink-0 text-right tabular-nums">
+            {fmtNum(r.impressions)} · {fmtPct(r.ctr)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** `adsScope` — totals + destination/objective breakdowns + audit flag. */
+export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
+  const { totals, byDestination, byObjective, byMonth, flags, window } = output;
+  const destMax = Math.max(1, ...byDestination.map((d) => d.impressions));
+  const objMax = Math.max(1, ...byObjective.map((o) => o.impressions));
+  const monthMax = Math.max(1, ...byMonth.map((m) => m.impressions));
+  return (
+    <ToolCard
+      icon={Megaphone}
+      title="Ad performance"
+      hint={fmtWindow(window)}
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat label="Impressions" value={fmtNum(totals.impressions)} />
+        <Stat label="Clicks" value={fmtNum(totals.clicks)} sub={fmtPct(totals.ctr)} />
+        <Stat label="Spend" value={fmtUsd(totals.spend)} />
+        <Stat
+          label="Ads delivered"
+          value={fmtNum(totals.ads)}
+          sub={`of ${fmtNum(totals.allAds)}`}
+        />
+      </div>
+
+      {!flags.hasAuditAds && (
+        <p className="mt-3 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+          No <span className="font-medium">audit</span>-destination ads ran in this window — that angle would be net-new.
+        </p>
+      )}
+
+      {byDestination.length > 0 && (
+        <div className="mt-3 border-t pt-3">
+          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+            By destination · impressions · CTR
+          </p>
+          <BreakdownBars rows={byDestination} label={destinationLabel} max={destMax} />
+        </div>
+      )}
+
+      {byObjective.length > 0 && (
+        <div className="mt-3 border-t pt-3">
+          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+            By objective
+          </p>
+          <BreakdownBars rows={byObjective} label={objectiveLabel} max={objMax} />
+        </div>
+      )}
+
+      {byMonth.length > 1 && (
+        <div className="mt-3 border-t pt-3">
+          <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
+            Impressions by launch month
+          </p>
+          <div className="flex items-end gap-1" style={{ height: 40 }}>
+            {byMonth.map((m) => (
+              <div
+                key={m.month}
+                className="flex flex-1 flex-col items-center justify-end gap-1"
+                title={`${fmtMonth(m.month)}: ${fmtNum(m.impressions)} impr · ${fmtUsd(m.spend)}`}
+              >
+                <div
+                  className="bg-primary/50 w-full rounded-sm"
+                  style={{ height: `${Math.max(2, (m.impressions / monthMax) * 32)}px` }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </ToolCard>
+  );
+}
+
+const DEST_CHIP =
+  "rounded-full border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground";
+
+/** A single ranked-ad row: thumbnail + name + metrics + truncated copy. */
+function RankedAdRow({ ad }: { ad: RankedAd }) {
+  const link = ad.link ?? undefined;
+  const Name = (
+    <span className="truncate text-sm font-medium" title={ad.name ?? undefined}>
+      {ad.name ?? "(unnamed ad)"}
+    </span>
+  );
+  return (
+    <li className="flex gap-3 py-2.5 first:pt-0 last:pb-0">
+      {ad.thumbnailUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={ad.thumbnailUrl}
+          alt=""
+          className="bg-muted size-12 shrink-0 rounded-md object-cover"
+        />
+      ) : (
+        <div className="bg-muted grid size-12 shrink-0 place-items-center rounded-md">
+          <Megaphone className="text-muted-foreground h-4 w-4" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          {link ? (
+            <a
+              href={link}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:underline truncate text-sm font-medium"
+              title={ad.name ?? undefined}
+            >
+              {ad.name ?? "(unnamed ad)"}
+            </a>
+          ) : (
+            Name
+          )}
+          <span className={DEST_CHIP}>{destinationLabel(ad.destination)}</span>
+        </div>
+        <p className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] tabular-nums">
+          <span>{fmtNum(ad.impressions)} impr</span>
+          <span>· {fmtNum(ad.clicks)} clicks</span>
+          <span>· {ad.ctr}% CTR</span>
+          <span>· {fmtNum(ad.engagement)} eng</span>
+          <span>· {fmtUsd(ad.spend)}</span>
+          {ad.created && <span>· {ad.created}</span>}
+        </p>
+        {ad.body && (
+          <p className="text-muted-foreground/90 mt-1 line-clamp-2 text-xs italic">
+            “{ad.body}”
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function rankedDigest(out: AdsRankedOutput): string {
+  const lines = [
+    `# Wander top ads — ${fmtWindow(out.window)}`,
+    `Ranked by ${METRIC_LABEL[out.filters.metric] ?? out.filters.metric}` +
+      `${out.filters.objective ? ` · objective ${out.filters.objective}` : ""}` +
+      `${out.filters.destination ? ` · destination ${out.filters.destination}` : ""}` +
+      ` · ${out.matched} matched`,
+    "",
+    ...out.ads.map(
+      (a, i) =>
+        `${i + 1}. [${destinationLabel(a.destination)}] ${a.name ?? "(unnamed)"} — ` +
+        `${fmtNum(a.impressions)} impr, ${fmtNum(a.clicks)} clicks, ${a.ctr}% CTR, ${fmtUsd(a.spend)}` +
+        `${a.body ? `\n   "${a.body}"` : ""}`,
+    ),
+  ];
+  return lines.join("\n");
+}
+
+type TopAdsInput = RouterInputs["ads"]["topAds"];
+type Metric = NonNullable<TopAdsInput["metric"]>;
+type StatusFilter = NonNullable<TopAdsInput["status"]>;
+
+const METRIC_OPTIONS: Metric[] = ["impressions", "clicks", "ctr", "engagement", "spend"];
+const STATUS_OPTIONS: StatusFilter[] = ["all", "active", "non-paused"];
+const OBJECTIVE_OPTIONS = [
+  "OUTCOME_SALES",
+  "OUTCOME_LEADS",
+  "OUTCOME_AWARENESS",
+  "OUTCOME_TRAFFIC",
+  "OUTCOME_ENGAGEMENT",
+] as const;
+const DESTINATION_OPTIONS = Object.keys(DESTINATION_LABEL);
+
+/** Compact native select styled to match the card chrome. */
+function MiniSelect({
+  value,
+  onChange,
+  children,
+  title,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <select
+      title={title}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="border-border bg-background text-foreground h-7 rounded-md border px-1.5 text-[11px]"
+    >
+      {children}
+    </select>
+  );
+}
+
+/**
+ * `topAds` — ranked creative rows with INTERACTIVE controls (Tier 2). First
+ * paint is the chat tool's output (seeded as `initialData`); changing a control
+ * refetches in place through the `ads` tRPC router — same compute, no LLM
+ * round-trip, no new chat messages.
+ */
+export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
+  const trpc = useTRPC();
+  const [metric, setMetric] = useState<Metric>(output.filters.metric as Metric);
+  const [status, setStatus] = useState<StatusFilter>(
+    output.filters.status as StatusFilter,
+  );
+  const [objective, setObjective] = useState(output.filters.objective ?? "");
+  const [destination, setDestination] = useState(output.filters.destination ?? "");
+
+  const input: TopAdsInput = {
+    fromDate: output.window.fromDate,
+    toDate: output.window.toDate,
+    objective: objective || undefined,
+    destination: (destination || undefined) as TopAdsInput["destination"],
+    status,
+    metric,
+    limit: output.filters.limit,
+  };
+
+  const { data, isFetching } = useQuery({
+    ...trpc.ads.topAds.queryOptions(input),
+    initialData: output as RouterOutputs["ads"]["topAds"],
+  });
+
+  const view: AdsRankedOutput = data ?? output;
+  const { ads, matched, window } = view;
+
+  return (
+    <ToolCard
+      icon={TrendingUp}
+      title={`Top ads · by ${METRIC_LABEL[metric] ?? metric}`}
+      hint={`${ads.length} of ${matched}`}
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        <MiniSelect value={metric} onChange={(v) => setMetric(v as Metric)} title="Rank by">
+          {METRIC_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              by {METRIC_LABEL[m] ?? m}
+            </option>
+          ))}
+        </MiniSelect>
+        <MiniSelect
+          value={objective}
+          onChange={setObjective}
+          title="Objective"
+        >
+          <option value="">All funnels</option>
+          {OBJECTIVE_OPTIONS.map((o) => (
+            <option key={o} value={o}>
+              {objectiveLabel(o)}
+            </option>
+          ))}
+        </MiniSelect>
+        <MiniSelect
+          value={destination}
+          onChange={setDestination}
+          title="Destination"
+        >
+          <option value="">Any destination</option>
+          {DESTINATION_OPTIONS.map((d) => (
+            <option key={d} value={d}>
+              {destinationLabel(d)}
+            </option>
+          ))}
+        </MiniSelect>
+        <MiniSelect value={status} onChange={(v) => setStatus(v as StatusFilter)} title="Status">
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </MiniSelect>
+        {isFetching && <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" />}
+        <span className="ml-auto">
+          {ads.length > 0 && <CopyButton text={rankedDigest(view)} label="Copy" />}
+        </span>
+      </div>
+      <p className="text-muted-foreground mb-1 flex items-center gap-1 text-[11px]">
+        <Target className="h-3 w-3" />
+        {fmtWindow(window)}
+      </p>
+      {ads.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No ads match this scope.</p>
+      ) : (
+        <ul className="divide-y">
+          {ads.map((ad) => (
+            <RankedAdRow key={ad.id} ad={ad} />
+          ))}
         </ul>
       )}
     </ToolCard>

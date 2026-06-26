@@ -1,4 +1,5 @@
 import { userRouter } from "@/server/api/routers/user.router";
+import { adsRouter } from "@/server/api/routers/ads.router";
 import { amplifierRouter } from "@/server/api/routers/amplifier.router";
 import { audienceRouter } from "@/server/api/routers/audience.router";
 import { brandRouter } from "@/server/api/routers/brand.router";
@@ -32,6 +33,7 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   user: userRouter,
+  ads: adsRouter,
   amplifier: amplifierRouter,
   audience: audienceRouter,
   brand: brandRouter,

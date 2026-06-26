@@ -30,6 +30,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import {
+  AdsRankedCard,
+  AdsScopeCard,
   BrandsCard,
   ContentPipelineCard,
   GenericToolCard,
@@ -38,6 +40,8 @@ import {
   ToolCallPending,
   UpcomingContentCard,
   WorkspaceOverviewCard,
+  type AdsRankedOutput,
+  type AdsScopeOutput,
   type ContentPipelineOutput,
   type LeadsSummaryOutput,
   type ListBrandsOutput,
@@ -67,6 +71,8 @@ const PENDING_LABELS: Record<string, string> = {
   upcomingContent: "Checking the calendar…",
   leadsSummary: "Tallying the leads pool…",
   recentMentions: "Scanning the listening queue…",
+  adsScope: "Scanning ad performance…",
+  topAds: "Ranking ads…",
 };
 
 /** Friendly fallback names for tools that error/deny before producing a card. */
@@ -77,6 +83,8 @@ const TOOL_LABELS: Record<string, string> = {
   upcomingContent: "Coming up",
   leadsSummary: "Leads pool",
   recentMentions: "Social mentions",
+  adsScope: "Ad performance",
+  topAds: "Top ads",
 };
 
 const STARTERS: { icon: LucideIcon; text: string }[] = [
@@ -448,6 +456,10 @@ function renderToolPart(part: ToolUIPart, key: string) {
       );
     case "recentMentions":
       return <MentionsCard key={key} output={part.output as MentionsOutput} />;
+    case "adsScope":
+      return <AdsScopeCard key={key} output={part.output as AdsScopeOutput} />;
+    case "topAds":
+      return <AdsRankedCard key={key} output={part.output as AdsRankedOutput} />;
     default:
       return <GenericToolCard key={key} name={toolName} output={part.output} />;
   }

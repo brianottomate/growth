@@ -670,15 +670,29 @@ export type ZernioAdsTreeCampaign = {
 
 // Paginates per docs: page (1-based), limit max 100, paginated at campaign level.
 // https://docs.zernio.com/ad-campaigns/get-ad-tree
-export async function getZernioAdsTree(): Promise<ZernioAdsTreeCampaign[]> {
+//
+// `metrics` default to the LAST 90 DAYS unless an explicit window is passed
+// (fromDate/toDate, YYYY-MM-DD, max 730d). Existing callers (sync, comment
+// fetch) omit the window and keep the 90d default; the analytics layer passes a
+// real window to rank "previous campaigns".
+export async function getZernioAdsTree(
+  options: { fromDate?: string; toDate?: string; status?: string } = {},
+): Promise<ZernioAdsTreeCampaign[]> {
   const all: ZernioAdsTreeCampaign[] = [];
   const limit = 100;
   const maxPages = 50;
 
   for (let page = 1; page <= maxPages; page++) {
-    const data = await zernioFetch<unknown>(
-      `/ads/tree?source=all&page=${page}&limit=${limit}`,
-    );
+    const params = new URLSearchParams({
+      source: "all",
+      page: String(page),
+      limit: String(limit),
+    });
+    if (options.fromDate) params.set("fromDate", options.fromDate);
+    if (options.toDate) params.set("toDate", options.toDate);
+    if (options.status) params.set("status", options.status);
+
+    const data = await zernioFetch<unknown>(`/ads/tree?${params.toString()}`);
 
     let pageItems: ZernioAdsTreeCampaign[] = [];
     let totalPages = 1;
