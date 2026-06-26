@@ -32,6 +32,8 @@ export const CHANNEL_LOGOS: Partial<Record<string, LogoComponent>> = {
   meta_ads: MetaAdsLogo,
   youtube: YouTubeLogo,
   openai_ads: OpenAIAdsLogo,
+  x_ads: XLogo,
+  tiktok_ads: TikTokLogo,
 };
 
 /** Display names + fallback code badges, keyed by channel_platform enum value. */
@@ -52,6 +54,8 @@ export const PLATFORM_META: Record<string, { name: string; code: string }> = {
   openai_ads: { name: "OpenAI Ads", code: "AI" },
   reddit_ads: { name: "Reddit Ads", code: "RA" },
   linkedin_ads: { name: "LinkedIn Ads", code: "LA" },
+  x_ads: { name: "X Ads", code: "XA" },
+  tiktok_ads: { name: "TikTok Ads", code: "TA" },
   newsletter: { name: "Newsletter", code: "NL" },
   blog: { name: "Blog", code: "BL" },
   other: { name: "Other", code: "··" },

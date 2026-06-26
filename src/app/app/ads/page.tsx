@@ -20,6 +20,8 @@ const AD_PLATFORMS = [
   "meta_ads",
   "reddit_ads",
   "linkedin_ads",
+  "x_ads",
+  "tiktok_ads",
 ] as const;
 
 const FUNNELS: { key: ConversionFunnel; label: string; sub: string }[] = [
