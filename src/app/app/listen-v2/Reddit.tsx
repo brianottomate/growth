@@ -623,7 +623,11 @@ function RedditCard({
             </div>
           )}
 
-          <ListenItemActions context={context} mentionId={m.id} />
+          <ListenItemActions
+            context={context}
+            mentionId={m.id}
+            trackedLink={{ id: m.id, source: m.source, subreddit: m.subreddit }}
+          />
         </div>
       )}
 

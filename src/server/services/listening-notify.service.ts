@@ -3,6 +3,7 @@ import "server-only";
 import { env } from "@/env";
 import { postOnSlack } from "@/server/clients/slack.client";
 import type { Mention } from "@/server/db/listening-schema";
+import { buildTrackedLink } from "@/lib/tracked-link";
 
 // #radio-social-listening — the social-listening sibling of wander.com's
 // #listed-inbound-radio / #os-inbound-radio lead channels. Scored mentions worth
@@ -10,6 +11,14 @@ import type { Mention } from "@/server/db/listening-schema";
 // polling /app/listen. (wander.com/src/features/postOnSlack is the lead-radio
 // equivalent this mirrors.)
 const RADIO_SOCIAL_LISTENING_CHANNEL_ID = "C0BAW47LFGF";
+
+// Per-source Slack owner to @-mention on broadcast, so the channel's RACI owner
+// gets pinged on engage-worthy hits instead of having to watch the channel.
+// Reddit only for now — add other sources (x, instagram, …) as they get owners,
+// or lift this onto listening_source if per-brand ownership is ever needed.
+const SOURCE_OWNER_SLACK_ID: Partial<Record<string, string>> = {
+  reddit: "U09K9UDU5FA",
+};
 
 // Keep the channel high-signal: only "engage" mentions ("act today") reach
 // Slack. "monitor"/"skip" and unscored rows stay in the table for the
@@ -24,9 +33,26 @@ function sourceLabel(m: Mention): string {
   return m.source;
 }
 
+// Deep-link the "Open in Listen" link to the room that owns this source, so the
+// jump from Slack lands on the right tab instead of the monitor overview.
+function listenTab(source: string): string {
+  if (source === "reddit") return "reddit";
+  if (source === "instagram") return "instagram";
+  if (source === "twitter") return "x";
+  return "monitor";
+}
+
+function trackedLinkFor(m: Mention): string {
+  return buildTrackedLink({ id: m.id, source: m.source, subreddit: m.subreddit });
+}
+
 function buildBlocks(m: Mention) {
   const where = sourceLabel(m);
   const lines: string[] = [];
+
+  const ownerSlackId = SOURCE_OWNER_SLACK_ID[m.source];
+  if (ownerSlackId) lines.push(`<@${ownerSlackId}> — you're on this one`);
+
   lines.push(`:eyes: New ${where} mention — ${m.title ? `*${m.title}*` : "_(no title)_"}`);
 
   const meta: string[] = [];
@@ -44,9 +70,29 @@ function buildBlocks(m: Mention) {
   if (m.rationale) lines.push(`_${m.rationale}_`);
 
   lines.push(
-    `<${m.url}|View on ${where}> · <${env.NEXT_PUBLIC_BASE_URL}/app/listen|Open in Listen>`,
+    `<${m.url}|View on ${where}> · <${env.NEXT_PUBLIC_BASE_URL}/app/listen-v2?tab=${listenTab(m.source)}|Open in Listen>`,
   );
+  // Copy-pasteable (code span, not a hyperlink) — the point is to drop it into
+  // the reply, not click it. utm_content = mention id → attributed in Amplitude.
+  lines.push(`:link: Tracked link: \`${trackedLinkFor(m)}\``);
 
+  return [
+    {
+      type: "section" as const,
+      text: { type: "mrkdwn" as const, text: lines.join("\n") },
+    },
+  ];
+}
+
+// The action kit, hung off the alert in a thread so the channel stays scannable:
+// the AI-drafted reply to make our own. Only posted when a draft exists.
+function buildThreadBlocks(m: Mention) {
+  const lines = [
+    ":speech_balloon: *Suggested reply* — make it yours, keep it human, and disclose you're with Wander:",
+  ];
+  if (m.suggestedReply) {
+    lines.push(`> ${m.suggestedReply.replace(/\n/g, "\n> ")}`);
+  }
   return [
     {
       type: "section" as const,
@@ -62,12 +108,26 @@ function buildBlocks(m: Mention) {
  * the team can verify the plumbing on any row). Best-effort: returns the
  * postOnSlack result instead of throwing.
  */
-export function postMentionToRadio(m: Mention) {
-  return postOnSlack({
+export async function postMentionToRadio(m: Mention) {
+  const result = await postOnSlack({
     text: `New ${sourceLabel(m)} mention${m.keyword ? ` for "${m.keyword}"` : ""}`,
     channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
     blocks: buildBlocks(m),
   });
+
+  // Best-effort thread: the suggested reply hangs off the alert so the channel
+  // stays a scannable feed. A thread failure must never change the result the
+  // caller sees for the main post, so we don't await-or-throw on it.
+  if (result.success && result.ts && m.suggestedReply) {
+    await postOnSlack({
+      text: "Suggested reply",
+      channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
+      thread_ts: result.ts,
+      blocks: buildThreadBlocks(m),
+    });
+  }
+
+  return result;
 }
 
 /**

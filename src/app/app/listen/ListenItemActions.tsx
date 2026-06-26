@@ -5,7 +5,10 @@ import { useMutation } from "@tanstack/react-query";
 import { Check, Copy, ExternalLink, Send } from "lucide-react";
 
 import { toast } from "@/components/ui/toast";
+import type { TrackedLinkInput } from "@/lib/tracked-link";
 import { useTRPC } from "@/trpc/react";
+
+import { CopyTrackedLink } from "./CopyTrackedLink";
 
 /**
  * Read-only listening posture: instead of a "generate reply" composer that would
@@ -15,13 +18,19 @@ import { useTRPC } from "@/trpc/react";
  * When `mentionId` is set (persisted-mention surfaces like the Reddit room), a
  * "Test → Slack" button force-broadcasts this mention to #radio-social-listening
  * so the team can smoke-test the F5Bot→Slack plumbing on any row.
+ *
+ * When `trackedLink` is set, a "Tracked link" control lets the rep grab a
+ * UTM-tagged wander.com link for this mention — decoupled from the draft, so
+ * it's there whether or not the reply ends up including a link.
  */
 export function ListenItemActions({
   context,
   mentionId,
+  trackedLink,
 }: {
   context: string;
   mentionId?: string;
+  trackedLink?: TrackedLinkInput;
 }) {
   const [copied, setCopied] = useState(false);
   const trpc = useTRPC();
@@ -54,6 +63,7 @@ export function ListenItemActions({
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {trackedLink && <CopyTrackedLink mention={trackedLink} />}
       <button type="button" onClick={copy} className={cls}>
         {copied ? (
           <Check className="h-3 w-3 text-emerald-500" />

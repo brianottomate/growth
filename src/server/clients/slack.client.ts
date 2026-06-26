@@ -310,7 +310,9 @@ interface PostOnSlackMessage {
  */
 export async function postOnSlack(
   message: PostOnSlackMessage,
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<
+  { success: true; ts?: string } | { success: false; error: string }
+> {
   if (!env.SLACK_API_TOKEN) {
     console.warn("⚠️ [Slack] SLACK_API_TOKEN not set — skipping post");
     return { success: false, error: "SLACK_API_TOKEN not set" };
@@ -337,13 +339,18 @@ export async function postOnSlack(
     });
 
     // Slack returns HTTP 200 with { ok: false, error } on logical failures
-    // (bad channel, not_in_channel, invalid_auth), so check both.
-    const data = (await response.json()) as { ok: boolean; error?: string };
+    // (bad channel, not_in_channel, invalid_auth), so check both. `ts` is the
+    // posted message's id — callers thread follow-ups off it (thread_ts).
+    const data = (await response.json()) as {
+      ok: boolean;
+      error?: string;
+      ts?: string;
+    };
     if (!response.ok || !data.ok) {
       console.error("❌ [Slack] chat.postMessage failed:", data);
       return { success: false, error: data.error ?? `HTTP ${response.status}` };
     }
-    return { success: true };
+    return { success: true, ts: data.ts };
   } catch (error) {
     console.error("❌ [Slack] Error posting message:", error);
     return {
