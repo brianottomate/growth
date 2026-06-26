@@ -9,10 +9,6 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/reddit",
-      "schedule": "0 * * * *"
-    },
-    {
       "path": "/api/cron/instagram",
       "schedule": "0 13 * * *"
     }

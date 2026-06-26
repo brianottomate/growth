@@ -14,10 +14,17 @@ const RADIO_SOCIAL_LISTENING_CHANNEL_ID = "C0BAW47LFGF";
 
 // Per-source Slack owner to @-mention on broadcast, so the channel's RACI owner
 // gets pinged on engage-worthy hits instead of having to watch the channel.
-// Reddit only for now — add other sources (x, instagram, …) as they get owners,
-// or lift this onto listening_source if per-brand ownership is ever needed.
+// Keyed by mention.source (note: X is stored as "twitter"). Lift onto
+// listening_source if per-brand ownership is ever needed.
+//
+// Live today: reddit (via F5Bot email) + instagram (via the account-watch cron)
+// both persist→score→broadcast, so their owners fire on real hits. The twitter
+// owner is wired ahead of the pipeline — X is manual-scan-only and doesn't yet
+// persist or notify, so Kyle's tag stays dormant until the X cron lands.
 const SOURCE_OWNER_SLACK_ID: Partial<Record<string, string>> = {
   reddit: "U09K9UDU5FA",
+  twitter: "U025DTBSU01", // Kyle — X / Twitter (dormant until X notifies)
+  instagram: "U0574R1RCD9", // Micaela — Instagram
 };
 
 // Keep the channel high-signal: only "engage" mentions ("act today") reach

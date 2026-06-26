@@ -165,25 +165,31 @@ function RedditSection() {
         Reddit monitoring
       </h2>
       <p className="mt-3 text-base text-gray-600">
-        An hourly Vercel cron polls the Tier 1 STR-operator subreddits, filters
-        new posts against a keyword list, and logs hits to Vercel logs. No
-        persistence yet — review by tailing logs; layer AI scoring + Slack
-        notifications later once we see what kind of signal lands.
+        Reddit mentions are captured by F5Bot, which emails us whenever our
+        keywords surface across Reddit (plus HN and Lobsters). Each alert is
+        scored and the engage-worthy ones broadcast to{" "}
+        <code className="font-mono">#radio-social-listening</code>. The earlier
+        hourly keyword cron was retired — it only logged to Vercel and
+        duplicated what F5Bot now does live. For ad-hoc sweeps of the Tier 1
+        subs, the on-demand live scan lives in Listen.
       </p>
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              Cron: <code className="font-mono text-base">/api/cron/reddit</code>
+              F5Bot →{" "}
+              <code className="font-mono text-base">#radio-social-listening</code>
             </h3>
             <p className="mt-1 text-sm text-gray-600">
-              Runs hourly. Logs go to Vercel runtime logs — filter by{" "}
-              <code className="font-mono">requestPath:/api/cron/reddit</code>.
+              Keyword alerts across Reddit/HN/Lobsters, scored and broadcast to
+              Slack. The hourly{" "}
+              <code className="font-mono">/api/cron/reddit</code> keyword scanner
+              was retired — log-only and redundant with F5Bot.
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900">
-            v1 · log-only
+          <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-900">
+            live · F5Bot
           </span>
         </div>
 
@@ -192,7 +198,7 @@ function RedditSection() {
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
           <div>
             <h4 className="text-sm font-semibold text-gray-900">
-              Subreddits polled
+              Tier 1 subreddits
             </h4>
             <ul className="mt-2 space-y-1 text-sm text-gray-700">
               {SUBREDDITS.map((sub) => (
