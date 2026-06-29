@@ -14,6 +14,8 @@ import {
   FileText,
   Loader2,
   Mail,
+  MessageCircle,
+  Phone,
   RefreshCw,
   Search,
   ShieldAlert,
@@ -25,8 +27,52 @@ import {
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
 type ReviewRow = RouterOutputs["leads"]["sendReview"]["items"][number];
+type Channel = ReviewRow["channels"][number];
 type Verdict = "send" | "review" | "form" | "skip";
 type Route = "instantly" | "form" | "none";
+
+// Captured reachability channels — what `channel-discovery.service` found on the
+// company's own website. In PR1 these are read-only badges; the gated send
+// actions hang off them in PR3.
+const channelMeta: Record<string, { Icon: LucideIcon; label: string }> = {
+  email: { Icon: Mail, label: "email" },
+  phone: { Icon: Phone, label: "phone" },
+  form: { Icon: FileText, label: "form" },
+  chatbot: { Icon: MessageCircle, label: "chat" },
+  sms: { Icon: MessageCircle, label: "sms" },
+};
+
+function ChannelBadges({ channels }: { channels: Channel[] }) {
+  if (!channels.length) {
+    return (
+      <span className="text-muted-foreground text-xs">
+        No channels captured yet
+      </span>
+    );
+  }
+  // One badge per kind, with a count when a domain has several of the same kind.
+  const counts = new Map<string, number>();
+  for (const channel of channels) {
+    counts.set(channel.kind, (counts.get(channel.kind) ?? 0) + 1);
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {[...counts].map(([kind, count]) => {
+        const meta = channelMeta[kind] ?? { Icon: FileText, label: kind };
+        return (
+          <span
+            key={kind}
+            className="border-border text-muted-foreground inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+          >
+            <meta.Icon className="size-3" />
+            {meta.label}
+            {count > 1 ? ` · ${count}` : ""}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 const fmt = (n: number | null | undefined) =>
   n == null ? "-" : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`;
@@ -277,6 +323,15 @@ function ReviewRowItem({
                 <div className="mt-1">
                   <EvidenceList row={row} />
                 </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-muted-foreground text-[11px] font-medium">
+                Reachability
+              </div>
+              <div className="mt-1">
+                <ChannelBadges channels={row.channels} />
               </div>
             </div>
 

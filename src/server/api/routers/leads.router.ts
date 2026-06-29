@@ -15,11 +15,13 @@ import {
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
+  leadChannelTable,
   leadContactTable,
   leadDomainTable,
   leadImportTable,
   leadOutreachTable,
 } from "@/server/db/leads-schema";
+import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
 import { discoverDomain } from "@/server/services/lead-discovery.service";
 import {
   extractFromDiscovery,
@@ -29,7 +31,6 @@ import { generateOutreachDraft } from "@/server/services/lead-outreach.service";
 import {
   isFreemailEmail,
   parseContactChannel,
-  resolveContactChannel,
   scoreLeadChannel,
   type StoredLeadContact,
 } from "@/server/services/lead-channel.service";
@@ -341,7 +342,17 @@ export const leadsRouter = createTRPCRouter({
         .where(eq(leadOutreachTable.domainId, input.id))
         .orderBy(desc(leadOutreachTable.createdAt))
         .limit(1);
-      return { domain, contacts, outreach: outreach ?? null };
+      const channels = await ctx.db
+        .select()
+        .from(leadChannelTable)
+        .where(
+          and(
+            eq(leadChannelTable.domainId, input.id),
+            isNull(leadChannelTable.deletedAt),
+          ),
+        )
+        .orderBy(asc(leadChannelTable.kind));
+      return { domain, contacts, outreach: outreach ?? null, channels };
     }),
 
   // ---- Manual enrichment (inspect-only; no DB write yet) ----
@@ -741,6 +752,34 @@ export const leadsRouter = createTRPCRouter({
         }
       }
 
+      // Captured reachability channels (one grouped query, same pattern as
+      // contacts/outreach above) — surfaced as badges in the send-review UI.
+      const channelRows = ids.length
+        ? await ctx.db
+            .select({
+              id: leadChannelTable.id,
+              domainId: leadChannelTable.domainId,
+              kind: leadChannelTable.kind,
+              value: leadChannelTable.value,
+              vendor: leadChannelTable.vendor,
+              deliveryState: leadChannelTable.deliveryState,
+            })
+            .from(leadChannelTable)
+            .where(
+              and(
+                inArray(leadChannelTable.domainId, ids),
+                isNull(leadChannelTable.deletedAt),
+              ),
+            )
+            .orderBy(asc(leadChannelTable.kind))
+        : [];
+      const channelsByDomain = new Map<string, typeof channelRows>();
+      for (const channel of channelRows) {
+        const list = channelsByDomain.get(channel.domainId) ?? [];
+        list.push(channel);
+        channelsByDomain.set(channel.domainId, list);
+      }
+
       let items = domains.map((domain) => {
         const contactChannel = parseContactChannel(
           (domain.enrichment as { contactChannel?: unknown } | null)
@@ -758,6 +797,7 @@ export const leadsRouter = createTRPCRouter({
           contactChannel,
           channelScore: scored,
           contactCount: contactsByDomain.get(domain.id)?.length ?? 0,
+          channels: channelsByDomain.get(domain.id) ?? [],
           outreach,
         };
       });
@@ -782,6 +822,10 @@ export const leadsRouter = createTRPCRouter({
       };
     }),
 
+  // Capture ALL ways to reach a domain by crawling its own website (emails,
+  // phone, contact form, chatbot) and persist them as `lead_channel` rows. This
+  // is always-on enrichment — no dependency on scoring. Keeps the original
+  // mutation name so the existing "Resolve channel" button is unchanged.
   resolveChannel: protectedProcedure
     .input(z.object({ domainId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -792,20 +836,11 @@ export const leadsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
       }
 
-      const contactChannel = await resolveContactChannel({
+      const { contactChannel, channels } = await captureAndPersistChannels({
+        domainId: row.id,
         domain: row.domain,
         companyName: row.companyName,
       });
-      await ctx.db
-        .update(leadDomainTable)
-        .set({
-          enrichment: sql`coalesce(${leadDomainTable.enrichment}, '{}'::jsonb) || ${JSON.stringify(
-            {
-              contactChannel,
-            },
-          )}::jsonb`,
-        })
-        .where(eq(leadDomainTable.id, row.id));
 
       const contacts = await ctx.db
         .select({
@@ -827,6 +862,7 @@ export const leadsRouter = createTRPCRouter({
 
       return {
         contactChannel,
+        channels,
         channelScore: scoreLeadChannel({
           domain: row.domain,
           contactChannel,

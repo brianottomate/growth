@@ -6,10 +6,15 @@ import {
   Check,
   Copy,
   ExternalLink,
+  FileText,
   GitMerge,
   Loader2,
+  Mail,
+  MessageCircle,
   Minus,
+  Phone,
   Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -24,6 +29,16 @@ import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
 /** A row from the leads list — what the table passes into the drawer. */
 export type LeadRow = RouterOutputs["leads"]["listDomains"]["items"][number];
+
+// Captured reachability channels (channel-discovery.service). Read-only in PR1;
+// the gated per-channel send actions land here in PR3.
+const CHANNEL_META: Record<string, { Icon: LucideIcon; label: string }> = {
+  email: { Icon: Mail, label: "Email" },
+  phone: { Icon: Phone, label: "Phone" },
+  form: { Icon: FileText, label: "Form" },
+  chatbot: { Icon: MessageCircle, label: "Chatbot" },
+  sms: { Icon: MessageCircle, label: "SMS" },
+};
 
 /** The AI-generated personalized sequence draft. */
 type OutreachDraftView = RouterOutputs["leads"]["generateOutreach"];
@@ -368,6 +383,44 @@ export function EnrichDrawer({
                   +{rankedContacts.length - 8} more
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Reachability channels — every way to reach this company we found by
+              crawling its own site. Populated by "Resolve channel" / the backfill. */}
+          {(detail.data?.channels.length ?? 0) > 0 && (
+            <div className="mt-2 rounded-lg border p-3">
+              <span className="text-sm font-medium">Reachability channels</span>
+              <div className="mt-2 space-y-1.5">
+                {detail.data?.channels.map((c) => {
+                  const meta = CHANNEL_META[c.kind] ?? {
+                    Icon: FileText,
+                    label: c.kind,
+                  };
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <meta.Icon className="text-muted-foreground size-3.5 shrink-0" />
+                      <span className="text-muted-foreground shrink-0">
+                        {meta.label}
+                      </span>
+                      <span className="truncate font-medium">{c.value}</span>
+                      {c.vendor && (
+                        <span className="text-muted-foreground shrink-0">
+                          · {c.vendor}
+                        </span>
+                      )}
+                      {c.deliveryState !== "discovered" && (
+                        <span className="text-muted-foreground ml-auto shrink-0 text-[10px]">
+                          {c.deliveryState}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

@@ -162,6 +162,58 @@ export async function extractStructuredData(params: {
 }
 
 /**
+ * Scrape a single page and pull a structured object out of it in ONE call,
+ * via the v2 `json` format (the `/extract` endpoint is deprecated/maintenance).
+ * Optionally also return the raw HTML from the same scrape (e.g. to regex for
+ * chat-widget script signatures) so we don't pay for a second fetch.
+ *
+ * Returns null on hard failure; `json` is null if the model found nothing.
+ *
+ * @example
+ * const res = await scrapeStructured({ url, schema: ContactChannelsSchema, includeHtml: true });
+ * res?.json   // typed extraction
+ * res?.html   // raw HTML (only when includeHtml)
+ */
+export async function scrapeStructured<T>(params: {
+  url: string;
+  schema: ZodType<T>;
+  prompt?: string;
+  includeHtml?: boolean;
+}): Promise<{ json: T | null; html?: string } | null> {
+  try {
+    console.log("🔵 [Firecrawl] Structured scrape:", { url: params.url });
+
+    const result = await firecrawl.scrape(params.url, {
+      formats: [
+        {
+          type: "json",
+          schema: params.schema,
+          prompt: params.prompt,
+        },
+        ...(params.includeHtml ? (["html"] as const) : []),
+      ],
+      onlyMainContent: false, // contact details often live in the footer/header
+    });
+
+    console.log("✅ [Firecrawl] Structured scrape succeeded:", {
+      url: params.url,
+      hasJson: result.json != null,
+    });
+
+    return {
+      json: (result.json as T | undefined) ?? null,
+      html: result.html,
+    };
+  } catch (error) {
+    console.error("❌ [Firecrawl] Structured scrape failed:", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      url: params.url,
+    });
+    return null;
+  }
+}
+
+/**
  * Scrape basic content from a URL (markdown only)
  *
  * Simplified scraping that returns markdown content and metadata.

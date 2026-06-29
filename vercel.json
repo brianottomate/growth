@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/x",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/channels?limit=100&concurrency=4&staleDays=30",
+      "schedule": "0 4 * * *"
     }
   ]
 }

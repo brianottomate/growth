@@ -137,7 +137,33 @@ export async function resolveContactChannel(input: {
     if (found.size || pagesOk) break;
   }
 
-  const emails = [...found];
+  return buildResolvedChannel({
+    domain: input.domain,
+    companyName: input.companyName,
+    emails: [...found],
+    hasForm,
+    pagesOk,
+  });
+}
+
+/**
+ * Classify a set of scraped emails (+ a form-present flag) into a
+ * `ResolvedContactChannel`: split corporate / role-inbox / freemail, pick the
+ * best email, and derive the route. Shared by the naive `resolveContactChannel`
+ * scraper and the richer Firecrawl-based `discoverContactChannels` so the
+ * email-quality logic lives in exactly one place.
+ */
+export function buildResolvedChannel(input: {
+  domain: string;
+  companyName: string | null;
+  emails: string[];
+  hasForm: boolean;
+  pagesOk?: number;
+  scrapedAt?: string;
+}): ResolvedContactChannel {
+  const emails = [...new Set(input.emails.map((e) => e.toLowerCase()))].filter(
+    (e) => !JUNK_DOMAIN.test(e),
+  );
   const corporate = emails.filter((email) =>
     isCorporateForDomain(email, input.domain),
   );
@@ -146,7 +172,7 @@ export async function resolveContactChannel(input: {
   const bestEmail = roleInbox[0] ?? corporate[0] ?? siteFreemail[0] ?? null;
   const route: LeadChannelRoute = bestEmail
     ? "instantly"
-    : hasForm
+    : input.hasForm
       ? "form"
       : "none";
 
@@ -157,11 +183,11 @@ export async function resolveContactChannel(input: {
     corporate,
     roleInbox,
     siteFreemail,
-    hasForm,
+    hasForm: input.hasForm,
     bestEmail,
     route,
-    pagesOk,
-    scrapedAt: new Date().toISOString(),
+    pagesOk: input.pagesOk ?? 0,
+    scrapedAt: input.scrapedAt ?? new Date().toISOString(),
   };
 }
 

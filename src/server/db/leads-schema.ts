@@ -48,6 +48,27 @@ export const leadTierEnum = leadsSchema.enum("lead_tier", [
 ]);
 export type LeadTier = (typeof leadTierEnum.enumValues)[number];
 
+// A captured way to reach a company, discovered by crawling its own website.
+// One `lead_domain` has many — this is the reachability superset behind the
+// "email is just the preferred route" model. `sms` is reserved for phase 2.
+export const leadChannelKindEnum = leadsSchema.enum("lead_channel_kind", [
+  "email",
+  "phone",
+  "form",
+  "chatbot",
+  "sms",
+]);
+export type LeadChannelKind = (typeof leadChannelKindEnum.enumValues)[number];
+
+// Per-channel delivery lifecycle. Discovery writes `discovered`; the
+// human-approved dispatch path walks it through queued → sending → sent, and
+// an inbound reply flips it to `replied`. `skipped`/`failed` are terminal.
+export const leadChannelStateEnum = leadsSchema.enum(
+  "lead_channel_delivery_state",
+  ["discovered", "queued", "sending", "sent", "replied", "failed", "skipped"],
+);
+export type LeadChannelState = (typeof leadChannelStateEnum.enumValues)[number];
+
 // ---- JSONB SHAPES --------------------------------------------------
 
 // Raw provider payloads, keyed by source. Lossless escape hatch — keep the
@@ -55,6 +76,26 @@ export type LeadTier = (typeof leadTierEnum.enumValues)[number];
 export type LeadEnrichment = Partial<
   Record<LeadSource, Record<string, unknown>>
 >;
+
+// A single field on a discovered contact form. Drives the field→value mapping
+// the operator confirms before an agent submits (the human-in-the-loop gate).
+export type ContactFormField = {
+  name: string;
+  label?: string | null;
+  type?: string | null; // text | email | tel | textarea | select | ...
+  required?: boolean | null;
+};
+
+// Evidence captured when a channel is used — the audit trail for an agentic
+// send. Screenshots land in R2; transcript/payload are kept verbatim. `error`
+// is set when a dispatch fails (captcha, blocked, submit rejected).
+export type LeadChannelEvidence = {
+  screenshotUrl?: string;
+  transcript?: string;
+  submittedPayload?: Record<string, unknown>;
+  confirmationText?: string;
+  error?: string;
+};
 
 // ---- LEAD DOMAIN (the spine) ---------------------------------------
 
@@ -112,6 +153,13 @@ export const leadDomainTable = leadsSchema.table(
     inHubspot: t.boolean().default(false).notNull(),
     inPregen: t.boolean().default(false).notNull(),
     inInstantly: t.boolean().default(false).notNull(),
+
+    // Reachability presence — projected from `lead_channel` by the channel
+    // discovery pass so the list can filter "has a form / phone / chatbot"
+    // without a join (mirrors the `in*` source-presence flags above).
+    hasPhone: t.boolean().default(false).notNull(),
+    hasForm: t.boolean().default(false).notNull(),
+    hasChatbot: t.boolean().default(false).notNull(),
 
     // ---- Unit-count enrichment (the headline: sales doesn't trust portfolio_size) ----
     // A triangulated estimate with a range + confidence + provenance. The raw
@@ -378,16 +426,118 @@ export const leadOutreachTable = leadsSchema.table(
 export type LeadOutreach = typeof leadOutreachTable.$inferSelect;
 export type LeadOutreachInsert = typeof leadOutreachTable.$inferInsert;
 
+// ---- LEAD CHANNEL (reachability + multi-channel delivery) ----------
+//
+// Every captured way to reach a company, discovered by crawling its own site
+// (channel-discovery.service.ts). MANY per `lead_domain`. This is the "email is
+// just the preferred route" model: a form/phone/chatbot row is a real delivery
+// target, not a dead end. Each row carries its own mutable delivery state +
+// evidence so a fallback send can be tracked independently of the email path.
+// The raw capture also caches into `lead_domain.enrichment.contactChannels`;
+// these rows are the queryable projection.
+
+// Physical name is `lead_channel` (not bare `channel`): Drizzle's relational
+// query builder keys its config by physical table name, so a bare `channel`
+// here collides with `public.channel` (channel-schema.ts) and corrupts the
+// relation inference for unrelated domains. The `leads.` schema prefix isn't
+// enough — keep the name globally unique.
+export const leadChannelTable = leadsSchema.table(
+  "lead_channel",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("lch")),
+
+    domainId: t
+      .text()
+      .references(() => leadDomainTable.id, { onDelete: "cascade" })
+      .notNull(),
+    // Denormalized normalized domain — same cheap-lookup rationale as lead_contact.
+    domain: t.text().notNull(),
+
+    kind: leadChannelKindEnum().notNull(),
+    // email address / E.164 phone / contact-form URL / chatbot page URL.
+    value: t.text().notNull(),
+    // Contact-form field structure (kind="form").
+    fields: t.jsonb().$type<ContactFormField[]>(),
+    // Detected chat widget vendor (kind="chatbot"): intercom | drift | crisp | ...
+    vendor: t.text(),
+
+    // Provenance + confidence of the capture.
+    source: t.text(), // firecrawl_extract | regex | manual
+    confidence: t.real(), // 0-1
+    verified: t.boolean().default(false).notNull(),
+
+    // ---- Delivery state (the dispatch half) ----
+    deliveryState: leadChannelStateEnum().default("discovered").notNull(),
+    // Which generated sequence was dispatched through this channel.
+    outreachId: t
+      .text()
+      .references(() => leadOutreachTable.id, { onDelete: "set null" }),
+    // The plus-addressed reply-to we stamped (form/chat sends leave our address);
+    // `replyToken` is the opaque key the inbound webhook resolves back to this row.
+    replyToAlias: t.text(),
+    replyToken: t.text(),
+    // Audit trail for an agentic send (screenshot/transcript/payload/error).
+    evidence: t.jsonb().$type<LeadChannelEvidence>(),
+
+    lastUsedAt: t.timestamp(),
+    sentAt: t.timestamp(),
+    repliedAt: t.timestamp(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: t.timestamp(),
+  }),
+  (table) => [
+    // One row per (domain, kind, value) — the upsert key so re-discovery
+    // refreshes rather than duplicates.
+    uniqueIndex("lead_channel_domain_kind_value_idx").on(
+      table.domainId,
+      table.kind,
+      table.value,
+    ),
+    index("lead_channel_domain_id_idx").on(table.domainId),
+    index("lead_channel_kind_idx").on(table.kind),
+    index("lead_channel_delivery_state_idx").on(table.deliveryState),
+    // Direct inbound-reply lookup (reply+<token>@… → this row).
+    uniqueIndex("lead_channel_reply_token_idx").on(table.replyToken),
+  ],
+);
+
+export type LeadChannel = typeof leadChannelTable.$inferSelect;
+export type LeadChannelInsert = typeof leadChannelTable.$inferInsert;
+
 // ---- RELATIONS -----------------------------------------------------
 
 export const leadDomainRelations = relations(leadDomainTable, ({ many }) => ({
   contacts: many(leadContactTable),
+  channels: many(leadChannelTable),
 }));
 
 export const leadContactRelations = relations(leadContactTable, ({ one }) => ({
   domainRow: one(leadDomainTable, {
     fields: [leadContactTable.domainId],
     references: [leadDomainTable.id],
+  }),
+}));
+
+export const leadChannelRelations = relations(leadChannelTable, ({ one }) => ({
+  domainRow: one(leadDomainTable, {
+    fields: [leadChannelTable.domainId],
+    references: [leadDomainTable.id],
+  }),
+  outreach: one(leadOutreachTable, {
+    fields: [leadChannelTable.outreachId],
+    references: [leadOutreachTable.id],
   }),
 }));
 
