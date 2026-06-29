@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -290,20 +291,22 @@ export function CampaignDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="camp-start">Starts</Label>
-              <Input
+              <DatePicker
                 id="camp-start"
-                type="date"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
+                value={fromDateInput(start) ?? undefined}
+                onChange={(d) => setStart(d ? toDateInput(d) : "")}
+                placeholder="Start date"
+                className="w-full justify-start py-1.5 text-sm"
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="camp-end">Ends</Label>
-              <Input
+              <DatePicker
                 id="camp-end"
-                type="date"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
+                value={fromDateInput(end) ?? undefined}
+                onChange={(d) => setEnd(d ? toDateInput(d) : "")}
+                placeholder="End date"
+                className="w-full justify-start py-1.5 text-sm"
               />
             </div>
             <div className="space-y-1.5">

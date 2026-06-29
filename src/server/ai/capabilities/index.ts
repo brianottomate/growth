@@ -3,7 +3,7 @@ import "server-only";
 import type { AnyCapability } from "./types";
 import { adsScope, topAds } from "./ads";
 import { listBrands } from "./brands";
-import { contentPipelineSummary, upcomingContent } from "./content";
+import { contentPipelineSummary, createIdea, upcomingContent } from "./content";
 import { leadsSummary } from "./leads";
 import { recentMentions } from "./listening";
 import { workspaceOverview } from "./overview";
@@ -22,6 +22,8 @@ export const OVERVIEW_CAPABILITIES: AnyCapability[] = [
   listBrands,
   contentPipelineSummary,
   upcomingContent,
+  // First WRITE capability — gated by an in-chat approval card.
+  createIdea,
   leadsSummary,
   recentMentions,
   // Ads: scope FIRST (cheap lay-of-the-land), then drill with topAds.

@@ -14,13 +14,21 @@ export function toAiTools(
   ctx: CapabilityContext,
 ): ToolSet {
   return Object.fromEntries(
-    capabilities.map((cap) => [
-      cap.name,
-      tool({
-        description: cap.description,
-        inputSchema: cap.inputSchema,
-        execute: (input) => cap.execute(input, ctx),
-      }),
-    ]),
+    capabilities.map((cap) => {
+      // A write capability (readOnly: false) opts into the AI SDK approval
+      // round-trip by default — the client renders an approval card and the
+      // tool only executes once the operator confirms (see SparPanel + the
+      // OverviewChat approval card). A capability can override via needsApproval.
+      const needsApproval = cap.needsApproval ?? !cap.readOnly;
+      return [
+        cap.name,
+        tool({
+          description: cap.description,
+          inputSchema: cap.inputSchema,
+          ...(needsApproval ? { needsApproval: true } : {}),
+          execute: (input) => cap.execute(input, ctx),
+        }),
+      ];
+    }),
   );
 }

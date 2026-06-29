@@ -48,6 +48,26 @@ async function assertMediaAccess(ctx: Ctx, mediaId: string) {
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB
 
 export const mediaRouter = createTRPCRouter({
+  /**
+   * Upload a transient chat attachment (a pasted/dropped image) → public R2
+   * URL. Not a media_asset — used by the /overview chat composer to attach the
+   * image to a message as an AI SDK file part. Any org member can call it.
+   */
+  uploadChatImage: protectedProcedure
+    .input(
+      z.object({
+        dataUrl: z.string().min(1),
+        fileName: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return MediaService.uploadChatImage({
+        dataUrl: input.dataUrl,
+        fileName: input.fileName,
+        userId: ctx.session.user.id,
+      });
+    }),
+
   list: protectedProcedure
     .input(
       z.object({

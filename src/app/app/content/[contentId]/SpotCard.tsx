@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Plus, UploadCloud, X } from "lucide-react";
+import { Images, Loader2, Plus, Sparkles, X } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { SimpleSelect } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Dropzone } from "@/components/ui/dropzone";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 import type { Member } from "@/components/assignment/assignee";
@@ -14,6 +16,8 @@ import type { MediaItem, PostStats } from "@/server/db/schema";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { SpotOwnerControl } from "./OwnerControls";
 import { STATUS_OPTIONS } from "./IdeaControls";
+import { MediaPickerDialog } from "./MediaPickerDialog";
+import { SPOT_PILLS, type SpotPill } from "@/lib/spot-pills";
 
 const STATUS_PILL: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -101,9 +105,46 @@ export function SpotCard({
   const [media, setMediaState] = useState<MediaItem[]>(spot.media ?? []);
   const [addingLink, setAddingLink] = useState(false);
   const [linkValue, setLinkValue] = useState("");
-  const [dragActive, setDragActive] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const { uploadImages, uploading } = useMediaUpload(brandId);
+
+  // Caption = the concrete per-platform copy (platform_post.text), plus the AI
+  // generate steer (pills + free-text nudge) that drafts it from the brief.
+  const [caption, setCaption] = useState(spot.text ?? "");
+  const [genOpen, setGenOpen] = useState(false);
+  const [pills, setPills] = useState<Set<SpotPill>>(new Set());
+  const [steer, setSteer] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const setText = useMutation(trpc.content.setSpotText.mutationOptions(refresh));
+  const generate = useMutation(
+    trpc.content.generateSpotCaption.mutationOptions({
+      onSuccess: (res) => {
+        // Drop the draft into the editor and persist it; still fully editable.
+        setCaption(res.caption);
+        setText.mutate({ platformPostId: spot.id, text: res.caption });
+        setGenOpen(false);
+      },
+    }),
+  );
+  const togglePill = (id: SpotPill) =>
+    setPills((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const runGenerate = () =>
+    generate.mutate({
+      platformPostId: spot.id,
+      pills: [...pills],
+      steer: steer.trim() || undefined,
+    });
+  const saveCaption = () => {
+    const next = caption.trim() ? caption : "";
+    if (next !== (spot.text ?? "")) {
+      setText.mutate({ platformPostId: spot.id, text: next || null });
+    }
+  };
 
   const fmtLabel = formatLabel(spot.format, spot.archetype, spot.template);
   const via = spot.provider ? (VIA[spot.provider] ?? spot.provider) : null;
@@ -119,12 +160,20 @@ export function SpotCard({
     setAssetLinks.mutate({ platformPostId: spot.id, assetLinks: next });
   };
   const persistMedia = (next: MediaItem[]) => {
-    setMediaState(next);
-    setMedia.mutate({ platformPostId: spot.id, media: next });
+    // Dedupe by assetId so dropping or picking the same library asset twice
+    // doesn't double-attach. Items without an assetId (scraped/legacy) are kept.
+    const seen = new Set<string>();
+    const deduped = next.filter((m) => {
+      if (!m.assetId) return true;
+      if (seen.has(m.assetId)) return false;
+      seen.add(m.assetId);
+      return true;
+    });
+    setMediaState(deduped);
+    setMedia.mutate({ platformPostId: spot.id, media: deduped });
   };
-  const onFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const items = await uploadImages(Array.from(files));
+  const handleUpload = async (files: File[]) => {
+    const items = await uploadImages(files);
     if (items.length) persistMedia([...media, ...items]);
   };
 
@@ -173,18 +222,16 @@ export function SpotCard({
           {/* meta: ship date + posted + via + open */}
           <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             {owned ? (
-              <input
-                type="date"
-                value={spot.scheduledAtISO ? spot.scheduledAtISO.slice(0, 10) : ""}
-                onChange={(e) =>
+              <DatePicker
+                value={spot.scheduledAtISO ? new Date(spot.scheduledAtISO) : undefined}
+                onChange={(d) =>
                   setSchedule.mutate({
                     platformPostId: spot.id,
-                    scheduledAt: e.target.value
-                      ? new Date(e.target.value).toISOString()
-                      : null,
+                    scheduledAt: d ? d.toISOString() : null,
                   })
                 }
-                className="bg-background rounded-md border px-1.5 py-0.5 text-[11px]"
+                placeholder="Schedule"
+                className="px-1.5 py-0.5 text-[11px]"
                 aria-label="Scheduled date"
               />
             ) : (
@@ -205,7 +252,21 @@ export function SpotCard({
           </div>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {owned && (
+            <button
+              onClick={() => setGenOpen((o) => !o)}
+              aria-label={caption.trim() ? "Regenerate caption" : "Generate caption"}
+              className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+            >
+              {generate.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              {caption.trim() ? "Regenerate" : "Generate"}
+            </button>
+          )}
           <SpotOwnerControl
             platformPostId={spot.id}
             initialOwner={spot.owner}
@@ -225,71 +286,119 @@ export function SpotCard({
         </div>
       </div>
 
-      {spot.text && <p className="text-muted-foreground mt-3 text-sm">{spot.text}</p>}
-
-      {/* media thumbnails */}
-      {(media.length > 0 || owned) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {media.map((m, i) => (
-            <span
-              key={i}
-              className="bg-muted group relative size-14 overflow-hidden rounded-lg border"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={m.thumbnail ?? m.url}
-                alt=""
-                className="size-full object-cover"
-                loading="lazy"
-              />
-              {owned && (
+      {/* Caption — the concrete platform copy. Editable for owned spots, with an
+          AI generate/regenerate that remixes the idea brief in the brand+channel
+          voice. Scraped posts show their captured text read-only. */}
+      {owned ? (
+        <div className="mt-3">
+          <textarea
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            onBlur={saveCaption}
+            placeholder="Platform caption… (Generate to draft it from the brief)"
+            className="bg-background focus:ring-ring/40 min-h-20 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
+          />
+          {setText.isPending && (
+            <p className="text-muted-foreground mt-1.5 text-[11px]">Saving…</p>
+          )}
+          {genOpen && (
+            <div className="bg-muted/30 mt-2 rounded-lg border p-2.5">
+              <div className="flex flex-wrap gap-1.5">
+                {SPOT_PILLS.map((p) => {
+                  const on = pills.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => togglePill(p.id)}
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                        on
+                          ? "bg-foreground text-background border-foreground"
+                          : "border-border text-muted-foreground hover:bg-accent",
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  value={steer}
+                  onChange={(e) => setSteer(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") runGenerate();
+                  }}
+                  placeholder="Optional nudge — e.g. lead with the pool"
+                  className="bg-background flex-1 rounded-md border px-2 py-1 text-xs outline-none"
+                />
                 <button
-                  onClick={() => persistMedia(media.filter((_, j) => j !== i))}
-                  className="absolute top-0.5 right-0.5 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                  aria-label="Remove asset"
+                  onClick={runGenerate}
+                  disabled={generate.isPending}
+                  className="bg-foreground text-background rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50"
                 >
-                  <X className="size-3" />
+                  {generate.isPending ? "Generating…" : "Generate"}
                 </button>
+              </div>
+              {generate.isError && (
+                <p className="text-destructive mt-1.5 text-[11px]">
+                  {generate.error.message}
+                </p>
               )}
-            </span>
-          ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        spot.text && <p className="text-muted-foreground mt-3 text-sm">{spot.text}</p>
+      )}
+
+      {/* media — thumbnails + a proper drop zone (saved to the library) */}
+      {(media.length > 0 || owned) && (
+        <div className="mt-3 space-y-2">
+          {media.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {media.map((m, i) => (
+                <span
+                  key={i}
+                  className="bg-muted group relative size-14 overflow-hidden rounded-lg border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={m.thumbnail ?? m.url}
+                    alt=""
+                    className="size-full object-cover"
+                    loading="lazy"
+                  />
+                  {owned && (
+                    <button
+                      onClick={() => persistMedia(media.filter((_, j) => j !== i))}
+                      className="absolute top-0.5 right-0.5 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-label="Remove asset"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
           {owned && (
-            <button
-              onClick={() => fileRef.current?.click()}
-              onDragEnter={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-              }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                void onFiles(e.dataTransfer.files);
-              }}
-              className={cn(
-                "text-muted-foreground hover:border-foreground/40 flex size-14 flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed text-[9px] transition-colors",
-                dragActive && "border-primary bg-primary/5",
-              )}
-            >
-              {uploading > 0 ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <UploadCloud className="size-4" />
-              )}
-              Drop
-              <input
-                ref={fileRef}
-                type="file"
+            <div className="flex items-stretch gap-2">
+              <Dropzone
+                compact
                 multiple
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => void onFiles(e.target.files)}
+                onFiles={handleUpload}
+                uploading={uploading}
+                className="flex-1"
               />
-            </button>
+              <button
+                onClick={() => setPickerOpen(true)}
+                className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
+              >
+                <Images className="size-5" />
+                Library
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -364,6 +473,16 @@ export function SpotCard({
           ))}
         </div>
       )}
+
+      <MediaPickerDialog
+        brandId={brandId}
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        existingAssetIds={media
+          .map((m) => m.assetId)
+          .filter((id): id is string => !!id)}
+        onPick={(item) => persistMedia([...media, item])}
+      />
     </div>
   );
 }

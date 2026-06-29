@@ -16,6 +16,9 @@ import {
   seriesTable,
 } from "@/server/db/schema";
 import { archetypeForFormat, platformFormatsFor } from "@/server/content/formats";
+import { ContentService } from "@/server/services/content.service";
+import { generateSpotCaption } from "@/server/services/spot-generate.service";
+import { SPOT_PILL_IDS } from "@/lib/spot-pills";
 import { displayPoster } from "@/lib/utils/media";
 
 type Ctx = {
@@ -233,6 +236,95 @@ export const contentRouter = createTRPCRouter({
             externalUrl: p.externalUrl ?? null,
           };
         });
+    }),
+
+  /**
+   * The "Sheet" view — a wide, date-first rendering of the team's old Google-
+   * Sheet content calendar. One row per IDEA, every editorial column in the
+   * sheet's order, grouped into month "workbooks" client-side. READ-ONLY mirror
+   * (no writes here; the row links to the detail page for edits) over the same
+   * data the board/schedule already expose — just the full column run in one
+   * shape, so nothing from the spreadsheet feels lost. Effective date = idea
+   * plan date, else the earliest spot ship date; undated ideas are dropped
+   * (the month workbooks are date-driven).
+   */
+  grid: protectedProcedure
+    .input(z.object({ brandId: z.string().optional(), pillar: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const { org, brands } = await orgContext(ctx);
+      if (!org) return [];
+      let brandIds = brands.map((b) => b.id);
+      if (input.brandId) brandIds = brandIds.filter((id) => id === input.brandId);
+      if (!brandIds.length) return [];
+
+      const memberCols = { id: true, name: true, image: true } as const;
+      const posts = await ctx.db.query.contentPostTable.findMany({
+        where: and(
+          inArray(contentPostTable.brandId, brandIds),
+          isNull(contentPostTable.deletedAt),
+          input.pillar ? eq(contentPostTable.pillar, input.pillar) : undefined,
+        ),
+        with: {
+          platformPosts: true,
+          series: true,
+          owner: { columns: memberCols },
+        },
+      });
+      const brandName = new Map(brands.map((b) => [b.id, b.name]));
+
+      return posts
+        .map((c) => {
+          // Effective publish date: idea plan date, else earliest spot date.
+          const earliestSpot = c.platformPosts
+            .map((p) => p.scheduledAt ?? p.publishedAt)
+            .filter((d): d is Date => !!d)
+            .sort((a, b) => a.getTime() - b.getTime())[0];
+          const at = c.plannedAt ?? earliestSpot ?? null;
+
+          // Spot-level columns are aggregated across the idea's renderings.
+          const platforms = [...new Set(c.platformPosts.map((p) => p.platform))];
+          const formats = [
+            ...new Set(
+              c.platformPosts
+                .map((p) => p.format ?? p.archetype)
+                .filter((f): f is string => !!f),
+            ),
+          ];
+          const assetLinks = [
+            ...new Set(c.platformPosts.flatMap((p) => p.assetLinks ?? [])),
+          ];
+          const links = [
+            ...new Set(
+              c.platformPosts
+                .map((p) => p.externalUrl)
+                .filter((u): u is string => !!u),
+            ),
+          ];
+
+          return {
+            id: c.id,
+            at: at ? at.toISOString() : null,
+            platforms,
+            pillar: c.pillar,
+            seriesName: c.series?.name ?? null,
+            seriesColor: c.series?.color ?? null,
+            title: c.title,
+            formats,
+            hook: c.hook,
+            captionDirection: c.captionDirection,
+            visualDirection: c.visualDirection,
+            ctaText: c.ctaText,
+            ctaKeyword: c.ctaKeyword,
+            kpi: c.kpi,
+            owner: toMember(c.owner),
+            status: c.status,
+            assetLinks,
+            links,
+            brandName: brandName.get(c.brandId) ?? "—",
+          };
+        })
+        .filter((r): r is typeof r & { at: string } => r.at !== null)
+        .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
     }),
 
   /** Move a content idea to a new lifecycle status (the Kanban drag target). */
@@ -471,6 +563,87 @@ export const contentRouter = createTRPCRouter({
       return { id: input.platformPostId };
     }),
 
+  /** Set a spot's concrete, platform-specific caption (`platform_post.text`) —
+   *  distinct from the idea-level `captionDirection` brief. */
+  setSpotText: protectedProcedure
+    .input(
+      z.object({ platformPostId: z.string(), text: z.string().max(5000).nullable() }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      if (spot.source !== "owned") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Can't edit a scraped post" });
+      }
+      const text = input.text && input.text.trim() ? input.text : null;
+      return ContentService.setSpotText({ platformPostId: input.platformPostId, text });
+    }),
+
+  /** AI-remix the idea brief into a platform-ready caption in the composed
+   *  brand+channel voice (fingerprint), with optional pills / free-text steer.
+   *  Side-effect-free — returns the draft; the client persists via setSpotText. */
+  generateSpotCaption: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        pills: z.array(z.enum(SPOT_PILL_IDS)).max(8).optional(),
+        steer: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      if (spot.source !== "owned") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't generate for a scraped post",
+        });
+      }
+      return generateSpotCaption(input);
+    }),
+
+  /** Set the content-level media POOL (`content_post.media`). The pool VIEW is
+   *  the union of this + every spot's media; this stores the idea-level adds. */
+  setPoolMedia: protectedProcedure
+    .input(
+      z.object({
+        contentPostId: z.string(),
+        media: z
+          .array(
+            z.object({
+              url: z.string().max(2000),
+              type: z.enum(["image", "video", "carousel"]),
+              width: z.number().int().positive().optional(),
+              height: z.number().int().positive().optional(),
+              thumbnail: z.string().max(2000).optional(),
+              assetId: z.string().optional(),
+              derivedFrom: z.string().optional(),
+            }),
+          )
+          .max(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const content = await ctx.db.query.contentPostTable.findFirst({
+        where: eq(contentPostTable.id, input.contentPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, content.brand?.organizationId);
+      return ContentService.setPoolMedia({
+        contentPostId: input.contentPostId,
+        media: input.media,
+      });
+    }),
+
   /**
    * Capture a new idea (the List's inline "+ Add idea"). Minimal by design —
    * title + where it sits; the brief gets filled in on the detail screen.
@@ -483,6 +656,15 @@ export const contentRouter = createTRPCRouter({
         pillar: z.string().optional(),
         seriesId: z.string().optional(),
         plannedAt: z.string().datetime().optional(),
+        // Editorial brief — written once at the idea level (see content_post).
+        hook: z.string().optional(),
+        captionDirection: z.string().optional(),
+        visualDirection: z.string().optional(),
+        ctaText: z.string().optional(),
+        ctaKeyword: z.string().optional(),
+        kpi: z.string().optional(),
+        // Channels to fan out to immediately, as owned spots.
+        platforms: z.array(z.enum(channelPlatformEnum.enumValues)).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -493,21 +675,11 @@ export const contentRouter = createTRPCRouter({
       if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, brand.organizationId);
 
-      const [row] = await ctx.db
-        .insert(contentPostTable)
-        .values({
-          brandId: input.brandId,
-          title: input.title,
-          pillar: input.pillar,
-          seriesId: input.seriesId,
-          plannedAt: input.plannedAt ? new Date(input.plannedAt) : undefined,
-          ownerId: ctx.session.user.id,
-          createdById: ctx.session.user.id,
-          status: "draft",
-          origin: "human",
-        })
-        .returning({ id: contentPostTable.id });
-      return { id: row?.id };
+      return ContentService.createIdea({
+        ...input,
+        ownerId: ctx.session.user.id,
+        createdById: ctx.session.user.id,
+      });
     }),
 
   /**
@@ -539,12 +711,7 @@ export const contentRouter = createTRPCRouter({
       if (!content) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, content.brand?.organizationId);
 
-      const { id, plannedAt, ...rest } = input;
-      const patch: Record<string, unknown> = { ...rest };
-      if (plannedAt !== undefined) patch.plannedAt = plannedAt ? new Date(plannedAt) : null;
-
-      await ctx.db.update(contentPostTable).set(patch).where(eq(contentPostTable.id, id));
-      return { id };
+      return ContentService.updateBrief(input);
     }),
 
   /**

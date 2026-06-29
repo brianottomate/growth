@@ -46,6 +46,12 @@ export interface Capability<
    * an MCP `destructiveHint` annotation. See Homi's approval-requested flow.
    */
   readOnly: boolean;
+  /**
+   * Force the chat approval round-trip (AI SDK `needsApproval`) regardless of
+   * `readOnly`. The adapter defaults this to `!readOnly`, so a write capability
+   * is gated by an in-chat approval card by default; set explicitly to override.
+   */
+  needsApproval?: boolean;
   domain: CapabilityDomain;
   execute: (input: z.infer<I>, ctx: CapabilityContext) => Promise<O>;
 }

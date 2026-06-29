@@ -7,6 +7,7 @@ import { Plus, X } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { SimpleSelect } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 
@@ -79,13 +80,11 @@ export function BriefEditor({
             size="sm"
             aria-label="Status"
           />
-          <input
-            type="date"
-            value={plannedAtISO ? plannedAtISO.slice(0, 10) : ""}
-            onChange={(e) =>
-              save({ plannedAt: e.target.value ? new Date(e.target.value).toISOString() : null })
-            }
-            className="bg-background rounded-md border px-2 py-1 text-xs"
+          <DatePicker
+            value={plannedAtISO ? new Date(plannedAtISO) : undefined}
+            onChange={(d) => save({ plannedAt: d ? d.toISOString() : null })}
+            placeholder="Plan date"
+            className="text-xs"
             aria-label="Plan date"
           />
         </div>

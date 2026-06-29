@@ -286,6 +286,14 @@ export const contentPostTable = pgTable(
     // `status="slot"` row often carries just this + plannedAt + pillar/series.
     targetSpots: t.jsonb().$type<TargetSpot[]>(),
 
+    // Content media POOL — assets associated with this idea, drawn down onto its
+    // spots. The pool VIEW (UI) is the union of THIS column + every spot's
+    // `platform_post.media` (so anything attached to a spot also shows in the
+    // pool, with no sync); this column stores idea-level adds, incl. items not
+    // yet on any spot. Items are `MediaItem` refs carrying `assetId` back to
+    // media_asset, same as platform_post.media.
+    media: t.jsonb().$type<MediaItem[]>(),
+
     // Demo-data marker. Real synced content inserts with `false` (the default);
     // the seed script sets `true`. `bun run db:unseed` deletes where true.
     // (Added with default(true) first to backfill existing seed rows, then

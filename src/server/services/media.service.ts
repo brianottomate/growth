@@ -3,6 +3,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "../db";
 import type { MediaKind } from "../db/schema";
 import { mediaAssetTable } from "../db/schema";
+import { createId } from "../db/utils";
 import { R2 } from "../clients/r2.client";
 import { Stream } from "../clients/stream.client";
 
@@ -310,6 +311,37 @@ export async function deleteMedia(id: string) {
   return { id };
 }
 
+/**
+ * Upload a transient chat attachment (a pasted/dropped image) to R2 and return
+ * its public URL. Deliberately NOT a media_asset row — it's an ephemeral blob
+ * the /overview chat composer attaches to a message as an AI SDK file part.
+ * Mirrors Homi's `uploadScreenshot`, on growth's R2 (1-shot, base64 in).
+ */
+export async function uploadChatImage(input: {
+  dataUrl: string;
+  userId: string;
+  fileName?: string;
+}): Promise<{ url: string; mediaType: string }> {
+  const match = /^data:([^;]+);base64,(.+)$/s.exec(input.dataUrl);
+  if (!match) throw new Error("Expected a base64-encoded image data URL");
+  const mediaType = match[1]!;
+  if (!mediaType.startsWith("image/")) {
+    throw new Error("Only images can be attached");
+  }
+  const buffer = Buffer.from(match[2]!, "base64");
+  const MAX_BYTES = 10 * 1024 * 1024; // 10MB — plenty for a screenshot/photo
+  if (buffer.byteLength > MAX_BYTES) {
+    throw new Error("Image is too large (max 10MB)");
+  }
+  const ext = (mediaType.split("/")[1] ?? "png").split("+")[0];
+  const safeName = input.fileName?.trim().replace(/[^a-zA-Z0-9_.-]/g, "-");
+  // Unique key per upload so same-named pastes never collide; scoped per user.
+  const filename = `${createId("att")}-${safeName || `paste.${ext}`}`;
+  const key = R2.buildUploadKey("chat", input.userId, filename);
+  const url = await R2.putBuffer(key, buffer, mediaType);
+  return { url, mediaType };
+}
+
 export const MediaService = {
   createR2Upload,
   finalizeR2Upload,
@@ -324,4 +356,5 @@ export const MediaService = {
   delete: deleteMedia,
   kindForMime,
   isVideoMime,
+  uploadChatImage,
 } as const;

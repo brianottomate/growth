@@ -18,8 +18,12 @@ import {
 import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleSelect } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { MessageSquare } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { MessageSquare, Plus } from "lucide-react";
 import { cn } from "@/components/ui/lib/utils";
 import {
   AssigneeButton,
@@ -33,7 +37,9 @@ import { PILLARS, PILLAR_BY_SLUG } from "@/lib/pillars";
 import type { ContentStatus } from "@/server/db/schema";
 import type { RouterOutputs } from "@/trpc/react";
 import { ContentCalendar } from "./ContentCalendar";
+import { ContentSheet } from "./ContentSheet";
 import { ReshuffleDialog } from "./ReshuffleDialog";
+import { AddIdeaDrawer } from "./AddIdeaDrawer";
 
 type Card = RouterOutputs["content"]["board"][number];
 
@@ -150,7 +156,8 @@ export function ContentBoard({
       onError: (_e, _v, context) => {
         if (context?.prev) qc.setQueryData(context.key, context.prev);
       },
-      onSettled: () => qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
+      onSettled: () =>
+        qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
     }),
   );
 
@@ -160,7 +167,9 @@ export function ContentBoard({
         const key = boardOptions.queryKey;
         await qc.cancelQueries({ queryKey: key });
         const prev = qc.getQueryData<Card[]>(key);
-        const owner = ownerId ? (members.find((m) => m.id === ownerId) ?? null) : null;
+        const owner = ownerId
+          ? (members.find((m) => m.id === ownerId) ?? null)
+          : null;
         qc.setQueryData<Card[]>(key, (old) =>
           old?.map((c) => (c.id === contentPostId ? { ...c, owner } : c)),
         );
@@ -169,7 +178,8 @@ export function ContentBoard({
       onError: (_e, _v, context) => {
         if (context?.prev) qc.setQueryData(context.key, context.prev);
       },
-      onSettled: () => qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
+      onSettled: () =>
+        qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
     }),
   );
 
@@ -190,7 +200,8 @@ export function ContentBoard({
       onError: (_e, _v, context) => {
         if (context?.prev) qc.setQueryData(context.key, context.prev);
       },
-      onSettled: () => qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
+      onSettled: () =>
+        qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
     }),
   );
 
@@ -208,7 +219,8 @@ export function ContentBoard({
     brandFilter !== "all" ? brandFilter : (brands[0]?.id ?? null);
   const createIdea = useMutation(
     trpc.content.create.mutationOptions({
-      onSettled: () => qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
+      onSettled: () =>
+        qc.invalidateQueries({ queryKey: boardOptions.queryKey }),
     }),
   );
   const onCreate = (title: string, plannedAt?: string) => {
@@ -225,13 +237,15 @@ export function ContentBoard({
   // the tactical "what's coming up this week" lens; Schedule is the full
   // date-first manual posting worklist.
   const [view, setView] = useState<
-    "board" | "list" | "week" | "schedule" | "calendar"
+    "board" | "list" | "week" | "schedule" | "calendar" | "sheet"
   >("list");
   const [reshuffleOpen, setReshuffleOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
 
   const visible = useMemo(() => {
     let out = cards;
-    if (statusFilter !== "all") out = out.filter((c) => c.status === statusFilter);
+    if (statusFilter !== "all")
+      out = out.filter((c) => c.status === statusFilter);
     if (mineOnly)
       out = out.filter(
         (c) =>
@@ -265,7 +279,11 @@ export function ContentBoard({
     () =>
       scheduleRows.filter((r) => {
         if (statusFilter !== "all" && r.status !== statusFilter) return false;
-        if (mineOnly && r.owner?.id !== currentUserId && r.spotOwner?.id !== currentUserId)
+        if (
+          mineOnly &&
+          r.owner?.id !== currentUserId &&
+          r.spotOwner?.id !== currentUserId
+        )
           return false;
         return true;
       }),
@@ -274,7 +292,9 @@ export function ContentBoard({
   const invalidateSchedule = () =>
     qc.invalidateQueries({ queryKey: scheduleOpts.queryKey });
   const setSpotSchedule = useMutation(
-    trpc.content.setSpotSchedule.mutationOptions({ onSettled: invalidateSchedule }),
+    trpc.content.setSpotSchedule.mutationOptions({
+      onSettled: invalidateSchedule,
+    }),
   );
   const onReschedule = (spotId: string, dateISO: string) =>
     setSpotSchedule.mutate({ platformPostId: spotId, scheduledAt: dateISO });
@@ -315,7 +335,7 @@ export function ContentBoard({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Content</h1>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -323,75 +343,84 @@ export function ContentBoard({
             {view === "board" ? " · drag to move through the pipeline" : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="border-border flex overflow-hidden rounded-full border">
-            {(["list", "board", "week", "schedule", "calendar"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium capitalize transition-colors",
-                  view === v
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:bg-accent",
-                )}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-          {(view === "schedule" || view === "calendar") && createBrandId && (
-            <button
-              onClick={() => setReshuffleOpen(true)}
-              className="border-border hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
-            >
-              ✨ Reshuffle
-            </button>
-          )}
+        {createBrandId && (
           <button
-            onClick={() => setMineOnly((v) => !v)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              mineOnly
-                ? "bg-foreground text-background border-foreground"
-                : "border-border text-muted-foreground hover:bg-accent",
-            )}
+            onClick={() => setAddOpen(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500"
           >
-            Mine
+            <Plus className="size-4" /> Add idea
           </button>
-          <SimpleSelect
-            value={brandFilter}
-            onValueChange={(v) => {
-              setBrandFilter(v);
-              setPillarFilter("all");
-            }}
-            options={[
-              { value: "all", label: "All brands" },
-              ...brands.map((b) => ({ value: b.id, label: b.name })),
-            ]}
-            size="sm"
-            aria-label="Brand"
-          />
-          <SimpleSelect
-            value={pillarFilter}
-            onValueChange={setPillarFilter}
-            options={[
-              { value: "all", label: "All pillars" },
-              ...pillars.map((p) => ({ value: p.slug, label: p.name })),
-            ]}
-            size="sm"
-            aria-label="Pillar"
-          />
-          <SimpleSelect
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-            options={statusOptions}
-            size="sm"
-            aria-label="Status"
-          />
-        </div>
+        )}
       </div>
-
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="border-border flex overflow-hidden rounded-full border">
+          {(
+            ["list", "board", "week", "schedule", "calendar", "sheet"] as const
+          ).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={cn(
+                "px-3 py-1 text-xs font-medium capitalize transition-colors",
+                view === v
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:bg-accent",
+              )}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+        {(view === "schedule" || view === "calendar") && createBrandId && (
+          <button
+            onClick={() => setReshuffleOpen(true)}
+            className="border-border hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+          >
+            ✨ Reshuffle
+          </button>
+        )}
+        <button
+          onClick={() => setMineOnly((v) => !v)}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            mineOnly
+              ? "bg-foreground text-background border-foreground"
+              : "border-border text-muted-foreground hover:bg-accent",
+          )}
+        >
+          Mine
+        </button>
+        <SimpleSelect
+          value={brandFilter}
+          onValueChange={(v) => {
+            setBrandFilter(v);
+            setPillarFilter("all");
+          }}
+          options={[
+            { value: "all", label: "All brands" },
+            ...brands.map((b) => ({ value: b.id, label: b.name })),
+          ]}
+          size="sm"
+          aria-label="Brand"
+        />
+        <SimpleSelect
+          value={pillarFilter}
+          onValueChange={setPillarFilter}
+          options={[
+            { value: "all", label: "All pillars" },
+            ...pillars.map((p) => ({ value: p.slug, label: p.name })),
+          ]}
+          size="sm"
+          aria-label="Pillar"
+        />
+        <SimpleSelect
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          options={statusOptions}
+          size="sm"
+          aria-label="Status"
+        />
+      </div>
       {/* List / Board / Schedule */}
       {view === "list" ? (
         <ContentList
@@ -425,8 +454,18 @@ export function ContentBoard({
           onReschedule={onReschedule}
           onOpen={openCard}
         />
+      ) : view === "sheet" ? (
+        <ContentSheet
+          brandId={input.brandId}
+          pillar={input.pillar}
+          onOpen={openCard}
+        />
       ) : (
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        >
           <div className="mt-5 flex flex-1 gap-3 overflow-x-auto pb-4">
             {COLUMNS.map((col) => (
               <Column
@@ -458,6 +497,17 @@ export function ContentBoard({
           }}
         />
       )}
+
+      <AddIdeaDrawer
+        brands={brands}
+        defaultBrandId={createBrandId}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onCreated={() => {
+          void qc.invalidateQueries({ queryKey: boardOptions.queryKey });
+          void invalidateSchedule();
+        }}
+      />
     </div>
   );
 }
@@ -480,7 +530,8 @@ function mondayOf(iso: string): Date {
 }
 function weekRange(monday: Date): string {
   const end = new Date(monday.getTime() + 6 * DAY_MS);
-  const f = (x: Date) => x.toLocaleDateString([], { month: "short", day: "numeric" });
+  const f = (x: Date) =>
+    x.toLocaleDateString([], { month: "short", day: "numeric" });
   return `${f(monday)} – ${f(end)}`;
 }
 
@@ -530,29 +581,51 @@ function ContentList({
       if (groupBy === "week") {
         if (c.plannedAt) {
           const mon = mondayOf(c.plannedAt);
-          push(`w${mon.getTime()}`, weekRange(mon), mon.getTime(), c, mon.toISOString());
+          push(
+            `w${mon.getTime()}`,
+            weekRange(mon),
+            mon.getTime(),
+            c,
+            mon.toISOString(),
+          );
         } else push("none", "Unscheduled", Number.MAX_SAFE_INTEGER, c);
       } else if (groupBy === "status") {
-        push(c.status, STATUS_LABEL[c.status] ?? c.status, STATUS_ORDER.indexOf(c.status), c);
+        push(
+          c.status,
+          STATUS_LABEL[c.status] ?? c.status,
+          STATUS_ORDER.indexOf(c.status),
+          c,
+        );
       } else if (groupBy === "pillar") {
-        const name = c.pillar ? (PILLAR_BY_SLUG[c.pillar]?.name ?? c.pillar) : "No pillar";
+        const name = c.pillar
+          ? (PILLAR_BY_SLUG[c.pillar]?.name ?? c.pillar)
+          : "No pillar";
         push(c.pillar ?? "none", name, c.pillar ? 0 : 1, c);
       } else {
-        push(c.seriesName ?? "none", c.seriesName ?? "No series", c.seriesName ? 0 : 1, c);
+        push(
+          c.seriesName ?? "none",
+          c.seriesName ?? "No series",
+          c.seriesName ? 0 : 1,
+          c,
+        );
       }
     }
     const arr = [...map.values()].sort(
       (a, b) => a.sort - b.sort || a.label.localeCompare(b.label),
     );
     for (const g of arr)
-      g.cards.sort((a, b) => (a.plannedAt ?? "").localeCompare(b.plannedAt ?? ""));
+      g.cards.sort((a, b) =>
+        (a.plannedAt ?? "").localeCompare(b.plannedAt ?? ""),
+      );
     return arr;
   }, [cards, groupBy]);
 
   return (
     <div className="mt-5">
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-muted-foreground text-xs font-medium">Group by</span>
+        <span className="text-muted-foreground text-xs font-medium">
+          Group by
+        </span>
         <div className="border-border flex overflow-hidden rounded-full border">
           {GROUP_OPTIONS.map((o) => (
             <button
@@ -597,7 +670,9 @@ function ContentList({
                 />
               ))}
               {canAdd && groupBy === "week" && (
-                <InlineAdd onCreate={(title) => onCreate(title, g.weekStartISO)} />
+                <InlineAdd
+                  onCreate={(title) => onCreate(title, g.weekStartISO)}
+                />
               )}
             </div>
           </section>
@@ -641,9 +716,13 @@ function ListRow({
           title={STATUS_LABEL[c.status] ?? c.status}
         />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{c.title ?? "Untitled"}</div>
+          <div className="truncate text-sm font-medium">
+            {c.title ?? "Untitled"}
+          </div>
           {c.hook && (
-            <div className="text-muted-foreground truncate text-xs">{c.hook}</div>
+            <div className="text-muted-foreground truncate text-xs">
+              {c.hook}
+            </div>
           )}
         </div>
         {c.seriesName && (
@@ -675,7 +754,9 @@ function ListRow({
             active={commentsOpen}
             onToggle={() => setCommentsOpen((o) => !o)}
           />
-          {c.assignees.length > 0 && <AvatarStack members={c.assignees} size="sm" />}
+          {c.assignees.length > 0 && (
+            <AvatarStack members={c.assignees} size="sm" />
+          )}
           <AssigneeButton
             value={c.owner}
             members={assign.members}
@@ -789,7 +870,9 @@ function InlineCommentThread({
             <div key={cm.id} className="flex items-start gap-2 text-xs">
               <OwnerAvatar member={cm.author} size="sm" />
               <div className="min-w-0 flex-1">
-                <span className="font-medium">{cm.author?.name ?? "Someone"}</span>
+                <span className="font-medium">
+                  {cm.author?.name ?? "Someone"}
+                </span>
                 <span className="text-muted-foreground">
                   {" · "}
                   {new Date(cm.createdAt).toLocaleDateString([], {
@@ -797,7 +880,9 @@ function InlineCommentThread({
                     day: "numeric",
                   })}
                 </span>
-                <p className="text-foreground/90 whitespace-pre-wrap">{cm.body}</p>
+                <p className="text-foreground/90 whitespace-pre-wrap">
+                  {cm.body}
+                </p>
               </div>
               {cm.authorId === currentUserId && (
                 <button
@@ -884,7 +969,8 @@ function InlineAdd({ onCreate }: { onCreate: (title: string) => void }) {
 // ---- Schedule view (date-first manual posting worklist) -------------------
 
 type SchedRow = RouterOutputs["content"]["schedule"][number];
-const schedDayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const schedDayKey = (d: Date) =>
+  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
 /** Tactical week lens — one Mon–Sun week, all 7 days shown (gaps included) so
  *  the team sees the week's shape at a glance: what ships when, where the holes
@@ -938,7 +1024,11 @@ function WeekView({
   return (
     <div className="mt-5">
       <div className="mb-3 flex items-center gap-2">
-        <button onClick={() => setOffset((o) => o - 1)} className={navBtn} aria-label="Previous week">
+        <button
+          onClick={() => setOffset((o) => o - 1)}
+          className={navBtn}
+          aria-label="Previous week"
+        >
           ←
         </button>
         <button
@@ -948,7 +1038,11 @@ function WeekView({
         >
           This week
         </button>
-        <button onClick={() => setOffset((o) => o + 1)} className={navBtn} aria-label="Next week">
+        <button
+          onClick={() => setOffset((o) => o + 1)}
+          className={navBtn}
+          aria-label="Next week"
+        >
           →
         </button>
         <span className="ml-1 text-sm font-semibold">{label}</span>
@@ -988,7 +1082,12 @@ function WeekView({
               ) : (
                 <div className="flex flex-col gap-2">
                   {d.rows.map((r) => (
-                    <ScheduleRow key={r.id} row={r} onOpen={onOpen} onChanged={onChanged} />
+                    <ScheduleRow
+                      key={r.id}
+                      row={r}
+                      onOpen={onOpen}
+                      onChanged={onChanged}
+                    />
                   ))}
                 </div>
               )}
@@ -1018,7 +1117,10 @@ function ScheduleView({
   const [showPast, setShowPast] = useState(false);
 
   const { days, undated } = useMemo(() => {
-    const map = new Map<string, { key: string; date: Date; rows: SchedRow[] }>();
+    const map = new Map<
+      string,
+      { key: string; date: Date; rows: SchedRow[] }
+    >();
     const undated: SchedRow[] = [];
     for (const r of rows) {
       if (!r.at) {
@@ -1032,7 +1134,9 @@ function ScheduleView({
       if (g) g.rows.push(r);
       else map.set(k, { key: k, date: day, rows: [r] });
     }
-    const days = [...map.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
+    const days = [...map.values()].sort(
+      (a, b) => a.date.getTime() - b.date.getTime(),
+    );
     return { days, undated };
   }, [rows]);
 
@@ -1046,7 +1150,11 @@ function ScheduleView({
 
   const now = new Date();
   const todayK = schedDayKey(now);
-  const todayTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayTime = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
   const pastDays = days.filter((g) => g.date.getTime() < todayTime);
   const shownDays = showPast
     ? days
@@ -1080,7 +1188,12 @@ function ScheduleView({
         return (
           <section key={g.key}>
             <div className="mb-1.5 flex items-center gap-2 px-1">
-              <h3 className={cn("text-sm font-semibold", isPast && "text-muted-foreground")}>
+              <h3
+                className={cn(
+                  "text-sm font-semibold",
+                  isPast && "text-muted-foreground",
+                )}
+              >
                 {g.date.toLocaleDateString([], {
                   weekday: "short",
                   month: "short",
@@ -1098,7 +1211,12 @@ function ScheduleView({
             </div>
             <div className={cn("flex flex-col gap-2", isPast && "opacity-60")}>
               {g.rows.map((r) => (
-                <ScheduleRow key={r.id} row={r} onOpen={onOpen} onChanged={onChanged} />
+                <ScheduleRow
+                  key={r.id}
+                  row={r}
+                  onOpen={onOpen}
+                  onChanged={onChanged}
+                />
               ))}
             </div>
           </section>
@@ -1107,14 +1225,21 @@ function ScheduleView({
       {undated.length > 0 && (
         <section>
           <div className="mb-1.5 flex items-center gap-2 px-1">
-            <h3 className="text-muted-foreground text-sm font-semibold">No date yet</h3>
+            <h3 className="text-muted-foreground text-sm font-semibold">
+              No date yet
+            </h3>
             <span className="text-muted-foreground text-xs tabular-nums">
               {undated.length}
             </span>
           </div>
           <div className="flex flex-col gap-2">
             {undated.map((r) => (
-              <ScheduleRow key={r.id} row={r} onOpen={onOpen} onChanged={onChanged} />
+              <ScheduleRow
+                key={r.id}
+                row={r}
+                onOpen={onOpen}
+                onChanged={onChanged}
+              />
             ))}
           </div>
         </section>
@@ -1140,9 +1265,14 @@ function ScheduleRow({
   );
   const done = row.status === "published";
   const time = row.at
-    ? new Date(row.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? new Date(row.at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : null;
-  const copyText = [row.hook, row.caption, row.cta].filter(Boolean).join("\n\n");
+  const copyText = [row.hook, row.caption, row.cta]
+    .filter(Boolean)
+    .join("\n\n");
 
   return (
     <div className="bg-card rounded-xl border">
@@ -1161,7 +1291,9 @@ function ScheduleRow({
             {row.title ?? "Untitled"}
           </div>
           {row.hook && (
-            <div className="text-muted-foreground truncate text-xs">{row.hook}</div>
+            <div className="text-muted-foreground truncate text-xs">
+              {row.hook}
+            </div>
           )}
         </button>
         {time && (
@@ -1192,7 +1324,7 @@ function ScheduleRow({
         <div className="space-y-2 border-t px-3 py-2.5">
           {copyText && (
             <div className="flex items-start gap-2">
-              <p className="text-muted-foreground min-w-0 flex-1 whitespace-pre-wrap text-sm">
+              <p className="text-muted-foreground min-w-0 flex-1 text-sm whitespace-pre-wrap">
                 {copyText}
               </p>
               <button

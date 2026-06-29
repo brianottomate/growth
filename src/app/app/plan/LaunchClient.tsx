@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
+import { DatePicker, fromDateInputValue } from "@/components/ui/date-picker";
 import { BlueprintReview, type Blueprint } from "./BlueprintReview";
 import { PlanChat, type PlanDraft } from "./PlanChat";
 
@@ -231,11 +232,11 @@ export function LaunchClient({
           </label>
           <label>
             <span className="text-muted-foreground text-xs">Launch date</span>
-            <input
-              type="date"
-              value={launchDate}
-              onChange={(e) => setLaunchDate(e.target.value)}
-              className="border-border bg-background mt-1 block rounded-md border px-2 py-1.5 text-sm"
+            <DatePicker
+              value={fromDateInputValue(launchDate)}
+              onChange={(d) => setLaunchDate(d ? toDateInput(d) : "")}
+              placeholder="Launch date"
+              className="mt-1 flex w-full justify-start py-1.5 text-sm"
             />
           </label>
           <label className="w-28">
@@ -329,11 +330,11 @@ export function LaunchClient({
             </label>
             <label>
               <span className="text-muted-foreground text-xs">Launch date</span>
-              <input
-                type="date"
-                value={launchDate}
-                onChange={(e) => setLaunchDate(e.target.value)}
-                className="border-border bg-background mt-1 block rounded-md border px-2 py-1.5 text-sm"
+              <DatePicker
+                value={fromDateInputValue(launchDate)}
+                onChange={(d) => setLaunchDate(d ? toDateInput(d) : "")}
+                placeholder="Launch date"
+                className="mt-1 flex w-full justify-start py-1.5 text-sm"
               />
             </label>
           </div>

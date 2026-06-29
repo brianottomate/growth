@@ -10,6 +10,7 @@ import { IdeaOwnerControl } from "./OwnerControls";
 import { CommentThread } from "./CommentThread";
 import { AddSpotControl, BriefEditor } from "./IdeaControls";
 import { SpotCard } from "./SpotCard";
+import { ContentPool } from "./ContentPool";
 
 const memberCols = { id: true, name: true, image: true } as const;
 const toMember = (
@@ -220,6 +221,18 @@ export default async function ContentDetailPage({
           ))}
         </div>
       )}
+
+      {/* content media pool — feeds the spots below */}
+      <ContentPool
+        contentPostId={content.id}
+        brandId={content.brandId}
+        directMedia={content.media ?? []}
+        spots={posts.map((p) => ({
+          id: p.id,
+          platform: p.platform,
+          media: p.media ?? [],
+        }))}
+      />
 
       {/* platform renderings */}
       <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold uppercase tracking-wider">

@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
+import { useMutation } from "@tanstack/react-query";
 import {
   DefaultChatTransport,
   getToolName,
@@ -13,21 +15,28 @@ import {
   ArrowDown,
   ArrowUp,
   CalendarClock,
+  Check,
   ChevronRight,
   Copy,
+  ExternalLink,
   LayoutDashboard,
   Loader2,
   type LucideIcon,
   MessageCircle,
+  Paperclip,
   RefreshCw,
+  ShieldQuestion,
   Square,
   Users,
+  X,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
+import { toast } from "@/components/ui/toast";
+import { useTRPC } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 import {
   AdsRankedCard,
@@ -73,6 +82,7 @@ const PENDING_LABELS: Record<string, string> = {
   recentMentions: "Scanning the listening queue…",
   adsScope: "Scanning ad performance…",
   topAds: "Ranking ads…",
+  createIdea: "Creating the idea…",
 };
 
 /** Friendly fallback names for tools that error/deny before producing a card. */
@@ -85,6 +95,7 @@ const TOOL_LABELS: Record<string, string> = {
   recentMentions: "Social mentions",
   adsScope: "Ad performance",
   topAds: "Top ads",
+  createIdea: "New idea",
 };
 
 const STARTERS: { icon: LucideIcon; text: string }[] = [
@@ -102,12 +113,70 @@ export function OverviewChat({ userName }: { userName: string }) {
   // Autofocus pops the soft keyboard on touch devices — desktop only.
   const desktop = useMediaQuery("(min-width: 768px)");
 
-  const { messages, sendMessage, status, error, stop, regenerate } = useChat({
+  const {
+    messages,
+    sendMessage,
+    status,
+    error,
+    stop,
+    regenerate,
+    addToolApprovalResponse,
+  } = useChat({
     transport: new DefaultChatTransport({ api: "/api/overview/chat" }),
   });
 
   const busy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
+
+  // ---- image attachment (transient R2 blob → AI SDK file part) ----
+  const trpc = useTRPC();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    previewUrl: string;
+    blobUrl?: string;
+    mediaType: string;
+    uploading: boolean;
+  } | null>(null);
+  const uploadChatImage = useMutation(
+    trpc.media.uploadChatImage.mutationOptions(),
+  );
+
+  const attachImage = useCallback(
+    (dataUrl: string, fileName?: string) => {
+      const mediaType = /^data:([^;]+);/.exec(dataUrl)?.[1] ?? "image/png";
+      setPendingAttachment({ previewUrl: dataUrl, mediaType, uploading: true });
+      uploadChatImage.mutate(
+        { dataUrl, fileName },
+        {
+          onSuccess: (res) =>
+            setPendingAttachment((prev) =>
+              prev ? { ...prev, blobUrl: res.url, uploading: false } : prev,
+            ),
+          onError: (err) => {
+            toast.error("Couldn't attach image", { description: err.message });
+            setPendingAttachment(null);
+          },
+        },
+      );
+    },
+    [uploadChatImage],
+  );
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const item = Array.from(e.clipboardData.items).find((it) =>
+      it.type.startsWith("image/"),
+    );
+    const file = item?.getAsFile();
+    if (!file) return;
+    e.preventDefault();
+    readImageFile(file, (dataUrl) => attachImage(dataUrl, file.name));
+  };
+
+  const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) readImageFile(file, (dataUrl) => attachImage(dataUrl, file.name));
+    e.target.value = "";
+  };
 
   // One consistent "working" indicator. A turn streams in steps — reasoning, a
   // tool call, more reasoning, then the answer — and between steps the tail is
@@ -150,6 +219,7 @@ export function OverviewChat({ userName }: { userName: string }) {
       behavior: "smooth",
     });
 
+  // Starter chips send a plain text prompt (no attachment).
   const send = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
@@ -157,9 +227,37 @@ export function OverviewChat({ userName }: { userName: string }) {
     setInput("");
   };
 
+  const attachmentReady =
+    !!pendingAttachment?.blobUrl && !pendingAttachment.uploading;
+  const canSend =
+    !busy &&
+    !pendingAttachment?.uploading &&
+    (input.trim().length > 0 || attachmentReady);
+
+  // The composer send — text and/or a ready image attachment (file part).
+  const submitComposer = () => {
+    if (!canSend) return;
+    void sendMessage({
+      text: input.trim(),
+      ...(attachmentReady
+        ? {
+            files: [
+              {
+                type: "file" as const,
+                mediaType: pendingAttachment!.mediaType,
+                url: pendingAttachment!.blobUrl!,
+              },
+            ],
+          }
+        : {}),
+    });
+    setInput("");
+    setPendingAttachment(null);
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    send(input);
+    submitComposer();
   };
 
   const copyMessageText = (message: UIMessage) => {
@@ -227,12 +325,7 @@ export function OverviewChat({ userName }: { userName: string }) {
                   )}
                 >
                   {message.role === "user" ? (
-                    <div className="bg-primary text-primary-foreground max-w-[85%] rounded-2xl rounded-br-sm px-4 py-2 text-sm whitespace-pre-wrap">
-                      {message.parts
-                        .filter((p) => p.type === "text")
-                        .map((p) => (p as { text: string }).text)
-                        .join("")}
-                    </div>
+                    <UserMessage message={message} />
                   ) : (
                     <div className="max-w-[95%] space-y-2">
                       {message.parts.map((part, i) => {
@@ -280,7 +373,16 @@ export function OverviewChat({ userName }: { userName: string }) {
                           );
                         }
                         if (part.type !== "dynamic-tool" && isToolUIPart(part)) {
-                          return renderToolPart(part, key);
+                          return renderToolPart(part, key, (approved) => {
+                            const approval = (
+                              part as { approval?: { id: string } }
+                            ).approval;
+                            if (approval)
+                              void addToolApprovalResponse({
+                                id: approval.id,
+                                approved,
+                              });
+                          });
                         }
                         return null;
                       })}
@@ -355,6 +457,29 @@ export function OverviewChat({ userName }: { userName: string }) {
       <div className="mx-auto w-full max-w-3xl">
         <form className="mt-3" onSubmit={submit}>
           <div className="border-border focus-within:border-primary/50 bg-card rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:shadow-md">
+            {pendingAttachment && (
+              <div className="relative mb-2 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingAttachment.previewUrl}
+                  alt="Attachment"
+                  className="h-16 w-16 rounded-md border object-cover"
+                />
+                {pendingAttachment.uploading && (
+                  <div className="bg-background/60 absolute inset-0 flex items-center justify-center rounded-md">
+                    <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPendingAttachment(null)}
+                  aria-label="Remove attachment"
+                  className="bg-background hover:bg-muted absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
             <Textarea
               ref={textareaRef}
               value={input}
@@ -362,15 +487,34 @@ export function OverviewChat({ userName }: { userName: string }) {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  send(input);
+                  submitComposer();
                 }
               }}
-              placeholder="Ask about the workspace…"
+              onPaste={handlePaste}
+              placeholder="Ask about the workspace… (paste or attach an image)"
               rows={1}
               autoFocus={desktop}
               className="max-h-40 min-h-9 w-full resize-none border-0 bg-transparent px-1.5 py-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
             />
-            <div className="mt-1 flex items-center justify-end">
+            <div className="mt-1 flex items-center justify-between">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onFilePicked}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="text-muted-foreground"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!!pendingAttachment}
+                aria-label="Attach image"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
               {busy ? (
                 <Button
                   type="button"
@@ -385,7 +529,7 @@ export function OverviewChat({ userName }: { userName: string }) {
                 <Button
                   type="submit"
                   size="icon"
-                  disabled={!input.trim()}
+                  disabled={!canSend}
                   aria-label="Send"
                 >
                   <ArrowUp className="h-4 w-4" />
@@ -402,9 +546,77 @@ export function OverviewChat({ userName }: { userName: string }) {
   );
 }
 
+/** Read a File as a base64 data URL (for paste / file-picker attach). */
+function readImageFile(file: File, onData: (dataUrl: string) => void) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    if (typeof ev.target?.result === "string") onData(ev.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+/** A user message bubble — image attachments stacked above the text. */
+function UserMessage({ message }: { message: UIMessage }) {
+  const images = message.parts.filter(
+    (p) =>
+      p.type === "file" &&
+      ((p as { mediaType?: string }).mediaType ?? "").startsWith("image/"),
+  );
+  const text = message.parts
+    .filter((p) => p.type === "text")
+    .map((p) => (p as { text: string }).text)
+    .join("");
+  return (
+    <div className="flex max-w-[85%] flex-col items-end gap-1.5">
+      {images.map((p, i) => {
+        const url = (p as { url?: string }).url;
+        return url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={`${message.id}-img-${i}`}
+            src={url}
+            alt="Attachment"
+            className="max-h-56 rounded-xl border object-cover"
+          />
+        ) : null;
+      })}
+      {text && (
+        <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2 text-sm whitespace-pre-wrap">
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Dispatch a tool part to its typed card (or a generic fallback). */
-function renderToolPart(part: ToolUIPart, key: string) {
+function renderToolPart(
+  part: ToolUIPart,
+  key: string,
+  onApprove: (approved: boolean) => void,
+) {
   const toolName = getToolName(part);
+
+  // Write tools (createIdea) pause for the operator's go-ahead. These states
+  // aren't in the base ToolUIPart union in this SDK version — read them loosely.
+  const loose = part as { state: string; input?: unknown };
+  if (loose.state === "approval-requested") {
+    return (
+      <ApprovalCard
+        key={key}
+        toolName={toolName}
+        input={loose.input}
+        onApprove={onApprove}
+      />
+    );
+  }
+  if (loose.state === "output-denied") {
+    return (
+      <p key={key} className="text-muted-foreground text-xs">
+        {TOOL_LABELS[toolName] ?? toolName} — skipped.
+      </p>
+    );
+  }
 
   if (part.state === "input-streaming" || part.state === "input-available") {
     return (
@@ -460,7 +672,95 @@ function renderToolPart(part: ToolUIPart, key: string) {
       return <AdsScopeCard key={key} output={part.output as AdsScopeOutput} />;
     case "topAds":
       return <AdsRankedCard key={key} output={part.output as AdsRankedOutput} />;
+    case "createIdea":
+      return (
+        <CreatedIdeaCard key={key} output={part.output as CreatedIdeaOutput} />
+      );
     default:
       return <GenericToolCard key={key} name={toolName} output={part.output} />;
   }
+}
+
+/** Approval gate for a write tool — mirrors SparPanel's pattern. */
+function ApprovalCard({
+  toolName,
+  input,
+  onApprove,
+}: {
+  toolName: string;
+  input: unknown;
+  onApprove: (approved: boolean) => void;
+}) {
+  // createIdea is the only write today; show its proposed idea.
+  const inp = input as
+    | { title?: string; hook?: string; platforms?: string[] }
+    | undefined;
+  return (
+    <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
+        <ShieldQuestion className="h-3.5 w-3.5" />
+        {toolName === "createIdea" ? "Create this idea?" : "Confirm this action?"}
+      </div>
+      {inp?.title && <p className="mt-1.5 text-sm font-medium">{inp.title}</p>}
+      {inp?.hook && (
+        <p className="text-muted-foreground mt-0.5 text-xs">{inp.hook}</p>
+      )}
+      {inp?.platforms && inp.platforms.length > 0 && (
+        <p className="text-muted-foreground mt-1 text-xs">
+          Channels: {inp.platforms.join(", ")}
+        </p>
+      )}
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" onClick={() => onApprove(true)}>
+          <Check className="h-3.5 w-3.5" />
+          Create it
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onApprove(false)}>
+          <X className="h-3.5 w-3.5" />
+          Not yet
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+type CreatedIdeaOutput = {
+  ok?: boolean;
+  id?: string | null;
+  title?: string;
+  brandName?: string;
+  platforms?: string[];
+  url?: string | null;
+  error?: string;
+};
+
+/** Success card for a created idea — links straight to the idea page. */
+function CreatedIdeaCard({ output }: { output: CreatedIdeaOutput }) {
+  if (output?.error) {
+    return <p className="text-destructive text-xs">{output.error}</p>;
+  }
+  return (
+    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+        <Check className="h-3.5 w-3.5" />
+        Idea created
+      </div>
+      <p className="mt-1 text-sm font-medium">{output.title ?? "Untitled"}</p>
+      <p className="text-muted-foreground text-xs">
+        {output.brandName ?? "—"}
+        {output.platforms && output.platforms.length > 0
+          ? ` · ${output.platforms.join(", ")}`
+          : ""}
+      </p>
+      {output.url && (
+        <Link
+          href={output.url}
+          className="text-primary mt-1.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+        >
+          Open idea
+          <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
+    </div>
+  );
 }
