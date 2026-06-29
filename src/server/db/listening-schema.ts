@@ -44,7 +44,7 @@ export type { SubredditEntry, SubredditProfile, SubredditStance };
 // it's a lean landing table for one push-based source, not a refactor of the
 // existing pull surfaces (DMs/comments/X live in cache/localStorage for now).
 
-export const MENTION_PROVIDERS = ["f5bot", "brightdata"] as const;
+export const MENTION_PROVIDERS = ["f5bot", "brightdata", "x-api"] as const;
 export type MentionProvider = (typeof MENTION_PROVIDERS)[number];
 
 export const MENTION_SOURCES = [
@@ -127,6 +127,15 @@ export const mentionTable = pgTable(
     // engage, because X", so the team + future scans/agents learn from it.
     // Cleared on reopen. The spar agent's recordDecision writes here.
     decisionNote: t.text(),
+
+    // ---- Broadcast trail ----
+    // The #radio-social-listening message this mention was posted to. We keep it
+    // so the app can update that message later (chat.update on engage/skip) and
+    // so re-running ingestion never double-broadcasts. `slackChannel` is the
+    // RESOLVED channel the post actually landed in — outside prod every post is
+    // redirected to #radio-slack-testing, so the intended channel isn't reliable.
+    slackTs: t.text(),
+    slackChannel: t.text(),
 
     // ---- Provenance ----
     sourceEmailId: t.text(), // Resend received-email id this came from

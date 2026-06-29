@@ -1,8 +1,11 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
+
 import { env } from "@/env";
 import { postOnSlack } from "@/server/clients/slack.client";
-import type { Mention } from "@/server/db/listening-schema";
+import { db } from "@/server/db";
+import { mentionTable, type Mention } from "@/server/db/listening-schema";
 import { buildTrackedLink } from "@/lib/tracked-link";
 
 // #radio-social-listening — the social-listening sibling of wander.com's
@@ -17,13 +20,12 @@ const RADIO_SOCIAL_LISTENING_CHANNEL_ID = "C0BAW47LFGF";
 // Keyed by mention.source (note: X is stored as "twitter"). Lift onto
 // listening_source if per-brand ownership is ever needed.
 //
-// Live today: reddit (via F5Bot email) + instagram (via the account-watch cron)
-// both persist→score→broadcast, so their owners fire on real hits. The twitter
-// owner is wired ahead of the pipeline — X is manual-scan-only and doesn't yet
-// persist or notify, so Kyle's tag stays dormant until the X cron lands.
+// All three sources now persist→score→broadcast, so their owners fire on real
+// hits: reddit via F5Bot email, instagram via the account-watch cron, twitter
+// via the hourly X recent-search cron (/api/cron/x).
 const SOURCE_OWNER_SLACK_ID: Partial<Record<string, string>> = {
   reddit: "U09K9UDU5FA",
-  twitter: "U025DTBSU01", // Kyle — X / Twitter (dormant until X notifies)
+  twitter: "U025DTBSU01", // Kyle — X / Twitter
   instagram: "U0574R1RCD9", // Micaela — Instagram
 };
 
@@ -122,16 +124,30 @@ export async function postMentionToRadio(m: Mention) {
     blocks: buildBlocks(m),
   });
 
-  // Best-effort thread: the suggested reply hangs off the alert so the channel
-  // stays a scannable feed. A thread failure must never change the result the
-  // caller sees for the main post, so we don't await-or-throw on it.
-  if (result.success && result.ts && m.suggestedReply) {
-    await postOnSlack({
-      text: "Suggested reply",
-      channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
-      thread_ts: result.ts,
-      blocks: buildThreadBlocks(m),
-    });
+  if (result.success && result.ts) {
+    // Remember where this landed: the target for a later chat.update (engage/
+    // skip) and the guard that stops re-ingestion from double-broadcasting.
+    // Best-effort — a DB hiccup must not fail ingestion or change the result.
+    try {
+      await db
+        .update(mentionTable)
+        .set({ slackTs: result.ts, slackChannel: result.channel })
+        .where(eq(mentionTable.id, m.id));
+    } catch (e) {
+      console.error("[radio] failed to persist slack thread ref", e);
+    }
+
+    // Best-effort thread: the suggested reply hangs off the alert so the channel
+    // stays a scannable feed. A thread failure must never change the result the
+    // caller sees for the main post, so we don't await-or-throw on it.
+    if (m.suggestedReply) {
+      await postOnSlack({
+        text: "Suggested reply",
+        channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
+        thread_ts: result.ts,
+        blocks: buildThreadBlocks(m),
+      });
+    }
   }
 
   return result;
@@ -143,7 +159,13 @@ export async function postMentionToRadio(m: Mention) {
  * (e.g. scoring failed upstream) is a no-op. Returns the count actually posted.
  */
 export async function postMentionsToRadio(mentions: Mention[]): Promise<number> {
-  const worth = mentions.filter(isWorthBroadcasting);
+  // Engage-worthy AND not already broadcast — `slackTs` is set once a mention
+  // has been posted, so a re-run (or a row that slipped through twice) is a
+  // no-op rather than a duplicate alert. The manual "Test → Slack" button calls
+  // postMentionToRadio directly and intentionally bypasses this guard.
+  const worth = mentions
+    .filter(isWorthBroadcasting)
+    .filter((m) => !m.slackTs);
   if (worth.length === 0) return 0;
 
   let posted = 0;

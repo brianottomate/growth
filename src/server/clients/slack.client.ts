@@ -311,7 +311,8 @@ interface PostOnSlackMessage {
 export async function postOnSlack(
   message: PostOnSlackMessage,
 ): Promise<
-  { success: true; ts?: string } | { success: false; error: string }
+  | { success: true; ts?: string; channel: string }
+  | { success: false; error: string }
 > {
   if (!env.SLACK_API_TOKEN) {
     console.warn("⚠️ [Slack] SLACK_API_TOKEN not set — skipping post");
@@ -350,7 +351,9 @@ export async function postOnSlack(
       console.error("❌ [Slack] chat.postMessage failed:", data);
       return { success: false, error: data.error ?? `HTTP ${response.status}` };
     }
-    return { success: true, ts: data.ts };
+    // Return the RESOLVED channel (not message.channel) — outside prod it's been
+    // redirected, and callers persist this to target the message later.
+    return { success: true, ts: data.ts, channel };
   } catch (error) {
     console.error("❌ [Slack] Error posting message:", error);
     return {

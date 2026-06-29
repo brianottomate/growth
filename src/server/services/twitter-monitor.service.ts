@@ -1,5 +1,12 @@
 import "server-only";
 
+import { inArray } from "drizzle-orm";
+
+import { db } from "@/server/db";
+import {
+  mentionTable,
+  type MentionInsert,
+} from "@/server/db/listening-schema";
 import {
   INTENT_TAGS,
   type DraftPill,
@@ -7,6 +14,7 @@ import {
   type SuggestedAction,
 } from "@/server/services/reddit-monitor.service";
 import { loadListeningContext } from "@/server/services/listening-config.service";
+import { postMentionsToRadio } from "@/server/services/listening-notify.service";
 import {
   composeListeningSystemPrompt,
   draftReply,
@@ -202,6 +210,107 @@ export async function scanAndScoreTweets(): Promise<{
   const tweets = await searchRecentTweets();
   const scored = await scoreTweets(tweets);
   return { scored, totalFetched: tweets.length };
+}
+
+export interface XScanResult {
+  fetched: number;
+  fresh: number;
+  scored: number;
+  inserted: number;
+  engage: number;
+  broadcast: number;
+}
+
+/**
+ * Cron entrypoint: search → dedup → score → persist → broadcast. Mirrors the
+ * Instagram account-watch pipeline (instagram-watch.service), so X mentions flow
+ * through the same `mention` table, /app/listen-v2 surface, and
+ * #radio-social-listening broadcast (engage-gated, owner @-mentioned) as every
+ * other source.
+ *
+ * Recent search re-returns the same tweets every run (it looks back ~7 days), so
+ * we dedup against already-stored urls BEFORE scoring — scoring costs LLM tokens,
+ * and there's no point re-scoring a tweet we've already triaged. The unique `url`
+ * index + onConflictDoNothing is the final backstop against a concurrent run.
+ */
+export async function scanScoreAndPersistTweets(opts?: {
+  dryRun?: boolean;
+}): Promise<XScanResult> {
+  const tweets = await searchRecentTweets();
+  const result: XScanResult = {
+    fetched: tweets.length,
+    fresh: 0,
+    scored: 0,
+    inserted: 0,
+    engage: 0,
+    broadcast: 0,
+  };
+  if (tweets.length === 0) return result;
+
+  const urls = tweets.map((t) => t.url);
+  const existing = await db
+    .select({ url: mentionTable.url })
+    .from(mentionTable)
+    .where(inArray(mentionTable.url, urls));
+  const seen = new Set(existing.map((r) => r.url));
+  const novel = tweets.filter((t) => !seen.has(t.url));
+  result.fresh = novel.length;
+  if (novel.length === 0 || opts?.dryRun) return result;
+
+  const scored = await scoreTweets(novel);
+  result.scored = scored.length;
+
+  const inserts: MentionInsert[] = [];
+  for (const s of scored) {
+    const t = s.tweet;
+    const draft =
+      s.suggestedAction === "engage"
+        ? await draftTweetReplyForPost({
+            tweet: { authorUsername: t.authorUsername, text: t.text },
+            intentTag: s.intentTag,
+            rationale: s.rationale,
+          }).catch(() => null)
+        : null;
+    inserts.push({
+      provider: "x-api",
+      source: "twitter",
+      sourceType: "post",
+      externalId: t.id,
+      url: t.url,
+      author: t.authorUsername,
+      snippet: t.text.slice(0, 1500),
+      postedAt: new Date(t.createdAt),
+      relevance: s.relevance,
+      intentTag: s.intentTag,
+      suggestedAction: s.suggestedAction,
+      rationale: s.rationale,
+      suggestedReply: draft,
+      status: "new",
+      raw: {
+        authorName: t.authorName,
+        likeCount: t.likeCount,
+        replyCount: t.replyCount,
+        retweetCount: t.retweetCount,
+        viewCount: t.viewCount,
+        authorFollowers: t.authorFollowers,
+      },
+    });
+  }
+
+  const insertedRows = inserts.length
+    ? await db
+        .insert(mentionTable)
+        .values(inserts)
+        .onConflictDoNothing({ target: mentionTable.url })
+        .returning()
+    : [];
+  result.inserted = insertedRows.length;
+  result.engage = insertedRows.filter(
+    (m) => m.suggestedAction === "engage",
+  ).length;
+  result.broadcast = await postMentionsToRadio(insertedRows);
+
+  return result;
 }
 
 const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
