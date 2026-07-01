@@ -225,6 +225,121 @@ export async function findCompaniesByDomains(
   return out;
 }
 
+// ---- Name / phone finders --------------------------------------------------
+// For cross-referencing permit companies that don't have a domain. NAME is a
+// weak/candidate signal (generic-name collisions — the "plum ∈ plumlee" trap);
+// PHONE is high-precision because permit phones are real, government-filed. Both
+// return a lightweight shape incl. lifecyclestage so callers can suppress
+// existing customers before cold-emailing.
+
+export type HubspotMatch = {
+  id: string;
+  name: string | null;
+  domain: string | null;
+  lifecycleStage: string | null;
+  leadStatus: string | null;
+  ownerId: string | null;
+};
+
+const MATCH_PROPS = [
+  "name",
+  "domain",
+  "lifecyclestage",
+  "hs_lead_status",
+  "hubspot_owner_id",
+];
+
+function toCompanyMatch(found: {
+  id: string;
+  properties?: Record<string, string | null>;
+}): HubspotMatch {
+  const p = found.properties ?? {};
+  return {
+    id: found.id,
+    name: p.name ?? null,
+    domain: p.domain ?? null,
+    lifecycleStage: p.lifecyclestage ?? null,
+    leadStatus: p.hs_lead_status ?? null,
+    ownerId: p.hubspot_owner_id ?? null,
+  };
+}
+
+function phoneDigits(phone: string): string {
+  return phone.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+}
+
+/** Weak candidate match — companies whose name contains the (cleaned) permit name tokens. */
+export async function findCompaniesByName(name: string): Promise<HubspotMatch[]> {
+  const q = name
+    .replace(/\b(llc|inc|corp|co|ltd|the|holdings?)\b/gi, " ")
+    .replace(/[^a-z0-9 ]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (q.length < 3) return [];
+  try {
+    const result = await client().crm.companies.searchApi.doSearch({
+      filterGroups: [
+        { filters: [{ propertyName: "name", operator: FilterOperatorEnum.ContainsToken, value: q }] },
+      ],
+      properties: MATCH_PROPS,
+      limit: 10,
+      sorts: [],
+    });
+    return result.results.map((f) =>
+      toCompanyMatch({ id: f.id, properties: f.properties }),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** High-precision — companies whose phone contains the permit phone digits. */
+export async function findCompaniesByPhone(phone: string): Promise<HubspotMatch[]> {
+  const digits = phoneDigits(phone);
+  if (digits.length < 10) return [];
+  try {
+    const result = await client().crm.companies.searchApi.doSearch({
+      filterGroups: [
+        { filters: [{ propertyName: "phone", operator: FilterOperatorEnum.ContainsToken, value: digits }] },
+      ],
+      properties: MATCH_PROPS,
+      limit: 10,
+      sorts: [],
+    });
+    return result.results.map((f) =>
+      toCompanyMatch({ id: f.id, properties: f.properties }),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** High-precision — contacts whose phone contains the permit phone digits. */
+export async function findContactsByPhone(phone: string): Promise<
+  Array<{ id: string; email: string | null; ownerId: string | null; companyId: string | null }>
+> {
+  const digits = phoneDigits(phone);
+  if (digits.length < 10) return [];
+  try {
+    const result = await client().crm.contacts.searchApi.doSearch({
+      filterGroups: [
+        { filters: [{ propertyName: "phone", operator: FilterOperatorEnum.ContainsToken, value: digits }] },
+      ],
+      properties: ["email", "phone", "hs_lead_status", "hubspot_owner_id", "associatedcompanyid"],
+      limit: 10,
+      sorts: [],
+    });
+    return result.results.map((c) => ({
+      id: c.id,
+      email: (c.properties?.email as string | undefined) ?? null,
+      ownerId: (c.properties?.hubspot_owner_id as string | undefined) ?? null,
+      companyId: (c.properties?.associatedcompanyid as string | undefined) ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** Contacts associated with a company (decision-makers for the merge view). */
 export async function getCompanyContacts(
   companyId: string,
