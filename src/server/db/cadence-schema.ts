@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { brandTable } from "./brand-schema";
@@ -103,6 +103,11 @@ export const mixTargetTable = pgTable(
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
+    // Null = the brand-wide default mix; set = a per-channel override (same
+    // override pattern as channelFingerprint over the brand fingerprint).
+    channelId: t
+      .text()
+      .references(() => channelTable.id, { onDelete: "cascade" }),
     pillar: t.text().notNull(), // pillar slug (lib/pillars)
     targetPct: t.integer().notNull(), // 0..100
     period: cadencePeriodEnum().notNull(),
@@ -120,7 +125,14 @@ export const mixTargetTable = pgTable(
   }),
   (table) => [
     index("mix_target_brand_idx").on(table.brandId),
-    uniqueIndex("mix_target_unique_idx").on(table.brandId, table.pillar, table.period),
+    // Two partial unique keys so the brand default and each channel override
+    // upsert independently (setMixTarget's ON CONFLICT targets the first).
+    uniqueIndex("mix_target_unique_idx")
+      .on(table.brandId, table.pillar, table.period)
+      .where(sql`channel_id is null`),
+    uniqueIndex("mix_target_channel_unique_idx")
+      .on(table.channelId, table.pillar, table.period)
+      .where(sql`channel_id is not null`),
   ],
 );
 export type MixTarget = typeof mixTargetTable.$inferSelect;
@@ -130,6 +142,10 @@ export const mixTargetRelations = relations(mixTargetTable, ({ one }) => ({
   brand: one(brandTable, {
     fields: [mixTargetTable.brandId],
     references: [brandTable.id],
+  }),
+  channel: one(channelTable, {
+    fields: [mixTargetTable.channelId],
+    references: [channelTable.id],
   }),
 }));
 

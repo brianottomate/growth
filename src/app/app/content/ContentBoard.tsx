@@ -63,9 +63,11 @@ type Assign = {
   onSetAssignees: (cardId: string, userIds: string[]) => void;
 };
 
-// Active editorial pipeline, left → right. `rejected` / `archived` are terminal
-// and intentionally off the board (they'd just be noise in the daily flow).
+// Active editorial pipeline, left → right. Slots (empty strategy-generated
+// placeholders) lead — dragging one right claims it as work. `rejected` /
+// `archived` are terminal and intentionally off the board.
 const COLUMNS: { status: ContentStatus; label: string }[] = [
+  { status: "slot", label: "Slots" },
   { status: "discovered", label: "Discovered" },
   { status: "draft", label: "Draft" },
   { status: "pending_review", label: "In Review" },
@@ -75,6 +77,7 @@ const COLUMNS: { status: ContentStatus; label: string }[] = [
 ];
 
 const DOT: Record<string, string> = {
+  slot: "bg-slate-500",
   published: "bg-emerald-500",
   scheduled: "bg-sky-500",
   approved: "bg-amber-500",
@@ -96,15 +99,16 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: "Rejected",
   archived: "Archived",
 };
-// Pipeline order for the List view sort.
+// Pipeline order for the List view sort. Slots lead: they're the unclaimed
+// front of the pipeline, not an afterthought.
 const STATUS_ORDER = [
+  "slot",
   "discovered",
   "draft",
   "pending_review",
   "approved",
   "scheduled",
   "published",
-  "slot",
   "rejected",
   "archived",
 ];
@@ -1424,7 +1428,12 @@ function ScheduleRow({
     .join("\n\n");
 
   return (
-    <div className="bg-card rounded-xl border">
+    <div
+      className={cn(
+        "bg-card rounded-xl border",
+        row.status === "slot" && "border-dashed bg-transparent opacity-80",
+      )}
+    >
       <div className="flex items-center gap-3 px-3 py-2.5">
         <Thumb src={row.mediaUrl} className="size-10 shrink-0" iconClassName="size-4" />
         <ChannelLogo platform={row.platform} className="size-5 shrink-0" />
@@ -1629,6 +1638,8 @@ function ContentCardBody({
     <div
       className={cn(
         "bg-card rounded-lg border p-3 text-left",
+        // Slots are empty containers, not work — render as ghosts.
+        card.status === "slot" && "border-dashed bg-transparent opacity-80",
         dragging && "shadow-lg",
       )}
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}

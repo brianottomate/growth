@@ -229,6 +229,7 @@ function CalChip({
       }}
       className={cn(
         "bg-card flex cursor-grab touch-none items-center gap-1 overflow-hidden rounded-md border p-1 text-[11px]",
+        spot.status === "slot" && "border-dashed bg-transparent opacity-75",
         isDragging && "opacity-40",
       )}
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}

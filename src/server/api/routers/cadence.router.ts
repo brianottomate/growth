@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -54,7 +54,8 @@ export const cadenceRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
-      // (brandId, pillar, period) is a notNull unique key → safe upsert.
+      // Brand-default rows (channelId null) upsert on the partial unique index
+      // (brandId, pillar, period) WHERE channel_id IS NULL.
       const [row] = await ctx.db
         .insert(mixTargetTable)
         .values({
@@ -70,6 +71,7 @@ export const cadenceRouter = createTRPCRouter({
             mixTargetTable.pillar,
             mixTargetTable.period,
           ],
+          targetWhere: sql`channel_id is null`,
           set: { targetPct: input.targetPct, isActive: true },
         })
         .returning();

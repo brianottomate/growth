@@ -127,6 +127,9 @@ export async function getBrandStrategy(
       where: and(
         eq(mixTargetTable.brandId, brandId),
         eq(mixTargetTable.isActive, true),
+        // Brand-level gauge reads the brand default only; per-channel override
+        // rows (channelId set) belong to channel-scoped views.
+        isNull(mixTargetTable.channelId),
       ),
     }),
   ]);
