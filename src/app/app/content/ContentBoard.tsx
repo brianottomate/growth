@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  FileSpreadsheet,
   Image as ImageIcon,
   MessageSquare,
   Plus,
@@ -51,6 +52,7 @@ import { ContentCalendar } from "./ContentCalendar";
 import { ContentSheet } from "./ContentSheet";
 import { ReshuffleDialog } from "./ReshuffleDialog";
 import { AddIdeaDrawer } from "./AddIdeaDrawer";
+import { ImportPlanDialog } from "./ImportPlanDialog";
 import { MarkScheduledButton } from "./MarkScheduledButton";
 
 type Card = RouterOutputs["content"]["board"][number];
@@ -297,6 +299,7 @@ export function ContentBoard({
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [reshuffleOpen, setReshuffleOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const visible = useMemo(() => {
     let out = cards;
@@ -400,6 +403,12 @@ export function ContentBoard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => setImportOpen(true)}
+            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+          >
+            <FileSpreadsheet className="size-3.5" /> Import plan
+          </button>
           <Link
             href="/app/content/groupings"
             className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
@@ -581,6 +590,13 @@ export function ContentBoard({
           }}
         />
       )}
+
+      <ImportPlanDialog
+        brands={brands}
+        defaultBrandId={createBrandId}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+      />
 
       <AddIdeaDrawer
         brands={brands}
