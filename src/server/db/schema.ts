@@ -10,6 +10,7 @@ export * from "./auth-schema";
 export * from "./brand-schema";
 export * from "./channel-schema";
 export * from "./content-schema";
+export * from "./plan-import-schema";
 export * from "./ads-schema";
 export * from "./conversions-schema";
 export * from "./amplification-schema";
