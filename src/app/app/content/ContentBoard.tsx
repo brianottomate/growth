@@ -51,6 +51,7 @@ import { ContentCalendar } from "./ContentCalendar";
 import { ContentSheet } from "./ContentSheet";
 import { ReshuffleDialog } from "./ReshuffleDialog";
 import { AddIdeaDrawer } from "./AddIdeaDrawer";
+import { MarkScheduledButton } from "./MarkScheduledButton";
 
 type Card = RouterOutputs["content"]["board"][number];
 
@@ -539,18 +540,24 @@ export function ContentBoard({
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
         >
-          <div className="mt-5 flex flex-1 gap-3 overflow-x-auto pb-4">
-            {COLUMNS.map((col) => (
-              <Column
-                key={col.status}
-                status={col.status}
-                label={col.label}
-                cards={byStatus.get(col.status) ?? []}
-                onOpen={openCard}
-                loading={isLoading}
-                assign={assign}
-              />
-            ))}
+          {/* Full-bleed, viewport-height board: the cqw negative margin escapes
+              the page's centered max-w-5xl (the app layout's scroll div is the
+              @container), and each column scrolls internally so one crowded
+              column doesn't set the page height. */}
+          <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)] mt-5">
+            <div className="flex h-[calc(100svh-15rem)] min-h-96 gap-3 overflow-x-auto px-8">
+              {COLUMNS.map((col) => (
+                <Column
+                  key={col.status}
+                  status={col.status}
+                  label={col.label}
+                  cards={byStatus.get(col.status) ?? []}
+                  onOpen={openCard}
+                  loading={isLoading}
+                  assign={assign}
+                />
+              ))}
+            </div>
           </div>
           <DragOverlay>
             {activeCard ? <ContentCardBody card={activeCard} dragging /> : null}
@@ -1405,6 +1412,7 @@ function ScheduleRow({
     trpc.content.setSpotStatus.mutationOptions({ onSettled: onChanged }),
   );
   const done = row.status === "published";
+  const scheduled = row.status === "scheduled";
   const time = row.at
     ? new Date(row.at).toLocaleTimeString([], {
         hour: "2-digit",
@@ -1445,6 +1453,12 @@ function ScheduleRow({
         )}
         <span className={cn("size-2 shrink-0 rounded-full", DOT[row.status])} />
         {row.owner && <OwnerAvatar member={row.owner} size="sm" />}
+        <MarkScheduledButton
+          spotId={row.id}
+          at={row.at}
+          scheduled={scheduled}
+          onChanged={onChanged}
+        />
         <button
           onClick={() =>
             setStatus.mutate({
@@ -1535,7 +1549,7 @@ function Column({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <div className="flex w-72 shrink-0 flex-col">
+    <div className="flex w-64 shrink-0 grow flex-col">
       <div className="mb-2 flex items-center gap-2 px-1">
         <span className={cn("size-2 rounded-full", DOT[status])} />
         <span className="text-sm font-semibold">{label}</span>
@@ -1546,7 +1560,7 @@ function Column({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex flex-1 flex-col gap-2 rounded-xl border border-dashed p-2 transition-colors",
+          "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-xl border border-dashed p-2 transition-colors",
           isOver ? "border-foreground/40 bg-accent/30" : "border-border/60",
         )}
       >

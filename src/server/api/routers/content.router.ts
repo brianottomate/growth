@@ -489,6 +489,10 @@ export const contentRouter = createTRPCRouter({
       z.object({
         platformPostId: z.string(),
         scheduledAt: z.string().datetime().nullable(),
+        // Also move the spot to `scheduled` — the "she queued it natively on
+        // the platform" hot action. Off for plain reschedules (calendar drag),
+        // which shouldn't silently promote a draft.
+        markScheduled: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -503,7 +507,12 @@ export const contentRouter = createTRPCRouter({
       }
       await ctx.db
         .update(platformPostTable)
-        .set({ scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null })
+        .set({
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
+          ...(input.markScheduled && input.scheduledAt
+            ? { status: "scheduled" as const }
+            : {}),
+        })
         .where(eq(platformPostTable.id, input.platformPostId));
       return { id: input.platformPostId };
     }),

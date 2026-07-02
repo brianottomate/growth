@@ -46,7 +46,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
         </header>
-        <div className="flex-1 overflow-auto">
+        {/* @container lets wide surfaces (e.g. the content Board) break out of
+            the centered column with a cqw-based negative margin. */}
+        <div className="@container flex-1 overflow-auto">
           <div className="mx-auto w-full max-w-5xl p-8">{children}</div>
         </div>
       </SidebarInset>
