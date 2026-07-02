@@ -235,6 +235,15 @@ function CalChip({
       title={spot.title ?? undefined}
     >
       <ChannelLogo platform={spot.platform} className="size-3.5 shrink-0" />
+      {spot.mediaUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={spot.mediaUrl}
+          alt=""
+          className="size-4 shrink-0 rounded-sm border object-cover"
+          onError={(e) => (e.currentTarget.style.display = "none")}
+        />
+      )}
       <span className="min-w-0 flex-1 truncate leading-tight">{spot.title ?? "Untitled"}</span>
       <span
         className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[spot.status] ?? "bg-slate-400")}

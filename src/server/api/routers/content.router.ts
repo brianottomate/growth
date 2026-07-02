@@ -155,12 +155,20 @@ export const contentRouter = createTRPCRouter({
               .map((o) => [o.id, { id: o.id, name: o.name, image: o.image }]),
           ).values(),
         ];
+        // Card thumbnail: the idea's pool image, else the first spot with media.
+        const mediaUrl =
+          displayPoster(c.media) ??
+          c.platformPosts
+            .map((p) => displayPoster(p.media))
+            .find((u): u is string => !!u) ??
+          null;
         return {
           id: c.id,
           title: c.title,
           brandId: c.brandId,
           brandName: brandName.get(c.brandId) ?? "—",
           pillar: c.pillar,
+          mediaUrl,
           seriesName: c.series?.name ?? null,
           seriesColor: c.series?.color ?? null,
           status: c.status,
@@ -579,7 +587,7 @@ export const contentRouter = createTRPCRouter({
       if (spot.source !== "owned") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Can't edit a scraped post" });
       }
-      const text = input.text && input.text.trim() ? input.text : null;
+      const text = input.text?.trim() ? input.text : null;
       return ContentService.setSpotText({ platformPostId: input.platformPostId, text });
     }),
 

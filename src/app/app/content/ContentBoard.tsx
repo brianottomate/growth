@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,11 +20,21 @@ import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleSelect } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { MessageSquare, Plus } from "lucide-react";
+import {
+  Image as ImageIcon,
+  MessageSquare,
+  Plus,
+  SlidersHorizontal,
+} from "lucide-react";
 import { cn } from "@/components/ui/lib/utils";
 import {
   AssigneeButton,
@@ -99,6 +110,42 @@ const STATUS_ORDER = [
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
+
+/** Row thumbnail with graceful fallback — scraped CDN URLs (e.g. signed
+ *  Instagram links) expire, so a dead image degrades to the placeholder
+ *  square instead of a broken-image glyph. */
+function Thumb({
+  src,
+  className,
+  iconClassName = "size-3.5",
+}: {
+  src: string | null;
+  className: string;
+  iconClassName?: string;
+}) {
+  const [brokenSrc, setBrokenSrc] = useState<string | null>(null);
+  if (!src || brokenSrc === src) {
+    return (
+      <span
+        className={cn(
+          "bg-muted/40 text-muted-foreground/30 flex items-center justify-center rounded-md border",
+          className,
+        )}
+      >
+        <ImageIcon className={iconClassName} />
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className={cn("rounded-md border object-cover", className)}
+      onError={() => setBrokenSrc(src)}
+    />
+  );
+}
 
 export function ContentBoard({
   brands,
@@ -233,12 +280,16 @@ export function ContentBoard({
     });
   };
 
-  // List is the team's default surface; Board is the strategist's lens; Week is
-  // the tactical "what's coming up this week" lens; Schedule is the full
-  // date-first manual posting worklist.
-  const [view, setView] = useState<
-    "board" | "list" | "week" | "schedule" | "calendar" | "sheet"
-  >("list");
+  // Three views, one per job: Board is the working tool (what's being made,
+  // what needs review, what's done); Schedule is the zoomed-in posting worklist
+  // (today, this week, month grid tucked behind a toggle); List is the backup
+  // ledger (grouped rows, with the legacy Sheet rendering tucked inside).
+  const [view, setView] = useState<"board" | "schedule" | "list">("board");
+  const [scheduleLayout, setScheduleLayout] = useState<"agenda" | "month">(
+    "agenda",
+  );
+  const [listLayout, setListLayout] = useState<"rows" | "sheet">("rows");
+  const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [reshuffleOpen, setReshuffleOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
@@ -273,7 +324,7 @@ export function ContentBoard({
   });
   const { data: scheduleRows = [], isLoading: scheduleLoading } = useQuery({
     ...scheduleOpts,
-    enabled: view === "schedule" || view === "calendar" || view === "week",
+    enabled: view === "schedule",
   });
   const scheduleVisible = useMemo(
     () =>
@@ -343,123 +394,145 @@ export function ContentBoard({
             {view === "board" ? " · drag to move through the pipeline" : ""}
           </p>
         </div>
-        {createBrandId && (
-          <button
-            onClick={() => setAddOpen(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500"
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/app/content/groupings"
+            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
           >
-            <Plus className="size-4" /> Add idea
-          </button>
-        )}
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="border-border flex overflow-hidden rounded-full border">
-          {(
-            ["list", "board", "week", "schedule", "calendar", "sheet"] as const
-          ).map((v) => (
+            ✨ Groupings
+          </Link>
+          {createBrandId && (
             <button
-              key={v}
-              onClick={() => setView(v)}
-              className={cn(
-                "px-3 py-1 text-xs font-medium capitalize transition-colors",
-                view === v
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-accent",
-              )}
+              onClick={() => setAddOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500"
             >
-              {v}
+              <Plus className="size-4" /> Add idea
             </button>
-          ))}
-        </div>
-        {(view === "schedule" || view === "calendar") && createBrandId && (
-          <button
-            onClick={() => setReshuffleOpen(true)}
-            className="border-border hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
-          >
-            ✨ Reshuffle
-          </button>
-        )}
-        <button
-          onClick={() => setMineOnly((v) => !v)}
-          className={cn(
-            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-            mineOnly
-              ? "bg-foreground text-background border-foreground"
-              : "border-border text-muted-foreground hover:bg-accent",
           )}
-        >
-          Mine
-        </button>
-        <SimpleSelect
-          value={brandFilter}
-          onValueChange={(v) => {
-            setBrandFilter(v);
-            setPillarFilter("all");
-          }}
-          options={[
-            { value: "all", label: "All brands" },
-            ...brands.map((b) => ({ value: b.id, label: b.name })),
-          ]}
-          size="sm"
-          aria-label="Brand"
-        />
-        <SimpleSelect
-          value={pillarFilter}
-          onValueChange={setPillarFilter}
-          options={[
-            { value: "all", label: "All pillars" },
-            ...pillars.map((p) => ({ value: p.slug, label: p.name })),
-          ]}
-          size="sm"
-          aria-label="Pillar"
-        />
-        <SimpleSelect
-          value={statusFilter}
-          onValueChange={setStatusFilter}
-          options={statusOptions}
-          size="sm"
-          aria-label="Status"
-        />
+        </div>
       </div>
-      {/* List / Board / Schedule */}
+      {/* Toolbar: views left · view-specific controls middle · filters right */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Segmented
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "board", label: "Board" },
+            { value: "schedule", label: "Schedule" },
+            { value: "list", label: "List" },
+          ]}
+        />
+        {view === "schedule" && (
+          <>
+            <Segmented
+              value={scheduleLayout}
+              onChange={setScheduleLayout}
+              options={[
+                { value: "agenda", label: "Agenda" },
+                { value: "month", label: "Month" },
+              ]}
+              compact
+            />
+            {createBrandId && (
+              <button
+                onClick={() => setReshuffleOpen(true)}
+                className="border-border hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+              >
+                ✨ Reshuffle
+              </button>
+            )}
+          </>
+        )}
+        {view === "list" && (
+          <>
+            <Segmented
+              value={listLayout}
+              onChange={setListLayout}
+              options={[
+                { value: "rows", label: "Rows" },
+                { value: "sheet", label: "Sheet" },
+              ]}
+              compact
+            />
+            {listLayout === "rows" && (
+              <SimpleSelect
+                value={groupBy}
+                onValueChange={(v) => setGroupBy(v as GroupBy)}
+                options={GROUP_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: `By ${o.label.toLowerCase()}`,
+                }))}
+                size="sm"
+                aria-label="Group by"
+              />
+            )}
+          </>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setMineOnly((v) => !v)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              mineOnly
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:bg-accent",
+            )}
+          >
+            Mine
+          </button>
+          <FiltersPopover
+            brandFilter={brandFilter}
+            onBrandChange={(v) => {
+              setBrandFilter(v);
+              setPillarFilter("all");
+            }}
+            pillarFilter={pillarFilter}
+            onPillarChange={setPillarFilter}
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            brands={brands}
+            pillars={pillars}
+            statusOptions={statusOptions}
+          />
+        </div>
+      </div>
+      {/* Board / Schedule / List */}
       {view === "list" ? (
-        <ContentList
-          cards={visible}
-          onOpen={openCard}
-          assign={assign}
-          loading={isLoading}
-          onCreate={onCreate}
-          canAdd={!!createBrandId}
-          onCommentChange={() =>
-            qc.invalidateQueries({ queryKey: boardOptions.queryKey })
-          }
-        />
-      ) : view === "week" ? (
-        <WeekView
-          rows={scheduleVisible}
-          loading={scheduleLoading}
-          onOpen={openCard}
-          onChanged={invalidateSchedule}
-        />
+        listLayout === "sheet" ? (
+          <ContentSheet
+            brandId={input.brandId}
+            pillar={input.pillar}
+            onOpen={openCard}
+          />
+        ) : (
+          <ContentList
+            cards={visible}
+            groupBy={groupBy}
+            onOpen={openCard}
+            assign={assign}
+            loading={isLoading}
+            onCreate={onCreate}
+            canAdd={!!createBrandId}
+            onCommentChange={() =>
+              qc.invalidateQueries({ queryKey: boardOptions.queryKey })
+            }
+          />
+        )
       ) : view === "schedule" ? (
-        <ScheduleView
-          rows={scheduleVisible}
-          loading={scheduleLoading}
-          onOpen={openCard}
-          onChanged={invalidateSchedule}
-        />
-      ) : view === "calendar" ? (
-        <ContentCalendar
-          rows={scheduleVisible}
-          onReschedule={onReschedule}
-          onOpen={openCard}
-        />
-      ) : view === "sheet" ? (
-        <ContentSheet
-          brandId={input.brandId}
-          pillar={input.pillar}
-          onOpen={openCard}
-        />
+        scheduleLayout === "month" ? (
+          <ContentCalendar
+            rows={scheduleVisible}
+            onReschedule={onReschedule}
+            onOpen={openCard}
+          />
+        ) : (
+          <ScheduleView
+            rows={scheduleVisible}
+            loading={scheduleLoading}
+            onOpen={openCard}
+            onChanged={invalidateSchedule}
+          />
+        )
       ) : (
         <DndContext
           sensors={sensors}
@@ -512,6 +585,142 @@ export function ContentBoard({
   );
 }
 
+/** Pill-style segmented control (the view switcher + the per-view sub-toggles). */
+function Segmented<T extends string>({
+  value,
+  onChange,
+  options,
+  compact,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+  compact?: boolean;
+}) {
+  return (
+    <div className="border-border flex overflow-hidden rounded-full border">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "text-xs font-medium transition-colors",
+            compact ? "px-2.5 py-1" : "px-3 py-1",
+            value === o.value
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:bg-accent",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Brand / pillar / status collapsed into one popover; badge = active count. */
+function FiltersPopover({
+  brandFilter,
+  onBrandChange,
+  pillarFilter,
+  onPillarChange,
+  statusFilter,
+  onStatusChange,
+  brands,
+  pillars,
+  statusOptions,
+}: {
+  brandFilter: string;
+  onBrandChange: (v: string) => void;
+  pillarFilter: string;
+  onPillarChange: (v: string) => void;
+  statusFilter: string;
+  onStatusChange: (v: string) => void;
+  brands: { id: string; name: string }[];
+  pillars: { slug: string; name: string }[];
+  statusOptions: { value: string; label: string }[];
+}) {
+  const activeCount = [brandFilter, pillarFilter, statusFilter].filter(
+    (v) => v !== "all",
+  ).length;
+  const row = "flex items-center justify-between gap-3";
+  const label = "text-muted-foreground text-xs font-medium";
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+            activeCount > 0
+              ? "border-foreground/40 text-foreground"
+              : "border-border text-muted-foreground hover:bg-accent",
+          )}
+        >
+          <SlidersHorizontal className="size-3.5" />
+          Filters
+          {activeCount > 0 && (
+            <span className="bg-foreground text-background flex size-4 items-center justify-center rounded-full text-[10px] tabular-nums">
+              {activeCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64">
+        <div className="flex flex-col gap-3">
+          <div className={row}>
+            <span className={label}>Brand</span>
+            <SimpleSelect
+              value={brandFilter}
+              onValueChange={onBrandChange}
+              options={[
+                { value: "all", label: "All brands" },
+                ...brands.map((b) => ({ value: b.id, label: b.name })),
+              ]}
+              size="sm"
+              aria-label="Brand"
+            />
+          </div>
+          <div className={row}>
+            <span className={label}>Pillar</span>
+            <SimpleSelect
+              value={pillarFilter}
+              onValueChange={onPillarChange}
+              options={[
+                { value: "all", label: "All pillars" },
+                ...pillars.map((p) => ({ value: p.slug, label: p.name })),
+              ]}
+              size="sm"
+              aria-label="Pillar"
+            />
+          </div>
+          <div className={row}>
+            <span className={label}>Status</span>
+            <SimpleSelect
+              value={statusFilter}
+              onValueChange={onStatusChange}
+              options={statusOptions}
+              size="sm"
+              aria-label="Status"
+            />
+          </div>
+          {activeCount > 0 && (
+            <button
+              onClick={() => {
+                onBrandChange("all");
+                onPillarChange("all");
+                onStatusChange("all");
+              }}
+              className="text-muted-foreground hover:text-foreground self-start text-xs underline"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 type GroupBy = "week" | "status" | "pillar" | "series";
 
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
@@ -535,11 +744,14 @@ function weekRange(monday: Date): string {
   return `${f(monday)} – ${f(end)}`;
 }
 
-/** The sheet-killer: one scannable line per idea, grouped (by week by default).
+/** The backup ledger: one scannable line per idea, grouped (by week by default).
  *  No spreadsheet grid — the brief lives on the detail screen; this is triage:
- *  glance the title + hook + pillar + channels, reassign, or add a new idea. */
+ *  glance the title + hook + pillar + channels, reassign, or add a new idea.
+ *  Week grouping opens on "Not scheduled" + this week onward; earlier weeks
+ *  stay reachable behind a toggle (the list is also the backwards ledger). */
 function ContentList({
   cards,
+  groupBy,
   onOpen,
   assign,
   loading,
@@ -548,6 +760,7 @@ function ContentList({
   onCommentChange,
 }: {
   cards: Card[];
+  groupBy: GroupBy;
   onOpen: (id: string) => void;
   assign: Assign;
   loading: boolean;
@@ -555,7 +768,7 @@ function ContentList({
   canAdd: boolean;
   onCommentChange: () => void;
 }) {
-  const [groupBy, setGroupBy] = useState<GroupBy>("week");
+  const [showPast, setShowPast] = useState(false);
 
   const groups = useMemo(() => {
     type G = {
@@ -588,7 +801,7 @@ function ContentList({
             c,
             mon.toISOString(),
           );
-        } else push("none", "Unscheduled", Number.MAX_SAFE_INTEGER, c);
+        } else push("none", "Not scheduled", Number.MAX_SAFE_INTEGER, c);
       } else if (groupBy === "status") {
         push(
           c.status,
@@ -620,30 +833,31 @@ function ContentList({
     return arr;
   }, [cards, groupBy]);
 
+  // Week grouping: "Not scheduled" (in-progress work with no date) leads,
+  // earlier weeks collapse so the list opens on now — not on last month.
+  const currentMonday = mondayOf(new Date().toISOString()).getTime();
+  const isWeek = groupBy === "week";
+  const notScheduled = isWeek ? groups.filter((g) => g.key === "none") : [];
+  const pastWeeks = isWeek
+    ? groups.filter((g) => g.key !== "none" && g.sort < currentMonday)
+    : [];
+  const upcoming = isWeek
+    ? groups.filter((g) => g.key !== "none" && g.sort >= currentMonday)
+    : groups;
+  const renderGroup = (g: (typeof groups)[number]) => (
+    <ListGroup
+      key={g.key}
+      group={g}
+      onOpen={onOpen}
+      assign={assign}
+      onCommentChange={onCommentChange}
+      canAdd={canAdd && isWeek}
+      onCreate={onCreate}
+    />
+  );
+
   return (
     <div className="mt-5">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-muted-foreground text-xs font-medium">
-          Group by
-        </span>
-        <div className="border-border flex overflow-hidden rounded-full border">
-          {GROUP_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              onClick={() => setGroupBy(o.value)}
-              className={cn(
-                "px-2.5 py-1 text-xs font-medium transition-colors",
-                groupBy === o.value
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:bg-accent",
-              )}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {groups.length === 0 && (
         <div className="text-muted-foreground rounded-xl border px-3 py-12 text-center text-sm">
           {loading ? "Loading…" : "No ideas yet"}
@@ -651,34 +865,87 @@ function ContentList({
       )}
 
       <div className="flex flex-col gap-5">
-        {groups.map((g) => (
-          <section key={g.key}>
-            <div className="mb-1.5 flex items-center gap-2 px-1">
-              <h3 className="text-sm font-semibold">{g.label}</h3>
-              <span className="text-muted-foreground text-xs tabular-nums">
-                {g.cards.length}
-              </span>
-            </div>
-            <div className="overflow-hidden rounded-xl border">
-              {g.cards.map((c) => (
-                <ListRow
-                  key={c.id}
-                  card={c}
-                  onOpen={onOpen}
-                  assign={assign}
-                  onCommentChange={onCommentChange}
-                />
-              ))}
-              {canAdd && groupBy === "week" && (
-                <InlineAdd
-                  onCreate={(title) => onCreate(title, g.weekStartISO)}
-                />
-              )}
-            </div>
-          </section>
-        ))}
+        {notScheduled.map(renderGroup)}
+        {pastWeeks.length > 0 && (
+          <PastWeeksToggle
+            count={pastWeeks.length}
+            open={showPast}
+            onToggle={() => setShowPast((v) => !v)}
+          />
+        )}
+        {showPast && pastWeeks.map(renderGroup)}
+        {upcoming.map(renderGroup)}
       </div>
     </div>
+  );
+}
+
+function PastWeeksToggle({
+  count,
+  open,
+  onToggle,
+}: {
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex">
+      <button
+        onClick={onToggle}
+        className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+      >
+        {open
+          ? "Hide earlier weeks"
+          : `Show ${count} earlier ${count === 1 ? "week" : "weeks"}`}
+      </button>
+    </div>
+  );
+}
+
+function ListGroup({
+  group: g,
+  onOpen,
+  assign,
+  onCommentChange,
+  canAdd,
+  onCreate,
+}: {
+  group: {
+    key: string;
+    label: string;
+    weekStartISO?: string;
+    cards: Card[];
+  };
+  onOpen: (id: string) => void;
+  assign: Assign;
+  onCommentChange: () => void;
+  canAdd: boolean;
+  onCreate: (title: string, plannedAt?: string) => void;
+}) {
+  return (
+    <section>
+      <div className="mb-1.5 flex items-center gap-2 px-1">
+        <h3 className="text-sm font-semibold">{g.label}</h3>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {g.cards.length}
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-xl border">
+        {g.cards.map((c) => (
+          <ListRow
+            key={c.id}
+            card={c}
+            onOpen={onOpen}
+            assign={assign}
+            onCommentChange={onCommentChange}
+          />
+        ))}
+        {canAdd && (
+          <InlineAdd onCreate={(title) => onCreate(title, g.weekStartISO)} />
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -715,6 +982,7 @@ function ListRow({
           className={cn("size-2 shrink-0 rounded-full", DOT[c.status])}
           title={STATUS_LABEL[c.status] ?? c.status}
         />
+        <Thumb src={c.mediaUrl} className="size-9 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">
             {c.title ?? "Untitled"}
@@ -972,133 +1240,6 @@ type SchedRow = RouterOutputs["content"]["schedule"][number];
 const schedDayKey = (d: Date) =>
   `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
-/** Tactical week lens — one Mon–Sun week, all 7 days shown (gaps included) so
- *  the team sees the week's shape at a glance: what ships when, where the holes
- *  are. Prev/next/This-week navigation; rows reuse the Schedule worklist row
- *  (expand → copyable brief + assets + mark-done). */
-function WeekView({
-  rows,
-  loading,
-  onOpen,
-  onChanged,
-}: {
-  rows: SchedRow[];
-  loading: boolean;
-  onOpen: (id: string) => void;
-  onChanged: () => void;
-}) {
-  const [offset, setOffset] = useState(0); // weeks from the current week
-
-  const { days, label, total } = useMemo(() => {
-    const now = new Date();
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + offset * 7);
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + i);
-      return { key: schedDayKey(date), date, rows: [] as SchedRow[] };
-    });
-    const byKey = new Map(days.map((d) => [d.key, d]));
-    let total = 0;
-    for (const r of rows) {
-      if (!r.at) continue;
-      const d = new Date(r.at);
-      const day = byKey.get(
-        schedDayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate())),
-      );
-      if (day) {
-        day.rows.push(r);
-        total++;
-      }
-    }
-    const end = days[6]!.date;
-    const f = (x: Date) =>
-      x.toLocaleDateString([], { month: "short", day: "numeric" });
-    return { days, label: `${f(monday)} – ${f(end)}`, total };
-  }, [rows, offset]);
-
-  const todayKey = schedDayKey(new Date());
-  const navBtn =
-    "border-border text-muted-foreground hover:bg-accent rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40";
-
-  return (
-    <div className="mt-5">
-      <div className="mb-3 flex items-center gap-2">
-        <button
-          onClick={() => setOffset((o) => o - 1)}
-          className={navBtn}
-          aria-label="Previous week"
-        >
-          ←
-        </button>
-        <button
-          onClick={() => setOffset(0)}
-          disabled={offset === 0}
-          className={navBtn}
-        >
-          This week
-        </button>
-        <button
-          onClick={() => setOffset((o) => o + 1)}
-          className={navBtn}
-          aria-label="Next week"
-        >
-          →
-        </button>
-        <span className="ml-1 text-sm font-semibold">{label}</span>
-        <span className="text-muted-foreground text-xs tabular-nums">
-          {total} {total === 1 ? "post" : "posts"}
-          {loading ? " · loading…" : ""}
-        </span>
-      </div>
-      <div className="flex flex-col gap-3">
-        {days.map((d) => {
-          const isToday = d.key === todayKey;
-          return (
-            <section key={d.key}>
-              <div className="mb-1.5 flex items-center gap-2 px-1">
-                <h3 className="text-sm font-semibold">
-                  {d.date.toLocaleDateString([], {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </h3>
-                {isToday && (
-                  <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-                    Today
-                  </span>
-                )}
-                {d.rows.length > 0 && (
-                  <span className="text-muted-foreground text-xs tabular-nums">
-                    {d.rows.length}
-                  </span>
-                )}
-              </div>
-              {d.rows.length === 0 ? (
-                <div className="text-muted-foreground/60 px-1 pb-1 text-xs">
-                  Nothing planned
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {d.rows.map((r) => (
-                    <ScheduleRow
-                      key={r.id}
-                      row={r}
-                      onOpen={onOpen}
-                      onChanged={onChanged}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /** Spot-level agenda grouped by ship day — what the team posts, per channel,
  *  per day. Each row expands to the copyable caption + assets + mark-done. */
 function ScheduleView({
@@ -1277,6 +1418,7 @@ function ScheduleRow({
   return (
     <div className="bg-card rounded-xl border">
       <div className="flex items-center gap-3 px-3 py-2.5">
+        <Thumb src={row.mediaUrl} className="size-10 shrink-0" iconClassName="size-4" />
         <ChannelLogo platform={row.platform} className="size-5 shrink-0" />
         <button
           onClick={() => setOpen((o) => !o)}
@@ -1340,14 +1482,6 @@ function ScheduleRow({
             </div>
           )}
           <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-            {row.mediaUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={row.mediaUrl}
-                alt=""
-                className="size-10 rounded-md border object-cover"
-              />
-            )}
             {(row.assetLinks ?? []).map((url, i) => (
               <a
                 key={i}
@@ -1485,6 +1619,15 @@ function ContentCardBody({
       )}
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
     >
+      {card.mediaUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={card.mediaUrl}
+          alt=""
+          className="mb-2 h-24 w-full rounded-md border object-cover"
+          onError={(e) => (e.currentTarget.style.display = "none")}
+        />
+      )}
       <div className="flex items-start gap-2">
         <span className="line-clamp-2 flex-1 text-sm font-medium">
           {card.title ?? "Untitled"}
