@@ -15,10 +15,17 @@ mix_target         slots        (empty, dashed)                (the team's      
 
 1. **Set targets** — per-channel cadence (`cadence_target`: channel × archetype
    × count/period) and content mix (`mix_target`: pillar % — brand default with
-   optional per-channel overrides via `channelId`). Seeded 2026-07-02 from
-   observed May–Jun performance + peer benchmarks (`scripts/seed-strategy-targets.ts`);
-   edit via /channels or the cadence router. `/channels` shows observed-vs-target.
-2. **Generate the month** — "Generate slots" (on /content and /calendar) expands
+   optional per-channel overrides via `channelId`). Baseline (2026-07-03) is
+   the team's own sheet legend — platform guide + content-mix ratios — with
+   reconciliations documented in `scripts/seed-strategy-targets.ts`; edit via
+   /channels or the cadence router. `/channels` shows observed-vs-target, and
+   its per-brand **"Suggest updates"** runs the AI proposal engine
+   (`cadence-suggest.service.ts`): peer cadence (Airbnb/Rimowa-class) anchors
+   volume targets, own Zernio engagement anchors format/mix — under-execution
+   alone never lowers a target. Proposals are ephemeral; Apply writes through
+   the normal target procedures.
+2. **Generate the month** — "Generate slots" (on /content and /calendar, plus
+   per-month **Generate/Evaluate CTAs** on the yearly calendar's month cards) expands
    targets into empty `status:"slot"` content_posts (`slotKind:"cadence"`, one
    owned spot each), pillars allocated from the mix, dates spread across the
    month. Preview-first; **idempotent top-up** — filled/claimed slots still
@@ -100,3 +107,22 @@ The comment-trigger keywords the captions use (`content_post.ctaKeyword`):
 Strategy baseline: the cadence/mix targets seeded by
 `scripts/seed-strategy-targets.ts` follow the sheet's platform guide and
 content-mix ratios (reconciliations documented in that script's header).
+
+## Current state — 2026-07-03 (pre-weekend snapshot)
+
+- **Targets**: 15 cadence rows + brand mix + 6 channel overrides live in the DB
+  (sheet-legend baseline). All lanes slot-planned — the `NOT_SLOT_PLANNED`
+  exclusion set is empty (X texts included per Kristian).
+- **August 2026**: 61 original slots; import `imp_Jrsum7TzUpS8p6by` (the real
+  August workbook) has **2 applied · 1 rejected · 18 pending review** at
+  `/app/content/import/imp_Jrsum7TzUpS8p6by` (or Import plan → Recent imports).
+  A Generate re-run would top August up +~40 for the newer lanes — deliberate
+  decision pending.
+- **September 2026**: NOT generated. Preview shows ~125 slots across 8
+  channels. One click in Generate slots when ready.
+- **Peer data**: fresh Instagram scrapes (2026-07-03) — Airbnb 12, Rimowa 12,
+  Outsite 11, Vrbo 12 posts. "Suggest updates" hasn't been re-run since; the
+  first fresh-data run is worth a look.
+- **Known next builds**: peer pillar-classification pass (peer mix comparisons
+  currently read as unsorted), re-import diff/merge, per-channel targets in
+  the Evaluate month report.
