@@ -1,8 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import { Sparkles } from "lucide-react";
+
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
+import { SuggestTargetsDialog } from "./SuggestTargetsDialog";
 
 const ARCHETYPE_LABEL: Record<string, string> = {
   image: "Image",
@@ -57,6 +61,9 @@ export function ChannelsClient({
   brands: BrandChannels[];
   windowDays: number;
 }) {
+  const [suggestFor, setSuggestFor] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
@@ -73,9 +80,15 @@ export function ChannelsClient({
         )}
         {brands.map((b) => (
           <section key={b.id} className="overflow-hidden rounded-xl border">
-            <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-2.5">
+            <div className="bg-muted/30 flex items-center gap-3 border-b px-4 py-2.5">
               <h2 className="text-sm font-semibold">{b.name}</h2>
-              <span className="text-muted-foreground text-xs tabular-nums">
+              <button
+                onClick={() => setSuggestFor({ id: b.id, name: b.name })}
+                className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors"
+              >
+                <Sparkles className="size-3" /> Suggest updates
+              </button>
+              <span className="text-muted-foreground ml-auto text-xs tabular-nums">
                 {b.mixTotal} posts · {b.channels.length} channels
               </span>
             </div>
@@ -216,6 +229,17 @@ export function ChannelsClient({
           </section>
         ))}
       </div>
+
+      {suggestFor && (
+        <SuggestTargetsDialog
+          brandId={suggestFor.id}
+          brandName={suggestFor.name}
+          open={!!suggestFor}
+          onOpenChange={(o) => {
+            if (!o) setSuggestFor(null);
+          }}
+        />
+      )}
     </div>
   );
 }

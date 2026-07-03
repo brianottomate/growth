@@ -11,6 +11,7 @@ import {
   mixTargetTable,
 } from "@/server/db/schema";
 import { generateMonthSlots } from "@/server/services/slot-generate.service";
+import { suggestTargets } from "@/server/services/cadence-suggest.service";
 
 type Ctx = { db: typeof import("@/server/db").db; session: { user: { id: string } } };
 
@@ -43,6 +44,18 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
 const periodEnum = z.enum(["day", "week", "month"]);
 
 export const cadenceRouter = createTRPCRouter({
+  /**
+   * AI target-update proposals from own Zernio performance + peer cadences.
+   * Persists nothing — the dialog applies accepted rows via
+   * setCadenceTarget / setMixTarget.
+   */
+  suggestTargets: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx, input.brandId);
+      return suggestTargets(input.brandId);
+    }),
+
   /**
    * The strategy→calendar computation: expand the brand's cadence/mix targets
    * into a month of empty slot placeholders. Idempotent top-up (claimed slots
