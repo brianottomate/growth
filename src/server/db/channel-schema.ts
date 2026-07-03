@@ -61,6 +61,7 @@ export const deliveryProviderEnum = pgEnum("delivery_provider", [
   "zernio",
   "customerio",
   "instantly",
+  "hubspot", // sales sequences mirrored into /lifecycle (docs/hubspot-gateway-plan.md §8)
   "native",
   "manual",
   "email_forward", // forwarded inbound email (e.g. a competitor newsletter we subscribed to)
