@@ -130,13 +130,6 @@ export function GenerateSlotsDialog({
             className="border-border bg-background rounded-md border px-2 py-1 text-sm"
             aria-label="Month"
           />
-          <button
-            onClick={runPreview}
-            disabled={dryRun.isPending || !brandId}
-            className="border-border hover:bg-accent ml-auto rounded-full border px-3 py-1 text-xs font-medium disabled:opacity-50"
-          >
-            {dryRun.isPending ? "Previewing…" : "Preview"}
-          </button>
         </div>
 
         {preview && (
@@ -183,16 +176,30 @@ export function GenerateSlotsDialog({
           >
             Cancel
           </button>
+          {/* One two-step button: dry-run preview → confirm-create. */}
           <button
-            onClick={() => generate.mutate({ brandId, ...parseMonth() })}
-            disabled={!preview || toCreate === 0 || generate.isPending}
+            onClick={() =>
+              preview
+                ? generate.mutate({ brandId, ...parseMonth() })
+                : runPreview()
+            }
+            disabled={
+              !brandId ||
+              dryRun.isPending ||
+              generate.isPending ||
+              (!!preview && toCreate === 0)
+            }
             className="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
             {generate.isPending
               ? "Creating…"
-              : preview
-                ? `Create ${toCreate} slots`
-                : "Preview first"}
+              : dryRun.isPending
+                ? "Previewing…"
+                : preview
+                  ? toCreate === 0
+                    ? "Nothing to create — targets met"
+                    : `Create ${toCreate} slots`
+                  : "Preview"}
           </button>
         </div>
       </DialogContent>
