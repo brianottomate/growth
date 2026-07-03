@@ -1,5 +1,10 @@
 # Cold Outbound — Playbook & Learnings (2026-06-18)
 
+> ⚠️ **2026-07-03:** the Instantly-based send machine described here is now a
+> **dormant escape hatch** — cold motions run as HubSpot sequences and the
+> leads DB projects into HubSpot instead (see `hubspot-gateway-plan.md`). The
+> enrichment/verification learnings below remain fully valid.
+
 Living doc for the first WanderOS cold-email campaign. Captures what we learned
 building the lead → enrich → contact → send pipeline so we don't re-derive it.
 

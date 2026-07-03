@@ -1,8 +1,49 @@
 # HubSpot Gateway & Mirror — Working Plan
 
-**Status:** working document, for review by Danny (sales engineering / HubSpot).
-**Date:** 2026-07-03 · **Authors:** Kristian + Claude
+**Status:** living working document — Phase 1 SHIPPED; link pass, sequence
+mirror, and first segments LIVE (see Progress log). For review by Danny
+(sales engineering / HubSpot).
+**Date:** 2026-07-03 (updated end of day) · **Authors:** Kristian + Claude
 **Decision owners:** Kristian (growth), Danny (HubSpot/sales systems)
+
+## Progress log (2026-07-03 — all shipped & verified)
+
+- ✅ **Gateway Phase 1**: wander.com's full client superset merged into
+  `src/server/clients/hubspot.client.ts` (contacts create/upsert, deals,
+  associations, notes, label maps, round-robin); `pms-mapping` ported to
+  Anthropic; `/api/hubspot/v1` live in prod (health · companies/find ·
+  companies/upsert · contacts/upsert, bearer-auth). Bonus fix:
+  `HUBSPOT_ACCESS_TOKEN_OPERATED` had never been set in Vercel prod — the
+  deployed /leads HubSpot features were silently dead until now.
+- ✅ **Decisions locked**: single shared private app ("Operated", id 1855067,
+  a legacy private app) — no dedicated gateway app; provenance via custom
+  fields; only new env var is `HUBSPOT_GATEWAY_API_TOKEN` (caller bearer for
+  our routes). Kristian flipped `automation.sequences.read` +
+  `automation.sequences.enrollments.write` on the app. Notes/engagement
+  writes turned out to already work (no extra scope needed).
+- ✅ **Sequence mirror + strategic layer** (`scripts/import-hubspot-sequences.ts`,
+  rerunnable): 202 sequences → `lifecycle_campaign` (provider `hubspot`,
+  runState derived from live enrollment), 327 touchpoints across 36 live
+  sequences, and **Danny's six active flows seeded as `lifecycle_program`s**
+  (66 derived steps, linked both ways via the new `campaign.programId` FK).
+  The six: Cold Outbound Main (407 enrolled) · Email Only (193) · GK
+  Mainline (69) · Call Only (58) · Re-engage (44) · Standard non-listed
+  Inbound (43).
+- ✅ **Link pass** (`scripts/link-leads-hubspot.ts`): **58,814 of 58,890 lead
+  domains (99.9%) matched to HubSpot companies** — real `hubspotRecordId` +
+  live lead status/owner now on every `leads.domain` row; stale CSV flags
+  dead. True net-new: **38 domains**, mostly garbled/AI-guessed domains from
+  the June-1 pregen import — net-new sourcing is laid to rest (if sourcing
+  resumes, stamp attribution on the way in). ~86% of the pool (50k) sits
+  untouched in HubSpot (`NEW`/`Research Needed`).
+- ✅ **First segments** (`scripts/push-hubspot-segments.ts`, rerunnable):
+  MANUAL company lists — **"Growth · Untouched small PMs (5–49 units,
+  integrated PMS)"** = 772 companies (list 3748) and **"Growth · Re-engage
+  candidates"** = 77 companies (list 3749; No Response + Follow Up Later —
+  Danny to sanity-check the status vocabulary before anyone enrolls, and to
+  decide whether stale MQL (500) / Connected (214) widen it).
+- 📐 **Next up: enrichment → projection** (§9) — the agreed architecture for
+  running enrichment flows from this repo into HubSpot.
 
 > ⚠️ This plan **inverts the core idea in `leads-system.md`** ("the internal Neon
 > DB is the system of record; Instantly and HubSpot are projections"). That model
@@ -169,11 +210,11 @@ read the Neon projection.
 
 | Phase | What | Done when |
 |---|---|---|
-| 1 | Merge wander.com's FULL client superset into growth's `hubspot.client.ts` (incl. round-robin, label maps, pms-mapping → Anthropic rewrite); `/api/hubspot/v1` with bearer auth + `/health` + company/contact find/upsert. Ships on the shared `HUBSPOT_ACCESS_TOKEN_OPERATED` token (decision: one private app, no dedicated gateway app) | Gateway deployed, callable, no consumers yet |
-| 2 | Expand the shared private app's scopes (sequences + webhooks) + provenance layer: property group + custom props, MANUAL join list, promotion path (automates today's manual `applyMerge`) | Growth-sourced records identifiable in HubSpot filters/lists |
+| 1 ✅ | Merge wander.com's FULL client superset into growth's `hubspot.client.ts` (incl. round-robin, label maps, pms-mapping → Anthropic rewrite); `/api/hubspot/v1` with bearer auth + `/health` + company/contact find/upsert. Shipped on the shared `HUBSPOT_ACCESS_TOKEN_OPERATED` token (decision: one private app, no dedicated gateway app) | **DONE 2026-07-03** — deployed, verified in prod |
+| 2 | Enrichment → projection (§9): growth property group + `hubspot_synced_at` + projection script + nightly cron. Sequences scopes ✅ (flipped by Kristian); link pass ✅ (99.9% matched); first segments ✅ (lists 3748/3749) | Enrichment lands in HubSpot within a day; sales filters on `growth_*` props |
 | 3 | Port inbound router with accept-then-process; wander.com calls gateway behind a flag with local fallback; dual-run ~1 week, compare in Slack; delete wander.com copy | wander.com has no HubSpot code |
-| 4 | `/lifecycle` HubSpot provider: cron import of sequences → `lifecycle_campaign`/`lifecycle_touchpoint`, program↔sequence linking, "reflected in HubSpot" check-off | All 205 sequences visible in /lifecycle strategy view |
-| 5 | Webhook receiver → Neon read-model hydration; trim `leads.*` columns that existed only because Neon was SoR (snapshot flags, source booleans); rebuild script | Stale-flag hedging (`HsMarker` "?") deleted |
+| 4 ✅ | `/lifecycle` HubSpot provider: `import-hubspot-sequences.ts` → 202 campaigns + 327 touchpoints + six programs linked via `campaign.programId` | **DONE 2026-07-03** — rerun script to refresh; cron-schedule it later |
+| 5 | Webhook receiver → Neon read-model hydration; trim `leads.*` columns that existed only because Neon was SoR; rebuild script. (Interim: rerun the link pass for status refresh) | Stale-flag hedging (`HsMarker` "?") deleted |
 | — | Later: monolith `@wosc/hubspot` port; Instantly decommission decision | — |
 
 ## 7. Open questions for Danny
@@ -236,6 +277,64 @@ app currently 403s on `automation/v4/sequences` — needs
 run-states + enrollment metrics from contact aggregates alone (names where
 known). Step-level touchpoints follow once `automation.sequences.read` is
 granted. Strategy altitude first, step detail second.
+
+## 9. Enrichment → projection (agreed 2026-07-03, not yet built)
+
+How enrichment flows in this repo reach HubSpot. Core rule: **Neon is the
+system of intelligence, HubSpot is a projection of learnings — never couple
+the two inline.** Enrichment (discovery fan-out, extraction, unit estimates,
+channel discovery, Minerva verify) keeps writing to Neon exactly as today; a
+separate projection pass pushes dirty rows. One new column drives it:
+`leads.domain.hubspot_synced_at` — projection = rows where
+`updated_at > hubspot_synced_at`. Self-healing, rerunnable, resumable.
+
+### Two write rules, never confused
+
+**Our namespace (`growth_*`) — always overwritten, we own it** (and sales can
+build native ACTIVE lists on it, which eventually replaces manual list pushes):
+
+| Property | Object | From |
+|---|---|---|
+| `growth_unit_estimate` + `growth_unit_confidence` | company | unit-estimate service |
+| `growth_tier` | company | computedTier / composite score |
+| `growth_pms_detected` | company | discovery (vs their `pms_ai_identified`) |
+| `growth_pregen_url` | company | pregen pipeline |
+| `growth_reachability` | company | channel discovery (form/phone/chatbot) |
+| `growth_enriched_at` | company | projection timestamp |
+| `growth_source`, `growth_import_id` | both | provenance (if sourcing resumes) |
+| `growth_outreach_status`, `growth_verification` | contact | outreach / verify history |
+
+**Their namespace (`portfolio_size`, `pms_ai_identified`, `city/state/country`,
+`sites_preview_url`) — audit-always backfill only** (`computeFieldsToWrite`:
+fill blanks, never overwrite sales edits).
+
+A "Growth" property group renders it all as one card on the record.
+**→ Danny reviews property names before creation (§7 Q1).**
+
+### Batching
+
+- **Enrichment: small batches** — constraint is LLM/scraper cost + quality,
+  not HubSpot. ~100 domains/night via the existing cron pattern
+  (`/api/cron/channels` is the precedent). Priority queue = **untouched +
+  integrated PMS + no unit estimate (31,928 companies)** — every batch grows
+  list 3748 mechanically.
+- **Projection: canary 50, then bulk.** Id-based batch update API (100
+  records/call, generous non-search bucket) — the whole matched pool projects
+  in ~10 min. Search was the slow part of the link pass; projection never
+  touches search.
+
+### Build order
+
+1. `scripts/create-hubspot-growth-properties.ts` — group + properties
+   (scopes already granted; blocked only on Danny's naming nod).
+2. `hubspot_synced_at` column + `scripts/sync-hubspot-companies.ts`
+   projection (canary 50 → the ~4k already-enriched → all).
+3. Nightly cron: enrich next-100 by priority → project dirty rows.
+4. Contacts wave, gated on the marketing-contacts billing check
+   (API-created contacts default non-marketing — confirm portal setting).
+
+End state: anything any flow learns lands in Neon and reaches HubSpot within
+a day, with provenance, without ever fighting sales' edits.
 
 ## Appendix: source research
 

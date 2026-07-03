@@ -1,5 +1,14 @@
 # The Leads System
 
+> ⚠️ **2026-07-03 — the "core idea" below is superseded.** The link pass
+> (`scripts/link-leads-hubspot.ts`) matched **99.9% of lead domains to
+> existing HubSpot companies** (38 true net-new, mostly garbled domains), so
+> the direction inverted: **HubSpot is the system of record; Neon is the
+> enrichment/intelligence layer that projects into it.** Instantly is a
+> dormant escape hatch. See `hubspot-gateway-plan.md` — the living plan.
+> Everything below about the schema, grain rule, and enrichment pipeline
+> mechanics is still accurate.
+
 The **outbound prospecting engine** for Wander Sites — a system-of-record for
 companies we might cold-contact (property managers, STR operators), the
 enrichment that decides whether they're worth contacting and how, and the
