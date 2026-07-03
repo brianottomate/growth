@@ -244,8 +244,8 @@ export function OverviewChat({ userName }: { userName: string }) {
             files: [
               {
                 type: "file" as const,
-                mediaType: pendingAttachment!.mediaType,
-                url: pendingAttachment!.blobUrl!,
+                mediaType: pendingAttachment.mediaType,
+                url: pendingAttachment.blobUrl!,
               },
             ],
           }

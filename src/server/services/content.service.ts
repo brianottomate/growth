@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { archetypeForFormat, platformFormatsFor } from "../content/formats";
 import {
-  channelPlatformEnum,
+  type channelPlatformEnum,
   contentPostTable,
   type MediaItem,
   platformPostTable,
@@ -83,7 +83,7 @@ async function addSpots(
 ): Promise<void> {
   const rows = [...new Set(platforms)].map((platform) => {
     const format = platformFormatsFor(
-      platform as Parameters<typeof platformFormatsFor>[0],
+      platform,
     )[0]?.id;
     return {
       brandId,
