@@ -1,8 +1,13 @@
 import { redirect } from "next/navigation";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { brandTable, channelTable, memberTable } from "@/server/db/schema";
+import {
+  brandTable,
+  channelTable,
+  memberTable,
+  mixTargetTable,
+} from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { getBrandStrategy } from "@/server/services/cadence.service";
 import { ChannelsClient, type BrandChannels } from "./ChannelsClient";
@@ -51,6 +56,30 @@ export default async function ChannelsPage() {
     channelRows.map((c) => [c.id, c.channelFingerprint?.fingerprintText ?? null]),
   );
 
+  // Per-channel mix OVERRIDES (channelId set) — the brand default (channelId
+  // null) already flows through getBrandStrategy's mix rows. These drive the
+  // slot generator's pillar allocation, so they deserve visibility here.
+  const overrideRows = await db.query.mixTargetTable.findMany({
+    where: and(
+      inArray(
+        mixTargetTable.brandId,
+        brands.map((b) => b.id),
+      ),
+      isNotNull(mixTargetTable.channelId),
+      eq(mixTargetTable.isActive, true),
+    ),
+    columns: { channelId: true, pillar: true, targetPct: true },
+  });
+  const mixByChannel = new Map<string, { pillar: string; targetPct: number }[]>();
+  for (const r of overrideRows) {
+    if (!r.channelId) continue;
+    const list = mixByChannel.get(r.channelId) ?? [];
+    list.push({ pillar: r.pillar, targetPct: r.targetPct });
+    mixByChannel.set(r.channelId, list);
+  }
+  for (const list of mixByChannel.values())
+    list.sort((a, b) => b.targetPct - a.targetPct);
+
   const data: BrandChannels[] = await Promise.all(
     brands.map(async (b) => {
       const s = await getBrandStrategy(b.id, { windowDays: WINDOW_DAYS });
@@ -70,6 +99,7 @@ export default async function ChannelsPage() {
           handle: c.handle,
           followerCount: c.followerCount,
           fingerprint: fingerprintById.get(c.channelId) ?? null,
+          mixTargets: mixByChannel.get(c.channelId) ?? [],
           postsInWindow: c.postsInWindow,
           archetypes: c.archetypes.map((a) => ({
             archetype: a.archetype,

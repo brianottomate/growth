@@ -17,6 +17,7 @@ import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { SpotOwnerControl } from "./OwnerControls";
 import { STATUS_OPTIONS } from "./IdeaControls";
 import { MediaPickerDialog } from "./MediaPickerDialog";
+import { MarkScheduledButton } from "../MarkScheduledButton";
 import { SPOT_PILLS, type SpotPill } from "@/lib/spot-pills";
 
 const STATUS_PILL: Record<string, string> = {
@@ -222,18 +223,28 @@ export function SpotCard({
           {/* meta: ship date + posted + via + open */}
           <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             {owned ? (
-              <DatePicker
-                value={spot.scheduledAtISO ? new Date(spot.scheduledAtISO) : undefined}
-                onChange={(d) =>
-                  setSchedule.mutate({
-                    platformPostId: spot.id,
-                    scheduledAt: d ? d.toISOString() : null,
-                  })
-                }
-                placeholder="Schedule"
-                className="px-1.5 py-0.5 text-[11px]"
-                aria-label="Scheduled date"
-              />
+              <>
+                <DatePicker
+                  value={spot.scheduledAtISO ? new Date(spot.scheduledAtISO) : undefined}
+                  onChange={(d) =>
+                    setSchedule.mutate({
+                      platformPostId: spot.id,
+                      scheduledAt: d ? d.toISOString() : null,
+                    })
+                  }
+                  placeholder="Schedule"
+                  className="px-1.5 py-0.5 text-[11px]"
+                  aria-label="Scheduled date"
+                />
+                {spot.status !== "published" && (
+                  <MarkScheduledButton
+                    spotId={spot.id}
+                    at={spot.scheduledAtISO}
+                    scheduled={spot.status === "scheduled"}
+                    onChanged={() => router.refresh()}
+                  />
+                )}
+              </>
             ) : (
               spot.scheduledAtISO && <span>{fmtWhen(spot.scheduledAtISO)}</span>
             )}

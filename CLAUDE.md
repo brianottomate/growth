@@ -56,10 +56,14 @@ Anthropic. Deployed on Vercel as the **`wanderdev/growth`** project (org slug is
 ### tRPC
 
 - Routers live in `src/server/api/routers/*.router.ts` and must be registered in
-  `src/server/api/root.ts` (`appRouter`). Current routers: user, amplifier, audience,
-  brand, channel, channelSuggestion, content, inbox, initiative, newsletter, org,
-  outreach, instantly, leads, lifecycle, listening, media, mention, moment, reddit,
-  studio, twitter. (Blob is a route handler under `api/blob`, not a tRPC router.)
+  `src/server/api/root.ts` (`appRouter`). Current routers: user, ads, amplifier,
+  audience, brand, cadence, channel, channelSuggestion, content, conversion, inbox,
+  initiative, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
+  listening, media, mention, moment, reddit, reschedule, studio, twitter. (Blob is a
+  route handler under `api/blob`, not a tRPC router.) Note: `apply` is a
+  tRPC-reserved procedure name.
+- The monthly content loop (strategy targets → slot generation → workbook import →
+  review → apply) is documented in `docs/content-monthly-loop.md`.
 - Procedures (`src/server/api/trpc.ts`): `publicProcedure`, `protectedProcedure`
   (requires session), `adminProcedure` (admin in prod, unrestricted in dev).
 - Context exposes `session`, `db`, and the Better Auth `authApi`.

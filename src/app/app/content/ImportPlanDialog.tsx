@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
+import { cn } from "@/components/ui/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +44,13 @@ export function ImportPlanDialog({
   const [brandId, setBrandId] = useState(defaultBrandId ?? brands[0]?.id ?? "");
   const [month, setMonth] = useState(nextMonth());
   const [rawText, setRawText] = useState("");
+
+  // Recent imports — the way back into a review you closed (e.g. one with
+  // pending decisions).
+  const { data: recent = [] } = useQuery({
+    ...trpc.planImport.list.queryOptions({}),
+    enabled: open,
+  });
 
   const create = useMutation(
     trpc.planImport.createFromPaste.mutationOptions({
@@ -94,6 +103,47 @@ export function ImportPlanDialog({
           placeholder="Paste the month workbook here…"
           className="h-64 font-mono text-xs"
         />
+        {recent.length > 0 && (
+          <div className="rounded-lg border">
+            <p className="text-muted-foreground border-b px-3 py-1.5 text-[11px] font-medium">
+              Recent imports
+            </p>
+            {recent.slice(0, 4).map((imp) => (
+              <Link
+                key={imp.id}
+                href={`/app/content/import/${imp.id}`}
+                onClick={() => onOpenChange(false)}
+                className="hover:bg-accent/40 flex items-center gap-2 border-b px-3 py-1.5 text-xs last:border-b-0"
+              >
+                <span className="font-medium">{imp.month}</span>
+                <span
+                  className={cn(
+                    "rounded-full border px-1.5 py-0.5 text-[10px]",
+                    imp.status === "applied"
+                      ? "border-emerald-500/40 text-emerald-400"
+                      : imp.status === "failed"
+                        ? "border-rose-500/40 text-rose-400"
+                        : "border-border text-muted-foreground",
+                  )}
+                >
+                  {imp.status}
+                </span>
+                <span className="text-muted-foreground">
+                  {imp.itemCount} ideas
+                  {imp.tally.pending > 0 && (
+                    <span className="text-amber-400"> · {imp.tally.pending} pending review</span>
+                  )}
+                </span>
+                <span className="text-muted-foreground/60 ml-auto tabular-nums">
+                  {new Date(imp.createdAt).toLocaleDateString([], {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
         <div className="flex items-center justify-end gap-2">
           <span className="text-muted-foreground mr-auto text-xs">
             {rawText.length ? `${rawText.length.toLocaleString()} chars` : ""}

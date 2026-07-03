@@ -33,6 +33,9 @@ export type BrandChannels = {
     handle: string | null;
     followerCount: number | null;
     fingerprint: string | null;
+    // Per-channel mix OVERRIDE (mix_target rows with channelId) — what the
+    // slot generator allocates pillars from on this channel.
+    mixTargets: { pillar: string; targetPct: number }[];
     postsInWindow: number;
     archetypes: { archetype: string; perWeek: number; target: number | null }[];
   }[];
@@ -180,6 +183,26 @@ export function ChannelsClient({
                         );
                       })}
                     </div>
+                    {/* per-channel mix override (what the slot generator uses) */}
+                    {c.mixTargets.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                        <span className="text-muted-foreground/60 text-[10px] font-medium tracking-wide uppercase">
+                          Mix target
+                        </span>
+                        {c.mixTargets.map((m) => (
+                          <span key={m.pillar} className="flex items-center gap-1 text-[11px]">
+                            <span
+                              className="size-2 rounded-full"
+                              style={{ background: pillarColor(m.pillar) }}
+                            />
+                            <span className="text-muted-foreground">{pillarName(m.pillar)}</span>
+                            <span className="text-muted-foreground/70 tabular-nums">
+                              {m.targetPct}%
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {/* voice fingerprint */}
                     {c.fingerprint && (
                       <p className="text-muted-foreground mt-1.5 line-clamp-2 text-[11px] italic">
