@@ -199,6 +199,44 @@ read the Neon projection.
    (BuiltWith exports?) so the join list can distinguish "ours" vs. "already
    theirs" honestly?
 
+## 8. Sequence → /lifecycle mapping (Phase 4 preview, explored 2026-07-03)
+
+What the real sequence data looks like (probed live; scope check: the shared
+app currently 403s on `automation/v4/sequences` — needs
+`automation.sequences.read`, see §7 Q5):
+
+- **205 sequences have enrollment history; only 37 have anyone currently
+  enrolled**, and the top 3 hold ~63% of the 1,148 live enrollments. Most of
+  the 205 are stale — the /lifecycle cleanup-candidates view will light up.
+- **Sequences are per-rep clone families.** Naming pattern:
+  `"{Source} Final Sequence | {Year} | {Rep}"` — e.g. OTAs / MLS for Sale /
+  MLS for Rent / MLS All Other, each cloned per AE (Cheyenne, Maggie Tran,
+  Sara Lawrence, …, plus `(clone)` variants). The *strategy* grain is the
+  family (~4 plays); the *execution* grain is the rep clone. Sequence names
+  are readable without the scope via the `hs_latest_sequence_enrolled`
+  property options (internal/MCP surface only — the public properties API
+  returns them empty).
+
+**Mapping onto the schema** (`lifecycle-schema.ts`):
+
+| HubSpot | lifecycle model | Notes |
+|---|---|---|
+| Sequence | `lifecycle_campaign` | `provider: 'hubspot'` — **schema delta: add to `delivery_provider` enum** (additive) |
+| — | `externalKind` | `'sequence'` — free-text column, no migration |
+| — | `kind` | `'outbound'` — enum value already exists |
+| — | `externalId`/`externalUrl` | sequence id / `app.hubspot.com/sequences/22480390/sequence/{id}` |
+| — | `runState` | Derived, **no scope needed**: currently-enrolled > 0 → `running`, else `ended` (contacts GROUP BY `hs_latest_sequence_enrolled` × `hs_sequences_is_enrolled`) |
+| — | `metrics.matched` | Historical enrollment count (approximate — `hs_latest_*` only tracks each contact's latest sequence) |
+| Step (email) | `lifecycle_touchpoint` `channel:'email'` | Needs the scope (`GET /sequences/{id}` returns stepOrder, delayMillis, actionType) |
+| Step (task) | `lifecycle_touchpoint` `channel:'bdr_task'` | Enum value already exists |
+| Clone family | `lifecycle_program` | **Design decision:** one program ↔ N rep-clone campaigns. `lifecycle_program_step.campaignId` (1 step → 1 campaign) doesn't fit; suggest a nullable `lifecycle_campaign.programId` FK, with family clustering by normalized name (strip `\| {year} \| {rep}` + `(clone)`) |
+
+**Incremental path:** a v1 `scripts/import-hubspot-sequences.ts` (sibling of
+`import-cio.ts`) can ship **before the scope lands** — campaigns + derived
+run-states + enrollment metrics from contact aggregates alone (names where
+known). Step-level touchpoints follow once `automation.sequences.read` is
+granted. Strategy altitude first, step detail second.
+
 ## Appendix: source research
 
 - Sequences API guide (`automation/v4/sequences`, date-versioned `2026-03`),
