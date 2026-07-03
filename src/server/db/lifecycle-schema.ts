@@ -62,6 +62,7 @@ export const lifecycleStepSystemEnum = pgEnum("lifecycle_step_system", [
   "postmark", // product notification email (monolith os-notifications)
   "outreach",
   "instantly", // cold-email sequences (leads prospecting)
+  "hubspot", // sales sequences (docs/hubspot-gateway-plan.md §8)
   "amplitude",
   "system", // product/backend (in-app surfaces, webhooks, push)
   "human", // BDR / concierge / manual touch
@@ -280,6 +281,12 @@ export const lifecycleCampaignTable = pgTable(
       .text()
       .references(() => channelTable.id, { onDelete: "set null" }),
 
+    // The strategic program this campaign fulfils (0..n campaigns per program —
+    // e.g. per-rep sequence clones all serving one outbound play).
+    programId: t
+      .text()
+      .references(() => lifecycleProgramTable.id, { onDelete: "set null" }),
+
     name: t.text().notNull(),
     description: t.text(),
 
@@ -382,6 +389,7 @@ export const lifecycleProgramRelations = relations(
       references: [brandTable.id],
     }),
     steps: many(lifecycleProgramStepTable),
+    campaigns: many(lifecycleCampaignTable),
   }),
 );
 
@@ -417,6 +425,10 @@ export const lifecycleCampaignRelations = relations(
     channel: one(channelTable, {
       fields: [lifecycleCampaignTable.channelId],
       references: [channelTable.id],
+    }),
+    program: one(lifecycleProgramTable, {
+      fields: [lifecycleCampaignTable.programId],
+      references: [lifecycleProgramTable.id],
     }),
     touchpoints: many(lifecycleTouchpointTable),
   }),
