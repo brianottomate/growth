@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
@@ -27,12 +27,15 @@ export function GenerateSlotsDialog({
   open,
   onOpenChange,
   onGenerated,
+  initialMonth,
 }: {
   brands: { id: string; name: string }[];
   defaultBrandId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onGenerated: () => void;
+  /** "YYYY-MM" — preselect a month (e.g. a per-month Generate CTA). */
+  initialMonth?: string;
 }) {
   const trpc = useTRPC();
 
@@ -46,6 +49,14 @@ export function GenerateSlotsDialog({
   const [brandId, setBrandId] = useState(defaultBrandId ?? brands[0]?.id ?? "");
   const [month, setMonth] = useState(nextMonth());
   const [preview, setPreview] = useState<GenRows | null>(null);
+
+  // A per-month CTA re-targets the dialog each time it opens.
+  useEffect(() => {
+    if (open && initialMonth) {
+      setMonth(initialMonth);
+      setPreview(null);
+    }
+  }, [open, initialMonth]);
 
   const parseMonth = () => {
     const [y, m] = month.split("-").map(Number);

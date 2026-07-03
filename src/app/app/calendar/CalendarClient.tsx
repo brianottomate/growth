@@ -208,6 +208,15 @@ export function CalendarClient({
   const [dayDetail, setDayDetail] = useState<{ key: string; date: Date } | null>(null);
   const [produceDate, setProduceDate] = useState<string | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
+  // Per-month CTAs: "Generate" pre-targets the dialog; "Evaluate" opens the report.
+  const [generateMonth, setGenerateMonth] = useState<string | null>(null);
+  const [reportMonth, setReportMonth] = useState<{ year: number; month: number } | null>(
+    null,
+  );
+  const openGenerateFor = (y: number, mo: number) => {
+    setGenerateMonth(`${y}-${String(mo + 1).padStart(2, "0")}`);
+    setGenerateOpen(true);
+  };
 
   const { ref, style } = useFullBleed();
 
@@ -365,7 +374,10 @@ export function CalendarClient({
           </button>
 
           <button
-            onClick={() => setGenerateOpen(true)}
+            onClick={() => {
+              setGenerateMonth(null);
+              setGenerateOpen(true);
+            }}
             className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors"
           >
             <CalendarPlus className="size-3.5" /> Generate slots
@@ -468,6 +480,8 @@ export function CalendarClient({
             keyDates={keyDates}
             todayKey={todayKey}
             onMonthClick={openMonth}
+            onEvaluate={(y, mo) => setReportMonth({ year: y, month: mo })}
+            onGenerate={openGenerateFor}
           />
         ) : yearMode === "detailed" ? (
           <YearMonthsDetailed
@@ -476,6 +490,8 @@ export function CalendarClient({
             todayKey={todayKey}
             onDayClick={(date) => setDayDetail({ key: keyOf(date), date })}
             onMonthClick={openMonth}
+            onEvaluate={(y, mo) => setReportMonth({ year: y, month: mo })}
+            onGenerate={openGenerateFor}
           />
         ) : (
           <Heatmap year={year} byDay={byDay} todayKey={todayKey} onDayClick={(d) => openMonth(d.getFullYear(), d.getMonth())} />
@@ -503,6 +519,21 @@ export function CalendarClient({
         open={generateOpen}
         onOpenChange={setGenerateOpen}
         onGenerated={() => router.refresh()}
+        initialMonth={generateMonth ?? undefined}
+      />
+
+      <MonthReportDialog
+        target={reportMonth}
+        entries={filtered}
+        onClose={() => setReportMonth(null)}
+        onGenerate={(y, mo) => {
+          setReportMonth(null);
+          openGenerateFor(y, mo);
+        }}
+        onOpenMonth={(y, mo) => {
+          setReportMonth(null);
+          openMonth(y, mo);
+        }}
       />
 
       {produceDate && produceBrand && (
@@ -540,24 +571,47 @@ function MonthGrid({
   onDayClick: (date: Date) => void;
   // When present, renders a clickable month-name bar with the post total —
   // used by the Year · Detailed grid; the Month zoom omits it.
-  header?: { name: string; total: number; onMonthClick: () => void };
+  header?: {
+    name: string;
+    total: number;
+    onMonthClick: () => void;
+    onEvaluate?: () => void;
+    onGenerate?: () => void;
+  };
 }) {
   const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
 
   return (
     <div className="overflow-hidden rounded-xl border">
       {header && (
-        <div className="bg-muted/30 flex items-center justify-between border-b px-2.5 py-1.5">
+        <div className="bg-muted/30 flex items-center gap-2 border-b px-2.5 py-1.5">
           <button
             onClick={header.onMonthClick}
             className="text-sm font-semibold hover:underline"
           >
             {header.name}
           </button>
+          <span className="flex-1" />
           {header.total > 0 && (
             <span className="text-muted-foreground text-[11px] tabular-nums">
               {header.total}
             </span>
+          )}
+          {header.onEvaluate && (
+            <button
+              onClick={header.onEvaluate}
+              className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors"
+            >
+              Evaluate
+            </button>
+          )}
+          {header.onGenerate && (
+            <button
+              onClick={header.onGenerate}
+              className="rounded-full border border-emerald-600/50 px-2 py-0.5 text-[10px] font-medium text-emerald-400 transition-colors hover:bg-emerald-600/15"
+            >
+              Generate
+            </button>
           )}
         </div>
       )}
@@ -669,12 +723,16 @@ function YearMonths({
   keyDates,
   todayKey,
   onMonthClick,
+  onEvaluate,
+  onGenerate,
 }: {
   months: { year: number; month: number }[];
   byDay: Map<string, CalEntry[]>;
   keyDates: Map<string, { emoji: string; name: string }>;
   todayKey: string;
   onMonthClick: (year: number, month: number) => void;
+  onEvaluate: (year: number, month: number) => void;
+  onGenerate: (year: number, month: number) => void;
 }) {
   const firstYear = months[0]?.year;
   return (
@@ -689,6 +747,8 @@ function YearMonths({
           keyDates={keyDates}
           todayKey={todayKey}
           onClick={() => onMonthClick(year, month)}
+          onEvaluate={() => onEvaluate(year, month)}
+          onGenerate={() => onGenerate(year, month)}
         />
       ))}
     </div>
@@ -703,6 +763,8 @@ function MiniMonth({
   keyDates,
   todayKey,
   onClick,
+  onEvaluate,
+  onGenerate,
 }: {
   name: string;
   year: number;
@@ -711,6 +773,8 @@ function MiniMonth({
   keyDates: Map<string, { emoji: string; name: string }>;
   todayKey: string;
   onClick: () => void;
+  onEvaluate: () => void;
+  onGenerate: () => void;
 }) {
   const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
   const total = useMemo(() => {
@@ -722,14 +786,40 @@ function MiniMonth({
   }, [weeks, month, byDay]);
 
   return (
-    <button
+    // div-with-role (not <button>) so the hover CTAs can be real buttons.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="hover:border-foreground/30 group rounded-lg border p-2.5 text-left transition-colors"
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onClick();
+      }}
+      className="hover:border-foreground/30 group cursor-pointer rounded-lg border p-2.5 text-left transition-colors"
     >
-      <div className="mb-1.5 flex items-center justify-between">
+      <div className="mb-1.5 flex items-center gap-1.5">
         <span className="text-sm font-semibold group-hover:underline">{name}</span>
+        <span className="flex-1" />
+        <span
+          className="hidden items-center gap-1 group-focus-within:flex group-hover:flex"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={onEvaluate}
+            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-1.5 py-0.5 text-[9px] font-medium"
+          >
+            Evaluate
+          </button>
+          <button
+            onClick={onGenerate}
+            className="rounded-full border border-emerald-600/50 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400 hover:bg-emerald-600/15"
+          >
+            Generate
+          </button>
+        </span>
         {total > 0 && (
-          <span className="text-muted-foreground text-[11px] tabular-nums">{total}</span>
+          <span className="text-muted-foreground text-[11px] tabular-nums group-hover:hidden">
+            {total}
+          </span>
         )}
       </div>
       <div className="grid grid-cols-7 gap-[3px]">
@@ -794,7 +884,7 @@ function MiniMonth({
           );
         })}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -822,12 +912,16 @@ function YearMonthsDetailed({
   todayKey,
   onDayClick,
   onMonthClick,
+  onEvaluate,
+  onGenerate,
 }: {
   months: { year: number; month: number }[];
   byDay: Map<string, CalEntry[]>;
   todayKey: string;
   onDayClick: (date: Date) => void;
   onMonthClick: (year: number, month: number) => void;
+  onEvaluate: (year: number, month: number) => void;
+  onGenerate: (year: number, month: number) => void;
 }) {
   const firstYear = months[0]?.year;
   return (
@@ -842,6 +936,8 @@ function YearMonthsDetailed({
           todayKey={todayKey}
           onDayClick={onDayClick}
           onMonthClick={() => onMonthClick(year, month)}
+          onEvaluate={() => onEvaluate(year, month)}
+          onGenerate={() => onGenerate(year, month)}
         />
       ))}
     </div>
@@ -856,6 +952,8 @@ function DetailedMonth({
   todayKey,
   onDayClick,
   onMonthClick,
+  onEvaluate,
+  onGenerate,
 }: {
   name: string;
   year: number;
@@ -864,6 +962,8 @@ function DetailedMonth({
   todayKey: string;
   onDayClick: (date: Date) => void;
   onMonthClick: () => void;
+  onEvaluate: () => void;
+  onGenerate: () => void;
 }) {
   const total = useMonthTotal(year, month, byDay);
   return (
@@ -873,7 +973,7 @@ function DetailedMonth({
       byDay={byDay}
       todayKey={todayKey}
       onDayClick={onDayClick}
-      header={{ name, total, onMonthClick }}
+      header={{ name, total, onMonthClick, onEvaluate, onGenerate }}
     />
   );
 }
@@ -1200,5 +1300,174 @@ function Legend({ mode }: { mode: "status" | "heat" }) {
         </span>
       ))}
     </div>
+  );
+}
+
+// ---- Month report (the "Evaluate" CTA) -------------------------------------
+
+const REPORT_STATUS: { key: string; label: string; cls: string }[] = [
+  { key: "slot", label: "Open slots", cls: "border-amber-500/40 text-amber-400" },
+  { key: "discovered", label: "Discovered", cls: "border-border text-muted-foreground" },
+  { key: "draft", label: "Draft", cls: "border-border text-muted-foreground" },
+  { key: "pending_review", label: "In review", cls: "border-border text-muted-foreground" },
+  { key: "approved", label: "Approved", cls: "border-sky-500/40 text-sky-400" },
+  { key: "scheduled", label: "Scheduled", cls: "border-sky-500/40 text-sky-400" },
+  { key: "published", label: "Published", cls: "border-emerald-500/40 text-emerald-400" },
+];
+
+/** Month-at-a-glance: what's on the calendar, in what state, on which
+ *  platforms, in what pillar mix — plus the two next actions (generate the
+ *  skeleton / open the month). Computed from the already-filtered entries so
+ *  it respects the page's brand/pillar/Mine filters. */
+function MonthReportDialog({
+  target,
+  entries,
+  onClose,
+  onGenerate,
+  onOpenMonth,
+}: {
+  target: { year: number; month: number } | null;
+  entries: CalEntry[];
+  onClose: () => void;
+  onGenerate: (year: number, month: number) => void;
+  onOpenMonth: (year: number, month: number) => void;
+}) {
+  const report = useMemo(() => {
+    if (!target) return null;
+    const rows = entries.filter((e) => {
+      const d = new Date(e.at);
+      return d.getFullYear() === target.year && d.getMonth() === target.month;
+    });
+    const count = (pick: (e: CalEntry) => string | null) => {
+      const m = new Map<string, number>();
+      for (const e of rows) {
+        const k = pick(e);
+        if (!k) continue;
+        m.set(k, (m.get(k) ?? 0) + 1);
+      }
+      return m;
+    };
+    return {
+      rows,
+      ours: rows.filter((e) => !e.tracked),
+      trackedCount: rows.filter((e) => e.tracked).length,
+      byStatus: count((e) => e.status),
+      byPlatform: [...count((e) => (e.tracked ? null : e.platform)).entries()].sort(
+        (a, b) => b[1] - a[1],
+      ),
+      byPillar: [...count((e) => (e.tracked ? null : (e.pillar ?? "__unsorted"))).entries()].sort(
+        (a, b) => b[1] - a[1],
+      ),
+    };
+  }, [target, entries]);
+
+  if (!target || !report) return null;
+  const monthLabel = `${MONTHS[target.month]} ${target.year}`;
+  const pillarTotal = report.byPillar.reduce((n, [, c]) => n + c, 0);
+  const pillarColorOf = (slug: string) =>
+    slug === "__unsorted"
+      ? "var(--color-muted-foreground)"
+      : (PILLAR_BY_SLUG[slug]?.color ?? "var(--color-muted-foreground)");
+
+  return (
+    <SimpleDialog
+      open={!!target}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title={`${monthLabel} — month report`}
+      footer={
+        <div className="flex w-full items-center justify-end gap-2">
+          <button
+            onClick={() => onOpenMonth(target.year, target.month)}
+            className="border-border hover:bg-accent rounded-full border px-4 py-1.5 text-sm"
+          >
+            Open month
+          </button>
+          <button
+            onClick={() => onGenerate(target.year, target.month)}
+            className="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500"
+          >
+            Generate slots
+          </button>
+        </div>
+      }
+    >
+      {report.rows.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          Nothing on the calendar for {monthLabel} yet — generate the month&apos;s
+          slot skeleton to get started.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {/* pipeline state */}
+          <div className="flex flex-wrap gap-1.5">
+            {REPORT_STATUS.map(({ key, label, cls }) => {
+              const n = report.byStatus.get(key) ?? 0;
+              if (n === 0) return null;
+              return (
+                <span
+                  key={key}
+                  className={cn("rounded-full border px-2 py-0.5 text-[11px] tabular-nums", cls)}
+                >
+                  {label} {n}
+                </span>
+              );
+            })}
+            {report.trackedCount > 0 && (
+              <span className="border-border text-muted-foreground/70 rounded-full border border-dashed px-2 py-0.5 text-[11px] tabular-nums">
+                tracked brands {report.trackedCount}
+              </span>
+            )}
+          </div>
+
+          {/* platforms */}
+          {report.byPlatform.length > 0 && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+              {report.byPlatform.map(([platform, n]) => (
+                <span key={platform} className="flex items-center gap-1.5 text-xs">
+                  <ChannelLogo platform={platform} className="size-3.5" />
+                  <span className="text-muted-foreground tabular-nums">{n}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* pillar mix */}
+          {pillarTotal > 0 && (
+            <div>
+              <div className="bg-muted/40 flex h-2 overflow-hidden rounded-full">
+                {report.byPillar.map(([slug, n]) => (
+                  <span
+                    key={slug}
+                    title={`${slug === "__unsorted" ? "Unsorted" : (PILLAR_BY_SLUG[slug]?.name ?? slug)} · ${Math.round((n / pillarTotal) * 100)}%`}
+                    style={{
+                      width: `${(n / pillarTotal) * 100}%`,
+                      background: pillarColorOf(slug),
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                {report.byPillar.map(([slug, n]) => (
+                  <span key={slug} className="flex items-center gap-1 text-[11px]">
+                    <span
+                      className="size-2 rounded-full"
+                      style={{ background: pillarColorOf(slug) }}
+                    />
+                    <span className="text-muted-foreground">
+                      {slug === "__unsorted" ? "Unsorted" : (PILLAR_BY_SLUG[slug]?.name ?? slug)}
+                    </span>
+                    <span className="text-muted-foreground/70 tabular-nums">
+                      {Math.round((n / pillarTotal) * 100)}%
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </SimpleDialog>
   );
 }
