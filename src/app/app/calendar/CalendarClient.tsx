@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { ProduceDrawer } from "@/app/app/studio/ProduceDrawer";
+import { GenerateSlotsDialog } from "@/app/app/content/GenerateSlotsDialog";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { SimpleSelect } from "@/components/ui/select";
@@ -170,6 +171,7 @@ type YearMode = "months" | "detailed" | "heatmap";
 export function CalendarClient({
   entries,
   brands,
+  ownedBrands,
   members,
   currentUserId,
   nowISO,
@@ -177,6 +179,8 @@ export function CalendarClient({
 }: {
   entries: CalEntry[];
   brands: { id: string; name: string; slug: string | null }[];
+  // Owned brands only (flagship first) — the Generate-slots target list.
+  ownedBrands: { id: string; name: string }[];
   members: Member[];
   currentUserId: string;
   nowISO: string;
@@ -203,6 +207,7 @@ export function CalendarClient({
   const [mineOnly, setMineOnly] = useState(false);
   const [dayDetail, setDayDetail] = useState<{ key: string; date: Date } | null>(null);
   const [produceDate, setProduceDate] = useState<string | null>(null);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   const { ref, style } = useFullBleed();
 
@@ -280,11 +285,28 @@ export function CalendarClient({
 
   const keyDates = useMemo(() => {
     const m = new Map<string, { emoji: string; name: string }>();
-    for (const { keyDate, date } of keyDatesForYear(year)) {
-      m.set(keyOf(date), { emoji: keyDate.emoji, name: keyDate.name });
+    // The rolling window can span two calendar years.
+    for (const y of [year, year + 1]) {
+      for (const { keyDate, date } of keyDatesForYear(y)) {
+        m.set(keyOf(date), { emoji: keyDate.emoji, name: keyDate.name });
+      }
     }
     return m;
   }, [year]);
+
+  // Year zoom = a rolling 12-month window anchored at (year, month): opens on
+  // the current month, steps backwards for history. Heatmap stays a calendar
+  // year (its grid is year-shaped).
+  const windowMonths = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const d = new Date(year, month + i, 1);
+        return { year: d.getFullYear(), month: d.getMonth() };
+      }),
+    [year, month],
+  );
+  const windowEnd = windowMonths[11]!;
+  const windowLabel = `${MONTHS_SHORT[month]} ${year} – ${MONTHS_SHORT[windowEnd.month]} ${windowEnd.year}`;
 
   const openMonth = (y: number, mo: number) => {
     setYear(y);
@@ -301,7 +323,7 @@ export function CalendarClient({
           <p className="text-muted-foreground mt-1 text-sm">
             {zoom === "month"
               ? `${MONTHS[month]} ${year}`
-              : `${year} · ${filtered.length} posts`}
+              : `${yearMode === "heatmap" ? year : windowLabel} · ${filtered.length} posts`}
           </p>
         </div>
 
@@ -340,6 +362,13 @@ export function CalendarClient({
             )}
           >
             Mine
+          </button>
+
+          <button
+            onClick={() => setGenerateOpen(true)}
+            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+          >
+            <CalendarPlus className="size-3.5" /> Generate slots
           </button>
 
           <span className="bg-border mx-1 h-5 w-px" />
@@ -381,10 +410,31 @@ export function CalendarClient({
         ) : (
           <>
             <NavStepper
-              onPrev={() => setYear(year - 1)}
-              onNext={() => setYear(year + 1)}
-              label={String(year)}
+              onPrev={() =>
+                yearMode === "heatmap"
+                  ? setYear(year - 1)
+                  : month === 0
+                    ? (setYear(year - 1), setMonth(11))
+                    : setMonth(month - 1)
+              }
+              onNext={() =>
+                yearMode === "heatmap"
+                  ? setYear(year + 1)
+                  : month === 11
+                    ? (setYear(year + 1), setMonth(0))
+                    : setMonth(month + 1)
+              }
+              label={yearMode === "heatmap" ? String(year) : windowLabel}
             />
+            <button
+              onClick={() => {
+                setYear(now.getFullYear());
+                setMonth(now.getMonth());
+              }}
+              className="border-border text-muted-foreground hover:bg-accent rounded-full border px-3 py-1 text-xs font-medium transition-colors"
+            >
+              Today
+            </button>
             <span className="bg-border mx-1 h-4 w-px" />
             <Segmented
               value={yearMode}
@@ -413,19 +463,19 @@ export function CalendarClient({
           />
         ) : yearMode === "months" ? (
           <YearMonths
-            year={year}
+            months={windowMonths}
             byDay={byDay}
             keyDates={keyDates}
             todayKey={todayKey}
-            onMonthClick={(mo) => openMonth(year, mo)}
+            onMonthClick={openMonth}
           />
         ) : yearMode === "detailed" ? (
           <YearMonthsDetailed
-            year={year}
+            months={windowMonths}
             byDay={byDay}
             todayKey={todayKey}
             onDayClick={(date) => setDayDetail({ key: keyOf(date), date })}
-            onMonthClick={(mo) => openMonth(year, mo)}
+            onMonthClick={openMonth}
           />
         ) : (
           <Heatmap year={year} byDay={byDay} todayKey={todayKey} onDayClick={(d) => openMonth(d.getFullYear(), d.getMonth())} />
@@ -441,6 +491,18 @@ export function CalendarClient({
           setDayDetail(null);
           setProduceDate(date.toISOString());
         }}
+      />
+
+      <GenerateSlotsDialog
+        brands={ownedBrands}
+        defaultBrandId={
+          brandFilter !== "all" && ownedBrands.some((b) => b.id === brandFilter)
+            ? brandFilter
+            : (ownedBrands[0]?.id ?? null)
+        }
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        onGenerated={() => router.refresh()}
       />
 
       {produceDate && produceBrand && (
@@ -602,30 +664,31 @@ function ContentChip({ g }: { g: DayGroup }) {
 // ---- Year · Months (mini calendars, pillar-tinted) ------------------------
 
 function YearMonths({
-  year,
+  months,
   byDay,
   keyDates,
   todayKey,
   onMonthClick,
 }: {
-  year: number;
+  months: { year: number; month: number }[];
   byDay: Map<string, CalEntry[]>;
   keyDates: Map<string, { emoji: string; name: string }>;
   todayKey: string;
-  onMonthClick: (month: number) => void;
+  onMonthClick: (year: number, month: number) => void;
 }) {
+  const firstYear = months[0]?.year;
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {MONTHS.map((name, mo) => (
+      {months.map(({ year, month }) => (
         <MiniMonth
-          key={mo}
-          name={name}
+          key={`${year}-${month}`}
+          name={year === firstYear ? MONTHS[month]! : `${MONTHS[month]} ${year}`}
           year={year}
-          month={mo}
+          month={month}
           byDay={byDay}
           keyDates={keyDates}
           todayKey={todayKey}
-          onClick={() => onMonthClick(mo)}
+          onClick={() => onMonthClick(year, month)}
         />
       ))}
     </div>
@@ -754,30 +817,31 @@ function useMonthTotal(
 }
 
 function YearMonthsDetailed({
-  year,
+  months,
   byDay,
   todayKey,
   onDayClick,
   onMonthClick,
 }: {
-  year: number;
+  months: { year: number; month: number }[];
   byDay: Map<string, CalEntry[]>;
   todayKey: string;
   onDayClick: (date: Date) => void;
-  onMonthClick: (month: number) => void;
+  onMonthClick: (year: number, month: number) => void;
 }) {
+  const firstYear = months[0]?.year;
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      {MONTHS.map((name, mo) => (
+      {months.map(({ year, month }) => (
         <DetailedMonth
-          key={mo}
-          name={name}
+          key={`${year}-${month}`}
+          name={year === firstYear ? MONTHS[month]! : `${MONTHS[month]} ${year}`}
           year={year}
-          month={mo}
+          month={month}
           byDay={byDay}
           todayKey={todayKey}
           onDayClick={onDayClick}
-          onMonthClick={() => onMonthClick(mo)}
+          onMonthClick={() => onMonthClick(year, month)}
         />
       ))}
     </div>

@@ -138,6 +138,11 @@ export default async function CalendarPage({
         ...brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug })),
         ...[...trackedBrands].map(([id, name]) => ({ id, name, slug: null })),
       ]}
+      ownedBrands={brands
+        .map((b) => ({ id: b.id, name: b.name, slug: b.slug }))
+        // Flagship first — the default Generate-slots target.
+        .sort((a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"))
+        .map(({ id, name }) => ({ id, name }))}
       members={members}
       currentUserId={session.user.id}
       nowISO={new Date().toISOString()}
