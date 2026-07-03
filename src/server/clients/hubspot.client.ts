@@ -374,6 +374,7 @@ export type CompanyProperties = {
   name?: string;
   type?: "Wander Sites";
   hs_lead_status?: string;
+  lifecyclestage?: string;
   hubspot_owner_id?: string;
   inbound_outbound?: "Inbound" | "Inbound - Sites";
   portfolio_size?: string;
@@ -454,6 +455,7 @@ export const COMPANY_CORE_PROPERTIES = [
   "name",
   "domain",
   "hs_lead_status",
+  "lifecyclestage",
   "hubspot_owner_id",
   "type",
   "inbound_outbound",
