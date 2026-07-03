@@ -43,6 +43,7 @@ export type TargetSuggestion = {
   pillar: string | null; // mix only (brand default)
   current: number | null; // count (cadence) or pct (mix); null = new target
   proposed: number;
+  basis: "peer_benchmark" | "own_performance" | "both";
   rationale: string;
   confidence: number;
 };
@@ -197,6 +198,9 @@ export async function suggestTargets(
             .int()
             .min(0)
             .describe("Cadence: the new COUNT (the existing target's period is kept). Mix: the new percent."),
+          basis: z
+            .enum(["peer_benchmark", "own_performance", "both"])
+            .describe("Which evidence drives this proposal."),
           rationale: z
             .string()
             .describe("One or two sentences citing the evidence: own performance, peer cadence, or both."),
@@ -213,10 +217,14 @@ export async function suggestTargets(
 
   const system = [
     `You are the content strategist for ${brand.name}, reviewing publishing cadence and pillar-mix targets against evidence.`,
-    "Propose target CHANGES only where evidence argues for one — performance (double down on formats that outperform), peer benchmarks (match or consciously diverge), or dead formats (cut). Keep proposals conservative: one step at a time, not 5x jumps.",
+    "SIGNAL HIERARCHY — use the right evidence for the right axis:\n" +
+      "- VOLUME (cadence counts): the PEER BENCHMARK is primary. What do category leaders like Airbnb and Rimowa actually publish per week on each platform/format? Targets exist to be competitive, not to mirror our own past output.\n" +
+      "- FORMAT & MIX allocation: OWN engagement performance is primary (double down on formats/pillars that outperform for us, trim ones that are dead for reach).",
+    "CRITICAL: under-execution is NOT evidence for lowering a target. If we target 4/wk and shipped 1.2/wk but the format performs fine, that is an execution gap — keep the ambition and say so in the rationale (or skip the suggestion). Only propose lowering volume when the format ALSO underperforms on engagement or peers genuinely publish less.",
+    "Propose target CHANGES only where evidence argues for one. Conservative steps: one notch at a time, not 5x jumps.",
     "Cadence proposals: the new count for an existing platform/archetype target (its period stays). Mix proposals: new percent for a brand-default pillar (aim for the full set still summing near 100 — prefer paired adjustments).",
     peerAge != null && peerAge > 14
-      ? `CAUTION: peer data is ~${peerAge} days stale — lean on own-performance evidence and lower confidence on peer-based claims.`
+      ? `CAUTION: peer data is ~${peerAge} days stale — say so when citing it and lower confidence on peer-based claims.`
       : null,
   ]
     .filter(Boolean)
@@ -273,6 +281,7 @@ export async function suggestTargets(
         pillar: null,
         current,
         proposed: s.proposed,
+        basis: s.basis,
         rationale: s.rationale,
         confidence: s.confidence,
       });
@@ -289,6 +298,7 @@ export async function suggestTargets(
         pillar: s.pillar,
         current,
         proposed: s.proposed,
+        basis: s.basis,
         rationale: s.rationale,
         confidence: s.confidence,
       });

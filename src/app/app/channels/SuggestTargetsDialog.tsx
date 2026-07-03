@@ -179,6 +179,22 @@ export function SuggestTargetsDialog({
                     >
                       {Math.round(s.confidence * 100)}%
                     </span>
+                    <span
+                      className={cn(
+                        "rounded-full border px-1.5 py-0.5 text-[10px]",
+                        s.basis === "peer_benchmark"
+                          ? "border-sky-500/40 text-sky-400"
+                          : s.basis === "both"
+                            ? "border-violet-500/40 text-violet-400"
+                            : "border-border text-muted-foreground",
+                      )}
+                    >
+                      {s.basis === "peer_benchmark"
+                        ? "peers"
+                        : s.basis === "both"
+                          ? "peers + own"
+                          : "own data"}
+                    </span>
                     <span className="ml-auto">
                       {isApplied ? (
                         <span className="text-xs text-emerald-400">applied ✓</span>
