@@ -107,13 +107,14 @@ Mitigations, built in from day one:
 
 HubSpot's Record Source is immutable: private-app creations get
 `INTEGRATION` + the app's name; `hs_object_source_detail_2/3` are writable **at
-creation only**. With one gateway app writing everything, Record Source says
-"the gateway" for all of it — so source distinction lives entirely in our own
-fields:
+creation only**. **Decision (2026-07-03): no dedicated gateway app.** We keep
+the single shared private app (`HUBSPOT_ACCESS_TOKEN_OPERATED`, same as
+wander.com) and expand its scopes as later phases need them (sequences
+read/enroll, webhooks). Record Source attributes everything to that shared
+app — fine, because provenance lives entirely in our own fields:
 
-- **A dedicated private app** (new token, sequences + webhook scopes) so
-  creations are at least attributable to the gateway, with batch/import ids
-  stamped into `hs_object_source_detail_2/3` at creation.
+- **`hs_object_source_detail_2/3`** stamped with batch/import ids at creation
+  (available to any integration regardless of which app writes).
 - **Custom properties**, extending the existing vocabulary
   (`inbound_outbound`, `lead_type`, `inbound_date`) rather than inventing a
   parallel one: e.g. `growth_source`, `growth_import_id`, plus per-sequence
@@ -168,8 +169,8 @@ read the Neon projection.
 
 | Phase | What | Done when |
 |---|---|---|
-| 1 | Merge wander.com client superset into growth's `hubspot.client.ts`; dedicated private app (sequences + webhook scopes); `/api/hubspot/v1` skeleton + auth + `/health` | Gateway deployed, callable, no consumers yet |
-| 2 | Provenance layer: property group + custom props, MANUAL join list, promotion path (automates today's manual `applyMerge`) | Growth-sourced records identifiable in HubSpot filters/lists |
+| 1 | Merge wander.com's FULL client superset into growth's `hubspot.client.ts` (incl. round-robin, label maps, pms-mapping → Anthropic rewrite); `/api/hubspot/v1` with bearer auth + `/health` + company/contact find/upsert. Ships on the shared `HUBSPOT_ACCESS_TOKEN_OPERATED` token (decision: one private app, no dedicated gateway app) | Gateway deployed, callable, no consumers yet |
+| 2 | Expand the shared private app's scopes (sequences + webhooks) + provenance layer: property group + custom props, MANUAL join list, promotion path (automates today's manual `applyMerge`) | Growth-sourced records identifiable in HubSpot filters/lists |
 | 3 | Port inbound router with accept-then-process; wander.com calls gateway behind a flag with local fallback; dual-run ~1 week, compare in Slack; delete wander.com copy | wander.com has no HubSpot code |
 | 4 | `/lifecycle` HubSpot provider: cron import of sequences → `lifecycle_campaign`/`lifecycle_touchpoint`, program↔sequence linking, "reflected in HubSpot" check-off | All 205 sequences visible in /lifecycle strategy view |
 | 5 | Webhook receiver → Neon read-model hydration; trim `leads.*` columns that existed only because Neon was SoR (snapshot flags, source booleans); rebuild script | Stale-flag hedging (`HsMarker` "?") deleted |
@@ -189,8 +190,9 @@ read the Neon projection.
 4. **Sequence conventions:** naming/sharing conventions so the /lifecycle
    mirror can group sequences by program; who owns archiving the stale ones
    (205 with history vs. what's actually active)?
-5. **Private app admin:** who besides Kristian holds admin on the new gateway
-   app; where does the token live (Vercel env + Doppler)?
+5. **Private app scopes:** we're expanding the shared app (not creating a new
+   one) — Danny to add sequences read/enroll + webhook scopes when Phase 2/4
+   land; heads-up that one rotation affects both wander.com and the gateway.
 6. **Cutover window** for the inbound router (phase 3) — quiet week preference,
    and what the fallback alert should look like in Slack.
 7. **Existing 215k imports:** any known provenance for the big IMPORT batches

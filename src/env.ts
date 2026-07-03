@@ -65,8 +65,12 @@ export const env = createEnv({
     APIFY_API_KEY: z.string().optional(),
     // Bright Data (dataset scrapes for competitor/peer social posts)
     BRIGHT_DATA_API_KEY: z.string().optional(),
-    // HubSpot (sales CRM — per-row pull/diff/write-back; private-app token)
+    // HubSpot (sales CRM — shared private-app token, same app as wander.com;
+    // gateway scopes get added to this app rather than a separate one)
     HUBSPOT_ACCESS_TOKEN_OPERATED: z.string().optional(),
+    // Inbound bearer for /api/hubspot/v1/* callers (wander.com, monolith) —
+    // authenticates callers to OUR gateway routes, unrelated to HubSpot auth
+    HUBSPOT_GATEWAY_API_TOKEN: z.string().min(32).optional(),
     // Lead enrichment — discovery providers (all optional; missing key skips that provider)
     PERPLEXITY_API_KEY: z.string().optional(), // Perplexity sonar web search
     TAVILY_API_KEY: z.string().optional(), // Tavily search/extract
@@ -173,6 +177,7 @@ export const env = createEnv({
     BRIGHT_DATA_API_KEY: process.env.BRIGHT_DATA_API_KEY,
     // HubSpot
     HUBSPOT_ACCESS_TOKEN_OPERATED: process.env.HUBSPOT_ACCESS_TOKEN_OPERATED,
+    HUBSPOT_GATEWAY_API_TOKEN: process.env.HUBSPOT_GATEWAY_API_TOKEN,
     // Lead enrichment — discovery providers
     PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY,
     TAVILY_API_KEY: process.env.TAVILY_API_KEY,
