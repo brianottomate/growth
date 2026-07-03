@@ -34,6 +34,7 @@ const CADENCE: Record<
     { archetype: "carousel", count: 2, period: "week", notes: "Best avg engagement (7.8k views); Rimowa-validated luxury format" },
     { archetype: "video_short", count: 2, period: "week" },
     { archetype: "image", count: 1, period: "week" },
+    { archetype: "story", count: 3, period: "week", notes: "One slot = one story NARRATIVE — sometimes a single frame, sometimes a 5-frame series (frame count is a production detail inside the slot)" },
   ],
   tiktok: [
     { archetype: "video_short", count: 2, period: "week", notes: "Hold volume until reach improves (~600 avg views)" },
@@ -44,8 +45,12 @@ const CADENCE: Record<
     { archetype: "video_long", count: 1, period: "week", notes: "Airbnb's power format (1.4k avg likes); text post as fallback" },
   ],
   x: [
-    { archetype: "text", count: 3, period: "week", notes: "Down from daily — 35 avg views; amplification-grade, not slot-planned" },
+    { archetype: "text", count: 3, period: "week", notes: "Down from daily (35 avg views); slot-planned per Kristian 2026-07-03 — a planned tweet lane" },
     { archetype: "video_short", count: 2, period: "month", notes: "The only format that has ever popped here (712k avg)" },
+  ],
+  facebook: [
+    { archetype: "image", count: 2, period: "week", notes: "IG crosspost mirror — fill by adding a FB spot to the IG idea; slot shells merge on fill" },
+    { archetype: "video_short", count: 1, period: "week", notes: "IG reel crosspost" },
   ],
   youtube: [
     { archetype: "video_long", count: 2, period: "month", notes: "48-hours-in itineraries" },

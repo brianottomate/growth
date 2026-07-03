@@ -25,9 +25,10 @@ import { PILLAR_BY_SLUG } from "@/lib/pillars";
  * claimed slot still occupies its place in the month's rhythm.
  */
 
-// Amplification-grade targets we track on /channels but don't plan as slots
-// (nobody briefs an X shitpost a month ahead).
-const NOT_SLOT_PLANNED = new Set(["x|text"]);
+// Targets tracked on /channels but excluded from slot planning, keyed
+// "platform|archetype". Empty as of 2026-07-03: X texts were excluded as
+// amplification-grade, but Kristian wants the full planned-tweet lane.
+const NOT_SLOT_PLANNED = new Set<string>([]);
 
 const daysIn = (year: number, month1: number) => new Date(year, month1, 0).getDate();
 const noon = (year: number, month1: number, day: number) =>
