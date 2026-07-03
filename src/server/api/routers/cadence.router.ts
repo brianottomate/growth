@@ -10,6 +10,7 @@ import {
   memberTable,
   mixTargetTable,
 } from "@/server/db/schema";
+import { generateMonthSlots } from "@/server/services/slot-generate.service";
 
 type Ctx = { db: typeof import("@/server/db").db; session: { user: { id: string } } };
 
@@ -42,6 +43,31 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
 const periodEnum = z.enum(["day", "week", "month"]);
 
 export const cadenceRouter = createTRPCRouter({
+  /**
+   * The strategy→calendar computation: expand the brand's cadence/mix targets
+   * into a month of empty slot placeholders. Idempotent top-up (claimed slots
+   * still count toward the rhythm) — safe to re-run after target edits.
+   * dryRun previews the per-channel counts without writing.
+   */
+  generateMonthSlots: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        year: z.number().int().min(2024).max(2100),
+        month: z.number().int().min(1).max(12),
+        dryRun: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx, input.brandId);
+      return generateMonthSlots({
+        brandId: input.brandId,
+        year: input.year,
+        month: input.month,
+        dryRun: input.dryRun,
+      });
+    }),
+
   // ---- Mix targets (pillar distribution, brand-level) ----
   setMixTarget: protectedProcedure
     .input(

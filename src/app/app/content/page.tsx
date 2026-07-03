@@ -20,10 +20,15 @@ export default async function ContentPage() {
     return <div className="text-muted-foreground">No organization found.</div>;
   }
 
-  const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
-    columns: { id: true, name: true, slug: true },
-  });
+  const brands = (
+    await db.query.brandTable.findMany({
+      where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+      columns: { id: true, name: true, slug: true },
+      orderBy: (t, { asc }) => [asc(t.name)],
+    })
+    // The flagship brand leads — brands[0] is the default target for
+    // Add idea / Import plan / Generate slots.
+  ).sort((a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"));
 
   // Initial (unfiltered) board + the assignee roster, for instant hydration.
   prefetch(trpc.content.board.queryOptions({}));

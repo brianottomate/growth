@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  CalendarPlus,
   FileSpreadsheet,
   Image as ImageIcon,
   MessageSquare,
@@ -52,6 +53,7 @@ import { ContentCalendar } from "./ContentCalendar";
 import { ContentSheet } from "./ContentSheet";
 import { ReshuffleDialog } from "./ReshuffleDialog";
 import { AddIdeaDrawer } from "./AddIdeaDrawer";
+import { GenerateSlotsDialog } from "./GenerateSlotsDialog";
 import { ImportPlanDialog } from "./ImportPlanDialog";
 import { MarkScheduledButton } from "./MarkScheduledButton";
 
@@ -300,6 +302,7 @@ export function ContentBoard({
   const [reshuffleOpen, setReshuffleOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   const visible = useMemo(() => {
     let out = cards;
@@ -403,6 +406,12 @@ export function ContentBoard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => setGenerateOpen(true)}
+            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+          >
+            <CalendarPlus className="size-3.5" /> Generate slots
+          </button>
           <button
             onClick={() => setImportOpen(true)}
             className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
@@ -590,6 +599,17 @@ export function ContentBoard({
           }}
         />
       )}
+
+      <GenerateSlotsDialog
+        brands={brands}
+        defaultBrandId={createBrandId}
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        onGenerated={() => {
+          void qc.invalidateQueries({ queryKey: boardOptions.queryKey });
+          void invalidateSchedule();
+        }}
+      />
 
       <ImportPlanDialog
         brands={brands}
