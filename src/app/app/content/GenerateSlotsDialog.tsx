@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
@@ -12,10 +12,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SimpleSelect } from "@/components/ui/select";
-import { ChannelLogo } from "@/components/channel-logos";
+import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { toast } from "@/components/ui/toast";
+import { PILLAR_BY_SLUG } from "@/lib/pillars";
 
-type GenRows = RouterOutputs["cadence"]["generateMonthSlots"]["rows"];
+type GenPreview = Pick<
+  RouterOutputs["cadence"]["generateMonthSlots"],
+  "rows" | "mix"
+>;
 
 /** "Generate slots" — expand the brand's cadence/mix targets (set on
  *  /channels) into a month of empty slot placeholders. Preview first, one
@@ -48,7 +52,7 @@ export function GenerateSlotsDialog({
 
   const [brandId, setBrandId] = useState(defaultBrandId ?? brands[0]?.id ?? "");
   const [month, setMonth] = useState(nextMonth());
-  const [preview, setPreview] = useState<GenRows | null>(null);
+  const [preview, setPreview] = useState<GenPreview | null>(null);
 
   // A per-month CTA re-targets the dialog each time it opens.
   useEffect(() => {
@@ -65,7 +69,7 @@ export function GenerateSlotsDialog({
 
   const dryRun = useMutation(
     trpc.cadence.generateMonthSlots.mutationOptions({
-      onSuccess: (res) => setPreview(res.rows),
+      onSuccess: (res) => setPreview({ rows: res.rows, mix: res.mix }),
       onError: (e) => toast.error(e.message),
     }),
   );
@@ -86,7 +90,16 @@ export function GenerateSlotsDialog({
     dryRun.mutate({ brandId, ...parseMonth(), dryRun: true });
   };
 
-  const toCreate = preview?.reduce((n, r) => n + r.created, 0) ?? 0;
+  const toCreate = preview?.rows.reduce((n, r) => n + r.created, 0) ?? 0;
+
+  // Per-channel sections: rows in service order, mix strategy attached.
+  const sections = preview
+    ? [...new Set(preview.rows.map((r) => r.platform))].map((platform) => ({
+        platform,
+        rows: preview.rows.filter((r) => r.platform === platform),
+        mix: preview.mix.find((m) => m.platform === platform) ?? null,
+      }))
+    : [];
 
   return (
     <Dialog
@@ -133,35 +146,83 @@ export function GenerateSlotsDialog({
         </div>
 
         {preview && (
-          <div className="overflow-hidden rounded-lg border">
+          <div className="max-h-96 overflow-y-auto rounded-lg border">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-muted-foreground bg-muted/30 text-left">
-                  <th className="px-2 py-1.5 font-medium">Channel · format</th>
+                <tr className="text-muted-foreground bg-muted/30 sticky top-0 text-left">
+                  <th className="px-2 py-1.5 font-medium">Format</th>
                   <th className="px-2 py-1.5 text-right font-medium">Target</th>
                   <th className="px-2 py-1.5 text-right font-medium">Existing</th>
                   <th className="px-2 py-1.5 text-right font-medium">New</th>
                 </tr>
               </thead>
               <tbody>
-                {preview.map((r) => (
-                  <tr key={`${r.platform}|${r.archetype}`} className="border-t">
-                    <td className="flex items-center gap-1.5 px-2 py-1">
-                      <ChannelLogo platform={r.platform} className="size-3.5" />
-                      {r.archetype}
-                    </td>
-                    <td className="px-2 py-1 text-right tabular-nums">{r.target}</td>
-                    <td className="px-2 py-1 text-right tabular-nums">{r.existing}</td>
-                    <td
-                      className={
-                        r.created > 0
-                          ? "px-2 py-1 text-right font-semibold tabular-nums text-emerald-400"
-                          : "text-muted-foreground px-2 py-1 text-right tabular-nums"
-                      }
-                    >
-                      +{r.created}
-                    </td>
-                  </tr>
+                {sections.map(({ platform, rows, mix }) => (
+                  <Fragment key={platform}>
+                    {/* channel header: identity + this channel's new-slot subtotal */}
+                    <tr className="bg-muted/20 border-t">
+                      <td colSpan={3} className="px-2 py-1.5">
+                        <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+                          <ChannelLogo platform={platform} className="size-3.5" />
+                          {platformLabel(platform)}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-400">
+                        +{rows.reduce((n, r) => n + r.created, 0)}
+                      </td>
+                    </tr>
+                    {rows.map((r) => (
+                      <tr key={`${r.platform}|${r.archetype}`} className="border-t">
+                        <td className="text-muted-foreground px-2 py-1 pl-7">
+                          {r.archetype}
+                        </td>
+                        <td className="px-2 py-1 text-right tabular-nums">{r.target}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{r.existing}</td>
+                        <td
+                          className={
+                            r.created > 0
+                              ? "px-2 py-1 text-right font-semibold tabular-nums text-emerald-400"
+                              : "text-muted-foreground px-2 py-1 text-right tabular-nums"
+                          }
+                        >
+                          +{r.created}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* the mix strategy this channel's slots are allocated from */}
+                    {mix && (
+                      <tr className="border-t">
+                        <td colSpan={4} className="px-2 py-1.5 pl-7">
+                          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <span className="text-muted-foreground/60 text-[10px] font-medium tracking-wide uppercase">
+                              Mix{mix.isOverride ? "" : " (brand default)"}
+                            </span>
+                            {mix.pillars.map((p) => (
+                              <span
+                                key={p.pillar}
+                                className="flex items-center gap-1 text-[11px]"
+                              >
+                                <span
+                                  className="size-2 rounded-full"
+                                  style={{
+                                    background:
+                                      PILLAR_BY_SLUG[p.pillar]?.color ??
+                                      "var(--color-muted-foreground)",
+                                  }}
+                                />
+                                <span className="text-muted-foreground">
+                                  {PILLAR_BY_SLUG[p.pillar]?.name ?? p.pillar}
+                                </span>
+                                <span className="text-muted-foreground/70 tabular-nums">
+                                  {p.pct}%
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

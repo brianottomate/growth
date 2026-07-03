@@ -49,12 +49,20 @@ export type SlotGenRow = {
   created: number;
 };
 
+/** The resolved pillar mix a channel's slots are allocated from (its
+ *  mix_target override, else the brand default), as display percentages. */
+export type SlotGenMix = {
+  platform: string;
+  isOverride: boolean;
+  pillars: { pillar: string; pct: number }[];
+};
+
 export async function generateMonthSlots(opts: {
   brandId: string;
   year: number;
   month: number; // 1-12
   dryRun?: boolean;
-}): Promise<{ rows: SlotGenRow[]; created: number }> {
+}): Promise<{ rows: SlotGenRow[]; created: number; mix: SlotGenMix[] }> {
   const { brandId, year, month, dryRun } = opts;
   const days = daysIn(year, month);
   const monthStart = new Date(year, month - 1, 1);
@@ -112,6 +120,25 @@ export async function generateMonthSlots(opts: {
     list.push(t);
     byChannel.set(t.channelId, list);
   }
+
+  // The resolved per-channel mix, for the preview UI ("what strategy is this
+  // channel's allocation running on?").
+  const mixSummary: SlotGenMix[] = [...byChannel.entries()].map(
+    ([channelId, targets]) => {
+      const weights = mixForChannel(channelId);
+      const totalPct = weights.reduce((n, w) => n + w.targetPct, 0) || 1;
+      return {
+        platform: targets[0]!.platform,
+        isOverride: weights.some((w) => w.channelId === channelId),
+        pillars: weights
+          .map((w) => ({
+            pillar: w.pillar,
+            pct: Math.round((w.targetPct / totalPct) * 100),
+          }))
+          .sort((a, b) => b.pct - a.pct),
+      };
+    },
+  );
 
   for (const [channelId, targets] of byChannel) {
     // Build the channel's slot skeleton: evenly spaced days per archetype,
@@ -203,5 +230,5 @@ export async function generateMonthSlots(opts: {
     }
   }
 
-  return { rows, created: createdTotal };
+  return { rows, created: createdTotal, mix: mixSummary };
 }
