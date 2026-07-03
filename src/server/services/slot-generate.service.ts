@@ -44,6 +44,10 @@ function monthTotal(count: number, period: string, days: number): number {
 export type SlotGenRow = {
   platform: string;
   archetype: string;
+  // The target as authored (the team thinks in weekly rhythm)…
+  count: number;
+  period: string; // "day" | "week" | "month"
+  // …and what it implies for this month.
   target: number;
   existing: number;
   created: number;
@@ -151,7 +155,15 @@ export async function generateMonthSlots(opts: {
       const target = monthTotal(t.count, t.period, days);
       const existing = existingByKey.get(key) ?? 0;
       const need = Math.max(0, target - existing);
-      rows.push({ platform: t.platform, archetype: t.archetype, target, existing, created: need });
+      rows.push({
+        platform: t.platform,
+        archetype: t.archetype,
+        count: t.count,
+        period: t.period,
+        target,
+        existing,
+        created: need,
+      });
       for (let i = 0; i < need; i++) {
         const day = Math.min(
           days,

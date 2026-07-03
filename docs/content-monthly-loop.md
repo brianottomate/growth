@@ -80,3 +80,23 @@ the targets.
 - Rejected items are remembered; slots they matched stay open.
 - Old slots minted by Reshuffle/moments are `slotKind: "anchored"|"freeflow"`
   and invisible to the cadence census — they coexist.
+
+## Appendix: ManyChat keyword library (from the team's sheet legend)
+
+The comment-trigger keywords the captions use (`content_post.ctaKeyword`):
+
+| Keyword | Delivers | Funnel goal | Content type |
+|---|---|---|---|
+| ESCAPE | Curated seasonal property collection | Consideration | Timely Travel / Inspiration reels |
+| GUIDE | Destination itinerary PDF/link | Lead capture + saves | Travel Discovery guides |
+| WANDER | Featured property of the week | Booking intent | Property showcase reels |
+| WORK | WFA-friendly home list | Mid-week booking | Remote Work Reset series |
+| DRIVE | Road-trip route guide | Email capture | Worth the Drive series |
+| PRICE | Weekend pricing breakdown | Objection removal | Luxury Travel, Real Budget |
+| COMPARE | Wander vs hotel/Airbnb doc | Conversion | Wander vs. The World series |
+| LOCAL | Locals' Edit guide for nearest property | Saves + loyalty | Locals' Edit series |
+| FIRST | Early access to new property drop | Loyalty + booking | What's Launching Soon series |
+
+Strategy baseline: the cadence/mix targets seeded by
+`scripts/seed-strategy-targets.ts` follow the sheet's platform guide and
+content-mix ratios (reconciliations documented in that script's header).

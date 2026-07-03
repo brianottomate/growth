@@ -159,12 +159,28 @@ export function GenerateSlotsDialog({
               <tbody>
                 {sections.map(({ platform, rows, mix }) => (
                   <Fragment key={platform}>
-                    {/* channel header: identity + this channel's new-slot subtotal */}
+                    {/* channel header: identity + weekly tempo + new-slot subtotal */}
                     <tr className="bg-muted/20 border-t">
                       <td colSpan={3} className="px-2 py-1.5">
                         <span className="flex items-center gap-1.5 text-[11px] font-semibold">
                           <ChannelLogo platform={platform} className="size-3.5" />
                           {platformLabel(platform)}
+                          <span className="text-muted-foreground/60 font-normal tabular-nums">
+                            ≈
+                            {rows
+                              .reduce(
+                                (n, r) =>
+                                  n +
+                                  (r.period === "week"
+                                    ? r.count
+                                    : r.period === "day"
+                                      ? r.count * 7
+                                      : r.count / 4.345),
+                                0,
+                              )
+                              .toFixed(1)}
+                            /wk
+                          </span>
                         </span>
                       </td>
                       <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-400">
@@ -175,6 +191,9 @@ export function GenerateSlotsDialog({
                       <tr key={`${r.platform}|${r.archetype}`} className="border-t">
                         <td className="text-muted-foreground px-2 py-1 pl-7">
                           {r.archetype}
+                          <span className="text-muted-foreground/50 ml-1.5 tabular-nums">
+                            {r.count}/{r.period === "week" ? "wk" : r.period === "month" ? "mo" : "day"}
+                          </span>
                         </td>
                         <td className="px-2 py-1 text-right tabular-nums">{r.target}</td>
                         <td className="px-2 py-1 text-right tabular-nums">{r.existing}</td>
