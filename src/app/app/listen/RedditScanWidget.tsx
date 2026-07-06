@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
-import { ListenItemActions } from "./ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 
 type ScannedPost = RouterOutputs["reddit"]["scanNow"]["scored"][number];
 

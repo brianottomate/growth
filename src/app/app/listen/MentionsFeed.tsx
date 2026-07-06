@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
-import { ListenItemActions } from "./ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 
 type Mention = RouterOutputs["mention"]["list"]["mentions"][number];
 

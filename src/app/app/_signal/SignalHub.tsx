@@ -2,15 +2,15 @@ import { Suspense, type ReactNode } from "react";
 
 import { isZernioConfigured } from "@/server/clients/zernio.client";
 
-import { AdComments } from "../listen/AdComments";
-import { Comments } from "../listen/Comments";
+import { AdComments } from "../inbox/AdComments";
+import { Comments } from "../inbox/Comments";
+import { conversationReplyUrl } from "../inbox/conversation-url";
+import { getRecentConversationsWithThreads } from "../inbox/inbox-data";
+import { InboxClient } from "../inbox/InboxClient";
 import { ListeningStrategy } from "../listen/ListeningStrategy";
 import { MentionsFeed } from "../listen/MentionsFeed";
 import { RedditScanWidget } from "../listen/RedditScanWidget";
 import { XListening } from "../listen/XListening";
-import { conversationReplyUrl } from "./conversation-url";
-import { getRecentConversationsWithThreads } from "./inbox-data";
-import { InboxClient } from "./InboxClient";
 import { SignalTabs, type SignalTabId } from "./SignalTabs";
 import { UnifiedQueue, type QueueConversation } from "./UnifiedQueue";
 

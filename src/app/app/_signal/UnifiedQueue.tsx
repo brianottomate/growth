@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
-import { ListenItemActions } from "@/app/app/listen/ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 import { useTRPC } from "@/trpc/react";
 
 /**

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { BadgeCheck } from "lucide-react";
 
-import { ListenItemActions } from "@/app/app/listen/ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 import type {
   ZernioConversation,

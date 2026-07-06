@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 import type { OrganicCommentItem } from "./zernio-listening";
-import { ListenItemActions } from "./ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 
 type Scored = RouterOutputs["inbox"]["triageComments"]["scored"][number];
 

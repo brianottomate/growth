@@ -1,6 +1,6 @@
 import { isZernioConfigured } from "@/server/clients/zernio.client";
 
-import { ListenItemActions } from "./ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 import {
   buildAdCommentContext,
   commentTimeMs,

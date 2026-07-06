@@ -7,7 +7,7 @@ import { toast } from "@/components/ui/toast";
 import { matchWatchlist, X_WATCHLIST } from "@/lib/x-watchlist";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
-import { ListenItemActions } from "./ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 
 /**
  * X — listening: a dedicated room for the X channel. The watchlist rail is the

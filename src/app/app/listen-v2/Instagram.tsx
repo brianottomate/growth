@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, Loader2, MessagesSquare, RefreshCw } from "lucide-react";
 
-import { ListenItemActions } from "@/app/app/listen/ListenItemActions";
+import { ListenItemActions } from "@/components/listening/ListenItemActions";
 import {
   AssigneeButton,
   OwnerAvatar,
