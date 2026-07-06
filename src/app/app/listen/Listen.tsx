@@ -6,17 +6,25 @@ import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTRPC } from "@/trpc/react";
 
-import { XListening } from "@/app/app/listen/XListening";
-
 import { Instagram } from "./Instagram";
 import { Playbook } from "./Playbook";
 import { Reddit } from "./Reddit";
+import { RedditScanWidget } from "./RedditScanWidget";
 import { Sources } from "./Sources";
+import { Tools } from "./Tools";
+import { XListening } from "./XListening";
 
-const TAB_IDS = ["monitor", "reddit", "instagram", "x", "playbook"] as const;
+const TAB_IDS = [
+  "monitor",
+  "reddit",
+  "instagram",
+  "x",
+  "llm",
+  "playbook",
+] as const;
 type TabId = (typeof TAB_IDS)[number];
 
-export function ListenV2({ defaultTab }: { defaultTab: TabId }) {
+export function Listen({ defaultTab }: { defaultTab: TabId }) {
   const trpc = useTRPC();
   const { data, isLoading, isError, error } = useQuery(
     trpc.listening.overview.queryOptions(),
@@ -58,6 +66,7 @@ export function ListenV2({ defaultTab }: { defaultTab: TabId }) {
         <TabsTrigger value="reddit">Reddit</TabsTrigger>
         <TabsTrigger value="instagram">Instagram</TabsTrigger>
         <TabsTrigger value="x">X</TabsTrigger>
+        <TabsTrigger value="llm">LLM &amp; tools</TabsTrigger>
         <TabsTrigger value="playbook">Playbook</TabsTrigger>
       </TabsList>
 
@@ -65,8 +74,21 @@ export function ListenV2({ defaultTab }: { defaultTab: TabId }) {
         <Sources brand={data.brand} sources={data.sources} />
       </TabsContent>
 
-      <TabsContent value="reddit">
+      <TabsContent value="reddit" className="space-y-10">
         <Reddit />
+        {/* Live subreddit sweep (not persisted) — complements the queue above
+            until on-demand scans persist into the mention store too. */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Live scan</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              On-demand AI scan over the configured subreddits — scored for
+              intent, with draft replies. Results are not saved to the queue
+              yet.
+            </p>
+          </div>
+          <RedditScanWidget />
+        </section>
       </TabsContent>
 
       <TabsContent value="instagram">
@@ -75,6 +97,10 @@ export function ListenV2({ defaultTab }: { defaultTab: TabId }) {
 
       <TabsContent value="x">
         <XListening />
+      </TabsContent>
+
+      <TabsContent value="llm">
+        <Tools />
       </TabsContent>
 
       <TabsContent value="playbook">

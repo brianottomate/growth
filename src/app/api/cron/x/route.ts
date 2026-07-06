@@ -7,7 +7,7 @@ import { scanScoreAndPersistTweets } from "@/server/services/twitter-monitor.ser
  * X (Twitter) listening scan, every 6 hours. Runs the watchlist recent-search,
  * dedups against stored mentions, AI-scores the fresh ones, drafts replies for
  * the engage-worthy hits, and writes the keepers to `mention` (source="twitter")
- * — surfacing in /app/listen-v2 and #radio-social-listening (Kyle gets @-pinged).
+ * — surfacing in /app/listen and #radio-social-listening (Kyle gets @-pinged).
  * Idempotent: dedup is on the unique mention url, so a re-run never double-posts.
  * Runs every 6 hours (schedule in vercel.json).
  *

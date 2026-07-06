@@ -7,7 +7,7 @@ import { scanAccountWatchSources } from "@/server/services/instagram-watch.servi
  * Daily account-watch scan (Instagram). Walks every active `account_watch`
  * source, pulls each watched account's recent posts via Bright Data, scores them
  * for "should Wander's official account comment?", drafts the comment, and writes
- * the keepers to `mention` (source="instagram") — surfacing in /app/listen-v2 and
+ * the keepers to `mention` (source="instagram") — surfacing in /app/listen and
  * #radio-social-listening. Idempotent: dedup is on the unique mention url, so a
  * re-run never double-posts. Runs at 0 13 * * * (see vercel.json).
  *

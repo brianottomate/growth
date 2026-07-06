@@ -15,7 +15,7 @@ type Overview = RouterOutputs["listening"]["overview"];
 /**
  * The brand listening "story" — the shared judgment injected into every scan
  * and reply draft. Voice is read-only here (it lives on the brand fingerprint,
- * shared with publishing). Its own tab on /app/listen-v2.
+ * shared with publishing). Its own tab on /app/listen.
  */
 export function Playbook({
   brandId,

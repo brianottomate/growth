@@ -224,7 +224,7 @@ export interface XScanResult {
 /**
  * Cron entrypoint: search → dedup → score → persist → broadcast. Mirrors the
  * Instagram account-watch pipeline (instagram-watch.service), so X mentions flow
- * through the same `mention` table, /app/listen-v2 surface, and
+ * through the same `mention` table, /app/listen surface, and
  * #radio-social-listening broadcast (engage-gated, owner @-mentioned) as every
  * other source.
  *

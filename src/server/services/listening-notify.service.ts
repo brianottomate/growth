@@ -79,7 +79,7 @@ function buildBlocks(m: Mention) {
   if (m.rationale) lines.push(`_${m.rationale}_`);
 
   lines.push(
-    `<${m.url}|View on ${where}> · <${env.NEXT_PUBLIC_BASE_URL}/app/listen-v2?tab=${listenTab(m.source)}|Open in Listen>`,
+    `<${m.url}|View on ${where}> · <${env.NEXT_PUBLIC_BASE_URL}/app/listen?tab=${listenTab(m.source)}|Open in Listen>`,
   );
   // Copy-pasteable (code span, not a hyperlink) — the point is to drop it into
   // the reply, not click it. utm_content = mention id → attributed in Amplitude.

@@ -43,20 +43,19 @@ const GROUPS: { key: AcquisitionShape; title: string; blurb: string }[] = [
 ];
 
 /**
- * Where the actual listening / triage for a source happens today. These point
- * at the existing /app/listen surfaces for now; re-point them at the v2 Inbox
- * tab once it exists.
+ * Where the actual listening / triage for a source happens today. External
+ * rooms live on this page; owned-inbound triage lives on /app/inbox.
  */
 function listeningSurfaceHref(s: Source): string {
-  if (s.acquisition === "account_watch") return "/app/listen-v2?tab=instagram";
+  if (s.acquisition === "account_watch") return "/app/listen?tab=instagram";
   if (s.acquisition === "owned_inbound") {
     return s.adapter === "zernio-dms"
-      ? "/app/listen?tab=dms"
-      : "/app/listen?tab=comments";
+      ? "/app/inbox?tab=dms"
+      : "/app/inbox?tab=comments";
   }
   if (s.adapter === "x-search" || s.platform === "x") return "/app/listen?tab=x";
-  // Reddit scan + provider alerts (F5Bot) both surface under "mentions".
-  return "/app/listen?tab=mentions";
+  // Reddit scan + provider alerts (F5Bot) both land in the Reddit room.
+  return "/app/listen?tab=reddit";
 }
 
 export function Sources({
