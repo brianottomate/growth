@@ -1,9 +1,7 @@
 import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod";
 
-// TODO: re-add protectedProcedure on scanNow + draftReply before exposing
-// /growth more broadly. Each LLM call costs money; open mutations = abuse risk.
-import { publicProcedure } from "../trpc";
+import { protectedProcedure } from "../trpc";
 import {
   DRAFT_PILLS,
   INTENT_TAGS,
@@ -14,11 +12,11 @@ import {
 } from "@/server/services/twitter-monitor.service";
 
 export const twitterRouter = {
-  scanNow: publicProcedure.mutation(async () => {
+  scanNow: protectedProcedure.mutation(async () => {
     return scanAndScoreTweets();
   }),
 
-  draftReply: publicProcedure
+  draftReply: protectedProcedure
     .input(
       z.object({
         tweet: z.object({

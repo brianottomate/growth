@@ -1,9 +1,7 @@
 import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod";
 
-// TODO: re-add publicProcedure on scanNow + draftReply before exposing
-// /growth more broadly. Each LLM call costs money; open mutations = abuse risk.
-import { publicProcedure } from "../trpc";
+import { protectedProcedure } from "../trpc";
 import {
   DRAFT_PILLS,
   INTENT_TAGS,
@@ -17,7 +15,7 @@ export const redditRouter = {
    * runs them through Claude Haiku 4.5 for relevance scoring.
    * Returns the scored list sorted by relevance (desc).
    */
-  scanNow: publicProcedure.mutation(async () => {
+  scanNow: protectedProcedure.mutation(async () => {
     return scanAndScore();
   }),
 
@@ -27,7 +25,7 @@ export const redditRouter = {
    * tailor tone (e.g. critical brand mentions get an acknowledge/apology, not
    * a pitch).
    */
-  draftReply: publicProcedure
+  draftReply: protectedProcedure
     .input(
       z.object({
         post: z.object({
