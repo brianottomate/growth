@@ -28,6 +28,7 @@ import {
   updateContact,
   updateDeal,
 } from "@/server/clients/hubspot.client";
+import { envSelect } from "@/env";
 import { postOnSlack } from "@/server/clients/slack.client";
 import { mapPmsToHsValues } from "@/server/services/pms-mapping.service";
 import { getEmailDomain, isPersonalEmail } from "@/lib/email";
@@ -783,6 +784,10 @@ export async function osInboundLeadRouter({
     return;
   }
 
+  // Small footer identifying where this message came from — debugging aid for
+  // the gateway era, where the sender is no longer the same app as the form.
+  const envLabel = `via wander-growth ${envSelect({ prod: "production", test: "preview" })}${test ? " · test traffic" : ""}`;
+
   // Best-effort: growth's postOnSlack returns a result object instead of throwing.
   const slackResult = await postOnSlack({
     text: slackText,
@@ -791,6 +796,10 @@ export async function osInboundLeadRouter({
       {
         type: "section",
         text: { type: "mrkdwn", text: slackBodyLines.join("\n") },
+      },
+      {
+        type: "context",
+        elements: [{ type: "mrkdwn", text: envLabel }],
       },
     ],
   });
