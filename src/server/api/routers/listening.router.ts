@@ -55,6 +55,8 @@ const SourceConfigSchema = z.object({
         flags: z.array(z.string()).optional(),
         enabled: z.boolean().optional(),
         verifiedAt: z.string().optional(),
+        status: z.enum(["live", "to_add", "to_remove"]).optional(),
+        note: z.string().optional(),
       }),
     )
     .optional(),

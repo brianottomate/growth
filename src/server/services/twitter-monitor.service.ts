@@ -144,8 +144,18 @@ export interface ScoredTweet {
 // Brand + STR pain phrases combined into one X recent-search query. The term
 // groups live in src/lib/x-watchlist.ts so the /app/listen X tab renders the
 // same watchlist that drives this scan.
+//
+// Terms that collide with common English words need co-occurrence context or
+// they drown the scan: bare "Hospitable" matched people calling Mexico
+// hospitable — 59 of the first 66 tweets ever persisted. X search is
+// case-insensitive, so the context clause is the only fix.
+const CONTEXTUAL_TERMS: Record<string, string> = {
+  Hospitable:
+    '("Hospitable" (Airbnb OR VRBO OR STR OR host OR hosts OR PMS OR "property manager" OR "channel manager"))',
+};
+
 const SEARCH_QUERY = X_WATCHLIST.flatMap((g) => g.terms)
-  .map((t) => `"${t}"`)
+  .map((t) => CONTEXTUAL_TERMS[t] ?? `"${t}"`)
   .join(" OR ");
 
 const FULL_QUERY = `(${SEARCH_QUERY}) -is:retweet lang:en`;

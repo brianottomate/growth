@@ -12,6 +12,7 @@ import { Reddit } from "./Reddit";
 import { RedditScanWidget } from "./RedditScanWidget";
 import { Sources } from "./Sources";
 import { Tools } from "./Tools";
+import { Twitter } from "./Twitter";
 import { XListening } from "./XListening";
 
 const TAB_IDS = [
@@ -95,8 +96,21 @@ export function Listen({ defaultTab }: { defaultTab: TabId }) {
         <Instagram />
       </TabsContent>
 
-      <TabsContent value="x">
-        <XListening />
+      <TabsContent value="x" className="space-y-10">
+        <Twitter />
+        {/* Live watchlist sweep (localStorage only) — complements the persisted
+            queue above, which the 6-hourly cron fills. */}
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Live scan</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              On-demand scan over the watchlist terms, straight against the X
+              API. Results live in this browser only — the queue above is the
+              persisted one, fed by the 6-hourly cron.
+            </p>
+          </div>
+          <XListening />
+        </section>
       </TabsContent>
 
       <TabsContent value="llm">

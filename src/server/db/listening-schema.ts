@@ -206,11 +206,20 @@ export type ListeningTrigger =
 // This is the INTENT — "what we want to monitor" — mirrored from the provider's
 // own config. `verifiedAt` records when we last confirmed it's actually live in
 // the channel, so the strategy view can show a "verified · <date>" badge.
+//
+// `status` makes the config a DESIRED state, not just a mirror: we decide the
+// term set here first (strategy), then apply it in the provider's own UI and
+// mark it done. Absent status = "live".
+//   live      — active in the provider (the default)
+//   to_add    — decided here, not yet created in the provider
+//   to_remove — decided here, not yet deleted in the provider
 export type ListeningAlertTerm = {
   term: string;
   flags?: string[]; // provider matching flags, e.g. F5Bot "whole" | "only-reddit" | "no-comments"
   enabled?: boolean; // mirrors the provider's enabled state
   verifiedAt?: string; // ISO date we last confirmed this term is live in the channel
+  status?: "live" | "to_add" | "to_remove"; // desired-state workflow (absent = live)
+  note?: string; // why this change — shown in the setup-task row
 };
 
 // One external account we watch under an account_watch source (IG today).
