@@ -256,6 +256,9 @@ export const auth = betterAuth({
     "https://growth-red.vercel.app",
     // Add your production domains and ngrok/localcan.dev tunnels here when deploying
     // Example: "https://yourapp.com", "https://yourapp-staging.localcan.dev"
+    // Dev only: port 3000 is often taken by another project, so trust every
+    // localhost port (Better Auth supports wildcard origin patterns).
+    ...(process.env.NODE_ENV === "development" ? ["http://localhost:*"] : []),
   ],
   // Google OAuth - only enabled when credentials are configured
   ...(env.GOOGLE_CLIENT_ID &&

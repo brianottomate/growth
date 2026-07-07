@@ -111,6 +111,8 @@ Other conventions:
   `sendOnSignUp: false`) so teammates sign in immediately. Comments mark how to restore it.
 - Signup is gated to `@wander.com` emails; new users auto-join the Wander org. The anonymous
   plugin was removed.
+- **Agent/local testing:** `GET /api/dev/login` mints a real session without a password
+  (dev-only, 404s in deploys; works on any localhost port) — see `docs/dev-login.md`.
 
 ### External integrations (`src/server/clients/`)
 
