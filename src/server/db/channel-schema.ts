@@ -265,7 +265,7 @@ export const channelSuggestionRelations = relations(
   }),
 );
 
-// NOTE: `website` + `web_page` (persistent pages) and the `content_pillar`
-// table are intentionally deferred — not needed for the Overview / Feed /
-// Content / Calendar screens. Add them when the Websites/Blog/Pillars screens
-// get built. Pillars are a text slug on `post` for now.
+// NOTE: `web_page` (persistent pages) now lives in `website-schema.ts`,
+// powering the Website wall. A parent `website` table stays deferred until a
+// brand has more than one site. The `content_pillar` table is also still
+// deferred — pillars are a text slug on `post` for now.
