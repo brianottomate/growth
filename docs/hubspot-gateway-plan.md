@@ -1,10 +1,24 @@
 # HubSpot Gateway & Mirror — Working Plan
 
-**Status:** living working document — Phase 1 SHIPPED; link pass, sequence
-mirror, and first segments LIVE (see Progress log). For review by Danny
-(sales engineering / HubSpot).
-**Date:** 2026-07-03 (updated end of day) · **Authors:** Kristian + Claude
+**Status:** living working document — Phases 1 & 4 SHIPPED; Phase 3 (inbound
+router port) IN REVIEW; link pass, sequence mirror, and first segments LIVE
+(see Progress log). For review by Danny (sales engineering / HubSpot).
+**Date:** 2026-07-06 · **Authors:** Kristian + Claude
 **Decision owners:** Kristian (growth), Danny (HubSpot/sales systems)
+
+## Progress log (2026-07-06)
+
+- 🔄 **Phase 3 — inbound router ported** (this PR): wander.com's
+  `osInboundLeadRouter` moved verbatim to
+  `src/server/services/inbound-router.service.ts` (classification, round-robin,
+  contact/company/deal upserts, Slack notify to `C0A3PMXE3MG`), exposed as
+  bearer-authed `POST /api/hubspot/v1/inbound` (validate → 200 → route via
+  `after()`). Round-robin weight tables synced to wander.com post-#3180 —
+  **weights now live here**; Danny PRs this repo (`hubspot.client.ts`,
+  ROUND-ROBIN TABLES section) instead of wander.com. Simplifications agreed
+  with Kristian: no submissions table (v2), no caller-side fallback — verify on
+  preview, then wander.com forwards directly. Cutover = merging the wander.com
+  caller PR.
 
 ## Progress log (2026-07-03 — all shipped & verified)
 
@@ -212,7 +226,7 @@ read the Neon projection.
 |---|---|---|
 | 1 ✅ | Merge wander.com's FULL client superset into growth's `hubspot.client.ts` (incl. round-robin, label maps, pms-mapping → Anthropic rewrite); `/api/hubspot/v1` with bearer auth + `/health` + company/contact find/upsert. Shipped on the shared `HUBSPOT_ACCESS_TOKEN_OPERATED` token (decision: one private app, no dedicated gateway app) | **DONE 2026-07-03** — deployed, verified in prod |
 | 2 | Enrichment → projection (§9): growth property group + `hubspot_synced_at` + projection script + nightly cron. Sequences scopes ✅ (flipped by Kristian); link pass ✅ (99.9% matched); first segments ✅ (lists 3748/3749) | Enrichment lands in HubSpot within a day; sales filters on `growth_*` props |
-| 3 | Port inbound router with accept-then-process; wander.com calls gateway behind a flag with local fallback; dual-run ~1 week, compare in Slack; delete wander.com copy | wander.com has no HubSpot code |
+| 3 🔄 | Port inbound router with accept-then-process (`POST /api/hubspot/v1/inbound`); weights synced post-#3180. Simplified per Kristian: no flag/fallback — preview-verify, then wander.com forwards directly | Router **IN REVIEW** here; wander.com caller PR + HubSpot-code removal are follow-ups |
 | 4 ✅ | `/lifecycle` HubSpot provider: `import-hubspot-sequences.ts` → 202 campaigns + 327 touchpoints + six programs linked via `campaign.programId` | **DONE 2026-07-03** — rerun script to refresh; cron-schedule it later |
 | 5 | Webhook receiver → Neon read-model hydration; trim `leads.*` columns that existed only because Neon was SoR; rebuild script. (Interim: rerun the link pass for status refresh) | Stale-flag hedging (`HsMarker` "?") deleted |
 | — | Later: monolith `@wosc/hubspot` port; Instantly decommission decision | — |

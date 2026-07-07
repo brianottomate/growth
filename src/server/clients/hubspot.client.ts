@@ -303,13 +303,14 @@ export function resolveHsLabel(
 // =====================================================
 
 export const AE_OTE_ROUND_ROBIN: Record<string, number> = {
-  "91455876": 0.5, // Kris Salguero
-  "94290553": 0.5, // Sean Kearney
+  "91455876": 0.33, // Kris Salguero
+  "94290553": 0.67, // Sean Kearney
 };
 
 export const AE_SMB_ROUND_ROBIN: Record<string, number> = {
-  "76731285": 0.5, // Pierce Butler
-  "725103433": 0.5, // Chris Boley
+  "76731285": 0.33, // Pierce Butler
+  "725103433": 0.33, // Chris Boley
+  "91455876": 0.33, // Kris Salguero
 };
 
 export const AE_MM_ROUND_ROBIN: Record<string, number> = {
@@ -319,7 +320,8 @@ export const AE_MM_ROUND_ROBIN: Record<string, number> = {
 };
 
 export const AE_ENTERPRISE_ROUND_ROBIN: Record<string, number> = {
-  "663245691": 1.0, // Matt Tassello
+  "663245691": 0.5, // Matt Tassello
+  "454414503": 0.5, // Matt Kowalewski
 };
 
 export const AE_STRATEGIC_ROUND_ROBIN: Record<string, number> = {
@@ -336,13 +338,15 @@ export const BDR_OTE_ROUND_ROBIN: Record<string, number> = {
 };
 
 export const BDR_SMB_ROUND_ROBIN: Record<string, number> = {
-  "430737561": 0.5, // Karolina Tenorio
-  "79859550": 0.5, // Skyler Rickey
+  "430737561": 0.33, // Karolina Tenorio
+  "79859550": 0.33, // Skyler Rickey
+  "93221525": 0.33, // Paige Madigan
 };
 
 export const BDR_MM_ROUND_ROBIN: Record<string, number> = {
-  "82330443": 0.5, // Matt Montanti
-  "80091646": 0.5, // Justin Showalter
+  "82330443": 0.33, // Matt Montanti
+  "80091646": 0.33, // Justin Showalter
+  "93243943": 0.33, // Nick Latham
 };
 
 export const BDR_ENTERPRISE_ROUND_ROBIN: Record<string, number> = {

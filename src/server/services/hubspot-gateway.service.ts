@@ -118,3 +118,46 @@ export const upsertContactBody = z.strictObject({
   properties: contactWriteProps.optional().default({}),
 });
 export type UpsertContactBody = z.infer<typeof upsertContactBody>;
+
+/**
+ * Inbound lead router payload — ported from wander.com's `osInboundSchema`
+ * (src/features/os/inbound/schema.ts). wander.com validates the raw form with
+ * its own copy and forwards the parsed payload wholesale. Deliberately NOT
+ * strictObject (unlike the property-write schemas above): unknown keys are
+ * stripped, not rejected, so wander.com adding a form field before this schema
+ * learns about it degrades to "field ignored" instead of "every lead 400s".
+ */
+export const inboundBody = z.object({
+  email: z.string().trim().pipe(z.email("Enter a valid email")),
+  directBookingSiteUrl: z.string().trim().min(1).optional(),
+  // Required for AE routing by portfolio size (WOS-3677). Pure integer to keep
+  // the HubSpot property numerically comparable for routing rules.
+  numberOfProperties: z.coerce.number().int().min(0).max(10000),
+  source: z.string().trim().min(1).default("unknown"),
+
+  // For leads that come from Meta forms.
+  // No length cap here: a too-long value must not fail validation and drop the
+  // whole lead — mapPmsToHsValues bounds the model input defensively instead.
+  pmsMeta: z.string().trim().min(1).optional(),
+  intentMeta: z.string().trim().min(1).optional(),
+
+  // Raw URL search string from the page at submit time — surfaced verbatim in
+  // the Slack notification so sales can eyeball ad attribution.
+  queryParams: z.string().trim().optional(),
+
+  firstName: z.string().trim().min(1).optional(),
+  lastName: z.string().trim().min(1).optional(),
+  phone: z.string().trim().min(1).optional(),
+
+  // Onboarding completion fields — sent when a PM completes onboarding in wOS.
+  orgId: z.string().trim().min(1).optional(),
+  orgName: z.string().trim().min(1).optional(),
+  onboardingComplete: z.boolean().optional(),
+  intentOnboarding: z.string().trim().optional(),
+
+  // Caller is not production (e.g. a wander.com preview deployment): the Slack
+  // notification goes to #radio-slack-testing instead of the live channel.
+  // HubSpot writes are unaffected — same split as the pre-gateway behavior.
+  test: z.boolean().optional(),
+});
+export type InboundBody = z.infer<typeof inboundBody>;
