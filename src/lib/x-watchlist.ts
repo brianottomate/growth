@@ -18,7 +18,7 @@ export const X_WATCHLIST: readonly XWatchlistGroup[] = [
   {
     id: "brand",
     name: "Brand terms",
-    terms: ["wander.com", "WanderOS", "Wander Sites", "Wander Operated"],
+    terms: ["wander.com", "WanderOS"],
     dotClass: "bg-emerald-500",
     textClass: "text-emerald-400",
     markClass: "rounded-[3px] bg-emerald-500/15 px-0.5 text-inherit",

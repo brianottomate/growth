@@ -1,8 +1,9 @@
 import "server-only";
 
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
+import { channelTable } from "@/server/db/channel-schema";
 import {
   mentionTable,
   type MentionInsert,
@@ -21,7 +22,7 @@ import {
   scoreItems,
   type ScoringChannel,
 } from "@/server/services/triage.service";
-import { X_WATCHLIST } from "@/lib/x-watchlist";
+import { matchWatchlist, X_WATCHLIST } from "@/lib/x-watchlist";
 
 const SCORING_SYSTEM_PROMPT = `You are a growth analyst at Wander, a vacation-rental company.
 
@@ -41,24 +42,53 @@ the OP's problem and a reply would add value to the thread.
 Key competitors (mentions are high-signal):
 - Hostaway, Guesty, OwnerRez, Hospitable, Lodgify, Streamline, Escapia
 - Tweets complaining about or comparing these competitors are prime
-  engagement opportunities.`;
+  engagement opportunities.
 
-const DRAFT_SYSTEM_PROMPT = `You write Twitter / X reply drafts for the Wander
+Signal quality matters as much as topical match:
+- Self-promotional growth-hacking content — hashtag walls, "free ebook" /
+  "free playbook" lead magnets, course sellers, link-in-bio funnels,
+  engagement farming — is noise. Tag it noise and suggest skip no matter how
+  many watchlist terms it contains. The author is broadcasting, not asking.
+- "engage" is for tweets by real operators, hosts, or owners with a genuine
+  question, complaint, or decision in progress, where a reply from Wander adds
+  value to the conversation.
+- Use the engagement + audience numbers: a tweet with negligible views and
+  interactions from an author with a tiny following is almost never worth
+  engaging — suggest monitor (if topically strong) or skip. A modest-reach
+  tweet can still be "engage" when the intent is unmistakably high.`;
+
+// The posting identity decides the disclosure rule: replies sent from the
+// brand's own X account need no affiliation disclaimer (the handle IS the
+// disclosure), while a personal-account reply must disclose. Resolved from the
+// DB (listening source → brand → its X channel) at draft time.
+function buildDraftMechanics(identity: {
+  handle: string;
+  brandName: string;
+} | null): string {
+  const identityRules = identity
+    ? `1. You are replying AS ${identity.handle} — ${identity.brandName}'s official
+   X account. The handle itself is the affiliation disclosure; never add
+   disclaimers like "I work at Wander". Say "we" for ${identity.brandName}
+   things, and keep it human and conversational — a person runs this account,
+   not a press office.`
+    : `1. You are replying from a personal account. Disclose Wander affiliation
+   briefly if you're mentioning Wander ("disclosure: I work at Wander"). Skip
+   the disclosure if there's no Wander mention.`;
+
+  return `You write Twitter / X reply drafts for the Wander
 growth team. Reddit etiquette doesn't apply here; tweets are short, casual,
 and public. Every reply must:
 
-1. Be under 270 characters (leaving room for the @-mention prefix).
-2. Sound like a human operator, not a brand. First-person, conversational.
-3. Disclose Wander affiliation briefly if you're mentioning Wander
-   ("disclosure: I work at Wander"). Skip the disclosure if there's no Wander
-   mention.
-4. Mention WanderOS / Wander Sites / Wander Operated only when it directly
+${identityRules}
+2. Be under 270 characters (leaving room for the @-mention prefix).
+3. Mention WanderOS / Wander Sites / Wander Operated only when it directly
    solves the OP's problem, and only as a short phrase. Never link to
    wander.com.
-5. If the tweet is a critical brand mention or complaint about Wander,
+4. If the tweet is a critical brand mention or complaint about Wander,
    acknowledge it directly and offer to help over DM. Skip any product pitch.
 
 No hashtags. No emojis. No exclamation points.`;
+}
 
 interface RawTweet {
   id: string;
@@ -120,7 +150,18 @@ const SEARCH_QUERY = X_WATCHLIST.flatMap((g) => g.terms)
 
 const FULL_QUERY = `(${SEARCH_QUERY}) -is:retweet lang:en`;
 
-export async function searchRecentTweets(): Promise<TweetSummary[]> {
+// The cron runs every 6 hours (vercel.json). Recent search defaults to a 7-day
+// lookback, which would waste most of the 50-result budget re-fetching tweets
+// we've already triaged — so the cron scans a 13h window (2× cadence: one
+// failed run never loses tweets; the overlap is free because dedup happens
+// before scoring). X moves fast, so cadence stays at 6h — the window is the
+// efficiency knob, not the schedule.
+export const CRON_SCAN_WINDOW_HOURS = 13;
+
+export async function searchRecentTweets(opts?: {
+  /** Only fetch tweets newer than this many hours (omit = API's ~7-day max). */
+  sinceHours?: number;
+}): Promise<TweetSummary[]> {
   const bearer = process.env.X_BEARER_TOKEN;
   if (!bearer) {
     throw new Error("X_BEARER_TOKEN is not set");
@@ -129,6 +170,10 @@ export async function searchRecentTweets(): Promise<TweetSummary[]> {
   const url = new URL("https://api.x.com/2/tweets/search/recent");
   url.searchParams.set("query", FULL_QUERY);
   url.searchParams.set("max_results", "50");
+  if (opts?.sinceHours) {
+    const start = new Date(Date.now() - opts.sinceHours * 60 * 60 * 1000);
+    url.searchParams.set("start_time", start.toISOString());
+  }
   url.searchParams.set(
     "tweet.fields",
     "created_at,public_metrics,author_id,lang",
@@ -175,9 +220,9 @@ function formatTweetForLLM(t: TweetSummary): string {
   const text = t.text.replace(/\s+/g, " ").slice(0, 500);
   return [
     `id: ${t.id}`,
-    `author: @${t.authorUsername}`,
+    `author: @${t.authorUsername} (${t.authorFollowers} followers)`,
     `text: ${text}`,
-    `engagement: ${t.likeCount}♥ ${t.replyCount}💬 ${t.retweetCount}🔁`,
+    `engagement: ${t.likeCount}♥ ${t.replyCount}💬 ${t.retweetCount}🔁 · ${t.viewCount} views`,
   ].join("\n");
 }
 
@@ -236,7 +281,9 @@ export interface XScanResult {
 export async function scanScoreAndPersistTweets(opts?: {
   dryRun?: boolean;
 }): Promise<XScanResult> {
-  const tweets = await searchRecentTweets();
+  const tweets = await searchRecentTweets({
+    sinceHours: CRON_SCAN_WINDOW_HOURS,
+  });
   const result: XScanResult = {
     fetched: tweets.length,
     fresh: 0,
@@ -277,6 +324,7 @@ export async function scanScoreAndPersistTweets(opts?: {
       sourceType: "post",
       externalId: t.id,
       url: t.url,
+      keyword: matchWatchlist(t.text)?.terms.join(", ") ?? null,
       author: t.authorUsername,
       snippet: t.text.slice(0, 1500),
       postedAt: new Date(t.createdAt),
@@ -308,15 +356,40 @@ export async function scanScoreAndPersistTweets(opts?: {
   result.engage = insertedRows.filter(
     (m) => m.suggestedAction === "engage",
   ).length;
-  result.broadcast = await postMentionsToRadio(insertedRows);
+
+  // Slack floor — engage alone isn't enough to ping the team. The tweet must
+  // also be a confident score AND have real reach (or a real audience): a
+  // 12-view zero-like tweet from a tiny account isn't worth a human's
+  // attention even when it's topically perfect. Everything still lands in the
+  // mention queue; this only gates the broadcast.
+  const scoredByUrl = new Map(scored.map((s) => [s.tweet.url, s]));
+  const broadcastable = insertedRows.filter((m) => {
+    const s = scoredByUrl.get(m.url);
+    if (!s || s.relevance < BROADCAST_MIN_RELEVANCE) return false;
+    const t = s.tweet;
+    const interactions = t.likeCount + t.replyCount + t.retweetCount;
+    return (
+      interactions >= BROADCAST_MIN_INTERACTIONS ||
+      t.viewCount >= BROADCAST_MIN_VIEWS ||
+      t.authorFollowers >= BROADCAST_MIN_FOLLOWERS
+    );
+  });
+  result.broadcast = await postMentionsToRadio(broadcastable);
 
   return result;
 }
 
+// Broadcast floor knobs. A tweet must clear the relevance bar AND any one of
+// the reach bars (interactions / views / author audience) to hit Slack.
+const BROADCAST_MIN_RELEVANCE = 8;
+const BROADCAST_MIN_INTERACTIONS = 2;
+const BROADCAST_MIN_VIEWS = 200;
+const BROADCAST_MIN_FOLLOWERS = 500;
+
 const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
   short: "Keep the reply under 140 characters.",
   "no-pitch":
-    "Do not mention any Wander product. Provide pure value to the OP. Skip the affiliation disclosure since there's no Wander mention to disclose.",
+    "Do not mention any Wander product. Provide pure value to the OP.",
   "lead-with-question":
     "Open the reply with a clarifying question to the OP before answering.",
   "story-first":
@@ -329,6 +402,35 @@ const PILL_INSTRUCTIONS: Record<DraftPill, string> = {
     "If you mention a Wander product, focus on Wander Operated (full-service property management).",
 };
 
+/**
+ * The X account replies are posted from — the listening brand's own X channel
+ * (today: brand "Wander" → @wander). Null when the brand has no connected X
+ * channel, which flips the draft prompt back to personal-account disclosure.
+ */
+async function loadPostingIdentity(
+  brandId: string | null,
+  brandName: string | null,
+): Promise<{ handle: string; brandName: string } | null> {
+  if (!brandId) return null;
+  const [channel] = await db
+    .select({ handle: channelTable.handle })
+    .from(channelTable)
+    .where(
+      and(
+        eq(channelTable.brandId, brandId),
+        eq(channelTable.platform, "x"),
+        eq(channelTable.isActive, true),
+        isNull(channelTable.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!channel?.handle) return null;
+  const handle = channel.handle.startsWith("@")
+    ? channel.handle
+    : `@${channel.handle}`;
+  return { handle, brandName: brandName ?? "the brand" };
+}
+
 export async function draftTweetReplyForPost(input: {
   tweet: Pick<TweetSummary, "authorUsername" | "text">;
   intentTag: IntentTag;
@@ -337,12 +439,13 @@ export async function draftTweetReplyForPost(input: {
   customInstructions?: string;
 }): Promise<string> {
   const ctx = await loadListeningContext("x-search");
+  const identity = await loadPostingIdentity(ctx.brandId, ctx.brandName);
   const systemPrompt = composeListeningSystemPrompt({
     brandVoice: ctx.brandVoice,
     story: ctx.story,
     voiceOverride: ctx.voiceOverride,
     signalNotes: ctx.signalNotes,
-    channelMechanics: DRAFT_SYSTEM_PROMPT,
+    channelMechanics: buildDraftMechanics(identity),
     mode: "draft",
   });
 

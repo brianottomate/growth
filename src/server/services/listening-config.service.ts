@@ -18,6 +18,8 @@ import {
 const LISTENING_BRAND_SLUG = "wander";
 
 export interface ListeningContext {
+  brandId: string | null;
+  brandName: string | null;
   brandVoice: string | null; // brandFingerprint.fingerprintText
   story: BrandListeningStory | null;
   voiceOverride: ChannelFingerprint | null;
@@ -26,6 +28,8 @@ export interface ListeningContext {
 }
 
 const EMPTY: ListeningContext = {
+  brandId: null,
+  brandName: null,
   brandVoice: null,
   story: null,
   voiceOverride: null,
@@ -39,6 +43,7 @@ export async function loadListeningContext(
   const [brand] = await db
     .select({
       id: brandTable.id,
+      name: brandTable.name,
       brandFingerprint: brandTable.brandFingerprint,
       brandListeningStory: brandTable.brandListeningStory,
     })
@@ -64,6 +69,8 @@ export async function loadListeningContext(
     .limit(1);
 
   return {
+    brandId: brand.id,
+    brandName: brand.name,
     brandVoice: brand.brandFingerprint?.fingerprintText ?? null,
     story: brand.brandListeningStory ?? null,
     voiceOverride: source?.voiceOverride ?? null,
