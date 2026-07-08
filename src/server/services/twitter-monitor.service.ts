@@ -139,6 +139,7 @@ export interface ScoredTweet {
   intentTag: IntentTag;
   suggestedAction: SuggestedAction;
   rationale: string;
+  banRisk: number;
 }
 
 // Brand + STR pain phrases combined into one X recent-search query. The term
@@ -255,6 +256,7 @@ export async function scoreTweets(
     intentTag: s.intentTag,
     suggestedAction: s.suggestedAction,
     rationale: s.rationale,
+    banRisk: s.banRisk,
   }));
 }
 
@@ -342,6 +344,7 @@ export async function scanScoreAndPersistTweets(opts?: {
       intentTag: s.intentTag,
       suggestedAction: s.suggestedAction,
       rationale: s.rationale,
+      banRisk: s.banRisk,
       suggestedReply: draft,
       status: "new",
       raw: {

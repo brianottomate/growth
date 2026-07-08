@@ -125,6 +125,7 @@ export interface ScoredPost {
   intentTag: IntentTag;
   suggestedAction: SuggestedAction;
   rationale: string;
+  banRisk: number;
 }
 
 /**
@@ -250,6 +251,7 @@ export async function scoreRedditPosts(
     intentTag: s.intentTag,
     suggestedAction: s.suggestedAction,
     rationale: s.rationale,
+    banRisk: s.banRisk,
   }));
 }
 

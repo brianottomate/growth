@@ -130,7 +130,19 @@ poster's problem and a reply would add value.
 High-signal: people complaining about / switching from OTAs (Airbnb, VRBO) or
 competitors (Hostaway, Guesty, OwnerRez, Hospitable, Lodgify), asking for direct
 booking solutions, or evaluating alternatives. Tag those competitor/high-intent.
-Brand mentions of Wander itself → brand. Generic chatter → noise.`;
+Brand mentions of Wander itself → brand. Generic chatter → noise.
+
+Signal quality matters as much as topical match:
+- Builder / founder self-promo — "I built X", "so I made something simpler",
+  product launches, lead magnets, link drops — is NOT an engagement target no
+  matter how on-topic. The author is broadcasting their own product, not asking
+  for help; replying with a Wander pitch under their launch adds nothing. Cap
+  these at monitor, and note that strict subs usually remove them (high banRisk).
+- "engage" is for real operators/hosts/owners with a genuine question,
+  complaint, or decision in progress where a reply from Wander adds value.
+- banRisk: judge whether the SOURCE post survives its community's moderation.
+  Self-promo in software/PMS subs is removed within hours far more often than
+  not — a Slack ping for a thread that dies is pure friction for the team.`;
 
 const mentionScoringChannel: ScoringChannel<Mention, MentionIntentTag> = {
   intentTags: MENTION_INTENT_TAGS,
@@ -217,6 +229,7 @@ export async function ingestF5BotEmail(email: {
             intentTag: r.intentTag,
             suggestedAction: r.suggestedAction,
             rationale: r.rationale,
+            banRisk: r.banRisk,
           })
           .where(inArray(mentionTable.id, [r.item.id])),
       ),
@@ -230,6 +243,7 @@ export async function ingestF5BotEmail(email: {
       intentTag: r.intentTag,
       suggestedAction: r.suggestedAction,
       rationale: r.rationale,
+      banRisk: r.banRisk,
     }));
     console.log(
       `[f5bot] scored ${scored} mention(s):`,

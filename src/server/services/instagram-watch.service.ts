@@ -324,6 +324,7 @@ export async function scanAccountWatchSources(opts?: {
         intentTag: s.intentTag,
         suggestedAction: s.suggestedAction,
         rationale: s.rationale,
+        banRisk: s.banRisk,
         suggestedReply: draft,
         status: "new",
         raw: {

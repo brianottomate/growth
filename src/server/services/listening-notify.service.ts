@@ -33,8 +33,22 @@ const SOURCE_OWNER_SLACK_ID: Partial<Record<string, string>> = {
 // Slack. "monitor"/"skip" and unscored rows stay in the table for the
 // /app/listen queue. Tighten/loosen here (e.g. also require relevance >= 8) if
 // the channel gets noisy.
+//
+// banRisk gate: content the model judges likely to be removed (self-promo in
+// strict subs, spam-shaped posts) stays out of Slack — a ping for a thread
+// that's dead by the time someone clicks is pure friction. The row still lands
+// in the /app/listen queue with its banRisk visible.
+const BAN_RISK_MAX = 0.6;
+
 function isWorthBroadcasting(m: Mention): boolean {
-  return m.suggestedAction === "engage";
+  if (m.suggestedAction !== "engage") return false;
+  if (typeof m.banRisk === "number" && m.banRisk >= BAN_RISK_MAX) {
+    console.log(
+      `[radio] suppressing ${m.id} (${m.url}) — banRisk ${m.banRisk.toFixed(2)} >= ${BAN_RISK_MAX}`,
+    );
+    return false;
+  }
+  return true;
 }
 
 function sourceLabel(m: Mention): string {
@@ -69,6 +83,10 @@ function buildBlocks(m: Mention) {
   if (m.author) meta.push(`by ${m.author}`);
   if (typeof m.relevance === "number") meta.push(`relevance ${m.relevance}/10`);
   if (m.intentTag) meta.push(`intent: ${m.intentTag}`);
+  // Surface non-trivial removal risk so the team knows to check the thread is
+  // still alive before investing in a reply.
+  if (typeof m.banRisk === "number" && m.banRisk >= 0.25)
+    meta.push(`ban-risk ${Math.round(m.banRisk * 100)}%`);
   if (meta.length) lines.push(meta.join(" · "));
 
   if (m.snippet) {

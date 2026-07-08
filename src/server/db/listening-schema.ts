@@ -101,6 +101,10 @@ export const mentionTable = pgTable(
     intentTag: t.text(),
     suggestedAction: t.text(), // engage | monitor | skip
     rationale: t.text(),
+    // Likelihood (0..1) the source content gets removed — mod-removal of
+    // self-promo in strict subs, rule-breaking, spam. High risk suppresses the
+    // Slack broadcast (the queue still gets the row); see listening-notify.
+    banRisk: t.real(),
     // AI-drafted reply/comment to act on (pre-engagement). For account-watch
     // (Instagram) this is the "short clever public comment" suggestion; null
     // until a scan drafts one. The human edits/copies it before posting —

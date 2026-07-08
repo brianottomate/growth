@@ -54,6 +54,7 @@ export interface ScoredItem<TItem, TIntent extends string> {
   intentTag: TIntent;
   suggestedAction: SuggestedAction;
   rationale: string;
+  banRisk: number;
 }
 
 /**
@@ -95,6 +96,13 @@ export async function scoreItems<TItem, TIntent extends string>(
         rationale: z
           .string()
           .describe("One concise sentence justifying the score."),
+        banRisk: z
+          .number()
+          .min(0)
+          .max(1)
+          .describe(
+            "Likelihood (0–1) that this content gets removed from its platform — moderator removal or author deletion. High: self-promo / product launches in strict communities, hashtag-wall spam, lead magnets, rule-breaking, throwaway-account posts. Low: genuine questions and discussions from established members. 0 = clearly durable, 1 = near-certain removal.",
+          ),
       }),
     }),
   });
@@ -110,6 +118,7 @@ export async function scoreItems<TItem, TIntent extends string>(
       intentTag: s.intentTag,
       suggestedAction: s.suggestedAction,
       rationale: s.rationale,
+      banRisk: s.banRisk,
     });
   }
   scored.sort((a, b) => b.relevance - a.relevance);
