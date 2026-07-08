@@ -4,6 +4,9 @@
 **Purpose:** define how `/overview` can grow from a chat assistant into an
 operator that watches the growth workspace and proposes the next useful work.
 
+**Companion:** `agent-runtime-options.md` expands the AI SDK 7, Mastra, Eve, and
+deployment-boundary reasoning for Growth.
+
 ## Recommendation
 
 Keep the current `/overview` chat agent as the foreground assistant. Add an
