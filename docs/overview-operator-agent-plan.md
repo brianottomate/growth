@@ -72,6 +72,20 @@ Suggested sections:
 The chat assistant can explain any item, but the item itself should exist as
 structured state, not only as prose in a conversation.
 
+## Deployment Boundary
+
+An external agent runtime can be packaged as an `agent/` directory, but the folder
+shape should not decide the product boundary.
+
+The first operator should live close to `/overview` and use the same app services
+that already understand organizations, channels, content, leads, listening, and
+sync state. It should write structured findings through product code, not by
+inventing a parallel operational state.
+
+A separate agent deployment becomes useful if the operator needs its own schedule,
+inbox, digest channel, durable run history, or independent observability. Until
+then, the simpler boundary is: in-product snapshot first, external agent later.
+
 ## Finding Shape
 
 Use a simple structured finding model:
@@ -122,6 +136,20 @@ execute approved actions.
 Eve is useful if the operator should live in multiple channels, such as scheduled
 email or Slack digests, but it is not required for the first in-product version.
 
+## Assumptions To Test
+
+- **The overview snapshot is enough:** structured findings inside `/overview`
+  reduce missed follow-ups without needing a separate agent service.
+- **Deterministic checks carry most of the value:** due dates, failed jobs, stale
+  queues, and missing assignments create useful findings before model judgment is
+  added.
+- **External channels change the runtime:** if daily digests, approvals, or
+  follow-ups naturally happen outside the app, a separate agent deployment becomes
+  more attractive.
+- **The product remains the write boundary:** even a separate agent should route
+  writes through approved app actions so publishing, sending, and outreach remain
+  reviewable.
+
 ## Build Sequence
 
 1. Add read-only operator checks for content pipeline, listening queue, lead pool,
@@ -141,4 +169,3 @@ email or Slack digests, but it is not required for the first in-product version.
 - The operator reduces missed follow-ups, stale queues, and sync blind spots.
 - Write actions remain explicit and reviewable.
 - The assistant feels like a back-office teammate, not a generic chatbot.
-
