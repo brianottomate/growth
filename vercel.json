@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/instagram",
-      "schedule": "0 13 * * *"
+      "schedule": "0 19 * * *"
     },
     {
       "path": "/api/cron/x",

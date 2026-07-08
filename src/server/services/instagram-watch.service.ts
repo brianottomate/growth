@@ -36,9 +36,11 @@ import {
  * mention. Reuses the shared triage engine (score = sonnet, draft = opus).
  */
 
-// Comment while content is fresh. Daily cron → look back ~48h for slack against
-// cron timing; the unique-url dedup makes re-scans idempotent.
-const DEFAULT_SINCE_HOURS = 48;
+// Comment while content is fresh — a comment on a 2-day-old IG post reads as
+// late. The cron runs daily at noon Pacific (19:00 UTC, vercel.json) so US
+// creators have posted that day; a 24h window then means every surfaced post
+// is from "today". The unique-url dedup makes re-scans idempotent regardless.
+const DEFAULT_SINCE_HOURS = 24;
 
 const IG_INTENTS = [
   "destination-match", // names specific places we'd plausibly have homes
