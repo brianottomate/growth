@@ -22,8 +22,11 @@ import {
 // works before the channel exists.
 const RADIO_AFFILIATE_CHANNEL = "radio-affiliate";
 
-// Who owns the program day-to-day. TODO: set once decided (Micaela?).
-const AFFILIATE_OWNER_SLACK_ID: string | null = null;
+// Who owns the program day-to-day — Micaela, the Wander-side owner of the
+// AP-shared #marketing-affiliates channel (confirmed via Slack, Jul 9).
+// NOTE: #marketing-affiliates itself is Slack Connect with Acceleration
+// Partners members — never point this feed there; internal alerts only.
+const AFFILIATE_OWNER_SLACK_ID: string | null = "U0574R1RCD9";
 
 const KIND_LABEL: Record<AffiliateItem["kind"], string> = {
   email: "Partner email",
@@ -122,6 +125,55 @@ export async function postAffiliateItemToRadio(item: AffiliateItem) {
   }
 
   return result;
+}
+
+// ---- Per-conversion radio posts ------------------------------------------
+//
+// The lightweight celebratory feed the other radio-* channels set the pattern
+// for (#referral-radio fires per code use). Volume today is a handful of
+// bookings a month, so one post per conversion is signal, not noise. Called by
+// the daily monitor only on the day's FIRST snapshot (re-runs update the metric
+// row and skip this), so each action posts at most once.
+
+export interface AffiliateConversion {
+  id: string;
+  partnerName?: string;
+  amount?: number;
+  payout?: number;
+  state?: string;
+  eventDate?: string;
+}
+
+const money = (n: number | undefined) =>
+  typeof n === "number"
+    ? n.toLocaleString("en-US", { style: "currency", currency: "USD" })
+    : "—";
+
+/** Post yesterday's conversions as a compact celebratory feed. Best-effort. */
+export async function postConversionsToRadio(
+  conversions: AffiliateConversion[],
+): Promise<number> {
+  let posted = 0;
+  for (const c of conversions) {
+    const lines = [
+      `:tada: Affiliate booking via *${c.partnerName ?? "unknown partner"}* — ${money(c.amount)} (payout ${money(c.payout)})`,
+      `${c.state ?? ""}${c.eventDate ? ` · ${c.eventDate.slice(0, 10)}` : ""} · action \`${c.id}\``,
+    ];
+    const result = await postOnSlack({
+      text: `Affiliate booking via ${c.partnerName ?? "partner"}: ${money(c.amount)}`,
+      channel: RADIO_AFFILIATE_CHANNEL,
+      blocks: [
+        {
+          type: "section" as const,
+          text: { type: "mrkdwn" as const, text: lines.join("\n") },
+        },
+      ],
+    });
+    if (result.success) posted += 1;
+  }
+  if (conversions.length > 0)
+    console.log(`[affiliate-radio] posted ${posted}/${conversions.length} conversion(s)`);
+  return posted;
 }
 
 /**

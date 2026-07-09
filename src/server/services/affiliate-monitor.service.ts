@@ -18,7 +18,10 @@ import {
   type PartnerProgram,
 } from "@/server/db/affiliate-schema";
 
-import { postAffiliateItemsToRadio } from "./affiliate-notify.service";
+import {
+  postAffiliateItemsToRadio,
+  postConversionsToRadio,
+} from "./affiliate-notify.service";
 
 // Daily affiliate monitor (Vercel cron → /api/cron/affiliate). Replaces the
 // agency's "Daily Performance & Balance" + "Applications" playbook rows
@@ -89,6 +92,18 @@ async function snapshotMetrics(
     await db
       .insert(affiliateMetricDailyTable)
       .values({ programId: program.id, date: day, ...values });
+    // First snapshot for this day → fire the per-conversion radio feed (a
+    // re-run hits the update branch above and never double-posts).
+    await postConversionsToRadio(
+      actions.map((a) => ({
+        id: a.Id,
+        partnerName: a.MediaPartnerName,
+        amount: typeof a.Amount === "string" ? Number(a.Amount) : a.Amount,
+        payout: typeof a.Payout === "string" ? Number(a.Payout) : a.Payout,
+        state: a.State,
+        eventDate: a.EventDate,
+      })),
+    );
   }
 
   console.log(
