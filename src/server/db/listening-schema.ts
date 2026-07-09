@@ -239,12 +239,16 @@ export type WatchedAccount = {
 export type ListeningSourceConfig = {
   subreddits?: SubredditEntry[]; // reddit — names (legacy) or full profiles
   keywords?: string[]; // x / linkedin / pinterest terms
-  alertTerms?: ListeningAlertTerm[]; // provider_alert terms (F5Bot) — intent + verified state
+  alertTerms?: ListeningAlertTerm[]; // provider_alert terms (F5Bot, Impact) — intent + verified state
   watchlistGroups?: { id: string; name: string; terms: string[] }[]; // x
   accounts?: WatchedAccount[]; // account_watch — external creators/publishers we monitor (IG)
   windowDays?: number;
-  ignoreList?: string[]; // e.g. F5Bot ad-block senders
+  ignoreList?: string[]; // provider-side exclusion terms (F5Bot ad senders, Impact excludes)
   maxResults?: number;
+  // provider_alert extras (Impact Social Listening): which of the provider's
+  // networks the listener spans, and which external program owns it.
+  channels?: string[];
+  externalProgramId?: string;
 };
 
 export const listeningSourceTable = pgTable(

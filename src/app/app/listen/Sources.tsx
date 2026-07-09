@@ -192,6 +192,17 @@ function SourceCard({ source, onEdit }: { source: Source; onEdit: () => void }) 
  * applied in the provider's own UI yet. "Mark applied" flips a to_add term to
  * live (stamping verifiedAt) or drops a to_remove term from the config.
  */
+// Where a provider_alert source's terms are actually configured — the setup-task
+// panel deep-links here. Keyed by adapter slug; unknown adapters fall back to a
+// plain label with no link.
+const PROVIDER_DASHBOARDS: Record<string, { label: string; url: string }> = {
+  f5bot: { label: "F5Bot", url: "https://f5bot.com/dash" },
+  "impact-social-listening": {
+    label: "Impact Social Listening",
+    url: "https://app.impact.com/secure/advertiser/discover/protect/fr/social-listening.ihtml",
+  },
+};
+
 function SetupTasks({ source }: { source: Source }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -231,14 +242,21 @@ function SetupTasks({ source }: { source: Source }) {
     <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
       <p className="text-xs font-semibold text-amber-400">
         Setup tasks — apply in{" "}
-        <a
-          href="https://f5bot.com/dash"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="underline underline-offset-2"
-        >
-          F5Bot ↗
-        </a>
+        {(() => {
+          const dash = PROVIDER_DASHBOARDS[source.adapter];
+          return dash ? (
+            <a
+              href={dash.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline underline-offset-2"
+            >
+              {dash.label} ↗
+            </a>
+          ) : (
+            <span>{source.adapter}</span>
+          );
+        })()}
         , then mark done
       </p>
       <ul className="mt-2 space-y-1.5">
