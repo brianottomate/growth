@@ -71,6 +71,9 @@ export const env = createEnv({
     // Inbound bearer for /api/hubspot/v1/* callers (wander.com, monolith) —
     // authenticates callers to OUR gateway routes, unrelated to HubSpot auth
     HUBSPOT_GATEWAY_API_TOKEN: z.string().min(32).optional(),
+    // HubSpot webhooks — the shared private app's client secret, used to
+    // verify the v3 request signature on /api/webhooks/hubspot
+    HUBSPOT_WEBHOOK_CLIENT_SECRET: z.string().optional(),
     // Lead enrichment — discovery providers (all optional; missing key skips that provider)
     PERPLEXITY_API_KEY: z.string().optional(), // Perplexity sonar web search
     TAVILY_API_KEY: z.string().optional(), // Tavily search/extract
@@ -183,6 +186,7 @@ export const env = createEnv({
     // HubSpot
     HUBSPOT_ACCESS_TOKEN_OPERATED: process.env.HUBSPOT_ACCESS_TOKEN_OPERATED,
     HUBSPOT_GATEWAY_API_TOKEN: process.env.HUBSPOT_GATEWAY_API_TOKEN,
+    HUBSPOT_WEBHOOK_CLIENT_SECRET: process.env.HUBSPOT_WEBHOOK_CLIENT_SECRET,
     // Lead enrichment — discovery providers
     PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY,
     TAVILY_API_KEY: process.env.TAVILY_API_KEY,

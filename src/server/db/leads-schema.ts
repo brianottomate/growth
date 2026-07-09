@@ -547,3 +547,54 @@ export const leadImportRelations = relations(leadImportTable, ({ one }) => ({
     references: [userTable.id],
   }),
 }));
+
+// ---- HUBSPOT WEBHOOK EVENTS (raw inbound event log) ----------------
+//
+// Accept-then-process: /api/webhooks/hubspot stores every HubSpot event row
+// here verbatim BEFORE anything is applied, so a processing bug can never
+// lose an event. A light inline pass refreshes lead_domain status/owner;
+// everything else stays pending (processedAt null) for the projection
+// processor that lands with the full company backfill
+// (docs/leads-convergence-plan.md — sync design).
+
+export const hubspotWebhookEventTable = leadsSchema.table(
+  "hubspot_webhook_event",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("hswe")),
+
+    // HubSpot's own event id — redeliveries reuse it, so unique +
+    // conflict-ignore makes retries a no-op.
+    eventId: t.text().notNull(),
+    subscriptionType: t.text().notNull(), // e.g. "company.propertyChange"
+    portalId: t.text(),
+    objectId: t.text().notNull(), // company/contact record id
+    propertyName: t.text(),
+    propertyValue: t.text(),
+    changeSource: t.text(),
+    attemptNumber: t.integer().default(0).notNull(),
+    occurredAt: t.timestamp(),
+
+    payload: t.jsonb().$type<Record<string, unknown>>().notNull(),
+
+    processedAt: t.timestamp(), // null = pending for the projection processor
+    processNote: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("hubspot_webhook_event_event_id_idx").on(table.eventId),
+    index("hubspot_webhook_event_object_idx").on(table.objectId),
+    index("hubspot_webhook_event_pending_idx").on(table.processedAt),
+    index("hubspot_webhook_event_type_idx").on(table.subscriptionType),
+  ],
+);
+
+export type HubspotWebhookEvent = typeof hubspotWebhookEventTable.$inferSelect;
+export type HubspotWebhookEventInsert =
+  typeof hubspotWebhookEventTable.$inferInsert;
