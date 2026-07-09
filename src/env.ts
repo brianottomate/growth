@@ -90,6 +90,11 @@ export const env = createEnv({
     // IDs via chat.postMessage (#radio-social-listening, etc.). Missing → posts
     // are skipped (no-op), never an error.
     SLACK_API_TOKEN: z.string().optional(), // Bot token (xoxb-…)
+    // Impact.com Brand API (affiliate program ops — docs/affiliate-program-takeover.md).
+    // Basic auth: AccountSID as username, AuthToken as password. Created in the
+    // Impact dashboard under Settings → API Access. Missing → the client no-ops.
+    IMPACT_ACCOUNT_SID: z.string().optional(),
+    IMPACT_AUTH_TOKEN: z.string().optional(),
   },
 
   /**
@@ -194,6 +199,8 @@ export const env = createEnv({
     CLOUDFLARE_STREAM_WEBHOOK_SECRET: process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
     RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
     SLACK_API_TOKEN: process.env.SLACK_API_TOKEN,
+    IMPACT_ACCOUNT_SID: process.env.IMPACT_ACCOUNT_SID,
+    IMPACT_AUTH_TOKEN: process.env.IMPACT_AUTH_TOKEN,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
