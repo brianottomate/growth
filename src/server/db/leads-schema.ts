@@ -568,7 +568,10 @@ export const hubspotWebhookEventTable = leadsSchema.table(
     // HubSpot's own event id — redeliveries reuse it, so unique +
     // conflict-ignore makes retries a no-op.
     eventId: t.text().notNull(),
-    subscriptionType: t.text().notNull(), // e.g. "company.propertyChange"
+    // Classic: "company.propertyChange". Expanded object support (beta):
+    // "object.propertyChange" + objectTypeId identifies the object.
+    subscriptionType: t.text().notNull(),
+    objectTypeId: t.text(), // e.g. "0-2" (company), "0-1" (contact); null on classic
     portalId: t.text(),
     objectId: t.text().notNull(), // company/contact record id
     propertyName: t.text(),

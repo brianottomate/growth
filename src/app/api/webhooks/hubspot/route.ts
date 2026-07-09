@@ -22,11 +22,29 @@ import {
 
 const MAX_TIMESTAMP_SKEW_MS = 5 * 60 * 1000; // HubSpot rejects replays > 5 min
 
+const COMPANY_OBJECT_TYPE_ID = "0-2"; // HubSpot's canonical company objectTypeId
+
 // propertyChange events we apply inline: HubSpot property -> lead_domain column
 const INLINE_COMPANY_PROPS = {
   hs_lead_status: "hubspotLeadStatus",
   hubspot_owner_id: "hubspotOwner",
 } as const;
+
+/**
+ * True for a company property-change event under either subscription model:
+ * classic ("company.propertyChange") or expanded object support
+ * ("object.propertyChange" + objectTypeId "0-2").
+ */
+function isCompanyPropertyChange(row: {
+  subscriptionType: string;
+  objectTypeId?: string | null;
+}): boolean {
+  if (row.subscriptionType === "company.propertyChange") return true;
+  return (
+    row.subscriptionType === "object.propertyChange" &&
+    row.objectTypeId === COMPANY_OBJECT_TYPE_ID
+  );
+}
 
 type JsonRecord = Record<string, unknown>;
 
@@ -97,6 +115,7 @@ function parseEvents(rawBody: string): HubspotWebhookEventInsert[] {
     rows.push({
       eventId,
       subscriptionType,
+      objectTypeId: asString(item.objectTypeId),
       objectId,
       portalId: asString(item.portalId),
       propertyName: asString(item.propertyName),
@@ -120,7 +139,7 @@ function parseEvents(rawBody: string): HubspotWebhookEventInsert[] {
  */
 async function applyInline(rows: HubspotWebhookEventInsert[]) {
   for (const row of rows) {
-    if (row.subscriptionType !== "company.propertyChange") continue;
+    if (!isCompanyPropertyChange(row)) continue;
     const column =
       INLINE_COMPANY_PROPS[
         row.propertyName as keyof typeof INLINE_COMPANY_PROPS
