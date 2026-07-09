@@ -11,3 +11,13 @@ export const RESEND_RECEIVING_DOMAIN = "lexaomo.resend.app";
 export function inspirationAddress(brandId: string): string {
   return `inspo+${brandId}@${RESEND_RECEIVING_DOMAIN}`;
 }
+
+/**
+ * Inbound address for affiliate-program mail. The partnerships@wander.com
+ * Google group forward-copies here (humans keep Gmail; the system gets a copy
+ * of every partner email, including Impact's own notification emails). The
+ * `affiliate+<programId>` token resolves the partner_program at ingest time.
+ */
+export function affiliateAddress(programId: string): string {
+  return `affiliate+${programId}@${RESEND_RECEIVING_DOMAIN}`;
+}

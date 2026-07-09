@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "@/env";
 import { resend } from "@/server/clients/resend.client";
+import { ingestAffiliateEmail } from "@/server/services/affiliate-inbound.service";
 import { ingestF5BotEmail } from "@/server/services/f5bot.service";
 import { ingestInspirationEmail } from "@/server/services/inspiration-newsletter.service";
 
@@ -12,6 +13,7 @@ import { ingestInspirationEmail } from "@/server/services/inspiration-newsletter
 // We route by recipient local-part:
 //   f5bot@…             → the F5Bot keyword-alert pipeline
 //   inspo+<brand>@…     → competitor-newsletter ingest (token names the brand)
+//   affiliate+<prg>@…   → affiliate-program inbox triage (partnerships@ forward)
 // Add more providers by pointing them at <provider>@… and branching below.
 
 interface ResendInboundEvent {
@@ -113,6 +115,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`[resend-webhook] inspiration ingest:`, result);
     } catch (err) {
       console.error(`[resend-webhook] inspiration ingest failed for ${emailId}:`, err);
+    }
+  } else if (recipient.includes("affiliate")) {
+    try {
+      const result = await ingestAffiliateEmail({
+        id: emailId,
+        recipients: to,
+        from: full.from ?? event.data?.from ?? null,
+        subject: full.subject ?? event.data?.subject ?? "",
+        text: full.text,
+        html: full.html,
+        receivedAt: full.created_at ?? event.created_at,
+      });
+      console.log(`[resend-webhook] affiliate ingest:`, result);
+    } catch (err) {
+      console.error(`[resend-webhook] affiliate ingest failed for ${emailId}:`, err);
     }
   } else {
     console.log(`[resend-webhook] no handler for recipient "${recipient}" — ignored`);
