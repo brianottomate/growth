@@ -107,9 +107,26 @@ function parseEvents(rawBody: string): HubspotWebhookEventInsert[] {
     if (!isRecord(item)) continue;
     const eventId = asString(item.eventId);
     const subscriptionType = asString(item.subscriptionType);
-    // Merge events carry primaryObjectId instead of objectId.
-    const objectId = asString(item.objectId) ?? asString(item.primaryObjectId);
-    if (!eventId || !subscriptionType || !objectId) continue;
+    // objectId across event shapes: propertyChange/creation/deletion use
+    // objectId; merge uses primaryObjectId; associationChange (generic model)
+    // uses fromObjectId for the primary object.
+    const objectId =
+      asString(item.objectId) ??
+      asString(item.primaryObjectId) ??
+      asString(item.fromObjectId);
+    if (!eventId || !subscriptionType || !objectId) {
+      // Never drop silently — store-raw-first is the whole point. Surface the
+      // shape so an unexpected payload is visible instead of lost.
+      console.warn(
+        "⚠️ [HubSpot Webhook] unparseable event skipped",
+        JSON.stringify({
+          hasEventId: Boolean(eventId),
+          subscriptionType,
+          keys: Object.keys(item),
+        }),
+      );
+      continue;
+    }
 
     const occurredAtMs = Number(item.occurredAt);
     rows.push({
