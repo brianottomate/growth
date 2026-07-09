@@ -17,6 +17,26 @@ scoped per the access-token scope picker. Never commit the token.
 | Partners joined to 31593 | 334 (of 1,350 account-wide) as of 2026-07-09 |
 | Recent volume | 4 actions in the 30 days to 2026-07-09 — a zero-action day is normal today |
 
+## The two programs, compared (live API, 2026-07-09)
+
+| | **31593 "Wander"** | **53661 "Wander - Creator"** |
+|---|---|---|
+| Type | Performance (classic affiliate) | Creator (Impact's influencer product) |
+| Partners joined | 334 | **0** |
+| Contracts | 332 | **0** |
+| Actions, trailing 44d | 7 (tracker "Booking") | **0** |
+| Tracking domain | wander.sjv.io | wander.sjv.io (same) |
+| Company contact | Dan Shapiro @ AP | Dan Shapiro @ AP (same — both need the 7/29 contact swap to partnerships@) |
+
+**53661 is an empty shell** — created (presumably by AP) to explore Impact's
+Creator marketplace, never launched. Same API surface works against it (Actions/
+MediaPartners/Campaigns all 200 with zero rows), so the paused `prg_wander_creator`
+row can be activated with no code changes if a creator program ever launches.
+
+Observed payouts on 31593 (answers part of the commission-rate "x" in AP's doc):
+Rakuten booking $4,432.94 → $177.32 (**4%**); Capital One bookings → **3%**.
+Partner mix skews loyalty/card-linked (Rakuten, Capital One).
+
 ## API mechanics (learned the hard way, all verified live)
 
 - **Base URL** `https://api.impact.com`; resources under `/Advertisers/<AccountSID>/…`.
