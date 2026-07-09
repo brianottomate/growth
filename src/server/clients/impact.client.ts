@@ -91,7 +91,7 @@ async function impactFetchAllPages(
 
 // ---- Actions -------------------------------------------------------------
 
-/** Documented per-action fields (List Actions); `raw` keeps everything else. */
+/** Live-verified per-action fields (List Actions); `raw` keeps everything else. */
 export interface ImpactAction {
   Id: string;
   State: string; // PENDING | APPROVED | REVERSED
@@ -105,6 +105,14 @@ export interface ImpactAction {
   EventDate?: string;
   CreationDate?: string;
   LockingDate?: string;
+  // Fraud-lens fields (all present on the live account's actions)
+  ReferringDomain?: string;
+  ReferringType?: string;
+  IpAddress?: string;
+  PromoCode?: string;
+  Oid?: string; // order id — the corrections join key
+  CustomerStatus?: string; // e.g. New vs Returning
+  CustomerCountry?: string;
   raw: Record<string, unknown>;
 }
 
@@ -156,6 +164,13 @@ export async function listActions(input: {
     EventDate: a.EventDate as string | undefined,
     CreationDate: a.CreationDate as string | undefined,
     LockingDate: a.LockingDate as string | undefined,
+    ReferringDomain: a.ReferringDomain as string | undefined,
+    ReferringType: a.ReferringType as string | undefined,
+    IpAddress: a.IpAddress as string | undefined,
+    PromoCode: a.PromoCode as string | undefined,
+    Oid: a.Oid as string | undefined,
+    CustomerStatus: a.CustomerStatus as string | undefined,
+    CustomerCountry: a.CustomerCountry as string | undefined,
     raw: a,
   }));
 }
@@ -171,6 +186,95 @@ export function aggregateActions(actions: ImpactAction[]): {
     revenue: actions.reduce((s, a) => s + num(a.Amount), 0),
     commission: actions.reduce((s, a) => s + num(a.Payout), 0),
   };
+}
+
+// ---- Campaigns (programs) ---------------------------------------------------
+
+export interface ImpactCampaign {
+  Id: string;
+  Name?: string;
+  State?: string;
+  Type?: string; // Performance | Creator
+  raw: Record<string, unknown>;
+}
+
+/** All programs on the account (incl. historical — watch for the old 17030). */
+export async function listCampaigns(): Promise<ImpactCampaign[]> {
+  const campaigns = await impactFetchAllPages("/Campaigns", {}, "Campaigns");
+  return campaigns.map((c) => ({
+    Id: str(c.Id),
+    Name: c.Name as string | undefined,
+    State: c.State as string | undefined,
+    Type: c.Type as string | undefined,
+    raw: c,
+  }));
+}
+
+// ---- Action inquiries (partner disputes) -------------------------------------
+
+/**
+ * Formal partner disputes over attribution/payout. Field shape is only loosely
+ * documented — parse defensively, keep everything in raw. CampaignId required.
+ */
+export interface ImpactActionInquiry {
+  Id: string;
+  Status?: string;
+  raw: Record<string, unknown>;
+}
+
+export async function listActionInquiries(
+  campaignId: string,
+): Promise<ImpactActionInquiry[]> {
+  const inquiries = await impactFetchAllPages(
+    "/ActionInquiries",
+    { CampaignId: campaignId },
+    "ActionInquiries",
+  );
+  return inquiries.map((i) => ({
+    Id: str(i.Id ?? i.InquiryId),
+    Status: (i.Status ?? i.State) as string | undefined,
+    raw: i,
+  }));
+}
+
+// ---- Invoices (partner payout obligations) ------------------------------------
+
+export interface ImpactInvoiceLineItem {
+  Status?: string; // PAID | PENDING | OVERDUE (all three live on the account)
+  DueDate?: string;
+  TotalItemAmount?: string;
+  CampaignName?: string;
+  raw: Record<string, unknown>;
+}
+
+export interface ImpactInvoice {
+  Id: string;
+  CreatedDate?: string;
+  MediaName?: string; // the partner being paid
+  TotalAmount?: string;
+  LineItems: ImpactInvoiceLineItem[];
+  raw: Record<string, unknown>;
+}
+
+/** Partner payout invoices — the funding/payment-health view (no balance API). */
+export async function listInvoices(): Promise<ImpactInvoice[]> {
+  const invoices = await impactFetchAllPages("/Invoices", {}, "Invoices");
+  return invoices.map((i) => ({
+    Id: str(i.Id),
+    CreatedDate: i.CreatedDate as string | undefined,
+    MediaName: i.MediaName as string | undefined,
+    TotalAmount: i.TotalAmount as string | undefined,
+    LineItems: (Array.isArray(i.LineItems) ? (i.LineItems as Array<Record<string, unknown>>) : []).map(
+      (l) => ({
+        Status: l.Status as string | undefined,
+        DueDate: l.DueDate as string | undefined,
+        TotalItemAmount: l.TotalItemAmount as string | undefined,
+        CampaignName: l.CampaignName as string | undefined,
+        raw: l,
+      }),
+    ),
+    raw: i,
+  }));
 }
 
 // ---- Partners (MediaPartners) ---------------------------------------------

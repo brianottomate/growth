@@ -33,6 +33,7 @@ const KIND_LABEL: Record<AffiliateItem["kind"], string> = {
   application: "Application",
   fraud_flag: "Fraud flag",
   correction: "Correction batch",
+  inquiry: "Partner dispute",
   finding: "Finding",
 };
 

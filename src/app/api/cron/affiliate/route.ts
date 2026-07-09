@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/env";
 import { runDailyAffiliateMonitor } from "@/server/services/affiliate-monitor.service";
+import { runWeeklyAffiliateReport } from "@/server/services/affiliate-report.service";
 
 /**
- * Daily affiliate program monitor (docs/affiliate-program-takeover.md).
- * Snapshots yesterday's Impact actions into affiliate_metric_daily, syncs the
- * partner list, queues PENDING applications as triage items, and raises a
- * tracking-health finding on a zero-action day against a non-zero baseline.
+ * Affiliate program crons (docs/affiliate-program-takeover.md), multiplexed by
+ * ?job= like /api/cron/growth:
+ *   job=daily (default) — metrics snapshot, partner sync, application queue,
+ *     tracking-health, open disputes (ActionInquiries), overdue payout invoices.
+ *   job=weekly — LLM-written program report + per-action fraud review → Slack.
  * Idempotent: metrics upsert per (program, day); items dedup on their keys.
  *
  * Skips cleanly (200 + skipped reason) until IMPACT_* credentials and the
@@ -34,12 +36,16 @@ async function handle(request: NextRequest) {
     );
   }
 
+  const job = request.nextUrl.searchParams.get("job") ?? "daily";
   const start = Date.now();
   try {
-    const results = await runDailyAffiliateMonitor();
+    const results =
+      job === "weekly"
+        ? await runWeeklyAffiliateReport()
+        : await runDailyAffiliateMonitor();
     const elapsedMs = Date.now() - start;
-    console.log(`[affiliate-monitor] done in ${elapsedMs}ms:`, results);
-    return NextResponse.json({ success: true, elapsedMs, results });
+    console.log(`[affiliate-${job}] done in ${elapsedMs}ms:`, results);
+    return NextResponse.json({ success: true, job, elapsedMs, results });
   } catch (e) {
     console.error("[affiliate-monitor] run failed", e);
     return NextResponse.json(

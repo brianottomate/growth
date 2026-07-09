@@ -138,6 +138,7 @@ export type AffiliatePartnerInsert = typeof affiliatePartnerTable.$inferInsert;
 //                  PENDING-state sync)
 //   fraud_flag   — a suspicious transaction/referrer surfaced by the fraud cron
 //   correction   — a staged void/correction batch awaiting approval
+//   inquiry      — a formal partner dispute (Impact ActionInquiries)
 //   finding      — anything an operator/cron wants a human to look at
 //                  (tracking break, balance alert, terms drift, …)
 
@@ -146,6 +147,7 @@ export const AFFILIATE_ITEM_KINDS = [
   "application",
   "fraud_flag",
   "correction",
+  "inquiry",
   "finding",
 ] as const;
 export type AffiliateItemKind = (typeof AFFILIATE_ITEM_KINDS)[number];

@@ -5,7 +5,9 @@ import { and, desc, eq, gte, isNull } from "drizzle-orm";
 import {
   aggregateActions,
   isImpactConfigured,
+  listActionInquiries,
   listActions,
+  listInvoices,
   listMediaPartners,
 } from "@/server/clients/impact.client";
 import { db } from "@/server/db";
@@ -41,6 +43,8 @@ export interface ProgramMonitorResult {
   partnersSynced?: number;
   applicationsQueued?: number;
   trackingAlert?: boolean;
+  inquiriesQueued?: number;
+  overdueInvoices?: number;
 }
 
 /** Yesterday as a UTC calendar day: [00:00, 24:00) plus its "YYYY-MM-DD". */
@@ -234,6 +238,89 @@ async function checkTrackingHealth(
   return inserted.length > 0;
 }
 
+/**
+ * Open partner disputes (ActionInquiries) → triage items. Field shape is only
+ * loosely documented, so titles are best-effort from raw and the full payload
+ * rides along. Resolved/closed inquiries are skipped when a status says so.
+ */
+async function checkInquiries(
+  program: PartnerProgram,
+  campaignId: string,
+): Promise<number> {
+  const inquiries = await listActionInquiries(campaignId);
+  const fresh: AffiliateItem[] = [];
+  for (const inq of inquiries) {
+    if (!inq.Id) continue;
+    const status = inq.Status?.toUpperCase() ?? "";
+    if (["RESOLVED", "CLOSED", "COMPLETED"].includes(status)) continue;
+    const r = inq.raw;
+    const partner =
+      (r.MediaPartnerName as string | undefined) ?? (r.MediaName as string | undefined);
+    const inserted = await db
+      .insert(affiliateItemTable)
+      .values({
+        programId: program.id,
+        kind: "inquiry",
+        dedupKey: `inquiry:${inq.Id}`,
+        title: `Partner dispute ${inq.Id}${partner ? ` — ${partner}` : ""}`,
+        snippet: JSON.stringify(r).slice(0, 600),
+        suggestedAction: "engage",
+        rationale:
+          "Open action inquiry on Impact — a partner formally disputes attribution or payout. Review and resolve in the Impact dashboard.",
+        receivedAt: new Date(),
+        raw: r,
+      })
+      .onConflictDoNothing({
+        target: [affiliateItemTable.programId, affiliateItemTable.dedupKey],
+      })
+      .returning();
+    if (inserted[0]) fresh.push(inserted[0]);
+  }
+  if (fresh.length > 0) await postAffiliateItemsToRadio(fresh);
+  return fresh.length;
+}
+
+/**
+ * Overdue partner-payout invoice line items → findings. Overdue payouts are
+ * how a program quietly burns partner trust (6 were live on the account at
+ * build time). Invoices are account-level; with one active program this runs
+ * once — revisit the dedup scope if a second program ever activates.
+ */
+async function checkOverdueInvoices(program: PartnerProgram): Promise<number> {
+  const invoices = await listInvoices();
+  const fresh: AffiliateItem[] = [];
+  for (const inv of invoices) {
+    const overdue = inv.LineItems.filter(
+      (l) => l.Status?.toUpperCase() === "OVERDUE",
+    );
+    if (overdue.length === 0) continue;
+    const total = overdue.reduce(
+      (s, l) => s + (Number(l.TotalItemAmount) || 0),
+      0,
+    );
+    const inserted = await db
+      .insert(affiliateItemTable)
+      .values({
+        programId: program.id,
+        kind: "finding",
+        dedupKey: `invoice-overdue:${inv.Id}`,
+        title: `Overdue partner payout — invoice ${inv.Id}${inv.MediaName ? ` (${inv.MediaName})` : ""}`,
+        snippet: `${overdue.length} overdue line item(s) totalling $${total.toFixed(2)}. Due ${overdue[0]?.DueDate?.slice(0, 10) ?? "?"}. Check funding/autopay in the Impact dashboard.`,
+        suggestedAction: "engage",
+        rationale: "Overdue payouts erode partner trust and program standing.",
+        receivedAt: new Date(),
+        raw: inv,
+      })
+      .onConflictDoNothing({
+        target: [affiliateItemTable.programId, affiliateItemTable.dedupKey],
+      })
+      .returning();
+    if (inserted[0]) fresh.push(inserted[0]);
+  }
+  if (fresh.length > 0) await postAffiliateItemsToRadio(fresh);
+  return fresh.length;
+}
+
 export async function runDailyAffiliateMonitor(): Promise<ProgramMonitorResult[]> {
   const programs = await db
     .select()
@@ -262,6 +349,8 @@ export async function runDailyAffiliateMonitor(): Promise<ProgramMonitorResult[]
       const { synced, pending } = await syncPartners(program, program.externalProgramId);
       const applicationsQueued = await queueApplications(program, pending);
       const trackingAlert = await checkTrackingHealth(program, metrics.actions);
+      const inquiriesQueued = await checkInquiries(program, program.externalProgramId);
+      const overdueInvoices = await checkOverdueInvoices(program);
       results.push({
         programId: program.id,
         actions: metrics.actions,
@@ -269,6 +358,8 @@ export async function runDailyAffiliateMonitor(): Promise<ProgramMonitorResult[]
         partnersSynced: synced,
         applicationsQueued,
         trackingAlert,
+        inquiriesQueued,
+        overdueInvoices,
       });
     } catch (error) {
       console.error(`[affiliate-monitor] ${program.id} failed:`, error);
