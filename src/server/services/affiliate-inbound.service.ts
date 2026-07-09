@@ -237,11 +237,24 @@ export async function ingestAffiliateEmail(email: {
     if (r) {
       // banRisk is a triage-engine field about content removal — meaningless
       // for email, so it stays out of the row (it lives in the raw score only).
+      //
+      // Junk policy: NOTHING is dropped, but clear noise (skip) is auto-filed
+      // to Dismissed with the reasoning, so the desk's Open bucket stays a
+      // human-worthy work queue (the write-only-queue lesson from listening).
+      // resolvedById stays null = "the system filed this", and Reopen undoes it.
+      const autoDismiss = r.suggestedAction === "skip";
       const update = {
         relevance: r.relevance,
         intentTag: r.intentTag,
         suggestedAction: r.suggestedAction,
         rationale: r.rationale,
+        ...(autoDismiss
+          ? {
+              status: "dismissed" as const,
+              decisionNote: `Auto-dismissed by triage: ${r.rationale}`,
+              resolvedAt: new Date(),
+            }
+          : {}),
       };
       await db
         .update(affiliateItemTable)

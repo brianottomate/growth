@@ -41,7 +41,8 @@ Structure (Slack mrkdwn — *bold*, bullets with •, no headings/#, no tables):
    codes we did not issue, or duplicate IPs across actions are not). Say
    "nothing suspicious" plainly when that's the verdict — never invent concerns.
 4. *Program health* — partner counts by state, pending applications, open desk
-   items, overdue/pending payout invoices if any.
+   items, overdue/pending payout invoices if any, and (one clause, for audit)
+   how many junk emails triage auto-filed this week.
 5. *Watch* — at most 2 bullets on what deserves attention next week. Omit the
    section if there's nothing real.
 
@@ -135,6 +136,20 @@ export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> 
       const openByKind: Record<string, number> = {};
       for (const i of openItems) openByKind[i.kind] = (openByKind[i.kind] ?? 0) + 1;
 
+      // Junk the triage auto-filed this week (resolvedById null = system) — the
+      // audit line that keeps silent filtering honest in the report.
+      const autoDismissed = await db
+        .select({ id: affiliateItemTable.id })
+        .from(affiliateItemTable)
+        .where(
+          and(
+            eq(affiliateItemTable.programId, program.id),
+            eq(affiliateItemTable.status, "dismissed"),
+            isNull(affiliateItemTable.resolvedById),
+            gte(affiliateItemTable.resolvedAt, weekAgo),
+          ),
+        );
+
       const invoices = await listInvoices();
       const payoutIssues = invoices
         .flatMap((inv) =>
@@ -161,6 +176,7 @@ export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> 
         },
         partnersByState,
         openDeskItemsByKind: openByKind,
+        autoDismissedEmailsThisWeek: autoDismissed.length,
         payoutIssues,
       };
 
