@@ -72,8 +72,8 @@ export interface WeeklyReportResult {
   actions?: number;
 }
 
-// Same channel constant as affiliate-notify — kept local to avoid exporting it.
-const RADIO_AFFILIATE_CHANNEL = "radio-affiliate";
+// Same channel as affiliate-notify (#radio-affiliate) — kept local to avoid exporting it.
+const RADIO_AFFILIATE_CHANNEL = "C0BH31P8W3S";
 
 export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> {
   const programs = await db

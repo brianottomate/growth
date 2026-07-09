@@ -15,12 +15,10 @@ import {
 // that demand action) are broadcast here so the partnerships owner triages from
 // Slack instead of polling /app/affiliate.
 //
-// TODO(ops): create #radio-affiliate, invite the wandercom bot, and replace the
-// name below with the channel ID (name-based posting works for public channels
-// the bot is in, but IDs survive renames). Outside prod every post is redirected
-// to #radio-slack-testing by postOnSlack's envSelect guard, so local testing
-// works before the channel exists.
-const RADIO_AFFILIATE_CHANNEL = "radio-affiliate";
+// #radio-affiliate — created 2026-07-09 with the Wander Radio bot invited.
+// Outside prod every post is redirected to #radio-slack-testing by
+// postOnSlack's envSelect guard.
+const RADIO_AFFILIATE_CHANNEL = "C0BH31P8W3S";
 
 // Who owns the program day-to-day — Micaela, the Wander-side owner of the
 // AP-shared #marketing-affiliates channel (confirmed via Slack, Jul 9).
