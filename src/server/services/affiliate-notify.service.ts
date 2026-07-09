@@ -20,11 +20,12 @@ import {
 // postOnSlack's envSelect guard.
 const RADIO_AFFILIATE_CHANNEL = "C0BH31P8W3S";
 
-// Who owns the program day-to-day — Micaela, the Wander-side owner of the
-// AP-shared #marketing-affiliates channel (confirmed via Slack, Jul 9).
-// NOTE: #marketing-affiliates itself is Slack Connect with Acceleration
-// Partners members — never point this feed there; internal alerts only.
-const AFFILIATE_OWNER_SLACK_ID: string | null = "U0574R1RCD9";
+// Who owns the program day-to-day. Ornella Nuñez (Social Media Manager, lead
+// of #marketing-affiliates) is tagged first on all impact/affiliate items;
+// Micaela is cc'd. NOTE: #marketing-affiliates itself is Slack Connect with
+// Acceleration Partners members — never point this feed there; internal only.
+const AFFILIATE_OWNER_SLACK_ID: string | null = "U08LV4ZNRF1"; // Ornella
+const AFFILIATE_CC_SLACK_ID: string | null = "U0574R1RCD9"; // Micaela
 
 const KIND_LABEL: Record<AffiliateItem["kind"], string> = {
   email: "Partner email",
@@ -43,7 +44,11 @@ function buildBlocks(item: AffiliateItem) {
   const lines: string[] = [];
 
   if (AFFILIATE_OWNER_SLACK_ID)
-    lines.push(`<@${AFFILIATE_OWNER_SLACK_ID}> — you're on this one`);
+    lines.push(
+      `<@${AFFILIATE_OWNER_SLACK_ID}> — you're on this one${
+        AFFILIATE_CC_SLACK_ID ? ` (cc <@${AFFILIATE_CC_SLACK_ID}>)` : ""
+      }`,
+    );
 
   const fromLabel = item.fromEmail
     ? ` from ${item.fromName ? `${item.fromName} ` : ""}(${item.fromEmail})`

@@ -53,7 +53,9 @@ From the transition plan, tiered by AP's own key:
   Reason=ORDER_UPDATE` → email to `2763eadb-d052-4910-ab2e-0e2c37f572e3@batch.impact.com`
   → propagates in 1–2h.
 - Merchant contact becomes `partnerships@wander.com` (AP updates it in Impact by 7/29).
-- Impact CSMs: Ornella; Wander-side contact Micaela.
+- Wander-side owners: **Ornella Nuñez** (Social Media Manager, program lead —
+  tag first on all affiliate matters) and Micaela (cc). (AP's doc lists
+  "Ornella, Micaela, and Partnerships@" as the transition-notification set.)
 - Known gaps in the doc itself: commission rates are literally `Base/Content: x,
   Loyalty: x, Coupon: x` (unfilled), and the goodbye newsletter has `X` / `email
   address` placeholders needing Wander's named contact + approval before the 7/27 send.
