@@ -28,7 +28,13 @@ async function impactFetch<T>(
   const token = env.IMPACT_AUTH_TOKEN;
   if (!sid || !token) throw new Error("Impact API not configured");
 
-  const url = new URL(`${IMPACT_BASE_URL}/Advertisers/${sid}${path}`);
+  // Pagination hands back absolute paths ("/Advertisers/…?Page=2"); first
+  // calls pass a resource path relative to the account root.
+  const url = new URL(
+    path.startsWith("/Advertisers")
+      ? `${IMPACT_BASE_URL}${path}`
+      : `${IMPACT_BASE_URL}/Advertisers/${sid}${path}`,
+  );
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) url.searchParams.set(key, String(value));
   }
@@ -55,6 +61,32 @@ async function impactFetch<T>(
     );
   }
   return JSON.parse(body) as T;
+}
+
+/**
+ * Fetch every page of a list endpoint. Impact paginates with root-level
+ * metadata ("@page", "@numpages", "@nextpageuri" — empty string on the last
+ * page); MediaPartners defaults to 100/page (1,350 partners = 14 pages),
+ * Actions to 20,000/page. Hard-capped at 100 pages as a runaway guard.
+ */
+async function impactFetchAllPages(
+  path: string,
+  params: Record<string, string | number | undefined>,
+  arrayKey: string,
+): Promise<Array<Record<string, unknown>>> {
+  const all: Array<Record<string, unknown>> = [];
+  let nextPath = path;
+  let nextParams = params;
+  for (let page = 0; page < 100; page++) {
+    const data = await impactFetch<Record<string, unknown>>(nextPath, nextParams);
+    const rows = data[arrayKey];
+    if (Array.isArray(rows)) all.push(...(rows as Array<Record<string, unknown>>));
+    const nextUri = data["@nextpageuri"];
+    if (typeof nextUri !== "string" || nextUri.length === 0) break;
+    nextPath = nextUri;
+    nextParams = {}; // the next-page URI already carries the full query string
+  }
+  return all;
 }
 
 // ---- Actions -------------------------------------------------------------
@@ -86,6 +118,11 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : typeof v === "number" ? String(v) : "";
 }
 
+/** Impact rejects fractional seconds — "2026-07-08T00:00:00Z", never ".000Z". */
+function isoNoMillis(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 /**
  * List actions for a program (Impact "campaign") filtered by EventDate window.
  * Dates are ISO 8601 with time; the window may not exceed 45 days.
@@ -96,16 +133,16 @@ export async function listActions(input: {
   actionDateEnd: Date;
   state?: "PENDING" | "APPROVED" | "REVERSED";
 }): Promise<ImpactAction[]> {
-  const data = await impactFetch<{ Actions?: Array<Record<string, unknown>> }>(
+  const actions = await impactFetchAllPages(
     "/Actions",
     {
       CampaignId: input.campaignId,
-      ActionDateStart: input.actionDateStart.toISOString(),
-      ActionDateEnd: input.actionDateEnd.toISOString(),
+      ActionDateStart: isoNoMillis(input.actionDateStart),
+      ActionDateEnd: isoNoMillis(input.actionDateEnd),
       State: input.state,
     },
+    "Actions",
   );
-  const actions = Array.isArray(data.Actions) ? data.Actions : [];
   return actions.map((a) => ({
     Id: str(a.Id),
     State: str(a.State),
@@ -154,11 +191,11 @@ export async function listMediaPartners(input?: {
   campaignId?: string;
   state?: string;
 }): Promise<ImpactPartner[]> {
-  const data = await impactFetch<{ Partners?: Array<Record<string, unknown>> }>(
+  const partners = await impactFetchAllPages(
     "/MediaPartners",
     { CampaignId: input?.campaignId, State: input?.state },
+    "Partners",
   );
-  const partners = Array.isArray(data.Partners) ? data.Partners : [];
   return partners.map((p) => ({
     Id: str(p.Id),
     Name: p.Name as string | undefined,
