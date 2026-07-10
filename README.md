@@ -96,6 +96,10 @@ bun run db:migrate     # Run migrations
 bun run db:studio      # Open Drizzle Studio
 ```
 
+Deployments currently remain `db:push`-managed. The prerequisites and staged
+cutover to checked-in migrations are documented in
+[`docs/database-migration-transition.md`](docs/database-migration-transition.md).
+
 Other local tools:
 
 ```bash

@@ -389,7 +389,7 @@ A separate major project will use this same Neon database for storing 100K+ prop
 ## Important Notes
 
 - **Never run `npm` or `yarn`** - this project uses Bun as the package manager
-- **Database migrations**: Use `db:push` for development, `db:generate` + `db:migrate` for production
+- **Database migrations**: Deployments currently use `db:push`. Do not treat the partial `drizzle/meta/_journal.json` as a valid migration chain; follow `docs/database-migration-transition.md` for the planned baseline and cutover.
 - **Auth routes**: All auth handled by Better Auth at `/api/auth/[...all]`
 - **tRPC endpoint**: Single endpoint at `/api/trpc/[trpc]` handles all tRPC calls
 - **Image optimization**: Configure remote patterns in `next.config.ts` for external images
