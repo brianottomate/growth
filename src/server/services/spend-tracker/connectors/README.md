@@ -26,11 +26,18 @@ directly via the connectors in this folder — ported from Brian's
 When Zernio has the platform connected and verified (spend matches the
 platform UI for a test window):
 
-1. Point the connector's fetch at Zernio (or delete the connector and inline a
+1. Re-run the account-scope probe against the new Zernio connection FIRST:
+   platform OAuth is personal-identity-based, so foreign ad accounts leak in
+   (the metaads connection carried Homi/Holaplex/personal accounts, and
+   Zernio's /ads/tree ignores its own scope filter). Register every account
+   the connection enumerates in the Neon `ad_account` allowlist
+   (`scripts/seed-ad-accounts.ts`, default-deny) and filter reads through
+   `ad-account-allowlist.service.ts`.
+2. Point the connector's fetch at Zernio (or delete the connector and inline a
    Zernio call in `spend-tracker.service.ts`).
-2. Delete the platform's env vars from `src/env.ts` (`GOOGLE_ADS_*` /
+3. Delete the platform's env vars from `src/env.ts` (`GOOGLE_ADS_*` /
    `PINTEREST_*`).
-3. This folder should eventually disappear entirely.
+4. This folder should eventually disappear entirely.
 
 ## Credentials
 

@@ -7,6 +7,10 @@ import {
   type ZernioAd,
   type ZernioAdsTreeCampaign,
 } from "@/server/clients/zernio.client";
+import {
+  filterToAllowedAdAccounts,
+  getAllowedAdAccountIds,
+} from "@/server/services/ad-account-allowlist.service";
 
 /**
  * Ad-performance analytics over the Zernio ad tree — the shared logic behind
@@ -80,6 +84,25 @@ const fetchTreeCached = unstable_cache(
   ["zernio-ads-tree-v1"],
   { revalidate: CACHE_TTL_SECONDS, tags: [ZERNIO_ADS_CACHE_TAG] },
 );
+
+/**
+ * Tree fetch + ad-account allowlist (default-deny). The Zernio metaads
+ * connection was OAuth'd via a personal Facebook login and enumerates foreign
+ * ad accounts (e.g. "Homi"); Zernio's own scope filter doesn't hold on
+ * /ads/tree — so every consumer goes through this guard, not fetchTreeCached
+ * directly. Campaigns carry platformAdAccountId; the allowlist lives in Neon
+ * `ad_account` (scripts/seed-ad-accounts.ts).
+ */
+async function fetchAllowedTree(
+  fromDate: string,
+  toDate: string,
+): Promise<ZernioAdsTreeCampaign[]> {
+  const [tree, allowed] = await Promise.all([
+    fetchTreeCached(fromDate, toDate),
+    getAllowedAdAccountIds(),
+  ]);
+  return filterToAllowedAdAccounts(tree, allowed, "zernio-ads-tree");
+}
 
 // ---- FLATTEN + CLASSIFY ----------------------------------------------------
 
@@ -217,7 +240,7 @@ export async function computeAdsScope(input: {
   toDate?: string;
 }): Promise<AdsScopeResult> {
   const window = resolveAdsWindow(input);
-  const tree = await fetchTreeCached(window.fromDate, window.toDate);
+  const tree = await fetchAllowedTree(window.fromDate, window.toDate);
   const all = flattenWindowedAds(tree);
   const delivered = all.filter((a) => a.impressions > 0);
 
@@ -319,7 +342,7 @@ export async function computeTopAds(input: {
   const metric = input.metric ?? "impressions";
   const limit = Math.min(Math.max(input.limit ?? 15, 1), 30);
 
-  const tree = await fetchTreeCached(window.fromDate, window.toDate);
+  const tree = await fetchAllowedTree(window.fromDate, window.toDate);
   let ads = flattenWindowedAds(tree).filter((a) => a.impressions > 0);
   ads = ads.filter((a) => passesStatus(a, status));
   if (input.objective) ads = ads.filter((a) => a.objective === input.objective);

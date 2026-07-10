@@ -7,6 +7,7 @@ export * from "./auth-schema";
 // Each domain lives in its own file; this barrel keeps a single import
 // surface so drizzle.config (points here) and the Better Auth augmented
 // schema (`import * as schema`) see every table. Add new domains here.
+export * from "./ad-account-schema";
 export * from "./brand-schema";
 export * from "./channel-schema";
 export * from "./content-schema";
