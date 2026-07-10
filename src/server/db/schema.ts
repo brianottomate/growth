@@ -17,6 +17,7 @@ export * from "./affiliate-schema";
 export * from "./conversions-schema";
 export * from "./amplification-schema";
 export * from "./cadence-schema";
+export * from "./funnel-schema";
 export * from "./leads-schema";
 export * from "./lifecycle-schema";
 export * from "./listening-schema";
