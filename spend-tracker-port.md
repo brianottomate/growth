@@ -1,7 +1,25 @@
 # Spend Tracker → Growth: Port Strategy
 
-> Status: **strategy / not started** · Last updated 2026-06-15
-> Goal: bring Brian's marketing **spend tracker** into the `growth/` repo, done properly — no Supabase, ideally no database at all.
+> Status: **✅ SHIPPED (v1 built 2026-07-10)** · strategy written 2026-06-15
+> Implementation: `src/server/services/spend-tracker/` + `/app/spend` + `spend` tRPC router + `/api/cron/spend`.
+> Verification: `bun test` (methodology suite) + `bun --conditions react-server scripts/spend-verify.ts`.
+>
+> **Deviations from this doc, decided during the 2026-07-10 build:**
+> - **Zernio is NOT the spend source.** Live probe found Zernio has no Google/Pinterest
+>   connection, its `/ads/timeline` ignores account/campaign filters, and the metaads
+>   connection blends 4 ad accounts (incl. Homi). Meta spend+bookings come from the
+>   Meta API directly (campaign-level, marketplace denylist, 28d_click+1d_view) via
+>   `meta.client.ts`; Google/others from BQ `marketing_adnetwork_daily_report` (alive
+>   again); Pinterest dormant ($0/30d). Zernio remains a cross-check in spend-verify.
+> - **No DB at all, including demand sales:** fixed costs AND demand-sales monthly
+>   numbers are effective-dated config in `spend-tracker.config.ts` (no Google Sheets,
+>   no Neon table — team reports numbers via a config edit + deploy).
+> - Google bookings are BQ last-touch (no Google Ads API creds in growth/) — documented
+>   v1 deviation from Decision #6; revisit if Google spend becomes material.
+> - Option C (BQ write-back `growth_tracker_daily_spend` for the dbt north-star spend
+>   CTE) is designed in (`computeDailySpendRows()`) — build after Joao ping.
+>
+> The strategy below is kept as historical context.
 
 This doc captures the discussion and conclusions so we can pick it back up later.
 

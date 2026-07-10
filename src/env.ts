@@ -49,6 +49,17 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: z.string().optional(), // Meta system user token (preferred)
     META_ACCESS_TOKEN: z.string().optional(), // Meta access token (fallback)
     META_AD_ACCOUNT_ID: z.string().optional(), // Meta ad account ID (e.g. act_885632...)
+    // Google Ads — interim spend-tracker connector until Zernio adds Google
+    // (creds to be handed off from Brian's Railway env; connector is a no-op until set)
+    GOOGLE_ADS_CLIENT_ID: z.string().optional(),
+    GOOGLE_ADS_CLIENT_SECRET: z.string().optional(),
+    GOOGLE_ADS_DEVELOPER_TOKEN: z.string().optional(),
+    GOOGLE_ADS_REFRESH_TOKEN: z.string().optional(),
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID: z.string().optional(), // MCC
+    GOOGLE_ADS_CUSTOMER_ID: z.string().optional(), // child account
+    // Pinterest Ads — interim spend-tracker connector (dormant, $0 spend Jul 2026)
+    PINTEREST_ACCESS_TOKEN: z.string().optional(),
+    PINTEREST_AD_ACCOUNT_ID: z.string().optional(),
     // Instantly.ai (cold email outreach)
     INSTANTLY_API_KEY: z.string().optional(), // Instantly API v2 key (Bearer auth)
     INSTANTLY_WEBHOOK_SECRET: z.string().optional(), // Shared secret sent as a header on Instantly webhooks
@@ -167,6 +178,16 @@ export const env = createEnv({
     FB_SYSUSER_TOKEN: process.env.FB_SYSUSER_TOKEN,
     META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,
     META_AD_ACCOUNT_ID: process.env.META_AD_ACCOUNT_ID,
+    // Google Ads (spend-tracker connector)
+    GOOGLE_ADS_CLIENT_ID: process.env.GOOGLE_ADS_CLIENT_ID,
+    GOOGLE_ADS_CLIENT_SECRET: process.env.GOOGLE_ADS_CLIENT_SECRET,
+    GOOGLE_ADS_DEVELOPER_TOKEN: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    GOOGLE_ADS_REFRESH_TOKEN: process.env.GOOGLE_ADS_REFRESH_TOKEN,
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
+    GOOGLE_ADS_CUSTOMER_ID: process.env.GOOGLE_ADS_CUSTOMER_ID,
+    // Pinterest Ads (spend-tracker connector)
+    PINTEREST_ACCESS_TOKEN: process.env.PINTEREST_ACCESS_TOKEN,
+    PINTEREST_AD_ACCOUNT_ID: process.env.PINTEREST_AD_ACCOUNT_ID,
     // Instantly
     INSTANTLY_API_KEY: process.env.INSTANTLY_API_KEY,
     INSTANTLY_WEBHOOK_SECRET: process.env.INSTANTLY_WEBHOOK_SECRET,

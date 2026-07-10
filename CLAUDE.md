@@ -38,7 +38,8 @@ bun run db:unseed       # Remove seeded rows
 bun run build           # velite build + next build
 ```
 
-There is no test runner configured. `bun run check` is the gate.
+`bun run check` is the gate. `bun test` runs the (sparse) unit tests — currently
+the spend-tracker methodology suite (`src/server/services/spend-tracker/*.test.ts`).
 
 One-off scripts live in `scripts/` (run via `bun run scripts/<file>.ts`) and
 `src/scripts/` (operational tooling, e.g. CIO sync/repair — see `cio:diagnose`/`cio:repair`).
@@ -59,8 +60,8 @@ Anthropic. Deployed on Vercel as the **`wanderdev/growth`** project (org slug is
   `src/server/api/root.ts` (`appRouter`). Current routers: user, ads, amplifier,
   audience, brand, cadence, channel, channelSuggestion, content, conversion, inbox,
   initiative, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
-  listening, media, mention, moment, reddit, reschedule, studio, twitter. (Blob is a
-  route handler under `api/blob`, not a tRPC router.) Note: `apply` is a
+  listening, media, mention, moment, reddit, reschedule, spend, studio, twitter.
+  (Blob is a route handler under `api/blob`, not a tRPC router.) Note: `apply` is a
   tRPC-reserved procedure name.
 - The monthly content loop (strategy targets → slot generation → workbook import →
   review → apply) is documented in `docs/content-monthly-loop.md`.
@@ -133,7 +134,7 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 
 ### Cron jobs (`vercel.json` → `src/app/api/cron/`)
 
-- `/api/cron/meta` — daily 06:00 (Meta ads sync)
+- `/api/cron/spend` — daily 05:30 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
 - `/api/cron/growth?job=daily_comprehensive_sync&...` — daily 03:00 (comprehensive CIO/lead sync)
 - `/api/cron/reddit` — hourly (Reddit monitor)
 

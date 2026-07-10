@@ -7,6 +7,7 @@ import {
   Building2,
   Calendar,
   Check,
+  CircleDollarSign,
   ClipboardCheck,
   ChevronsUpDown,
   Database,
@@ -108,6 +109,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
       { label: "Audiences", href: "/app/audiences", icon: Target },
       { label: "Ads", href: "/app/ads", icon: Crosshair },
+      { label: "Spend", href: "/app/spend", icon: CircleDollarSign },
     ],
   },
   {

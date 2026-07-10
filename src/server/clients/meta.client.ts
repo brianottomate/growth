@@ -324,3 +324,97 @@ export async function fetchMetaConversions(params: {
   console.log(`[Meta] Combined → ${rows.length} rows`);
   return rows;
 }
+
+// =====================================================
+// PUBLIC API — CAMPAIGN-LEVEL DAILY INSIGHTS
+// =====================================================
+
+export interface MetaCampaignDayRecord {
+  date_start: string;
+  date_stop: string;
+  campaign_name?: string;
+  spend: string;
+  clicks: string;
+  impressions: string;
+  actions?: MetaAction[];
+  action_values?: MetaAction[];
+}
+
+/**
+ * Fetch CAMPAIGN-level daily insights with both attribution windows
+ * (28d_click + 1d_view) in a single request — each action entry carries both
+ * window keys. Used by the spend tracker, which needs campaign names to apply
+ * the marketplace campaign denylist (the ad account is shared with
+ * WanderOS/Listed — see spend-tracker.config.ts NON_MARKETPLACE_CAMPAIGN_PATTERN).
+ *
+ * Ported from wander-growth-tracker src/lib/meta/queries.ts (fetchMetaInsights).
+ */
+export async function fetchMetaCampaignDailyInsights(params: {
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+}): Promise<MetaCampaignDayRecord[]> {
+  const accessToken = env.FB_SYSUSER_TOKEN ?? env.META_ACCESS_TOKEN;
+  const adAccountId = env.META_AD_ACCOUNT_ID;
+
+  if (!accessToken) {
+    throw new Error("FB_SYSUSER_TOKEN or META_ACCESS_TOKEN is required");
+  }
+  if (!adAccountId?.startsWith("act_")) {
+    throw new Error("META_AD_ACCOUNT_ID must start with 'act_'");
+  }
+
+  const urlParams = new URLSearchParams({
+    access_token: accessToken,
+    fields:
+      "campaign_name,date_start,date_stop,impressions,clicks,spend,actions,action_values",
+    time_range: JSON.stringify({
+      since: params.startDate,
+      until: params.endDate,
+    }),
+    level: "campaign",
+    time_increment: "1",
+    // NOTE: deliberately NO `filtering` param — filtering on action_type would
+    // drop campaign-days that had spend but zero purchases, losing spend.
+    // (The tracker's fetchMetaInsights had no filtering either.)
+    limit: "500",
+    action_attribution_windows: JSON.stringify(["28d_click", "1d_view"]),
+  });
+
+  const all: MetaCampaignDayRecord[] = [];
+  let fetchUrl: string | null =
+    `${BASE_URL}/${adAccountId}/insights?${urlParams.toString()}`;
+  let page = 0;
+
+  while (fetchUrl) {
+    const response = await fetch(fetchUrl, { cache: "no-store" });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Meta API ${response.status}: ${body}`);
+    }
+
+    const json = (await response.json()) as {
+      data?: MetaCampaignDayRecord[];
+      error?: { message: string; code: number };
+      paging?: { next?: string };
+    };
+    if (json.error) {
+      throw new Error(
+        `Meta API error (code ${json.error.code}): ${json.error.message}`,
+      );
+    }
+
+    all.push(...(json.data ?? []));
+    fetchUrl = json.paging?.next ?? null;
+    page++;
+
+    if (fetchUrl) {
+      // Rate limit breathing room
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  console.log(
+    `[Meta] campaign-daily: fetched ${all.length} campaign-day rows in ${page} page(s)`,
+  );
+  return all;
+}
