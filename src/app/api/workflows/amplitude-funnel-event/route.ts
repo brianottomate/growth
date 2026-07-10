@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { env } from "@/env";
 import {
+  FUNNEL_EVENTS,
   ingestFunnelEvent,
-  normalizeFunnelEventName,
 } from "@/server/services/funnel-ingest.service";
 import {
   extractBearerToken,
@@ -13,10 +13,11 @@ import {
 // =====================================================
 // POST /api/workflows/amplitude-funnel-event
 //
-// Called by Amplitude Webhook destinations (one destination per event,
-// cloned from the "User Signed Up" destination) for the marketplace
-// funnel events: Search Started, Product Added To Wishlist,
-// Checkout Started, Payment Info Entered, Order Completed.
+// Called by the Amplitude Webhook destination (cloned from the
+// "User Signed Up" destination) for the marketplace funnel events:
+// Search Started, Product Added To Wishlist, Checkout Previewed,
+// Checkout Started, Payment Info Entered, Payment Submit Clicked,
+// Order Completed.
 //
 // Purely dark: upserts funnel_state (one row per user) and returns.
 // Nothing is sent to Outreach/CIO from here — detection and sends live
@@ -103,13 +104,7 @@ export async function GET() {
   return NextResponse.json({
     status: "ok",
     service: "amplitude-funnel-event",
-    events: [
-      "search_started",
-      "product_added_to_wishlist",
-      "checkout_started",
-      "payment_info_entered",
-      "order_completed",
-    ].map(normalizeFunnelEventName),
+    events: [...FUNNEL_EVENTS],
     timestamp: new Date().toISOString(),
   });
 }

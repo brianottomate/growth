@@ -69,6 +69,17 @@ export const funnelStateTable = pgTable(
     lastWishlistTs: t.timestamp({ withTimezone: true }),
     lastWishlistProperty: t.text(),
 
+    // -- Checkout preview (from `Checkout Previewed`) --
+    // Fires on the trip-summary view, authed or not (~4.5x checkout_started
+    // volume): captures users who bounce at the auth wall or at price shock
+    // and never reach Checkout Started. Anonymous previews never get here
+    // (no user_id at ingest).
+    lastCheckoutPreviewTs: t.timestamp({ withTimezone: true }),
+    lastCheckoutPreviewProperty: t.text(),
+    lastCheckoutPreviewCheckin: t.date(),
+    lastCheckoutPreviewCheckout: t.date(),
+    lastCheckoutPreviewValue: t.doublePrecision(),
+
     // -- Checkout (from `Checkout Started`) --
     lastCheckoutTs: t.timestamp({ withTimezone: true }),
     lastCheckoutProperty: t.text(),
@@ -78,6 +89,11 @@ export const funnelStateTable = pgTable(
 
     // -- Payment (from `Payment Info Entered`) --
     lastPaymentTs: t.timestamp({ withTimezone: true }),
+
+    // -- Payment submit (from `Payment Submit Clicked`) --
+    // Submit-clicked with no purchase following usually means a failed or
+    // declined payment — the hottest abandonment signal there is.
+    lastPaymentSubmitTs: t.timestamp({ withTimezone: true }),
 
     // -- Purchase (from `Order Completed`) — the completion signal that
     //    exits a user from every abandonment stage. --
@@ -99,6 +115,9 @@ export const funnelStateTable = pgTable(
     // The sweep filters on stage timestamps; keep them indexed.
     index("funnel_state_last_search_ts_idx").on(table.lastSearchTs),
     index("funnel_state_last_wishlist_ts_idx").on(table.lastWishlistTs),
+    index("funnel_state_last_checkout_preview_ts_idx").on(
+      table.lastCheckoutPreviewTs,
+    ),
     index("funnel_state_last_checkout_ts_idx").on(table.lastCheckoutTs),
     index("funnel_state_last_payment_ts_idx").on(table.lastPaymentTs),
   ],

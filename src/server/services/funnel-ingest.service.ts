@@ -15,11 +15,13 @@ import { funnelStateTable } from "@/server/db/funnel-schema";
 // =====================================================
 
 /** Events we ingest, normalized to snake_case. Everything else is ignored. */
-const FUNNEL_EVENTS = [
+export const FUNNEL_EVENTS = [
   "search_started",
   "product_added_to_wishlist",
+  "checkout_previewed",
   "checkout_started",
   "payment_info_entered",
+  "payment_submit_clicked",
   "order_completed",
 ] as const;
 export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
@@ -165,6 +167,26 @@ export async function ingestFunnelEvent(
       return { status: "applied", eventName };
     }
 
+    case "checkout_previewed": {
+      const values = {
+        lastCheckoutPreviewTs: eventTs,
+        lastCheckoutPreviewProperty:
+          asString(props.property_name) ?? asString(props.name) ?? null,
+        lastCheckoutPreviewCheckin: asDateOnly(props.checkin_date) ?? null,
+        lastCheckoutPreviewCheckout: asDateOnly(props.checkout_date) ?? null,
+        lastCheckoutPreviewValue: asNumber(props.value) ?? null,
+      };
+      await db
+        .insert(funnelStateTable)
+        .values({ userId, email, ...values })
+        .onConflictDoUpdate({
+          target: funnelStateTable.userId,
+          set: { ...values, ...emailUpdate },
+          setWhere: sql`${funnelStateTable.lastCheckoutPreviewTs} IS NULL OR ${funnelStateTable.lastCheckoutPreviewTs} < ${eventTs}`,
+        });
+      return { status: "applied", eventName };
+    }
+
     case "checkout_started": {
       const values = {
         lastCheckoutTs: eventTs,
@@ -194,6 +216,19 @@ export async function ingestFunnelEvent(
           target: funnelStateTable.userId,
           set: { ...values, ...emailUpdate },
           setWhere: sql`${funnelStateTable.lastPaymentTs} IS NULL OR ${funnelStateTable.lastPaymentTs} < ${eventTs}`,
+        });
+      return { status: "applied", eventName };
+    }
+
+    case "payment_submit_clicked": {
+      const values = { lastPaymentSubmitTs: eventTs };
+      await db
+        .insert(funnelStateTable)
+        .values({ userId, email, ...values })
+        .onConflictDoUpdate({
+          target: funnelStateTable.userId,
+          set: { ...values, ...emailUpdate },
+          setWhere: sql`${funnelStateTable.lastPaymentSubmitTs} IS NULL OR ${funnelStateTable.lastPaymentSubmitTs} < ${eventTs}`,
         });
       return { status: "applied", eventName };
     }
