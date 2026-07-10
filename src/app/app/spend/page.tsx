@@ -362,7 +362,8 @@ export default async function SpendPage({
             <code>spend-tracker.config.ts</code> (no more Google Sheets).
           </p>
           <p className="pt-1">
-            Full provenance: <code>docs/GROWTH_TRACKER_CONTEXT.md</code> in
+            Full explainer: <code>docs/spend-tracker.md</code> in this repo.
+            Decision provenance: <code>docs/GROWTH_TRACKER_CONTEXT.md</code> in
             Brian&apos;s wander-growth-tracker repo, §12 — every constant here
             traces to a locked decision there.
           </p>
