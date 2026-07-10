@@ -13,6 +13,25 @@
  *   - FIXED_COSTS         (effective-dated monthly amounts per category)
  *   - DEMAND_SALES_MONTHLY (bookings + GMV reported by the demand-sales team;
  *                           replaces Serrelle's Google Sheet — no more sheets)
+ *
+ * ─── FUTURE: config → Neon (jotted 2026-07-10, not built) ───────────────────
+ * If manual entry ever moves to a form (a `manual_channel_metric`-style table
+ * + admin form on /app/spend), migrate ONLY the operational data:
+ *   - DEMAND_SALES_MONTHLY → `manual_channel_metric` (channel, month,
+ *     bookings, gmv, note, enteredBy) — lets Serrelle self-serve monthly.
+ *   - FIXED_COSTS → `fixed_cost` table (same effective-dated resolver
+ *     semantics; port resolveFixedCostsForMonth as a query) — lets Kyle edit
+ *     without a deploy. Beware the tracker's lesson: its Settings-UI edits
+ *     bypassed migrations and made history unauditable — keep an
+ *     updatedBy/note column and never allow editing past months in place.
+ *   - Precedent: the ad-account allowlist already lives in Neon
+ *     (`ad_account`, db/ad-account-schema.ts) because it's shared config
+ *     enforced across services.
+ * KEEP IN CODE regardless: methodology constants (CPB_TARGET,
+ * BLENDED_TAKE_RATE, OTA/ACTIVE channel sets, NON_MARKETPLACE_CAMPAIGN_PATTERN,
+ * DATA_SOURCE_HIERARCHY, META_AD_ACCOUNT_ID) — these are locked DECISIONS, not
+ * data; changing them should require code review, tests, and a git trail.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 // -----------------------------------------------------------------------------

@@ -23,6 +23,15 @@ import {
  * API (and default to the last 90 days). This layer pulls a real window, ranks
  * creatives by Meta platform metrics, and buckets by destination + objective.
  *
+ * Endpoint choice, evaluated 2026-07-10: /ads/tree is the ONLY Zernio endpoint
+ * with per-ad creative + metrics (timeline is connection-level daily aggregates
+ * with a broken scope filter; /analytics is organic posts), so it stays despite
+ * its cost — a full 365-730d fetch is 3 pages / ~6MB / ~15s, absorbed by the
+ * 10-min unstable_cache. Its metrics are WINDOW TOTALS (right for creative
+ * ranking; the spend tracker needs daily series and uses the Meta API directly
+ * instead). ~54% of returned campaigns are dead $0 X drafts — no platform
+ * filter exists to skip them. Revisit if Zernio adds account/platform params.
+ *
  * Reference oracle: scripts/zernio-ads-perf-scan.ts (same numbers, same window).
  */
 
