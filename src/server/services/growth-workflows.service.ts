@@ -3,13 +3,23 @@ import {
   fetchUnassignedBdrCandidates,
   type SyncCandidate,
 } from "@/server/clients/bigquery.client";
+import {
+  type EmailBackfillResult,
+  runFunnelEmailBackfill,
+} from "@/server/services/funnel-heal.service";
+import {
+  type FunnelSweepResult,
+  runFunnelAbandonmentSweep,
+} from "@/server/services/funnel-sweep.service";
 import { processLead, type SyncResult } from "@/server/services/sync.service";
 
 export type GrowthWorkflowName =
   | "daily_comprehensive_sync"
   | "outreach_auto_healing"
   | "bdr_alignment_backfill"
-  | "backfill_checkout";
+  | "backfill_checkout"
+  | "funnel_abandonment_sweep"
+  | "funnel_email_backfill";
 
 interface WorkflowOptions {
   limit?: number;
@@ -40,6 +50,8 @@ export interface WorkflowRunResult {
   skippedCount: number;
   dryRun: boolean;
   sampleFailures: Array<{ email: string; error: string }>;
+  /** Job-specific breakdown (e.g. per-stage sweep counts). */
+  details?: FunnelSweepResult | EmailBackfillResult;
 }
 
 interface CandidateTask {
@@ -256,6 +268,57 @@ async function runBackfillCheckout(
   });
 }
 
+async function runFunnelSweepWorkflow(
+  options: WorkflowOptions,
+): Promise<WorkflowRunResult> {
+  const sweep = await runFunnelAbandonmentSweep({
+    dryRun: options.dryRun ?? true,
+    limitPerStage: options.limit,
+    concurrency: options.concurrency,
+  });
+
+  const eligible = sweep.stages.reduce((sum, s) => sum + s.eligible, 0);
+  const newEpisodes = sweep.stages.reduce((sum, s) => sum + s.newEpisodes, 0);
+  const synced = sweep.stages.reduce((sum, s) => sum + s.synced, 0);
+  const failed = sweep.stages.reduce((sum, s) => sum + s.failed, 0);
+
+  return {
+    workflow: "funnel_abandonment_sweep",
+    startedAt: sweep.startedAt,
+    completedAt: sweep.completedAt,
+    durationMs: sweep.durationMs,
+    candidateCount: eligible,
+    processedCount: newEpisodes,
+    successCount: synced,
+    failedCount: failed,
+    skippedCount: newEpisodes - synced - failed,
+    dryRun: sweep.dryRun,
+    sampleFailures: [],
+    details: sweep,
+  };
+}
+
+async function runFunnelEmailBackfillWorkflow(
+  options: WorkflowOptions,
+): Promise<WorkflowRunResult> {
+  const heal = await runFunnelEmailBackfill({ limit: options.limit });
+
+  return {
+    workflow: "funnel_email_backfill",
+    startedAt: heal.startedAt,
+    completedAt: heal.completedAt,
+    durationMs: heal.durationMs,
+    candidateCount: heal.missingEmail,
+    processedCount: heal.lookedUp,
+    successCount: heal.healed,
+    failedCount: 0,
+    skippedCount: heal.missingEmail - heal.healed,
+    dryRun: false,
+    sampleFailures: [],
+    details: heal,
+  };
+}
+
 export async function runGrowthWorkflow(
   workflow: GrowthWorkflowName,
   options: WorkflowOptions = {},
@@ -269,6 +332,10 @@ export async function runGrowthWorkflow(
       return runBdrAlignmentBackfill(options);
     case "backfill_checkout":
       return runBackfillCheckout(options);
+    case "funnel_abandonment_sweep":
+      return runFunnelSweepWorkflow(options);
+    case "funnel_email_backfill":
+      return runFunnelEmailBackfillWorkflow(options);
     default: {
       const _never: never = workflow;
       throw new Error(`Unknown workflow: ${String(_never)}`);

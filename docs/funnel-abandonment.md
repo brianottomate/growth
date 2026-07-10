@@ -110,10 +110,17 @@ can't retry-storm.
   nothing sends. Destinations for checkout/payment/order/wishlist can be
   created immediately; search gets rich payloads once tracking-core 0.33.0 is
   live on wander.com.
-- **Phase 1:** `funnel_abandonment_sweep` (new job in the `runGrowthWorkflow`
-  registry, cron ~20 min, `dryRun` default ON) + `funnel_state_heal` (daily,
-  offset from the 03:00 sync; also does rolling deletes: send_log >90d).
-  Watch drift + dry-run counts for ~2 weeks.
+- **Phase 1 (SHIPPED 2026-07-10, dry-run):** `funnel_abandonment_sweep` — cron
+  every 20 min with `dryRun=true`; per-stage windows: search/wishlist/cart
+  1h–7d, payment 30min–48h; "abandoned" = anchor ts in window AND no
+  deeper-stage timestamp after the anchor. Dry-run writes `funnel_send_log`
+  rows with `syncStatus=dry_run` (the reviewable would-fire list). Live mode
+  exists behind `dryRun=false` + per-stage cap, calls `processLead`.
+  Plus `funnel_email_backfill` (every 6h): heals NULL emails from BQ
+  `customer_profiles` — Search Started carries no email, so search-only leads
+  are unsendable until healed. Full heal (event drift log, purchase truth from
+  `analytics.bookings` — client Order Completed under-fires when tabs close
+  early) remains follow-up scope.
 - **Phase 2:** flip on abandoned-search email (biggest cohort, lowest stakes)
   via CIO-as-dumb-target (sweep fires a CIO Track event, CIO campaign renders
   the drip — detection has left CIO, only delivery remains). Payment hot path:

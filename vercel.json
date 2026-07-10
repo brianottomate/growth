@@ -9,6 +9,14 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/growth?job=funnel_abandonment_sweep&dryRun=true",
+      "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/cron/growth?job=funnel_email_backfill",
+      "schedule": "30 */6 * * *"
+    },
+    {
       "path": "/api/cron/instagram",
       "schedule": "0 19 * * *"
     },

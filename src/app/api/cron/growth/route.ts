@@ -10,6 +10,8 @@ const WORKFLOW_NAMES: GrowthWorkflowName[] = [
   "outreach_auto_healing",
   "bdr_alignment_backfill",
   "backfill_checkout",
+  "funnel_abandonment_sweep",
+  "funnel_email_backfill",
 ];
 
 function isWorkflowName(value: string | null): value is GrowthWorkflowName {

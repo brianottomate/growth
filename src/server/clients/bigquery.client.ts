@@ -548,6 +548,30 @@ LIMIT @limit
     }));
 }
 
+/**
+ * Look up emails for a batch of wander user ids.
+ *
+ * Powers the funnel email backfill: search-only users reach funnel_state
+ * without an email (Search Started carries none), and the sweep can't act
+ * on them until this heals the gap from customer_profiles.
+ */
+export async function fetchEmailsByUserIds(
+  userIds: string[],
+): Promise<Array<{ id_user: string; email: string }>> {
+  if (userIds.length === 0) return [];
+
+  const rows = await executeQuery<{ id_user: string; email: string | null }>(
+    `SELECT id_user, email
+FROM \`wander-9fc9c.analytics.customer_profiles\`
+WHERE id_user IN UNNEST(@user_ids) AND email IS NOT NULL`,
+    { user_ids: userIds },
+  );
+
+  return rows.filter((row): row is { id_user: string; email: string } =>
+    Boolean(row.email),
+  );
+}
+
 // =====================================================
 // WRITE: STREAMING INSERT
 // =====================================================
