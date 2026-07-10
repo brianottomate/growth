@@ -115,7 +115,10 @@ export default async function SpendPage({
         <div>
           <h1 className="text-2xl font-semibold">Spend</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Marketing unit economics · {startDate} → {endDate}
+            Marketing unit economics · {startDate} → {endDate} ·{" "}
+            <a href="#methodology" className="underline underline-offset-2">
+              what am I looking at?
+            </a>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -152,42 +155,50 @@ export default async function SpendPage({
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         <StatCard
           label="Marketing Spend"
+          explainer="Everything spent on marketing in this window: ad platforms (Meta, Google) plus fixed monthly costs (BDRs, TV, content, affiliate) pro-rated per day. Loyalty points and coupons are not included."
           value={compact(t.totalMarketingSpend)}
           hint={`${compact(t.adSpend)} ads + ${compact(t.fixedCosts)} fixed`}
         />
         <StatCard
           label="DCPB · primary"
+          explainer="Direct Cost Per Booking — the primary efficiency metric. Total marketing spend ÷ direct bookings (booked on wander.com, not OTAs). Target under $500: green <$400, amber ≤$500, red above."
           value={money(e.directCpb)}
           hint={`target $${CPB_TARGET} · spend / direct bookings`}
           tone={dcpbTone}
         />
         <StatCard
           label="CPB"
+          explainer="Spend ÷ ALL bookings including OTAs (Airbnb, Vrbo, Booking.com, Amex). Reference only — OTA bookings arrive without ad spend, so this always looks better than DCPB."
           value={money(e.cpb)}
           hint="spend / all bookings incl. OTA"
         />
         <StatCard
           label="ROAS"
+          explainer="For every $1 of AD spend (fixed costs excluded), dollars of estimated take-rate revenue: GMV × 20% blended take rate — a locked, deliberately Operated-leaning constant."
           value={`${e.roas.toFixed(1)}x`}
           hint="GMV × 20% take / ad spend"
         />
         <StatCard
           label="Total Bookings"
+          explainer="Finance-aligned count: confirmed, profit-generating bookings; Sites excluded; cancellations NOT netted. Deliberately does not match the channel table's sum — that view uses platform attribution."
           value={int(t.bookings)}
           hint={`${int(t.directBookings)} direct (${int(t.wanderDirectBookings)} wander + ${int(t.manualBookings)} manual) · ${int(t.otaBookings)} OTA`}
         />
         <StatCard
           label="Total GMV"
+          explainer="Full booking value at the moment of booking (not revenue-recognized), including bookings later cancelled. Dylan Wright's canonical definition (analytics.report_gmv)."
           value={compact(t.gmv)}
           hint={`${compact(t.directGmv)} direct · ${compact(t.otaGmv)} OTA`}
         />
         <StatCard
           label="Gross Take"
+          explainer="Wander's revenue share (platform + management fees) from the dbt north-star model. Recognition-based: recent days keep filling in for about a week."
           value={summary.northStar ? compact(summary.northStar.grossTake) : "—"}
           hint="dbt north-star model"
         />
         <StatCard
           label="Net Take"
+          explainer="Gross take minus ALL marketing spend. Gross take backfills for ~a week while spend is final immediately, so recent windows read low at first — trust the settled figure (both sides clipped to a week ago)."
           value={summary.northStar ? compact(summary.northStar.netTake) : "—"}
           hint={
             summary.northStar?.settled
@@ -205,16 +216,19 @@ export default async function SpendPage({
         />
         <StatCard
           label="Checkouts Started"
+          explainer="Checkout starts attributed last-touch. A top-of-funnel volume signal — most don't convert."
           value={int(t.checkoutStarted)}
           hint="last-touch attribution"
         />
         <StatCard
           label="Account Creations"
+          explainer="New account signups, last-touch attribution. CPAC = total marketing spend per new account."
           value={int(t.accountCreations)}
           hint={`CPAC ${money(e.cpac)}`}
         />
         <StatCard
           label="Net Take / Direct"
+          explainer="Profit per direct booking after every marketing dollar (ads + fixed costs)."
           value={
             summary.northStar && t.directBookings > 0
               ? money(summary.northStar.netTake / t.directBookings)
@@ -224,6 +238,7 @@ export default async function SpendPage({
         />
         <StatCard
           label="Take Rate Revenue"
+          explainer="What Wander actually earned on this window's bookings: booking_revenue_recognized summed from BigQuery. The 'real' counterpart to the 20% ROAS proxy."
           value={compact(t.takeRateRevenue)}
           hint="booking_revenue_recognized (BQ)"
         />
@@ -237,7 +252,7 @@ export default async function SpendPage({
               <th className="px-4 py-3 font-medium">Channel</th>
               <th className="px-4 py-3 text-right font-medium">Spend</th>
               {showPacing && (
-                <th className="px-4 py-3 text-right font-medium">Pacing (EOM)</th>
+                <th className="px-4 py-3 text-right font-medium" title="Projected end-of-month spend, extrapolated from completed days only (the in-progress day is excluded — fixed costs count it as $0 and ad platforms report it late).">Pacing (EOM)</th>
               )}
               <th className="px-4 py-3 text-right font-medium">Bookings</th>
               <th className="px-4 py-3 text-right font-medium">GMV</th>
@@ -308,7 +323,7 @@ export default async function SpendPage({
       />
 
       {/* Methodology */}
-      <details className="rounded-xl border p-4">
+      <details id="methodology" className="scroll-mt-8 rounded-xl border p-4">
         <summary className="cursor-pointer text-sm font-medium">
           Methodology — locked decisions
         </summary>
