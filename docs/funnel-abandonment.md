@@ -64,6 +64,7 @@ Tracking shape shipped in `wandercom/tracking#49` (core 0.33.0), wired by
 |---|---|
 | `Search Started` | `destination`, `checkin_date`/`checkout_date` or `search_flexible`, `search_id`, `search_entrypoint`, `search_trigger`, `search_parent_id` |
 | `Product Added To Wishlist` | `name` (property) — select BOTH casing variants in Amplitude ("…To…"/"…to…"); the route lowercases |
+| `Property Reserve Clicked` | (timestamp) — click-intent twin of Checkout Previewed, ~16k/30d; the reliable "moved toward checkout" signal |
 | `Checkout Previewed` | `checkin_date`, `checkout_date`, `value` — fires authed or not (~4.5x Checkout Started volume); captures auth-wall/price-shock bounces. Anonymous previews are dropped (`missing_identity`) |
 | `Checkout Started` | `name`, `checkin_date`, `checkout_date`, `value` |
 | `Payment Info Entered` | (timestamp is the signal) |

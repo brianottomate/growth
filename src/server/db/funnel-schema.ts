@@ -69,6 +69,12 @@ export const funnelStateTable = pgTable(
     lastWishlistTs: t.timestamp({ withTimezone: true }),
     lastWishlistProperty: t.text(),
 
+    // -- Reserve click (from `Property Reserve Clicked`) --
+    // The click-intent twin of Checkout Previewed (~16k/30d): a discrete
+    // user action rather than a page load, so it is the more trustworthy
+    // "moved toward checkout" signal when the pageview events misbehave.
+    lastReserveClickTs: t.timestamp({ withTimezone: true }),
+
     // -- Checkout preview (from `Checkout Previewed`) --
     // Fires on the trip-summary view, authed or not (~4.5x checkout_started
     // volume): captures users who bounce at the auth wall or at price shock
@@ -115,6 +121,9 @@ export const funnelStateTable = pgTable(
     // The sweep filters on stage timestamps; keep them indexed.
     index("funnel_state_last_search_ts_idx").on(table.lastSearchTs),
     index("funnel_state_last_wishlist_ts_idx").on(table.lastWishlistTs),
+    index("funnel_state_last_reserve_click_ts_idx").on(
+      table.lastReserveClickTs,
+    ),
     index("funnel_state_last_checkout_preview_ts_idx").on(
       table.lastCheckoutPreviewTs,
     ),

@@ -18,6 +18,7 @@ import { funnelStateTable } from "@/server/db/funnel-schema";
 export const FUNNEL_EVENTS = [
   "search_started",
   "product_added_to_wishlist",
+  "property_reserve_clicked",
   "checkout_previewed",
   "checkout_started",
   "payment_info_entered",
@@ -163,6 +164,19 @@ export async function ingestFunnelEvent(
           target: funnelStateTable.userId,
           set: { ...values, ...emailUpdate },
           setWhere: sql`${funnelStateTable.lastWishlistTs} IS NULL OR ${funnelStateTable.lastWishlistTs} < ${eventTs}`,
+        });
+      return { status: "applied", eventName };
+    }
+
+    case "property_reserve_clicked": {
+      const values = { lastReserveClickTs: eventTs };
+      await db
+        .insert(funnelStateTable)
+        .values({ userId, email, ...values })
+        .onConflictDoUpdate({
+          target: funnelStateTable.userId,
+          set: { ...values, ...emailUpdate },
+          setWhere: sql`${funnelStateTable.lastReserveClickTs} IS NULL OR ${funnelStateTable.lastReserveClickTs} < ${eventTs}`,
         });
       return { status: "applied", eventName };
     }
