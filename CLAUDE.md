@@ -159,6 +159,12 @@ house convention, all AI calls use `generateText`/`streamText` + `Output.object`
   (asset library), `listen` (social listening + reply drafts), `inbox`, `campaigns`,
   `audiences`, `people`, `calendar`. `feed-v5` is the live swimlane timeline; older
   `feed*` variants are retired/in-progress prototypes.
+- `src/app/lab/` — Kristian's private workspace (system maps, whiteboard, one-off
+  tools), admin-gated via `src/server/lab-access.ts` (404 for non-admins; dev mode
+  open). Diagnostic JSON endpoints live under `src/app/api/lab/*` behind the same
+  gate (+ `Bearer ADMIN_TOKEN` for curl). Never link /lab from public pages, and
+  never add an ungated "test" route outside it — the old open /api/test/* routes
+  leaked lead PII (removed 2026-07-10).
 - UI components in `src/components/ui/` are shadcn/Radix-based.
 - **Styling bridge:** `src/styles/globals.css` maps wandercom design-system tokens
   (`@wandercom/design-system-*`) into shadcn variables. Theming is via a `data-theme`

@@ -8,18 +8,9 @@ import { Button } from "@wandercom/design-system-web/ui/button";
 // /app/org/[orgSlug], etc.) are omitted since they need an id to resolve.
 const LINK_GROUPS: { label: string; links: { name: string; href: string }[] }[] =
   [
-    {
-      label: "Prototypes",
-      links: [
-        { name: "Timeline (feed v5)", href: "/app/feed-v5" },
-        { name: "Growth system", href: "/flow/growth-system" },
-        { name: "Message streams", href: "/flow/message-streams" },
-        { name: "Pregen sites", href: "/flow/pregen-sites" },
-        { name: "System map", href: "/flow/system" },
-        { name: "Tracking audit", href: "/flow/tracking-audit" },
-        { name: "Whiteboard", href: "/flow/whiteboard" },
-      ],
-    },
+    // NOTE: the old "Prototypes" group (system maps, whiteboard, tracking
+    // audit) moved to /lab — Kristian's admin-gated private workspace. Don't
+    // link lab pages from public surfaces.
     {
       label: "Marketing & misc",
       links: [

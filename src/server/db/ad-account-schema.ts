@@ -21,6 +21,11 @@ import { createId } from "./utils";
 // Rows are operator-managed config (Drizzle Studio or a seed script), not
 // synced state. Keep explicit isAllowed=false rows for known-foreign accounts
 // so the denial is self-documenting rather than an absence.
+//
+// If this ever gets a UI (Kristian, 2026-07-10): the ALLOWED accounts are the
+// content — show them prominently; the denied rows are just an audit trail —
+// tuck them into a small collapsed "denied / ignored" section. Enforcement is
+// default-deny either way, so the deny list is documentation, not a control.
 
 export const adAccountTable = pgTable(
   "ad_account",
