@@ -218,12 +218,37 @@ export async function computeSpendTracker(
     );
     const actualMarketingSpend = summary.totals.totalMarketingSpend;
     const netTake = ns.grossTake - actualMarketingSpend;
+
+    // Settled net take: gross take restates upward for several days
+    // (recognition backfill), spend doesn't — so clip BOTH to T-7 for an
+    // apples-to-apples figure. Computed from rows already in hand.
+    const SETTLE_DAYS = 7;
+    const settledThrough = ymd(
+      new Date(Date.now() - SETTLE_DAYS * 24 * 60 * 60 * 1000),
+    );
+    let settled: NonNullable<typeof summary.northStar>["settled"] = null;
+    const settledGross = northStar
+      .filter((r) => normalizeDate(r.dt) <= settledThrough)
+      .reduce((s, r) => s + (Number(r.gross_take) || 0), 0);
+    const settledSpend = rows
+      .filter((r) => r.date <= settledThrough)
+      .reduce((s, r) => s + (r.spend ?? 0), 0);
+    if (northStar.some((r) => normalizeDate(r.dt) <= settledThrough)) {
+      settled = {
+        through: settledThrough,
+        grossTake: settledGross,
+        spend: settledSpend,
+        netTake: settledGross - settledSpend,
+      };
+    }
+
     summary.northStar = {
       ...ns,
       totalMarketingSpend: actualMarketingSpend,
       netTake,
       netTakeRate: ns.directGmv > 0 ? netTake / ns.directGmv : 0,
       takeRate: ns.directGmv > 0 ? ns.grossTake / ns.directGmv : 0,
+      settled,
     };
     summary.efficiency.netTakeRate = summary.northStar.netTakeRate;
   }

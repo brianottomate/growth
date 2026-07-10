@@ -391,6 +391,14 @@ export interface NorthStarSummary {
   totalMarketingSpend: number;
   directConfirmedBookings: number;
   engagedSessions: number;
+  /**
+   * Net take over the SETTLED part of the window only (both gross take and
+   * spend clipped to `through`). The dbt gross_take restates upward for
+   * several days (recognition backfill — Jul 1-6 2026 restated +57% in 4
+   * days), so recent-day net take always reads low at first; this variant is
+   * apples-to-apples. Null when the window has no settled days.
+   */
+  settled: { through: string; grossTake: number; spend: number; netTake: number } | null;
 }
 
 export interface DashboardSummary {

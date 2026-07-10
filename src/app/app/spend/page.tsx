@@ -53,7 +53,7 @@ const moneyOrDash = (n: number | null | undefined) => (n ? money(n) : "—");
 export default async function SpendPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; end?: string }>;
 }) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
@@ -61,7 +61,22 @@ export default async function SpendPage({
   const params = await searchParams;
   const range: RangeKey =
     RANGES.find((r) => r.key === params.range)?.key ?? "90";
-  const { startDate, endDate } = windowFor(range);
+  let { startDate, endDate } = windowFor(range);
+  // Power-user lagged view: ?end=YYYY-MM-DD shifts the whole window back so
+  // you can look at fully-settled data (gross take restates for ~a week).
+  if (params.end && /^\d{4}-\d{2}-\d{2}$/.test(params.end) && params.end < endDate) {
+    const days = Math.round(
+      (new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000,
+    );
+    endDate = params.end;
+    if (range !== "mtd") {
+      startDate = new Date(
+        new Date(`${params.end}T00:00:00Z`).getTime() - days * 86400000,
+      )
+        .toISOString()
+        .slice(0, 10);
+    }
+  }
   const { summary, rows } = await getSpendTracker(startDate, endDate);
   const t = summary.totals;
   const e = summary.efficiency;
@@ -174,10 +189,15 @@ export default async function SpendPage({
         <StatCard
           label="Net Take"
           value={summary.northStar ? compact(summary.northStar.netTake) : "—"}
-          hint="gross take − complete spend"
+          hint={
+            summary.northStar?.settled
+              ? `recent days still recognizing · settled thru ${summary.northStar.settled.through.slice(5)}: ${compact(summary.northStar.settled.netTake)}`
+              : "gross take − complete spend"
+          }
           tone={
             summary.northStar
-              ? summary.northStar.netTake >= 0
+              ? (summary.northStar.settled?.netTake ??
+                  summary.northStar.netTake) >= 0
                 ? "good"
                 : "bad"
               : undefined
@@ -323,7 +343,13 @@ export default async function SpendPage({
           </p>
           <p>
             <b>Net take</b> = gross take (dbt north-star) − complete marketing
-            spend. No 1.70× multiplier (killed May 2026).
+            spend. No 1.70× multiplier (killed May 2026). Gross take is
+            recognition-based and <i>restates upward for ~a week</i> (Jul 1–6
+            2026 restated +57% within 4 days), so recent-day net take always
+            reads low at first — the tile shows a settled-through-T-7 figure
+            alongside, and <code>?end=YYYY-MM-DD</code> shifts any window back
+            for a fully-settled view. Spend, bookings, and GMV do NOT restate
+            — only this metric lags.
           </p>
           <p>
             <b>Meta scope:</b> single ad account act_885632589057558, WanderOS/
