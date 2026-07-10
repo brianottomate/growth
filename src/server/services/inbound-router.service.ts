@@ -86,6 +86,23 @@ export function extractEmailDomain(email: string): string | null {
   return getEmailDomain(email) || null;
 }
 
+/**
+ * Heuristic: does this phone number carry a non-US/Canada country code?
+ * Treats a leading "+" (or "00" international access prefix) followed by a
+ * country code other than "1" as international. A number with no country-code
+ * prefix, or one starting with +1, is assumed domestic (US/CA). Used to route
+ * international inbound leads to Kris instead of the normal round-robin.
+ */
+export function isInternationalPhone(
+  phone: string | null | undefined,
+): boolean {
+  if (!phone) return false;
+  const normalized = phone.trim().replace(/^00/, "+");
+  if (!normalized.startsWith("+")) return false;
+  const digits = normalized.slice(1).replace(/\D/g, "");
+  return digits.length > 0 && !digits.startsWith("1");
+}
+
 // contract_type values (HubSpot "Agreement Type" on deals) that qualify as wOS/WanderOS deals
 const WOS_CONTRACT_TYPES = new Set([
   "Wander Sites",
@@ -593,6 +610,18 @@ export async function osInboundLeadRouter({
       "❌ [inbound-router] osInboundLeadRouter: round-robin AE lookup failed",
       err,
     );
+  }
+
+  // International or Spanish-language inbound leads route to Kris instead of the
+  // normal round-robin — but only for leads we're actually reassigning
+  // (tagAsInbound) that have at least 10 units. Active/closed-won/resubmission
+  // leads keep their existing owner; sub-10-unit leads stay on the normal RR.
+  if (
+    tagAsInbound &&
+    officialInboundUnits >= 10 &&
+    (isInternationalPhone(phone) || source.toLowerCase().includes("spanish"))
+  ) {
+    aeForRR = HS_USER_IDS.KRIS;
   }
 
   // Upsert contact + company and associate them. Errors are caught internally per operation.

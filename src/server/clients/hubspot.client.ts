@@ -59,6 +59,7 @@ export const HS_USER_IDS = {
   NICK_LATHAM: "93243943",
   PAIGE: "93221525",
   SEAN: "94290553",
+  KRIS: "91455876",
 } as const;
 
 export const LIFECYCLE_STAGES = {
