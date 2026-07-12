@@ -48,15 +48,18 @@ export async function runFunnelEmailBackfill(options: {
     lookedUp = found.length;
 
     if (found.length > 0) {
-      const userIds = found.map((f) => f.id_user);
-      const emails = found.map((f) => f.email);
-      // One statement instead of N round-trips over the HTTP driver.
+      // One statement instead of N round-trips over the HTTP driver. Pairs
+      // travel as a single jsonb param — drizzle binds a JS array as a row
+      // constructor ($1, $2), not a PG array, so unnest(...::text[]) breaks.
+      const pairs = JSON.stringify(
+        found.map((f) => ({ u: f.id_user, m: f.email })),
+      );
       const result = await db.execute(sql`
         UPDATE ${funnelStateTable} AS fs
         SET email = v.email
         FROM (
-          SELECT unnest(${userIds}::text[]) AS user_id,
-                 unnest(${emails}::text[]) AS email
+          SELECT e->>'u' AS user_id, e->>'m' AS email
+          FROM jsonb_array_elements(${pairs}::jsonb) e
         ) v
         WHERE fs.user_id = v.user_id AND fs.email IS NULL
       `);
