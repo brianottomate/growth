@@ -206,7 +206,19 @@ export async function processLead(params: {
 
     // Carry forward checkout-specific context (checkin/checkout dates, amount)
     // CIO renders missing dates as the string "false" — filter those out
-    const rawCheckin = eventData?.checkin;
+    const rawDestination = eventData?.search_destination;
+    if (typeof rawDestination === "string" && rawDestination) {
+      leadData.webhook_search_destination = rawDestination;
+    }
+    const rawSearchCount = eventData?.search_count;
+    if (rawSearchCount != null && !isNaN(Number(rawSearchCount))) {
+      leadData.webhook_search_count = Number(rawSearchCount);
+    }
+    const rawLastSearch = eventData?.last_search_date;
+    if (typeof rawLastSearch === "string" && rawLastSearch) {
+      leadData.webhook_last_search_date = rawLastSearch;
+    }
+        const rawCheckin = eventData?.checkin;
     if (rawCheckin != null && rawCheckin !== false && rawCheckin !== "false" && rawCheckin !== "" && (typeof rawCheckin === "string" || typeof rawCheckin === "number")) {
       leadData.webhook_checkin_date = String(rawCheckin);
     }

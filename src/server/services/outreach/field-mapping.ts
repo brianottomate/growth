@@ -89,6 +89,11 @@ export const FIELD_MAPPING = {
 
   // Property lists (custom53, 58)
   viewed_properties: "custom53",
+  // Abandoned-search context (custom54-57) — fed by the funnel sweep
+  last_search_destination: "custom54",
+  last_search_dates: "custom55",
+  search_count: "custom56",
+  last_search_date: "custom57",
   wishlisted_properties: "custom58",
 
   // Booking property tracking (custom60-61)
@@ -153,6 +158,10 @@ export const SYNC_TAG_MAPPING: Record<string, string> = {
   user_signed_up: "RealtimeSync-UserSignedUp",
   order_completed: "RealtimeSync-OrderCompleted",
   product_added_to_wishlist: "RealtimeSync-Wishlisted",
+  // Funnel sweep stages (docs/funnel-abandonment.md)
+  abandoned_search: "RealtimeSync-SearchAbandoned",
+  abandoned_wishlist: "RealtimeSync-WishlistAbandoned",
+  abandoned_payment: "RealtimeSync-PaymentAbandoned",
 };
 
 /** Activity tags with priority (higher = more important) */
@@ -160,6 +169,8 @@ export const TAG_PRIORITIES: Record<string, number> = {
   "Completed Purchase": 3,
   "Abandoned Payment": 2,
   "Abandoned Cart": 1,
+  "Abandoned Wishlist": 1,
+  "Abandoned Search": 0,
   "New Signup": 0,
 };
 
@@ -343,8 +354,10 @@ export function getActivityTag(eventTypes: string | null): string | null {
   if (!eventTypes) return null;
   const types = eventTypes.toLowerCase();
   if (types.includes("order_completed")) return "Completed Purchase";
-  if (types.includes("payment_info_entered")) return "Abandoned Payment";
+  if (types.includes("payment_info_entered") || types.includes("abandoned_payment")) return "Abandoned Payment";
   if (types.includes("checkout_started") || types.includes("abandoned_cart")) return "Abandoned Cart";
+  if (types.includes("abandoned_wishlist")) return "Abandoned Wishlist";
+  if (types.includes("abandoned_search")) return "Abandoned Search";
   if (types.includes("user_signed_up")) return "New Signup";
   return null;
 }
@@ -407,6 +420,9 @@ export interface LeadData {
   webhook_checkin_date?: string | null;
   webhook_checkout_date?: string | null;
   webhook_checkout_amount?: number | null;
+  webhook_search_destination?: string | null;
+  webhook_search_count?: number | null;
+  webhook_last_search_date?: string | null;
 
   // Minerva AI
   minerva_rank?: number | null;
@@ -523,6 +539,23 @@ export function mapLeadToOutreachFields(lead: LeadData): MappedCustomFields {
   if (lead.interacted_properties)
     fields.custom53 = safeString(lead.interacted_properties);
 
+  // custom54-57: Abandoned-search context (funnel sweep)
+  if (lead.webhook_search_destination)
+    fields.custom54 = safeString(lead.webhook_search_destination);
+  if (
+    lead.webhook_event_type === "abandoned_search" &&
+    lead.webhook_checkin_date &&
+    lead.webhook_checkout_date
+  ) {
+    const from = formatDateForOutreach(lead.webhook_checkin_date);
+    const to = formatDateForOutreach(lead.webhook_checkout_date);
+    if (from && to) fields.custom55 = `${from} \u2192 ${to}`;
+  }
+  const searchCount = safeInt(lead.webhook_search_count);
+  if (searchCount != null) fields.custom56 = String(searchCount);
+  if (lead.webhook_last_search_date)
+    fields.custom57 = formatDateForOutreach(lead.webhook_last_search_date);
+
   // custom58: Wishlisted Properties
   if (lead.wishlisted_properties)
     fields.custom58 = safeString(lead.wishlisted_properties);
@@ -617,7 +650,10 @@ function eventContextLabel(eventType: string | null | undefined): string {
   switch (eventType) {
     case "order_completed": return "Booking Confirmed";
     case "payment_info_entered": return "Abandoned Payment";
+    case "abandoned_payment": return "Abandoned Payment";
     case "product_added_to_wishlist": return "Wishlisted";
+    case "abandoned_wishlist": return "Abandoned Wishlist";
+    case "abandoned_search": return "Abandoned Search";
     default: return "Abandoned Cart";
   }
 }
@@ -625,6 +661,7 @@ function eventContextLabel(eventType: string | null | undefined): string {
 function formatCheckoutContext(lead: LeadData): string | null {
   const parts: string[] = [];
   if (lead.webhook_property_name) parts.push(`Property: ${lead.webhook_property_name}`);
+  if (lead.webhook_search_destination) parts.push(`Destination: ${lead.webhook_search_destination}`);
   const checkin = lead.webhook_checkin_date ? formatDateForOutreach(lead.webhook_checkin_date) : null;
   if (checkin) parts.push(`Check-in: ${checkin}`);
   const checkout = lead.webhook_checkout_date ? formatDateForOutreach(lead.webhook_checkout_date) : null;
