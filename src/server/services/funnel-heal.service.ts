@@ -26,6 +26,8 @@ export interface EmailBackfillResult {
   missingEmail: number;
   lookedUp: number;
   healed: number;
+  prunedState: number;
+  prunedSendLog: number;
 }
 
 export async function runFunnelEmailBackfill(options: {
@@ -67,8 +69,22 @@ export async function runFunnelEmailBackfill(options: {
     }
   }
 
+  // Rolling retention (design doc §ops): storage is a non-issue (state is
+  // one row per user), this is PII hygiene — a user inactive for 90 days
+  // has no business sitting in an internal DB. Returning users are simply
+  // re-created by their next event and re-healed. Send-log history beyond
+  // 90 days lives on in Outreach itself.
+  const prunedStateRes = await db.execute(sql`
+    DELETE FROM ${funnelStateTable} WHERE updated_at < now() - interval '90 days'
+  `);
+  const prunedLogRes = await db.execute(sql`
+    DELETE FROM funnel_send_log WHERE sent_at < now() - interval '90 days'
+  `);
+  const prunedState = prunedStateRes.rowCount ?? 0;
+  const prunedSendLog = prunedLogRes.rowCount ?? 0;
+
   console.log(
-    `🩹 [FunnelHeal] Email backfill: missing=${missing.length} lookedUp=${lookedUp} healed=${healed}`,
+    `🩹 [FunnelHeal] Email backfill: missing=${missing.length} lookedUp=${lookedUp} healed=${healed} | pruned state=${prunedState} sendLog=${prunedSendLog}`,
   );
 
   const completedAt = new Date();
@@ -79,5 +95,7 @@ export async function runFunnelEmailBackfill(options: {
     missingEmail: missing.length,
     lookedUp,
     healed,
+    prunedState,
+    prunedSendLog,
   };
 }
