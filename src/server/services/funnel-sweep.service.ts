@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { db } from "@/server/db";
@@ -232,7 +232,26 @@ export async function runFunnelAbandonmentSweep(options: {
         });
     }
 
-    const toProcess = newEpisodes.slice(0, limitPerStage);
+    // Process from the PENDING queue, not just this run's fresh inserts —
+    // otherwise episodes ledgered beyond the per-run cap are orphaned as
+    // pending forever (their re-inserts conflict and never return).
+    const toProcess = dryRun
+      ? []
+      : await db
+          .select({
+            id: funnelSendLogTable.id,
+            userId: funnelSendLogTable.userId,
+            email: funnelSendLogTable.email,
+          })
+          .from(funnelSendLogTable)
+          .where(
+            and(
+              eq(funnelSendLogTable.stage, def.stage),
+              eq(funnelSendLogTable.syncStatus, "pending"),
+            ),
+          )
+          .orderBy(asc(funnelSendLogTable.sentAt))
+          .limit(limitPerStage);
 
     let synced = 0;
     let failed = 0;
