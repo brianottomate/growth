@@ -89,11 +89,14 @@ export const FIELD_MAPPING = {
 
   // Property lists (custom53, 58)
   viewed_properties: "custom53",
-  // Abandoned-search context (custom54-57) — fed by the funnel sweep
-  last_search_destination: "custom54",
-  last_search_dates: "custom55",
-  search_count: "custom56",
-  last_search_date: "custom57",
+  // Abandoned-search context (custom67-70) — fed by the funnel sweep.
+  // NOTE: 54-57 looked free in OUR mapping but the Outreach org has them
+  // provisioned with validations (55 numeric, 56 picklist) — 422s. 67-70
+  // verified empty AND validation-free against the live org 2026-07-12.
+  last_search_destination: "custom67",
+  last_search_dates: "custom68",
+  search_count: "custom69",
+  last_search_date: "custom70",
   wishlisted_properties: "custom58",
 
   // Booking property tracking (custom60-61)
@@ -541,7 +544,7 @@ export function mapLeadToOutreachFields(lead: LeadData): MappedCustomFields {
 
   // custom54-57: Abandoned-search context (funnel sweep)
   if (lead.webhook_search_destination)
-    fields.custom54 = safeString(lead.webhook_search_destination);
+    fields.custom67 = safeString(lead.webhook_search_destination);
   if (
     lead.webhook_event_type === "abandoned_search" &&
     lead.webhook_checkin_date &&
@@ -549,12 +552,12 @@ export function mapLeadToOutreachFields(lead: LeadData): MappedCustomFields {
   ) {
     const from = formatDateForOutreach(lead.webhook_checkin_date);
     const to = formatDateForOutreach(lead.webhook_checkout_date);
-    if (from && to) fields.custom55 = `${from} \u2192 ${to}`;
+    if (from && to) fields.custom68 = `${from} \u2192 ${to}`;
   }
   const searchCount = safeInt(lead.webhook_search_count);
-  if (searchCount != null) fields.custom56 = String(searchCount);
+  if (searchCount != null) fields.custom69 = String(searchCount);
   if (lead.webhook_last_search_date)
-    fields.custom57 = formatDateForOutreach(lead.webhook_last_search_date);
+    fields.custom70 = formatDateForOutreach(lead.webhook_last_search_date);
 
   // custom58: Wishlisted Properties
   if (lead.wishlisted_properties)
