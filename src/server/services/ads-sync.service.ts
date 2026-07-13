@@ -9,10 +9,15 @@ import {
   type CampaignStatus,
 } from "@/server/db/ads-schema";
 import { brandTable } from "@/server/db/brand-schema";
-import { channelTable } from "@/server/db/channel-schema";
+import {
+  type ChannelPlatform,
+  channelTable,
+} from "@/server/db/channel-schema";
+import { getAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
 import {
   getZernioAdsTree,
   isZernioConfigured,
+  mapZernioPlatform,
   type ZernioAd,
   type ZernioAdsTreeCampaign,
 } from "@/server/clients/zernio.client";
@@ -103,21 +108,72 @@ function flattenAds(c: ZernioAdsTreeCampaign): ZernioAd[] {
   return ads;
 }
 
-function manageUrl(accountId: string | undefined, campaignId: string | undefined): string | undefined {
+// Platform-aware deep links. Google's campaign manager needs an `ocid` we
+// don't have, so Google gets the account-level campaigns view only.
+function accountManageUrl(
+  platform: ChannelPlatform,
+  accountId: string | undefined,
+): string | undefined {
+  if (!accountId) return undefined;
+  if (platform === "meta_ads")
+    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId.replace("act_", "")}`;
+  if (platform === "google_ads") return "https://ads.google.com/aw/campaigns";
+  return undefined;
+}
+
+function campaignManageUrl(
+  platform: ChannelPlatform,
+  accountId: string | undefined,
+  campaignId: string | undefined,
+): string | undefined {
   if (!accountId || !campaignId) return undefined;
-  const act = accountId.startsWith("act_") ? accountId : `act_${accountId}`;
-  return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${act.replace("act_", "")}&selected_campaign_ids=${campaignId}`;
+  if (platform === "meta_ads")
+    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId.replace("act_", "")}&selected_campaign_ids=${campaignId}`;
+  return accountManageUrl(platform, accountId);
+}
+
+// Zernio's tree mixes every connected ads platform in one list, and reports
+// the campaign platform as the SOCIAL network name (facebook/twitter/google),
+// not the connection name (metaads/xads/googleads). Map to our ad enums.
+const ADS_PLATFORM_MAP: Record<string, ChannelPlatform> = {
+  facebook: "meta_ads",
+  metaads: "meta_ads",
+  meta_ads: "meta_ads",
+  google: "google_ads",
+  googleads: "google_ads",
+  google_ads: "google_ads",
+  twitter: "x_ads",
+  x: "x_ads",
+  xads: "x_ads",
+  x_ads: "x_ads",
+  linkedin: "linkedin_ads",
+  linkedinads: "linkedin_ads",
+};
+function campaignPlatform(c: Record<string, unknown>): string {
+  const raw = str(c.platform)?.toLowerCase();
+  return (raw && ADS_PLATFORM_MAP[raw]) ?? mapZernioPlatform(raw);
 }
 
 /**
- * Pull Wander's Meta ad campaigns from Zernio (`/ads/tree`) and upsert them into
- * `campaign` (one row per Zernio campaign, keyed on platformCampaignId). Stores a
- * latest metrics snapshot + one hero creative so feed/calendar can render a card
- * without touching `ad_spot`. Idempotent — safe to re-run; updates metrics in
- * place. `initiativeId` is left null (the throughline is authored by hand).
+ * Pull one platform's ad campaigns from Zernio (`/ads/tree`) and upsert them
+ * into `campaign` (one row per Zernio campaign, keyed on platformCampaignId).
+ * Stores a latest metrics snapshot + one hero creative so feed/calendar can
+ * render a card without touching `ad_spot`. Idempotent — safe to re-run;
+ * updates metrics in place. `initiativeId` stays null (authored by hand).
+ *
+ * The tree mixes every connected platform, so campaigns are filtered three
+ * ways: by `platform`, by the default-deny ad-account allowlist, and — when
+ * `adAccountId` is given (Google has Demand/Supply/Sites under one
+ * connection) — down to that single account. The channel row is resolved per
+ * (brand, platform[, externalId]) and its externalId is backfilled onto
+ * placeholder rows.
  */
 export async function syncZernioAds(options?: {
   brandSlug?: string;
+  /** channel_platform ad value; default "meta_ads" (original behavior). */
+  platform?: ChannelPlatform;
+  /** Scope to one platform ad account (e.g. a Google customer id). */
+  adAccountId?: string;
 }): Promise<{
   brandId: string;
   channelId: string;
@@ -129,6 +185,7 @@ export async function syncZernioAds(options?: {
   errors: string[];
 }> {
   const brandSlug = options?.brandSlug ?? "wander";
+  const platform = options?.platform ?? "meta_ads";
   const errors: string[] = [];
 
   if (!isZernioConfigured) throw new Error("ZERNIO_API_KEY not configured");
@@ -138,7 +195,26 @@ export async function syncZernioAds(options?: {
   });
   if (!brand) throw new Error(`Brand "${brandSlug}" not found`);
 
-  const tree = await getZernioAdsTree();
+  const allowedAccounts = await getAllowedAdAccountIds();
+  // Meta allowlist rows carry the `act_` prefix; Zernio sometimes reports the
+  // bare id. Compare both spellings.
+  const isAllowed = (acct: string) =>
+    allowedAccounts.has(acct) ||
+    allowedAccounts.has(acct.replace(/^act_/, "")) ||
+    allowedAccounts.has(`act_${acct}`);
+  const sameAccount = (a: string, b: string) =>
+    a.replace(/^act_/, "") === b.replace(/^act_/, "");
+
+  const fullTree = await getZernioAdsTree();
+  const tree = fullTree.filter((c) => {
+    const obj = c as Record<string, unknown>;
+    if (campaignPlatform(obj) !== platform) return false;
+    const acct = str(obj.platformAdAccountId);
+    if (!acct || !isAllowed(acct)) return false; // default-deny
+    if (options?.adAccountId && !sameAccount(acct, options.adAccountId))
+      return false;
+    return true;
+  });
   if (tree.length === 0) {
     return {
       brandId: brand.id,
@@ -152,29 +228,49 @@ export async function syncZernioAds(options?: {
     };
   }
 
-  // Resolve (or create) the Meta ad-account channel from the first campaign.
+  // Resolve (or create) the ad-account channel from the first campaign.
   const first = tree[0] as Record<string, unknown>;
   const accountId = str(first.platformAdAccountId);
   const accountName = str(first.platformAdAccountName);
 
-  let channel = await db.query.channelTable.findFirst({
+  // Prefer an exact externalId match (a brand can hold several ad accounts on
+  // one platform — e.g. WanderOS holds both Google Supply and Sites); fall
+  // back to a placeholder row for this platform (no externalId yet).
+  const platformChannels = await db.query.channelTable.findMany({
     where: and(
       eq(channelTable.brandId, brand.id),
-      eq(channelTable.platform, "meta_ads"),
+      eq(channelTable.platform, platform),
     ),
   });
+  let channel =
+    (accountId &&
+      platformChannels.find(
+        (ch) => ch.externalId && sameAccount(ch.externalId, accountId),
+      )) ||
+    platformChannels.find((ch) => !ch.externalId);
+  if (channel && accountId && !channel.externalId) {
+    // Backfill the placeholder row with the real account identity.
+    const [updatedChannel] = await db
+      .update(channelTable)
+      .set({
+        externalId: accountId,
+        displayName: channel.displayName ?? accountName,
+        manageUrl: channel.manageUrl ?? accountManageUrl(platform, accountId),
+      })
+      .where(eq(channelTable.id, channel.id))
+      .returning();
+    channel = updatedChannel;
+  }
   if (!channel) {
     const [created] = await db
       .insert(channelTable)
       .values({
         brandId: brand.id,
         kind: "ad",
-        platform: "meta_ads",
-        displayName: accountName ?? "Meta Ads",
+        platform,
+        displayName: accountName ?? platform,
         externalId: accountId,
-        manageUrl: accountId
-          ? `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId.replace("act_", "")}`
-          : undefined,
+        manageUrl: accountManageUrl(platform, accountId),
       })
       .returning();
     channel = created;
@@ -206,10 +302,13 @@ export async function syncZernioAds(options?: {
     candidates.push({
       channelId,
       brandId: brand.id,
-      platform: "meta_ads",
+      platform,
       name: str(obj.campaignName) ?? c.name ?? externalId,
       status,
-      objective: str(obj.platformObjective),
+      // Google campaigns carry no platformObjective; the channel type
+      // (SEARCH / PERFORMANCE_MAX / DISPLAY / DEMAND_GEN) is the objective.
+      objective:
+        str(obj.platformObjective) ?? str(obj.advertisingChannelType),
       startAt: firstMs !== undefined ? new Date(firstMs) : undefined,
       // Active campaigns are ongoing — no end date. Else last creative date.
       endAt: status === "live" || lastMs === undefined ? undefined : new Date(lastMs),
@@ -218,7 +317,11 @@ export async function syncZernioAds(options?: {
       stats,
       heroThumbnailUrl: pickHeroThumbnail(ads),
       externalId,
-      manageUrl: manageUrl(accountId, externalId),
+      manageUrl: campaignManageUrl(
+        platform,
+        str(obj.platformAdAccountId) ?? accountId,
+        externalId,
+      ),
     });
   }
 
