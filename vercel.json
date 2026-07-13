@@ -9,7 +9,7 @@
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/growth?job=funnel_abandonment_sweep&dryRun=true",
+      "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
       "schedule": "*/20 * * * *"
     },
     {

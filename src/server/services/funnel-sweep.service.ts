@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { db } from "@/server/db";
@@ -105,7 +105,41 @@ interface StageCandidate {
   email: string | null;
   windowKey: string;
   destination: string | null;
+  searchCheckin: string | null;
+  searchCheckout: string | null;
+  searchCount: number;
+  lastSearchTs: Date | null;
+  checkoutCheckin: string | null;
+  checkoutCheckout: string | null;
   propertyName: string | null;
+}
+
+/** Per-stage webhook payload for processLead — the personalization BDRs see. */
+function buildEventData(
+  stage: FunnelStage,
+  c: StageCandidate,
+): Record<string, unknown> {
+  const base = { source_workflow: "funnel_abandonment_sweep" };
+  if (stage === "abandoned_search") {
+    return {
+      ...base,
+      search_destination: c.destination ?? undefined,
+      checkin: c.searchCheckin ?? undefined,
+      checkout: c.searchCheckout ?? undefined,
+      search_count: c.searchCount,
+      last_search_date: c.lastSearchTs?.toISOString(),
+    };
+  }
+  if (stage === "abandoned_wishlist") {
+    return { ...base, property_name: c.propertyName ?? undefined };
+  }
+  // cart + payment: checkout context
+  return {
+    ...base,
+    property_name: c.propertyName ?? undefined,
+    checkin: c.checkoutCheckin ?? undefined,
+    checkout: c.checkoutCheckout ?? undefined,
+  };
 }
 
 export interface StageSweepResult {
@@ -148,6 +182,16 @@ export async function runFunnelAbandonmentSweep(options: {
         email: t.email,
         windowKey: def.anchor,
         destination: t.lastSearchDestination,
+        searchCheckin: t.lastSearchCheckin,
+        searchCheckout: t.lastSearchCheckout,
+        searchCount: t.searchCount,
+        lastSearchTs: t.lastSearchTs,
+        checkoutCheckin: sql<
+          string | null
+        >`COALESCE(${t.lastCheckoutCheckin}, ${t.lastCheckoutPreviewCheckin})`,
+        checkoutCheckout: sql<
+          string | null
+        >`COALESCE(${t.lastCheckoutCheckout}, ${t.lastCheckoutPreviewCheckout})`,
         propertyName: sql<
           string | null
         >`COALESCE(${t.lastCheckoutProperty}, ${t.lastCheckoutPreviewProperty}, ${t.lastWishlistProperty})`,
@@ -188,7 +232,26 @@ export async function runFunnelAbandonmentSweep(options: {
         });
     }
 
-    const toProcess = newEpisodes.slice(0, limitPerStage);
+    // Process from the PENDING queue, not just this run's fresh inserts —
+    // otherwise episodes ledgered beyond the per-run cap are orphaned as
+    // pending forever (their re-inserts conflict and never return).
+    const toProcess = dryRun
+      ? []
+      : await db
+          .select({
+            id: funnelSendLogTable.id,
+            userId: funnelSendLogTable.userId,
+            email: funnelSendLogTable.email,
+          })
+          .from(funnelSendLogTable)
+          .where(
+            and(
+              eq(funnelSendLogTable.stage, def.stage),
+              eq(funnelSendLogTable.syncStatus, "pending"),
+            ),
+          )
+          .orderBy(asc(funnelSendLogTable.sentAt))
+          .limit(limitPerStage);
 
     let synced = 0;
     let failed = 0;
@@ -206,11 +269,9 @@ export async function runFunnelAbandonmentSweep(options: {
             const result = await processLead({
               email: episode.email,
               eventType: def.stage,
-              eventData: {
-                property_name: candidate?.propertyName ?? undefined,
-                search_destination: candidate?.destination ?? undefined,
-                source_workflow: "funnel_abandonment_sweep",
-              },
+              eventData: candidate
+                ? buildEventData(def.stage, candidate)
+                : { source_workflow: "funnel_abandonment_sweep" },
             });
             const ok = result.status === "success";
             if (ok) {

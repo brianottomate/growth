@@ -26,6 +26,8 @@ export interface EmailBackfillResult {
   missingEmail: number;
   lookedUp: number;
   healed: number;
+  prunedState: number;
+  prunedSendLog: number;
 }
 
 export async function runFunnelEmailBackfill(options: {
@@ -48,15 +50,18 @@ export async function runFunnelEmailBackfill(options: {
     lookedUp = found.length;
 
     if (found.length > 0) {
-      const userIds = found.map((f) => f.id_user);
-      const emails = found.map((f) => f.email);
-      // One statement instead of N round-trips over the HTTP driver.
+      // One statement instead of N round-trips over the HTTP driver. Pairs
+      // travel as a single jsonb param — drizzle binds a JS array as a row
+      // constructor ($1, $2), not a PG array, so unnest(...::text[]) breaks.
+      const pairs = JSON.stringify(
+        found.map((f) => ({ u: f.id_user, m: f.email })),
+      );
       const result = await db.execute(sql`
         UPDATE ${funnelStateTable} AS fs
         SET email = v.email
         FROM (
-          SELECT unnest(${userIds}::text[]) AS user_id,
-                 unnest(${emails}::text[]) AS email
+          SELECT e->>'u' AS user_id, e->>'m' AS email
+          FROM jsonb_array_elements(${pairs}::jsonb) e
         ) v
         WHERE fs.user_id = v.user_id AND fs.email IS NULL
       `);
@@ -64,8 +69,22 @@ export async function runFunnelEmailBackfill(options: {
     }
   }
 
+  // Rolling retention (design doc §ops): storage is a non-issue (state is
+  // one row per user), this is PII hygiene — a user inactive for 90 days
+  // has no business sitting in an internal DB. Returning users are simply
+  // re-created by their next event and re-healed. Send-log history beyond
+  // 90 days lives on in Outreach itself.
+  const prunedStateRes = await db.execute(sql`
+    DELETE FROM ${funnelStateTable} WHERE updated_at < now() - interval '90 days'
+  `);
+  const prunedLogRes = await db.execute(sql`
+    DELETE FROM funnel_send_log WHERE sent_at < now() - interval '90 days'
+  `);
+  const prunedState = prunedStateRes.rowCount ?? 0;
+  const prunedSendLog = prunedLogRes.rowCount ?? 0;
+
   console.log(
-    `🩹 [FunnelHeal] Email backfill: missing=${missing.length} lookedUp=${lookedUp} healed=${healed}`,
+    `🩹 [FunnelHeal] Email backfill: missing=${missing.length} lookedUp=${lookedUp} healed=${healed} | pruned state=${prunedState} sendLog=${prunedSendLog}`,
   );
 
   const completedAt = new Date();
@@ -76,5 +95,7 @@ export async function runFunnelEmailBackfill(options: {
     missingEmail: missing.length,
     lookedUp,
     healed,
+    prunedState,
+    prunedSendLog,
   };
 }
