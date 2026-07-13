@@ -14,13 +14,22 @@ export type ZernioAccount = {
   name?: string;
   username?: string;
   displayName?: string;
+  profileId?: string | { _id?: string; name?: string };
+  profileUrl?: string;
+  profilePicture?: string;
+  followersCount?: number;
+  enabled?: boolean;
+  platformStatus?: string;
   profilePictureUrl?: string;
   isActive?: boolean;
   connectedAt?: string;
   [key: string]: unknown;
 };
 
-async function zernioFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function zernioFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   if (!env.ZERNIO_API_KEY) {
     throw new Error("ZERNIO_API_KEY is not configured");
   }
@@ -94,6 +103,7 @@ export type ZernioProfile = {
   color?: string;
   isDefault?: boolean;
   isOverLimit?: boolean;
+  accountUsernames?: string[];
   [key: string]: unknown;
 };
 
@@ -207,7 +217,9 @@ export async function listZernioPosts(
   return { posts, pagination };
 }
 
-export async function getZernioPost(postId: string): Promise<ZernioPost | null> {
+export async function getZernioPost(
+  postId: string,
+): Promise<ZernioPost | null> {
   const data = await zernioFetch<unknown>(
     `/posts/${encodeURIComponent(postId)}`,
   );
@@ -343,12 +355,14 @@ export async function getZernioAnalytics(options: {
   const data = await zernioFetch<unknown>(`/analytics${qs ? `?${qs}` : ""}`);
   const posts = unwrapList<ZernioAnalyticsPost>(data, "posts", "data");
 
-  let pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  } | undefined;
+  let pagination:
+    | {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+      }
+    | undefined;
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const obj = data as Record<string, unknown>;
     if (obj.pagination && typeof obj.pagination === "object") {
@@ -413,7 +427,9 @@ export async function listZernioCommentedPosts(
   if (options.accountId) params.set("accountId", options.accountId);
   if (options.since) params.set("since", options.since);
 
-  const data = await zernioFetch<unknown>(`/inbox/comments?${params.toString()}`);
+  const data = await zernioFetch<unknown>(
+    `/inbox/comments?${params.toString()}`,
+  );
   const posts = unwrapList<ZernioCommentedPost>(data, "data", "posts");
 
   let hasMore = false;
@@ -883,8 +899,7 @@ export async function getZernioAdComments(
           : {};
       return {
         comments,
-        platform:
-          typeof meta.platform === "string" ? meta.platform : undefined,
+        platform: typeof meta.platform === "string" ? meta.platform : undefined,
         effectiveStoryId:
           typeof meta.effectiveStoryId === "string"
             ? meta.effectiveStoryId
@@ -1039,7 +1054,10 @@ export function mapZernioPostToPlatformPosts(
   post: ZernioAnalyticsPost,
   ctx: {
     brandId: string;
-    resolveChannelId?: (platform: string, accountId?: string) => string | undefined;
+    resolveChannelId?: (
+      platform: string,
+      accountId?: string,
+    ) => string | undefined;
     scrapedAt?: Date;
   },
 ) {

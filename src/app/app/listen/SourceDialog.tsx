@@ -54,10 +54,22 @@ const LISTENING_PLATFORMS: ChannelPlatform[] = [
 ];
 
 const ACQUISITIONS: [AcquisitionShape, string, string][] = [
-  ["keyword_search", "Market — keyword search", "Search public conversations for signal"],
-  ["account_watch", "Market — account watch", "Monitor specific accounts' posts (Instagram)"],
+  [
+    "keyword_search",
+    "Market — keyword search",
+    "Search public conversations for signal",
+  ],
+  [
+    "account_watch",
+    "Market — account watch",
+    "Monitor specific accounts' posts (Instagram)",
+  ],
   ["owned_inbound", "Owned — inbound", "DMs & comments on our own accounts"],
-  ["provider_alert", "Provider — pushed alerts", "A third-party tool pushes matches to us"],
+  [
+    "provider_alert",
+    "Provider — pushed alerts",
+    "A third-party tool pushes matches to us",
+  ],
 ];
 
 /** Parse one watchlist line (@handle / handle / profile URL) into an account. */
@@ -78,7 +90,10 @@ const TRIGGERS: [ListeningTrigger, string][] = [
 ];
 
 const linesToArr = (s: string) =>
-  s.split("\n").map((x) => x.trim()).filter(Boolean);
+  s
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
 const arrToLines = (a?: string[]) => (a ?? []).join("\n");
 
 /** Best-guess connector slug so operators never have to know what an adapter is. */
@@ -146,7 +161,9 @@ export function SourceDialog({
   }, [open, initial]);
 
   const invalidate = () =>
-    queryClient.invalidateQueries(trpc.listening.overview.queryOptions());
+    queryClient.invalidateQueries({
+      queryKey: trpc.listening.overview.queryKey(),
+    });
 
   const create = useMutation(
     trpc.listening.createSource.mutationOptions({
@@ -242,7 +259,9 @@ export function SourceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit source" : "Add a source to monitor"}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Edit source" : "Add a source to monitor"}
+          </DialogTitle>
           <DialogDescription>
             One place we listen — its config drives the scans and reply drafts.
           </DialogDescription>
@@ -267,7 +286,8 @@ export function SourceDialog({
                 {platformLabel(platform)}
               </span>
               <span className="bg-muted rounded px-2 py-0.5 font-medium">
-                {ACQUISITIONS.find((a) => a[0] === acquisition)?.[1] ?? acquisition}
+                {ACQUISITIONS.find((a) => a[0] === acquisition)?.[1] ??
+                  acquisition}
               </span>
               <span className="text-muted-foreground/70">
                 (fixed — delete &amp; re-add to change)
@@ -326,17 +346,21 @@ export function SourceDialog({
                 onChange={(e) => setAccounts(e.target.value)}
                 rows={4}
                 className="font-mono text-xs"
-                placeholder={"whowhatwear\ncondenasttraveler\nhttps://www.instagram.com/architecturaldigest/"}
+                placeholder={
+                  "whowhatwear\ncondenasttraveler\nhttps://www.instagram.com/architecturaldigest/"
+                }
               />
               <p className="text-muted-foreground text-[11px]">
-                Their recent posts are scanned daily; relevant ones surface in the
-                Instagram queue with a drafted comment.
+                Their recent posts are scanned daily; relevant ones surface in
+                the Instagram queue with a drafted comment.
               </p>
             </div>
           ) : isKeywordSearch ? (
             isReddit ? (
               <div className="space-y-1.5">
-                <Label htmlFor="src-subs">Subreddits (one per line, no r/)</Label>
+                <Label htmlFor="src-subs">
+                  Subreddits (one per line, no r/)
+                </Label>
                 <Textarea
                   id="src-subs"
                   value={subreddits}
@@ -348,14 +372,18 @@ export function SourceDialog({
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label htmlFor="src-kw">Keywords / search terms (one per line)</Label>
+                <Label htmlFor="src-kw">
+                  Keywords / search terms (one per line)
+                </Label>
                 <Textarea
                   id="src-kw"
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   rows={4}
                   className="font-mono text-xs"
-                  placeholder={"direct booking\nOTA fees\nalternative to Airbnb"}
+                  placeholder={
+                    "direct booking\nOTA fees\nalternative to Airbnb"
+                  }
                 />
               </div>
             )
@@ -369,7 +397,8 @@ export function SourceDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="src-notes">
-              Signal notes <span className="text-muted-foreground">(optional)</span>
+              Signal notes{" "}
+              <span className="text-muted-foreground">(optional)</span>
             </Label>
             <Textarea
               id="src-notes"
@@ -385,7 +414,8 @@ export function SourceDialog({
             onClick={() => setShowAdvanced((v) => !v)}
             className="text-muted-foreground hover:text-foreground text-xs font-medium"
           >
-            {showAdvanced ? "− Hide" : "+ Show"} advanced (cadence, connector, voice)
+            {showAdvanced ? "− Hide" : "+ Show"} advanced (cadence, connector,
+            voice)
           </button>
 
           {showAdvanced && (
@@ -455,7 +485,8 @@ export function SourceDialog({
                       checked={overridesBrand}
                       onChange={(e) => setOverridesBrand(e.target.checked)}
                     />
-                    Replace the brand voice entirely (instead of layering on top)
+                    Replace the brand voice entirely (instead of layering on
+                    top)
                   </label>
                 )}
               </div>

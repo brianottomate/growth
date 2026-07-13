@@ -9,12 +9,17 @@ import { db } from "@/server/db";
 import {
   amplifierTable,
   brandTable,
+  channelTable,
   channelSuggestionTable,
   type AmplifierHandle,
   type ChannelSuggestion,
 } from "@/server/db/schema";
 import type { channelPlatformEnum } from "@/server/db/channel-schema";
-import { scrapeUrl, isFirecrawlConfigured } from "@/server/clients/firecrawl.client";
+import {
+  firecrawl,
+  scrapeUrl,
+  isFirecrawlConfigured,
+} from "@/server/clients/firecrawl.client";
 import {
   tavilySearch,
   parallelSearch,
@@ -32,8 +37,15 @@ import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.servi
 
 // Public-profile platforms we discover handles for (subset of channel platforms).
 const DISCOVER_PLATFORMS = [
-  "linkedin", "instagram", "x", "facebook", "youtube", "tiktok", "threads",
-  "reddit", "pinterest",
+  "linkedin",
+  "instagram",
+  "x",
+  "facebook",
+  "youtube",
+  "tiktok",
+  "threads",
+  "reddit",
+  "pinterest",
 ] as const;
 type DiscoverPlatform = (typeof DISCOVER_PLATFORMS)[number];
 
@@ -67,6 +79,17 @@ function formatPerplexity(r: PerplexityResult): string {
   return clip(r.content, 4_000) + cites;
 }
 
+function formatFirecrawlSearch(
+  results: Array<{ url: string; title?: string; description?: string }>,
+): string {
+  return results
+    .map(
+      (result) =>
+        `- ${result.title ?? "Untitled"} — ${result.url}\n  ${clip(result.description ?? "", 500)}`,
+    )
+    .join("\n");
+}
+
 async function envelope<T>(
   enabled: boolean,
   fn: () => Promise<T>,
@@ -94,13 +117,17 @@ const SCHEMA = z.object({
     z.object({
       platform: z.enum(DISCOVER_PLATFORMS),
       handle: z.string().describe("Handle only, no leading @ and no URL"),
-      profileUrl: z.string().describe("Full profile URL exactly as it appears in the evidence"),
+      profileUrl: z
+        .string()
+        .describe("Full profile URL exactly as it appears in the evidence"),
       confidence: z.number().min(0).max(1),
       isOfficial: z.boolean(),
       reasoning: z.string(),
       sources: z
         .array(z.string())
-        .describe("Which labelled sources (website/tavily/parallel/perplexity) this handle appears in"),
+        .describe(
+          "Which labelled sources (website/tavily/parallel/perplexity) this handle appears in",
+        ),
     }),
   ),
 });
@@ -118,7 +145,8 @@ export async function discoverSocialHandles(input: {
   name: string;
   website?: string | null;
 }): Promise<SocialSuggestion[]> {
-  if (!isClaudeConfigured) throw new Error("Claude not configured — discovery needs it.");
+  if (!isClaudeConfigured)
+    throw new Error("Claude not configured — discovery needs it.");
   const { name, website } = input;
   const blocks: string[] = [];
 
@@ -131,18 +159,79 @@ export async function discoverSocialHandles(input: {
     if (md) blocks.push(sourceBlock("website", clip(md, 8_000)));
   }
 
-  // Stage 2: search providers (fan out, each isolated).
+  // Stage 2: search providers (fan out, each isolated). Firecrawl search is
+  // the built-in baseline because the same key already powers website reads;
+  // the specialist providers remain optional corroboration.
   const query = `Official social media profile URLs for "${name}"${website ? ` (${website})` : ""}: LinkedIn, Instagram, X/Twitter, Facebook, TikTok, YouTube, Threads. Give full profile URLs.`;
-  const [tav, par, perp] = await Promise.all([
-    envelope(isTavilyConfigured, () => tavilySearch(`${name} official social media accounts`)),
-    envelope(isParallelConfigured, () => parallelSearch(query, [`${name} official social profiles`])),
+  const domain = website
+    ? (() => {
+        try {
+          return new URL(website).hostname.replace(/^www\./, "");
+        } catch {
+          return website;
+        }
+      })()
+    : "";
+  const [firecrawlResults, tav, par, perp] = await Promise.all([
+    envelope(isFirecrawlConfigured, async () => {
+      const siteQueries = [
+        "instagram.com",
+        "x.com",
+        "linkedin.com/company",
+        "facebook.com",
+        "tiktok.com/@",
+        "youtube.com",
+        "threads.net",
+        "pinterest.com",
+      ].map((site) => `site:${site} ${name}${domain ? ` ${domain}` : ""}`);
+      const results = await Promise.all(
+        siteQueries.map((searchQuery) =>
+          firecrawl.search(searchQuery, { limit: 5, sources: ["web"] }),
+        ),
+      );
+      return results.flatMap((result) =>
+        (result.web ?? []).flatMap((candidate) => {
+          const web = candidate as {
+            url?: unknown;
+            title?: unknown;
+            description?: unknown;
+          };
+          if (typeof web.url !== "string") return [];
+          return [
+            {
+              url: web.url,
+              title: typeof web.title === "string" ? web.title : undefined,
+              description:
+                typeof web.description === "string"
+                  ? web.description
+                  : undefined,
+            },
+          ];
+        }),
+      );
+    }),
+    envelope(isTavilyConfigured, () =>
+      tavilySearch(`${name} official social media accounts`),
+    ),
+    envelope(isParallelConfigured, () =>
+      parallelSearch(query, [`${name} official social profiles`]),
+    ),
     envelope(isPerplexityConfigured, () => perplexitySearch(query)),
   ]);
+  if (firecrawlResults?.length) {
+    blocks.push(
+      sourceBlock("firecrawl-search", formatFirecrawlSearch(firecrawlResults)),
+    );
+  }
   if (tav) blocks.push(sourceBlock("tavily", formatTavily(tav)));
   if (par) blocks.push(sourceBlock("parallel", formatParallel(par)));
   if (perp) blocks.push(sourceBlock("perplexity", formatPerplexity(perp)));
 
-  if (!blocks.length) return [];
+  if (!blocks.length) {
+    throw new Error(
+      "Discovery found no readable website or search evidence. Check the Firecrawl key or add another search provider.",
+    );
+  }
 
   // Stage 3: Claude reads the evidence and returns one official handle per platform.
   const { output } = await generateText({
@@ -202,7 +291,9 @@ async function enrichBrandIfSparse(brand: {
       .update(brandTable)
       .set({
         ...(!brand.tagline && e.tagline ? { tagline: e.tagline } : {}),
-        ...(!brand.description && e.description ? { description: e.description } : {}),
+        ...(!brand.description && e.description
+          ? { description: e.description }
+          : {}),
         ...(!brand.logo && e.logo ? { logo: e.logo } : {}),
         websiteMeta: e.websiteMeta,
       })
@@ -230,10 +321,35 @@ export async function discoverAndSaveSuggestions(
   // Also fill in brand profile fields from the site while we're here.
   const enrichedBrand = await enrichBrandIfSparse(brand);
 
-  const suggestions = await discoverSocialHandles({ name: brand.name, website: brand.website });
+  const discoveredSuggestions = await discoverSocialHandles({
+    name: brand.name,
+    website: brand.website,
+  });
+  const existingChannels = await db.query.channelTable.findMany({
+    where: eq(channelTable.brandId, brandId),
+    columns: { platform: true, handle: true, profileUrl: true },
+  });
+  const suggestions = discoveredSuggestions.filter(
+    (suggestion) =>
+      !existingChannels.some(
+        (channel) =>
+          channel.platform === suggestion.platform &&
+          (channel.handle?.replace(/^@/, "").toLowerCase() ===
+            suggestion.handle.toLowerCase() ||
+            channel.profileUrl === suggestion.profileUrl),
+      ),
+  );
 
   // Verify (where a profile dataset exists) before persisting.
-  const verifications = new Map<string, { verified: boolean; followerCount?: number; error?: string }>();
+  const verifications = new Map<
+    string,
+    {
+      verified: boolean | null;
+      followerCount?: number;
+      profileImageUrl?: string;
+      error?: string;
+    }
+  >();
   if (opts?.verify) {
     await Promise.all(
       suggestions
@@ -241,10 +357,15 @@ export async function discoverAndSaveSuggestions(
         .map(async (s) => {
           try {
             const v = await verifyProfile(s.platform, s.profileUrl);
-            if (v) verifications.set(s.platform + s.handle, { verified: v.exists, followerCount: v.followerCount });
+            if (v)
+              verifications.set(s.platform + s.handle, {
+                verified: v.exists,
+                followerCount: v.followerCount,
+                profileImageUrl: v.profileImageUrl,
+              });
           } catch (e) {
             verifications.set(s.platform + s.handle, {
-              verified: false,
+              verified: null,
               error: e instanceof Error ? e.message : String(e),
             });
           }
@@ -256,7 +377,9 @@ export async function discoverAndSaveSuggestions(
   const existing = await db.query.channelSuggestionTable.findMany({
     where: eq(channelSuggestionTable.brandId, brandId),
   });
-  const existingByKey = new Map(existing.map((r) => [`${r.platform}:${r.handle.toLowerCase()}`, r]));
+  const existingByKey = new Map(
+    existing.map((r) => [`${r.platform}:${r.handle.toLowerCase()}`, r]),
+  );
 
   let inserted = 0;
   let updated = 0;
@@ -267,6 +390,7 @@ export async function discoverAndSaveSuggestions(
     const verifyFields = {
       verified: v ? v.verified : null,
       followerCount: v?.followerCount ?? null,
+      profileImageUrl: v?.profileImageUrl ?? null,
       verifyError: v?.error ?? null,
       verifiedAt: v ? new Date() : null,
     };

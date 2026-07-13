@@ -17,7 +17,12 @@ import {
   type NewsletterKind,
 } from "@/lib/newsletter-kind";
 import { inspirationAddress } from "@/lib/inbound-email";
-import { CoverWall, DocumentReader, type CoverItem } from "@/components/cover-wall";
+import {
+  CoverWall,
+  DocumentReader,
+  type CoverItem,
+} from "@/components/cover-wall";
+import { BrandFilterSelect } from "@/components/brand-filter-select";
 import { fetchNewsletterContent } from "@/server/clients/cio-content";
 import {
   CompetitorNewsletters,
@@ -34,9 +39,13 @@ const monthKey = (d: Date) =>
 export default async function NewslettersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kind?: string; view?: string }>;
+  searchParams: Promise<{ kind?: string; view?: string; brand?: string }>;
 }) {
-  const { kind: kindFilter, view: viewParam } = await searchParams;
+  const {
+    kind: kindFilter,
+    view: viewParam,
+    brand: brandParam,
+  } = await searchParams;
   const view: "list" | "wall" | "read" =
     viewParam === "wall" || viewParam === "read" ? viewParam : "list";
   const session = await getSession();
@@ -47,12 +56,32 @@ export default async function NewslettersPage({
     with: { organization: true },
   });
   const org = membership?.organization;
-  if (!org) return <div className="text-muted-foreground">No organization found.</div>;
+  if (!org)
+    return <div className="text-muted-foreground">No organization found.</div>;
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
   });
-  const brandIds = brands.map((b) => b.id);
+  const selectedBrand = brandParam
+    ? (brands.find((brand) => brand.slug === brandParam) ?? null)
+    : null;
+  const brandIds = selectedBrand
+    ? [selectedBrand.id]
+    : brands.map((brand) => brand.id);
+  const newsletterHref = (input?: {
+    kind?: string;
+    view?: "list" | "wall" | "read";
+  }) => {
+    const params = new URLSearchParams();
+    if (selectedBrand?.slug) params.set("brand", selectedBrand.slug);
+    if (input?.kind) params.set("kind", input.kind);
+    if (input?.view) params.set("view", input.view);
+    const query = params.toString();
+    return query ? `/app/newsletters?${query}` : "/app/newsletters";
+  };
 
   const issues = brandIds.length
     ? await db.query.platformPostTable.findMany({
@@ -73,10 +102,15 @@ export default async function NewslettersPage({
         where: inArray(brandInspirationTable.brandId, brandIds),
       })
     : [];
-  const refBrandIds = [...new Set(inspirations.map((i) => i.inspirationBrandId))];
+  const refBrandIds = [
+    ...new Set(inspirations.map((i) => i.inspirationBrandId)),
+  ];
   const refBrands = refBrandIds.length
     ? await db.query.brandTable.findMany({
-        where: and(inArray(brandTable.id, refBrandIds), isNull(brandTable.deletedAt)),
+        where: and(
+          inArray(brandTable.id, refBrandIds),
+          isNull(brandTable.deletedAt),
+        ),
       })
     : [];
   const nlChannels = refBrandIds.length
@@ -130,7 +164,11 @@ export default async function NewslettersPage({
   const tagged = issues.map((i) => {
     const kind = newsletterKind(i.text ?? "");
     const s = i.stats;
-    return { issue: i, kind, openRate: s?.delivered ? (s.opened ?? 0) / s.delivered : null };
+    return {
+      issue: i,
+      kind,
+      openRate: s?.delivered ? (s.opened ?? 0) / s.delivered : null,
+    };
   });
 
   // Kinds overview.
@@ -139,7 +177,12 @@ export default async function NewslettersPage({
     { count: number; reach: number; openSum: number; openN: number }
   >();
   for (const t of tagged) {
-    const a = kindAgg.get(t.kind) ?? { count: 0, reach: 0, openSum: 0, openN: 0 };
+    const a = kindAgg.get(t.kind) ?? {
+      count: 0,
+      reach: 0,
+      openSum: 0,
+      openN: 0,
+    };
     a.count++;
     a.reach += t.issue.stats?.sent ?? 0;
     if (t.openRate != null) {
@@ -148,7 +191,9 @@ export default async function NewslettersPage({
     }
     kindAgg.set(t.kind, a);
   }
-  const kindCards = [...kindAgg.entries()].sort((a, b) => b[1].count - a[1].count);
+  const kindCards = [...kindAgg.entries()].sort(
+    (a, b) => b[1].count - a[1].count,
+  );
 
   const visible = kindFilter
     ? tagged.filter((t) => t.kind === kindFilter)
@@ -205,23 +250,31 @@ export default async function NewslettersPage({
 
   return (
     <div>
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Newsletters</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {tagged.length} issues · {fmt(totalReach)} reached ·{" "}
             {avgOpen != null ? `${Math.round(avgOpen * 100)}%` : "—"} avg open ·
             via Customer.io
+            {selectedBrand ? ` · ${selectedBrand.name}` : ""}
           </p>
         </div>
+        <BrandFilterSelect
+          brands={brands.flatMap((brand) =>
+            brand.slug ? [{ slug: brand.slug, name: brand.name }] : [],
+          )}
+        />
       </div>
 
       {/* Kinds overview */}
       <div className="mt-5 flex flex-wrap gap-2.5">
         <Link
-          href="/app/newsletters"
+          href={newsletterHref()}
           className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
-            !kindFilter ? "border-foreground bg-accent/40" : "hover:bg-accent/40"
+            !kindFilter
+              ? "border-foreground bg-accent/40"
+              : "hover:bg-accent/40"
           }`}
         >
           <div className="font-semibold">All</div>
@@ -233,7 +286,7 @@ export default async function NewslettersPage({
           return (
             <Link
               key={kind}
-              href={`/app/newsletters?kind=${kind}`}
+              href={newsletterHref({ kind })}
               className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
                 active ? "border-foreground bg-accent/40" : "hover:bg-accent/40"
               }`}
@@ -250,7 +303,8 @@ export default async function NewslettersPage({
               </div>
               <div className="text-muted-foreground tabular-nums">
                 {fmt(a.reach)} reach ·{" "}
-                {a.openN ? `${Math.round((a.openSum / a.openN) * 100)}%` : "—"} open
+                {a.openN ? `${Math.round((a.openSum / a.openN) * 100)}%` : "—"}{" "}
+                open
               </div>
             </Link>
           );
@@ -258,8 +312,8 @@ export default async function NewslettersPage({
       </div>
 
       <p className="text-muted-foreground mt-3 text-xs">
-        Topics (General · Destinations · Location Recommendations) — coming soon,
-        from Customer.io subscription topics.
+        Topics (General · Destinations · Location Recommendations) — coming
+        soon, from Customer.io subscription topics.
       </p>
 
       {/* view toggle */}
@@ -267,7 +321,7 @@ export default async function NewslettersPage({
         {(["list", "wall", "read"] as const).map((v) => (
           <Link
             key={v}
-            href={`/app/newsletters?view=${v}${kindFilter ? `&kind=${kindFilter}` : ""}`}
+            href={newsletterHref({ view: v, kind: kindFilter })}
             className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
               view === v
                 ? "bg-foreground text-background border-foreground"
@@ -298,50 +352,56 @@ export default async function NewslettersPage({
       {/* Chronological issues (list) */}
       {view === "list" &&
         months.map((m) => (
-        <section key={m.key} className="mt-8">
-          <h2 className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
-            {m.key} · {m.items.length}
-          </h2>
-          <div className="flex flex-col">
-            {m.items.map(({ issue, kind, openRate }) => {
-              const meta = NEWSLETTER_KIND_META[kind];
-              const s = issue.stats;
-              return (
-                <Link
-                  key={issue.id}
-                  href={`/app/newsletters/${issue.id}`}
-                  className="hover:bg-accent/40 -mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0"
-                >
-                  <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
-                    {issue.publishedAt!.toLocaleDateString([], {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                  <span
-                    className="size-1.5 shrink-0 rounded-full"
-                    style={{ background: meta.color }}
-                    title={meta.label}
-                  />
-                  <span className="min-w-0 flex-1 truncate">{issue.text}</span>
-                  <span className="text-muted-foreground hidden w-28 shrink-0 text-right text-xs tabular-nums sm:block">
-                    {s?.sent ? `${fmt(s.sent)} sent` : "—"}
-                  </span>
-                  <span className="text-muted-foreground w-16 shrink-0 text-right text-xs tabular-nums">
-                    {openRate != null ? pct(s?.opened ?? 0, s?.delivered ?? 0) : "—"}
-                  </span>
-                  <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
-                    ↗
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+          <section key={m.key} className="mt-8">
+            <h2 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
+              {m.key} · {m.items.length}
+            </h2>
+            <div className="flex flex-col">
+              {m.items.map(({ issue, kind, openRate }) => {
+                const meta = NEWSLETTER_KIND_META[kind];
+                const s = issue.stats;
+                return (
+                  <Link
+                    key={issue.id}
+                    href={`/app/newsletters/${issue.id}`}
+                    className="hover:bg-accent/40 -mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0"
+                  >
+                    <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
+                      {issue.publishedAt!.toLocaleDateString([], {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                    <span
+                      className="size-1.5 shrink-0 rounded-full"
+                      style={{ background: meta.color }}
+                      title={meta.label}
+                    />
+                    <span className="min-w-0 flex-1 truncate">
+                      {issue.text}
+                    </span>
+                    <span className="text-muted-foreground hidden w-28 shrink-0 text-right text-xs tabular-nums sm:block">
+                      {s?.sent ? `${fmt(s.sent)} sent` : "—"}
+                    </span>
+                    <span className="text-muted-foreground w-16 shrink-0 text-right text-xs tabular-nums">
+                      {openRate != null
+                        ? pct(s?.opened ?? 0, s?.delivered ?? 0)
+                        : "—"}
+                    </span>
+                    <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
+                      ↗
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ))}
 
       {visible.length === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">No issues for this filter.</p>
+        <p className="text-muted-foreground mt-10 text-sm">
+          No issues for this filter.
+        </p>
       )}
 
       <CompetitorNewsletters rows={competitorRows} />

@@ -4,16 +4,20 @@ import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArchiveRestore,
   ArrowUpRight,
   CalendarClock,
   CircleDot,
   FileText,
+  Globe2,
+  ImageIcon,
   Layers,
   Loader2,
   type LucideIcon,
   Megaphone,
   MessageCircle,
   Radio,
+  Search,
   Sparkles,
   Target,
   TrendingUp,
@@ -45,7 +49,12 @@ type StatusCount = { status: string; count: number };
 export interface WorkspaceOverviewOutput {
   brands: number;
   content: { total: number; byStatus: StatusCount[]; needsAttention: number };
-  leads: { domains: number; contacts: number; netNew: number; inInstantly: number };
+  leads: {
+    domains: number;
+    contacts: number;
+    netNew: number;
+    inInstantly: number;
+  };
   engageWorthyMentions: number;
 }
 
@@ -53,9 +62,223 @@ export interface ListBrandsOutput {
   brands: { id: string; name: string; tagline: string | null }[];
 }
 
+export interface AudienceTargetsOutput {
+  error?: string;
+  targets: {
+    id: string;
+    name: string;
+    description: string | null;
+    brandName: string | null;
+    status: string;
+    priority: string;
+    profileScope?: string;
+    marketSide?: string;
+    researchMaturity?: string;
+    geography?:
+      | { mode: "global"; exclude?: { name: string }[] }
+      | {
+          mode: "specific";
+          include: { name: string }[];
+          exclude?: { name: string }[];
+        }
+      | null;
+    demographics?: {
+      ageRange?: { min?: number; max?: number };
+      languages?: string[];
+    } | null;
+    intendedChannels: string[] | null;
+    coverage: "covered" | "partial" | "gap";
+    missingChannels: string[];
+    linkedPlatformAudiences: unknown[];
+  }[];
+  unmappedPlatformAudiences: unknown[];
+}
+
+export interface WebSearchOutput {
+  error?: string;
+  query: string;
+  results: {
+    title: string;
+    url: string;
+    highlights: string[];
+    publishedDate?: string;
+    author?: string;
+  }[];
+}
+
+export interface ReadWebPageOutput {
+  error?: string;
+  title?: string;
+  url: string;
+  text?: string;
+  provider?: "exa" | "firecrawl";
+  publishedDate?: string;
+  author?: string;
+}
+
 export interface ContentPipelineOutput {
   total: number;
   byStatus: StatusCount[];
+  standaloneTotal: number;
+  standaloneByStatus: StatusCount[];
+}
+
+export interface MediaSuggestionsOutput {
+  content: {
+    id: string;
+    title: string | null;
+    platformDrafts: { id: string; platform: string }[];
+  };
+  library: {
+    mediaAssetId: string;
+    kind: string;
+    title: string | null;
+    alt: string | null;
+    tags: string[];
+    url: string | null;
+    thumbnailUrl: string | null;
+    alreadyAttached: boolean;
+  }[];
+  libraryAssetsWithoutSemanticMetadata: number;
+  archive: {
+    platformPostId: string;
+    platform: string;
+    text: string | null;
+    publishedAt: string | null;
+    media: {
+      mediaIndex: number;
+      type: string;
+      previewAvailable: boolean;
+    }[];
+  }[];
+}
+
+/** A visual shelf for the real candidates behind the assistant's recommendation. */
+export function MediaSuggestionsCard({
+  output,
+  onPrompt,
+}: {
+  output: MediaSuggestionsOutput;
+  onPrompt: (prompt: string) => void;
+}) {
+  const library = output.library.slice(0, 3);
+  const archive = output.archive
+    .flatMap((post) =>
+      post.media.slice(0, 1).map((media) => ({ ...post, media })),
+    )
+    .slice(0, 3);
+
+  return (
+    <div className="bg-card overflow-hidden rounded-xl border">
+      <div className="flex items-center gap-2 border-b px-3.5 py-2.5">
+        <Sparkles className="text-primary size-3.5" />
+        <div>
+          <p className="text-xs font-semibold">Media candidates</p>
+          <p className="text-muted-foreground text-[10px]">
+            Library now · archive recovery · generate if needed
+          </p>
+        </div>
+      </div>
+
+      {library.length > 0 && (
+        <div className="border-b p-3">
+          <div className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide uppercase">
+            <ImageIcon className="size-3" /> Ready in library
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {library.map((asset) => (
+              <div
+                key={asset.mediaAssetId}
+                className="bg-background overflow-hidden rounded-lg border"
+              >
+                <div className="bg-muted aspect-[4/3] overflow-hidden">
+                  {(asset.thumbnailUrl ?? asset.url) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={asset.thumbnailUrl ?? asset.url ?? undefined}
+                      alt={asset.alt ?? asset.title ?? "Library candidate"}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-muted-foreground grid size-full place-items-center">
+                      <ImageIcon className="size-5" />
+                    </div>
+                  )}
+                </div>
+                <div className="p-2">
+                  <p className="truncate text-[11px] font-medium">
+                    {asset.title ?? asset.alt ?? "Library asset"}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={asset.alreadyAttached}
+                    onClick={() =>
+                      onPrompt(
+                        `Attach the library asset “${asset.title ?? asset.alt ?? asset.mediaAssetId}” (${asset.mediaAssetId}) to this content pool.`,
+                      )
+                    }
+                    className="text-primary disabled:text-muted-foreground mt-1 text-[10px] font-medium hover:underline disabled:no-underline"
+                  >
+                    {asset.alreadyAttached ? "Already attached" : "Use this"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {archive.length > 0 && (
+        <div className="p-3">
+          <div className="text-muted-foreground mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wide uppercase">
+            <ArchiveRestore className="size-3" /> Found in archive
+          </div>
+          <div className="space-y-2">
+            {archive.map((candidate) => (
+              <div
+                key={`${candidate.platformPostId}-${candidate.media.mediaIndex}`}
+                className="bg-background flex items-start gap-2 rounded-lg border p-2"
+              >
+                <div className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-md">
+                  <ArchiveRestore className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-medium">
+                    {candidate.text ?? "Archived post media"}
+                  </p>
+                  <p className="text-muted-foreground text-[10px]">
+                    {candidate.platform} · {candidate.media.type}
+                    {candidate.publishedAt
+                      ? ` · ${fmtDate(candidate.publishedAt)}`
+                      : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onPrompt(
+                      `Recover media ${candidate.media.mediaIndex + 1} from the archived ${candidate.platform} post ${candidate.platformPostId} and attach it to this content pool.`,
+                    )
+                  }
+                  className="text-primary shrink-0 text-[10px] font-medium hover:underline"
+                >
+                  Recover
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {output.libraryAssetsWithoutSemanticMetadata > 0 && (
+        <p className="text-muted-foreground border-t px-3 py-2 text-[10px]">
+          {output.libraryAssetsWithoutSemanticMetadata} more library asset
+          {output.libraryAssetsWithoutSemanticMetadata === 1 ? "" : "s"} need
+          analysis before the assistant can recommend them confidently.
+        </p>
+      )}
+    </div>
+  );
 }
 
 export interface UpcomingContentOutput {
@@ -66,6 +289,16 @@ export interface UpcomingContentOutput {
     status: string;
     pillar: string | null;
     plannedAt: string | null;
+  }[];
+  standalonePlatformPosts: {
+    id: string;
+    title: string;
+    brandId: string;
+    platform: string;
+    status: string;
+    pillar: string | null;
+    text: string | null;
+    scheduledAt: string | null;
   }[];
 }
 
@@ -123,7 +356,13 @@ export interface AdsScopeOutput {
     engagement: number;
     conversions: number;
   };
-  byMonth: { month: string; ads: number; impressions: number; clicks: number; spend: number }[];
+  byMonth: {
+    month: string;
+    ads: number;
+    impressions: number;
+    clicks: number;
+    spend: number;
+  }[];
   byObjective: AdsBucket[];
   byDestination: AdsBucket[];
   flags: { hasAuditAds: boolean; hasOsAds: boolean };
@@ -264,16 +503,55 @@ function Stat({
 
 // ── Content-status presentation ────────────────────────────────────────────
 
-const STATUS_META: Record<string, { label: string; dot: string; badge: string }> = {
-  slot: { label: "Slot", dot: "bg-muted-foreground/40", badge: "bg-muted text-muted-foreground" },
-  draft: { label: "Draft", dot: "bg-amber-400", badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-  discovered: { label: "Discovered", dot: "bg-violet-400", badge: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
-  pending_review: { label: "Needs review", dot: "bg-orange-400", badge: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
-  approved: { label: "Approved", dot: "bg-sky-400", badge: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
-  scheduled: { label: "Scheduled", dot: "bg-blue-400", badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-  published: { label: "Published", dot: "bg-emerald-400", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-  rejected: { label: "Rejected", dot: "bg-red-400", badge: "bg-red-500/10 text-red-600 dark:text-red-400" },
-  archived: { label: "Archived", dot: "bg-muted-foreground/30", badge: "bg-muted text-muted-foreground" },
+const STATUS_META: Record<
+  string,
+  { label: string; dot: string; badge: string }
+> = {
+  slot: {
+    label: "Slot",
+    dot: "bg-muted-foreground/40",
+    badge: "bg-muted text-muted-foreground",
+  },
+  draft: {
+    label: "Draft",
+    dot: "bg-amber-400",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  discovered: {
+    label: "Discovered",
+    dot: "bg-violet-400",
+    badge: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  },
+  pending_review: {
+    label: "Needs review",
+    dot: "bg-orange-400",
+    badge: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  },
+  approved: {
+    label: "Approved",
+    dot: "bg-sky-400",
+    badge: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  },
+  scheduled: {
+    label: "Scheduled",
+    dot: "bg-blue-400",
+    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  },
+  published: {
+    label: "Published",
+    dot: "bg-emerald-400",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  rejected: {
+    label: "Rejected",
+    dot: "bg-red-400",
+    badge: "bg-red-500/10 text-red-600 dark:text-red-400",
+  },
+  archived: {
+    label: "Archived",
+    dot: "bg-muted-foreground/30",
+    badge: "bg-muted text-muted-foreground",
+  },
 };
 
 const statusMeta = (s: string) =>
@@ -284,15 +562,23 @@ const statusMeta = (s: string) =>
   };
 
 const ACTION_META: Record<string, { label: string; badge: string }> = {
-  engage: { label: "Engage", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-  monitor: { label: "Monitor", badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
+  engage: {
+    label: "Engage",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  monitor: {
+    label: "Monitor",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
   skip: { label: "Skip", badge: "bg-muted text-muted-foreground" },
 };
 
 function StatusBadge({ status }: { status: string }) {
   const m = statusMeta(status);
   return (
-    <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-medium", m.badge)}>
+    <span
+      className={cn("rounded px-1.5 py-0.5 text-[11px] font-medium", m.badge)}
+    >
       {m.label}
     </span>
   );
@@ -310,7 +596,11 @@ const fmtNum = (n: number) => n.toLocaleString("en-US");
 // ── Cards ────────────────────────────────────────────────────────────────
 
 /** The home snapshot — `workspaceOverview`. Four deep-linked metric tiles. */
-export function WorkspaceOverviewCard({ output }: { output: WorkspaceOverviewOutput }) {
+export function WorkspaceOverviewCard({
+  output,
+}: {
+  output: WorkspaceOverviewOutput;
+}) {
   const { brands, content, leads, engageWorthyMentions } = output;
   return (
     <ToolCard icon={Sparkles} title="Workspace snapshot">
@@ -361,7 +651,10 @@ export function BrandsCard({ output }: { output: ListBrandsOutput }) {
       ) : (
         <ul className="divide-y">
           {brands.map((b) => (
-            <li key={b.id} className="flex items-baseline gap-2 py-1.5 first:pt-0 last:pb-0">
+            <li
+              key={b.id}
+              className="flex items-baseline gap-2 py-1.5 first:pt-0 last:pb-0"
+            >
               <span className="text-sm font-medium">{b.name}</span>
               {b.tagline && (
                 <span className="text-muted-foreground truncate text-xs">
@@ -376,40 +669,231 @@ export function BrandsCard({ output }: { output: ListBrandsOutput }) {
   );
 }
 
+/** `listAudienceTargets` — strategic targets and paid-channel coverage. */
+export function AudienceTargetsCard({
+  output,
+}: {
+  output: AudienceTargetsOutput;
+}) {
+  const { targets = [], unmappedPlatformAudiences = [] } = output;
+  return (
+    <ToolCard
+      icon={Target}
+      title="Audience strategy"
+      href="/app/audiences"
+      hint={`${targets.length} target${targets.length === 1 ? "" : "s"}`}
+    >
+      {output.error ? (
+        <p className="text-destructive text-sm">{output.error}</p>
+      ) : targets.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          No strategic audience targets yet.
+        </p>
+      ) : (
+        <ul className="divide-y">
+          {targets.map((target) => (
+            <li key={target.id} className="py-2 first:pt-0 last:pb-0">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 truncate text-sm font-medium">
+                  {target.name}
+                </span>
+                <span
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                    target.coverage === "covered" &&
+                      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                    target.coverage === "partial" &&
+                      "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+                    target.coverage === "gap" &&
+                      "bg-red-500/10 text-red-600 dark:text-red-400",
+                  )}
+                >
+                  {target.coverage}
+                </span>
+              </div>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {[
+                  target.brandName,
+                  target.profileScope?.replaceAll("_", " "),
+                  target.marketSide,
+                  target.priority.replaceAll("_", " "),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              <p className="text-muted-foreground mt-0.5 text-[11px]">
+                {target.geography == null
+                  ? "Geography not established"
+                  : target.geography.mode === "global"
+                    ? "Global"
+                    : target.geography.include
+                        .map((place) => place.name)
+                        .join(", ")}
+                {target.researchMaturity
+                  ? ` · ${target.researchMaturity.replaceAll("_", " ")}`
+                  : ""}
+              </p>
+              {target.description && (
+                <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
+                  {target.description}
+                </p>
+              )}
+              {(target.intendedChannels?.length ?? 0) > 0 && (
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Intended: {target.intendedChannels!.join(", ")}
+                  {target.missingChannels.length > 0 &&
+                    ` · Missing: ${target.missingChannels.join(", ")}`}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {unmappedPlatformAudiences.length > 0 && (
+        <p className="text-muted-foreground mt-2 border-t pt-2 text-xs">
+          {unmappedPlatformAudiences.length} platform audience
+          {unmappedPlatformAudiences.length === 1 ? " is" : "s are"} not linked
+          to a target.
+        </p>
+      )}
+    </ToolCard>
+  );
+}
+
+/** `webSearch` — Exa results with compact highlights and usable citations. */
+export function WebSearchCard({ output }: { output: WebSearchOutput }) {
+  const results = output.results ?? [];
+  return (
+    <ToolCard
+      icon={Search}
+      title="Web research"
+      hint={`${results.length} sources`}
+    >
+      <p className="mb-2 text-sm font-medium">{output.query}</p>
+      {output.error ? (
+        <p className="text-destructive text-sm">{output.error}</p>
+      ) : results.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No sources found.</p>
+      ) : (
+        <ul className="divide-y">
+          {results.map((result) => (
+            <li key={result.url} className="py-2 first:pt-0 last:pb-0">
+              <a
+                href={result.url}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-primary flex items-start gap-1 text-sm font-medium"
+              >
+                <span className="line-clamp-2">{result.title}</span>
+                <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0" />
+              </a>
+              {(result.author || result.publishedDate) && (
+                <p className="text-muted-foreground mt-0.5 text-[11px]">
+                  {[result.author, result.publishedDate?.slice(0, 10)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+              {result.highlights[0] && (
+                <p className="text-muted-foreground mt-1 line-clamp-3 text-xs">
+                  {result.highlights[0]}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </ToolCard>
+  );
+}
+
+/** `readWebPage` — confirms the specific source the agent inspected. */
+export function ReadWebPageCard({ output }: { output: ReadWebPageOutput }) {
+  return (
+    <ToolCard icon={Globe2} title="Page read" hint={output.provider}>
+      {output.error ? (
+        <p className="text-destructive text-sm">{output.error}</p>
+      ) : (
+        <>
+          <a
+            href={output.url}
+            target="_blank"
+            rel="noreferrer"
+            className="hover:text-primary inline-flex items-start gap-1 text-sm font-medium"
+          >
+            <span className="line-clamp-2">{output.title ?? output.url}</span>
+            <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0" />
+          </a>
+          {output.text && (
+            <p className="text-muted-foreground mt-1.5 line-clamp-4 text-xs">
+              {output.text}
+            </p>
+          )}
+        </>
+      )}
+    </ToolCard>
+  );
+}
+
 /** `contentPipelineSummary` — segmented bar + per-status legend. */
-export function ContentPipelineCard({ output }: { output: ContentPipelineOutput }) {
-  const { total, byStatus } = output;
+export function ContentPipelineCard({
+  output,
+}: {
+  output: ContentPipelineOutput;
+}) {
+  const { total, byStatus, standaloneTotal = 0 } = output;
   const sorted = [...byStatus].sort((a, b) => b.count - a.count);
   return (
     <ToolCard
       icon={FileText}
       title="Content pipeline"
       href="/app/content"
-      hint={`${fmtNum(total)} posts`}
+      hint={`${fmtNum(total)} ideas · ${fmtNum(standaloneTotal)} native drafts`}
     >
-      {total === 0 ? (
+      {total === 0 && standaloneTotal === 0 ? (
         <p className="text-muted-foreground text-sm">Pipeline is empty.</p>
       ) : (
         <>
-          <div className="bg-muted flex h-2 w-full overflow-hidden rounded-full">
-            {sorted.map((s) => (
-              <div
-                key={s.status}
-                className={statusMeta(s.status).dot}
-                style={{ width: `${(s.count / total) * 100}%` }}
-                title={`${statusMeta(s.status).label}: ${s.count}`}
-              />
-            ))}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
-            {sorted.map((s) => (
-              <div key={s.status} className="flex items-center gap-1.5 text-xs">
-                <span className={cn("size-2 rounded-full", statusMeta(s.status).dot)} />
-                <span className="text-muted-foreground">{statusMeta(s.status).label}</span>
-                <span className="font-medium tabular-nums">{s.count}</span>
+          {total > 0 && (
+            <>
+              <div className="bg-muted flex h-2 w-full overflow-hidden rounded-full">
+                {sorted.map((s) => (
+                  <div
+                    key={s.status}
+                    className={statusMeta(s.status).dot}
+                    style={{ width: `${(s.count / total) * 100}%` }}
+                    title={`${statusMeta(s.status).label}: ${s.count}`}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+                {sorted.map((s) => (
+                  <div
+                    key={s.status}
+                    className="flex items-center gap-1.5 text-xs"
+                  >
+                    <span
+                      className={cn(
+                        "size-2 rounded-full",
+                        statusMeta(s.status).dot,
+                      )}
+                    />
+                    <span className="text-muted-foreground">
+                      {statusMeta(s.status).label}
+                    </span>
+                    <span className="font-medium tabular-nums">{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {standaloneTotal > 0 && (
+            <p className="text-muted-foreground mt-3 text-xs">
+              {standaloneTotal} platform-first draft
+              {standaloneTotal === 1 ? "" : "s"} are still intentionally
+              ungrouped.
+            </p>
+          )}
         </>
       )}
     </ToolCard>
@@ -417,23 +901,40 @@ export function ContentPipelineCard({ output }: { output: ContentPipelineOutput 
 }
 
 /** `upcomingContent` — soonest-first rows with date chip + status. */
-export function UpcomingContentCard({ output }: { output: UpcomingContentOutput }) {
-  const { posts } = output;
+export function UpcomingContentCard({
+  output,
+}: {
+  output: UpcomingContentOutput;
+}) {
+  const rows = [
+    ...output.posts.map((post) => ({
+      ...post,
+      at: post.plannedAt,
+      platform: null as string | null,
+    })),
+    ...(output.standalonePlatformPosts ?? []).map((post) => ({
+      ...post,
+      at: post.scheduledAt,
+    })),
+  ].sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
   return (
     <ToolCard
       icon={CalendarClock}
       title="Coming up"
-      href="/app/calendar"
-      hint={`${posts.length}`}
+      href="/app/feed"
+      hint={`${rows.length}`}
     >
-      {posts.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">Nothing planned ahead.</p>
       ) : (
         <ul className="divide-y">
-          {posts.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+          {rows.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+            >
               <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
-                {fmtDate(p.plannedAt)}
+                {fmtDate(p.at)}
               </span>
               <span className="min-w-0 flex-1 truncate text-sm">
                 {p.title?.trim() || (
@@ -442,6 +943,11 @@ export function UpcomingContentCard({ output }: { output: UpcomingContentOutput 
                 {p.pillar && (
                   <span className="text-muted-foreground ml-1.5 text-xs">
                     · {p.pillar}
+                  </span>
+                )}
+                {p.platform && (
+                  <span className="text-muted-foreground ml-1.5 text-xs">
+                    · {p.platform}
                   </span>
                 )}
               </span>
@@ -456,7 +962,15 @@ export function UpcomingContentCard({ output }: { output: UpcomingContentOutput 
 
 /** `leadsSummary` — headline tiles + top-PMS mini bars. */
 export function LeadsSummaryCard({ output }: { output: LeadsSummaryOutput }) {
-  const { domains, contacts, netNew, untouched, inInstantly, inHubspot, topPms } = output;
+  const {
+    domains,
+    contacts,
+    netNew,
+    untouched,
+    inInstantly,
+    inHubspot,
+    topPms,
+  } = output;
   const pmsMax = Math.max(1, ...topPms.map((p) => p.count));
   return (
     <ToolCard icon={Users} title="Leads pool" href="/app/leads">
@@ -480,8 +994,13 @@ export function LeadsSummaryCard({ output }: { output: LeadsSummaryOutput }) {
           </p>
           <div className="space-y-1.5">
             {topPms.map((p) => (
-              <div key={p.pms ?? "unknown"} className="flex items-center gap-2 text-xs">
-                <span className="w-24 shrink-0 truncate">{p.pms ?? "Unknown"}</span>
+              <div
+                key={p.pms ?? "unknown"}
+                className="flex items-center gap-2 text-xs"
+              >
+                <span className="w-24 shrink-0 truncate">
+                  {p.pms ?? "Unknown"}
+                </span>
                 <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
                   <div
                     className="bg-primary/60 h-full rounded-full"
@@ -528,7 +1047,9 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">
                     {m.title?.trim() || (
-                      <span className="text-muted-foreground italic">No title</span>
+                      <span className="text-muted-foreground italic">
+                        No title
+                      </span>
                     )}
                   </p>
                   <p className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
@@ -538,7 +1059,9 @@ export function MentionsCard({ output }: { output: MentionsOutput }) {
                     {typeof m.relevance === "number" && (
                       <span className="inline-flex items-center gap-0.5">
                         · <CircleDot className="h-2.5 w-2.5" />
-                        {m.relevance <= 1 ? Math.round(m.relevance * 100) : m.relevance}
+                        {m.relevance <= 1
+                          ? Math.round(m.relevance * 100)
+                          : m.relevance}
                       </span>
                     )}
                   </p>
@@ -668,14 +1191,14 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
   const objMax = Math.max(1, ...byObjective.map((o) => o.impressions));
   const monthMax = Math.max(1, ...byMonth.map((m) => m.impressions));
   return (
-    <ToolCard
-      icon={Megaphone}
-      title="Ad performance"
-      hint={fmtWindow(window)}
-    >
+    <ToolCard icon={Megaphone} title="Ad performance" hint={fmtWindow(window)}>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Impressions" value={fmtNum(totals.impressions)} />
-        <Stat label="Clicks" value={fmtNum(totals.clicks)} sub={fmtPct(totals.ctr)} />
+        <Stat
+          label="Clicks"
+          value={fmtNum(totals.clicks)}
+          sub={fmtPct(totals.ctr)}
+        />
         <Stat label="Spend" value={fmtUsd(totals.spend)} />
         <Stat
           label="Ads delivered"
@@ -686,7 +1209,8 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
 
       {!flags.hasAuditAds && (
         <p className="mt-3 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
-          No <span className="font-medium">audit</span>-destination ads ran in this window — that angle would be net-new.
+          No <span className="font-medium">audit</span>-destination ads ran in
+          this window — that angle would be net-new.
         </p>
       )}
 
@@ -695,7 +1219,11 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
           <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
             By destination · impressions · CTR
           </p>
-          <BreakdownBars rows={byDestination} label={destinationLabel} max={destMax} />
+          <BreakdownBars
+            rows={byDestination}
+            label={destinationLabel}
+            max={destMax}
+          />
         </div>
       )}
 
@@ -704,7 +1232,11 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
           <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">
             By objective
           </p>
-          <BreakdownBars rows={byObjective} label={objectiveLabel} max={objMax} />
+          <BreakdownBars
+            rows={byObjective}
+            label={objectiveLabel}
+            max={objMax}
+          />
         </div>
       )}
 
@@ -722,7 +1254,9 @@ export function AdsScopeCard({ output }: { output: AdsScopeOutput }) {
               >
                 <div
                   className="bg-primary/50 w-full rounded-sm"
-                  style={{ height: `${Math.max(2, (m.impressions / monthMax) * 32)}px` }}
+                  style={{
+                    height: `${Math.max(2, (m.impressions / monthMax) * 32)}px`,
+                  }}
                 />
               </div>
             ))}
@@ -765,7 +1299,7 @@ function RankedAdRow({ ad }: { ad: RankedAd }) {
               href={link}
               target="_blank"
               rel="noreferrer"
-              className="hover:underline truncate text-sm font-medium"
+              className="truncate text-sm font-medium hover:underline"
               title={ad.name ?? undefined}
             >
               {ad.name ?? "(unnamed ad)"}
@@ -815,7 +1349,13 @@ type TopAdsInput = RouterInputs["ads"]["topAds"];
 type Metric = NonNullable<TopAdsInput["metric"]>;
 type StatusFilter = NonNullable<TopAdsInput["status"]>;
 
-const METRIC_OPTIONS: Metric[] = ["impressions", "clicks", "ctr", "engagement", "spend"];
+const METRIC_OPTIONS: Metric[] = [
+  "impressions",
+  "clicks",
+  "ctr",
+  "engagement",
+  "spend",
+];
 const STATUS_OPTIONS: StatusFilter[] = ["all", "active", "non-paused"];
 const OBJECTIVE_OPTIONS = [
   "OUTCOME_SALES",
@@ -863,7 +1403,9 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
     output.filters.status as StatusFilter,
   );
   const [objective, setObjective] = useState(output.filters.objective ?? "");
-  const [destination, setDestination] = useState(output.filters.destination ?? "");
+  const [destination, setDestination] = useState(
+    output.filters.destination ?? "",
+  );
 
   const input: TopAdsInput = {
     fromDate: output.window.fromDate,
@@ -890,18 +1432,18 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
       hint={`${ads.length} of ${matched}`}
     >
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        <MiniSelect value={metric} onChange={(v) => setMetric(v as Metric)} title="Rank by">
+        <MiniSelect
+          value={metric}
+          onChange={(v) => setMetric(v as Metric)}
+          title="Rank by"
+        >
           {METRIC_OPTIONS.map((m) => (
             <option key={m} value={m}>
               by {METRIC_LABEL[m] ?? m}
             </option>
           ))}
         </MiniSelect>
-        <MiniSelect
-          value={objective}
-          onChange={setObjective}
-          title="Objective"
-        >
+        <MiniSelect value={objective} onChange={setObjective} title="Objective">
           <option value="">All funnels</option>
           {OBJECTIVE_OPTIONS.map((o) => (
             <option key={o} value={o}>
@@ -921,16 +1463,24 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
             </option>
           ))}
         </MiniSelect>
-        <MiniSelect value={status} onChange={(v) => setStatus(v as StatusFilter)} title="Status">
+        <MiniSelect
+          value={status}
+          onChange={(v) => setStatus(v as StatusFilter)}
+          title="Status"
+        >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
         </MiniSelect>
-        {isFetching && <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" />}
+        {isFetching && (
+          <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+        )}
         <span className="ml-auto">
-          {ads.length > 0 && <CopyButton text={rankedDigest(view)} label="Copy" />}
+          {ads.length > 0 && (
+            <CopyButton text={rankedDigest(view)} label="Copy" />
+          )}
         </span>
       </div>
       <p className="text-muted-foreground mb-1 flex items-center gap-1 text-[11px]">
@@ -938,7 +1488,9 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
         {fmtWindow(window)}
       </p>
       {ads.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No ads match this scope.</p>
+        <p className="text-muted-foreground text-sm">
+          No ads match this scope.
+        </p>
       ) : (
         <ul className="divide-y">
           {ads.map((ad) => (

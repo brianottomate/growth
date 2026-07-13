@@ -5,9 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { memberTable, platformPostTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-
-const AMPLITUDE_URL =
-  "https://app.amplitude.com/analytics/wander-hq/dashboard/aqc691oc";
+import { ContentAnalysisPanel } from "@/components/content-analysis-panel";
+import { readContentAnalysis } from "@/lib/content-analysis";
 
 type BlogMeta = {
   description?: string | null;
@@ -42,13 +41,21 @@ export default async function BlogArticlePage({
   if (!post || post.brand?.organizationId !== org.id) notFound();
 
   const meta = (post.metadata ?? {}) as BlogMeta;
+  const analysis = readContentAnalysis(post.metadata);
   const cover = post.media?.[0]?.url ?? null;
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       {/* breadcrumb */}
       <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-        <Link href="/app/blog" className="hover:text-foreground">
+        <Link
+          href={
+            post.brand?.slug
+              ? `/app/blog?brand=${post.brand.slug}`
+              : "/app/blog"
+          }
+          className="hover:text-foreground"
+        >
           Blog
         </Link>
         <span>/</span>
@@ -64,7 +71,9 @@ export default async function BlogArticlePage({
         />
       )}
 
-      <h1 className="mt-5 text-2xl font-semibold tracking-tight">{post.text}</h1>
+      <h1 className="mt-5 text-2xl font-semibold tracking-tight">
+        {post.text}
+      </h1>
 
       <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-sm">
         {post.publishedAt && (
@@ -100,23 +109,22 @@ export default async function BlogArticlePage({
             rel="noopener noreferrer"
             className="bg-foreground text-background rounded-full px-3.5 py-1.5 text-xs font-medium"
           >
-            Read on wander.com ↗
+            Read original ↗
           </a>
         )}
-        <a
-          href={AMPLITUDE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:bg-accent rounded-full border px-3.5 py-1.5 text-xs font-medium"
-        >
-          Stats in Amplitude ↗
-        </a>
       </div>
 
       <p className="text-muted-foreground mt-6 text-xs">
-        Full body + per-post analytics are surfaced via the links above for now;
-        in-app rendering and stats can come later.
+        Full-body rendering and per-post analytics can be added as the source
+        adapters expose richer content and performance data.
       </p>
+
+      <ContentAnalysisPanel
+        id={post.id}
+        kind="blog"
+        initialAnalysis={analysis}
+        sourceUrl={post.externalUrl}
+      />
     </div>
   );
 }

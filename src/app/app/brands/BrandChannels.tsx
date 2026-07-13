@@ -32,20 +32,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTRPC } from "@/trpc/react";
-import { ChannelLogo, PLATFORM_META, platformLabel } from "@/components/channel-logos";
+import {
+  ChannelLogo,
+  PLATFORM_META,
+  platformLabel,
+} from "@/components/channel-logos";
 import type { FollowerSnapshot } from "@/server/db/channel-schema";
+import { AD_PLATFORM_VALUES } from "@/lib/ad-platforms";
 import type { SuggestionLite } from "./SuggestedChannels";
+import { ZernioConnection } from "./ZernioConnection";
+import { OwnedHistorySync } from "./OwnedHistorySync";
 
 export type ChannelLite = {
   id: string;
   kind: string;
   platform: string;
   handle: string | null;
+  profileImageUrl: string | null;
   connectionStatus: string;
   profileUrl: string | null;
   manageUrl: string | null;
   followerCount: number | null;
   followerHistory: FollowerSnapshot[];
+  defaultProvider: string | null;
 };
 
 const KINDS = [
@@ -56,8 +65,18 @@ const KINDS = [
 ];
 
 const PLATFORMS_BY_KIND: Record<string, string[]> = {
-  social: ["instagram", "x", "linkedin", "facebook", "youtube", "tiktok", "threads", "reddit", "pinterest"],
-  ad: ["meta_ads", "google_ads", "openai_ads"],
+  social: [
+    "instagram",
+    "x",
+    "linkedin",
+    "facebook",
+    "youtube",
+    "tiktok",
+    "threads",
+    "reddit",
+    "pinterest",
+  ],
+  ad: [...AD_PLATFORM_VALUES],
   newsletter: ["newsletter", "other"],
   blog: ["blog", "other"],
 };
@@ -83,6 +102,7 @@ type FormState = {
   kind: string;
   platform: string;
   handle: string;
+  profileImageUrl: string;
   profileUrl: string;
   manageUrl: string;
   connectionStatus: string;
@@ -94,6 +114,7 @@ const EMPTY: FormState = {
   kind: "social",
   platform: "instagram",
   handle: "",
+  profileImageUrl: "",
   profileUrl: "",
   manageUrl: "",
   connectionStatus: "connected",
@@ -113,11 +134,13 @@ export function BrandChannels({
   channels,
   suggestions = [],
   postCountByPlatform = {},
+  zernioProfileId,
 }: {
   brandId: string;
   channels: ChannelLite[];
   suggestions?: SuggestionLite[];
   postCountByPlatform?: Record<string, number>;
+  zernioProfileId: string | null;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -176,6 +199,7 @@ export function BrandChannels({
       kind: c.kind,
       platform: c.platform,
       handle: c.handle ?? "",
+      profileImageUrl: c.profileImageUrl ?? "",
       profileUrl: c.profileUrl ?? "",
       manageUrl: c.manageUrl ?? "",
       connectionStatus: c.connectionStatus,
@@ -203,7 +227,9 @@ export function BrandChannels({
   const removeCapture = (capturedAt: string) =>
     setForm((f) => ({
       ...f,
-      followerHistory: f.followerHistory.filter((s) => s.capturedAt !== capturedAt),
+      followerHistory: f.followerHistory.filter(
+        (s) => s.capturedAt !== capturedAt,
+      ),
     }));
 
   const save = () => {
@@ -211,6 +237,7 @@ export function BrandChannels({
       kind: form.kind as never,
       platform: form.platform as never,
       handle: form.handle,
+      profileImageUrl: form.profileImageUrl,
       profileUrl: form.profileUrl,
       manageUrl: form.manageUrl,
       connectionStatus: form.connectionStatus as never,
@@ -221,24 +248,53 @@ export function BrandChannels({
   };
 
   const setKind = (kind: string) =>
-    setForm((f) => ({ ...f, kind, platform: PLATFORMS_BY_KIND[kind]?.[0] ?? "other" }));
+    setForm((f) => ({
+      ...f,
+      kind,
+      platform: PLATFORMS_BY_KIND[kind]?.[0] ?? "other",
+    }));
 
   // Follower captures only make sense for social channels.
   const showFollowers = form.kind === "social";
   const todayISO = new Date().toISOString().slice(0, 10);
 
   const suggestionsForGroup = (kinds: readonly string[]) =>
-    suggestions.filter((s) => kinds.includes(KIND_BY_PLATFORM[s.platform] ?? "social"));
+    suggestions.filter((s) =>
+      kinds.includes(KIND_BY_PLATFORM[s.platform] ?? "social"),
+    );
 
   const hasAny = channels.length > 0 || suggestions.length > 0;
+  const connectedCount = channels.filter(
+    (channel) => channel.defaultProvider === "zernio",
+  ).length;
+  const discoveredCount = channels.filter(
+    (channel) =>
+      channel.kind === "social" && channel.defaultProvider !== "zernio",
+  ).length;
+  const connectionSummary = [
+    connectedCount > 0 && `${connectedCount} connected`,
+    discoveredCount > 0 && `${discoveredCount} discovered`,
+  ].filter(Boolean) as string[];
 
   return (
     <div className="mt-3 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
-          Channels{channels.length > 0 && ` · ${channels.length}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+            Channels{channels.length > 0 && ` · ${channels.length}`}
+          </span>
+          {connectionSummary.length > 0 && (
+            <span className="text-muted-foreground text-[11px]">
+              {connectionSummary.join(" · ")}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
+          {zernioProfileId && <OwnedHistorySync brandId={brandId} />}
+          <ZernioConnection
+            brandId={brandId}
+            currentProfileId={zernioProfileId}
+          />
           <Button
             variant="ghost"
             size="sm"
@@ -259,7 +315,7 @@ export function BrandChannels({
             loading={discoverM.isPending}
           >
             <Sparkles className="size-3.5" />
-            {discoverM.isPending ? "Discovering…" : "Discover"}
+            {discoverM.isPending ? "Discovering…" : "Find public profiles"}
           </Button>
         </div>
       </div>
@@ -274,61 +330,70 @@ export function BrandChannels({
         if (group.length === 0 && groupSuggestions.length === 0) return null;
         return (
           <div key={label}>
-            <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wide">
+            <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-wide uppercase">
               {label} · {group.length + groupSuggestions.length}
             </div>
             <div className="flex flex-wrap gap-2">
               {group.map((c) => {
                 const posts = postCountByPlatform[c.platform] ?? 0;
                 return (
-                <div
-                  key={c.id}
-                  className="hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
-                >
-                  <button
-                    onClick={() => openEdit(c)}
-                    className="flex items-center gap-2 text-left"
+                  <div
+                    key={c.id}
+                    className="hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
                   >
-                    <ChannelLogo platform={c.platform} />
-                    <span className="flex flex-col leading-tight">
-                      <span className="text-xs font-medium">
-                        {platformLabel(c.platform)}
-                      </span>
-                      {(c.handle || c.followerCount != null || posts > 0) && (
-                        <span className="text-muted-foreground text-[11px]">
-                          {c.handle}
-                          {c.handle && c.followerCount != null && " · "}
-                          {c.followerCount != null &&
-                            `${followerFmt.format(c.followerCount)} followers`}
-                          {posts > 0 &&
-                            `${c.handle || c.followerCount != null ? " · " : ""}${posts} ${posts === 1 ? "post" : "posts"}`}
+                    <button
+                      onClick={() => openEdit(c)}
+                      className="flex items-center gap-2 text-left"
+                    >
+                      <ChannelLogo platform={c.platform} />
+                      <span className="flex flex-col leading-tight">
+                        <span className="text-xs font-medium">
+                          {platformLabel(c.platform)}
+                          {c.kind === "social" &&
+                            c.defaultProvider !== "zernio" && (
+                              <span
+                                className="text-muted-foreground ml-1.5 rounded-full border px-1.5 py-0.5 text-[9px] font-normal"
+                                title="Discovered profile; not connected through Zernio"
+                              >
+                                Discovered
+                              </span>
+                            )}
                         </span>
-                      )}
-                    </span>
-                  </button>
-                  {c.profileUrl && (
-                    <a
-                      href={c.profileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Open page"
-                      className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
-                    >
-                      <ExternalLink className="size-3.5" />
-                    </a>
-                  )}
-                  {c.manageUrl && (
-                    <a
-                      href={c.manageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Open manage page"
-                      className="text-muted-foreground hover:text-foreground hover:bg-background rounded p-1"
-                    >
-                      <Settings className="size-3.5" />
-                    </a>
-                  )}
-                </div>
+                        {(c.handle || c.followerCount != null || posts > 0) && (
+                          <span className="text-muted-foreground text-[11px]">
+                            {c.handle}
+                            {c.handle && c.followerCount != null && " · "}
+                            {c.followerCount != null &&
+                              `${followerFmt.format(c.followerCount)} followers`}
+                            {posts > 0 &&
+                              `${c.handle || c.followerCount != null ? " · " : ""}${posts} ${posts === 1 ? "post" : "posts"}`}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                    {c.profileUrl && (
+                      <a
+                        href={c.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open page"
+                        className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
+                      >
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    )}
+                    {c.manageUrl && (
+                      <a
+                        href={c.manageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open manage page"
+                        className="text-muted-foreground hover:text-foreground hover:bg-background rounded p-1"
+                      >
+                        <Settings className="size-3.5" />
+                      </a>
+                    )}
+                  </div>
                 );
               })}
 
@@ -401,14 +466,16 @@ export function BrandChannels({
         <p className="text-muted-foreground text-[11px]">
           {discoverM.isPending
             ? "Searching the web + verifying profiles…"
-            : "No channels yet. Add one, or run Discover to find this brand's profiles."}
+            : "No channels yet. Connect Zernio for owned accounts, or find public profiles on the web."}
         </p>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{form.id ? "Edit channel" : "Add channel"}</DialogTitle>
+            <DialogTitle>
+              {form.id ? "Edit channel" : "Add channel"}
+            </DialogTitle>
           </DialogHeader>
 
           <Tabs
@@ -423,7 +490,9 @@ export function BrandChannels({
                   Followers
                   {form.followerHistory.length > 0 && (
                     <span className="text-muted-foreground ml-1 text-[11px] tabular-nums">
-                      {followerFmt.format(latestCount(form.followerHistory) ?? 0)}
+                      {followerFmt.format(
+                        latestCount(form.followerHistory) ?? 0,
+                      )}
                     </span>
                   )}
                 </TabsTrigger>
@@ -451,7 +520,9 @@ export function BrandChannels({
                   <Label>Platform</Label>
                   <Select
                     value={form.platform}
-                    onValueChange={(platform) => setForm((f) => ({ ...f, platform }))}
+                    onValueChange={(platform) =>
+                      setForm((f) => ({ ...f, platform }))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -471,16 +542,35 @@ export function BrandChannels({
                 <Label>Handle</Label>
                 <Input
                   value={form.handle}
-                  onChange={(e) => setForm((f) => ({ ...f, handle: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, handle: e.target.value }))
+                  }
                   placeholder="@wander or account name"
                 />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label>Profile image</Label>
+                <Input
+                  value={form.profileImageUrl}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, profileImageUrl: e.target.value }))
+                  }
+                  placeholder="https://…/profile.jpg"
+                />
+                <p className="text-muted-foreground text-[11px]">
+                  Imported from the provider when available; paste a current
+                  image URL to override it.
+                </p>
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <Label>Page link</Label>
                 <Input
                   value={form.profileUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, profileUrl: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, profileUrl: e.target.value }))
+                  }
                   placeholder="Public page, e.g. https://instagram.com/wander"
                 />
               </div>
@@ -489,7 +579,9 @@ export function BrandChannels({
                 <Label>Manage link</Label>
                 <Input
                   value={form.manageUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, manageUrl: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, manageUrl: e.target.value }))
+                  }
                   placeholder="Where you manage it, e.g. ads manager / studio"
                 />
               </div>
@@ -524,7 +616,8 @@ export function BrandChannels({
                     </Button>
                   </div>
                   <p className="text-muted-foreground text-[11px]">
-                    Adds a capture dated today · {todayISO}. Persists when you Save.
+                    Adds a capture dated today · {todayISO}. Persists when you
+                    Save.
                   </p>
                 </div>
 
@@ -537,7 +630,9 @@ export function BrandChannels({
                     <Label className="text-muted-foreground">History</Label>
                     <div className="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-md border p-1.5">
                       {[...form.followerHistory]
-                        .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
+                        .sort((a, b) =>
+                          b.capturedAt.localeCompare(a.capturedAt),
+                        )
                         .map((snap) => (
                           <div
                             key={snap.capturedAt}
@@ -584,7 +679,12 @@ export function BrandChannels({
               <span />
             )}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={busy}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setOpen(false)}
+                disabled={busy}
+              >
                 Cancel
               </Button>
               <Button size="sm" onClick={save} loading={busy}>

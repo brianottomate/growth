@@ -54,7 +54,9 @@ export function CompetitorNewsletters({
     try {
       const r = await track.mutateAsync({ brandId: row.brandId });
       await navigator.clipboard.writeText(r.address).catch(() => undefined);
-      toast.success(`Address copied — paste it into ${row.name}'s newsletter signup`);
+      toast.success(
+        `Address copied — paste it into ${row.name}'s newsletter signup`,
+      );
       router.refresh();
     } catch (e) {
       toast.error("Couldn't provision the address");
@@ -84,9 +86,9 @@ export function CompetitorNewsletters({
         <Mail className="size-4" /> Competitor newsletters
       </h2>
       <p className="text-muted-foreground mt-1 text-xs">
-        Subscribe to a tracked competitor&apos;s newsletter with its capture address;
-        forwarded issues land here as inspiration. Confirm the double opt-in once
-        from the Resend inbox.
+        Subscribe to a tracked competitor&apos;s newsletter with its capture
+        address; forwarded issues land here as inspiration. Confirm the double
+        opt-in once from the Resend inbox.
       </p>
 
       {rows.length === 0 ? (
@@ -97,10 +99,7 @@ export function CompetitorNewsletters({
       ) : (
         <div className="mt-4 flex flex-col gap-2">
           {rows.map((row) => (
-            <div
-              key={row.brandId}
-              className="rounded-xl border p-3"
-            >
+            <div key={row.brandId} className="rounded-xl border p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {row.logo ? (
@@ -114,7 +113,9 @@ export function CompetitorNewsletters({
                     <div className="bg-muted size-7 shrink-0 rounded-md" />
                   )}
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{row.name}</div>
+                    <div className="truncate text-sm font-medium">
+                      {row.name}
+                    </div>
                     <div className="text-muted-foreground truncate text-xs">
                       {row.tracked
                         ? `${row.issueCount} issue${row.issueCount === 1 ? "" : "s"}${
@@ -163,12 +164,8 @@ export function CompetitorNewsletters({
                       {row.recentIssues.map((issue) => (
                         <a
                           key={issue.id}
-                          href={issue.url ?? undefined}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`hover:bg-accent/40 -mx-1 flex items-center gap-2 rounded-md px-1 py-1.5 text-xs ${
-                            issue.url ? "" : "pointer-events-none opacity-70"
-                          }`}
+                          href={`/app/newsletters/${issue.id}`}
+                          className="hover:bg-accent/40 -mx-1 flex items-center gap-2 rounded-md px-1 py-1.5 text-xs"
                         >
                           <span className="text-muted-foreground w-10 shrink-0 tabular-nums">
                             {issue.receivedAt ? fmtDate(issue.receivedAt) : "—"}

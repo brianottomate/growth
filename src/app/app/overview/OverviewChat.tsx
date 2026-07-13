@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { useMutation } from "@tanstack/react-query";
 import {
   DefaultChatTransport,
   getToolName,
   isToolUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
   type ToolUIPart,
   type UIMessage,
 } from "ai";
@@ -39,24 +41,37 @@ import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 import {
+  ASSISTANT_INTENT_EVENT,
+  type AssistantIntent,
+  type ContentWorkContext,
+} from "@/lib/assistant-events";
+import {
   AdsRankedCard,
   AdsScopeCard,
+  AudienceTargetsCard,
   BrandsCard,
   ContentPipelineCard,
   GenericToolCard,
   LeadsSummaryCard,
+  MediaSuggestionsCard,
   MentionsCard,
+  ReadWebPageCard,
   ToolCallPending,
   UpcomingContentCard,
   WorkspaceOverviewCard,
+  WebSearchCard,
   type AdsRankedOutput,
   type AdsScopeOutput,
+  type AudienceTargetsOutput,
   type ContentPipelineOutput,
   type LeadsSummaryOutput,
   type ListBrandsOutput,
+  type MediaSuggestionsOutput,
   type MentionsOutput,
+  type ReadWebPageOutput,
   type UpcomingContentOutput,
   type WorkspaceOverviewOutput,
+  type WebSearchOutput,
 } from "./OverviewToolCards";
 
 /**
@@ -75,37 +90,127 @@ import {
 /** While-running labels per tool — keyed by capability name. */
 const PENDING_LABELS: Record<string, string> = {
   workspaceOverview: "Pulling the workspace snapshot…",
+  getBrandMap: "Reading the brand map…",
+  nextForBrand: "Checking the next two weeks…",
+  previewTwoWeekSlots: "Previewing the two-week rhythm…",
+  generateTwoWeekSlots: "Creating the two-week slots…",
+  navigateWorkspace: "Opening the workspace surface…",
   listBrands: "Looking up brands…",
   contentPipelineSummary: "Counting the content pipeline…",
   upcomingContent: "Checking the calendar…",
+  productionQueue: "Checking production readiness…",
+  getContentWorkItem: "Reading the production workspace…",
+  updateContentWorkItem: "Updating the work item…",
+  addContentCrossPost: "Adding channel renderings…",
+  attachChatImageToContent: "Saving and attaching the image…",
+  suggestMediaForContent: "Looking through the library and archives…",
+  attachLibraryMediaToContent: "Attaching the library asset…",
+  recoverArchiveMediaToContent: "Recovering the archived media…",
   leadsSummary: "Tallying the leads pool…",
   recentMentions: "Scanning the listening queue…",
   adsScope: "Scanning ad performance…",
   topAds: "Ranking ads…",
+  listAudienceTargets: "Reading audience strategy…",
+  webSearch: "Researching the web…",
+  readWebPage: "Reading the source…",
+  createAudienceTarget: "Creating the audience target…",
+  saveAudienceTargets: "Saving audience profiles…",
+  updateAudienceActivation: "Updating campaign targeting…",
+  updateAudienceTarget: "Updating the audience target…",
+  createPlatformPost: "Creating the channel draft…",
+  promotePlatformPost: "Promoting the post into a content idea…",
   createIdea: "Creating the idea…",
+  discoverBrandChannels: "Discovering official channels…",
+  scrapeBrandPosts: "Scraping recent public posts…",
+  syncOwnedBrandContent: "Syncing owned content history…",
+  syncBrandWebsite: "Refreshing the website map…",
+  syncBrandBlog: "Refreshing the editorial stream…",
+  proposeContentGroupings: "Proposing content structure…",
+  analyzeMediaAsset: "Analyzing the media asset…",
+  draftMomentBlueprint: "Drafting the moment shape…",
+  commitMomentPlan: "Creating the initiative and slots…",
+  proposeStrategyTargets: "Comparing strategy with observed performance…",
 };
 
 /** Friendly fallback names for tools that error/deny before producing a card. */
 const TOOL_LABELS: Record<string, string> = {
   workspaceOverview: "Workspace snapshot",
+  getBrandMap: "Brand map",
+  nextForBrand: "What’s next",
+  previewTwoWeekSlots: "Two-week slot preview",
+  generateTwoWeekSlots: "Two-week slots",
+  navigateWorkspace: "Workspace navigation",
   listBrands: "Brands",
   contentPipelineSummary: "Content pipeline",
   upcomingContent: "Coming up",
+  productionQueue: "Production queue",
+  getContentWorkItem: "Content work item",
+  updateContentWorkItem: "Content update",
+  addContentCrossPost: "New cross-posts",
+  attachChatImageToContent: "Attached image",
+  suggestMediaForContent: "Media suggestions",
+  attachLibraryMediaToContent: "Attached library asset",
+  recoverArchiveMediaToContent: "Recovered archive media",
   leadsSummary: "Leads pool",
   recentMentions: "Social mentions",
   adsScope: "Ad performance",
   topAds: "Top ads",
+  listAudienceTargets: "Audience strategy",
+  webSearch: "Web research",
+  readWebPage: "Page read",
+  createAudienceTarget: "New audience target",
+  saveAudienceTargets: "Audience profiles",
+  updateAudienceActivation: "Campaign targeting",
+  updateAudienceTarget: "Audience target update",
+  createPlatformPost: "New channel draft",
+  promotePlatformPost: "Promoted content idea",
   createIdea: "New idea",
+  discoverBrandChannels: "Channel discovery",
+  scrapeBrandPosts: "Public post scrape",
+  syncOwnedBrandContent: "Owned content sync",
+  syncBrandWebsite: "Website map sync",
+  syncBrandBlog: "Blog sync",
+  proposeContentGroupings: "Content grouping analysis",
+  analyzeMediaAsset: "Media analysis",
+  draftMomentBlueprint: "Moment blueprint",
+  commitMomentPlan: "Committed moment plan",
+  proposeStrategyTargets: "Strategy target proposals",
 };
 
-const STARTERS: { icon: LucideIcon; text: string }[] = [
+const OVERVIEW_STARTERS: { icon: LucideIcon; text: string }[] = [
   { icon: LayoutDashboard, text: "Catch me up on the whole workspace" },
   { icon: CalendarClock, text: "What's in the content pipeline right now?" },
   { icon: MessageCircle, text: "Any social mentions worth replying to?" },
-  { icon: Users, text: "How big is our leads pool?" },
+  { icon: Users, text: "Research potential audiences for one of our brands" },
 ];
 
-export function OverviewChat({ userName }: { userName: string }) {
+const NEXT_STARTERS: { icon: LucideIcon; text: string }[] = [
+  { icon: CalendarClock, text: "Plan the next two weeks" },
+  { icon: Paperclip, text: "Help me use something I already have" },
+  { icon: MessageCircle, text: "Turn one channel post into a reusable idea" },
+];
+
+export function OverviewChat({
+  userName,
+  variant = "page",
+  active = true,
+  mode = "overview",
+  brandId,
+  brandName,
+  intent,
+  workContext,
+}: {
+  userName: string;
+  variant?: "page" | "popup";
+  /** Lets the popup focus its composer only when it is actually opened. */
+  active?: boolean;
+  mode?: "overview" | "create" | "next";
+  brandId?: string;
+  brandName?: string;
+  intent?: string;
+  workContext?: ContentWorkContext;
+}) {
+  const router = useRouter();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -122,13 +227,67 @@ export function OverviewChat({ userName }: { userName: string }) {
     regenerate,
     addToolApprovalResponse,
   } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/overview/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/overview/chat",
+      body: {
+        surface: mode,
+        brandId,
+        intent,
+        workContext,
+      },
+    }),
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
   });
 
   const busy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
+  const navigatedCalls = useRef(new Set<string>());
 
-  // ---- image attachment (transient R2 blob → AI SDK file part) ----
+  useEffect(() => {
+    const receiveIntent = (event: Event) => {
+      const intent = (event as CustomEvent<AssistantIntent>).detail;
+      if (busy) {
+        toast.info("The assistant is still working");
+        return;
+      }
+      void sendMessage(
+        { text: intent.visibleText },
+        { body: { assistantIntent: intent } },
+      );
+    };
+    window.addEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
+    return () =>
+      window.removeEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
+  }, [busy, sendMessage]);
+
+  // Navigation is a portable capability result. The in-app adapter follows it
+  // with router.push; MCP clients can use the same returned canonical URL.
+  useEffect(() => {
+    for (const message of messages) {
+      for (const part of message.parts) {
+        if (!isToolUIPart(part)) continue;
+        const loose = part as {
+          toolCallId?: string;
+          state: string;
+          output?: { action?: string; href?: string; error?: string };
+        };
+        if (
+          loose.state !== "output-available" ||
+          loose.output?.action !== "navigate" ||
+          !loose.output.href
+        )
+          continue;
+        const key =
+          loose.toolCallId ??
+          `${message.id}:${getToolName(part)}:${loose.output.href}`;
+        if (navigatedCalls.current.has(key)) continue;
+        navigatedCalls.current.add(key);
+        router.push(loose.output.href);
+      }
+    }
+  }, [messages, router]);
+
+  // ---- image attachment (transient Blob URL → AI SDK file part) ----
   const trpc = useTRPC();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{
@@ -213,6 +372,10 @@ export function OverviewChat({ userName }: { userName: string }) {
     }
   }, [messages, atBottom]);
 
+  useEffect(() => {
+    if (active && desktop) textareaRef.current?.focus();
+  }, [active, desktop]);
+
   const scrollToBottom = () =>
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
@@ -237,20 +400,32 @@ export function OverviewChat({ userName }: { userName: string }) {
   // The composer send — text and/or a ready image attachment (file part).
   const submitComposer = () => {
     if (!canSend) return;
-    void sendMessage({
-      text: input.trim(),
-      ...(attachmentReady
+    void sendMessage(
+      {
+        text: input.trim(),
+        ...(attachmentReady
+          ? {
+              files: [
+                {
+                  type: "file" as const,
+                  mediaType: pendingAttachment.mediaType,
+                  url: pendingAttachment.blobUrl!,
+                },
+              ],
+            }
+          : {}),
+      },
+      attachmentReady
         ? {
-            files: [
-              {
-                type: "file" as const,
-                mediaType: pendingAttachment.mediaType,
+            body: {
+              chatAttachment: {
                 url: pendingAttachment.blobUrl!,
+                mediaType: pendingAttachment.mediaType,
               },
-            ],
+            },
           }
-        : {}),
-    });
+        : undefined,
+    );
     setInput("");
     setPendingAttachment(null);
   };
@@ -269,9 +444,15 @@ export function OverviewChat({ userName }: { userName: string }) {
   };
 
   const firstName = userName.split(" ")[0] ?? userName;
+  const starters = mode === "overview" ? OVERVIEW_STARTERS : NEXT_STARTERS;
 
   return (
-    <div className="relative flex h-[calc(100vh-7rem)] min-h-0 flex-col">
+    <div
+      className={cn(
+        "relative flex min-h-0 flex-col",
+        variant === "page" ? "h-[calc(100vh-7rem)]" : "h-full",
+      )}
+    >
       <div className="relative min-h-0 flex-1">
         <div
           ref={scrollRef}
@@ -280,20 +461,38 @@ export function OverviewChat({ userName }: { userName: string }) {
           aria-label="Overview assistant conversation"
           className="h-full overflow-y-auto"
         >
-          <div className="mx-auto w-full max-w-3xl space-y-4 px-1 pb-4">
+          <div
+            className={cn(
+              "mx-auto w-full space-y-4 pb-4",
+              variant === "page" ? "max-w-3xl px-1" : "px-4",
+            )}
+          >
             {isEmpty && (
-              <div className="animate-in fade-in slide-in-from-bottom-2 flex flex-col gap-6 pt-10 duration-500">
+              <div
+                className={cn(
+                  "animate-in fade-in slide-in-from-bottom-2 flex flex-col duration-500",
+                  variant === "page" ? "gap-6 pt-10" : "gap-4 pt-4",
+                )}
+              >
                 <div>
-                  <h1 className="text-2xl font-semibold">Hi {firstName} 👋</h1>
+                  <h1 className="text-2xl font-semibold">
+                    {mode !== "overview"
+                      ? `What’s next${brandName ? ` for ${brandName}` : ""}?`
+                      : `Hi ${firstName} 👋`}
+                  </h1>
                   <p className="text-muted-foreground mt-1 text-sm">
-                    Ask me about what&apos;s happening across the growth
-                    workspace — brands, content, leads, listening. This surface
-                    is early; I&apos;ll tell you when something is outside what I
-                    can see yet.
+                    {mode !== "overview"
+                      ? "Start with the next two weeks, or paste an image, link, or rough thought. I’ll use the brand context, act when the next step is clear, and take you to the right place to inspect or edit the result."
+                      : "Ask me about what’s happening across the growth workspace — brands, content, leads, listening. This surface is early; I’ll tell you when something is outside what I can see yet."}
                   </p>
                 </div>
-                <div className="grid auto-rows-fr gap-2 sm:grid-cols-2">
-                  {STARTERS.map(({ icon: Icon, text }) => (
+                <div
+                  className={cn(
+                    "grid auto-rows-fr gap-2",
+                    variant === "page" && "sm:grid-cols-2",
+                  )}
+                >
+                  {starters.map(({ icon: Icon, text }) => (
                     <button
                       key={text}
                       type="button"
@@ -372,17 +571,25 @@ export function OverviewChat({ userName }: { userName: string }) {
                             </Streamdown>
                           );
                         }
-                        if (part.type !== "dynamic-tool" && isToolUIPart(part)) {
-                          return renderToolPart(part, key, (approved) => {
-                            const approval = (
-                              part as { approval?: { id: string } }
-                            ).approval;
-                            if (approval)
-                              void addToolApprovalResponse({
-                                id: approval.id,
-                                approved,
-                              });
-                          });
+                        if (
+                          part.type !== "dynamic-tool" &&
+                          isToolUIPart(part)
+                        ) {
+                          return renderToolPart(
+                            part,
+                            key,
+                            (approved) => {
+                              const approval = (
+                                part as { approval?: { id: string } }
+                              ).approval;
+                              if (approval)
+                                void addToolApprovalResponse({
+                                  id: approval.id,
+                                  approved,
+                                });
+                            },
+                            send,
+                          );
                         }
                         return null;
                       })}
@@ -454,7 +661,12 @@ export function OverviewChat({ userName }: { userName: string }) {
         )}
       </div>
 
-      <div className="mx-auto w-full max-w-3xl">
+      <div
+        className={cn(
+          "mx-auto w-full",
+          variant === "page" ? "max-w-3xl" : "border-t px-3 pb-3",
+        )}
+      >
         <form className="mt-3" onSubmit={submit}>
           <div className="border-border focus-within:border-primary/50 bg-card rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:shadow-md">
             {pendingAttachment && (
@@ -491,9 +703,13 @@ export function OverviewChat({ userName }: { userName: string }) {
                 }
               }}
               onPaste={handlePaste}
-              placeholder="Ask about the workspace… (paste or attach an image)"
+              placeholder={
+                mode !== "overview"
+                  ? "Ask what’s next, or paste something you want to use…"
+                  : "Ask about the workspace… (paste or attach an image)"
+              }
               rows={1}
-              autoFocus={desktop}
+              autoFocus={desktop && active}
               className="max-h-40 min-h-9 w-full resize-none border-0 bg-transparent px-1.5 py-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
             />
             <div className="mt-1 flex items-center justify-between">
@@ -538,9 +754,11 @@ export function OverviewChat({ userName }: { userName: string }) {
             </div>
           </div>
         </form>
-        <p className="text-muted-foreground/60 mt-1.5 text-center text-[11px]">
-          Reads the live growth workspace · early surface, verify before acting
-        </p>
+        {variant === "page" && (
+          <p className="text-muted-foreground/60 mt-1.5 text-center text-[11px]">
+            Reads live workspace context · asks before writing
+          </p>
+        )}
       </div>
     </div>
   );
@@ -594,6 +812,7 @@ function renderToolPart(
   part: ToolUIPart,
   key: string,
   onApprove: (approved: boolean) => void,
+  onPrompt: (prompt: string) => void,
 ) {
   const toolName = getToolName(part);
 
@@ -645,6 +864,51 @@ function renderToolPart(
       );
     case "listBrands":
       return <BrandsCard key={key} output={part.output as ListBrandsOutput} />;
+    case "navigateWorkspace": {
+      const output = part.output as {
+        href?: string;
+        brandName?: string;
+        error?: string;
+      };
+      if (output.error)
+        return (
+          <p key={key} className="text-destructive text-xs">
+            {output.error}
+          </p>
+        );
+      return (
+        <div
+          key={key}
+          className="bg-muted/40 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+        >
+          <Check className="size-3.5 text-emerald-500" />
+          Opened {output.brandName ?? "the requested surface"}
+          {output.href && (
+            <Link
+              href={output.href}
+              className="text-primary ml-auto hover:underline"
+            >
+              Open again
+            </Link>
+          )}
+        </div>
+      );
+    }
+    case "listAudienceTargets":
+      return (
+        <AudienceTargetsCard
+          key={key}
+          output={part.output as AudienceTargetsOutput}
+        />
+      );
+    case "webSearch":
+      return (
+        <WebSearchCard key={key} output={part.output as WebSearchOutput} />
+      );
+    case "readWebPage":
+      return (
+        <ReadWebPageCard key={key} output={part.output as ReadWebPageOutput} />
+      );
     case "contentPipelineSummary":
       return (
         <ContentPipelineCard
@@ -659,6 +923,14 @@ function renderToolPart(
           output={part.output as UpcomingContentOutput}
         />
       );
+    case "suggestMediaForContent":
+      return (
+        <MediaSuggestionsCard
+          key={key}
+          output={part.output as MediaSuggestionsOutput}
+          onPrompt={onPrompt}
+        />
+      );
     case "leadsSummary":
       return (
         <LeadsSummaryCard
@@ -671,10 +943,21 @@ function renderToolPart(
     case "adsScope":
       return <AdsScopeCard key={key} output={part.output as AdsScopeOutput} />;
     case "topAds":
-      return <AdsRankedCard key={key} output={part.output as AdsRankedOutput} />;
+      return (
+        <AdsRankedCard key={key} output={part.output as AdsRankedOutput} />
+      );
     case "createIdea":
       return (
         <CreatedIdeaCard key={key} output={part.output as CreatedIdeaOutput} />
+      );
+    case "createAudienceTarget":
+    case "saveAudienceTargets":
+    case "updateAudienceTarget":
+      return (
+        <AudienceTargetMutationCard
+          key={key}
+          output={part.output as AudienceTargetMutationOutput}
+        />
       );
     default:
       return <GenericToolCard key={key} name={toolName} output={part.output} />;
@@ -691,29 +974,88 @@ function ApprovalCard({
   input: unknown;
   onApprove: (approved: boolean) => void;
 }) {
-  // createIdea is the only write today; show its proposed idea.
   const inp = input as
-    | { title?: string; hook?: string; platforms?: string[] }
+    | {
+        title?: string;
+        hook?: string;
+        platforms?: string[];
+        platform?: string;
+        scheduledAt?: string;
+        name?: string;
+        description?: string | null;
+        intendedChannels?: string[];
+        priority?: string;
+      }
     | undefined;
+  const isAudienceWrite =
+    toolName === "createAudienceTarget" || toolName === "updateAudienceTarget";
+  const heading =
+    toolName === "createPlatformPost"
+      ? "Create this channel draft?"
+      : toolName === "promotePlatformPost"
+        ? "Turn this post into a content idea?"
+        : toolName === "createIdea"
+          ? "Create this idea?"
+          : toolName === "createAudienceTarget"
+            ? "Create this audience target?"
+            : toolName === "updateAudienceTarget"
+              ? "Save these audience changes?"
+              : toolName === "attachLibraryMediaToContent"
+                ? "Attach this library asset?"
+                : toolName === "recoverArchiveMediaToContent"
+                  ? "Recover and attach this archive media?"
+                  : "Confirm this action?";
+  const primaryLabel =
+    toolName === "createPlatformPost"
+      ? "Create draft"
+      : toolName === "promotePlatformPost"
+        ? "Promote post"
+        : toolName === "createIdea"
+          ? "Create it"
+          : toolName === "createAudienceTarget"
+            ? "Create target"
+            : toolName === "updateAudienceTarget"
+              ? "Save changes"
+              : toolName === "attachLibraryMediaToContent"
+                ? "Attach asset"
+                : toolName === "recoverArchiveMediaToContent"
+                  ? "Recover & attach"
+                  : "Confirm";
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
         <ShieldQuestion className="h-3.5 w-3.5" />
-        {toolName === "createIdea" ? "Create this idea?" : "Confirm this action?"}
+        {heading}
       </div>
-      {inp?.title && <p className="mt-1.5 text-sm font-medium">{inp.title}</p>}
-      {inp?.hook && (
-        <p className="text-muted-foreground mt-0.5 text-xs">{inp.hook}</p>
+      {(inp?.title || inp?.name) && (
+        <p className="mt-1.5 text-sm font-medium">{inp.title ?? inp.name}</p>
       )}
-      {inp?.platforms && inp.platforms.length > 0 && (
-        <p className="text-muted-foreground mt-1 text-xs">
-          Channels: {inp.platforms.join(", ")}
+      {(inp?.hook || inp?.description) && (
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          {inp.hook ?? inp.description}
         </p>
       )}
+      {isAudienceWrite && inp?.priority && (
+        <p className="text-muted-foreground mt-1 text-xs">
+          Priority: {inp.priority.replaceAll("_", " ")}
+        </p>
+      )}
+      {inp?.platform ? (
+        <p className="text-muted-foreground mt-1 text-xs">
+          Channel: {inp.platform}
+          {inp.scheduledAt
+            ? ` · ${new Date(inp.scheduledAt).toLocaleString()}`
+            : ""}
+        </p>
+      ) : (inp?.platforms ?? inp?.intendedChannels)?.length ? (
+        <p className="text-muted-foreground mt-1 text-xs">
+          Channels: {(inp.platforms ?? inp.intendedChannels)?.join(", ")}
+        </p>
+      ) : null}
       <div className="mt-2 flex gap-2">
         <Button size="sm" onClick={() => onApprove(true)}>
           <Check className="h-3.5 w-3.5" />
-          Create it
+          {primaryLabel}
         </Button>
         <Button size="sm" variant="outline" onClick={() => onApprove(false)}>
           <X className="h-3.5 w-3.5" />
@@ -758,6 +1100,81 @@ function CreatedIdeaCard({ output }: { output: CreatedIdeaOutput }) {
           className="text-primary mt-1.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"
         >
           Open idea
+          <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+type AudienceTargetMutationOutput = {
+  ok?: boolean;
+  action?: "created" | "saved" | "updated";
+  count?: number;
+  target?: {
+    name?: string;
+    priority?: string;
+    intendedChannels?: string[] | null;
+  };
+  targets?: {
+    name?: string;
+    priority?: string;
+    intendedChannels?: string[] | null;
+  }[];
+  brandName?: string;
+  url?: string | null;
+  error?: string;
+};
+
+function AudienceTargetMutationCard({
+  output,
+}: {
+  output: AudienceTargetMutationOutput;
+}) {
+  if (output?.error) {
+    return <p className="text-destructive text-xs">{output.error}</p>;
+  }
+  const target = output.target;
+  const targets = output.targets ?? (target ? [target] : []);
+  return (
+    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+        <Check className="h-3.5 w-3.5" />
+        {targets.length > 1
+          ? `${targets.length} audience profiles saved`
+          : `Audience profile ${output.action ?? "saved"}`}
+      </div>
+      {targets.length > 1 ? (
+        <ul className="mt-1.5 space-y-1">
+          {targets.map((item, index) => (
+            <li key={`${item.name ?? "audience"}-${index}`} className="text-sm">
+              {item.name ?? "Audience profile"}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <>
+          <p className="mt-1 text-sm font-medium">
+            {target?.name ?? "Audience profile"}
+          </p>
+          <p className="text-muted-foreground text-xs">
+            {[output.brandName, target?.priority?.replaceAll("_", " ")]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {target?.intendedChannels && target.intendedChannels.length > 0 && (
+            <p className="text-muted-foreground mt-1 text-xs">
+              Channels: {target.intendedChannels.join(", ")}
+            </p>
+          )}
+        </>
+      )}
+      {output.url && (
+        <Link
+          href={output.url}
+          className="text-primary mt-1.5 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+        >
+          Open audiences
           <ExternalLink className="h-3 w-3" />
         </Link>
       )}

@@ -1,9 +1,10 @@
-import type { TRPCRouterRecord } from "@trpc/server";
-import { asc, eq } from "drizzle-orm";
+import { TRPCError, type TRPCRouterRecord } from "@trpc/server";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/brand-schema";
+import { memberTable } from "@/server/db/auth-schema";
 import { channelPlatformEnum } from "@/server/db/channel-schema";
 import {
   acquisitionShapeEnum,
@@ -21,8 +22,7 @@ import { protectedProcedure } from "../trpc";
 
 // Listening STRATEGY config: the editable brand "story" (shared signal + reply
 // judgment) and the per-source rows. Voice itself is read from brandFingerprint
-// and shown read-only here. The single Wander brand owns listening today; we
-// resolve it by slug.
+// and shown read-only here. Every owned brand can have its own listening setup.
 
 const StorySchema = z.object({
   signalGuidance: z.string(),
@@ -98,8 +98,49 @@ const PlatformSchema = z.enum(channelPlatformEnum.enumValues);
 const AcquisitionSchema = z.enum(acquisitionShapeEnum.enumValues);
 const TriggerSchema = z.enum(listeningTriggerEnum.enumValues);
 
-function resolveBrand() {
-  return db.query.brandTable.findFirst({ where: eq(brandTable.slug, "wander") });
+async function ownedBrandsForUser(userId: string) {
+  const memberships = await db.query.memberTable.findMany({
+    where: eq(memberTable.userId, userId),
+    columns: { organizationId: true },
+  });
+  const organizationIds = memberships.map((row) => row.organizationId);
+  if (organizationIds.length === 0) return [];
+
+  return db.query.brandTable.findMany({
+    where: and(
+      inArray(brandTable.organizationId, organizationIds),
+      isNull(brandTable.deletedAt),
+      eq(brandTable.isActive, true),
+    ),
+    orderBy: (brand, { asc: orderAsc }) => orderAsc(brand.createdAt),
+  });
+}
+
+async function assertOwnedBrand(userId: string, brandId: string) {
+  const brand = (await ownedBrandsForUser(userId)).find(
+    (candidate) => candidate.id === brandId,
+  );
+  if (!brand) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You do not have access to this brand",
+    });
+  }
+  return brand;
+}
+
+async function assertSourceManageable(userId: string, sourceId: string) {
+  const source = await db.query.listeningSourceTable.findFirst({
+    where: eq(listeningSourceTable.id, sourceId),
+    columns: { brandId: true },
+  });
+  if (!source) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Listening source not found",
+    });
+  }
+  await assertOwnedBrand(userId, source.brandId);
 }
 
 /**
@@ -158,27 +199,75 @@ function slugifyKey(label: string, fallback: string): string {
 
 export const listeningRouter = {
   /** Brand story + voice + all listening sources for the strategic view. */
-  overview: protectedProcedure.query(async () => {
-    const brand = await resolveBrand();
-    if (!brand) {
-      return { brand: null, story: null, brandVoice: null, sources: [] };
-    }
-    const sources = await db
-      .select()
-      .from(listeningSourceTable)
-      .where(eq(listeningSourceTable.brandId, brand.id))
-      .orderBy(asc(listeningSourceTable.acquisition), asc(listeningSourceTable.platform));
-    return {
-      brand: { id: brand.id, name: brand.name },
-      story: brand.brandListeningStory ?? null,
-      brandVoice: brand.brandFingerprint?.fingerprintText ?? null,
-      sources,
-    };
-  }),
+  overview: protectedProcedure
+    .input(z.object({ brandId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const brands = await ownedBrandsForUser(ctx.session.user.id);
+      if (brands.length === 0) {
+        return {
+          brands: [],
+          brand: null,
+          story: null,
+          brandVoice: null,
+          sources: [],
+        };
+      }
+
+      const requested = input?.brandId
+        ? brands.find((brand) => brand.id === input.brandId)
+        : undefined;
+      if (input?.brandId && !requested) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this brand",
+        });
+      }
+
+      const configuredBrandIds = await db
+        .selectDistinct({ brandId: listeningSourceTable.brandId })
+        .from(listeningSourceTable)
+        .where(
+          inArray(
+            listeningSourceTable.brandId,
+            brands.map((brand) => brand.id),
+          ),
+        );
+      const configured = new Set(configuredBrandIds.map((row) => row.brandId));
+      const brand =
+        requested ??
+        brands.find(
+          (candidate) =>
+            configured.has(candidate.id) || candidate.brandListeningStory,
+        ) ??
+        brands[0]!;
+
+      const sources = await db
+        .select()
+        .from(listeningSourceTable)
+        .where(eq(listeningSourceTable.brandId, brand.id))
+        .orderBy(
+          asc(listeningSourceTable.acquisition),
+          asc(listeningSourceTable.platform),
+        );
+      return {
+        brands: brands.map((candidate) => ({
+          id: candidate.id,
+          name: candidate.name,
+          configured:
+            configured.has(candidate.id) ||
+            Boolean(candidate.brandListeningStory),
+        })),
+        brand: { id: brand.id, name: brand.name },
+        story: brand.brandListeningStory ?? null,
+        brandVoice: brand.brandFingerprint?.fingerprintText ?? null,
+        sources,
+      };
+    }),
 
   updateStory: protectedProcedure
     .input(z.object({ brandId: z.string(), story: StorySchema }))
     .mutation(async ({ input, ctx }) => {
+      await assertOwnedBrand(ctx.session.user.id, input.brandId);
       const [updated] = await db
         .update(brandTable)
         .set({
@@ -208,7 +297,8 @@ export const listeningRouter = {
         }),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertSourceManageable(ctx.session.user.id, input.id);
       const [updated] = await db
         .update(listeningSourceTable)
         .set(input.patch)
@@ -233,7 +323,8 @@ export const listeningRouter = {
         voiceOverride: VoiceOverrideSchema.optional(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertOwnedBrand(ctx.session.user.id, input.brandId);
       const [created] = await db
         .insert(listeningSourceTable)
         .values({
@@ -259,7 +350,8 @@ export const listeningRouter = {
 
   deleteSource: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertSourceManageable(ctx.session.user.id, input.id);
       await db
         .delete(listeningSourceTable)
         .where(eq(listeningSourceTable.id, input.id));
@@ -274,7 +366,10 @@ export const listeningRouter = {
    */
   scanAccountWatch: protectedProcedure
     .input(z.object({ sourceId: z.string().optional() }).optional())
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      if (input?.sourceId) {
+        await assertSourceManageable(ctx.session.user.id, input.sourceId);
+      }
       return scanAccountWatchSources({ sourceId: input?.sourceId });
     }),
 
@@ -288,7 +383,8 @@ export const listeningRouter = {
    */
   evaluateSubreddit: protectedProcedure
     .input(z.object({ sourceId: z.string(), name: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertSourceManageable(ctx.session.user.id, input.sourceId);
       const fresh = await evaluateSubredditProfile(input.name);
       return mutateSubreddit(input.sourceId, fresh.name, (prev) => ({
         ...fresh,
@@ -301,7 +397,8 @@ export const listeningRouter = {
   /** Upsert a subreddit profile from the editor (manual edits win). */
   setSubredditProfile: protectedProcedure
     .input(z.object({ sourceId: z.string(), profile: SubredditProfileSchema }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertSourceManageable(ctx.session.user.id, input.sourceId);
       return mutateSubreddit(input.sourceId, input.profile.name, (prev) => ({
         ...(prev ?? {}),
         ...input.profile,
@@ -312,7 +409,8 @@ export const listeningRouter = {
   /** Drop a subreddit from a source. */
   removeSubreddit: protectedProcedure
     .input(z.object({ sourceId: z.string(), name: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      await assertSourceManageable(ctx.session.user.id, input.sourceId);
       await mutateSubreddit(input.sourceId, input.name, () => null);
       return { name: input.name };
     }),

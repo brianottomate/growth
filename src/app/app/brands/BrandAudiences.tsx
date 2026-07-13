@@ -7,6 +7,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
+import { AD_PLATFORM_SHORT_LABELS } from "@/lib/ad-platforms";
 import { TargetDialog, type TargetDraft } from "../audiences/TargetDialog";
 
 const COVERAGE = {
@@ -15,19 +16,10 @@ const COVERAGE = {
   gap: { label: "Gap", cls: "text-red-300", dot: "bg-red-400" },
 } as const;
 
-const TYPE_LABEL: Record<string, string> = {
+const PROFILE_LABEL: Record<string, string> = {
+  core: "Core ICP",
   segment: "Segment",
-  keyword: "Keyword",
-  intent: "Intent",
-  lookalike: "Lookalike",
-  custom: "Custom",
-};
-
-// Short labels for the inline per-channel coverage dots.
-const PLATFORM_SHORT: Record<string, string> = {
-  google_ads: "Google",
-  meta_ads: "Meta",
-  openai_ads: "OpenAI",
+  experimental: "Experimental",
 };
 
 const COVERAGE_ORDER = ["gap", "partial", "covered"];
@@ -75,7 +67,7 @@ export function BrandAudiences({
   return (
     <div className="mt-3 border-t pt-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+        <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
           Audiences{targets.length > 0 && ` · ${targets.length}`}
         </span>
         <Button
@@ -109,9 +101,11 @@ export function BrandAudiences({
                 <span className={`size-1.5 shrink-0 rounded-full ${cov.dot}`} />
                 <span className="flex min-w-0 flex-1 flex-col leading-tight">
                   <span className="flex items-center gap-1.5">
-                    <span className="truncate text-xs font-medium">{t.name}</span>
+                    <span className="truncate text-xs font-medium">
+                      {t.name}
+                    </span>
                     <span className="border-border text-muted-foreground rounded-full border px-1.5 py-px text-[10px]">
-                      {TYPE_LABEL[t.type] ?? t.type}
+                      {PROFILE_LABEL[t.profileScope] ?? t.profileScope}
                     </span>
                   </span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
@@ -125,7 +119,8 @@ export function BrandAudiences({
                             missing ? "text-red-300/80" : "text-emerald-300/90"
                           }
                         >
-                          {missing ? "○" : "●"} {PLATFORM_SHORT[c] ?? c}
+                          {missing ? "○" : "●"}{" "}
+                          {AD_PLATFORM_SHORT_LABELS[c] ?? c}
                         </span>
                       );
                     })}
@@ -148,11 +143,16 @@ export function BrandAudiences({
                         brandId: t.brandId,
                         name: t.name,
                         description: t.description,
-                        type: t.type,
+                        profileScope: t.profileScope,
+                        marketSide: t.marketSide,
+                        researchMaturity: t.researchMaturity,
                         status: t.status,
                         priority: t.priority,
                         intendedChannels: t.intendedChannels,
                         sizeGoalLabel: t.sizeGoalLabel,
+                        geography: t.geography,
+                        demographics: t.demographics,
+                        context: t.context,
                       });
                       setDialogOpen(true);
                     }}

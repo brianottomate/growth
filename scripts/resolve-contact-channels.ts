@@ -28,7 +28,7 @@ const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const FREEMAIL = /@(gmail|yahoo|hotmail|aol|outlook|msn|icloud|comcast|att|live|me|mac)\./i;
 const ROLE = /^(info|hello|contact|admin|office|hi|team|stay|book|bookings|reservations|sales|rentals|owner|owners|support|frontdesk|reception|enquiries|inquiries)@/i;
 // Junk that the email regex catches from markup/assets.
-const JUNK_DOMAIN = /\.(png|jpg|jpeg|gif|svg|webp|css|js|woff|ttf)$|sentry|wixpress|example\.|schema\.org|w3\.org|googleapis|gstatic|cloudflare|jquery|bootstrap|fontawesome|\.wix|sentry\.io/i;
+const JUNK_DOMAIN = /\.(png|jpg|jpeg|gif|svg|webp|css|js|woff|ttf)$|sentry|wixpress|example\.|schema\.org|w3\.org|googleapis|gstatic|jquery|bootstrap|fontawesome|\.wix|sentry\.io/i;
 
 type Resolved = {
   domain: string;

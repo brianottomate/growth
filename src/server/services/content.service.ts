@@ -1,11 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "../db";
 import { archetypeForFormat, platformFormatsFor } from "../content/formats";
 import {
   type channelPlatformEnum,
+  channelTable,
   contentPostTable,
   type MediaItem,
+  platformPostLinkTable,
   platformPostTable,
 } from "../db/schema";
 
@@ -20,6 +22,156 @@ import {
  */
 
 type ChannelPlatform = (typeof channelPlatformEnum.enumValues)[number];
+
+export type CreatePlatformPostInput = {
+  brandId: string;
+  platform: ChannelPlatform;
+  ownerId: string;
+  text?: string | null;
+  title?: string | null;
+  pillar?: string | null;
+  scheduledAt?: string | null;
+  format?: string | null;
+  referencePlatformPostId?: string | null;
+};
+
+/**
+ * Start with one concrete channel draft. This intentionally creates NO
+ * content_post: the operator can write and schedule something native first,
+ * then promote it only if it earns a wider life.
+ */
+async function createPlatformPost(input: CreatePlatformPostInput): Promise<{
+  id: string | undefined;
+}> {
+  const channel = await db.query.channelTable.findFirst({
+    where: and(
+      eq(channelTable.brandId, input.brandId),
+      eq(channelTable.platform, input.platform),
+      isNull(channelTable.deletedAt),
+    ),
+  });
+  const format =
+    input.format ?? platformFormatsFor(input.platform)[0]?.id ?? undefined;
+  const [row] = await db
+    .insert(platformPostTable)
+    .values({
+      brandId: input.brandId,
+      channelId: channel?.id,
+      platform: input.platform,
+      username: channel?.handle,
+      format,
+      archetype: format ? archetypeForFormat(format) : undefined,
+      pillar: input.pillar ?? undefined,
+      source: "owned",
+      status: "draft",
+      origin: "human",
+      ownerId: input.ownerId,
+      text: input.text ?? undefined,
+      scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
+      metadata: {
+        platformFirst: true,
+        ...(input.title ? { workingTitle: input.title } : {}),
+        ...(input.referencePlatformPostId
+          ? { referencePlatformPostId: input.referencePlatformPostId }
+          : {}),
+      },
+    })
+    .returning({ id: platformPostTable.id });
+
+  if (row?.id && input.referencePlatformPostId) {
+    await db.insert(platformPostLinkTable).values({
+      fromPlatformPostId: row.id,
+      toPlatformPostId: input.referencePlatformPostId,
+      kind: "repurposes",
+      metadata: { source: "platform-first" },
+    });
+  }
+  return { id: row?.id };
+}
+
+export type PromotePlatformPostInput = {
+  platformPostId: string;
+  title?: string | null;
+  pillar?: string | null;
+  seriesId?: string | null;
+  crossPostPlatforms?: ChannelPlatform[];
+  ownerId: string;
+  createdById: string;
+};
+
+const fallbackTitle = (text?: string | null) => {
+  const first = text
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (!first) return "Untitled content idea";
+  return first.length > 80 ? `${first.slice(0, 77).trimEnd()}…` : first;
+};
+
+/** Promote one useful platform draft/history item into the canonical layer. */
+async function promotePlatformPost(
+  input: PromotePlatformPostInput,
+): Promise<{ id: string; platformPostId: string; alreadyPromoted: boolean }> {
+  const post = await db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.id, input.platformPostId),
+  });
+  if (!post) throw new Error("Platform post not found");
+  if (post.contentPostId) {
+    return {
+      id: post.contentPostId,
+      platformPostId: post.id,
+      alreadyPromoted: true,
+    };
+  }
+  const metadata = (post.metadata ?? {}) as { workingTitle?: string };
+  const [content] = await db
+    .insert(contentPostTable)
+    .values({
+      brandId: post.brandId,
+      title:
+        input.title?.trim() ||
+        metadata.workingTitle ||
+        fallbackTitle(post.text),
+      pillar: input.pillar ?? post.pillar ?? undefined,
+      seriesId: input.seriesId ?? undefined,
+      plannedAt: post.scheduledAt,
+      hook: post.text
+        ?.split("\n")
+        .map((line) => line.trim())
+        .find(Boolean),
+      ownerId: post.ownerId ?? input.ownerId,
+      createdById: input.createdById,
+      status: post.status,
+      origin: "human",
+    })
+    .returning({ id: contentPostTable.id });
+  if (!content) throw new Error("Could not promote platform post");
+
+  await db
+    .update(platformPostTable)
+    .set({
+      contentPostId: content.id,
+      pillar: input.pillar ?? post.pillar,
+      metadata: {
+        ...metadata,
+        platformFirst: true,
+        promotedAt: new Date().toISOString(),
+      },
+    })
+    .where(eq(platformPostTable.id, post.id));
+
+  const extraPlatforms = (input.crossPostPlatforms ?? []).filter(
+    (platform) => platform !== post.platform,
+  );
+  if (extraPlatforms.length) {
+    await addSpots(content.id, post.brandId, extraPlatforms);
+  }
+  return {
+    id: content.id,
+    platformPostId: post.id,
+    alreadyPromoted: false,
+  };
+}
 
 export type CreateIdeaInput = {
   brandId: string;
@@ -46,7 +198,9 @@ export type CreateIdeaInput = {
  * to a set of channel spots in one shot. This is the write behind "Add idea"
  * — and the same handler the chat's create tool will call.
  */
-async function createIdea(input: CreateIdeaInput): Promise<{ id: string | undefined }> {
+async function createIdea(
+  input: CreateIdeaInput,
+): Promise<{ id: string | undefined }> {
   const [row] = await db
     .insert(contentPostTable)
     .values({
@@ -82,9 +236,7 @@ async function addSpots(
   platforms: ChannelPlatform[],
 ): Promise<void> {
   const rows = [...new Set(platforms)].map((platform) => {
-    const format = platformFormatsFor(
-      platform,
-    )[0]?.id;
+    const format = platformFormatsFor(platform)[0]?.id;
     return {
       brandId,
       contentPostId,
@@ -120,7 +272,10 @@ async function updateBrief(input: UpdateBriefInput): Promise<{ id: string }> {
   if (plannedAt !== undefined) {
     patch.plannedAt = plannedAt ? new Date(plannedAt) : null;
   }
-  await db.update(contentPostTable).set(patch).where(eq(contentPostTable.id, id));
+  await db
+    .update(contentPostTable)
+    .set(patch)
+    .where(eq(contentPostTable.id, id));
   return { id };
 }
 
@@ -158,10 +313,77 @@ async function setPoolMedia(input: {
   return { id: input.contentPostId };
 }
 
+async function setSpotMedia(input: {
+  platformPostId: string;
+  media: MediaItem[];
+}): Promise<{ id: string }> {
+  const seen = new Set<string>();
+  const deduped = input.media.filter((item) => {
+    const key = item.assetId ?? item.url;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  await db
+    .update(platformPostTable)
+    .set({ media: deduped.length ? deduped : null })
+    .where(eq(platformPostTable.id, input.platformPostId));
+  return { id: input.platformPostId };
+}
+
+async function updatePlatformDraft(input: {
+  platformPostId: string;
+  text?: string | null;
+  status?: (typeof contentPostTable.$inferSelect)["status"];
+  scheduledAt?: string | null;
+  markScheduled?: boolean;
+}): Promise<{ id: string }> {
+  const current = await db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.id, input.platformPostId),
+    columns: { publishedAt: true, scheduledAt: true },
+  });
+  const patch: Record<string, unknown> = {};
+  if (input.text !== undefined) patch.text = input.text?.trim() || null;
+  if (input.status !== undefined) patch.status = input.status;
+  if (input.scheduledAt !== undefined) {
+    patch.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+  }
+  if (input.markScheduled && input.scheduledAt) patch.status = "scheduled";
+  if (input.status === "published" && !current?.publishedAt) {
+    patch.publishedAt =
+      input.scheduledAt !== undefined
+        ? input.scheduledAt
+          ? new Date(input.scheduledAt)
+          : new Date()
+        : (current?.scheduledAt ?? new Date());
+  }
+  await db
+    .update(platformPostTable)
+    .set(patch)
+    .where(eq(platformPostTable.id, input.platformPostId));
+  return { id: input.platformPostId };
+}
+
+async function setContentStatus(input: {
+  contentPostId: string;
+  status: (typeof contentPostTable.$inferSelect)["status"];
+}): Promise<{ id: string }> {
+  await db
+    .update(contentPostTable)
+    .set({ status: input.status })
+    .where(eq(contentPostTable.id, input.contentPostId));
+  return { id: input.contentPostId };
+}
+
 export const ContentService = {
   createIdea,
+  createPlatformPost,
+  promotePlatformPost,
   updateBrief,
   addSpots,
   setSpotText,
   setPoolMedia,
+  setSpotMedia,
+  updatePlatformDraft,
+  setContentStatus,
 } as const;

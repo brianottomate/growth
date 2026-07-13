@@ -30,15 +30,23 @@ import { PILLAR_BY_SLUG } from "@/lib/pillars";
 // amplification-grade, but Kristian wants the full planned-tweet lane.
 const NOT_SLOT_PLANNED = new Set<string>([]);
 
-const daysIn = (year: number, month1: number) => new Date(year, month1, 0).getDate();
-const noon = (year: number, month1: number, day: number) =>
-  new Date(year, month1 - 1, day, 12);
+const atNoon = (start: Date, dayOffset: number) => {
+  const date = new Date(start);
+  date.setDate(date.getDate() + dayOffset);
+  date.setHours(12, 0, 0, 0);
+  return date;
+};
 
-/** Slots a period target implies for the given month. */
-function monthTotal(count: number, period: string, days: number): number {
+/** Slots a period target implies for a bounded planning window. */
+function rangeTotal(
+  count: number,
+  period: string,
+  days: number,
+  fullMonth: boolean,
+): number {
   if (period === "day") return count * days;
   if (period === "week") return Math.round((count * days) / 7);
-  return count; // month
+  return fullMonth ? count : Math.round((count * days) / 30.4375);
 }
 
 export type SlotGenRow = {
@@ -68,9 +76,36 @@ export async function generateMonthSlots(opts: {
   dryRun?: boolean;
 }): Promise<{ rows: SlotGenRow[]; created: number; mix: SlotGenMix[] }> {
   const { brandId, year, month, dryRun } = opts;
-  const days = daysIn(year, month);
-  const monthStart = new Date(year, month - 1, 1);
-  const monthEnd = new Date(year, month, 1);
+  return generateSlotsForRange({
+    brandId,
+    rangeStart: new Date(year, month - 1, 1),
+    rangeEnd: new Date(year, month, 1),
+    dryRun,
+    fullMonth: true,
+  });
+}
+
+export async function generateRangeSlots(opts: {
+  brandId: string;
+  rangeStart: Date;
+  rangeEnd: Date;
+  dryRun?: boolean;
+}): Promise<{ rows: SlotGenRow[]; created: number; mix: SlotGenMix[] }> {
+  return generateSlotsForRange({ ...opts, fullMonth: false });
+}
+
+async function generateSlotsForRange(opts: {
+  brandId: string;
+  rangeStart: Date;
+  rangeEnd: Date;
+  dryRun?: boolean;
+  fullMonth: boolean;
+}): Promise<{ rows: SlotGenRow[]; created: number; mix: SlotGenMix[] }> {
+  const { brandId, rangeStart, rangeEnd, dryRun, fullMonth } = opts;
+  const days = Math.max(
+    1,
+    Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000),
+  );
 
   const [cadence, mix, existingSlots] = await Promise.all([
     db.query.cadenceTargetTable.findMany({
@@ -81,27 +116,28 @@ export async function generateMonthSlots(opts: {
       ),
     }),
     db.query.mixTargetTable.findMany({
-      where: and(eq(mixTargetTable.brandId, brandId), eq(mixTargetTable.isActive, true)),
-    }),
-    db.query.contentPostTable.findMany({
       where: and(
-        eq(contentPostTable.brandId, brandId),
-        eq(contentPostTable.slotKind, "cadence"),
-        isNull(contentPostTable.deletedAt),
-        gte(contentPostTable.plannedAt, monthStart),
-        lt(contentPostTable.plannedAt, monthEnd),
+        eq(mixTargetTable.brandId, brandId),
+        eq(mixTargetTable.isActive, true),
       ),
-      with: { platformPosts: { columns: { platform: true, archetype: true } } },
+    }),
+    db.query.platformPostTable.findMany({
+      where: and(
+        eq(platformPostTable.brandId, brandId),
+        eq(platformPostTable.source, "owned"),
+        gte(platformPostTable.scheduledAt, rangeStart),
+        lt(platformPostTable.scheduledAt, rangeEnd),
+      ),
+      columns: { platform: true, archetype: true },
     }),
   ]);
 
-  // Existing cadence slots per platform|archetype (claimed ones still count).
+  // Every scheduled owned post counts against the rhythm, including
+  // platform-first drafts and cadence slots that have since been claimed.
   const existingByKey = new Map<string, number>();
-  for (const s of existingSlots) {
-    for (const p of s.platformPosts) {
-      const key = `${p.platform}|${p.archetype ?? ""}`;
-      existingByKey.set(key, (existingByKey.get(key) ?? 0) + 1);
-    }
+  for (const post of existingSlots) {
+    const key = `${post.platform}|${post.archetype ?? ""}`;
+    existingByKey.set(key, (existingByKey.get(key) ?? 0) + 1);
   }
 
   // Pillar weights per channel: override rows if the channel has any, else the
@@ -147,12 +183,16 @@ export async function generateMonthSlots(opts: {
   for (const [channelId, targets] of byChannel) {
     // Build the channel's slot skeleton: evenly spaced days per archetype,
     // offset per archetype so formats interleave instead of stacking.
-    type Pending = { platform: string; archetype: string; day: number };
+    type Pending = {
+      platform: string;
+      archetype: string;
+      dayOffset: number;
+    };
     const pending: Pending[] = [];
 
     targets.forEach((t, archIdx) => {
       const key = `${t.platform}|${t.archetype}`;
-      const target = monthTotal(t.count, t.period, days);
+      const target = rangeTotal(t.count, t.period, days, fullMonth);
       const existing = existingByKey.get(key) ?? 0;
       const need = Math.max(0, target - existing);
       rows.push({
@@ -165,15 +205,19 @@ export async function generateMonthSlots(opts: {
         created: need,
       });
       for (let i = 0; i < need; i++) {
-        const day = Math.min(
-          days,
-          Math.max(1, Math.round(((i + 0.5) * days) / need) + archIdx),
+        const dayOffset = Math.min(
+          days - 1,
+          Math.max(0, Math.round(((i + 0.5) * days) / need) - 1 + archIdx),
         );
-        pending.push({ platform: t.platform, archetype: t.archetype, day });
+        pending.push({
+          platform: t.platform,
+          archetype: t.archetype,
+          dayOffset,
+        });
       }
     });
     if (!pending.length) continue;
-    pending.sort((a, b) => a.day - b.day);
+    pending.sort((a, b) => a.dayOffset - b.dayOffset);
 
     // Largest-remainder pillar allocation over the channel's new slots, then
     // hand out by "most remaining first" so the mix spreads across the month.
@@ -188,8 +232,8 @@ export async function generateMonthSlots(opts: {
     }
     const byRemainder = [...weights].sort(
       (a, b) =>
-        ((b.targetPct / totalPct) * pending.length) % 1 -
-        ((a.targetPct / totalPct) * pending.length) % 1,
+        (((b.targetPct / totalPct) * pending.length) % 1) -
+        (((a.targetPct / totalPct) * pending.length) % 1),
     );
     for (let i = 0; allocated < pending.length; i++, allocated++) {
       const p = byRemainder[i % byRemainder.length]!.pillar;
@@ -203,7 +247,9 @@ export async function generateMonthSlots(opts: {
       const format = platformFormatsFor(slot.platform as ChannelPlatform).find(
         (f) => f.archetype === slot.archetype,
       );
-      const pillarName = pillar ? (PILLAR_BY_SLUG[pillar]?.name ?? pillar) : null;
+      const pillarName = pillar
+        ? (PILLAR_BY_SLUG[pillar]?.name ?? pillar)
+        : null;
       const title = [pillarName, format?.label ?? slot.archetype]
         .filter(Boolean)
         .join(" ");
@@ -220,9 +266,15 @@ export async function generateMonthSlots(opts: {
           status: "slot",
           slotKind: "cadence",
           origin: "ai",
-          plannedAt: noon(year, month, slot.day),
+          plannedAt: atNoon(rangeStart, slot.dayOffset),
           targetSpots: format
-            ? [{ platform: slot.platform, format: format.id, archetype: slot.archetype }]
+            ? [
+                {
+                  platform: slot.platform,
+                  format: format.id,
+                  archetype: slot.archetype,
+                },
+              ]
             : undefined,
         })
         .returning({ id: contentPostTable.id });
@@ -236,7 +288,7 @@ export async function generateMonthSlots(opts: {
           source: "owned",
           status: "slot",
           origin: "ai",
-          scheduledAt: noon(year, month, slot.day),
+          scheduledAt: atNoon(rangeStart, slot.dayOffset),
         });
       }
     }

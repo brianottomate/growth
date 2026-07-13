@@ -47,16 +47,19 @@ const GROUPS: { key: AcquisitionShape; title: string; blurb: string }[] = [
  * Where the actual listening / triage for a source happens today. External
  * rooms live on this page; owned-inbound triage lives on /app/inbox.
  */
-function listeningSurfaceHref(s: Source): string {
-  if (s.acquisition === "account_watch") return "/app/listen?tab=instagram";
+function listeningSurfaceHref(s: Source, brandId: string): string {
+  const brand = encodeURIComponent(brandId);
+  if (s.acquisition === "account_watch")
+    return `/app/listen?tab=instagram&brand=${brand}`;
   if (s.acquisition === "owned_inbound") {
     return s.adapter === "zernio-dms"
       ? "/app/inbox?tab=dms"
       : "/app/inbox?tab=comments";
   }
-  if (s.adapter === "x-search" || s.platform === "x") return "/app/listen?tab=x";
+  if (s.adapter === "x-search" || s.platform === "x")
+    return `/app/listen?tab=x&brand=${brand}`;
   // Reddit scan + provider alerts (F5Bot) both land in the Reddit room.
-  return "/app/listen?tab=reddit";
+  return `/app/listen?tab=reddit&brand=${brand}`;
 }
 
 export function Sources({
@@ -82,7 +85,9 @@ export function Sources({
     <section className="space-y-5">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">What we monitor</h2>
+          <h2 className="text-lg font-semibold tracking-tight">
+            What we monitor
+          </h2>
           <p className="text-muted-foreground mt-1 text-sm">
             Every place we listen, and what we listen for.
           </p>
@@ -98,7 +103,9 @@ export function Sources({
         return (
           <div key={g.key} className="space-y-2.5">
             <div>
-              <h3 className="text-foreground text-sm font-semibold">{g.title}</h3>
+              <h3 className="text-foreground text-sm font-semibold">
+                {g.title}
+              </h3>
               <p className="text-muted-foreground text-xs">{g.blurb}</p>
             </div>
             {groupSources.length === 0 ? (
@@ -108,7 +115,12 @@ export function Sources({
             ) : (
               <div className="grid gap-2.5">
                 {groupSources.map((s) => (
-                  <SourceCard key={s.id} source={s} onEdit={() => openEdit(s)} />
+                  <SourceCard
+                    key={s.id}
+                    source={s}
+                    brandId={brand.id}
+                    onEdit={() => openEdit(s)}
+                  />
                 ))}
               </div>
             )}
@@ -126,7 +138,15 @@ export function Sources({
   );
 }
 
-function SourceCard({ source, onEdit }: { source: Source; onEdit: () => void }) {
+function SourceCard({
+  source,
+  brandId,
+  onEdit,
+}: {
+  source: Source;
+  brandId: string;
+  onEdit: () => void;
+}) {
   // Latest "confirmed live in the provider" date across this source's alert terms.
   const verifiedDates = (source.config?.alertTerms ?? [])
     .map((t) => t.verifiedAt)
@@ -158,7 +178,7 @@ function SourceCard({ source, onEdit }: { source: Source; onEdit: () => void }) 
 
         <div className="flex shrink-0 items-center gap-1">
           <ButtonLink
-            href={listeningSurfaceHref(source)}
+            href={listeningSurfaceHref(source, brandId)}
             variant="ghost"
             size="sm"
           >
@@ -214,9 +234,9 @@ function SetupTasks({ source }: { source: Source }) {
   const update = useMutation(
     trpc.listening.updateSource.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries(
-          trpc.listening.overview.queryOptions(),
-        );
+        await queryClient.invalidateQueries({
+          queryKey: trpc.listening.overview.queryKey(),
+        });
       },
     }),
   );
@@ -277,7 +297,10 @@ function SetupTasks({ source }: { source: Source }) {
                 </span>
               ) : null}
               {t.note && (
-                <span className="text-muted-foreground italic"> — {t.note}</span>
+                <span className="text-muted-foreground italic">
+                  {" "}
+                  — {t.note}
+                </span>
               )}
             </span>
             <Button
@@ -377,8 +400,10 @@ function StatusBadge({
     <span
       className={cn(
         "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-        tone === "emerald" && "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
-        tone === "amber" && "border-amber-500/40 bg-amber-500/10 text-amber-400",
+        tone === "emerald" &&
+          "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
+        tone === "amber" &&
+          "border-amber-500/40 bg-amber-500/10 text-amber-400",
         tone === "muted" && "text-muted-foreground bg-muted border-transparent",
       )}
     >

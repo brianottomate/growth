@@ -69,11 +69,12 @@ async function pollSnapshot(
 ): Promise<unknown[]> {
   const auth = { Authorization: `Bearer ${token}` };
   for (let i = 0; i < maxAttempts; i++) {
-    const prog = (await fetch(`${BASE}/progress/${snapshotId}`, { headers: auth }).then(
-      (r) => r.json(),
-    )) as { status?: string };
+    const prog = (await fetch(`${BASE}/progress/${snapshotId}`, {
+      headers: auth,
+    }).then((r) => r.json())) as { status?: string };
     if (prog.status === "ready") break;
-    if (prog.status === "failed") throw new Error(`snapshot ${snapshotId} failed`);
+    if (prog.status === "failed")
+      throw new Error(`snapshot ${snapshotId} failed`);
     await sleep(5000);
   }
   const text = await fetch(`${BASE}/snapshot/${snapshotId}?format=json`, {
@@ -128,16 +129,23 @@ export async function runScrape(
     // Per-call overrides (e.g. discover_by=profile_url for a personal LinkedIn
     // profile vs the registry default company_url).
     ...(opts?.query ?? {}),
-    ...(opts?.limitPerInput ? { limit_per_input: String(opts.limitPerInput) } : {}),
+    ...(opts?.limitPerInput
+      ? { limit_per_input: String(opts.limitPerInput) }
+      : {}),
   });
 
   const res = await fetch(`${BASE}/trigger?${qs.toString()}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(input),
   });
   if (!res.ok) {
-    throw new Error(`Bright Data ${key} ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    throw new Error(
+      `Bright Data ${key} ${res.status}: ${(await res.text()).slice(0, 300)}`,
+    );
   }
 
   const trigger = (await res.json()) as { snapshot_id?: string };
@@ -168,7 +176,16 @@ export type ProfileVerification = {
   exists: boolean;
   followerCount?: number;
   handle?: string;
+  profileImageUrl?: string;
 };
+
+function firstString(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return undefined;
+}
 
 // Per-platform capability: which dataset + how to read follower count.
 // Only platforms with a cheap profile-level dataset are verified here; the
@@ -189,6 +206,12 @@ const VERIFY: Partial<
       exists: !r.error && !!r.account,
       followerCount: typeof r.followers === "number" ? r.followers : undefined,
       handle: typeof r.account === "string" ? r.account : undefined,
+      profileImageUrl: firstString(r, [
+        "profile_image_link",
+        "profile_image_url",
+        "profile_pic_url_hd",
+        "profile_pic_url",
+      ]),
     }),
   },
   linkedin: {
@@ -197,13 +220,14 @@ const VERIFY: Partial<
       exists: !r.error && !!(r.name ?? r.id),
       followerCount: typeof r.followers === "number" ? r.followers : undefined,
       handle: typeof r.id === "string" ? r.id : undefined,
+      profileImageUrl: firstString(r, ["logo", "avatar", "profile_image_url"]),
     }),
   },
 };
 
 /** True if we can verify a profile for this platform via a profile dataset. */
 export function canVerify(platform: string): boolean {
-  return platform in VERIFY;
+  return isBrightDataConfigured && platform in VERIFY;
 }
 
 /**

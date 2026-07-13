@@ -24,9 +24,11 @@ const followerFmt = new Intl.NumberFormat("en-US");
 export function SuggestedChannels({
   brandId,
   suggestions,
+  variant = "full",
 }: {
   brandId: string;
   suggestions: SuggestionLite[];
+  variant?: "full" | "action" | "results";
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -46,32 +48,47 @@ export function SuggestedChannels({
     trpc.channelSuggestion.reject.mutationOptions({ onSuccess: refresh }),
   );
 
-  const busyId =
-    acceptM.isPending
-      ? acceptM.variables?.id
-      : rejectM.isPending
-        ? rejectM.variables?.id
-        : null;
+  const busyId = acceptM.isPending
+    ? acceptM.variables?.id
+    : rejectM.isPending
+      ? rejectM.variables?.id
+      : null;
+
+  const discoverButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-muted-foreground gap-1.5"
+      onClick={() => {
+        setError(null);
+        discoverM.mutate({ brandId });
+      }}
+      loading={discoverM.isPending}
+    >
+      <Sparkles className="size-3.5" />
+      {discoverM.isPending ? "Discovering…" : "Discover handles"}
+    </Button>
+  );
+
+  if (variant === "action") {
+    return (
+      <div className="flex items-center gap-2">
+        {discoverButton}
+        {error && <p className="text-destructive text-[11px]">{error}</p>}
+      </div>
+    );
+  }
+
+  if (variant === "results" && suggestions.length === 0) return null;
 
   return (
     <div className="mt-3 border-t pt-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
-          Suggested handles{suggestions.length > 0 && ` · ${suggestions.length}`}
+        <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+          Suggested handles
+          {suggestions.length > 0 && ` · ${suggestions.length}`}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground gap-1.5"
-          onClick={() => {
-            setError(null);
-            discoverM.mutate({ brandId });
-          }}
-          loading={discoverM.isPending}
-        >
-          <Sparkles className="size-3.5" />
-          {discoverM.isPending ? "Discovering…" : "Discover handles"}
-        </Button>
+        {variant === "full" && discoverButton}
       </div>
 
       {error && <p className="text-destructive mb-2 text-[11px]">{error}</p>}
@@ -111,7 +128,8 @@ export function SuggestedChannels({
                     )}
                   </span>
                   <span className="text-muted-foreground text-[11px]">
-                    {s.confidence != null && `${Math.round(s.confidence * 100)}% confidence`}
+                    {s.confidence != null &&
+                      `${Math.round(s.confidence * 100)}% confidence`}
                     {s.verified === true &&
                       s.followerCount != null &&
                       ` · ✓ ${followerFmt.format(s.followerCount)} followers`}

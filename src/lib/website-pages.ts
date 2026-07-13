@@ -81,6 +81,17 @@ const LEGAL_PATHS = new Set([
   "/good-neighbor-policy",
   "/accessibility",
   "/licensing",
+  "/privacy",
+  "/tos",
+]);
+
+const NON_LOCATION_ROOTS = new Set([
+  "article",
+  "blog",
+  "help",
+  "help-center",
+  "mortgage-calculator",
+  "property",
 ]);
 
 /**
@@ -123,10 +134,22 @@ export const PAGE_TYPE_META: Record<
 > = {
   home: { label: "Home", plural: "Home", color: "#f472b6" },
   brand: { label: "Brand page", plural: "Brand pages", color: "#38bdf8" },
-  seo_landing: { label: "SEO landing", plural: "SEO landing pages", color: "#a78bfa" },
-  location_hub: { label: "Location hub", plural: "Location hubs", color: "#34d399" },
+  seo_landing: {
+    label: "SEO landing",
+    plural: "SEO landing pages",
+    color: "#a78bfa",
+  },
+  location_hub: {
+    label: "Location hub",
+    plural: "Location hubs",
+    color: "#34d399",
+  },
   location_city: { label: "City page", plural: "City pages", color: "#4ade80" },
-  location_category: { label: "Location category", plural: "Location category pages", color: "#a3e635" },
+  location_category: {
+    label: "Location category",
+    plural: "Location category pages",
+    color: "#a3e635",
+  },
   property: { label: "Property", plural: "Property pages", color: "#f59e0b" },
   article: { label: "Article", plural: "Articles", color: "#fb7185" },
   legal: { label: "Legal", plural: "Legal pages", color: "#94a3b8" },
@@ -174,6 +197,15 @@ export function classifyWebPage(
     }
     if (first === "article")
       return { pageType: "article", title: humanizeSlug(second ?? "") };
+    if (first === "blog" && segments.length >= 2) {
+      if (segments.length === 2 && second === "engineering") {
+        return { pageType: "brand", title: "Engineering blog" };
+      }
+      return {
+        pageType: "article",
+        title: humanizeSlug(segments[segments.length - 1] ?? ""),
+      };
+    }
     if (first === "help" || first === "help-center")
       return {
         pageType: "help",
@@ -188,9 +220,14 @@ export function classifyWebPage(
     // Location grammar: /{hub}[/{city-or-category}][/{category}]
     if (first && locationHubs.has(first)) {
       // Overridden hub titles (e.g. /ca → Canada) carry into child pages.
-      const hubTitle = MANUAL_OVERRIDES[`/${first}`]?.title ?? humanizeSlug(first);
+      const hubTitle =
+        MANUAL_OVERRIDES[`/${first}`]?.title ?? humanizeSlug(first);
       if (segments.length === 1)
-        return { pageType: "location_hub", title: hubTitle, locationSlug: first };
+        return {
+          pageType: "location_hub",
+          title: hubTitle,
+          locationSlug: first,
+        };
       if (segments.length === 2) {
         if (LOCATION_CATEGORY_SLUGS.has(second!))
           return {
@@ -240,14 +277,13 @@ export function deriveLocationHubs(paths: string[]): Set<string> {
   for (const p of paths) {
     const segs = p.split("/").filter(Boolean);
     if (segs.length === 1) roots.add(segs[0]!);
-    if (segs.length >= 2 && segs[0] !== "property" && segs[0] !== "article")
+    if (segs.length >= 2 && !NON_LOCATION_ROOTS.has(segs[0]!))
       withChildren.add(segs[0]!);
   }
   const hubs = new Set([...roots].filter((r) => withChildren.has(r)));
   for (const [path, o] of Object.entries(MANUAL_OVERRIDES))
     if (o.pageType === "location_hub") hubs.add(path.replace(/^\//, ""));
   // "help" has child pages but is never a location hub.
-  hubs.delete("help");
-  hubs.delete("help-center");
+  for (const root of NON_LOCATION_ROOTS) hubs.delete(root);
   return hubs;
 }

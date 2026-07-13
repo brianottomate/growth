@@ -8,6 +8,7 @@ import {
   brandTable,
   contentPostTable,
   initiativeTable,
+  memberTable,
 } from "@/server/db/schema";
 import {
   commitMomentBlueprint,
@@ -16,6 +17,32 @@ import {
   momentBlueprintSchema,
   momentSlotSchema,
 } from "@/server/services/plan-moment.service";
+
+async function assertOwnedBrandAccess(
+  ctx: {
+    db: typeof import("@/server/db").db;
+    session: { user: { id: string } };
+  },
+  brandId: string,
+) {
+  const brand = await ctx.db.query.brandTable.findFirst({
+    where: eq(brandTable.id, brandId),
+  });
+  if (!brand?.organizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Owned brand not found",
+    });
+  }
+  const membership = await ctx.db.query.memberTable.findFirst({
+    where: and(
+      eq(memberTable.userId, ctx.session.user.id),
+      eq(memberTable.organizationId, brand.organizationId),
+    ),
+  });
+  if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
+  return brand;
+}
 
 /**
  * Moments — the forward-planning capstone. `generate` proposes a shape (no DB
@@ -53,10 +80,7 @@ export const momentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const brand = await ctx.db.query.brandTable.findFirst({
-        where: eq(brandTable.id, input.brandId),
-      });
-      if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
+      const brand = await assertOwnedBrandAccess(ctx, input.brandId);
       return generateMomentBlueprint({
         brandName: brand.name,
         brandTagline: brand.tagline,
@@ -79,7 +103,10 @@ export const momentRouter = createTRPCRouter({
         blueprint: momentBlueprintSchema,
       }),
     )
-    .mutation(async ({ input }) => commitMomentBlueprint(input)),
+    .mutation(async ({ ctx, input }) => {
+      await assertOwnedBrandAccess(ctx, input.brandId);
+      return commitMomentBlueprint(input);
+    }),
 
   get: protectedProcedure
     .input(z.object({ initiativeId: z.string() }))
@@ -88,6 +115,7 @@ export const momentRouter = createTRPCRouter({
         where: eq(initiativeTable.id, input.initiativeId),
       });
       if (!initiative) return null;
+      await assertOwnedBrandAccess(ctx, initiative.brandId);
       const slots = await ctx.db.query.contentPostTable.findMany({
         where: and(
           eq(contentPostTable.initiativeId, input.initiativeId),

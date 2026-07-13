@@ -1,8 +1,12 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import { runScrape } from "@/server/clients/brightdata.client";
+import { isApifyConfigured, runActor } from "@/server/clients/apify.client";
+import {
+  isBrightDataConfigured,
+  runScrape,
+} from "@/server/clients/brightdata.client";
 import {
   getAllXUserTweets,
   getXUserByUsername,
@@ -19,6 +23,7 @@ import {
   type PlatformPostInsert,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import { ingestPlatformPosts } from "./platform-post-ingest.service";
 
 /**
  * Peer/own social scrape → platform_post → AI suggestions.
@@ -37,6 +42,7 @@ import { createId } from "@/server/db/utils";
 
 /** Platforms with a Bright Data dataset mapper wired into this pipeline. */
 export type ScrapePlatform = "linkedin" | "x" | "instagram" | "facebook";
+export type PeerScrapeProvider = "brightdata" | "apify";
 
 type Raw = Record<string, unknown>;
 
@@ -62,7 +68,8 @@ function linkedinMedia(rec: Raw): { media: MediaItem[]; cover?: string } {
     if (url)
       media.push({ url, type: "video", thumbnail: str(rec.video_thumbnail) });
   }
-  const cover = media.find((m) => m.type === "image")?.url ?? str(rec.video_thumbnail);
+  const cover =
+    media.find((m) => m.type === "image")?.url ?? str(rec.video_thumbnail);
   return { media, cover };
 }
 
@@ -99,7 +106,9 @@ export function mapLinkedInRecord(rec: Raw, brandId: string): Mapped | null {
           platform: "linkedin",
         }
       : undefined,
-    publishedAt: str(rec.date_posted) ? new Date(str(rec.date_posted)!) : undefined,
+    publishedAt: str(rec.date_posted)
+      ? new Date(str(rec.date_posted)!)
+      : undefined,
     scrapedAt: new Date(),
     metadata: { hashtags: rec.hashtags, taggedCompanies: rec.tagged_companies },
   };
@@ -157,48 +166,93 @@ export function mapXRecord(rec: Raw, brandId: string): Mapped | null {
             platform: "x",
           }
         : undefined,
-    publishedAt: str(rec.date_posted) ? new Date(str(rec.date_posted)!) : undefined,
+    publishedAt: str(rec.date_posted)
+      ? new Date(str(rec.date_posted)!)
+      : undefined,
     scrapedAt: new Date(),
     metadata: { hashtags: rec.hashtags },
   };
-  return { insert, raw: rec, cover: media.find((m) => m.type === "image")?.url };
+  return {
+    insert,
+    raw: rec,
+    cover: media.find((m) => m.type === "image")?.url,
+  };
 }
 
 export function mapInstagramRecord(rec: Raw, brandId: string): Mapped | null {
-  // Items come from the IG-profile dataset's nested posts[] (flattened upstream).
+  // Accept both Bright Data's nested profile-post shape and Apify's post shape.
   if (rec.error || !str(rec.id)) return null;
 
-  const imageUrl = str(rec.image_url);
-  const videoUrl = str(rec.video_url);
+  const imageUrl = str(rec.image_url) ?? str(rec.displayUrl);
+  const videoUrl = str(rec.video_url) ?? str(rec.videoUrl);
   const media: MediaItem[] = [];
-  if (videoUrl) media.push({ url: videoUrl, type: "video", thumbnail: imageUrl });
-  else if (imageUrl) media.push({ url: imageUrl, type: "image" });
+  const childPosts = arr(rec.childPosts) as Raw[];
+  const mediaRecords = childPosts.length ? childPosts : [rec];
+  for (const item of mediaRecords) {
+    const childImage =
+      str(item.image_url) ?? str(item.displayUrl) ?? str(item.thumbnailUrl);
+    const childVideo = str(item.video_url) ?? str(item.videoUrl);
+    if (childVideo) {
+      media.push({
+        url: childVideo,
+        type: "video",
+        thumbnail: childImage,
+        width: num(item.dimensionsWidth),
+        height: num(item.dimensionsHeight),
+      });
+    } else if (childImage) {
+      media.push({
+        url: childImage,
+        type: "image",
+        width: num(item.dimensionsWidth),
+        height: num(item.dimensionsHeight),
+      });
+    }
+  }
+  // Some Apify records expose carousel images as a flat images[] array.
+  if (!childPosts.length) {
+    for (const image of arr(rec.images)) {
+      const url = urlOf(image);
+      if (url && !media.some((item) => item.url === url)) {
+        media.push({ url, type: "image" });
+      }
+    }
+  }
 
   const fmt = classifyFormatFromFields("instagram", rec);
   const insert: PlatformPostInsert = {
     id: createId("pp"),
     brandId,
     platform: "instagram",
-    username: str(rec.account),
+    username: str(rec.account) ?? str(rec.ownerUsername),
     source: "scraped",
     status: "published",
     format: fmt.format,
     archetype: fmt.archetype,
     text: str(rec.caption),
     media: media.length ? media : undefined,
-    stats: { likes: num(rec.likes), comments: num(rec.comments) },
+    stats: {
+      likes: num(rec.likes) ?? num(rec.likesCount),
+      comments: num(rec.comments) ?? num(rec.commentsCount),
+    },
     externalId: str(rec.id),
-    externalUrl: str(rec.url),
+    externalUrl: str(rec.url) ?? str(rec.inputUrl),
     externalKind: "post",
-    publishedAt: str(rec.datetime) ? new Date(str(rec.datetime)!) : undefined,
+    publishedAt: str(rec.datetime ?? rec.timestamp)
+      ? new Date(str(rec.datetime ?? rec.timestamp)!)
+      : undefined,
     scrapedAt: new Date(),
     metadata: {
-      hashtags: rec.post_hashtags,
-      contentType: rec.content_type,
+      hashtags: rec.post_hashtags ?? rec.hashtags,
+      contentType: rec.content_type ?? rec.type,
       location: rec.location,
     },
   };
-  return { insert, raw: rec, cover: imageUrl };
+  return {
+    insert,
+    raw: rec,
+    cover: media.find((item) => item.type === "image")?.url ?? imageUrl,
+  };
 }
 
 export function mapFacebookRecord(rec: Raw, brandId: string): Mapped | null {
@@ -214,7 +268,9 @@ export function mapFacebookRecord(rec: Raw, brandId: string): Mapped | null {
   }
   if (!media.length) {
     const img =
-      str(rec.post_image) ?? str(rec.post_external_image) ?? str(rec.header_image);
+      str(rec.post_image) ??
+      str(rec.post_external_image) ??
+      str(rec.header_image);
     if (img) media.push({ url: img, type: "image" });
   }
 
@@ -239,7 +295,9 @@ export function mapFacebookRecord(rec: Raw, brandId: string): Mapped | null {
     externalId: str(rec.post_id),
     externalUrl: str(rec.url),
     externalKind: "post",
-    publishedAt: str(rec.date_posted) ? new Date(str(rec.date_posted)!) : undefined,
+    publishedAt: str(rec.date_posted)
+      ? new Date(str(rec.date_posted)!)
+      : undefined,
     scrapedAt: new Date(),
     metadata: {
       hashtags: rec.hashtags,
@@ -247,7 +305,11 @@ export function mapFacebookRecord(rec: Raw, brandId: string): Mapped | null {
       isSponsored: rec.is_sponsored,
     },
   };
-  return { insert, raw: rec, cover: media.find((m) => m.type === "image")?.url };
+  return {
+    insert,
+    raw: rec,
+    cover: media.find((m) => m.type === "image")?.url,
+  };
 }
 
 const MAPPERS: Record<
@@ -266,10 +328,13 @@ export type ProcessResult = {
   scanned: number;
   inserted: number;
   skippedExisting: number;
+  updatedExisting: number;
+  rehosted: number;
   classificationSuggestions: number;
   amplificationSuggestions: number;
   amplificationResolved: number;
 };
+export type PeerScrapeResult = ProcessResult & { provider: PeerScrapeProvider };
 
 export async function processRecords(opts: {
   brandId: string;
@@ -278,6 +343,7 @@ export async function processRecords(opts: {
   skipTemplate?: boolean;
   /** Drop dated posts older than this — the hard 30-day bound. */
   cutoff?: Date;
+  ingestProvider?: "brightdata" | "apify" | "x_api";
 }): Promise<ProcessResult> {
   const map = MAPPERS[opts.platform];
   if (!map) throw new Error(`no mapper for ${opts.platform}`);
@@ -296,6 +362,7 @@ export async function processRecords(opts: {
     mapped,
     scanned: opts.records.length,
     skipTemplate: opts.skipTemplate,
+    ingestProvider: opts.ingestProvider,
   });
 }
 
@@ -307,40 +374,31 @@ async function processMapped(opts: {
   mapped: Mapped[];
   scanned: number;
   skipTemplate?: boolean;
+  ingestProvider?: "brightdata" | "apify" | "x_api";
 }): Promise<ProcessResult> {
   const mapped = opts.mapped;
 
-  // Dedup vs already-scraped rows for this brand (by externalId).
-  const ids = mapped
-    .map((m) => m.insert.externalId)
-    .filter((x): x is string => !!x);
-  const existing = ids.length
-    ? await db
-        .select({ externalId: platformPostTable.externalId })
-        .from(platformPostTable)
-        .where(
-          and(
-            eq(platformPostTable.brandId, opts.brandId),
-            inArray(platformPostTable.externalId, ids),
-          ),
-        )
-    : [];
-  const seen = new Set(existing.map((r) => r.externalId));
+  const ingest = await ingestPlatformPosts({
+    brandId: opts.brandId,
+    ingestProvider: opts.ingestProvider ?? "brightdata",
+    rows: mapped.map((m) => m.insert),
+  });
+  const insertedIds = new Set(ingest.insertedIds);
   const fresh = mapped.filter(
-    (m) => m.insert.externalId && !seen.has(m.insert.externalId),
+    (m) => m.insert.id && insertedIds.has(m.insert.id),
   );
 
   const result: ProcessResult = {
     scanned: opts.scanned,
-    inserted: fresh.length,
-    skippedExisting: mapped.length - fresh.length,
+    inserted: ingest.inserted,
+    skippedExisting: 0,
+    updatedExisting: ingest.updated,
+    rehosted: ingest.rehosted,
     classificationSuggestions: 0,
     amplificationSuggestions: 0,
     amplificationResolved: 0,
   };
   if (!fresh.length) return result;
-
-  await db.insert(platformPostTable).values(fresh.map((m) => m.insert));
 
   for (const m of fresh) {
     const postId = m.insert.id!;
@@ -388,7 +446,9 @@ async function processMapped(opts: {
         subjectPostId: postId,
         targetPostId,
         targetRef: amp,
-        proposed: { linkKind: m.insert.externalKind === "quote" ? "quotes" : "reposts" },
+        proposed: {
+          linkKind: m.insert.externalKind === "quote" ? "quotes" : "reposts",
+        },
         confidence,
         reasoning: `${opts.platform} ${m.insert.externalKind} of @${amp.username ?? "?"}${
           targetPostId ? " — matched an existing post" : " — original not in DB"
@@ -410,6 +470,17 @@ const SCRAPER_KEY = {
   instagram: "instagramProfile",
   facebook: "facebookPosts",
 } as const;
+
+/** Pick the richest configured provider that supports this platform. */
+export function peerScrapeProviderFor(
+  platform: ScrapePlatform,
+): PeerScrapeProvider | null {
+  if (isBrightDataConfigured) return "brightdata";
+  // The maintained Instagram actor returns post text, engagement, timestamps,
+  // and every childPosts item for carousels, which our shared mapper preserves.
+  if (isApifyConfigured && platform === "instagram") return "apify";
+  return null;
+}
 
 /** Resolve a brand's profile URL for a platform from its channel row. */
 export async function profileUrlForBrand(
@@ -437,10 +508,41 @@ export async function scrapeAndSuggest(opts: {
   /** How many days back to keep (hard bound, default 30). */
   sinceDays?: number;
   skipTemplate?: boolean;
-}): Promise<ProcessResult> {
+  provider?: PeerScrapeProvider;
+}): Promise<PeerScrapeResult> {
   const limit = opts.limit ?? 30;
   const sinceDays = opts.sinceDays ?? 30;
   const cutoff = new Date(Date.now() - sinceDays * 86_400_000);
+
+  const provider = opts.provider ?? peerScrapeProviderFor(opts.platform);
+  if (!provider) {
+    throw new Error(
+      `No configured scraper supports ${opts.platform}. Configure Bright Data${
+        opts.platform === "instagram" ? " or Apify" : ""
+      }.`,
+    );
+  }
+
+  if (provider === "apify") {
+    const records = await runActor<Raw>("apify/instagram-scraper", {
+      directUrls: [opts.profileUrl],
+      resultsType: "posts",
+      resultsLimit: limit,
+      onlyPostsNewerThan: `${sinceDays} days`,
+      skipPinnedPosts: true,
+    });
+    return {
+      ...(await processRecords({
+        brandId: opts.brandId,
+        platform: opts.platform,
+        records,
+        skipTemplate: opts.skipTemplate,
+        cutoff,
+        ingestProvider: "apify",
+      })),
+      provider: "apify",
+    };
+  }
 
   // LinkedIn posts dataset discovers by company_url by default; a personal
   // profile (/in/) needs discover_by=profile_url.
@@ -453,15 +555,47 @@ export async function scrapeAndSuggest(opts: {
   // Facebook caps via `num_of_posts` in the input row; the IG-profile dataset
   // takes NEITHER — passing limit_per_input returns 0 rows — it just yields the
   // profile's recent posts (≤12), which the cutoff filter then bounds.
-  const usesLimitParam =
-    opts.platform === "linkedin" || opts.platform === "x";
+  const usesLimitParam = opts.platform === "linkedin" || opts.platform === "x";
   const inputRow: Record<string, unknown> = { url: opts.profileUrl };
   if (opts.platform === "facebook") inputRow.num_of_posts = limit;
 
-  let records = (await runScrape(SCRAPER_KEY[opts.platform], [inputRow], {
-    limitPerInput: usesLimitParam ? limit : undefined,
-    query,
-  })) as Raw[];
+  let records: Raw[];
+  try {
+    records = (await runScrape(SCRAPER_KEY[opts.platform], [inputRow], {
+      limitPerInput: usesLimitParam ? limit : undefined,
+      query,
+    })) as Raw[];
+  } catch (error) {
+    // Bright Data can have a valid API key while its customer is inactive.
+    // For Instagram we have a maintained Apify fallback with an equivalent
+    // enough post/media shape, so use it rather than presenting a dead button.
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      opts.platform === "instagram" &&
+      isApifyConfigured &&
+      message.includes("Customer is not active")
+    ) {
+      const fallbackRecords = await runActor<Raw>("apify/instagram-scraper", {
+        directUrls: [opts.profileUrl],
+        resultsType: "posts",
+        resultsLimit: limit,
+        onlyPostsNewerThan: `${sinceDays} days`,
+        skipPinnedPosts: true,
+      });
+      return {
+        ...(await processRecords({
+          brandId: opts.brandId,
+          platform: opts.platform,
+          records: fallbackRecords,
+          skipTemplate: opts.skipTemplate,
+          cutoff,
+          ingestProvider: "apify",
+        })),
+        provider: "apify",
+      };
+    }
+    throw error;
+  }
 
   // The IG-profile dataset returns ONE profile object with a nested posts[];
   // flatten to per-post records and carry the profile handle onto each.
@@ -472,13 +606,75 @@ export async function scrapeAndSuggest(opts: {
     });
   }
 
-  return processRecords({
-    brandId: opts.brandId,
-    platform: opts.platform,
-    records,
-    skipTemplate: opts.skipTemplate,
-    cutoff,
+  return {
+    ...(await processRecords({
+      brandId: opts.brandId,
+      platform: opts.platform,
+      records,
+      skipTemplate: opts.skipTemplate,
+      cutoff,
+      ingestProvider: "brightdata",
+    })),
+    provider: "brightdata",
+  };
+}
+
+/**
+ * Re-read one public Instagram permalink to renew its short-lived media URLs.
+ * This intentionally updates the same canonical `platform_post`; it is a
+ * manual recovery action for an expired preview, not a scheduled refresh.
+ */
+export async function refreshInstagramPostMedia(opts: {
+  brandId: string;
+  postUrl: string;
+}): Promise<PeerScrapeResult> {
+  if (!isApifyConfigured) {
+    throw new Error("Apify is not configured for Instagram media refresh");
+  }
+  const records = await runActor<Raw>("apify/instagram-scraper", {
+    directUrls: [opts.postUrl],
+    resultsType: "posts",
+    resultsLimit: 1,
   });
+  return {
+    ...(await processRecords({
+      brandId: opts.brandId,
+      platform: "instagram",
+      records,
+      ingestProvider: "apify",
+    })),
+    provider: "apify",
+  };
+}
+
+/**
+ * Refresh the visible history of one owned Instagram profile without imposing a
+ * date cutoff. Used only by the explicit owned-media recovery action, before
+ * its newly issued URLs are copied into Blob.
+ */
+export async function refreshInstagramProfileMedia(opts: {
+  brandId: string;
+  profileUrl: string;
+  limit?: number;
+}): Promise<PeerScrapeResult> {
+  if (!isApifyConfigured) {
+    throw new Error("Apify is not configured for Instagram media refresh");
+  }
+  const records = await runActor<Raw>("apify/instagram-scraper", {
+    directUrls: [opts.profileUrl],
+    resultsType: "posts",
+    resultsLimit: opts.limit ?? 30,
+    skipPinnedPosts: false,
+  });
+  return {
+    ...(await processRecords({
+      brandId: opts.brandId,
+      platform: "instagram",
+      records,
+      ingestProvider: "apify",
+    })),
+    provider: "apify",
+  };
 }
 
 /** Resolve a brand's X handle from its channel row. */
@@ -486,7 +682,9 @@ export async function xHandleForBrand(brandId: string): Promise<string | null> {
   const [chan] = await db
     .select({ handle: channelTable.handle })
     .from(channelTable)
-    .where(and(eq(channelTable.brandId, brandId), eq(channelTable.platform, "x")))
+    .where(
+      and(eq(channelTable.brandId, brandId), eq(channelTable.platform, "x")),
+    )
     .limit(1);
   return chan?.handle ?? null;
 }
@@ -559,7 +757,9 @@ export async function ingestXViaApi(opts: {
       format: hasVideo ? "x.video" : "x.tweet",
       archetype: hasVideo ? "video_short" : "text",
       externalKind,
-      amplifiedFrom: ampRef ? { externalId: ampRef.id, platform: "x" } : undefined,
+      amplifiedFrom: ampRef
+        ? { externalId: ampRef.id, platform: "x" }
+        : undefined,
     };
     mapped.push({
       insert,
@@ -574,6 +774,7 @@ export async function ingestXViaApi(opts: {
     mapped,
     scanned: tweets.length,
     skipTemplate: opts.skipTemplate,
+    ingestProvider: "x_api",
   });
 
   // Link threads AFTER insert (rows exist now → no self-FK ordering issue).

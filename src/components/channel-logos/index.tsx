@@ -56,6 +56,7 @@ export const PLATFORM_META: Record<string, { name: string; code: string }> = {
   linkedin_ads: { name: "LinkedIn Ads", code: "LA" },
   x_ads: { name: "X Ads", code: "XA" },
   tiktok_ads: { name: "TikTok Ads", code: "TA" },
+  pinterest_ads: { name: "Pinterest Ads", code: "PA" },
   newsletter: { name: "Newsletter", code: "NL" },
   blog: { name: "Blog", code: "BL" },
   other: { name: "Other", code: "··" },

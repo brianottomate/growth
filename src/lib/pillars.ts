@@ -113,6 +113,47 @@ export const PILLARS: Pillar[] = [
     color: "oklch(0.62 0.16 270)",
     brandSlug: "wanderos",
   },
+  // Homi (AI-assisted home search)
+  {
+    slug: "product-in-action",
+    name: "Product in Action",
+    description:
+      "Concrete Homi workflows, demos, releases, and explanations of what the product remembers or makes easier.",
+    color: "oklch(0.7 0.14 235)",
+    brandSlug: "homi",
+  },
+  {
+    slug: "home-search-intelligence",
+    name: "Home-search Intelligence",
+    description:
+      "Useful observations about evaluating listings, collaborating, comparing tradeoffs, and making a move.",
+    color: "oklch(0.72 0.14 150)",
+    brandSlug: "homi",
+  },
+  {
+    slug: "building-homi",
+    name: "Building Homi",
+    description:
+      "Founder perspective, product decisions, experiments, technical lessons, and honest progress from behind the scenes.",
+    color: "oklch(0.68 0.12 285)",
+    brandSlug: "homi",
+  },
+  {
+    slug: "customer-proof",
+    name: "Customer Proof",
+    description:
+      "Real searches, feedback, collaboration stories, outcomes, and credible evidence that Homi helps.",
+    color: "oklch(0.74 0.15 60)",
+    brandSlug: "homi",
+  },
+  {
+    slug: "homi-news",
+    name: "Homi News",
+    description:
+      "Launches, partnerships, press, milestones, market expansion, and other genuinely timely company updates.",
+    color: "oklch(0.68 0.04 280)",
+    brandSlug: "homi",
+  },
 ];
 
 export const PILLAR_BY_SLUG: Record<string, Pillar> = Object.fromEntries(

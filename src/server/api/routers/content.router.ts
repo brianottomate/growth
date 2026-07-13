@@ -15,7 +15,10 @@ import {
   platformPostTable,
   seriesTable,
 } from "@/server/db/schema";
-import { archetypeForFormat, platformFormatsFor } from "@/server/content/formats";
+import {
+  archetypeForFormat,
+  platformFormatsFor,
+} from "@/server/content/formats";
 import { ContentService } from "@/server/services/content.service";
 import { generateSpotCaption } from "@/server/services/spot-generate.service";
 import { SPOT_PILL_IDS } from "@/lib/spot-pills";
@@ -35,7 +38,10 @@ async function orgContext(ctx: Ctx) {
   const org = membership?.organization ?? null;
   if (!org) return { org: null, brands: [] as { id: string; name: string }[] };
   const brands = await ctx.db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
     columns: { id: true, name: true },
   });
   return { org, brands };
@@ -56,14 +62,20 @@ async function assertOrgMember(ctx: Ctx, orgId: string | null | undefined) {
       })
     : null;
   if (!orgId || !membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this content" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No access to this content",
+    });
   }
 }
 
 /** The minimal person shape every assignment surface renders (avatar + name). */
 export type Member = { id: string; name: string | null; image: string | null };
 const toMember = (
-  u: { id: string; name: string | null; image: string | null } | null | undefined,
+  u:
+    | { id: string; name: string | null; image: string | null }
+    | null
+    | undefined,
 ): Member | null => (u ? { id: u.id, name: u.name, image: u.image } : null);
 
 const statusEnum = z.enum(contentStatusEnum.enumValues);
@@ -86,7 +98,8 @@ export const contentRouter = createTRPCRouter({
       if (!org) return [];
 
       let brandIds = brands.map((b) => b.id);
-      if (input.brandId) brandIds = brandIds.filter((id) => id === input.brandId);
+      if (input.brandId)
+        brandIds = brandIds.filter((id) => id === input.brandId);
       if (!brandIds.length) return [];
 
       const memberCols = { id: true, name: true, image: true } as const;
@@ -121,7 +134,10 @@ export const contentRouter = createTRPCRouter({
           })
         : [];
       type LastComment = { author: string | null; body: string; at: string };
-      const commentAgg = new Map<string, { count: number; last: LastComment | null }>();
+      const commentAgg = new Map<
+        string,
+        { count: number; last: LastComment | null }
+      >();
       for (const cm of comments) {
         if (!cm.contentPostId) continue;
         const e = commentAgg.get(cm.contentPostId) ?? { count: 0, last: null };
@@ -196,12 +212,18 @@ export const contentRouter = createTRPCRouter({
    * manual posting worklist — what goes out, on which channel, on which day.
    */
   schedule: protectedProcedure
-    .input(z.object({ brandId: z.string().optional(), pillar: z.string().optional() }))
+    .input(
+      z.object({
+        brandId: z.string().optional(),
+        pillar: z.string().optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const { org, brands } = await orgContext(ctx);
       if (!org) return [];
       let brandIds = brands.map((b) => b.id);
-      if (input.brandId) brandIds = brandIds.filter((id) => id === input.brandId);
+      if (input.brandId)
+        brandIds = brandIds.filter((id) => id === input.brandId);
       if (!brandIds.length) return [];
 
       const memberCols = { id: true, name: true, image: true } as const;
@@ -211,7 +233,9 @@ export const contentRouter = createTRPCRouter({
           eq(platformPostTable.source, "owned"),
         ),
         with: {
-          contentPost: { with: { series: true, owner: { columns: memberCols } } },
+          contentPost: {
+            with: { series: true, owner: { columns: memberCols } },
+          },
           owner: { columns: memberCols },
         },
       });
@@ -219,9 +243,12 @@ export const contentRouter = createTRPCRouter({
 
       return spots
         .filter((p) => p.contentPost && !p.contentPost.deletedAt)
-        .filter((p) => (input.pillar ? p.contentPost?.pillar === input.pillar : true))
+        .filter((p) =>
+          input.pillar ? p.contentPost?.pillar === input.pillar : true,
+        )
         .map((p) => {
-          const at = p.scheduledAt ?? p.publishedAt ?? p.contentPost?.plannedAt ?? null;
+          const at =
+            p.scheduledAt ?? p.publishedAt ?? p.contentPost?.plannedAt ?? null;
           return {
             id: p.id,
             contentPostId: p.contentPostId,
@@ -257,12 +284,18 @@ export const contentRouter = createTRPCRouter({
    * (the month workbooks are date-driven).
    */
   grid: protectedProcedure
-    .input(z.object({ brandId: z.string().optional(), pillar: z.string().optional() }))
+    .input(
+      z.object({
+        brandId: z.string().optional(),
+        pillar: z.string().optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const { org, brands } = await orgContext(ctx);
       if (!org) return [];
       let brandIds = brands.map((b) => b.id);
-      if (input.brandId) brandIds = brandIds.filter((id) => id === input.brandId);
+      if (input.brandId)
+        brandIds = brandIds.filter((id) => id === input.brandId);
       if (!brandIds.length) return [];
 
       const memberCols = { id: true, name: true, image: true } as const;
@@ -290,7 +323,9 @@ export const contentRouter = createTRPCRouter({
           const at = c.plannedAt ?? earliestSpot ?? null;
 
           // Spot-level columns are aggregated across the idea's renderings.
-          const platforms = [...new Set(c.platformPosts.map((p) => p.platform))];
+          const platforms = [
+            ...new Set(c.platformPosts.map((p) => p.platform)),
+          ];
           const formats = [
             ...new Set(
               c.platformPosts
@@ -355,37 +390,43 @@ export const contentRouter = createTRPCRouter({
           })
         : null;
       if (!orgId || !membership) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "No access to this content" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No access to this content",
+        });
       }
 
-      await ctx.db
-        .update(contentPostTable)
-        .set({ status: input.status })
-        .where(eq(contentPostTable.id, input.id));
-
+      await ContentService.setContentStatus({
+        contentPostId: input.id,
+        status: input.status,
+      });
       return { id: input.id, status: input.status };
     }),
 
   /** Org roster for the assignee picker — everyone who can own a piece/spot. */
-  assignableMembers: protectedProcedure.query(async ({ ctx }): Promise<Member[]> => {
-    const { org } = await orgContext(ctx);
-    if (!org) return [];
-    const members = await ctx.db.query.memberTable.findMany({
-      where: eq(memberTable.organizationId, org.id),
-      with: { user: { columns: { id: true, name: true, image: true } } },
-    });
-    return members
-      .map((m) => toMember(m.user))
-      .filter((m): m is Member => m !== null)
-      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-  }),
+  assignableMembers: protectedProcedure.query(
+    async ({ ctx }): Promise<Member[]> => {
+      const { org } = await orgContext(ctx);
+      if (!org) return [];
+      const members = await ctx.db.query.memberTable.findMany({
+        where: eq(memberTable.organizationId, org.id),
+        with: { user: { columns: { id: true, name: true, image: true } } },
+      });
+      return members
+        .map((m) => toMember(m.user))
+        .filter((m): m is Member => m !== null)
+        .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+    },
+  ),
 
   /**
    * Assign / clear the idea-level owner (DRI). `ownerId: null` disowns.
    * Self-assign is just `ownerId === session.user.id`; no admin gate.
    */
   setOwner: protectedProcedure
-    .input(z.object({ contentPostId: z.string(), ownerId: z.string().nullable() }))
+    .input(
+      z.object({ contentPostId: z.string(), ownerId: z.string().nullable() }),
+    )
     .mutation(async ({ ctx, input }) => {
       const content = await ctx.db.query.contentPostTable.findFirst({
         where: eq(contentPostTable.id, input.contentPostId),
@@ -406,7 +447,9 @@ export const contentRouter = createTRPCRouter({
    * Designer + copywriter + approver, etc. Idempotent: pass the full list.
    */
   setAssignees: protectedProcedure
-    .input(z.object({ contentPostId: z.string(), userIds: z.array(z.string()) }))
+    .input(
+      z.object({ contentPostId: z.string(), userIds: z.array(z.string()) }),
+    )
     .mutation(async ({ ctx, input }) => {
       const content = await ctx.db.query.contentPostTable.findFirst({
         where: eq(contentPostTable.id, input.contentPostId),
@@ -421,7 +464,10 @@ export const contentRouter = createTRPCRouter({
         .where(eq(contentAssigneeTable.contentPostId, input.contentPostId));
       if (ids.length) {
         await ctx.db.insert(contentAssigneeTable).values(
-          ids.map((userId) => ({ contentPostId: input.contentPostId, userId })),
+          ids.map((userId) => ({
+            contentPostId: input.contentPostId,
+            userId,
+          })),
         );
       }
       return { id: input.contentPostId, userIds: ids };
@@ -432,7 +478,9 @@ export const contentRouter = createTRPCRouter({
    * differs per person, so a spot can be owned independently of the idea.
    */
   setSpotOwner: protectedProcedure
-    .input(z.object({ platformPostId: z.string(), ownerId: z.string().nullable() }))
+    .input(
+      z.object({ platformPostId: z.string(), ownerId: z.string().nullable() }),
+    )
     .mutation(async ({ ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
         where: eq(platformPostTable.id, input.platformPostId),
@@ -463,20 +511,15 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Can't edit a scraped post" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't edit a scraped post",
+        });
       }
-      // Manual posting: when the team marks a spot Published, stamp the ship
-      // time (its scheduled day, or now) so it lands correctly on the timeline.
-      const fields: { status: typeof input.status; publishedAt?: Date } = {
+      await ContentService.updatePlatformDraft({
+        platformPostId: input.platformPostId,
         status: input.status,
-      };
-      if (input.status === "published" && !spot.publishedAt) {
-        fields.publishedAt = spot.scheduledAt ?? new Date();
-      }
-      await ctx.db
-        .update(platformPostTable)
-        .set(fields)
-        .where(eq(platformPostTable.id, input.platformPostId));
+      });
       return { id: input.platformPostId, status: input.status };
     }),
 
@@ -503,17 +546,16 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Can't edit a scraped post" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't edit a scraped post",
+        });
       }
-      await ctx.db
-        .update(platformPostTable)
-        .set({
-          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
-          ...(input.markScheduled && input.scheduledAt
-            ? { status: "scheduled" as const }
-            : {}),
-        })
-        .where(eq(platformPostTable.id, input.platformPostId));
+      await ContentService.updatePlatformDraft({
+        platformPostId: input.platformPostId,
+        scheduledAt: input.scheduledAt,
+        markScheduled: input.markScheduled,
+      });
       return { id: input.platformPostId };
     }),
 
@@ -533,7 +575,10 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Can't edit a scraped post" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't edit a scraped post",
+        });
       }
       await ctx.db
         .update(platformPostTable)
@@ -542,7 +587,7 @@ export const contentRouter = createTRPCRouter({
       return { id: input.platformPostId };
     }),
 
-  /** Attach hosted media (R2/Stream library assets) to a spot. `assetId` links
+  /** Attach hosted media (Blob library assets) to a spot. `assetId` links
    *  each item back to the media library; uploaded via the media router. */
   setMedia: protectedProcedure
     .input(
@@ -571,20 +616,22 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Can't edit a scraped post" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't edit a scraped post",
+        });
       }
-      await ctx.db
-        .update(platformPostTable)
-        .set({ media: input.media.length ? input.media : null })
-        .where(eq(platformPostTable.id, input.platformPostId));
-      return { id: input.platformPostId };
+      return ContentService.setSpotMedia(input);
     }),
 
   /** Set a spot's concrete, platform-specific caption (`platform_post.text`) —
    *  distinct from the idea-level `captionDirection` brief. */
   setSpotText: protectedProcedure
     .input(
-      z.object({ platformPostId: z.string(), text: z.string().max(5000).nullable() }),
+      z.object({
+        platformPostId: z.string(),
+        text: z.string().max(5000).nullable(),
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
@@ -594,10 +641,16 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Can't edit a scraped post" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't edit a scraped post",
+        });
       }
       const text = input.text?.trim() ? input.text : null;
-      return ContentService.setSpotText({ platformPostId: input.platformPostId, text });
+      return ContentService.setSpotText({
+        platformPostId: input.platformPostId,
+        text,
+      });
     }),
 
   /** AI-remix the idea brief into a platform-ready caption in the composed
@@ -700,6 +753,78 @@ export const contentRouter = createTRPCRouter({
     }),
 
   /**
+   * Start with one native channel draft. Unlike `create`, this deliberately
+   * leaves contentPostId null until the operator decides the post deserves a
+   * canonical idea, cross-posts, a grouping, or a series.
+   */
+  createPlatformPost: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        platform: z.enum(channelPlatformEnum.enumValues),
+        title: z.string().trim().min(1).optional(),
+        text: z.string().max(10_000).optional(),
+        pillar: z.string().optional(),
+        scheduledAt: z.string().datetime().optional(),
+        format: z.string().optional(),
+        referencePlatformPostId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const brand = await ctx.db.query.brandTable.findFirst({
+        where: eq(brandTable.id, input.brandId),
+        columns: { organizationId: true },
+      });
+      if (!brand) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, brand.organizationId);
+
+      if (input.referencePlatformPostId) {
+        const reference = await ctx.db.query.platformPostTable.findFirst({
+          where: eq(platformPostTable.id, input.referencePlatformPostId),
+          columns: { id: true },
+        });
+        if (!reference) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Reference platform post not found",
+          });
+        }
+      }
+
+      return ContentService.createPlatformPost({
+        ...input,
+        ownerId: ctx.session.user.id,
+      });
+    }),
+
+  /** Lift one platform-first draft/history item into the canonical idea layer. */
+  promotePlatformPost: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        title: z.string().trim().min(1).optional(),
+        pillar: z.string().nullable().optional(),
+        seriesId: z.string().nullable().optional(),
+        crossPostPlatforms: z
+          .array(z.enum(channelPlatformEnum.enumValues))
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const post = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!post) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, post.brand?.organizationId);
+      return ContentService.promotePlatformPost({
+        ...input,
+        ownerId: ctx.session.user.id,
+        createdById: ctx.session.user.id,
+      });
+    }),
+
+  /**
    * Edit the idea-level editorial brief (the sheet's hook/caption/CTA/KPI
    * columns) plus title / pillar / series / plan date. Partial — only the
    * provided keys are written.
@@ -781,7 +906,10 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       if (spot.source !== "owned") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Can't remove a scraped post" });
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't remove a scraped post",
+        });
       }
       await ctx.db
         .delete(platformPostTable)
@@ -897,7 +1025,10 @@ export const contentRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      const review = { reviewedById: ctx.session.user.id, reviewedAt: new Date() };
+      const review = {
+        reviewedById: ctx.session.user.id,
+        reviewedAt: new Date(),
+      };
 
       if (!input.accept) {
         await ctx.db
@@ -966,7 +1097,11 @@ export const contentRouter = createTRPCRouter({
           .update(contentSuggestionTable)
           .set({ status: "accepted", ...review })
           .where(eq(contentSuggestionTable.id, input.id));
-        return { id: input.id, status: "accepted" as const, seriesId: series?.id };
+        return {
+          id: input.id,
+          status: "accepted" as const,
+          seriesId: series?.id,
+        };
       }
 
       // "single": one piece — all members are its renderings/amplifications.
@@ -997,7 +1132,11 @@ export const contentRouter = createTRPCRouter({
         .set({ status: "accepted", ...review })
         .where(eq(contentSuggestionTable.id, input.id));
 
-      return { id: input.id, status: "accepted" as const, contentPostId: cp?.id };
+      return {
+        id: input.id,
+        status: "accepted" as const,
+        contentPostId: cp?.id,
+      };
     }),
 
   /**
@@ -1110,7 +1249,9 @@ export const contentRouter = createTRPCRouter({
     }),
 
   addComment: protectedProcedure
-    .input(z.object({ contentPostId: z.string(), body: z.string().trim().min(1) }))
+    .input(
+      z.object({ contentPostId: z.string(), body: z.string().trim().min(1) }),
+    )
     .mutation(async ({ ctx, input }) => {
       const content = await ctx.db.query.contentPostTable.findFirst({
         where: eq(contentPostTable.id, input.contentPostId),

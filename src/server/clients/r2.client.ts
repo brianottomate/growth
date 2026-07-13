@@ -35,6 +35,18 @@ function getClient(): S3Client {
   return _client;
 }
 
+/** True when a URL points at our public R2 bucket (i.e. bytes we host). */
+export function r2IsPublicUrl(url: string): boolean {
+  if (!env.R2_PUBLIC_BASE_URL) return false;
+  try {
+    const base = new URL(env.R2_PUBLIC_BASE_URL);
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname === base.hostname;
+  } catch {
+    return false;
+  }
+}
+
 /** Public URL for an object key (bucket root is mapped to R2_PUBLIC_BASE_URL). */
 export function r2PublicUrl(key: string): string {
   if (!env.R2_PUBLIC_BASE_URL) {
@@ -105,6 +117,34 @@ export function r2BuildPosterKey(brandId: string, id: string, ext = "jpg"): stri
     .join("/");
 }
 
+/**
+ * Key prefix for one video-analysis run's derived storyboard boards, under
+ * `{R2_PREFIX}analysis/{organizationId}/{analysisId}/`. Boards are derived
+ * artifacts — deliberately outside the media-library key space.
+ */
+export function r2AnalysisKeyPrefix(
+  organizationId: string,
+  analysisId: string,
+): string {
+  const safeOrg = organizationId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const safeAnalysis = analysisId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  return (
+    [env.R2_PREFIX, "analysis", safeOrg, safeAnalysis]
+      .filter(Boolean)
+      .join("/") + "/"
+  );
+}
+
+/** Object key for one storyboard board image within an analysis run. */
+export function r2BuildAnalysisKey(
+  organizationId: string,
+  analysisId: string,
+  filename: string,
+): string {
+  const safeName = filename.replace(/[^a-zA-Z0-9_.-]/g, "-") || "board.png";
+  return `${r2AnalysisKeyPrefix(organizationId, analysisId)}${safeName}`;
+}
+
 /** Key for a user's profile photo (not brand-scoped). */
 export function r2BuildUserPhotoKey(userId: string, filename: string): string {
   const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -167,7 +207,10 @@ export async function r2PutFromUrl(key: string, sourceUrl: string): Promise<stri
 
 export const R2 = {
   publicUrl: r2PublicUrl,
+  isPublicUrl: r2IsPublicUrl,
   buildKey: r2BuildKey,
+  analysisKeyPrefix: r2AnalysisKeyPrefix,
+  buildAnalysisKey: r2BuildAnalysisKey,
   buildPosterKey: r2BuildPosterKey,
   buildUserPhotoKey: r2BuildUserPhotoKey,
   buildUploadKey: r2BuildUploadKey,

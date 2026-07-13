@@ -23,6 +23,7 @@ export const env = createEnv({
     ADMIN_TOKEN: z.string().min(32), // Require strong token (32+ chars)
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
+    FAL_AI_API_KEY: z.string().optional(), // fal.ai image/video generation
     FIRECRAWL_API_KEY: z.string().min(1), // For web scraping
     OUTREACH_S2S_GUID: z.string().optional(), // For Outreach S2S auth
     OUTREACH_PRIVATE_KEY: z.string().optional(), // For Outreach S2S JWT signing
@@ -151,6 +152,7 @@ export const env = createEnv({
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    FAL_AI_API_KEY: process.env.FAL_AI_API_KEY,
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
     OUTREACH_S2S_GUID: process.env.OUTREACH_S2S_GUID,
     OUTREACH_PRIVATE_KEY: process.env.OUTREACH_PRIVATE_KEY,

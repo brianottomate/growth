@@ -11,11 +11,14 @@ import { env } from "@/env";
  *
  * @see https://docs.firecrawl.dev
  */
-export const firecrawl = new Firecrawl({
-  apiKey: env.FIRECRAWL_API_KEY,
-});
-
 export const isFirecrawlConfigured = !!env.FIRECRAWL_API_KEY;
+
+// Optional integrations must never construct network clients during a build.
+// Callers that need Firecrawl already handle a failed/null scrape; the one
+// enrichment helper below makes the same absence explicit.
+export const firecrawl = isFirecrawlConfigured
+  ? new Firecrawl({ apiKey: env.FIRECRAWL_API_KEY })
+  : (null as unknown as Firecrawl);
 
 /**
  * Scrape a site for lead enrichment: main-content markdown + page metadata +
@@ -27,6 +30,7 @@ export async function scrapeForEnrichment(url: string): Promise<{
   metadata?: Record<string, unknown>;
   screenshot?: string;
 }> {
+  if (!isFirecrawlConfigured) return {};
   const result = await firecrawl.scrape(url, {
     formats: ["markdown", "screenshot"],
     onlyMainContent: true,

@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { userTable } from "./auth-schema";
@@ -39,6 +39,7 @@ export const channelPlatformEnum = pgEnum("channel_platform", [
   "linkedin_ads",
   "x_ads",
   "tiktok_ads",
+  "pinterest_ads",
   // owned content surfaces
   "newsletter",
   "blog",
@@ -53,8 +54,7 @@ export const connectionStatusEnum = pgEnum("connection_status", [
   "error",
   "disconnected",
 ]);
-export type ConnectionStatus =
-  (typeof connectionStatusEnum.enumValues)[number];
+export type ConnectionStatus = (typeof connectionStatusEnum.enumValues)[number];
 
 // How content actually ships — the "via X" pipe shown in the Feed.
 export const deliveryProviderEnum = pgEnum("delivery_provider", [
@@ -66,8 +66,7 @@ export const deliveryProviderEnum = pgEnum("delivery_provider", [
   "manual",
   "email_forward", // forwarded inbound email (e.g. a competitor newsletter we subscribed to)
 ]);
-export type DeliveryProvider =
-  (typeof deliveryProviderEnum.enumValues)[number];
+export type DeliveryProvider = (typeof deliveryProviderEnum.enumValues)[number];
 
 // ---- FOLLOWER HISTORY ----------------------------------------------
 
@@ -121,6 +120,8 @@ export const channelTable = pgTable(
 
     handle: t.text(), // @wander
     displayName: t.text(),
+    profileImageUrl: t.text(),
+    bannerImageUrl: t.text(),
     externalId: t.text(), // platform account id
     profileUrl: t.text(), // public profile link
     manageUrl: t.text(), // where you manage this channel (paste from the platform)
@@ -153,6 +154,11 @@ export const channelTable = pgTable(
     index("channel_kind_idx").on(table.kind),
     index("channel_platform_idx").on(table.platform),
     index("channel_connection_status_idx").on(table.connectionStatus),
+    uniqueIndex("channel_zernio_account_idx")
+      .on(table.externalId)
+      .where(
+        sql`${table.defaultProvider} = 'zernio' AND ${table.externalId} IS NOT NULL`,
+      ),
   ],
 );
 
@@ -205,6 +211,7 @@ export const channelSuggestionTable = pgTable(
     platform: channelPlatformEnum().notNull(),
     handle: t.text().notNull(),
     profileUrl: t.text(),
+    profileImageUrl: t.text(),
 
     // AI consolidation output.
     confidence: t.real(), // 0..1

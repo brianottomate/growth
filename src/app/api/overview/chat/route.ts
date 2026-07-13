@@ -5,13 +5,18 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
+import { brandTable, contentPostTable, memberTable } from "@/server/db/schema";
 import { OVERVIEW_AGENT_PERSONA } from "@/server/ai/overview-agent/persona";
 import { OVERVIEW_CAPABILITIES, toAiTools } from "@/server/ai/capabilities";
+import type {
+  AssistantIntent,
+  ContentWorkContext,
+} from "@/lib/assistant-events";
+import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
 
 /**
  * /overview chat agent — a general growth back-office assistant.
@@ -37,13 +42,101 @@ export async function POST(req: Request): Promise<Response> {
     return new Response("No organization", { status: 403 });
   }
 
-  const { messages } = (await req.json()) as { messages: UIMessage[] };
+  const {
+    messages,
+    surface,
+    brandId,
+    intent: rawIntent,
+    assistantIntent,
+    workContext,
+    chatAttachment,
+  } = (await req.json()) as {
+    messages: UIMessage[];
+    surface?: "overview" | "create" | "next";
+    brandId?: string;
+    intent?: string;
+    assistantIntent?: AssistantIntent;
+    workContext?: ContentWorkContext;
+    chatAttachment?: { url?: string; mediaType?: string };
+  };
+  const intent = ["plan", "create", "place", "analyze"].includes(
+    rawIntent ?? "",
+  )
+    ? rawIntent
+    : undefined;
+
+  const requestedWorkContext =
+    assistantIntent?.type === "work_content_post"
+      ? assistantIntent
+      : workContext;
+  const workItem = requestedWorkContext?.contentPostId
+    ? await db.query.contentPostTable.findFirst({
+        where: and(
+          eq(contentPostTable.id, requestedWorkContext.contentPostId),
+          isNull(contentPostTable.deletedAt),
+        ),
+        with: {
+          brand: { columns: { organizationId: true, name: true } },
+          platformPosts: { columns: { id: true, platform: true } },
+        },
+      })
+    : null;
+  const selectedPlatformPost = workItem?.platformPosts.find(
+    (post) => post.id === requestedWorkContext?.platformPostId,
+  );
+  const activeWorkContext: ContentWorkContext | null =
+    workItem?.brand?.organizationId === membership.organizationId
+      ? {
+          type: "work_content_post",
+          brandId: workItem.brandId,
+          brandName: workItem.brand.name,
+          contentPostId: workItem.id,
+          contentTitle: workItem.title ?? "Untitled",
+          platformPostId: selectedPlatformPost?.id,
+          platform: selectedPlatformPost?.platform,
+        }
+      : null;
+  const requestedBrandId =
+    activeWorkContext?.brandId ?? assistantIntent?.brandId ?? brandId;
+  const brand = requestedBrandId
+    ? await db.query.brandTable.findFirst({
+        where: and(
+          eq(brandTable.id, requestedBrandId),
+          eq(brandTable.organizationId, membership.organizationId),
+          isNull(brandTable.deletedAt),
+        ),
+        columns: { id: true, name: true },
+      })
+    : null;
+
+  const surfaceContext =
+    surface === "create" || surface === "next"
+      ? `\n\n# Current surface\nThe operator is in the unified Next conversation${brand ? ` for ${brand.name} (brandId: ${brand.id})` : ""}${intent ? ` with intent \"${intent}\"` : ""}. The default operating horizon is the next 14 days. Treat questions, pasted images, links, and rough thoughts as one continuous iteration loop. First establish readiness with nextForBrand when a brand is known. Do not pretend this is an editing studio. Prefer the smallest useful action, keep suggestions to at most three and usually one, execute only approval-gated writes, then point or navigate the operator to the existing content, schedule, calendar, media, or review surface where the result belongs.`
+      : "";
+  const intentContext =
+    assistantIntent?.type === "plan_two_weeks" && brand
+      ? `\n\n# Triggered intent\nThe operator clicked Plan next two weeks on the Content surface for ${brand.name}. Call nextForBrand first, then previewTwoWeekSlots only when readiness and the existing 14-day pipeline indicate it is useful. Do not create slots without the approval-gated generateTwoWeekSlots call.`
+      : "";
+  const workContextPrompt =
+    activeWorkContext && brand
+      ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call getContentWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists. Use approval-gated content tools for writes.`
+      : "";
+  const safeAttachment =
+    chatAttachment?.url &&
+    chatAttachment.mediaType?.startsWith("image/") &&
+    isOwnedChatImageUrl(chatAttachment.url, session.user.id)
+      ? chatAttachment
+      : null;
+  const attachmentPrompt =
+    safeAttachment && activeWorkContext
+      ? `\n\n# Current pasted image\nThe operator attached an image stored at ${safeAttachment.url} (${safeAttachment.mediaType}). You can analyze it visually now. If the operator asks to use, save, or attach it to the active work item, call attachChatImageToContent with this exact URL. Do not save it merely because it was pasted.`
+      : "";
 
   const modelMessages = await convertToModelMessages(messages);
 
   const result = streamText({
     model: anthropic(MODEL),
-    system: OVERVIEW_AGENT_PERSONA,
+    system: `${OVERVIEW_AGENT_PERSONA}${surfaceContext}${intentContext}${workContextPrompt}${attachmentPrompt}`,
     messages: modelMessages,
     tools: toAiTools(OVERVIEW_CAPABILITIES, {
       orgId: membership.organizationId,

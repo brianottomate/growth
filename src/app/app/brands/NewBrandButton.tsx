@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -68,6 +69,9 @@ export function NewBrandButton() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New brand</DialogTitle>
+            <DialogDescription>
+              Create an owned company or personal brand inside Boe Ventures.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-2">
@@ -102,7 +106,7 @@ export function NewBrandButton() {
               <Input
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
-                placeholder="wander.com"
+                placeholder="example.com"
               />
               <p className="text-muted-foreground text-xs">
                 Optional — we&apos;ll auto-fill details from the site.
@@ -111,10 +115,20 @@ export function NewBrandButton() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={createM.isPending}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpen(false)}
+              disabled={createM.isPending}
+            >
               Cancel
             </Button>
-            <Button size="sm" onClick={save} loading={createM.isPending} disabled={!name.trim()}>
+            <Button
+              size="sm"
+              onClick={save}
+              loading={createM.isPending}
+              disabled={!name.trim()}
+            >
               Create
             </Button>
           </DialogFooter>

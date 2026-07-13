@@ -110,8 +110,16 @@ export function usePhotoPicker(initialPreview: string | null = null) {
 /** Presentational counterpart to `usePhotoPicker`. */
 export function PhotoPickerField({
   picker,
+  variant = "avatar",
+  label = "Optional profile photo",
+  help = "click or paste (⌘V) · ≤4.5MB",
+  idPrefix = "photo",
 }: {
   picker: ReturnType<typeof usePhotoPicker>;
+  variant?: "avatar" | "banner";
+  label?: string;
+  help?: string;
+  idPrefix?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -122,19 +130,26 @@ export function PhotoPickerField({
           type="button"
           onClick={() => fileRef.current?.click()}
           className={cn(
-            "bg-muted flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border",
+            "bg-muted flex shrink-0 items-center justify-center overflow-hidden border",
+            variant === "banner"
+              ? "h-20 w-40 rounded-lg"
+              : "size-14 rounded-full",
             "hover:border-primary transition-colors",
           )}
         >
           {picker.preview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={picker.preview} alt="" className="size-full object-cover" />
+            <img
+              src={picker.preview}
+              alt=""
+              className="size-full object-cover"
+            />
           ) : (
             <ImagePlus className="text-muted-foreground size-5" />
           )}
         </button>
         <div className="text-muted-foreground text-xs">
-          Optional profile photo · click or paste (⌘V) · ≤4.5MB
+          {label} · {help}
           <br />
           <button
             type="button"
@@ -157,9 +172,9 @@ export function PhotoPickerField({
 
       {picker.urlMode && (
         <div className="space-y-1.5">
-          <Label htmlFor="photo-url">Photo URL</Label>
+          <Label htmlFor={`${idPrefix}-url`}>{label} URL</Label>
           <Input
-            id="photo-url"
+            id={`${idPrefix}-url`}
             type="url"
             value={picker.photoUrl}
             onChange={(e) => picker.handleUrl(e.target.value)}

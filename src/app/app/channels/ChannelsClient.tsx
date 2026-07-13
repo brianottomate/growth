@@ -1,12 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import { ExternalLink, Pencil, Sparkles } from "lucide-react";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/components/ui/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
+import { useTRPC } from "@/trpc/react";
 import { SuggestTargetsDialog } from "./SuggestTargetsDialog";
+import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
 
 const ARCHETYPE_LABEL: Record<string, string> = {
   image: "Image",
@@ -35,6 +58,11 @@ export type BrandChannels = {
     id: string;
     platform: string;
     handle: string | null;
+    profileImageUrl: string | null;
+    bannerImageUrl: string | null;
+    profileUrl: string | null;
+    manageUrl: string | null;
+    connectionStatus: string;
     followerCount: number | null;
     fingerprint: string | null;
     // Per-channel mix OVERRIDE (mix_target rows with channelId) — what the
@@ -54,6 +82,26 @@ const pillarColor = (slug: string) =>
     ? "var(--color-muted-foreground)"
     : (PILLAR_BY_SLUG[slug]?.color ?? "var(--color-muted-foreground)");
 
+function inferredProfileUrl(channel: BrandChannels["channels"][number]) {
+  if (channel.profileUrl) return channel.profileUrl;
+  const handle = channel.handle?.replace(/^@/, "");
+  if (!handle) return null;
+
+  switch (channel.platform) {
+    case "instagram":
+      return `https://www.instagram.com/${handle}/`;
+    case "x":
+    case "twitter":
+      return `https://x.com/${handle}`;
+    case "tiktok":
+      return `https://www.tiktok.com/@${handle}`;
+    case "youtube":
+      return `https://www.youtube.com/@${handle}`;
+    default:
+      return null;
+  }
+}
+
 export function ChannelsClient({
   brands,
   windowDays,
@@ -61,16 +109,21 @@ export function ChannelsClient({
   brands: BrandChannels[];
   windowDays: number;
 }) {
-  const [suggestFor, setSuggestFor] = useState<{ id: string; name: string } | null>(
-    null,
-  );
+  const [suggestFor, setSuggestFor] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [editChannel, setEditChannel] = useState<
+    (BrandChannels["channels"][number] & { brandName: string }) | null
+  >(null);
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Channels</h1>
       <p className="text-muted-foreground mt-1 text-sm">
         Each brand&apos;s channels — voice, cadence, and content mix.{" "}
         <span className="text-muted-foreground/70">
-          Observed = last {windowDays} days; targets from cadence &amp; mix when set.
+          Observed = last {windowDays} days; targets from cadence &amp; mix when
+          set.
         </span>
       </p>
 
@@ -95,11 +148,13 @@ export function ChannelsClient({
 
             {/* Pillar content mix (observed vs target) */}
             <div className="border-b px-4 py-3">
-              <div className="text-muted-foreground mb-1.5 text-[11px] font-medium uppercase tracking-wide">
+              <div className="text-muted-foreground mb-1.5 text-[11px] font-medium tracking-wide uppercase">
                 Content mix
               </div>
               {b.mixTotal === 0 ? (
-                <p className="text-muted-foreground text-xs">No posts in window.</p>
+                <p className="text-muted-foreground text-xs">
+                  No posts in window.
+                </p>
               ) : (
                 <>
                   <div className="bg-muted/40 flex h-2.5 overflow-hidden rounded-full">
@@ -108,7 +163,10 @@ export function ChannelsClient({
                         <span
                           key={m.pillar}
                           title={`${pillarName(m.pillar)} · ${m.pct}%`}
-                          style={{ width: `${m.pct}%`, background: pillarColor(m.pillar) }}
+                          style={{
+                            width: `${m.pct}%`,
+                            background: pillarColor(m.pillar),
+                          }}
                         />
                       ) : null,
                     )}
@@ -117,18 +175,27 @@ export function ChannelsClient({
                     {b.mixRows.map((m) => {
                       const under = m.targetPct != null && m.pct < m.targetPct;
                       return (
-                        <span key={m.pillar} className="flex items-center gap-1 text-[11px]">
+                        <span
+                          key={m.pillar}
+                          className="flex items-center gap-1 text-[11px]"
+                        >
                           <span
                             className="size-2 rounded-full"
                             style={{ background: pillarColor(m.pillar) }}
                           />
-                          <span className="text-foreground/90">{pillarName(m.pillar)}</span>
-                          <span className="text-muted-foreground tabular-nums">{m.pct}%</span>
+                          <span className="text-foreground/90">
+                            {pillarName(m.pillar)}
+                          </span>
+                          <span className="text-muted-foreground tabular-nums">
+                            {m.pct}%
+                          </span>
                           {m.targetPct != null && (
                             <span
                               className={cn(
                                 "tabular-nums",
-                                under ? "text-amber-400" : "text-muted-foreground/60",
+                                under
+                                  ? "text-amber-400"
+                                  : "text-muted-foreground/60",
                               )}
                             >
                               (target {m.targetPct}%)
@@ -143,88 +210,160 @@ export function ChannelsClient({
             </div>
 
             {/* Channels */}
-            <div className="divide-y">
+            <div className="grid gap-3 p-3 md:grid-cols-2">
               {b.channels.length === 0 && (
-                <p className="text-muted-foreground px-4 py-3 text-xs">
+                <p className="text-muted-foreground text-xs md:col-span-2">
                   No connected channels.
                 </p>
               )}
-              {b.channels.map((c) => (
-                <div key={c.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
-                  <div className="flex w-44 shrink-0 items-center gap-2">
-                    <ChannelLogo platform={c.platform} className="size-4 shrink-0" />
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">
-                        {platformLabel(c.platform)}
-                      </div>
-                      <div className="text-muted-foreground truncate text-[11px]">
-                        {c.handle ?? "—"}
-                        {c.followerCount ? ` · ${fmt(c.followerCount)} followers` : ""}
-                      </div>
-                    </div>
-                  </div>
+              {b.channels.map((c) => {
+                const publicUrl = inferredProfileUrl(c);
 
-                  <div className="min-w-0 flex-1">
-                    {/* cadence chips */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-muted-foreground text-[11px] tabular-nums">
-                        {(c.postsInWindow / (windowDays / 7)).toFixed(1)}/wk
-                      </span>
-                      {c.archetypes.length === 0 && (
-                        <span className="text-muted-foreground/60 text-[11px]">
-                          nothing in window
-                        </span>
+                return (
+                  <article
+                    key={c.id}
+                    className="bg-background/50 overflow-hidden rounded-lg border"
+                  >
+                    <div className="bg-muted relative h-16">
+                      {c.bannerImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={c.bannerImageUrl}
+                          alt=""
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <div className="from-muted to-muted/30 flex size-full items-center justify-center bg-gradient-to-br">
+                          <ChannelLogo
+                            platform={c.platform}
+                            className="size-7 opacity-15"
+                          />
+                        </div>
                       )}
-                      {c.archetypes.map((a) => {
-                        const under = a.target != null && a.perWeek < a.target;
-                        return (
-                          <span
-                            key={a.archetype}
-                            className={cn(
-                              "rounded-full border px-2 py-0.5 text-[10px] tabular-nums",
-                              under
-                                ? "border-amber-500/40 text-amber-300"
-                                : "border-border text-muted-foreground",
-                            )}
-                          >
-                            {ARCHETYPE_LABEL[a.archetype] ?? a.archetype}{" "}
-                            {a.perWeek.toFixed(1)}/wk
-                            {a.target != null && (
-                              <span className="opacity-60"> · t{a.target.toFixed(0)}</span>
-                            )}
-                          </span>
-                        );
-                      })}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
+                      <Avatar className="bg-background absolute -bottom-5 left-3 size-11 border-2 shadow-sm">
+                        {c.profileImageUrl && (
+                          <AvatarImage
+                            src={c.profileImageUrl}
+                            alt={`${c.handle ?? platformLabel(c.platform)} profile`}
+                          />
+                        )}
+                        <AvatarFallback>
+                          <ChannelLogo
+                            platform={c.platform}
+                            className="size-4"
+                          />
+                        </AvatarFallback>
+                      </Avatar>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute top-2 right-2 size-7 bg-black/45 text-white backdrop-blur hover:bg-black/65"
+                        title={`Edit ${platformLabel(c.platform)} channel`}
+                        onClick={() =>
+                          setEditChannel({ ...c, brandName: b.name })
+                        }
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
                     </div>
-                    {/* per-channel mix override (what the slot generator uses) */}
-                    {c.mixTargets.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                        <span className="text-muted-foreground/60 text-[10px] font-medium tracking-wide uppercase">
-                          Mix target
-                        </span>
-                        {c.mixTargets.map((m) => (
-                          <span key={m.pillar} className="flex items-center gap-1 text-[11px]">
-                            <span
-                              className="size-2 rounded-full"
-                              style={{ background: pillarColor(m.pillar) }}
-                            />
-                            <span className="text-muted-foreground">{pillarName(m.pillar)}</span>
-                            <span className="text-muted-foreground/70 tabular-nums">
-                              {m.targetPct}%
-                            </span>
-                          </span>
-                        ))}
+
+                    <div className="px-3 pt-7 pb-3">
+                      <div className="min-w-0">
+                        {publicUrl ? (
+                          <a
+                            href={publicUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hover:text-primary focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm text-sm font-medium transition-colors outline-none focus-visible:ring-2"
+                            title={`Open ${platformLabel(c.platform)} profile`}
+                          >
+                            {platformLabel(c.platform)}
+                            <ExternalLink className="size-3 opacity-60" />
+                          </a>
+                        ) : (
+                          <div className="text-sm font-medium">
+                            {platformLabel(c.platform)}
+                          </div>
+                        )}
+                        <div className="text-muted-foreground truncate text-[11px]">
+                          {c.handle ?? "—"}
+                          {c.followerCount
+                            ? ` · ${fmt(c.followerCount)} followers`
+                            : ""}
+                        </div>
                       </div>
-                    )}
-                    {/* voice fingerprint */}
-                    {c.fingerprint && (
-                      <p className="text-muted-foreground mt-1.5 line-clamp-2 text-[11px] italic">
-                        {c.fingerprint}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
+
+                      {/* cadence chips */}
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
+                        <span className="text-muted-foreground text-[11px] tabular-nums">
+                          {(c.postsInWindow / (windowDays / 7)).toFixed(1)}/wk
+                        </span>
+                        {c.archetypes.length === 0 && (
+                          <span className="text-muted-foreground/60 text-[11px]">
+                            nothing in window
+                          </span>
+                        )}
+                        {c.archetypes.map((a) => {
+                          const under =
+                            a.target != null && a.perWeek < a.target;
+                          return (
+                            <span
+                              key={a.archetype}
+                              className={cn(
+                                "rounded-full border px-2 py-0.5 text-[10px] tabular-nums",
+                                under
+                                  ? "border-amber-500/40 text-amber-300"
+                                  : "border-border text-muted-foreground",
+                              )}
+                            >
+                              {ARCHETYPE_LABEL[a.archetype] ?? a.archetype}{" "}
+                              {a.perWeek.toFixed(1)}/wk
+                              {a.target != null && (
+                                <span className="opacity-60">
+                                  {" "}
+                                  · t{a.target.toFixed(0)}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      {/* per-channel mix override (what the slot generator uses) */}
+                      {c.mixTargets.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                          <span className="text-muted-foreground/60 text-[10px] font-medium tracking-wide uppercase">
+                            Mix target
+                          </span>
+                          {c.mixTargets.map((m) => (
+                            <span
+                              key={m.pillar}
+                              className="flex items-center gap-1 text-[11px]"
+                            >
+                              <span
+                                className="size-2 rounded-full"
+                                style={{ background: pillarColor(m.pillar) }}
+                              />
+                              <span className="text-muted-foreground">
+                                {pillarName(m.pillar)}
+                              </span>
+                              <span className="text-muted-foreground/70 tabular-nums">
+                                {m.targetPct}%
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {/* voice fingerprint */}
+                      {c.fingerprint && (
+                        <p className="text-muted-foreground mt-1.5 line-clamp-2 text-[11px] italic">
+                          {c.fingerprint}
+                        </p>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
         ))}
@@ -240,6 +379,186 @@ export function ChannelsClient({
           }}
         />
       )}
+      {editChannel && (
+        <EditChannelDialog
+          channel={editChannel}
+          open={!!editChannel}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setEditChannel(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+type EditableChannel = BrandChannels["channels"][number] & {
+  brandName: string;
+};
+
+function EditChannelDialog({
+  channel,
+  open,
+  onOpenChange,
+}: {
+  channel: EditableChannel;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const trpc = useTRPC();
+  const router = useRouter();
+  const photoPicker = usePhotoPicker(channel.profileImageUrl);
+  const bannerPicker = usePhotoPicker(channel.bannerImageUrl);
+  const [removeBanner, setRemoveBanner] = useState(false);
+  const [form, setForm] = useState({
+    handle: channel.handle ?? "",
+    profileUrl: channel.profileUrl ?? "",
+    manageUrl: channel.manageUrl ?? "",
+    connectionStatus: channel.connectionStatus,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const bannerPayload =
+    "photo" in bannerPicker.payload
+      ? { bannerPhoto: bannerPicker.payload.photo }
+      : "photoUrl" in bannerPicker.payload
+        ? { bannerPhotoUrl: bannerPicker.payload.photoUrl }
+        : {};
+
+  const updateM = useMutation(
+    trpc.channel.update.mutationOptions({
+      onSuccess: () => {
+        onOpenChange(false);
+        router.refresh();
+      },
+      onError: (mutationError) => setError(mutationError.message),
+    }),
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent onPaste={photoPicker.handlePaste}>
+        <DialogHeader>
+          <DialogTitle>Edit {platformLabel(channel.platform)}</DialogTitle>
+          <DialogDescription>
+            {channel.brandName} · update this channel&apos;s public identity and
+            connection state.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-2">
+          <PhotoPickerField picker={photoPicker} idPrefix="channel-profile" />
+          <div className="grid gap-2 border-t pt-4">
+            <PhotoPickerField
+              picker={bannerPicker}
+              variant="banner"
+              label="Optional banner image"
+              help="click to upload · ≤4.5MB"
+              idPrefix="channel-banner"
+            />
+            {channel.bannerImageUrl && !bannerPicker.changed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground justify-self-start"
+                onClick={() => setRemoveBanner((current) => !current)}
+              >
+                {removeBanner ? "Keep current banner" : "Remove banner"}
+              </Button>
+            )}
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Handle</Label>
+            <Input
+              value={form.handle}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  handle: event.target.value,
+                }))
+              }
+              placeholder="@handle"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Public profile</Label>
+            <Input
+              value={form.profileUrl}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  profileUrl: event.target.value,
+                }))
+              }
+              placeholder="https://x.com/handle"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Manage link</Label>
+            <Input
+              value={form.manageUrl}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  manageUrl: event.target.value,
+                }))
+              }
+              placeholder="Provider dashboard URL"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Connection status</Label>
+            <Select
+              value={form.connectionStatus}
+              onValueChange={(connectionStatus) =>
+                setForm((current) => ({ ...current, connectionStatus }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="connected">Connected</SelectItem>
+                <SelectItem value="disconnected">Disconnected</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="error">Error</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {error && <p className="text-destructive text-sm">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            loading={updateM.isPending}
+            onClick={() =>
+              updateM.mutate({
+                id: channel.id,
+                handle: form.handle,
+                profileUrl: form.profileUrl,
+                manageUrl: form.manageUrl,
+                ...photoPicker.payload,
+                ...bannerPayload,
+                ...(removeBanner ? { bannerImageUrl: "" } : {}),
+                connectionStatus: form.connectionStatus as
+                  | "connected"
+                  | "disconnected"
+                  | "expired"
+                  | "error",
+              })
+            }
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -6,11 +6,8 @@ import { db } from "@/server/db";
 import { brandTable, memberTable, platformPostTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { CoverWall, type CoverItem } from "@/components/cover-wall";
-
-// Initial stats link-out — per the plan, blogs link to Amplitude until we
-// surface per-post numbers in-app. Blog performance dashboard.
-const AMPLITUDE_URL =
-  "https://app.amplitude.com/analytics/wander-hq/dashboard/aqc691oc";
+import { readSocialPreviewMode } from "@/lib/social-preview";
+import { BlogControls } from "./BlogControls";
 
 type BlogMeta = {
   description?: string | null;
@@ -25,9 +22,20 @@ const monthKey = (d: Date) =>
 export default async function BlogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tag?: string; view?: string }>;
+  searchParams: Promise<{
+    tag?: string;
+    view?: string;
+    brand?: string;
+    preview?: string;
+  }>;
 }) {
-  const { tag: tagFilter, view: viewParam } = await searchParams;
+  const {
+    tag: tagFilter,
+    view: viewParam,
+    brand: brandParam,
+    preview: previewParam,
+  } = await searchParams;
+  const preview = readSocialPreviewMode(previewParam);
   const view: "list" | "wall" = viewParam === "wall" ? "wall" : "list";
   const session = await getSession();
   if (!session?.user) redirect("/signin");
@@ -37,12 +45,22 @@ export default async function BlogPage({
     with: { organization: true },
   });
   const org = membership?.organization;
-  if (!org) return <div className="text-muted-foreground">No organization found.</div>;
+  if (!org)
+    return <div className="text-muted-foreground">No organization found.</div>;
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
+    orderBy: (brand, { asc }) => asc(brand.createdAt),
   });
-  const brandIds = brands.map((b) => b.id);
+  const selectedBrand = brandParam
+    ? (brands.find((brand) => brand.slug === brandParam) ?? null)
+    : null;
+  const brandIds = selectedBrand
+    ? [selectedBrand.id]
+    : brands.map((brand) => brand.id);
 
   const posts = brandIds.length
     ? await db.query.platformPostTable.findMany({
@@ -68,11 +86,22 @@ export default async function BlogPage({
   const tagCounts = new Map<string, number>();
   for (const t of tagged)
     for (const tag of t.tags) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
-  const topTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  const topTags = [...tagCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12);
 
   const visible = tagFilter
     ? tagged.filter((t) => t.tags.includes(tagFilter))
     : tagged;
+  const blogHref = (input?: { tag?: string; view?: "list" | "wall" }) => {
+    const params = new URLSearchParams();
+    if (selectedBrand?.slug) params.set("brand", selectedBrand.slug);
+    if (preview !== "original") params.set("preview", preview);
+    if (input?.tag) params.set("tag", input.tag);
+    if (input?.view) params.set("view", input.view);
+    const query = params.toString();
+    return query ? `/app/blog?${query}` : "/app/blog";
+  };
 
   // Build cover items (image-backed — cheap, no live iframes).
   const items: CoverItem[] = visible.map((t) => ({
@@ -107,23 +136,33 @@ export default async function BlogPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Blog</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {tagged.length} articles · wander.com/blog · via DatoCMS
+            {tagged.length} articles
+            {selectedBrand
+              ? ` · ${selectedBrand.name}${selectedBrand.website ? ` · ${new URL(/^https?:\/\//i.test(selectedBrand.website) ? selectedBrand.website : `https://${selectedBrand.website}`).hostname.replace(/^www\./, "")}` : ""}`
+              : ` · across ${brands.length} brands`}
           </p>
         </div>
-        <a
-          href={AMPLITUDE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:bg-accent rounded-full border px-3 py-1.5 text-xs font-medium"
-        >
-          Blog performance ↗
-        </a>
+        <BlogControls
+          brands={brands.flatMap((brand) =>
+            brand.slug
+              ? [
+                  {
+                    id: brand.id,
+                    slug: brand.slug,
+                    name: brand.name,
+                    website: brand.website,
+                  },
+                ]
+              : [],
+          )}
+          selectedBrandSlug={selectedBrand?.slug ?? null}
+        />
       </div>
 
       {/* topic (tag) facets */}
       <div className="mt-5 flex flex-wrap gap-2 border-b pb-4">
         <Link
-          href="/app/blog"
+          href={blogHref()}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
             !tagFilter
               ? "bg-foreground text-background border-foreground"
@@ -135,7 +174,7 @@ export default async function BlogPage({
         {topTags.map(([tag, n]) => (
           <Link
             key={tag}
-            href={`/app/blog?tag=${encodeURIComponent(tag)}`}
+            href={blogHref({ tag })}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               tagFilter === tag
                 ? "bg-foreground text-background border-foreground"
@@ -152,7 +191,7 @@ export default async function BlogPage({
         {(["list", "wall"] as const).map((v) => (
           <Link
             key={v}
-            href={`/app/blog?view=${v}${tagFilter ? `&tag=${encodeURIComponent(tagFilter)}` : ""}`}
+            href={blogHref({ view: v, tag: tagFilter })}
             className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
               view === v
                 ? "bg-foreground text-background border-foreground"
@@ -166,12 +205,12 @@ export default async function BlogPage({
 
       {view === "wall" ? (
         <div className="mt-6">
-          <CoverWall items={items} />
+          <CoverWall items={items} variant="og" preview={preview} />
         </div>
       ) : (
         months.map((m) => (
           <section key={m.key} className="mt-8">
-            <h2 className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
+            <h2 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
               {m.key} · {m.items.length}
             </h2>
             <div className="flex flex-col">
@@ -190,12 +229,17 @@ export default async function BlogPage({
                   <span className="min-w-0 flex-1 truncate">{t.post.text}</span>
                   <span className="text-muted-foreground hidden shrink-0 gap-1 text-[11px] sm:flex">
                     {t.tags.slice(0, 2).map((tag) => (
-                      <span key={tag} className="border-border rounded-full border px-1.5 py-0.5">
+                      <span
+                        key={tag}
+                        className="border-border rounded-full border px-1.5 py-0.5"
+                      >
                         {tag}
                       </span>
                     ))}
                   </span>
-                  <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">↗</span>
+                  <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
+                    ↗
+                  </span>
                 </Link>
               ))}
             </div>
@@ -204,7 +248,11 @@ export default async function BlogPage({
       )}
 
       {visible.length === 0 && (
-        <p className="text-muted-foreground mt-10 text-sm">No articles for this filter.</p>
+        <p className="text-muted-foreground mt-10 text-sm">
+          {selectedBrand
+            ? `No articles for ${selectedBrand.name} yet. Use Sync blog above to discover its public feed.`
+            : "No articles for this filter."}
+        </p>
       )}
     </div>
   );

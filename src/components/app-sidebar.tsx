@@ -31,8 +31,8 @@ import {
   Plus,
   Radar,
   Repeat,
-  Rocket,
   Radio,
+  Rocket,
   Rss,
   Rows3,
   Settings,
@@ -82,34 +82,42 @@ type NavItem = {
 const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     items: [
+      { label: "Next", href: "/app/next", icon: MessageSquare },
+      { label: "Review", href: "/app/review", icon: ClipboardCheck },
       { label: "Overview", href: "/app/overview", icon: MessageSquare },
       { label: "Dashboard", href: "/app", icon: LayoutDashboard },
     ],
   },
   {
-    label: "Workspace",
+    label: "Brand map",
     items: [
       { label: "Brands", href: "/app/brands", icon: Building2 },
+      { label: "Channels", href: "/app/channels", icon: Radio },
+      { label: "Website", href: "/app/website", icon: Globe },
+      { label: "Audiences", href: "/app/audiences", icon: Target },
+    ],
+  },
+  {
+    label: "Plan & publish",
+    items: [
       { label: "Content", href: "/app/content", icon: FileText },
       { label: "Calendar", href: "/app/calendar", icon: Calendar },
-      { label: "Feed", href: "/app/feed", icon: Rss },
-      { label: "Timeline", href: "/app/feed-v5", icon: Rows3 },
-      { label: "Channels", href: "/app/channels", icon: Radio },
+      { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
       { label: "Studio", href: "/app/studio", icon: Sparkles },
       { label: "Plan", href: "/app/plan", icon: Rocket },
     ],
   },
   {
-    label: "Content",
+    label: "Observe",
     items: [
-      { label: "Pillars", href: "/app/pillars", icon: Layers },
+      { label: "Timeline", href: "/app/feed-v5", icon: Rows3 },
+      { label: "Feed", href: "/app/feed", icon: Rss },
       { label: "Blog", href: "/app/blog", icon: Newspaper },
       { label: "Newsletters", href: "/app/newsletters", icon: Mail },
-      { label: "Website", href: "/app/website", icon: Globe },
-      { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
-      { label: "Audiences", href: "/app/audiences", icon: Target },
       { label: "Ads", href: "/app/ads", icon: Crosshair },
       { label: "Spend", href: "/app/spend", icon: CircleDollarSign },
+      { label: "Inbox", href: "/app/inbox", icon: InboxIcon },
+      { label: "Listen", href: "/app/listen", icon: Radar },
     ],
   },
   {
@@ -121,9 +129,6 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
         href: "/app/leads/send-review",
         icon: ClipboardCheck,
       },
-      { label: "Inbox", href: "/app/inbox", icon: InboxIcon },
-      { label: "Listen", href: "/app/listen", icon: Radar },
-      { label: "Affiliate", href: "/app/affiliate", icon: Handshake },
       { label: "Lifecycle", href: "/app/lifecycle", icon: Repeat },
     ],
   },
@@ -131,12 +136,16 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     label: "Library",
     items: [
       { label: "Media", href: "/app/media", icon: ImageIcon },
+      { label: "Pillars", href: "/app/pillars", icon: Layers },
       { label: "People", href: "/app/people", icon: Users },
     ],
   },
   {
-    label: "System",
-    items: [{ label: "Engineering", href: "/app/engineering", icon: Gauge }],
+    label: "Operations",
+    items: [
+      { label: "Affiliate", href: "/app/affiliate", icon: Handshake },
+      { label: "Engineering", href: "/app/engineering", icon: Gauge },
+    ],
   },
 ];
 

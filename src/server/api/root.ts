@@ -4,10 +4,12 @@ import { affiliateRouter } from "@/server/api/routers/affiliate.router";
 import { amplifierRouter } from "@/server/api/routers/amplifier.router";
 import { audienceRouter } from "@/server/api/routers/audience.router";
 import { brandRouter } from "@/server/api/routers/brand.router";
+import { blogRouter } from "@/server/api/routers/blog.router";
 import { cadenceRouter } from "@/server/api/routers/cadence.router";
 import { channelRouter } from "@/server/api/routers/channel.router";
 import { channelSuggestionRouter } from "@/server/api/routers/channelSuggestion.router";
 import { contentRouter } from "@/server/api/routers/content.router";
+import { contentAnalysisRouter } from "@/server/api/routers/contentAnalysis.router";
 import { conversionRouter } from "@/server/api/routers/conversion.router";
 import { inboxRouter } from "@/server/api/routers/inbox.router";
 import { initiativeRouter } from "@/server/api/routers/initiative.router";
@@ -27,6 +29,8 @@ import { rescheduleRouter } from "@/server/api/routers/reschedule.router";
 import { spendRouter } from "@/server/api/routers/spend.router";
 import { studioRouter } from "@/server/api/routers/studio.router";
 import { twitterRouter } from "@/server/api/routers/twitter.router";
+import { websiteRouter } from "@/server/api/routers/website.router";
+import { zernioRouter } from "@/server/api/routers/zernio.router";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -41,10 +45,12 @@ export const appRouter = createTRPCRouter({
   amplifier: amplifierRouter,
   audience: audienceRouter,
   brand: brandRouter,
+  blog: blogRouter,
   cadence: cadenceRouter,
   channel: channelRouter,
   channelSuggestion: channelSuggestionRouter,
   content: contentRouter,
+  contentAnalysis: contentAnalysisRouter,
   conversion: conversionRouter,
   inbox: inboxRouter,
   initiative: initiativeRouter,
@@ -64,6 +70,8 @@ export const appRouter = createTRPCRouter({
   spend: spendRouter,
   studio: studioRouter,
   twitter: twitterRouter,
+  website: websiteRouter,
+  zernio: zernioRouter,
 });
 
 // export type definition of API

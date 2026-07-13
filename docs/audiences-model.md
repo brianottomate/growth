@@ -1,149 +1,143 @@
 # Audiences model
 
-Design note (2026-06-05). Proposal — **not yet applied**. Companion to the
-"Audiences & the ad-set gap" section in `paid-ads-surfacing.md`.
+Implemented baseline, 2026-07-11.
 
-## Framing — audiences are a *platform-layer ad concept*, planned from the top
+Audiences serve two jobs in Growth:
 
-Correcting the earlier "audiences mirror lifecycle programs" framing. Audiences are
-**primarily an advertising concept**, living at roughly the **same grain as a
-campaign / ad set**. They are not a standalone strategic artifact — they're how a
-campaign is pointed at people. The strategy lives one layer up.
+1. durable brand context — who the brand serves, available to AI, content,
+   research, and campaign planning;
+2. paid activation — how a strategic audience is translated into the controls
+   a particular ad platform supports.
 
-```
-STRATEGIC / authored  (intent — the planning surface)
-  initiative           goal-driven push ("drive WanderOS lead volume")
-  audience_target      canonical "who" ("STR operators, 10+ properties")
+Those jobs share intent but not semantics. In particular, descriptive
+demographics are not automatically valid or permitted ad-targeting controls.
 
-PLATFORM / synced  (reality — what's in Meta / Google / OpenAI)
-  campaign → ad set → ad_spot          the delivery
-  audience                             the saved/custom/lookalike/prompt object
-    └─ audience_placement              ← NEW: where an audience is actually attached
-```
+## Layers
 
-So:
-- **`audience_target`** (+ optional link up to `initiative`/goal) is the strategic
-  "who we want to reach". Hand-authored. This is the planning surface.
-- **`audience`** is the real platform object (a Meta saved/custom/lookalike audience,
-  a Google segment, an OpenAI prompt audience). Synced, not authored.
-- **`audience_placement`** is the missing connective tissue: which campaign(s)/ad
-  set(s) an audience is attached to, and whether it's live. This is the analogue of
-  `lifecycle_program_step.campaignId` + `status` — it's what lets *coverage reflect
-  what's actually running*, not just what exists.
-
-## The gaps this closes (recap)
-
-1. **No run-state** on `audience` → `/audiences` coverage counts a paused audience as
-   "covered" (false positive). The Slack-thread event ("now live") is a state change
-   we can't represent.
-2. **No `audience ↔ campaign` link** → can't answer "which campaigns is the Minerva
-   lookalike running in?" (deployment grain is the ad set, flattened to strings on
-   `ad_spot`).
-3. **No lookalike seed lineage** → `Minerva*`/`Hubspot*` lookalikes are seeded from
-   our lead/CRM lists, but nothing links `audience` back to `leads.*`.
-4. **Definition is Meta-shaped only** → OpenAI/ChatGPT audiences are described in
-   *natural language* + demographics, not structured selects. No home for that.
-
-## Proposal
-
-### A. Enrich `audience` (the platform object)
-
-```ts
-// additions to audienceTable (ads-schema.ts)
-status: audienceRunStateEnum().default("active").notNull(), // active | paused | archived | draft
-                                                            //   ← mirrors ad-set status from the tree
-
-// --- how the audience is DEFINED (varies by platform) ---
-definitionStyle: t.text(), // "structured" (Meta/Google selects) | "prompt" (OpenAI NL) | "hybrid"
-prompt: t.text(),          // the natural-language brief — for OpenAI/ChatGPT audiences.
-                           //   This IS the targeting spec there, not just a label.
-// definition jsonb already exists — formalize its shape:
-//   { demographics?: {ageMin,ageMax,genders,countries,...},   // ALWAYS relevant, every platform
-//     interests?: string[], behaviors?: string[], geo?: {...}, // Meta detailed targeting
-//     keywords?: string[], inMarket?: string[] }               // Google
-//   Demographics live here for prompt audiences too.
-
-// --- lookalike / custom seed lineage ---
-seedKind: t.text(),            // "list" | "audience" | "pixel_event" | "engagement"
-seedAudienceId: t.text().references(() => audienceTable.id), // self-FK: LAL of another audience
-seedSource: t.text(),          // "leads" | "hubspot" | "minerva" | "csv" | "crm"
-seedRef: t.text(),             // id into the source system (e.g. a leads.lead_import id)
-lookalikeSpec: t.jsonb(),      // { ratio: 0.01, country: "US" } — null for non-LAL
+```text
+audience_target       authored profile / ICP / segment
+  ↓
+audience_activation   planned targeting for one platform
+  ↓
+audience              mirrored platform audience object
+  ↓
+audience_placement    where that object is attached and running
 ```
 
-`audienceTypeEnum` already has `segment | keyword | intent | lookalike | custom` —
-keep it for the *structural* kind. `definitionStyle` is orthogonal (a `segment` can
-be authored structurally on Meta or by prompt on OpenAI).
+`audience_evidence` records why a profile is believed: research, customer
+evidence, analytics, operator knowledge, or an explicit inference.
 
-### B. New table: `audience_placement` (the connective layer)
+## Audience profile (`audience_target`)
 
-The join between an audience and where it runs. Many-to-many: one audience → N ad
-sets; one ad set → N stacked audiences. Synced from the ad tree (and the place a
-human could pre-author an *intended* placement before it exists, status `planned`).
+The existing table name is retained for compatibility. Product surfaces should
+describe the row as an audience profile, ICP, or segment depending on
+`profileScope`:
 
-```ts
-export const audiencePlacementTable = pgTable("audience_placement", (t) => ({
-  id: t.text().primaryKey().$defaultFn(() => createId("aplc")),
-  audienceId: t.text().references(() => audienceTable.id, { onDelete: "cascade" }).notNull(),
-  campaignId: t.text().references(() => campaignTable.id, { onDelete: "cascade" }).notNull(),
-  // Ad set denormalized (same decision as ad_spot — we don't model ad_set as a table).
-  adSetId: t.text(),
-  adSetName: t.text(),
-  status: t.text(),         // active | paused — from the ad set
-  // optional snapshot so a placement can show its own pull without ad_spot
-  stats: t.jsonb().$type<AdStats>(),
-  externalId: t.text(),
-  createdAt: ..., updatedAt: ...,
-}));
+- `core` — a durable ICP or market side;
+- `segment` — an actionable slice of a core audience;
+- `experimental` — a hypothesis that should not silently become canonical.
+
+Important fields:
+
+- `slug` — stable idempotency key within a brand;
+- `marketSide` — consumer, professional, business, or partner;
+- `researchMaturity` — hypothesis, researched, or validated;
+- `geography` — the audience's real market context;
+- `demographics` — descriptive research and messaging context;
+- `context` — jobs, pains, outcomes, triggers, objections, qualification
+  signals, exclusions, messaging angles, and tags.
+
+The older `type`, `intendedChannels`, and `sizeGoalLabel` fields remain during
+the compatibility period. New platform mechanics belong on activations.
+
+## Geography
+
+Geography has three intentionally different states:
+
+- `null` — not established yet;
+- `{ mode: "global" }` — genuinely global;
+- `{ mode: "specific", include: [...] }` — defined markets.
+
+Both global and specific scopes can contain exclusions. Locations preserve a
+human name and may add country/region codes, platform keys, coordinates, or a
+radius when known. A broad profile can therefore say “United States,” while a
+campaign activation narrows to New York and Chicago without rewriting the ICP.
+
+Activation geography uses an explicit mode:
+
+- `inherit` — use the profile market unchanged;
+- `narrow` — select a subset within the profile market;
+- `replace` — deliberately target a different market.
+
+`inherit` with null activation geography is not missing data; it is an explicit
+inheritance instruction.
+
+## Demographics
+
+Profile demographics describe who research suggests the audience tends to be.
+They may include age range, genders, languages, life stages, occupations,
+education, household context, income range, and notes. Unknown attributes stay
+unknown; the system must not invent them to make a profile look complete.
+
+Activation demographics are separate and use an explicit mode:
+
+- `none` — no demographic targeting planned (the safe default);
+- `inherit_descriptive` — deliberately translate eligible descriptive fields;
+- `override` — use a campaign-specific demographic definition.
+
+Before `inherit_descriptive` or `override` is used, the operator/agent must
+check the platform, jurisdiction, objective, and special-ad-category rules.
+Housing, employment, credit, and political campaigns can restrict available
+targeting dimensions. `specialAdCategory` and `complianceNotes` live on the
+activation for this reason.
+
+## Activation (`audience_activation`)
+
+There is at most one planned activation per profile and platform. It contains:
+
+- platform, structural targeting type, and lifecycle status;
+- geography mode plus optional geography;
+- demographics mode plus optional demographics;
+- structured targeting spec or natural-language prompt;
+- exclusions, reach estimate, special category, and compliance notes.
+
+Adding an intended channel creates an activation with:
+
+```text
+geographyMode = inherit
+demographicsMode = none
 ```
 
-Coverage then becomes honest: a target is **covered** on a channel only if it has a
-linked audience with an **active placement** there — not merely a linked row.
+This is conservative by design. Profile context remains useful to AI and
+creative work without silently becoming an ad-platform instruction.
 
-### C. (Optional) tie targets up to the strategic push
+## Platform object (`audience`)
 
-`audience_target.initiativeId` (nullable FK) — so an initiative ("WanderOS lead
-volume") can declare the audiences it wants, exactly like it declares
-`targetChannels` for campaigns. Defer until initiatives are authored.
+An `audience` row mirrors something that exists in one ad account: a Meta saved,
+custom, or lookalike audience; a Google segment; an OpenAI prompt audience; and
+so on. It remains linked to the strategic profile through `targetId`.
 
-## Concrete examples
+The platform object's `definition` is source reality, not the profile source of
+truth. Future sync work can add seed lineage and formalized provider-specific
+definition shapes without changing the upper layers.
 
-All real, pulled from the live `act_885632589057558` tree (2026-06-05).
+## Placement (`audience_placement`)
 
-**Target (authored):** `audience_target` — *"STR operators, 10+ properties"*,
-`type=lookalike`, `intendedChannels=[meta, google, openai]`, `priority=must_have`.
+Placement connects a mirrored audience to a campaign/ad set and stores run
+status plus optional stats. This is required for honest coverage: an audience
+object merely existing does not mean it is active in a campaign.
 
-| audience (platform object) | type | definitionStyle | seed | placement → campaign | status |
-|---|---|---|---|---|---|
-| `LeadForm_MinervaLookalike` | lookalike | structured | `seedSource=minerva`, `seedKind=list`, `lookalikeSpec={ratio:0.01,country:US}` | `WanderOS_MetaLeadForm_Conversions` | active |
-| `LeadForm_HubspotLookalike` | lookalike | structured | `seedSource=hubspot`, `seedKind=list` | `WanderOS_MetaLeadForm_Conversions` | active |
-| `Listed PM interests US 30-60` | segment | structured | `definition={demographics:{ageMin:30,ageMax:60,countries:[US]}, interests:["vacation rental management","Airbnb hosting"]}` | `Prospecting_Listed_Wander_A_B_Test_Leads` | active |
-| `OpenAI – frustrated Airbnb operators` | segment | **prompt** | `prompt="US property managers / STR operators running 5+ listings, frustrated with Airbnb & VRBO fees, looking to take direct bookings"`, `definition={demographics:{ageMin:30,ageMax:60,countries:[US]}}` | (OpenAI campaign) | planned |
-| `Google in-market: vacation rental software` | intent | structured | `definition={inMarket:["Vacation Rental Software"], keywords:["airbnb alternative","direct booking platform"]}` | (Google campaign) | planned |
+The current UI still computes compatibility coverage from linked platform
+objects. Once placement sync is populated, coverage should require an active
+placement on the intended platform.
 
-Two takeaways the examples make obvious:
-- The first two are the **A/B test in the Slack thread** — *two audiences, same
-  campaign*. Only `audience_placement` can express that; `targetId` alone can't.
-- The OpenAI row carries **no interest selects** — its targeting is the `prompt`
-  string + demographics. That's why a label isn't enough: the prompt *is* the spec.
+## Agent writes
 
-## On "maybe it's just a label" (the ChatGPT free-text)
-
-My take: make it a real `prompt` column, not just lean on the audience name.
-- For Meta/Google the structured `definition` is the source of truth; the name is a
-  handle.
-- For OpenAI the natural-language brief **is** the targeting — if it only lives in
-  the name, you lose it the moment someone renames the audience, and you can't diff
-  "what we asked for" against "what's running". One nullable text column is cheap.
-- **Demographics stay structured for everyone** (`definition.demographics`) — the
-  user is right that they remain first-class even on ChatGPT; only the
-  interest/behavior selects collapse into prose there.
-
-## Open questions
-
-1. Promote ad set to a real table, or keep denormalizing it onto `audience_placement`
-   + `ad_spot`? (Leaning: keep denormalized for now — consistent, less to sync.)
-2. Does `audience_placement` get synced from the tree, hand-authored, or both? (Both:
-   synced rows are reality; `status=planned` rows are intent before they exist.)
-3. Lookalike seed → does `seedRef` point at a `leads.lead_import`, a HubSpot list id,
-   or a generic external ref? (Generic `seedSource`+`seedRef` now; tighten later.)
+- Explicit create/update requests execute directly; ordinary audience writes do
+  not ask for a redundant second confirmation.
+- Bulk saves use one transaction through the repo's transaction-capable Neon
+  client.
+- `(brandId, slug)` makes creates idempotent and safe to retry.
+- Delete/merge operations remain appropriate candidates for approval or undo.
+- Research evidence and activation plans are returned by `listAudienceTargets`
+  so later AI tasks can distinguish fact, operator input, and inference.

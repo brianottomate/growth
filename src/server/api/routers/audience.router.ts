@@ -1,21 +1,38 @@
 import { z } from "zod";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   audienceTable,
+  audienceActivationTable,
+  audienceEvidenceTable,
   audienceTargetPriorityEnum,
   audienceTargetStatusEnum,
   audienceTargetTable,
+  audienceActivationStatusEnum,
   audienceTypeEnum,
   brandTable,
   channelPlatformEnum,
   memberTable,
 } from "@/server/db/schema";
+import {
+  audienceContextSchema,
+  audienceActivationDemographicModeSchema,
+  audienceActivationGeoModeSchema,
+  audienceDemographicsSchema,
+  audienceEvidenceInputSchema,
+  audienceGeographySchema,
+  audienceMarketSideSchema,
+  audienceProfileScopeSchema,
+  audienceResearchMaturitySchema,
+  audienceSlug,
+} from "@/lib/audience-model";
+import { withTransaction } from "@/server/db";
+import type { db as database } from "@/server/db";
 
 type Ctx = {
-  db: typeof import("@/server/db").db;
+  db: typeof database;
   session: { user: { id: string } };
 };
 
@@ -64,6 +81,7 @@ const typeSchema = z.enum(audienceTypeEnum.enumValues);
 const statusSchema = z.enum(audienceTargetStatusEnum.enumValues);
 const prioritySchema = z.enum(audienceTargetPriorityEnum.enumValues);
 const platformSchema = z.enum(channelPlatformEnum.enumValues);
+const activationStatusSchema = z.enum(audienceActivationStatusEnum.enumValues);
 
 const targetInput = {
   name: z.string().min(1).max(200),
@@ -73,7 +91,52 @@ const targetInput = {
   priority: prioritySchema.optional(),
   intendedChannels: z.array(platformSchema).optional(),
   sizeGoalLabel: z.string().max(100).nullish(),
+  profileScope: audienceProfileScopeSchema.optional(),
+  marketSide: audienceMarketSideSchema.optional(),
+  researchMaturity: audienceResearchMaturitySchema.optional(),
+  geography: audienceGeographySchema.nullish(),
+  demographics: audienceDemographicsSchema.nullish(),
+  context: audienceContextSchema.nullish(),
+  evidence: z.array(audienceEvidenceInputSchema).max(30).optional(),
 };
+
+async function syncActivations(
+  tx: Parameters<Parameters<typeof withTransaction>[0]>[0],
+  targetId: string,
+  platforms: string[],
+) {
+  if (platforms.length === 0) {
+    await tx
+      .delete(audienceActivationTable)
+      .where(eq(audienceActivationTable.targetId, targetId));
+    return;
+  }
+
+  await tx
+    .delete(audienceActivationTable)
+    .where(
+      and(
+        eq(audienceActivationTable.targetId, targetId),
+        notInArray(
+          audienceActivationTable.platform,
+          platforms as (typeof channelPlatformEnum.enumValues)[number][],
+        ),
+      ),
+    );
+  if (platforms.length > 0) {
+    await tx
+      .insert(audienceActivationTable)
+      .values(
+        platforms.map((platform) => ({
+          targetId,
+          platform: platform as (typeof channelPlatformEnum.enumValues)[number],
+          geographyMode: "inherit",
+          demographicsMode: "none",
+        })),
+      )
+      .onConflictDoNothing();
+  }
+}
 
 export const audienceRouter = createTRPCRouter({
   /**
@@ -92,6 +155,7 @@ export const audienceRouter = createTRPCRouter({
           inArray(audienceTargetTable.brandId, brandIds),
           isNull(audienceTargetTable.deletedAt),
         ),
+        with: { activations: true, evidence: true },
       }),
       ctx.db.query.audienceTable.findMany({
         where: inArray(audienceTable.brandId, brandIds),
@@ -117,7 +181,10 @@ export const audienceRouter = createTRPCRouter({
         const present = new Set<string>(
           linked.map((a) => a.channel?.platform ?? ""),
         );
-        const intended = t.intendedChannels ?? [];
+        const intended =
+          t.activations.length > 0
+            ? t.activations.map((activation) => activation.platform)
+            : (t.intendedChannels ?? []);
         const missing = intended.filter((p) => !present.has(p));
         let coverage: AudienceCoverage;
         if (intended.length === 0) {
@@ -139,27 +206,100 @@ export const audienceRouter = createTRPCRouter({
     .input(z.object({ brandId: z.string(), ...targetInput }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
-      const { brandId, type, ...rest } = input;
-      const [target] = await ctx.db
-        .insert(audienceTargetTable)
-        .values({ brandId, type: type ?? "segment", ...rest })
-        .returning();
-      return target;
+      const { brandId, type, evidence, intendedChannels = [], ...rest } = input;
+      return withTransaction(async (tx) => {
+        const [target] = await tx
+          .insert(audienceTargetTable)
+          .values({
+            brandId,
+            slug: audienceSlug(input.name),
+            type: type ?? "segment",
+            intendedChannels,
+            ...rest,
+          })
+          .onConflictDoUpdate({
+            target: [audienceTargetTable.brandId, audienceTargetTable.slug],
+            set: { ...rest, intendedChannels, deletedAt: null },
+          })
+          .returning();
+        if (!target) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await syncActivations(tx, target.id, intendedChannels);
+        if (evidence?.length) {
+          await tx
+            .insert(audienceEvidenceTable)
+            .values(evidence.map((item) => ({ ...item, targetId: target.id })));
+        }
+        return target;
+      });
     }),
 
   updateTarget: protectedProcedure
     .input(z.object({ id: z.string(), ...targetInput }).partial({ name: true }))
     .mutation(async ({ ctx, input }) => {
-      const { id, ...rest } = input;
+      const { id, evidence, intendedChannels, name, ...rest } = input;
       const existing = await ctx.db.query.audienceTargetTable.findFirst({
         where: eq(audienceTargetTable.id, id),
       });
       if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
       await assertBrandAccess(ctx, existing.brandId);
+      return withTransaction(async (tx) => {
+        const [updated] = await tx
+          .update(audienceTargetTable)
+          .set({
+            ...rest,
+            ...(name !== undefined ? { name, slug: audienceSlug(name) } : {}),
+            ...(intendedChannels !== undefined ? { intendedChannels } : {}),
+          })
+          .where(eq(audienceTargetTable.id, id))
+          .returning();
+        if (intendedChannels !== undefined) {
+          await syncActivations(tx, id, intendedChannels);
+        }
+        if (evidence?.length) {
+          await tx
+            .insert(audienceEvidenceTable)
+            .values(evidence.map((item) => ({ ...item, targetId: id })));
+        }
+        return updated;
+      });
+    }),
+
+  updateActivation: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        type: typeSchema.optional(),
+        status: activationStatusSchema.optional(),
+        geographyMode: audienceActivationGeoModeSchema.optional(),
+        geography: audienceGeographySchema.nullable().optional(),
+        demographicsMode: audienceActivationDemographicModeSchema.optional(),
+        demographics: audienceDemographicsSchema.nullable().optional(),
+        targetingSpec: z.record(z.string(), z.unknown()).nullable().optional(),
+        prompt: z.string().max(5000).nullable().optional(),
+        exclusions: z.array(z.string().max(500)).max(100).nullable().optional(),
+        specialAdCategory: z.string().max(100).nullable().optional(),
+        complianceNotes: z.string().max(3000).nullable().optional(),
+        reachEstimateLabel: z.string().max(100).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...changes } = input;
+      const activation = await ctx.db.query.audienceActivationTable.findFirst({
+        where: eq(audienceActivationTable.id, id),
+        with: { target: { columns: { brandId: true } } },
+      });
+      if (!activation?.target) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertBrandAccess(ctx, activation.target.brandId);
       const [updated] = await ctx.db
-        .update(audienceTargetTable)
-        .set(rest)
-        .where(eq(audienceTargetTable.id, id))
+        .update(audienceActivationTable)
+        .set({
+          ...changes,
+          ...(changes.geographyMode === "inherit" ? { geography: null } : {}),
+          ...(changes.demographicsMode === "none"
+            ? { demographics: null }
+            : {}),
+        })
+        .where(eq(audienceActivationTable.id, id))
         .returning();
       return updated;
     }),

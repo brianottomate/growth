@@ -81,7 +81,12 @@ export async function tavilySearch(query: string): Promise<TavilyResult> {
   }
   const json = (await res.json()) as {
     answer?: string;
-    results?: { title?: string; url?: string; content?: string; score?: number }[];
+    results?: {
+      title?: string;
+      url?: string;
+      content?: string;
+      score?: number;
+    }[];
   };
   return {
     answer: json.answer ?? null,
@@ -145,6 +150,103 @@ export type ExaResult = {
     author?: string;
   }[];
 };
+
+export type ExaWebSearchResult = {
+  query: string;
+  results: {
+    title: string;
+    url: string;
+    highlights: string[];
+    publishedDate?: string;
+    author?: string;
+  }[];
+};
+
+export type ExaContentsResult = {
+  title: string;
+  url: string;
+  text: string;
+  publishedDate?: string;
+  author?: string;
+};
+
+async function exaRequest<T>(
+  path: "search" | "contents",
+  body: unknown,
+): Promise<T> {
+  if (!isExaConfigured) throw new Error("Exa search is not configured.");
+  const res = await fetch(`https://api.exa.ai/${path}`, {
+    method: "POST",
+    headers: {
+      "x-api-key": env.EXA_API_KEY!,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Exa ${path} failed (${res.status}).`);
+  return (await res.json()) as T;
+}
+
+/** Token-efficient search results for agent workflows and source cards. */
+export async function exaWebSearch(params: {
+  query: string;
+  numResults?: number;
+}): Promise<ExaWebSearchResult> {
+  const json = await exaRequest<{
+    results?: {
+      title?: string;
+      url?: string;
+      highlights?: string[];
+      publishedDate?: string;
+      author?: string;
+    }[];
+  }>("search", {
+    query: params.query,
+    type: "auto",
+    numResults: Math.min(Math.max(params.numResults ?? 6, 1), 8),
+    contents: { highlights: true },
+  });
+  return {
+    query: params.query,
+    results: (json.results ?? [])
+      .filter((result) => result.url)
+      .map((result) => ({
+        title: result.title?.trim() || result.url!,
+        url: result.url!,
+        highlights: (result.highlights ?? []).map((text) =>
+          text.slice(0, 1200),
+        ),
+        publishedDate: result.publishedDate,
+        author: result.author,
+      })),
+  };
+}
+
+/** Clean, bounded content for a URL the agent already knows about. */
+export async function exaGetContents(url: string): Promise<ExaContentsResult> {
+  const json = await exaRequest<{
+    results?: {
+      title?: string;
+      url?: string;
+      text?: string;
+      publishedDate?: string;
+      author?: string;
+    }[];
+  }>("contents", {
+    urls: [url],
+    text: { maxCharacters: 12_000 },
+  });
+  const result = json.results?.[0];
+  if (!result?.text)
+    throw new Error("Exa could not extract readable page content.");
+  return {
+    title: result.title?.trim() || url,
+    url: result.url ?? url,
+    text: result.text.slice(0, 12_000),
+    publishedDate: result.publishedDate,
+    author: result.author,
+  };
+}
 
 export async function exaSearch(query: string): Promise<ExaResult> {
   const res = await fetch("https://api.exa.ai/search", {

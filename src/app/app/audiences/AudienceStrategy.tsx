@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
+import { AD_PLATFORM_LABELS } from "@/lib/ad-platforms";
 import { TargetDialog, type TargetDraft } from "./TargetDialog";
 
 const COVERAGE = {
@@ -22,24 +23,16 @@ const COVERAGE = {
   gap: { label: "Gap", cls: "text-red-300", dot: "bg-red-400" },
 };
 
-const TYPE_LABEL: Record<string, string> = {
+const PROFILE_LABEL: Record<string, string> = {
+  core: "Core ICP",
   segment: "Segment",
-  keyword: "Keyword",
-  intent: "Intent",
-  lookalike: "Lookalike",
-  custom: "Custom",
+  experimental: "Experimental",
 };
 
 const PRIORITY_LABEL: Record<string, string> = {
   must_have: "Must have",
   should_have: "Should have",
   nice_to_have: "Nice to have",
-};
-
-const PLATFORM_LABEL: Record<string, string> = {
-  google_ads: "Google Ads",
-  meta_ads: "Meta Ads",
-  openai_ads: "OpenAI Ads",
 };
 
 const COVERAGE_ORDER = ["gap", "partial", "covered"];
@@ -96,13 +89,18 @@ export function AudienceStrategy({
           <p className="text-muted-foreground mt-1 text-sm">
             Who we <em>want</em> to reach vs. which platform audiences exist.{" "}
             {gaps > 0 && (
-              <span className="text-amber-300">
-                {gaps} not fully covered
-              </span>
+              <span className="text-amber-300">{gaps} not fully covered</span>
             )}
           </p>
         </div>
-        <Button size="sm" onClick={() => { setEditing(undefined); setDialogOpen(true); }} disabled={brands.length === 0}>
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditing(undefined);
+            setDialogOpen(true);
+          }}
+          disabled={brands.length === 0}
+        >
           <Plus className="size-4" />
           New target
         </Button>
@@ -125,9 +123,12 @@ export function AudienceStrategy({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{t.name}</span>
                     <span className="border-border text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                      {TYPE_LABEL[t.type] ?? t.type}
+                      {PROFILE_LABEL[t.profileScope] ?? t.profileScope}
                     </span>
-                    <span className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                    <span className="text-muted-foreground text-[10px] capitalize">
+                      {t.marketSide}
+                    </span>
+                    <span className="text-muted-foreground text-[10px] tracking-wide uppercase">
                       {PRIORITY_LABEL[t.priority] ?? t.priority}
                     </span>
                     <span
@@ -142,6 +143,29 @@ export function AudienceStrategy({
                       {t.description}
                     </p>
                   )}
+                  <div className="text-muted-foreground mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                    <span>
+                      {t.geography == null
+                        ? "Geography not established"
+                        : t.geography.mode === "global"
+                          ? "Global"
+                          : t.geography.include
+                              .map((place) => place.name)
+                              .join(", ")}
+                    </span>
+                    {t.demographics?.ageRange && (
+                      <span>
+                        Age {t.demographics.ageRange.min ?? "any"}–
+                        {t.demographics.ageRange.max ?? "any"}
+                      </span>
+                    )}
+                    {(t.demographics?.languages?.length ?? 0) > 0 && (
+                      <span>{t.demographics?.languages?.join(", ")}</span>
+                    )}
+                    <span className="capitalize">
+                      {t.researchMaturity.replaceAll("_", " ")}
+                    </span>
+                  </div>
                   <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
                     {t.sizeGoalLabel && <span>goal {t.sizeGoalLabel}</span>}
                     {(t.intendedChannels ?? []).map((c) => {
@@ -149,9 +173,11 @@ export function AudienceStrategy({
                       return (
                         <span
                           key={c}
-                          className={missing ? "text-red-300" : "text-emerald-300"}
+                          className={
+                            missing ? "text-red-300" : "text-emerald-300"
+                          }
                         >
-                          {missing ? "○" : "●"} {PLATFORM_LABEL[c] ?? c}
+                          {missing ? "○" : "●"} {AD_PLATFORM_LABELS[c] ?? c}
                         </span>
                       );
                     })}
@@ -168,11 +194,16 @@ export function AudienceStrategy({
                         brandId: t.brandId,
                         name: t.name,
                         description: t.description,
-                        type: t.type,
+                        profileScope: t.profileScope,
+                        marketSide: t.marketSide,
+                        researchMaturity: t.researchMaturity,
                         status: t.status,
                         priority: t.priority,
                         intendedChannels: t.intendedChannels,
                         sizeGoalLabel: t.sizeGoalLabel,
+                        geography: t.geography,
+                        demographics: t.demographics,
+                        context: t.context,
                       });
                       setDialogOpen(true);
                     }}
@@ -207,7 +238,7 @@ export function AudienceStrategy({
                     >
                       <span className="truncate text-xs">{a.name}</span>
                       <span className="text-muted-foreground text-[10px]">
-                        {PLATFORM_LABEL[a.channel?.platform ?? ""] ??
+                        {AD_PLATFORM_LABELS[a.channel?.platform ?? ""] ??
                           a.channel?.platform}
                         {a.sizeLabel ? ` · ${a.sizeLabel}` : ""}
                       </span>
@@ -239,7 +270,7 @@ export function AudienceStrategy({
                       {unmapped.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
                           {a.name} ·{" "}
-                          {PLATFORM_LABEL[a.channel?.platform ?? ""] ??
+                          {AD_PLATFORM_LABELS[a.channel?.platform ?? ""] ??
                             a.channel?.platform}
                         </SelectItem>
                       ))}
@@ -254,7 +285,7 @@ export function AudienceStrategy({
 
       {unmapped.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider uppercase">
             <Target className="size-3.5" />
             Unmapped · {unmapped.length}
           </h2>
@@ -269,7 +300,7 @@ export function AudienceStrategy({
               >
                 <span className="truncate text-sm">{a.name}</span>
                 <span className="text-muted-foreground text-[10px]">
-                  {PLATFORM_LABEL[a.channel?.platform ?? ""] ??
+                  {AD_PLATFORM_LABELS[a.channel?.platform ?? ""] ??
                     a.channel?.platform}
                 </span>
                 {targets.length > 0 && (

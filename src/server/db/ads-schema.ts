@@ -1,10 +1,15 @@
 import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { brandTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { MediaItem } from "./content-schema";
 import { createId } from "./utils";
+import type {
+  AudienceContext,
+  AudienceDemographics,
+  AudienceGeography,
+} from "@/lib/audience-model";
 
 // NOTE: this is a read-only "launchpad" mirror — campaigns & audiences are
 // created/managed in each platform's portal (Meta/Google/OpenAI ads managers)
@@ -51,6 +56,37 @@ export const audienceTargetPriorityEnum = pgEnum("audience_target_priority", [
 export type AudienceTargetPriority =
   (typeof audienceTargetPriorityEnum.enumValues)[number];
 
+export const audienceProfileScopeEnum = pgEnum("audience_profile_scope", [
+  "core",
+  "segment",
+  "experimental",
+]);
+export type AudienceProfileScope =
+  (typeof audienceProfileScopeEnum.enumValues)[number];
+
+export const audienceMarketSideEnum = pgEnum("audience_market_side", [
+  "consumer",
+  "professional",
+  "business",
+  "partner",
+]);
+export type AudienceMarketSide =
+  (typeof audienceMarketSideEnum.enumValues)[number];
+
+export const audienceResearchMaturityEnum = pgEnum(
+  "audience_research_maturity",
+  ["hypothesis", "researched", "validated"],
+);
+export type AudienceResearchMaturity =
+  (typeof audienceResearchMaturityEnum.enumValues)[number];
+
+export const audienceActivationStatusEnum = pgEnum(
+  "audience_activation_status",
+  ["draft", "planned", "active", "paused", "retired"],
+);
+export type AudienceActivationStatus =
+  (typeof audienceActivationStatusEnum.enumValues)[number];
+
 // ---- INITIATIVE (top-level, goal-driven push across ad channels) ----
 
 /**
@@ -67,8 +103,7 @@ export const initiativeStatusEnum = pgEnum("initiative_status", [
   "completed",
   "archived",
 ]);
-export type InitiativeStatus =
-  (typeof initiativeStatusEnum.enumValues)[number];
+export type InitiativeStatus = (typeof initiativeStatusEnum.enumValues)[number];
 
 export const initiativeTable = pgTable(
   "initiative",
@@ -223,7 +258,9 @@ export const adSpotTable = pgTable(
       .text()
       .references(() => campaignTable.id, { onDelete: "cascade" })
       .notNull(),
-    channelId: t.text().references(() => channelTable.id, { onDelete: "set null" }),
+    channelId: t
+      .text()
+      .references(() => channelTable.id, { onDelete: "set null" }),
     brandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
@@ -289,7 +326,19 @@ export const audienceTargetTable = pgTable(
       .notNull(),
 
     name: t.text().notNull(), // canonical "who", e.g. "CA remote workers"
+    slug: t.text().notNull(), // stable, idempotent key within a brand
     description: t.text(), // why we want to reach them
+
+    // Durable audience / ICP semantics. Platform targeting mechanics live on
+    // audience_activation and the mirrored audience object below.
+    profileScope: audienceProfileScopeEnum().default("segment").notNull(),
+    marketSide: audienceMarketSideEnum().default("consumer").notNull(),
+    researchMaturity: audienceResearchMaturityEnum()
+      .default("hypothesis")
+      .notNull(),
+    geography: t.jsonb().$type<AudienceGeography>(),
+    demographics: t.jsonb().$type<AudienceDemographics>(),
+    context: t.jsonb().$type<AudienceContext>(),
 
     type: audienceTypeEnum().notNull(),
     status: audienceTargetStatusEnum().default("planned").notNull(),
@@ -318,11 +367,97 @@ export const audienceTargetTable = pgTable(
     index("audience_target_brand_idx").on(table.brandId),
     index("audience_target_type_idx").on(table.type),
     index("audience_target_status_idx").on(table.status),
+    uniqueIndex("audience_target_brand_slug_uq").on(table.brandId, table.slug),
   ],
 );
 
 export type AudienceTarget = typeof audienceTargetTable.$inferSelect;
 export type AudienceTargetInsert = typeof audienceTargetTable.$inferInsert;
+
+// ---- AUDIENCE ACTIVATION (planned per-platform targeting) ----------
+
+export const audienceActivationTable = pgTable(
+  "audience_activation",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("aact")),
+    targetId: t
+      .text()
+      .references(() => audienceTargetTable.id, { onDelete: "cascade" })
+      .notNull(),
+    platform: channelPlatformEnum().notNull(),
+    type: audienceTypeEnum().default("segment").notNull(),
+    status: audienceActivationStatusEnum().default("planned").notNull(),
+
+    // Null geography/demographics plus the corresponding mode is deliberate:
+    // inherit/narrow/replace and none/inherit_descriptive/override are distinct.
+    geographyMode: t.text().default("inherit").notNull(),
+    geography: t.jsonb().$type<AudienceGeography>(),
+    demographicsMode: t.text().default("none").notNull(),
+    demographics: t.jsonb().$type<AudienceDemographics>(),
+
+    targetingSpec: t.jsonb(),
+    prompt: t.text(),
+    exclusions: t.jsonb().$type<string[]>(),
+    specialAdCategory: t.text(),
+    complianceNotes: t.text(),
+    reachEstimateLabel: t.text(),
+    metadata: t.jsonb(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("audience_activation_target_platform_uq").on(
+      table.targetId,
+      table.platform,
+    ),
+    index("audience_activation_status_idx").on(table.status),
+  ],
+);
+
+export type AudienceActivation = typeof audienceActivationTable.$inferSelect;
+export type AudienceActivationInsert =
+  typeof audienceActivationTable.$inferInsert;
+
+// ---- AUDIENCE EVIDENCE (why we believe the profile) ----------------
+
+export const audienceEvidenceTable = pgTable(
+  "audience_evidence",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("aevd")),
+    targetId: t
+      .text()
+      .references(() => audienceTargetTable.id, { onDelete: "cascade" })
+      .notNull(),
+    url: t.text(),
+    title: t.text(),
+    claim: t.text().notNull(),
+    sourceType: t.text().default("research").notNull(),
+    observedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [index("audience_evidence_target_idx").on(table.targetId)],
+);
+
+export type AudienceEvidence = typeof audienceEvidenceTable.$inferSelect;
 
 // ---- AUDIENCE ------------------------------------------------------
 
@@ -379,6 +514,44 @@ export const audienceTable = pgTable(
 export type Audience = typeof audienceTable.$inferSelect;
 export type AudienceInsert = typeof audienceTable.$inferInsert;
 
+// ---- AUDIENCE PLACEMENT (where a platform audience is running) -----
+
+export const audiencePlacementTable = pgTable(
+  "audience_placement",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("aplc")),
+    audienceId: t
+      .text()
+      .references(() => audienceTable.id, { onDelete: "cascade" })
+      .notNull(),
+    campaignId: t
+      .text()
+      .references(() => campaignTable.id, { onDelete: "cascade" })
+      .notNull(),
+    adSetId: t.text(),
+    adSetName: t.text(),
+    status: t.text(),
+    stats: t.jsonb().$type<AdStats>(),
+    externalId: t.text(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("audience_placement_audience_idx").on(table.audienceId),
+    index("audience_placement_campaign_idx").on(table.campaignId),
+  ],
+);
+
 // ---- RELATIONS -----------------------------------------------------
 
 export const initiativeRelations = relations(
@@ -431,6 +604,28 @@ export const audienceTargetRelations = relations(
       references: [brandTable.id],
     }),
     audiences: many(audienceTable),
+    activations: many(audienceActivationTable),
+    evidence: many(audienceEvidenceTable),
+  }),
+);
+
+export const audienceActivationRelations = relations(
+  audienceActivationTable,
+  ({ one }) => ({
+    target: one(audienceTargetTable, {
+      fields: [audienceActivationTable.targetId],
+      references: [audienceTargetTable.id],
+    }),
+  }),
+);
+
+export const audienceEvidenceRelations = relations(
+  audienceEvidenceTable,
+  ({ one }) => ({
+    target: one(audienceTargetTable, {
+      fields: [audienceEvidenceTable.targetId],
+      references: [audienceTargetTable.id],
+    }),
   }),
 );
 
@@ -448,3 +643,17 @@ export const audienceRelations = relations(audienceTable, ({ one }) => ({
     references: [audienceTargetTable.id],
   }),
 }));
+
+export const audiencePlacementRelations = relations(
+  audiencePlacementTable,
+  ({ one }) => ({
+    audience: one(audienceTable, {
+      fields: [audiencePlacementTable.audienceId],
+      references: [audienceTable.id],
+    }),
+    campaign: one(campaignTable, {
+      fields: [audiencePlacementTable.campaignId],
+      references: [campaignTable.id],
+    }),
+  }),
+);

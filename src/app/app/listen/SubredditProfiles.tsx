@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  Loader2,
-  Pencil,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { ChevronDown, Loader2, Pencil, Sparkles, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,10 +28,7 @@ import { useTRPC, type RouterOutputs } from "@/trpc/react";
 type Source = RouterOutputs["listening"]["overview"]["sources"][number];
 
 // Stance → tone. Mirrors the intent palette used across the listen surfaces.
-const STANCE_META: Record<
-  SubredditStance,
-  { label: string; cls: string }
-> = {
+const STANCE_META: Record<SubredditStance, { label: string; cls: string }> = {
   engage: {
     label: "Engage",
     cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
@@ -71,7 +62,9 @@ export function SubredditProfiles({ source }: { source: Source }) {
 
   const profiles = subredditProfiles(source.config?.subreddits);
   const invalidate = () =>
-    queryClient.invalidateQueries(trpc.listening.overview.queryOptions());
+    queryClient.invalidateQueries({
+      queryKey: trpc.listening.overview.queryKey(),
+    });
 
   const evaluate = useMutation(
     trpc.listening.evaluateSubreddit.mutationOptions({
@@ -271,7 +264,9 @@ function SubredditCard({
       </div>
 
       {p.cultureSummary && (
-        <p className="text-muted-foreground mt-1.5 text-xs">{p.cultureSummary}</p>
+        <p className="text-muted-foreground mt-1.5 text-xs">
+          {p.cultureSummary}
+        </p>
       )}
       {p.sanctionedPath && (
         <p className="mt-1 text-xs">

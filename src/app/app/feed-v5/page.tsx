@@ -36,11 +36,16 @@ export default async function FeedV5Page() {
   });
   const org = membership?.organization;
   if (!org) {
-    return <div className="text-muted-foreground p-8">No organization found.</div>;
+    return (
+      <div className="text-muted-foreground p-8">No organization found.</div>
+    );
   }
 
   const owned = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
     columns: { id: true, name: true, logo: true },
   });
   const ownedIds = owned.map((b) => b.id);
@@ -49,7 +54,9 @@ export default async function FeedV5Page() {
   const trackedLinks = ownedIds.length
     ? await db.query.brandInspirationTable.findMany({
         where: inArray(brandInspirationTable.brandId, ownedIds),
-        with: { inspirationBrand: { columns: { id: true, name: true, logo: true } } },
+        with: {
+          inspirationBrand: { columns: { id: true, name: true, logo: true } },
+        },
       })
     : [];
   const tracked = new Map<string, V5Brand>();
@@ -66,7 +73,9 @@ export default async function FeedV5Page() {
   }
 
   const brands: V5Brand[] = [
-    ...owned.map((b): V5Brand => ({ id: b.id, name: b.name, logo: b.logo, role: "owned" })),
+    ...owned.map(
+      (b): V5Brand => ({ id: b.id, name: b.name, logo: b.logo, role: "owned" }),
+    ),
     ...tracked.values(),
   ];
   const allIds = brands.map((b) => b.id);
@@ -134,7 +143,7 @@ export default async function FeedV5Page() {
       handle: p.username,
       contentPostId: p.contentPostId,
       title: p.contentPost?.title ?? null,
-      pillar: p.contentPost?.pillar ?? null,
+      pillar: p.contentPost?.pillar ?? p.pillar ?? null,
       seriesName: p.contentPost?.series?.name ?? null,
       seriesColor: p.contentPost?.series?.color ?? null,
       text: p.text,
@@ -142,6 +151,7 @@ export default async function FeedV5Page() {
       externalUrl: p.externalUrl,
       externalKind: p.externalKind,
       mediaUrl: displayPoster(p.media),
+      media: p.media ?? [],
       likes: p.stats?.likes ?? 0,
       comments: p.stats?.comments ?? 0,
       views: p.stats?.views ?? 0,

@@ -1,12 +1,8 @@
 import "server-only";
 
-import { anthropic } from "@ai-sdk/anthropic";
-import { Output, generateText } from "ai";
 import { and, eq, isNull, or } from "drizzle-orm";
-import { z } from "zod";
 
-import { env } from "@/env";
-import { r2PutBuffer } from "@/server/clients/r2.client";
+import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
 import {
   brandTable,
@@ -15,6 +11,10 @@ import {
   type PlatformPostInsert,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import {
+  extractNewsletterIndex,
+  type NewsletterIndex,
+} from "@/server/services/content-analysis.service";
 
 // Competitor-newsletter pipeline. We subscribe to a competitor's newsletter
 // using a per-brand inbound address — `inspo+<brandIdOrSlug>@<receiving domain>`
@@ -26,8 +26,6 @@ import { createId } from "@/server/db/utils";
 // on metadata. Mirrors the F5Bot pipeline (see f5bot.service.ts): AI-first,
 // best-effort, and watching-mode safe — an unmatched email is logged, never
 // thrown, so we can point real competitors at it and watch what lands.
-
-const EXTRACTION_MODEL = anthropic("claude-sonnet-4-6");
 
 /**
  * Pull the brand token out of an `inspo+<token>@…` recipient. Returns null for
@@ -41,29 +39,7 @@ export function parseInspirationToken(recipients: string[]): string | null {
 
 // ---- Inspiration extraction --------------------------------------------------
 
-const InspirationSchema = z.object({
-  subject: z
-    .string()
-    .nullable()
-    .describe("The issue's subject line, cleaned of list/forwarding cruft."),
-  summary: z
-    .string()
-    .describe("One or two sentences: what this issue is actually about."),
-  themes: z
-    .array(z.string())
-    .describe("1–5 short topic/theme tags covered by the issue."),
-  ctas: z
-    .array(z.string())
-    .describe(
-      "Notable calls-to-action or offers, as short verbatim phrases. Empty if none.",
-    ),
-});
-
-export type InspirationExtract = z.infer<typeof InspirationSchema>;
-
-const EXTRACTION_SYSTEM = `You read a competitor's marketing newsletter and extract what is reusable as inspiration for our own growth team.
-
-Be concise and concrete. Capture the subject line, a tight summary of the issue, the content themes it covers, and any notable calls-to-action or offers (verbatim short phrases). Ignore boilerplate: unsubscribe footers, "view in browser", address blocks, and tracking junk. If a field is genuinely absent, return an empty array (or null for subject) — do not invent.`;
+export type InspirationExtract = NewsletterIndex;
 
 /** Best-effort structured read of a forwarded newsletter issue. */
 export async function extractInspiration(input: {
@@ -71,14 +47,7 @@ export async function extractInspiration(input: {
   text: string | null;
   html: string | null;
 }): Promise<InspirationExtract> {
-  const body = (input.text?.trim() || input.html?.trim() || "").slice(0, 20_000);
-  const { output } = await generateText({
-    model: EXTRACTION_MODEL,
-    system: EXTRACTION_SYSTEM,
-    prompt: `Subject: ${input.subject}\n\n${body}`,
-    output: Output.object({ schema: InspirationSchema }),
-  });
-  return output;
+  return extractNewsletterIndex(input);
 }
 
 // ---- Ingest (match → archive body → extract → persist) -----------------------
@@ -93,7 +62,7 @@ export interface InspirationIngestResult {
 
 /**
  * Full ingest for one forwarded competitor-newsletter email. Idempotent on the
- * Resend email id (dedup per brand). Best-effort throughout: R2 archival and
+ * Resend email id (dedup per brand). Best-effort throughout: Blob archival and
  * the inspiration extraction each fail soft so the issue is still captured.
  */
 export async function ingestInspirationEmail(email: {
@@ -137,7 +106,13 @@ export async function ingestInspirationEmail(email: {
     .limit(1);
   if (existing) {
     console.log(`[inspiration] ${email.id} already ingested for ${brand.name}`);
-    return { matched: true, brandId: brand.id, brandName: brand.name, inserted: false, reason: "dupe" };
+    return {
+      matched: true,
+      brandId: brand.id,
+      brandName: brand.name,
+      inserted: false,
+      reason: "dupe",
+    };
   }
 
   const receivedAt = email.receivedAt ? new Date(email.receivedAt) : new Date();
@@ -162,10 +137,8 @@ export async function ingestInspirationEmail(email: {
   const body = email.html ?? email.text ?? "";
   if (body) {
     try {
-      const key = [env.R2_PREFIX, "newsletters", brand.id, `${email.id}.html`]
-        .filter(Boolean)
-        .join("/");
-      externalUrl = await r2PutBuffer(
+      const key = R2.buildUploadKey("newsletters", brand.id, `${email.id}.html`);
+      externalUrl = await R2.putBuffer(
         key,
         Buffer.from(body, "utf-8"),
         "text/html; charset=utf-8",
@@ -207,7 +180,11 @@ export async function ingestInspirationEmail(email: {
     externalKind: "broadcast",
     publishedAt: receivedAt,
     scrapedAt: new Date(),
-    metadata: { from: email.from ?? null, ingestSource: "email_forward", inspiration },
+    metadata: {
+      from: email.from ?? null,
+      ingestSource: "email_forward",
+      inspiration,
+    },
   };
 
   await db.insert(platformPostTable).values(insert);
@@ -215,5 +192,11 @@ export async function ingestInspirationEmail(email: {
     `[inspiration] stored issue for ${brand.name} (${brand.id}): "${insert.text}"${externalUrl ? " (body archived)" : ""}`,
   );
 
-  return { matched: true, brandId: brand.id, brandName: brand.name, inserted: true, reason: "stored" };
+  return {
+    matched: true,
+    brandId: brand.id,
+    brandName: brand.name,
+    inserted: true,
+    reason: "stored",
+  };
 }

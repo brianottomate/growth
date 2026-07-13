@@ -2,13 +2,41 @@ import "server-only";
 
 import type { AnyCapability } from "./types";
 import { adsScope, topAds } from "./ads";
+import {
+  createAudienceTarget,
+  listAudienceTargets,
+  saveAudienceTargets,
+  updateAudienceActivation,
+  updateAudienceTarget,
+} from "./audiences";
+import { getBrandMap } from "./brand-map";
 import { listBrands } from "./brands";
-import { contentPipelineSummary, createIdea, upcomingContent } from "./content";
+import {
+  addContentCrossPost,
+  attachChatImageToContent,
+  attachLibraryMediaToContent,
+  contentPipelineSummary,
+  createIdea,
+  createPlatformPost,
+  getContentWorkItem,
+  promotePlatformPost,
+  productionQueue,
+  recoverArchiveMediaToContent,
+  suggestMediaForContent,
+  updateContentWorkItem,
+  upcomingContent,
+} from "./content";
 import { leadsSummary } from "./leads";
 import { recentMentions } from "./listening";
+import { navigateWorkspace } from "./navigation";
+import { nextForBrand } from "./next";
+import { OPERATION_CAPABILITIES } from "./operations";
+import { PLANNING_CAPABILITIES } from "./planning";
 import { workspaceOverview } from "./overview";
+import { readWebPage, webSearch } from "./research";
 
 export { toAiTools } from "./to-ai-tools";
+export { registerMcpCapabilities } from "./to-mcp-server";
 export { defineCapability } from "./types";
 export type { Capability, AnyCapability, CapabilityContext } from "./types";
 
@@ -19,14 +47,37 @@ export type { Capability, AnyCapability, CapabilityContext } from "./types";
  */
 export const OVERVIEW_CAPABILITIES: AnyCapability[] = [
   workspaceOverview,
+  navigateWorkspace,
   listBrands,
+  nextForBrand,
+  getBrandMap,
+  listAudienceTargets,
+  webSearch,
+  readWebPage,
+  createAudienceTarget,
+  saveAudienceTargets,
+  updateAudienceActivation,
+  updateAudienceTarget,
   contentPipelineSummary,
   upcomingContent,
-  // First WRITE capability — gated by an in-chat approval card.
+  productionQueue,
+  getContentWorkItem,
+  suggestMediaForContent,
+  // Content writes remain approval-gated; explicit audience saves are direct.
+  updateContentWorkItem,
+  addContentCrossPost,
+  attachChatImageToContent,
+  attachLibraryMediaToContent,
+  recoverArchiveMediaToContent,
+  createPlatformPost,
+  promotePlatformPost,
   createIdea,
   leadsSummary,
   recentMentions,
   // Ads: scope FIRST (cheap lay-of-the-land), then drill with topAds.
   adsScope,
   topAds,
+  // Portable, approval-gated operational workflows shared by chat and MCP.
+  ...OPERATION_CAPABILITIES,
+  ...PLANNING_CAPABILITIES,
 ];

@@ -6,6 +6,9 @@ import "./src/env";
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  turbopack: {
+    root: process.cwd(),
+  },
   /** Enable MDX pages */
   pageExtensions: ["ts", "tsx", "md", "mdx"],
 

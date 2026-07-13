@@ -122,7 +122,7 @@ export function ImageUpload({
 
       const alt = `${file.name.split(".")[0]} image`;
 
-      // Upload to R2 via the generic upload endpoint.
+      // Upload to Blob via the generic upload endpoint.
       const searchParams = new URLSearchParams();
       searchParams.set("filename", file.name);
       searchParams.set("alt", alt);

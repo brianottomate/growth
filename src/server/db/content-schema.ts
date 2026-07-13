@@ -1,11 +1,21 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { index, pgEnum, pgTable, primaryKey } from "drizzle-orm/pg-core";
+import {
+  index,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { initiativeTable } from "./ads-schema";
 import { userTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
-import { channelPlatformEnum, channelTable, deliveryProviderEnum } from "./channel-schema";
+import {
+  channelPlatformEnum,
+  channelTable,
+  deliveryProviderEnum,
+} from "./channel-schema";
 import { createId } from "./utils";
 
 // NOTE: the master content table is named `content_post` (export
@@ -230,7 +240,9 @@ export const contentPostTable = pgTable(
 
     // Optional themed grouping (e.g. "World Cup 2026"). Platform posts inherit
     // their series through this parent.
-    seriesId: t.text().references(() => seriesTable.id, { onDelete: "set null" }),
+    seriesId: t
+      .text()
+      .references(() => seriesTable.id, { onDelete: "set null" }),
 
     // Optional strategic push this content supports (the organic counterpart to
     // a campaign living under the same initiative). Lets a slot be anchored to a
@@ -372,7 +384,9 @@ export const contentCommentTable = pgTable(
       .references(() => contentPostTable.id, { onDelete: "cascade" }),
     platformPostId: t
       .text()
-      .references((): AnyPgColumn => platformPostTable.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => platformPostTable.id, {
+        onDelete: "cascade",
+      }),
     authorId: t
       .text()
       .references(() => userTable.id)
@@ -438,6 +452,11 @@ export const platformPostTable = pgTable(
     format: t.text(), // concrete platform format, e.g. "instagram.reel"
     archetype: t.text(), // mechanic, e.g. "carousel" — denormalized for cadence
     template: t.text(), // editorial structure, e.g. "informational_deck"
+    // A standalone platform draft can participate in the strategy mix before
+    // it is promoted into a canonical content_post. Once promoted, the same
+    // value is copied to content_post.pillar; keeping it here preserves the
+    // platform-post-first path without hiding strategy in metadata.
+    pillar: t.text(),
 
     // Threading / sequence (a TREE, ordered): an X thread is a root row + child
     // rows, all under one content_post. Cross-brand amplification (reposts,
@@ -459,10 +478,15 @@ export const platformPostTable = pgTable(
     // The pipe this spot actually shipped through ("via Zernio").
     provider: deliveryProviderEnum(),
 
+    // The connector that most recently hydrated this mirror. Kept separate
+    // from `provider`: a native Instagram post may be ingested through Zernio,
+    // Bright Data, or an official API without having been published by it.
+    ingestProvider: t.text(),
+
     text: t.text(),
     media: t.jsonb().$type<MediaItem[]>(),
     // External asset links (e.g. Google Drive folders) for this spot. The team
-    // produces in Drive; `media` (R2/Stream) is for assets WE host. Keeping the
+    // produces in Drive; `media` (Blob) is for assets WE host. Keeping the
     // Drive URLs means we don't force an asset migration to kill the sheet.
     assetLinks: t.jsonb().$type<string[]>(),
     stats: t.jsonb().$type<PostStats>(), // inline latest snapshot, not time-series
@@ -517,6 +541,9 @@ export const platformPostTable = pgTable(
     index("platform_post_published_at_idx").on(table.publishedAt),
     index("platform_post_cleanup_idx").on(table.cleanupStatus),
     index("platform_post_external_idx").on(table.provider, table.externalId),
+    uniqueIndex("platform_post_canonical_external_idx")
+      .on(table.brandId, table.platform, table.externalId)
+      .where(sql`${table.externalId} IS NOT NULL`),
     index("platform_post_parent_idx").on(table.parentPlatformPostId),
     // Headline cadence query: GROUP BY (brand, archetype, week-of publishedAt).
     index("platform_post_cadence_idx").on(
@@ -528,6 +555,47 @@ export const platformPostTable = pgTable(
 );
 
 export type PlatformPost = typeof platformPostTable.$inferSelect;
+
+// ---- CONTENT INGEST RUN -------------------------------------------
+
+/**
+ * One user-triggered history fetch. This is deliberately an audit record, not
+ * a scheduler: owned history and peer scraping remain explicit actions.
+ */
+export const contentIngestRunTable = pgTable(
+  "content_ingest_run",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("ingest")),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    requestedById: t.text().references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    mode: t.text().notNull(), // owned_backfill | peer_scrape
+    provider: t.text().notNull(), // zernio+x_api | brightdata | apify
+    status: t.text().default("running").notNull(),
+    requestedFrom: t.timestamp({ withTimezone: true }),
+    requestedTo: t.timestamp({ withTimezone: true }),
+    result: t.jsonb().$type<Record<string, unknown>>(),
+    error: t.text(),
+    startedAt: t
+      .timestamp({ withTimezone: true })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    completedAt: t.timestamp({ withTimezone: true }),
+  }),
+  (table) => [
+    index("content_ingest_run_brand_idx").on(table.brandId),
+    index("content_ingest_run_started_idx").on(table.startedAt),
+  ],
+);
+
+export type ContentIngestRun = typeof contentIngestRunTable.$inferSelect;
 export type PlatformPostInsert = typeof platformPostTable.$inferInsert;
 
 // ---- PLATFORM POST LINK (cross-post graph: a GRAPH, not a tree) ----
@@ -621,11 +689,9 @@ export const contentSuggestionTable = pgTable(
       .references(() => platformPostTable.id, { onDelete: "cascade" })
       .notNull(),
     // The "to" post for an edge suggestion, when resolved to one of our rows.
-    targetPostId: t
-      .text()
-      .references((): AnyPgColumn => platformPostTable.id, {
-        onDelete: "set null",
-      }),
+    targetPostId: t.text().references((): AnyPgColumn => platformPostTable.id, {
+      onDelete: "set null",
+    }),
     // External pointer when the edge target isn't (yet) a platform_post row.
     targetRef: t.jsonb().$type<Amplification>(),
 

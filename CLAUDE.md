@@ -61,7 +61,7 @@ Anthropic. Deployed on Vercel as the **`wanderdev/growth`** project (org slug is
   audience, brand, cadence, channel, channelSuggestion, content, conversion, inbox,
   initiative, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
   listening, media, mention, moment, reddit, reschedule, spend, studio, twitter.
-  (Blob is a route handler under `api/blob`, not a tRPC router.) Note: `apply` is a
+  Note: `apply` is a
   tRPC-reserved procedure name.
 - The monthly content loop (strategy targets → slot generation → workbook import →
   review → apply) is documented in `docs/content-monthly-loop.md`.
@@ -138,7 +138,7 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 - `/api/cron/growth?job=daily_comprehensive_sync&...` — daily 03:00 (comprehensive CIO/lead sync)
 - `/api/cron/reddit` — hourly (Reddit monitor)
 
-Other API routes: `api/trpc`, `api/auth/[...all]`, `api/blob`, `api/webhooks`,
+Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
 `api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
 `api/outreach`, `api/workflows`, `api/og`, `api/admin`, `api/plan/chat` (plan-agent
 streaming endpoint).

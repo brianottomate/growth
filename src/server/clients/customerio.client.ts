@@ -24,14 +24,14 @@ import { env } from "@/env";
 
 // SDK instances — use these directly for operations covered by the SDK
 export const trackClient = new TrackClient(
-  env.CUSTOMER_IO_SITE_ID,
-  env.CUSTOMER_IO_API_KEY,
+  env.CUSTOMER_IO_SITE_ID ?? "",
+  env.CUSTOMER_IO_API_KEY ?? "",
   {
     region: RegionUS,
   },
 );
 
-export const apiClient = new APIClient(env.CUSTOMER_IO_APP_KEY, {
+export const apiClient = new APIClient(env.CUSTOMER_IO_APP_KEY ?? "", {
   region: RegionUS,
 });
 
@@ -267,7 +267,7 @@ export async function getCustomerAttributes(customerId: string) {
 /**
  * Get recent activities for a customer.
  *
- * Used to populate Outreach Custom Field 64 (CIO Activity Summary)
+ * Used to populate a CRM activity-summary field when that integration is enabled.
  * in the Python version.
  */
 export async function getCustomerActivities(customerId: string, limit = 10) {

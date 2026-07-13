@@ -7,7 +7,7 @@ import ws from "ws";
 import { env } from "@/env";
 import * as schema from "./schema";
 
-// Configure for serverless environments (Vercel Edge, Cloudflare Workers, etc.)
+// Configure for serverless environments (Vercel and local development).
 neonConfig.webSocketConstructor = ws;
 // Enable querying over fetch for edge environments
 neonConfig.poolQueryViaFetch = true;

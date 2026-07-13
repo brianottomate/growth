@@ -6,15 +6,21 @@ import { db } from "@/server/db";
 import { contentPostTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
+import { getContentReadiness } from "@/lib/content-readiness";
 import { IdeaOwnerControl } from "./OwnerControls";
 import { CommentThread } from "./CommentThread";
-import { AddSpotControl, BriefEditor } from "./IdeaControls";
+import { AddSpotControl } from "./IdeaControls";
 import { SpotCard } from "./SpotCard";
 import { ContentPool } from "./ContentPool";
+import { ContentAssistantActions } from "./ContentAssistantActions";
+import { BriefOverview } from "./BriefOverview";
 
 const memberCols = { id: true, name: true, image: true } as const;
 const toMember = (
-  u: { id: string; name: string | null; image: string | null } | null | undefined,
+  u:
+    | { id: string; name: string | null; image: string | null }
+    | null
+    | undefined,
 ) => (u ? { id: u.id, name: u.name, image: u.image } : null);
 
 const STATUS: Record<string, string> = {
@@ -68,7 +74,11 @@ export default async function ContentDetailPage({
       owner: { columns: memberCols },
     },
   });
-  if (!content || content.brand?.organizationId !== org.id || content.deletedAt) {
+  if (
+    !content ||
+    content.brand?.organizationId !== org.id ||
+    content.deletedAt
+  ) {
     notFound();
   }
 
@@ -103,11 +113,24 @@ export default async function ContentDetailPage({
     const tb = (b.publishedAt ?? b.scheduledAt ?? b.createdAt).getTime();
     return ta - tb;
   });
+  const readiness = getContentReadiness({
+    hook: content.hook,
+    status: content.status,
+    spots: posts.map((post) => ({
+      source: post.source,
+      platform: post.platform,
+      archetype: post.archetype,
+      text: post.text,
+      scheduledAt: post.scheduledAt,
+      mediaCount: post.media?.length ?? 0,
+      assetLinkCount: post.assetLinks?.length ?? 0,
+    })),
+  });
 
   // Aggregate analytics across every rendering.
   const totals = posts.reduce(
     (acc, p) => {
-      const s = (p.stats) ?? {};
+      const s = p.stats ?? {};
       acc.likes += s.likes ?? 0;
       acc.views += s.views ?? 0;
       acc.comments += s.comments ?? 0;
@@ -192,9 +215,8 @@ export default async function ContentDetailPage({
         )}
       </div>
 
-      <BriefEditor
-        contentPostId={content.id}
-        initial={{
+      <BriefOverview
+        brief={{
           hook: content.hook,
           captionDirection: content.captionDirection,
           visualDirection: content.visualDirection,
@@ -202,8 +224,15 @@ export default async function ContentDetailPage({
           ctaKeyword: content.ctaKeyword,
           kpi: content.kpi,
         }}
-        status={content.status}
-        plannedAtISO={content.plannedAt ? content.plannedAt.toISOString() : null}
+        plannedAt={content.plannedAt}
+      />
+
+      <ContentAssistantActions
+        brandId={content.brandId}
+        brandName={content.brand?.name ?? "Brand"}
+        contentPostId={content.id}
+        contentTitle={content.title ?? "Untitled"}
+        readiness={readiness}
       />
 
       {/* aggregate analytics */}
@@ -214,7 +243,7 @@ export default async function ContentDetailPage({
               <div className="text-lg font-semibold tabular-nums">
                 {fmt(m.value)}
               </div>
-              <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+              <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
                 {m.label}
               </div>
             </div>
@@ -226,6 +255,8 @@ export default async function ContentDetailPage({
       <ContentPool
         contentPostId={content.id}
         brandId={content.brandId}
+        brandName={content.brand?.name ?? "Brand"}
+        contentTitle={content.title ?? "Untitled"}
         directMedia={content.media ?? []}
         spots={posts.map((p) => ({
           id: p.id,
@@ -235,7 +266,7 @@ export default async function ContentDetailPage({
       />
 
       {/* platform renderings */}
-      <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold uppercase tracking-wider">
+      <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
         Platform posts · {posts.length}
       </h2>
       <div className="flex flex-col gap-2.5">
@@ -245,6 +276,9 @@ export default async function ContentDetailPage({
             brandId={content.brandId}
             members={members}
             currentUserId={session.user.id}
+            contentPostId={content.id}
+            contentTitle={content.title ?? "Untitled"}
+            brandName={content.brand?.name ?? "Brand"}
             spot={{
               id: p.id,
               platform: p.platform,
@@ -257,8 +291,12 @@ export default async function ContentDetailPage({
               text: p.text,
               externalUrl: p.externalUrl,
               provider: p.provider,
-              scheduledAtISO: p.scheduledAt ? p.scheduledAt.toISOString() : null,
-              publishedAtISO: p.publishedAt ? p.publishedAt.toISOString() : null,
+              scheduledAtISO: p.scheduledAt
+                ? p.scheduledAt.toISOString()
+                : null,
+              publishedAtISO: p.publishedAt
+                ? p.publishedAt.toISOString()
+                : null,
               assetLinks: p.assetLinks,
               media: p.media,
               stats: p.stats,
@@ -276,7 +314,7 @@ export default async function ContentDetailPage({
       {/* series siblings */}
       {content.series && (
         <>
-          <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
             More in “{content.series.name}” · {siblings.length}
           </h2>
           {siblings.length === 0 ? (
@@ -303,7 +341,7 @@ export default async function ContentDetailPage({
       )}
 
       {/* Team discussion on this idea (audience comment counts live in stats). */}
-      <h2 className="text-muted-foreground mt-8 mb-1 text-xs font-semibold uppercase tracking-wider">
+      <h2 className="text-muted-foreground mt-8 mb-1 text-xs font-semibold tracking-wider uppercase">
         Discussion
       </h2>
       {totals.comments > 0 && (
@@ -311,7 +349,10 @@ export default async function ContentDetailPage({
           {fmt(totals.comments)} audience comments across platforms.
         </p>
       )}
-      <CommentThread contentPostId={content.id} currentUserId={session.user.id} />
+      <CommentThread
+        contentPostId={content.id}
+        currentUserId={session.user.id}
+      />
     </div>
   );
 }

@@ -1,5 +1,11 @@
-import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+  check,
+  index,
+  pgEnum,
+  pgTable,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { organizationTable, userTable } from "./auth-schema";
 import { createId } from "./utils";
@@ -164,6 +170,10 @@ export const brandTable = pgTable(
     logo: t.text(),
     website: t.text(),
 
+    // One Zernio workspace is shared by Boe Ventures. Each owned brand maps to
+    // one profile in that workspace; its connected accounts live on `channel`.
+    zernioProfileId: t.text(),
+
     // Cached aggregate (sum of channel followers) for overview cards.
     followerCount: t.integer(),
 
@@ -196,6 +206,11 @@ export const brandTable = pgTable(
     index("brand_owner_id_idx").on(table.ownerId),
     index("brand_type_idx").on(table.type),
     uniqueIndex("brand_org_slug_idx").on(table.organizationId, table.slug),
+    uniqueIndex("brand_zernio_profile_idx").on(table.zernioProfileId),
+    check(
+      "brand_zernio_profile_owned_check",
+      sql`${table.zernioProfileId} IS NULL OR ${table.organizationId} IS NOT NULL`,
+    ),
   ],
 );
 
@@ -250,8 +265,7 @@ export const brandInspirationTable = pgTable(
 );
 
 export type BrandInspiration = typeof brandInspirationTable.$inferSelect;
-export type BrandInspirationInsert =
-  typeof brandInspirationTable.$inferInsert;
+export type BrandInspirationInsert = typeof brandInspirationTable.$inferInsert;
 
 // ---- ACCESS (notion-style grants, modeled on homi collection_access) ------
 

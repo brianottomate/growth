@@ -13,9 +13,8 @@ import { env } from "@/env";
  * - Phone number enrichment (last-resort fallback in the enrichment chain)
  *
  * Minerva enrichment is used for:
- * 1. Phone enrichment: BigQuery → webhook → CIO → **Minerva** (last resort)
- * 2. Income backfill: Outreach custom38 (household_income)
- * 3. Location enrichment: Outreach addressCity / addressState / addressCountry
+ * Enrichment is optional and self-contained; it does not depend on a sales
+ * warehouse or sales-engagement provider.
  */
 
 export const isMinervaConfigured =
@@ -338,7 +337,7 @@ export async function verifyContactGeo(
 /**
  * Enrich phone number for a lead (last-resort fallback).
  *
- * Called when BigQuery, webhook, and CIO all lack a phone number.
+ * Called when the available profile sources lack a phone number.
  * Used in the real-time sync pipeline phone enrichment chain.
  */
 export async function enrichPhone(
@@ -373,10 +372,10 @@ export async function enrichPhone(
 }
 
 /**
- * Batch enrich income data for Outreach backfill.
+ * Batch enrich income data for a future profile backfill.
  *
  * Used by the daily `minerva_income_backfill_daily` cron job to update
- * Outreach custom38 (household_income) from Minerva's estimated_income_range.
+ * A profile income field from Minerva's estimated_income_range.
  *
  * Reference: wander-growth-api minerva-income-backfill endpoint
  */

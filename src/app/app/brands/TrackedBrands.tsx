@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
@@ -76,7 +77,9 @@ export function TrackedBrands({
       },
     }),
   );
-  const untrackM = useMutation(trpc.brand.untrack.mutationOptions({ onSuccess: refresh }));
+  const untrackM = useMutation(
+    trpc.brand.untrack.mutationOptions({ onSuccess: refresh }),
+  );
 
   const save = () =>
     createM.mutate({
@@ -89,7 +92,7 @@ export function TrackedBrands({
 
   return (
     <div className="mt-4 border-t pt-4">
-      <div className="text-muted-foreground mb-2 text-[10px] font-semibold uppercase tracking-wide">
+      <div className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wide uppercase">
         Tracking · {tracked.length}
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -98,13 +101,21 @@ export function TrackedBrands({
             key={t.inspirationId}
             className="group hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
           >
-            <div className="bg-muted flex size-5 items-center justify-center rounded text-[10px] font-semibold">
-              {t.name.slice(0, 2)}
-            </div>
-            <span className="text-xs font-medium">{t.name}</span>
-            <PurposeTag purpose={t.purpose} />
+            <Link
+              href={`#tracked-brand-${t.id}`}
+              className="flex items-center gap-2"
+              title={`Jump to ${t.name}`}
+            >
+              <span className="bg-muted flex size-5 items-center justify-center rounded text-[10px] font-semibold">
+                {t.name.slice(0, 2)}
+              </span>
+              <span className="text-xs font-medium">{t.name}</span>
+              <PurposeTag purpose={t.purpose} />
+            </Link>
             <button
-              onClick={() => untrackM.mutate({ inspirationId: t.inspirationId })}
+              onClick={() =>
+                untrackM.mutate({ inspirationId: t.inspirationId })
+              }
               disabled={untrackM.isPending}
               title="Stop tracking"
               className="text-muted-foreground hover:text-foreground opacity-0 transition-opacity group-hover:opacity-100"

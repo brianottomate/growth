@@ -17,7 +17,7 @@ import {
 // domain. A claude-sonnet-5 agent with web-search + site-read tools (Firecrawl
 // is the fetch layer; the model is the judgment layer) goes and verifies the
 // operator's real domain — and, since it's already reading the site, ALSO
-// judges whether the company is a viable target for our outreach.
+// judges whether the company is a viable target for a future sales workflow.
 //
 // Two distinct axes, deliberately separate:
 //   • VERIFICATION — is this domain really this company? (belongsToCompany)

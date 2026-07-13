@@ -7,7 +7,11 @@ import { getSession } from "@/server/better-auth/server";
 import { trpc, HydrateClient, prefetch } from "@/trpc/server";
 import { ContentBoard } from "./ContentBoard";
 
-export default async function ContentPage() {
+export default async function ContentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ brandId?: string; view?: string }>;
+}) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -22,16 +26,29 @@ export default async function ContentPage() {
 
   const brands = (
     await db.query.brandTable.findMany({
-      where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+      where: and(
+        eq(brandTable.organizationId, org.id),
+        isNull(brandTable.deletedAt),
+      ),
       columns: { id: true, name: true, slug: true },
       orderBy: (t, { asc }) => [asc(t.name)],
     })
+  )
     // The flagship brand leads — brands[0] is the default target for
     // Add idea / Import plan / Generate slots.
-  ).sort((a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"));
+    .sort((a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"));
 
-  // Initial (unfiltered) board + the assignee roster, for instant hydration.
-  prefetch(trpc.content.board.queryOptions({}));
+  const sp = await searchParams;
+  const initialBrandId = brands.some((brand) => brand.id === sp.brandId)
+    ? sp.brandId
+    : undefined;
+  const initialView =
+    sp.view === "schedule" || sp.view === "list" || sp.view === "board"
+      ? sp.view
+      : undefined;
+
+  // Initial board (optionally brand-filtered) + the assignee roster.
+  prefetch(trpc.content.board.queryOptions({ brandId: initialBrandId }));
   prefetch(trpc.content.assignableMembers.queryOptions());
 
   return (
@@ -39,6 +56,8 @@ export default async function ContentPage() {
       <ContentBoard
         brands={brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug }))}
         currentUserId={session.user.id}
+        initialBrandId={initialBrandId}
+        initialView={initialView}
       />
     </HydrateClient>
   );

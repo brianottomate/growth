@@ -47,6 +47,7 @@ import {
   type Member,
 } from "@/components/assignment/assignee";
 import { PILLARS, PILLAR_BY_SLUG } from "@/lib/pillars";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 import type { ContentStatus } from "@/server/db/schema";
 import type { RouterOutputs } from "@/trpc/react";
 import { ContentCalendar } from "./ContentCalendar";
@@ -159,15 +160,19 @@ function Thumb({
 export function ContentBoard({
   brands,
   currentUserId,
+  initialBrandId,
+  initialView = "board",
 }: {
   brands: { id: string; name: string; slug: string | null }[];
   currentUserId: string;
+  initialBrandId?: string;
+  initialView?: "board" | "schedule" | "list";
 }) {
   const trpc = useTRPC();
   const qc = useQueryClient();
   const router = useRouter();
 
-  const [brandFilter, setBrandFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState(initialBrandId ?? "all");
   const [pillarFilter, setPillarFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [mineOnly, setMineOnly] = useState(false);
@@ -273,6 +278,8 @@ export function ContentBoard({
   // Inline "+ Add idea" creates under the filtered brand (or the first owned).
   const createBrandId =
     brandFilter !== "all" ? brandFilter : (brands[0]?.id ?? null);
+  const createBrand =
+    brands.find((brand) => brand.id === createBrandId) ?? null;
   const createIdea = useMutation(
     trpc.content.create.mutationOptions({
       onSettled: () =>
@@ -293,7 +300,7 @@ export function ContentBoard({
   // what needs review, what's done); Schedule is the zoomed-in posting worklist
   // (today, this week, month grid tucked behind a toggle); List is the backup
   // ledger (grouped rows, with the legacy Sheet rendering tucked inside).
-  const [view, setView] = useState<"board" | "schedule" | "list">("board");
+  const [view, setView] = useState<"board" | "schedule" | "list">(initialView);
   const [scheduleLayout, setScheduleLayout] = useState<"agenda" | "month">(
     "agenda",
   );
@@ -407,11 +414,34 @@ export function ContentBoard({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
-            onClick={() => setGenerateOpen(true)}
+            onClick={() => {
+              if (!createBrand) return;
+              sendAssistantIntent({
+                type: "plan_two_weeks",
+                brandId: createBrand.id,
+                brandName: createBrand.name,
+                source: "content",
+                visibleText: `Plan the next two weeks for ${createBrand.name}`,
+              });
+            }}
+            disabled={!createBrand}
             className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
           >
-            <CalendarPlus className="size-3.5" /> Generate slots
+            <MessageSquare className="size-3.5" /> Plan next two weeks
           </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setGenerateOpen(true)}
+                className="border-border text-muted-foreground hover:bg-accent hover:text-foreground grid size-8 place-items-center rounded-full border transition-colors"
+                aria-label="Manual monthly slot fill"
+              >
+                <CalendarPlus className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Manual monthly slot fill</TooltipContent>
+          </Tooltip>
           <button
             onClick={() => setImportOpen(true)}
             className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
@@ -1471,7 +1501,11 @@ function ScheduleRow({
       )}
     >
       <div className="flex items-center gap-3 px-3 py-2.5">
-        <Thumb src={row.mediaUrl} className="size-10 shrink-0" iconClassName="size-4" />
+        <Thumb
+          src={row.mediaUrl}
+          className="size-10 shrink-0"
+          iconClassName="size-4"
+        />
         <ChannelLogo platform={row.platform} className="size-5 shrink-0" />
         <button
           onClick={() => setOpen((o) => !o)}

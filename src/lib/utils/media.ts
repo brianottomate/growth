@@ -2,7 +2,7 @@ import type { MediaItem } from "@/server/db/content-schema";
 
 // CDN hosts that hard-block cross-origin hotlinking (403 even server-side, with
 // any headers/referer). Their URLs can't render in an <img>, so we treat such
-// media as absent until we re-host it (e.g. to R2). Facebook's photo/video CDN
+// media as absent until we re-host it (e.g. to Blob). Facebook's photo/video CDN
 // is the main offender; Instagram + Twitter CDNs serve cross-origin fine.
 const BLOCKED_HOSTS = ["fbcdn.net"];
 

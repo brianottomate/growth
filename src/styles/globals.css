@@ -228,6 +228,25 @@
   --animate-spin-slow: spin-slow 3s linear infinite;
 }
 
+/* Scrollbar styling utilities for chat/queue surfaces (AI sprint backport). */
+@utility scrollbar {
+  scrollbar-color: var(--color-surface-tertiary) transparent;
+  scrollbar-width: auto;
+}
+
+@utility scrollbar-thin {
+  scrollbar-color: var(--color-surface-tertiary) transparent;
+  scrollbar-width: thin;
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ============================================================================
    WANDER ANIMATION LIBRARY
    ============================================================================ */

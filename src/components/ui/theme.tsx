@@ -7,13 +7,13 @@ import { Sun, Moon, Monitor } from "lucide-react";
 import {
   ToggleGroup,
   ToggleGroupItem,
-} from "@wandercom/design-system-web/ui/toggle-group";
+} from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@wandercom/design-system-web/ui/tooltip";
+} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +21,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@wandercom/design-system-web/ui/button";
+import { Button } from "@/components/ui/button";
 
 const ThemeModeSchema = z.enum(["light", "dark", "auto"]);
 

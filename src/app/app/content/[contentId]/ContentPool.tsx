@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Images, X } from "lucide-react";
+import { Images, Sparkles, X } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -12,6 +12,7 @@ import { Dropzone } from "@/components/ui/dropzone";
 import type { MediaItem } from "@/server/db/schema";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { MediaPickerDialog } from "./MediaPickerDialog";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 
 type Spot = { id: string; platform: string; media: MediaItem[] };
 
@@ -28,19 +29,27 @@ const keyOf = (m: MediaItem) => m.assetId ?? m.url;
 export function ContentPool({
   contentPostId,
   brandId,
+  brandName,
+  contentTitle,
   directMedia,
   spots,
 }: {
   contentPostId: string;
   brandId: string;
+  brandName: string;
+  contentTitle: string;
   directMedia: MediaItem[];
   spots: Spot[];
 }) {
   const trpc = useTRPC();
   const router = useRouter();
   const refresh = { onSettled: () => router.refresh() };
-  const setPoolMedia = useMutation(trpc.content.setPoolMedia.mutationOptions(refresh));
-  const setSpotMedia = useMutation(trpc.content.setMedia.mutationOptions(refresh));
+  const setPoolMedia = useMutation(
+    trpc.content.setPoolMedia.mutationOptions(refresh),
+  );
+  const setSpotMedia = useMutation(
+    trpc.content.setMedia.mutationOptions(refresh),
+  );
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const { uploadImages, uploading } = useMediaUpload(brandId);
@@ -49,7 +58,8 @@ export function ContentPool({
   const poolMap = new Map<string, MediaItem>();
   for (const m of directMedia) poolMap.set(keyOf(m), m);
   for (const s of spots)
-    for (const m of s.media) if (!poolMap.has(keyOf(m))) poolMap.set(keyOf(m), m);
+    for (const m of s.media)
+      if (!poolMap.has(keyOf(m))) poolMap.set(keyOf(m), m);
   const pool = [...poolMap.values()];
   const directKeys = new Set(directMedia.map(keyOf));
 
@@ -78,14 +88,17 @@ export function ContentPool({
 
   return (
     <section className="mt-8">
-      <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider">
+      <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
         Media pool · {pool.length}
       </h2>
       <div className="flex flex-wrap gap-3">
         {pool.map((m) => {
           const onPool = directKeys.has(keyOf(m));
           return (
-            <div key={keyOf(m)} className="bg-card w-28 rounded-lg border p-1.5">
+            <div
+              key={keyOf(m)}
+              className="bg-card w-28 rounded-lg border p-1.5"
+            >
               <div className="bg-muted relative aspect-square overflow-hidden rounded-md">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -121,7 +134,10 @@ export function ContentPool({
                             : "opacity-40 hover:opacity-100",
                         )}
                       >
-                        <ChannelLogo platform={s.platform} className="size-3.5" />
+                        <ChannelLogo
+                          platform={s.platform}
+                          className="size-3.5"
+                        />
                       </button>
                     );
                   })}
@@ -130,7 +146,6 @@ export function ContentPool({
             </div>
           );
         })}
-
       </div>
       <div className="mt-3 flex items-stretch gap-2">
         <Dropzone
@@ -147,10 +162,27 @@ export function ContentPool({
           <Images className="size-5" />
           Library
         </button>
+        <button
+          onClick={() =>
+            sendAssistantIntent({
+              type: "work_content_post",
+              brandId,
+              brandName,
+              contentPostId,
+              contentTitle,
+              visibleText: `Suggest media for “${contentTitle}” from the library, our archives, or a strong AI image prompt`,
+            })
+          }
+          className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
+        >
+          <Sparkles className="size-5" />
+          Suggest media
+        </button>
       </div>
       <p className="text-muted-foreground mt-1.5 text-[10px]">
-        Anything attached to a spot also shows here. Toggle a platform icon to add
-        or remove it on that spot. New uploads are saved to your media library.
+        Anything attached to a spot also shows here. Toggle a platform icon to
+        add or remove it on that spot. New uploads are saved to your media
+        library.
       </p>
 
       <MediaPickerDialog

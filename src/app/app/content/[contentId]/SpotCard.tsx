@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Images, Loader2, Plus, Sparkles, X } from "lucide-react";
+import {
+  Images,
+  Loader2,
+  MessageSquare,
+  Plus,
+  Sparkles,
+  X,
+} from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { SimpleSelect } from "@/components/ui/select";
@@ -19,6 +26,7 @@ import { STATUS_OPTIONS } from "./IdeaControls";
 import { MediaPickerDialog } from "./MediaPickerDialog";
 import { MarkScheduledButton } from "../MarkScheduledButton";
 import { SPOT_PILLS, type SpotPill } from "@/lib/spot-pills";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 
 const STATUS_PILL: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -85,22 +93,36 @@ export function SpotCard({
   brandId,
   members,
   currentUserId,
+  contentPostId,
+  contentTitle,
+  brandName,
 }: {
   spot: SpotCardData;
   brandId: string;
   members: Member[];
   currentUserId: string;
+  contentPostId: string;
+  contentTitle: string;
+  brandName: string;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
   const owned = spot.source === "owned";
 
   const refresh = { onSettled: () => router.refresh() };
-  const setStatus = useMutation(trpc.content.setSpotStatus.mutationOptions(refresh));
-  const setSchedule = useMutation(trpc.content.setSpotSchedule.mutationOptions(refresh));
-  const setAssetLinks = useMutation(trpc.content.setAssetLinks.mutationOptions(refresh));
+  const setStatus = useMutation(
+    trpc.content.setSpotStatus.mutationOptions(refresh),
+  );
+  const setSchedule = useMutation(
+    trpc.content.setSpotSchedule.mutationOptions(refresh),
+  );
+  const setAssetLinks = useMutation(
+    trpc.content.setAssetLinks.mutationOptions(refresh),
+  );
   const setMedia = useMutation(trpc.content.setMedia.mutationOptions(refresh));
-  const removeSpot = useMutation(trpc.content.removeSpot.mutationOptions(refresh));
+  const removeSpot = useMutation(
+    trpc.content.removeSpot.mutationOptions(refresh),
+  );
 
   const [links, setLinks] = useState<string[]>(spot.assetLinks ?? []);
   const [media, setMediaState] = useState<MediaItem[]>(spot.media ?? []);
@@ -116,7 +138,9 @@ export function SpotCard({
   const [steer, setSteer] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const setText = useMutation(trpc.content.setSpotText.mutationOptions(refresh));
+  const setText = useMutation(
+    trpc.content.setSpotText.mutationOptions(refresh),
+  );
   const generate = useMutation(
     trpc.content.generateSpotCaption.mutationOptions({
       onSuccess: (res) => {
@@ -187,9 +211,13 @@ export function SpotCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold">{platformLabel(spot.platform)}</span>
+            <span className="text-sm font-semibold">
+              {platformLabel(spot.platform)}
+            </span>
             {spot.username && (
-              <span className="text-muted-foreground text-xs">{spot.username}</span>
+              <span className="text-muted-foreground text-xs">
+                {spot.username}
+              </span>
             )}
             {fmtLabel && (
               <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium">
@@ -199,10 +227,15 @@ export function SpotCard({
             {owned ? (
               <SimpleSelect
                 value={
-                  STATUS_OPTIONS.some((o) => o.value === spot.status) ? spot.status : "draft"
+                  STATUS_OPTIONS.some((o) => o.value === spot.status)
+                    ? spot.status
+                    : "draft"
                 }
                 onValueChange={(v) =>
-                  setStatus.mutate({ platformPostId: spot.id, status: v as never })
+                  setStatus.mutate({
+                    platformPostId: spot.id,
+                    status: v as never,
+                  })
                 }
                 options={STATUS_OPTIONS}
                 size="sm"
@@ -225,7 +258,11 @@ export function SpotCard({
             {owned ? (
               <>
                 <DatePicker
-                  value={spot.scheduledAtISO ? new Date(spot.scheduledAtISO) : undefined}
+                  value={
+                    spot.scheduledAtISO
+                      ? new Date(spot.scheduledAtISO)
+                      : undefined
+                  }
                   onChange={(d) =>
                     setSchedule.mutate({
                       platformPostId: spot.id,
@@ -248,7 +285,9 @@ export function SpotCard({
             ) : (
               spot.scheduledAtISO && <span>{fmtWhen(spot.scheduledAtISO)}</span>
             )}
-            {spot.publishedAtISO && <span>· posted {fmtWhen(spot.publishedAtISO)}</span>}
+            {spot.publishedAtISO && (
+              <span>· posted {fmtWhen(spot.publishedAtISO)}</span>
+            )}
             {via && <span>· via {via}</span>}
             {spot.externalUrl && (
               <a
@@ -266,16 +305,21 @@ export function SpotCard({
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {owned && (
             <button
-              onClick={() => setGenOpen((o) => !o)}
-              aria-label={caption.trim() ? "Regenerate caption" : "Generate caption"}
+              onClick={() =>
+                sendAssistantIntent({
+                  type: "work_content_post",
+                  brandId,
+                  brandName,
+                  contentPostId,
+                  contentTitle,
+                  platformPostId: spot.id,
+                  platform: spot.platform,
+                  visibleText: `Help me refine the ${platformLabel(spot.platform)} version of “${contentTitle}”`,
+                })
+              }
               className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
             >
-              {generate.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="size-3.5" />
-              )}
-              {caption.trim() ? "Regenerate" : "Generate"}
+              <MessageSquare className="size-3.5" /> Refine in chat
             </button>
           )}
           <SpotOwnerControl
@@ -302,16 +346,46 @@ export function SpotCard({
           voice. Scraped posts show their captured text read-only. */}
       {owned ? (
         <div className="mt-3">
-          <textarea
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            onBlur={saveCaption}
-            placeholder="Platform caption… (Generate to draft it from the brief)"
-            className="bg-background focus:ring-ring/40 min-h-20 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-          />
-          {setText.isPending && (
-            <p className="text-muted-foreground mt-1.5 text-[11px]">Saving…</p>
-          )}
+          <div className="bg-background min-h-16 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
+            {caption.trim() || (
+              <span className="text-muted-foreground">
+                No channel copy yet. Refine it with the assistant.
+              </span>
+            )}
+          </div>
+          <details className="mt-2">
+            <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
+              Manual edit
+            </summary>
+            <div className="mt-2">
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                onBlur={saveCaption}
+                placeholder="Platform caption…"
+                className="bg-background focus:ring-ring/40 min-h-24 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
+              />
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGenOpen((open) => !open)}
+                  className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+                >
+                  {generate.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-3.5" />
+                  )}
+                  {caption.trim() ? "Regenerate" : "Generate"}
+                </button>
+                {setText.isPending && (
+                  <span className="text-muted-foreground text-[11px]">
+                    Saving…
+                  </span>
+                )}
+              </div>
+            </div>
+          </details>
           {genOpen && (
             <div className="bg-muted/30 mt-2 rounded-lg border p-2.5">
               <div className="flex flex-wrap gap-1.5">
@@ -360,7 +434,9 @@ export function SpotCard({
           )}
         </div>
       ) : (
-        spot.text && <p className="text-muted-foreground mt-3 text-sm">{spot.text}</p>
+        spot.text && (
+          <p className="text-muted-foreground mt-3 text-sm">{spot.text}</p>
+        )
       )}
 
       {/* media — thumbnails + a proper drop zone (saved to the library) */}
@@ -382,7 +458,9 @@ export function SpotCard({
                   />
                   {owned && (
                     <button
-                      onClick={() => persistMedia(media.filter((_, j) => j !== i))}
+                      onClick={() =>
+                        persistMedia(media.filter((_, j) => j !== i))
+                      }
                       className="absolute top-0.5 right-0.5 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
                       aria-label="Remove asset"
                     >
@@ -394,22 +472,27 @@ export function SpotCard({
             </div>
           )}
           {owned && (
-            <div className="flex items-stretch gap-2">
-              <Dropzone
-                compact
-                multiple
-                onFiles={handleUpload}
-                uploading={uploading}
-                className="flex-1"
-              />
-              <button
-                onClick={() => setPickerOpen(true)}
-                className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
-              >
-                <Images className="size-5" />
-                Library
-              </button>
-            </div>
+            <details>
+              <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
+                Channel media
+              </summary>
+              <div className="mt-2 flex items-stretch gap-2">
+                <Dropzone
+                  compact
+                  multiple
+                  onFiles={handleUpload}
+                  uploading={uploading}
+                  className="flex-1"
+                />
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
+                >
+                  <Images className="size-5" />
+                  Library
+                </button>
+              </div>
+            </details>
           )}
         </div>
       )}

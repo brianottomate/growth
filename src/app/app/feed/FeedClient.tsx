@@ -19,7 +19,7 @@ import { useFullBleed } from "@/lib/use-full-bleed";
 /** Card media with a graceful fallback. Scraped IG/peer thumbnails live on
  *  signed CDN URLs that EXPIRE, so an `<img>` that loaded once 404s later — on
  *  error we drop to the text-forward / logo panel instead of a broken image.
- *  (Durable fix = re-host scraped media to R2 at scrape time.) */
+ *  (Durable fix = re-host scraped media to Blob at scrape time.) */
 function FeedMedia({
   mediaUrl,
   text,
@@ -42,9 +42,9 @@ function FeedMedia({
     );
   }
   return (
-    <div className="from-muted to-muted/30 flex h-full w-full items-center bg-gradient-to-br px-3 pb-2 pt-9">
+    <div className="from-muted to-muted/30 flex h-full w-full items-center bg-gradient-to-br px-3 pt-9 pb-2">
       {text ? (
-        <p className="text-foreground/80 line-clamp-4 text-[13px] font-medium leading-snug">
+        <p className="text-foreground/80 line-clamp-4 text-[13px] leading-snug font-medium">
           {text}
         </p>
       ) : (
@@ -230,12 +230,12 @@ function Segmented<T extends string>({
 function NowMarker({ now }: { now: number }) {
   return (
     <div className="flex flex-none flex-col items-center gap-1.5 self-stretch px-1">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-400">
+      <span className="text-[10px] font-semibold tracking-wide text-sky-400 uppercase">
         now
       </span>
       <span className="size-2 rounded-full bg-sky-400" />
       <span className="w-0.5 flex-1 rounded bg-sky-400/40" />
-      <span className="text-[10px] tabular-nums text-sky-400">
+      <span className="text-[10px] text-sky-400 tabular-nums">
         {fmtTime(new Date(now))}
       </span>
     </div>
@@ -301,7 +301,7 @@ function FeedCard({ e }: { e: FeedEntry }) {
           hotlink-blocked CDN. */}
       <div className="bg-muted relative h-36">
         <FeedMedia mediaUrl={e.mediaUrl} text={e.text} platform={e.platform} />
-        <div className="absolute left-2 top-2 flex items-center gap-1">
+        <div className="absolute top-2 left-2 flex items-center gap-1">
           {e.brandLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -336,12 +336,12 @@ function FeedCard({ e }: { e: FeedEntry }) {
           )}
         </div>
         <span
-          className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm ${status.cls}`}
+          className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm ${status.cls}`}
         >
           {status.label}
         </span>
         {e.isSeed && (
-          <span className="absolute right-2 top-8 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 backdrop-blur-sm">
+          <span className="absolute top-8 right-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 backdrop-blur-sm">
             Seed
           </span>
         )}
@@ -353,7 +353,7 @@ function FeedCard({ e }: { e: FeedEntry }) {
             onClick={(ev) => ev.stopPropagation()}
             title={`Open on ${platformLabel(e.platform)}`}
             aria-label={`Open on ${platformLabel(e.platform)}`}
-            className="absolute bottom-2 right-2 flex size-6 items-center justify-center rounded-md bg-black/40 text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+            className="absolute right-2 bottom-2 flex size-6 items-center justify-center rounded-md bg-black/40 text-xs text-white backdrop-blur-sm transition-colors hover:bg-black/60"
           >
             ↗
           </a>
@@ -439,8 +439,7 @@ function ContentGroupBox({ g }: { g: ContentGroup }) {
           </span>
         )}
         <span className="text-muted-foreground shrink-0">
-          {g.entries.length}{" "}
-          {g.entries.length === 1 ? "platform" : "platforms"}
+          {g.entries.length} {g.entries.length === 1 ? "platform" : "platforms"}
         </span>
       </Link>
       <div className="flex gap-3">
@@ -492,7 +491,11 @@ function BrandRow({
       <div className="mb-1.5 flex items-center gap-1.5">
         {bg.brandLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={bg.brandLogo} alt="" className="size-5 rounded object-cover" />
+          <img
+            src={bg.brandLogo}
+            alt=""
+            className="size-5 rounded object-cover"
+          />
         ) : (
           <span className="bg-muted flex size-5 items-center justify-center rounded text-[9px] font-semibold">
             {bg.brandName.slice(0, 2)}
@@ -552,7 +555,9 @@ export function FeedClient({
 
   const [brandFilter, setBrandFilter] = useState("all");
   const [channelFilter, setChannelFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "organic" | "paid">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "organic" | "paid">(
+    "all",
+  );
   const [view, setView] = useState<"grouped" | "all">("grouped");
   const [mineOnly, setMineOnly] = useState(false);
   const [spot, setSpot] = useState<FeedEntry | null>(null);
@@ -570,7 +575,8 @@ export function FeedClient({
     () => ({
       members,
       currentUserId,
-      ownerOf: (e: FeedEntry) => (e.id in overrides ? overrides[e.id]! : e.owner),
+      ownerOf: (e: FeedEntry) =>
+        e.id in overrides ? overrides[e.id]! : e.owner,
       assign: (platformPostId: string, ownerId: string | null) => {
         setOverrides((prev) => ({
           ...prev,
@@ -593,12 +599,22 @@ export function FeedClient({
     () =>
       entries.filter((e) => {
         if (brandFilter !== "all" && e.brandId !== brandFilter) return false;
-        if (channelFilter !== "all" && e.platform !== channelFilter) return false;
+        if (channelFilter !== "all" && e.platform !== channelFilter)
+          return false;
         if (typeFilter === "paid") return false; // no ad spots yet
-        if (mineOnly && assignCtx.ownerOf(e)?.id !== currentUserId) return false;
+        if (mineOnly && assignCtx.ownerOf(e)?.id !== currentUserId)
+          return false;
         return true;
       }),
-    [entries, brandFilter, channelFilter, typeFilter, mineOnly, assignCtx, currentUserId],
+    [
+      entries,
+      brandFilter,
+      channelFilter,
+      typeFilter,
+      mineOnly,
+      assignCtx,
+      currentUserId,
+    ],
   );
 
   // Group by day (newest first); within a day, sub-group by brand (owned-first,
@@ -615,7 +631,9 @@ export function FeedClient({
       .map(([k, list]) => {
         const byBrand = new Map<string, FeedEntry[]>();
         for (const e of list)
-          (byBrand.get(e.brandId) ?? byBrand.set(e.brandId, []).get(e.brandId)!).push(e);
+          (
+            byBrand.get(e.brandId) ?? byBrand.set(e.brandId, []).get(e.brandId)!
+          ).push(e);
         const brandGroups = [...byBrand.entries()]
           .sort(
             (a, b) =>
@@ -629,118 +647,132 @@ export function FeedClient({
               (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
             ),
           }));
-        return { key: k, today: k === todayKey, count: list.length, brandGroups };
+        return {
+          key: k,
+          today: k === todayKey,
+          count: list.length,
+          brandGroups,
+        };
       });
   }, [filtered, todayKey, brands]);
 
   return (
     <SpotlightContext.Provider value={setSpot}>
-    <AssignContext.Provider value={assignCtx}>
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Feed</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        Everything going out, newest first · {entries.length} posts
-      </p>
+      <AssignContext.Provider value={assignCtx}>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Feed</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Everything going out, newest first · {entries.length} posts
+          </p>
 
-      {/* filter bar */}
-      <div className="mt-5 flex flex-wrap items-center gap-2 border-b pb-4">
-        <Segmented
-          value={typeFilter}
-          onChange={setTypeFilter}
-          options={[
-            { value: "all", label: "All" },
-            { value: "organic", label: "Organic" },
-            { value: "paid", label: "Paid" },
-          ]}
-        />
-        <span className="bg-border mx-1 h-4 w-px" />
-        <FilterPill active={brandFilter === "all"} onClick={() => setBrandFilter("all")}>
-          All brands
-        </FilterPill>
-        {brands.map((b) => (
-          <FilterPill
-            key={b.id}
-            active={brandFilter === b.id}
-            onClick={() => setBrandFilter(b.id)}
-          >
-            {b.name}
-          </FilterPill>
-        ))}
-        <span className="bg-border mx-1 h-4 w-px" />
-        <FilterPill active={channelFilter === "all"} onClick={() => setChannelFilter("all")}>
-          All channels
-        </FilterPill>
-        {platforms.map((p) => (
-          <FilterPill
-            key={p}
-            active={channelFilter === p}
-            onClick={() => setChannelFilter(p)}
-          >
-            {platformLabel(p)}
-          </FilterPill>
-        ))}
-        <span className="flex-1" />
-        <FilterPill active={mineOnly} onClick={() => setMineOnly((v) => !v)}>
-          Mine
-        </FilterPill>
-        <Segmented
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "grouped", label: "Grouped" },
-            { value: "all", label: "All posts" },
-          ]}
-        />
-      </div>
-
-      {/* timeline */}
-      <div ref={ref} style={style} className="px-8 sm:px-0">
-        {typeFilter === "paid" ? (
-        <div className="text-muted-foreground py-16 text-center text-sm">
-          Paid spots arrive with the ads schema — coming soon.
-        </div>
-      ) : days.length === 0 ? (
-        <div className="text-muted-foreground py-16 text-center text-sm">
-          Nothing for these filters.
-        </div>
-      ) : (
-        days.map((d) => (
-          <div key={d.key} className="mt-6">
-            <div className="mb-2.5 flex items-center gap-3">
-              <span
-                className={`text-xs font-semibold ${
-                  d.today
-                    ? "bg-foreground text-background rounded-full px-2.5 py-1"
-                    : "text-foreground"
-                }`}
+          {/* filter bar */}
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-b pb-4">
+            <Segmented
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "organic", label: "Organic" },
+                { value: "paid", label: "Paid" },
+              ]}
+            />
+            <span className="bg-border mx-1 h-4 w-px" />
+            <FilterPill
+              active={brandFilter === "all"}
+              onClick={() => setBrandFilter("all")}
+            >
+              All brands
+            </FilterPill>
+            {brands.map((b) => (
+              <FilterPill
+                key={b.id}
+                active={brandFilter === b.id}
+                onClick={() => setBrandFilter(b.id)}
               >
-                {fmtDay(new Date(d.key))}
-                {d.today ? " · today" : ""}
-              </span>
-              <span className="bg-border h-px flex-1" />
-              <span className="text-muted-foreground text-[11px]">
-                {d.count} item{d.count === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            <div className="space-y-4">
-              {d.brandGroups.map((bg) => (
-                <BrandRow
-                  key={bg.brandId}
-                  bg={bg}
-                  view={view}
-                  now={now}
-                  today={d.today}
-                />
-              ))}
-            </div>
+                {b.name}
+              </FilterPill>
+            ))}
+            <span className="bg-border mx-1 h-4 w-px" />
+            <FilterPill
+              active={channelFilter === "all"}
+              onClick={() => setChannelFilter("all")}
+            >
+              All channels
+            </FilterPill>
+            {platforms.map((p) => (
+              <FilterPill
+                key={p}
+                active={channelFilter === p}
+                onClick={() => setChannelFilter(p)}
+              >
+                {platformLabel(p)}
+              </FilterPill>
+            ))}
+            <span className="flex-1" />
+            <FilterPill
+              active={mineOnly}
+              onClick={() => setMineOnly((v) => !v)}
+            >
+              Mine
+            </FilterPill>
+            <Segmented
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "grouped", label: "Grouped" },
+                { value: "all", label: "All posts" },
+              ]}
+            />
           </div>
-        ))
-      )}
-      </div>
-      <SpotlightDialog entry={spot} onClose={() => setSpot(null)} />
-    </div>
-    </AssignContext.Provider>
+
+          {/* timeline */}
+          <div ref={ref} style={style} className="px-8 sm:px-0">
+            {typeFilter === "paid" ? (
+              <div className="text-muted-foreground py-16 text-center text-sm">
+                Paid spots arrive with the ads schema — coming soon.
+              </div>
+            ) : days.length === 0 ? (
+              <div className="text-muted-foreground py-16 text-center text-sm">
+                Nothing for these filters.
+              </div>
+            ) : (
+              days.map((d) => (
+                <div key={d.key} className="mt-6">
+                  <div className="mb-2.5 flex items-center gap-3">
+                    <span
+                      className={`text-xs font-semibold ${
+                        d.today
+                          ? "bg-foreground text-background rounded-full px-2.5 py-1"
+                          : "text-foreground"
+                      }`}
+                    >
+                      {fmtDay(new Date(d.key))}
+                      {d.today ? " · today" : ""}
+                    </span>
+                    <span className="bg-border h-px flex-1" />
+                    <span className="text-muted-foreground text-[11px]">
+                      {d.count} item{d.count === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {d.brandGroups.map((bg) => (
+                      <BrandRow
+                        key={bg.brandId}
+                        bg={bg}
+                        view={view}
+                        now={now}
+                        today={d.today}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <SpotlightDialog entry={spot} onClose={() => setSpot(null)} />
+        </div>
+      </AssignContext.Provider>
     </SpotlightContext.Provider>
   );
 }
@@ -753,25 +785,34 @@ function SpotlightDialog({
   entry: FeedEntry | null;
   onClose: () => void;
 }) {
+  const trpc = useTRPC();
+  const router = useRouter();
+  const promote = useMutation(
+    trpc.content.promotePlatformPost.mutationOptions({
+      onSuccess: (result) => router.push(`/app/content/${result.id}`),
+    }),
+  );
   const stat = entry ? statLine(entry.stats) : null;
   const via = entry?.via ? (VIA[entry.via] ?? entry.via) : null;
   return (
     <SimpleDialog
       open={!!entry}
       onOpenChange={(o) => !o && onClose()}
-      title={entry ? `${entry.brandName} · ${platformLabel(entry.platform)}` : ""}
+      title={
+        entry ? `${entry.brandName} · ${platformLabel(entry.platform)}` : ""
+      }
       size="lg"
       scrollable
     >
       {entry && (
         <div className="flex flex-col gap-4">
-          {entry.mediaUrl && (
-            <DetailMedia src={entry.mediaUrl} />
-          )}
+          {entry.mediaUrl && <DetailMedia src={entry.mediaUrl} />}
           <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
             <ChannelLogo platform={entry.platform} className="size-4" />
             {entry.handle && <span>{entry.handle}</span>}
-            <span>· {fmtDay(new Date(entry.at))} {fmtTime(new Date(entry.at))}</span>
+            <span>
+              · {fmtDay(new Date(entry.at))} {fmtTime(new Date(entry.at))}
+            </span>
             {via && <span>· via {via}</span>}
             {stat && <span className="tabular-nums">· {stat}</span>}
           </div>
@@ -780,15 +821,39 @@ function SpotlightDialog({
               {entry.text}
             </p>
           )}
-          {entry.externalUrl && (
-            <a
-              href={entry.externalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-foreground text-background hover:bg-foreground/90 inline-flex w-fit items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium"
-            >
-              Open on {platformLabel(entry.platform)} ↗
-            </a>
+          <div className="flex flex-wrap gap-2">
+            {entry.contentPostId ? (
+              <Link
+                href={`/app/content/${entry.contentPostId}`}
+                className="bg-foreground text-background hover:bg-foreground/90 inline-flex w-fit items-center rounded-full px-3.5 py-1.5 text-sm font-medium"
+              >
+                Open content idea
+              </Link>
+            ) : !entry.tracked ? (
+              <button
+                type="button"
+                disabled={promote.isPending}
+                onClick={() => promote.mutate({ platformPostId: entry.id })}
+                className="bg-foreground text-background hover:bg-foreground/90 inline-flex w-fit items-center rounded-full px-3.5 py-1.5 text-sm font-medium disabled:opacity-50"
+              >
+                {promote.isPending
+                  ? "Creating content idea…"
+                  : "Turn into content idea"}
+              </button>
+            ) : null}
+            {entry.externalUrl && (
+              <a
+                href={entry.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-border hover:bg-accent inline-flex w-fit items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium"
+              >
+                Open on {platformLabel(entry.platform)} ↗
+              </a>
+            )}
+          </div>
+          {promote.error && (
+            <p className="text-destructive text-xs">{promote.error.message}</p>
           )}
         </div>
       )}

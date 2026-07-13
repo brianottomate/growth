@@ -1,0 +1,71 @@
+"use client";
+
+import { Check, Circle, MessageSquare } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { sendAssistantIntent } from "@/lib/assistant-events";
+import type { getContentReadiness } from "@/lib/content-readiness";
+
+type Readiness = ReturnType<typeof getContentReadiness>;
+
+export function ContentAssistantActions({
+  brandId,
+  brandName,
+  contentPostId,
+  contentTitle,
+  readiness,
+}: {
+  brandId: string;
+  brandName: string;
+  contentPostId: string;
+  contentTitle: string;
+  readiness: Readiness;
+}) {
+  const work = () =>
+    sendAssistantIntent({
+      type: "work_content_post",
+      brandId,
+      brandName,
+      contentPostId,
+      contentTitle,
+      visibleText: `Help me finish “${contentTitle}”`,
+    });
+
+  return (
+    <section className="bg-card mt-5 rounded-xl border p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <div>
+          <p className="text-sm font-semibold">Production readiness</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {readiness.completed}/{readiness.total} complete
+            {readiness.next ? ` · Next: ${readiness.next.detail}` : " · Ready"}
+          </p>
+        </div>
+        <Button size="sm" className="ml-auto" onClick={work}>
+          <MessageSquare className="size-3.5" /> Work in chat
+        </Button>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {readiness.checks.map((check) => (
+          <div
+            key={check.id}
+            className="bg-background flex items-start gap-2 rounded-lg border px-2.5 py-2"
+            title={check.detail}
+          >
+            {check.complete ? (
+              <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+            ) : (
+              <Circle className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+            )}
+            <span className="min-w-0">
+              <span className="block text-xs font-medium">{check.label}</span>
+              <span className="text-muted-foreground block truncate text-[10px]">
+                {check.detail}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

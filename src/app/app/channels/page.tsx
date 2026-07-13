@@ -33,11 +33,16 @@ export default async function ChannelsPage() {
   });
   const org = membership?.organization;
   if (!org) {
-    return <div className="text-muted-foreground p-8">No organization found.</div>;
+    return (
+      <div className="text-muted-foreground p-8">No organization found.</div>
+    );
   }
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
     columns: { id: true, name: true },
   });
   if (!brands.length) {
@@ -50,10 +55,27 @@ export default async function ChannelsPage() {
       channelTable.brandId,
       brands.map((b) => b.id),
     ),
-    columns: { id: true, channelFingerprint: true },
+    columns: {
+      id: true,
+      channelFingerprint: true,
+      profileImageUrl: true,
+      bannerImageUrl: true,
+      profileUrl: true,
+      manageUrl: true,
+      connectionStatus: true,
+    },
   });
   const fingerprintById = new Map(
-    channelRows.map((c) => [c.id, c.channelFingerprint?.fingerprintText ?? null]),
+    channelRows.map((c) => [
+      c.id,
+      c.channelFingerprint?.fingerprintText ?? null,
+    ]),
+  );
+  const profileImageById = new Map(
+    channelRows.map((channel) => [channel.id, channel.profileImageUrl]),
+  );
+  const channelDetailsById = new Map(
+    channelRows.map((channel) => [channel.id, channel]),
   );
 
   // Per-channel mix OVERRIDES (channelId set) — the brand default (channelId
@@ -70,7 +92,10 @@ export default async function ChannelsPage() {
     ),
     columns: { channelId: true, pillar: true, targetPct: true },
   });
-  const mixByChannel = new Map<string, { pillar: string; targetPct: number }[]>();
+  const mixByChannel = new Map<
+    string,
+    { pillar: string; targetPct: number }[]
+  >();
   for (const r of overrideRows) {
     if (!r.channelId) continue;
     const list = mixByChannel.get(r.channelId) ?? [];
@@ -93,20 +118,28 @@ export default async function ChannelsPage() {
           pct: m.pct,
           targetPct: m.targetPct,
         })),
-        channels: s.channels.map((c) => ({
-          id: c.channelId,
-          platform: c.platform,
-          handle: c.handle,
-          followerCount: c.followerCount,
-          fingerprint: fingerprintById.get(c.channelId) ?? null,
-          mixTargets: mixByChannel.get(c.channelId) ?? [],
-          postsInWindow: c.postsInWindow,
-          archetypes: c.archetypes.map((a) => ({
-            archetype: a.archetype,
-            perWeek: a.observedPerWeek,
-            target: a.target,
-          })),
-        })),
+        channels: s.channels.map((c) => {
+          const details = channelDetailsById.get(c.channelId);
+          return {
+            id: c.channelId,
+            platform: c.platform,
+            handle: c.handle,
+            profileImageUrl: profileImageById.get(c.channelId) ?? null,
+            bannerImageUrl: details?.bannerImageUrl ?? null,
+            profileUrl: details?.profileUrl ?? null,
+            manageUrl: details?.manageUrl ?? null,
+            connectionStatus: details?.connectionStatus ?? "disconnected",
+            followerCount: c.followerCount,
+            fingerprint: fingerprintById.get(c.channelId) ?? null,
+            mixTargets: mixByChannel.get(c.channelId) ?? [],
+            postsInWindow: c.postsInWindow,
+            archetypes: c.archetypes.map((a) => ({
+              archetype: a.archetype,
+              perWeek: a.observedPerWeek,
+              target: a.target,
+            })),
+          };
+        }),
       };
     }),
   );

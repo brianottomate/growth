@@ -26,10 +26,13 @@ export interface CapabilityContext {
 export type CapabilityDomain =
   | "overview"
   | "brands"
+  | "audiences"
   | "content"
   | "leads"
   | "listening"
-  | "ads";
+  | "ads"
+  | "research"
+  | "operations";
 
 export interface Capability<
   I extends z.ZodTypeAny = z.ZodTypeAny,

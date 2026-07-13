@@ -22,11 +22,16 @@ export default async function FeedPage() {
   });
   const org = membership?.organization;
   if (!org) {
-    return <div className="text-muted-foreground p-8">No organization found.</div>;
+    return (
+      <div className="text-muted-foreground p-8">No organization found.</div>
+    );
   }
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
   });
   const brandIds = brands.map((b) => b.id);
 
@@ -38,7 +43,10 @@ export default async function FeedPage() {
         with: { inspirationBrand: true },
       })
     : [];
-  const trackedBrands = new Map<string, { name: string; logo: string | null }>();
+  const trackedBrands = new Map<
+    string,
+    { name: string; logo: string | null }
+  >();
   for (const l of trackedLinks) {
     if (l.inspirationBrand) {
       trackedBrands.set(l.inspirationBrand.id, {
@@ -102,7 +110,7 @@ export default async function FeedPage() {
     handle: p.username,
     contentPostId: p.contentPostId,
     title: p.contentPost?.title ?? null,
-    pillar: p.contentPost?.pillar ?? null,
+    pillar: p.contentPost?.pillar ?? p.pillar ?? null,
     seriesName: p.contentPost?.series?.name ?? null,
     seriesColor: p.contentPost?.series?.color ?? null,
     text: p.text,
@@ -110,13 +118,15 @@ export default async function FeedPage() {
     isSeed: p.isSeed,
     via: p.provider,
     externalUrl: p.externalUrl,
-    stats: (p.stats) ?? null,
+    stats: p.stats ?? null,
     mediaUrl: displayPoster(p.media),
     at: (p.publishedAt ?? p.scheduledAt ?? p.createdAt).toISOString(),
     published: p.status === "published",
     externalKind: p.externalKind,
     amplifiedFromUser: p.amplifiedFrom?.username ?? null,
-    owner: p.owner ? { id: p.owner.id, name: p.owner.name, image: p.owner.image } : null,
+    owner: p.owner
+      ? { id: p.owner.id, name: p.owner.name, image: p.owner.image }
+      : null,
   }));
 
   return (

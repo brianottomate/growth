@@ -33,7 +33,7 @@ import type {
 /**
  * Instantly.ai API v2 Client
  *
- * Cold email outreach platform used for lead management, campaigns,
+ * Cold email platform used for lead management and campaigns.
  * and AI-enriched lead scoring workflows.
  *
  * Authentication: Bearer token via API key

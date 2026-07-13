@@ -19,6 +19,7 @@ import { BrandAudiences } from "./BrandAudiences";
 import { BrandLinks } from "./BrandLinks";
 import { BrandActions } from "./BrandActions";
 import { NewBrandButton } from "./NewBrandButton";
+import { ImportZernioBrands } from "./ImportZernioBrands";
 import { TrackedBrands, type TrackedLite } from "./TrackedBrands";
 import { SuggestedChannels, type SuggestionLite } from "./SuggestedChannels";
 import { PeerScrapeButton } from "./PeerScrapeButton";
@@ -118,7 +119,9 @@ function BrandCard({
             )}
           </div>
           {brand.tagline && (
-            <p className="text-muted-foreground mt-1 text-sm">{brand.tagline}</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {brand.tagline}
+            </p>
           )}
           {summary.length > 0 && (
             <p className="text-muted-foreground mt-1 text-xs">
@@ -143,6 +146,7 @@ function BrandCard({
         channels={channels}
         suggestions={suggestions}
         postCountByPlatform={postCountByPlatform}
+        zernioProfileId={brand.zernioProfileId}
       />
 
       <BrandLinks brandId={brand.id} links={brand.links ?? []} />
@@ -188,19 +192,26 @@ function PeerBrandCard({
         }`
       : null;
   return (
-    <div className="bg-card rounded-2xl border p-5 shadow-sm">
+    <div
+      id={`tracked-brand-${brand.id}`}
+      className="bg-card scroll-mt-24 rounded-2xl border p-4 shadow-sm"
+    >
       <div className="flex items-start gap-3.5">
         {brand.logo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={brand.logo} alt="" className="size-11 shrink-0 rounded-xl object-cover" />
+          <img
+            src={brand.logo}
+            alt=""
+            className="size-10 shrink-0 rounded-xl object-cover"
+          />
         ) : (
-          <div className="bg-muted text-foreground flex size-11 shrink-0 items-center justify-center rounded-xl text-base font-semibold">
+          <div className="bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold">
             {brand.name.slice(0, 2)}
           </div>
         )}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-base font-semibold">{brand.name}</span>
+            <span className="text-sm font-semibold">{brand.name}</span>
             {brand.website && (
               <a
                 href={brand.website}
@@ -211,62 +222,84 @@ function PeerBrandCard({
                 {brand.website.replace(/^https?:\/\//, "")}
               </a>
             )}
-            <span className="text-muted-foreground text-[11px]">{trackedByLabel}</span>
+            <span className="text-muted-foreground text-[11px]">
+              {trackedByLabel}
+            </span>
           </div>
           {brand.tagline && (
-            <p className="text-muted-foreground mt-1 text-sm">{brand.tagline}</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {brand.tagline}
+            </p>
           )}
           {scrapeSummary && (
-            <p className="text-muted-foreground mt-1 text-xs">{scrapeSummary}</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {scrapeSummary}
+            </p>
           )}
         </div>
-        <PeerScrapeButton
-          brandId={brand.id}
-          channels={channels.map((c) => ({
-            platform: c.platform,
-            profileUrl: c.profileUrl,
-          }))}
-        />
+        <div className="flex items-center gap-1">
+          <SuggestedChannels
+            brandId={brand.id}
+            suggestions={suggestions}
+            variant="action"
+          />
+          <PeerScrapeButton
+            brandId={brand.id}
+            channels={channels.map((c) => ({
+              platform: c.platform,
+              profileUrl: c.profileUrl,
+            }))}
+          />
+        </div>
       </div>
 
       {channels.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-2.5 flex flex-wrap gap-2">
           {channels.map((c) => {
             const posts = postCountByPlatform[c.platform] ?? 0;
             return (
-            <div key={c.id} className="flex items-center gap-2 rounded-lg border px-2 py-1.5">
-              <ChannelLogo platform={c.platform} />
-              <span className="flex flex-col leading-tight">
-                <span className="text-xs font-medium">{platformLabel(c.platform)}</span>
-                {(c.handle || c.followerCount != null || posts > 0) && (
-                  <span className="text-muted-foreground text-[11px]">
-                    {c.handle}
-                    {c.handle && c.followerCount != null && " · "}
-                    {c.followerCount != null &&
-                      `${new Intl.NumberFormat("en-US").format(c.followerCount)} followers`}
-                    {posts > 0 &&
-                      `${c.handle || c.followerCount != null ? " · " : ""}${posts} ${posts === 1 ? "post" : "posts"}`}
+              <div
+                key={c.id}
+                className="flex items-center gap-2 rounded-lg border px-2 py-1.5"
+              >
+                <ChannelLogo platform={c.platform} />
+                <span className="flex flex-col leading-tight">
+                  <span className="text-xs font-medium">
+                    {platformLabel(c.platform)}
                   </span>
+                  {(c.handle || c.followerCount != null || posts > 0) && (
+                    <span className="text-muted-foreground text-[11px]">
+                      {c.handle}
+                      {c.handle && c.followerCount != null && " · "}
+                      {c.followerCount != null &&
+                        `${new Intl.NumberFormat("en-US").format(c.followerCount)} followers`}
+                      {posts > 0 &&
+                        `${c.handle || c.followerCount != null ? " · " : ""}${posts} ${posts === 1 ? "post" : "posts"}`}
+                    </span>
+                  )}
+                </span>
+                {c.profileUrl && (
+                  <a
+                    href={c.profileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open page"
+                    className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </a>
                 )}
-              </span>
-              {c.profileUrl && (
-                <a
-                  href={c.profileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Open page"
-                  className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
-                >
-                  <ExternalLink className="size-3.5" />
-                </a>
-              )}
-            </div>
+              </div>
             );
           })}
         </div>
       )}
 
-      <SuggestedChannels brandId={brand.id} suggestions={suggestions} />
+      <SuggestedChannels
+        brandId={brand.id}
+        suggestions={suggestions}
+        variant="results"
+      />
     </div>
   );
 }
@@ -281,11 +314,16 @@ export default async function BrandsPage() {
   });
   const org = membership?.organization;
   if (!org) {
-    return <div className="text-muted-foreground p-8">No organization found.</div>;
+    return (
+      <div className="text-muted-foreground p-8">No organization found.</div>
+    );
   }
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
     // Earliest-created first for a deterministic order; may switch to an explicit order column later.
     orderBy: (b, { asc }) => asc(b.createdAt),
   });
@@ -301,7 +339,8 @@ export default async function BrandsPage() {
   // Peer/reference brands tracked by this org's owned brands.
   const peerBrandMap = new Map<string, typeof brandTable.$inferSelect>();
   for (const insp of inspirations) {
-    if (insp.inspirationBrand) peerBrandMap.set(insp.inspirationBrand.id, insp.inspirationBrand);
+    if (insp.inspirationBrand)
+      peerBrandMap.set(insp.inspirationBrand.id, insp.inspirationBrand);
   }
   const peerBrands = [...peerBrandMap.values()];
 
@@ -364,11 +403,15 @@ export default async function BrandsPage() {
   // Per-platform: `${brandId}:${platform}` → count.
   const postCountByBrandPlatform = new Map<string, number>();
   for (const r of postRollup) {
-    postCountByBrand.set(r.brandId, (postCountByBrand.get(r.brandId) ?? 0) + r.posts);
+    postCountByBrand.set(
+      r.brandId,
+      (postCountByBrand.get(r.brandId) ?? 0) + r.posts,
+    );
     postCountByBrandPlatform.set(`${r.brandId}:${r.platform}`, r.posts);
     if (r.lastScraped) {
       const cur = lastScrapedByBrand.get(r.brandId);
-      if (!cur || r.lastScraped > cur) lastScrapedByBrand.set(r.brandId, r.lastScraped);
+      if (!cur || r.lastScraped > cur)
+        lastScrapedByBrand.set(r.brandId, r.lastScraped);
     }
   }
   const postCountsForBrand = (brandId: string): Record<string, number> => {
@@ -405,11 +448,13 @@ export default async function BrandsPage() {
     kind: c.kind,
     platform: c.platform,
     handle: c.handle,
+    profileImageUrl: c.profileImageUrl,
     connectionStatus: c.connectionStatus,
     profileUrl: c.profileUrl,
     manageUrl: c.manageUrl,
     followerCount: c.followerCount,
     followerHistory: c.followerHistory ?? [],
+    defaultProvider: c.defaultProvider,
   });
 
   const toSuggestion = (
@@ -451,7 +496,10 @@ export default async function BrandsPage() {
             {brands.length} owned · {distinctTracked} tracked
           </p>
         </div>
-        <NewBrandButton />
+        <div className="flex items-center gap-2">
+          <ImportZernioBrands />
+          <NewBrandButton />
+        </div>
       </div>
 
       {brands.length === 0 && (
@@ -462,7 +510,7 @@ export default async function BrandsPage() {
 
       {company.length > 0 && (
         <>
-          <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
             Company brands
           </h2>
           <div className="flex flex-col gap-4">{company.map(renderBrand)}</div>
@@ -471,7 +519,7 @@ export default async function BrandsPage() {
 
       {personal.length > 0 && (
         <>
-          <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
             Personal brands
           </h2>
           <div className="flex flex-col gap-4">{personal.map(renderBrand)}</div>
@@ -480,7 +528,7 @@ export default async function BrandsPage() {
 
       {peerBrands.length > 0 && (
         <>
-          <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
             Tracked brands
           </h2>
           <div className="flex flex-col gap-4">
@@ -488,11 +536,15 @@ export default async function BrandsPage() {
               <PeerBrandCard
                 key={brand.id}
                 brand={brand}
-                channels={channels.filter((c) => c.brandId === brand.id).map(toLite)}
+                channels={channels
+                  .filter((c) => c.brandId === brand.id)
+                  .map(toLite)}
                 trackedByLabel={(peerTrackedBy.get(brand.id) ?? []).join(" · ")}
                 suggestions={suggestionsFor(brand.id)}
                 postCount={postCountByBrand.get(brand.id) ?? 0}
-                lastScraped={lastScrapedByBrand.get(brand.id)?.toISOString() ?? null}
+                lastScraped={
+                  lastScrapedByBrand.get(brand.id)?.toISOString() ?? null
+                }
                 postCountByPlatform={postCountsForBrand(brand.id)}
               />
             ))}

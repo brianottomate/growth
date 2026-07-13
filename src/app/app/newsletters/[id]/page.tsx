@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { memberTable, platformPostTable } from "@/server/db/schema";
+import {
+  brandInspirationTable,
+  brandTable,
+  memberTable,
+  platformPostTable,
+} from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { fetchNewsletterContent } from "@/server/clients/cio-content";
 import { NEWSLETTER_KIND_META, newsletterKind } from "@/lib/newsletter-kind";
+import { ContentAnalysisPanel } from "@/components/content-analysis-panel";
+import { readContentAnalysis } from "@/lib/content-analysis";
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
@@ -34,14 +41,46 @@ export default async function NewsletterIssuePage({
     ),
     with: { brand: true },
   });
-  if (!issue || issue.brand?.organizationId !== org.id) notFound();
+  if (!issue?.brand) notFound();
+  let hasAccess = issue.brand.organizationId === org.id;
+  if (!hasAccess && !issue.brand.organizationId) {
+    const ownedBrands = await db.query.brandTable.findMany({
+      where: eq(brandTable.organizationId, org.id),
+      columns: { id: true },
+    });
+    const ownedBrandIds = ownedBrands.map((brand) => brand.id);
+    if (ownedBrandIds.length) {
+      const inspiration = await db.query.brandInspirationTable.findFirst({
+        where: and(
+          inArray(brandInspirationTable.brandId, ownedBrandIds),
+          eq(brandInspirationTable.inspirationBrandId, issue.brand.id),
+        ),
+      });
+      hasAccess = Boolean(inspiration);
+    }
+  }
+  if (!hasAccess) notFound();
 
   const kind = newsletterKind(issue.text ?? "");
   const meta = NEWSLETTER_KIND_META[kind];
   const s = issue.stats;
-  const content = issue.externalId
-    ? await fetchNewsletterContent(issue.externalId)
-    : null;
+  let content =
+    issue.provider === "customerio" && issue.externalId
+      ? await fetchNewsletterContent(issue.externalId)
+      : null;
+  if (!content && issue.provider === "email_forward" && issue.externalUrl) {
+    try {
+      const response = await fetch(issue.externalUrl, {
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (response.ok) {
+        content = { body: await response.text(), subject: issue.text };
+      }
+    } catch {
+      content = null;
+    }
+  }
+  const analysis = readContentAnalysis(issue.metadata);
 
   const metrics = [
     { label: "Sent", value: s?.sent },
@@ -55,7 +94,14 @@ export default async function NewsletterIssuePage({
     <div>
       {/* breadcrumb */}
       <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-        <Link href="/app/newsletters" className="hover:text-foreground">
+        <Link
+          href={
+            issue.brand?.slug
+              ? `/app/newsletters?brand=${issue.brand.slug}`
+              : "/app/newsletters"
+          }
+          className="hover:text-foreground"
+        >
           Newsletters
         </Link>
         <span>/</span>
@@ -106,8 +152,10 @@ export default async function NewsletterIssuePage({
         <div className="mt-5 flex flex-wrap gap-6 border-y py-4">
           {metrics.map((m) => (
             <div key={m.label}>
-              <div className="text-lg font-semibold tabular-nums">{fmt(m.value!)}</div>
-              <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+              <div className="text-lg font-semibold tabular-nums">
+                {fmt(m.value!)}
+              </div>
+              <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
                 {m.label}
               </div>
             </div>
@@ -117,7 +165,7 @@ export default async function NewsletterIssuePage({
               <div className="text-lg font-semibold tabular-nums">
                 {Math.round((s.opened / s.delivered) * 100)}%
               </div>
-              <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+              <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
                 Open rate
               </div>
             </div>
@@ -126,7 +174,7 @@ export default async function NewsletterIssuePage({
       )}
 
       {/* basic body preview */}
-      <h2 className="text-muted-foreground mt-6 mb-2 text-xs font-semibold uppercase tracking-wider">
+      <h2 className="text-muted-foreground mt-6 mb-2 text-xs font-semibold tracking-wider uppercase">
         Preview
       </h2>
       {content?.body ? (
@@ -151,6 +199,13 @@ export default async function NewsletterIssuePage({
           )}
         </div>
       )}
+
+      <ContentAnalysisPanel
+        id={issue.id}
+        kind="newsletter"
+        initialAnalysis={analysis}
+        sourceUrl={issue.externalUrl}
+      />
     </div>
   );
 }

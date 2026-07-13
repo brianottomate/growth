@@ -34,9 +34,9 @@ const LEGACY_TABS: Record<string, TabId> = {
 export default async function ListenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; brand?: string }>;
 }) {
-  const { tab } = await searchParams;
+  const { tab, brand } = await searchParams;
 
   // v1's DMs/comments tabs moved to /app/inbox — honor old bookmarks.
   if (tab === "dms") redirect("/app/inbox?tab=dms");
@@ -51,12 +51,12 @@ export default async function ListenPage({
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Listen</h1>
         <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
-          Our social listening strategy — the channels we monitor, what we
-          listen for, and how we reply. The brain behind every scan and draft
-          reply; edit it live, no deploy.
+          Brand-specific social listening — the channels you monitor, what
+          counts as signal, and how each brand replies. Configure it here; no
+          seed script or deploy required.
         </p>
       </header>
-      <Listen defaultTab={defaultTab} />
+      <Listen defaultTab={defaultTab} initialBrandId={brand} />
     </div>
   );
 }

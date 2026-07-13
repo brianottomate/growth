@@ -11,7 +11,7 @@
  * conversion's `last_utm_content` in Amplitude points straight back at the row
  * in the `mention` table that earned it, with no matching heuristics.
  *
- * Mirrors the cold-email convention in lead-outreach.service.ts (which uses
+ * Mirrors the cold-email convention formerly used by the retired lead sender (which uses
  * utm_medium=outbound, utm_content=<domain>); organic engagement is
  * utm_medium=community so the two channels stay separable in Amplitude.
  *

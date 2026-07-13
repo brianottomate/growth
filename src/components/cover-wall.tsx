@@ -1,5 +1,10 @@
 import Link from "next/link";
 
+import {
+  SOCIAL_PREVIEW_META,
+  type SocialPreviewMode,
+} from "@/lib/social-preview";
+
 /**
  * Shared "document wall" primitive. A CoverItem is anything with a rendered
  * preview — a newsletter's email HTML, later a blog post's thumbnail/HTML.
@@ -36,14 +41,29 @@ function ScaledHtml({ html, title }: { html: string; title: string }) {
         pointerEvents: "none",
         border: 0,
       }}
-      className="absolute left-0 top-0"
+      className="absolute top-0 left-0"
     />
   );
 }
 
-function Cover({ item }: { item: CoverItem }) {
+export type CoverWallVariant = "document" | "og";
+
+function Cover({
+  item,
+  variant,
+  preview,
+}: {
+  item: CoverItem;
+  variant: CoverWallVariant;
+  preview: SocialPreviewMode;
+}) {
+  const previewMeta = SOCIAL_PREVIEW_META[preview];
   return (
-    <div className="bg-muted relative h-[300px] w-full overflow-hidden bg-white">
+    <div
+      className={`bg-muted relative w-full overflow-hidden bg-white ${
+        variant === "og" ? previewMeta.aspectClass : "h-[300px]"
+      }`}
+    >
       {item.html ? (
         <ScaledHtml html={item.html} title={item.title} />
       ) : item.coverImage ? (
@@ -51,7 +71,9 @@ function Cover({ item }: { item: CoverItem }) {
         <img
           src={item.coverImage}
           alt=""
-          className="h-full w-full object-cover object-top"
+          className={`h-full w-full ${
+            variant === "og" ? previewMeta.cropClass : "object-cover object-top"
+          }`}
         />
       ) : (
         <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
@@ -62,16 +84,30 @@ function Cover({ item }: { item: CoverItem }) {
   );
 }
 
-export function CoverWall({ items }: { items: CoverItem[] }) {
+export function CoverWall({
+  items,
+  variant = "document",
+  preview = "original",
+}: {
+  items: CoverItem[];
+  variant?: CoverWallVariant;
+  preview?: SocialPreviewMode;
+}) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+    <div
+      className={
+        variant === "og"
+          ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          : "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+      }
+    >
       {items.map((it) => (
         <Link
           key={it.id}
           href={it.href}
           className="group bg-card hover:border-foreground/30 overflow-hidden rounded-xl border transition-colors"
         >
-          <Cover item={it} />
+          <Cover item={it} variant={variant} preview={preview} />
           <div className="flex items-start gap-2 p-3">
             {it.badge && (
               <span

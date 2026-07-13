@@ -12,7 +12,12 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { audienceTable, audienceTargetTable, brandTable } from "@/server/db/schema";
+import { audienceSlug } from "@/lib/audience-model";
+import {
+  audienceTable,
+  audienceTargetTable,
+  brandTable,
+} from "@/server/db/schema";
 import type {
   AudienceTargetPriority,
   AudienceTargetStatus,
@@ -121,7 +126,12 @@ async function main() {
       } else {
         [target] = await db
           .insert(audienceTargetTable)
-          .values({ brandId: brand.id, name: t.name, ...values })
+          .values({
+            brandId: brand.id,
+            name: t.name,
+            slug: audienceSlug(t.name),
+            ...values,
+          })
           .returning();
         console.log(`  + created target "${t.name}"`);
       }

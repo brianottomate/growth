@@ -1,17 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useRef, useState } from "react";
+import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ExternalLink,
+  Download,
   Film,
   FileText,
   FolderOpen,
   ImageIcon,
   Link2,
   Loader2,
+  Maximize2,
   Pencil,
   Rocket,
+  Search,
+  Settings2,
+  Sparkles,
   Trash2,
   UploadCloud,
 } from "lucide-react";
@@ -31,9 +37,12 @@ import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
-import { useTRPC } from "@/trpc/react";
+import { useTRPC, type RouterOutputs } from "@/trpc/react";
 import { EditLinkDialog } from "./EditLinkDialog";
 import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
+import { MediaTaxonomyDialog } from "./MediaTaxonomyDialog";
+import { OrganizeMediaDialog } from "./OrganizeMediaDialog";
+import { MediaLightbox } from "./MediaLightbox";
 /**
  * Build a deep-link to the launch planner with this media prefilled as the hero
  * creative. No separate drawer — /launch owns the whole generate→review→commit
@@ -54,7 +63,11 @@ function launchHref(opts: {
   ]
     .filter(Boolean)
     .join(" ");
-  const params = new URLSearchParams({ brandId: opts.brandId, name: opts.title, prompt: ref });
+  const params = new URLSearchParams({
+    brandId: opts.brandId,
+    name: opts.title,
+    prompt: ref,
+  });
   if (opts.imageUrl) params.set("img", opts.imageUrl);
   return `/app/plan?${params.toString()}`;
 }
@@ -66,18 +79,29 @@ function assetLaunchHref(asset: MediaAsset, brandId: string): string {
     brandId,
     title: asset.title ?? asset.filename ?? "Untitled",
     href: asset.externalUrl ?? asset.url,
-    imageUrl: isExternal ? null : asset.kind === "image" ? asset.url : asset.thumbnailUrl,
+    imageUrl: isExternal
+      ? null
+      : asset.kind === "image"
+        ? asset.url
+        : asset.thumbnailUrl,
     kind: asset.kind,
     sourceProvider: isExternal ? (asset.sourceProvider ?? "link") : null,
   });
 }
 
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
+const IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+  "image/gif",
+];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 const ACCEPT = [...IMAGE_TYPES, ...VIDEO_TYPES].join(",");
-const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB (R2)
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 type Brand = { id: string; name: string; logo: string | null };
+type LibraryAsset = RouterOutputs["media"]["list"][number];
 
 const KIND_FILTERS: { value: string; label: string }[] = [
   { value: "all", label: "All media" },
@@ -86,7 +110,9 @@ const KIND_FILTERS: { value: string; label: string }[] = [
   { value: "gif", label: "GIFs" },
 ];
 
-function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
+function readImageDimensions(
+  file: File,
+): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
     const img = new window.Image();
     img.onload = () => resolve({ width: img.width, height: img.height });
@@ -109,6 +135,15 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
 
   const [brandId, setBrandId] = useState(brands[0]!.id);
   const [filter, setFilter] = useState<string>("all");
+  const [folderFilter, setFolderFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [organizingAsset, setOrganizingAsset] = useState<LibraryAsset | null>(
+    null,
+  );
+  const [previewAsset, setPreviewAsset] = useState<LibraryAsset | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -123,23 +158,33 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   // "Edit link" dialog — the asset currently being edited.
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
 
-
   const listInput = {
     brandId,
     ...(filter !== "all" ? { kind: filter as MediaKind } : {}),
+    ...(folderFilter === "unfiled"
+      ? { folderId: null }
+      : folderFilter !== "all"
+        ? { folderId: folderFilter }
+        : {}),
+    ...(tagFilter !== "all" ? { tagId: tagFilter } : {}),
+    ...(deferredSearch.trim() ? { query: deferredSearch.trim() } : {}),
   };
   const listOpts = trpc.media.list.queryOptions(listInput);
   const { data: assets, isLoading } = useQuery(listOpts);
+  const taxonomyOpts = trpc.media.taxonomy.queryOptions({ brandId });
+  const { data: taxonomy } = useQuery(taxonomyOpts);
 
   const invalidate = useCallback(
     () => queryClient.invalidateQueries({ queryKey: listOpts.queryKey }),
     [queryClient, listOpts.queryKey],
   );
 
-  const createUploadUrl = useMutation(trpc.media.createUploadUrl.mutationOptions());
-  const finalizeUpload = useMutation(trpc.media.finalizeUpload.mutationOptions());
-  const createVideoUpload = useMutation(trpc.media.createVideoUpload.mutationOptions());
-  const syncVideo = useMutation(trpc.media.syncVideo.mutationOptions());
+  const createUploadUrl = useMutation(
+    trpc.media.createUploadUrl.mutationOptions(),
+  );
+  const finalizeUpload = useMutation(
+    trpc.media.finalizeUpload.mutationOptions(),
+  );
   const finalizeLinkCreate = () => {
     toast.success("Link added");
     setLinkOpen(false);
@@ -184,8 +229,17 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
       },
     }),
   );
+  const analyzeMedia = useMutation(
+    trpc.media.analyze.mutationOptions({
+      onSuccess: () => {
+        toast.success("Image analyzed");
+        void invalidate();
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
 
-  // --- upload one file (routes image→R2, video→Stream) ---
+  // --- upload one file directly to R2 via a presigned PUT ---
   const uploadFile = useCallback(
     async (file: File) => {
       const isImage = IMAGE_TYPES.includes(file.type);
@@ -201,35 +255,27 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
 
       setUploadingCount((c) => c + 1);
       try {
-        if (isImage) {
-          const dims = await readImageDimensions(file);
-          const { mediaId, uploadUrl } = await createUploadUrl.mutateAsync({
+        const dims = isImage ? await readImageDimensions(file) : undefined;
+        const { mediaId, uploadUrl, publicUrl, pathname } =
+          await createUploadUrl.mutateAsync({
             brandId,
             filename: file.name,
             mimeType: file.type,
             size: file.size,
           });
-          const put = await fetch(uploadUrl, {
-            method: "PUT",
-            body: file,
-            headers: { "Content-Type": file.type },
-          });
-          if (!put.ok) throw new Error(`R2 upload failed (${put.status})`);
-          await finalizeUpload.mutateAsync({
-            mediaId,
-            width: dims.width || undefined,
-            height: dims.height || undefined,
-          });
-        } else {
-          const { uploadUrl } = await createVideoUpload.mutateAsync({
-            brandId,
-            filename: file.name,
-          });
-          const form = new FormData();
-          form.append("file", file);
-          const post = await fetch(uploadUrl, { method: "POST", body: form });
-          if (!post.ok) throw new Error(`Stream upload failed (${post.status})`);
-        }
+        const put = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+        await finalizeUpload.mutateAsync({
+          mediaId,
+          url: publicUrl,
+          pathname,
+          width: dims?.width || undefined,
+          height: dims?.height || undefined,
+        });
         toast.success(`Uploaded ${file.name}`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -238,7 +284,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         void invalidate();
       }
     },
-    [brandId, createUploadUrl, finalizeUpload, createVideoUpload, invalidate],
+    [brandId, createUploadUrl, finalizeUpload, invalidate],
   );
 
   const handleFiles = useCallback(
@@ -249,43 +295,27 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
     [uploadFile],
   );
 
-  // --- poll still-processing videos until ready ---
-  const processing = (assets ?? []).filter((a) => a.status === "processing");
-  useEffect(() => {
-    if (processing.length === 0) return;
-    const t = setInterval(() => {
-      void (async () => {
-        let changed = false;
-        for (const a of processing) {
-          const res = await syncVideo.mutateAsync({ mediaId: a.id }).catch(() => null);
-          if (res?.status === "ready") changed = true;
-        }
-        if (changed) void invalidate();
-      })();
-    }, 5000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processing.map((a) => a.id).join(",")]);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Media</h1>
           <p className="text-muted-foreground text-sm">
-            Reusable creative for Studio · images on R2, video on Cloudflare Stream
+            Reusable creative for Studio, stored in Cloudflare R2
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {brands.length > 1 && (
-            <SimpleSelect
-              value={brandId}
-              onValueChange={setBrandId}
-              options={brands.map((b) => ({ value: b.id, label: b.name }))}
-              aria-label="Brand"
-              size="sm"
-            />
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          <SimpleSelect
+            value={brandId}
+            onValueChange={(nextBrandId) => {
+              setBrandId(nextBrandId);
+              setFolderFilter("all");
+              setTagFilter("all");
+            }}
+            options={brands.map((b) => ({ value: b.id, label: b.name }))}
+            aria-label="Brand"
+            size="sm"
+          />
           <SimpleSelect
             value={filter}
             onValueChange={setFilter}
@@ -296,6 +326,14 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           <Button variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
             <Link2 className="size-4" />
             Add link
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTaxonomyOpen(true)}
+          >
+            <Settings2 className="size-4" />
+            Organize
           </Button>
           <Button
             size="sm"
@@ -312,6 +350,45 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-56 flex-1 sm:max-w-sm">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search media or tags"
+            className="pl-9"
+          />
+        </div>
+        <SimpleSelect
+          value={folderFilter}
+          onValueChange={setFolderFilter}
+          options={[
+            { value: "all", label: "All folders" },
+            { value: "unfiled", label: "Unfiled" },
+            ...(taxonomy?.folders ?? []).map((folder) => ({
+              value: folder.id,
+              label: folder.name,
+            })),
+          ]}
+          aria-label="Folder"
+          size="sm"
+        />
+        <SimpleSelect
+          value={tagFilter}
+          onValueChange={setTagFilter}
+          options={[
+            { value: "all", label: "All tags" },
+            ...(taxonomy?.tags ?? []).map((tag) => ({
+              value: tag.id,
+              label: tag.name,
+            })),
+          ]}
+          aria-label="Tag"
+          size="sm"
+        />
+      </div>
+
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
         <DialogContent onPaste={linkThumb.handlePaste}>
           <DialogHeader>
@@ -319,9 +396,10 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
             <p className="text-muted-foreground text-xs">
-              Reference a file we don&apos;t host — a Google Drive / Dropbox / Frame.io
-              master (e.g. a heavy working video). Cut-downs you publish get hosted
-              separately and can link back to this as their source.
+              Reference a file we don&apos;t host — a Google Drive / Dropbox /
+              Frame.io master (e.g. a heavy working video). Cut-downs you
+              publish get hosted separately and can link back to this as their
+              source.
             </p>
             <PhotoPickerField picker={linkThumb} />
             <div className="flex flex-col gap-1.5">
@@ -412,7 +490,9 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         )}
       >
         <UploadCloud className="text-muted-foreground size-6" />
-        <p className="text-sm font-medium">Drop images or video, or click to browse</p>
+        <p className="text-sm font-medium">
+          Drop images or video, or click to browse
+        </p>
         <p className="text-muted-foreground text-xs">
           JPEG · PNG · WebP · GIF (≤25MB) · MP4 · WebM · MOV
         </p>
@@ -445,6 +525,17 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
                   ? () => setEditingAsset(asset)
                   : undefined
               }
+              onOrganize={() => setOrganizingAsset(asset)}
+              onPreview={() => setPreviewAsset(asset)}
+              onAnalyze={
+                asset.kind === "image"
+                  ? () => analyzeMedia.mutate({ id: asset.id })
+                  : undefined
+              }
+              analyzing={
+                analyzeMedia.isPending &&
+                analyzeMedia.variables?.id === asset.id
+              }
               launchHref={assetLaunchHref(asset, brandId)}
             />
           ))}
@@ -457,6 +548,28 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         onOpenChange={(open) => !open && setEditingAsset(null)}
         onSaved={() => void invalidate()}
       />
+      <MediaTaxonomyDialog
+        brandId={brandId}
+        open={taxonomyOpen}
+        onOpenChange={setTaxonomyOpen}
+      />
+      {organizingAsset && taxonomy && (
+        <OrganizeMediaDialog
+          key={organizingAsset.id}
+          asset={organizingAsset}
+          taxonomy={taxonomy}
+          open
+          onOpenChange={(open) => !open && setOrganizingAsset(null)}
+        />
+      )}
+      {previewAsset && (
+        <MediaLightbox
+          key={previewAsset.id}
+          asset={previewAsset}
+          open
+          onOpenChange={(open) => !open && setPreviewAsset(null)}
+        />
+      )}
     </div>
   );
 }
@@ -465,11 +578,19 @@ function MediaCard({
   asset,
   onDelete,
   onEdit,
+  onOrganize,
+  onPreview,
+  onAnalyze,
+  analyzing,
   launchHref,
 }: {
-  asset: MediaAsset;
+  asset: LibraryAsset;
   onDelete: () => void;
   onEdit?: () => void;
+  onOrganize: () => void;
+  onPreview: () => void;
+  onAnalyze?: () => void;
+  analyzing: boolean;
   launchHref: string;
 }) {
   const isVideo = asset.kind === "video";
@@ -487,7 +608,11 @@ function MediaCard({
 
   return (
     <div className="group bg-muted/30 relative overflow-hidden rounded-lg border">
-      <div className="bg-muted relative aspect-square">
+      <div
+        className="bg-muted relative aspect-square cursor-zoom-in"
+        title="View full screen"
+        onClick={onPreview}
+      >
         {asset.status === "processing" ? (
           <div className="text-muted-foreground absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs">
             <Loader2 className="size-5 animate-spin" />
@@ -499,6 +624,7 @@ function MediaCard({
             target="_blank"
             rel="noopener noreferrer"
             className="group/link text-muted-foreground hover:text-foreground absolute inset-0 flex flex-col items-center justify-center gap-1.5 transition-colors"
+            onClick={(event) => event.stopPropagation()}
           >
             {preview ? (
               <>
@@ -525,12 +651,12 @@ function MediaCard({
             )}
           </a>
         ) : preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={preview}
             alt={asset.alt ?? asset.filename ?? ""}
-            className="size-full object-cover"
-            loading="lazy"
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
+            className="object-cover"
           />
         ) : (
           <div className="text-muted-foreground absolute inset-0 flex items-center justify-center">
@@ -542,9 +668,37 @@ function MediaCard({
           variant="outline"
           className="absolute top-1.5 left-1.5 gap-1 bg-black/55 text-[10px] text-white backdrop-blur"
         >
-          {isExternal ? <Link2 className="size-3" /> : <KindIcon className="size-3" />}
+          {isExternal ? (
+            <Link2 className="size-3" />
+          ) : (
+            <KindIcon className="size-3" />
+          )}
           {isExternal ? (asset.sourceProvider ?? "link") : asset.kind}
         </Badge>
+        <Button
+          variant="secondary"
+          size="icon"
+          className="absolute top-1.5 right-1.5 z-10 size-7 bg-black/55 text-white backdrop-blur hover:bg-black/75"
+          title="View full screen"
+          onClick={(event) => {
+            event.stopPropagation();
+            onPreview();
+          }}
+        >
+          <Maximize2 className="size-3.5" />
+        </Button>
+        {asset.provider === "r2" && asset.url && (
+          <ButtonLink
+            variant="secondary"
+            size="icon"
+            className="absolute top-1.5 right-10 z-10 size-7 bg-black/55 text-white backdrop-blur hover:bg-black/75"
+            title="Download original"
+            href={`/api/media/${asset.id}/download`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Download className="size-3.5" />
+          </ButtonLink>
+        )}
 
         <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100">
           <ButtonLink
@@ -556,6 +710,39 @@ function MediaCard({
           >
             <Rocket className="size-3.5" />
           </ButtonLink>
+          {onAnalyze && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className="pointer-events-auto size-7"
+              title="Analyze image"
+              onClick={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                onAnalyze();
+              }}
+              disabled={analyzing}
+            >
+              {analyzing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="secondary"
+            className="pointer-events-auto size-7"
+            title="Organize media"
+            onClick={(event) => {
+              event.stopPropagation();
+              event.preventDefault();
+              onOrganize();
+            }}
+          >
+            <FolderOpen className="size-3.5" />
+          </Button>
           {onEdit && (
             <Button
               size="icon"
@@ -585,11 +772,40 @@ function MediaCard({
         </div>
       </div>
       <div className="truncate px-2 py-1.5 text-xs">
-        <p className="truncate font-medium">{asset.title ?? asset.filename ?? "Untitled"}</p>
+        <p className="truncate font-medium">
+          {asset.title ?? asset.filename ?? "Untitled"}
+        </p>
         <p className="text-muted-foreground">
           {asset.width && asset.height ? `${asset.width}×${asset.height}` : ""}
           {asset.size ? ` · ${formatBytes(asset.size)}` : ""}
         </p>
+        {(asset.folder || asset.tagAssignments.length > 0) && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {asset.folder && (
+              <Badge variant="outline" className="h-4 px-1 text-[9px]">
+                {asset.folder.name}
+              </Badge>
+            )}
+            {Array.from(
+              new Map(
+                asset.tagAssignments.map((assignment) => [
+                  assignment.tagId,
+                  assignment.tag,
+                ]),
+              ).values(),
+            )
+              .slice(0, 2)
+              .map((tag) => (
+                <Badge
+                  key={tag.id}
+                  variant="secondary"
+                  className="h-4 px-1 text-[9px]"
+                >
+                  {tag.name}
+                </Badge>
+              ))}
+          </div>
+        )}
       </div>
     </div>
   );

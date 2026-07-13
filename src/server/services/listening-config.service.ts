@@ -12,10 +12,8 @@ import {
 
 // Loads the evolvable listening context (brand voice + story + per-source
 // override/config) so the monitor services can compose their prompts and read
-// their source config from the DB instead of hardcoded constants. The single
-// Wander brand owns listening today; resolved by slug.
-
-const LISTENING_BRAND_SLUG = "wander";
+// their source config from the DB instead of hardcoded constants. The source is
+// the binding to its owned brand; there is no global hardcoded listening brand.
 
 export interface ListeningContext {
   brandId: string | null;
@@ -40,41 +38,35 @@ const EMPTY: ListeningContext = {
 export async function loadListeningContext(
   adapter: string,
 ): Promise<ListeningContext> {
-  const [brand] = await db
+  const [row] = await db
     .select({
       id: brandTable.id,
       name: brandTable.name,
       brandFingerprint: brandTable.brandFingerprint,
       brandListeningStory: brandTable.brandListeningStory,
-    })
-    .from(brandTable)
-    .where(eq(brandTable.slug, LISTENING_BRAND_SLUG))
-    .limit(1);
-
-  if (!brand) return EMPTY;
-
-  const [source] = await db
-    .select({
       voiceOverride: listeningSourceTable.voiceOverride,
       signalNotes: listeningSourceTable.signalNotes,
       config: listeningSourceTable.config,
     })
     .from(listeningSourceTable)
+    .innerJoin(brandTable, eq(listeningSourceTable.brandId, brandTable.id))
     .where(
       and(
-        eq(listeningSourceTable.brandId, brand.id),
         eq(listeningSourceTable.adapter, adapter),
+        eq(brandTable.isActive, true),
       ),
     )
     .limit(1);
 
+  if (!row) return EMPTY;
+
   return {
-    brandId: brand.id,
-    brandName: brand.name,
-    brandVoice: brand.brandFingerprint?.fingerprintText ?? null,
-    story: brand.brandListeningStory ?? null,
-    voiceOverride: source?.voiceOverride ?? null,
-    signalNotes: source?.signalNotes ?? null,
-    sourceConfig: source?.config ?? null,
+    brandId: row.id,
+    brandName: row.name,
+    brandVoice: row.brandFingerprint?.fingerprintText ?? null,
+    story: row.brandListeningStory ?? null,
+    voiceOverride: row.voiceOverride ?? null,
+    signalNotes: row.signalNotes ?? null,
+    sourceConfig: row.config ?? null,
   };
 }

@@ -1,11 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createContext, Fragment, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  Fragment,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import { useMutation } from "@tanstack/react-query";
+import { parseAsString, useQueryState } from "nuqs";
 import {
   AlignLeft,
+  Check,
   Eye,
   ExternalLink,
   Heart,
@@ -26,6 +34,7 @@ import { cn } from "@/components/ui/lib/utils";
 import { PILLAR_BY_SLUG, PILLARS } from "@/lib/pillars";
 import { getPlatformFormat } from "@/server/content/formats";
 import { useFullBleed } from "@/lib/use-full-bleed";
+import { PostDetailDialog } from "./PostDetailDialog";
 
 // Cross-platform mechanic → short glanceable label (fallback when there's no
 // concrete format). Format label ("Reel", "Carousel") wins when we have it.
@@ -41,7 +50,10 @@ const ARCHETYPE_LABEL: Record<string, string> = {
   article: "Article",
 };
 
-function postTypeLabel(format: string | null, archetype: string | null): string | null {
+function postTypeLabel(
+  format: string | null,
+  archetype: string | null,
+): string | null {
   if (format) return getPlatformFormat(format)?.label ?? null;
   if (archetype) return ARCHETYPE_LABEL[archetype] ?? null;
   return null;
@@ -117,7 +129,8 @@ const MetricsCtx = createContext(false);
 const fmtNum = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
 // One comparable number per post: views if we have them, else likes + comments.
-const engagementOf = (e: V5Entry) => (e.views > 0 ? e.views : e.likes + e.comments);
+const engagementOf = (e: V5Entry) =>
+  e.views > 0 ? e.views : e.likes + e.comments;
 const engagementLabel = (e: V5Entry) =>
   e.views > 0
     ? `${fmtNum(e.views)} views`
@@ -132,6 +145,14 @@ export type V5Brand = {
   name: string;
   logo: string | null;
   role: V5Role;
+};
+
+export type V5Media = {
+  url: string;
+  type: "image" | "video" | "carousel";
+  thumbnail?: string;
+  width?: number;
+  height?: number;
 };
 
 export type V5Entry = {
@@ -154,11 +175,14 @@ export type V5Entry = {
   externalUrl: string | null;
   externalKind: string | null;
   mediaUrl: string | null;
+  media: V5Media[];
   likes: number;
   comments: number;
   views: number;
   at: string; // ISO — published ?? scheduled ?? created
 };
+
+const PostOpenCtx = createContext<(entry: V5Entry) => void>(() => undefined);
 
 // A pending AI grouping proposal (content_suggestion kind="grouping") — the
 // server passes these so the timeline can offer "accept this grouping" inline.
@@ -191,7 +215,9 @@ function isoWeek(d: Date): number {
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   t.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7) + 3); // nearest Thursday
   const firstThu = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
-  firstThu.setUTCDate(firstThu.getUTCDate() - ((firstThu.getUTCDay() + 6) % 7) + 3);
+  firstThu.setUTCDate(
+    firstThu.getUTCDate() - ((firstThu.getUTCDay() + 6) % 7) + 3,
+  );
   return 1 + Math.round((t.getTime() - firstThu.getTime()) / (7 * 86_400_000));
 }
 
@@ -230,7 +256,14 @@ function groupEntries(entries: V5Entry[]): Group[] {
 }
 
 type LaneAxis = "brand" | "pillar" | "channel";
-type Lane = { key: string; label: string; logo: string | null; role: V5Role | null; color: string | null; platform: string | null };
+type Lane = {
+  key: string;
+  label: string;
+  logo: string | null;
+  role: V5Role | null;
+  color: string | null;
+  platform: string | null;
+};
 
 // ==========================================================================
 
@@ -255,7 +288,9 @@ export function V5Client({
   // In-cell grouping: by content idea (trays) or by channel (sub-headers).
   const [cellMode, setCellMode] = useState<"content" | "channel">("content");
   // Creative (default) vs Performance (engagement overlay) lens.
-  const [metricsMode, setMetricsMode] = useState<"creative" | "performance">("creative");
+  const [metricsMode, setMetricsMode] = useState<"creative" | "performance">(
+    "creative",
+  );
   // Time window: N months of past (the timeline is retrospective — no future).
   // "Load older" adds 3mo.
   const [pastMonths, setPastMonths] = useState(2);
@@ -271,6 +306,18 @@ export function V5Client({
   const [groupOpen, setGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [groupUnit, setGroupUnit] = useState<"single" | "series">("single");
+  const [postId, setPostId] = useQueryState(
+    "post",
+    parseAsString.withOptions({ history: "push" }),
+  );
+  const detail = useMemo(
+    () => entries.find((entry) => entry.id === postId) ?? null,
+    [entries, postId],
+  );
+  const openPost = useCallback(
+    (entry: V5Entry) => void setPostId(entry.id),
+    [setPostId],
+  );
 
   const ownedFirst = useMemo(
     () =>
@@ -285,7 +332,8 @@ export function V5Client({
       entries.filter((e) => {
         if (!brandSel.has(e.brandId)) return false;
         if (statusFilter !== "all" && e.status !== statusFilter) return false;
-        if (channelFilter !== "all" && e.platform !== channelFilter) return false;
+        if (channelFilter !== "all" && e.platform !== channelFilter)
+          return false;
         if (typeFilter !== "all" && e.archetype !== typeFilter) return false;
         return true;
       }),
@@ -303,7 +351,11 @@ export function V5Client({
   );
   const typeOptions = useMemo(
     () =>
-      [...new Set(entries.map((e) => e.archetype).filter((a): a is string => !!a))].sort(),
+      [
+        ...new Set(
+          entries.map((e) => e.archetype).filter((a): a is string => !!a),
+        ),
+      ].sort(),
     [entries],
   );
 
@@ -339,16 +391,25 @@ export function V5Client({
     }
     if (axis === "pillar") {
       const present = new Set(filtered.map((e) => e.pillar ?? "__none"));
-      const out: Lane[] = PILLARS.filter((p) => present.has(p.slug)).map((p) => ({
-        key: p.slug,
-        label: p.name,
-        logo: null,
-        role: null,
-        color: p.color,
-        platform: null,
-      }));
+      const out: Lane[] = PILLARS.filter((p) => present.has(p.slug)).map(
+        (p) => ({
+          key: p.slug,
+          label: p.name,
+          logo: null,
+          role: null,
+          color: p.color,
+          platform: null,
+        }),
+      );
       if (present.has("__none"))
-        out.push({ key: "__none", label: "Unsorted", logo: null, role: null, color: null, platform: null });
+        out.push({
+          key: "__none",
+          label: "Unsorted",
+          logo: null,
+          role: null,
+          color: null,
+          platform: null,
+        });
       return out;
     }
     // channel
@@ -364,7 +425,11 @@ export function V5Client({
   }, [axis, ownedFirst, brandSel, filtered]);
 
   const laneKeyOf = (e: V5Entry): string =>
-    axis === "brand" ? e.brandId : axis === "pillar" ? (e.pillar ?? "__none") : e.platform;
+    axis === "brand"
+      ? e.brandId
+      : axis === "pillar"
+        ? (e.pillar ?? "__none")
+        : e.platform;
 
   // Day rows (descending — newest first). Only days that actually have posts
   // are rendered (plus today), so the grid stays bounded.
@@ -417,9 +482,15 @@ export function V5Client({
   // Lens — clicking an idea title or a series chip focuses it (toggles off if
   // it's already the focus). An entry is "in focus" when it belongs.
   const setIdeaFocus = (key: string, label: string) =>
-    setFocus((f) => (f?.kind === "idea" && f.key === key ? null : { kind: "idea", key, label }));
+    setFocus((f) =>
+      f?.kind === "idea" && f.key === key ? null : { kind: "idea", key, label },
+    );
   const setSeriesFocus = (key: string, label: string) =>
-    setFocus((f) => (f?.kind === "series" && f.key === key ? null : { kind: "series", key, label }));
+    setFocus((f) =>
+      f?.kind === "series" && f.key === key
+        ? null
+        : { kind: "series", key, label },
+    );
   const inFocus = (e: V5Entry) =>
     !focus
       ? true
@@ -442,7 +513,9 @@ export function V5Client({
       "prompt",
       `Riff on ${sel.length} selected post${sel.length > 1 ? "s" : ""} from the timeline.`,
     );
-    const imgs = [...new Set(sel.map((e) => e.mediaUrl).filter((u): u is string => !!u))].slice(0, 6);
+    const imgs = [
+      ...new Set(sel.map((e) => e.mediaUrl).filter((u): u is string => !!u)),
+    ].slice(0, 6);
     for (const u of imgs) params.append("img", u);
     router.push(`/app/plan?${params.toString()}`);
   };
@@ -450,317 +523,382 @@ export function V5Client({
   const allBrandsOn = brandSel.size === brands.length;
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {windowed.length} posts · {lanes.length} lanes · {days.length} days
-            {hasOlder && <span className="text-muted-foreground/60"> · {filtered.length} all-time</span>}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {focus && (
-            <button
-              onClick={() => setFocus(null)}
-              className="flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
-            >
-              <span className="opacity-70">{focus.kind === "series" ? "Series" : "Idea"}:</span>
-              <span className="max-w-[14rem] truncate">{focus.label}</span>
-              <span className="text-emerald-400/70 tabular-nums">· {focusCount}</span>
-              <X className="size-3.5" />
-            </button>
-          )}
-          <span className="text-muted-foreground ml-1 text-xs">Lanes</span>
-          <Segmented
-            value={axis}
-            onChange={setAxis}
-            options={[
-              { value: "brand", label: "Brand" },
-              { value: "pillar", label: "Pillar" },
-              { value: "channel", label: "Channel" },
-            ]}
-          />
-          <span className="text-muted-foreground ml-1 text-xs">Group</span>
-          <Segmented
-            value={cellMode}
-            onChange={setCellMode}
-            options={[
-              { value: "content", label: "Ideas" },
-              { value: "channel", label: "Channels" },
-            ]}
-          />
-          <span className="text-muted-foreground ml-1 text-xs">View</span>
-          <Segmented
-            value={metricsMode}
-            onChange={setMetricsMode}
-            options={[
-              { value: "creative", label: "Creative" },
-              { value: "performance", label: "Performance" },
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* Brand filter chips */}
-      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-b pb-4">
-        <span className="text-muted-foreground mr-1 text-xs">Brands</span>
-        <button
-          onClick={() => setBrandSel(new Set(brands.map((b) => b.id)))}
-          className={cn(
-            "rounded-full border px-2 py-0.5 text-xs transition-colors",
-            allBrandsOn
-              ? "bg-foreground text-background border-foreground"
-              : "border-border text-muted-foreground hover:bg-accent",
-          )}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setBrandSel(new Set(brands.filter((b) => b.role === "owned").map((b) => b.id)))}
-          className="border-border text-muted-foreground hover:bg-accent rounded-full border px-2 py-0.5 text-xs transition-colors"
-        >
-          Only owned
-        </button>
-        <span className="bg-border mx-1 h-4 w-px" />
-        {ownedFirst.map((b) => {
-          const on = brandSel.has(b.id);
-          return (
-            <button
-              key={b.id}
-              onClick={() =>
-                setBrandSel((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(b.id)) {
-                    next.delete(b.id);
-                  } else {
-                    next.add(b.id);
-                  }
-                  return next;
-                })
-              }
-              className={cn(
-                "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
-                on
-                  ? "border-foreground/30 bg-accent"
-                  : "border-border text-muted-foreground/60 hover:bg-accent",
-              )}
-            >
-              <span className={cn("size-1.5 rounded-full", on ? ROLE_BADGE[b.role].cls : "bg-muted")} />
-              {b.name}
-            </button>
-          );
-        })}
-        <span className="bg-border mx-1 h-4 w-px" />
-        <FilterSelect
-          value={statusFilter}
-          onChange={setStatusFilter}
-          allLabel="All statuses"
-          options={statusOptions.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
-        />
-        <FilterSelect
-          value={channelFilter}
-          onChange={setChannelFilter}
-          allLabel="All channels"
-          options={channelOptions.map((p) => ({ value: p, label: platformLabel(p) }))}
-        />
-        <FilterSelect
-          value={typeFilter}
-          onChange={setTypeFilter}
-          allLabel="All types"
-          options={typeOptions.map((a) => ({ value: a, label: ARCHETYPE_LABEL[a] ?? a }))}
-        />
-      </div>
-
-      {/* Swimlane grid — time flows down, lanes are columns. */}
-      <MetricsCtx.Provider value={metricsMode === "performance"}>
-      <div ref={ref} style={style} className="mt-5 px-8 sm:px-0">
-        {lanes.length === 0 ? (
-          <p className="text-muted-foreground py-12 text-center text-sm">
-            No lanes — turn on a brand above.
-          </p>
-        ) : (
-          <div className="max-h-[calc(100vh-9rem)] overflow-auto rounded-xl border">
-            <div
-              className="grid min-w-max"
-              style={{ gridTemplateColumns: `7rem repeat(${lanes.length}, 26rem)` }}
-            >
-              {/* Header row — sticks to the top; corner sticks to top+left. */}
-              <div className="bg-muted sticky left-0 top-0 z-30 border-b border-r" />
-              {lanes.map((l) => (
-                <LaneHeader key={l.key} lane={l} />
-              ))}
-
-              {/* Day rows (with a month divider whenever the month changes) */}
-              {days.map((dk, i) => {
-                const date = new Date(`${dk}T00:00:00`);
-                const prev = i > 0 ? new Date(`${days[i - 1]}T00:00:00`) : null;
-                const newMonth =
-                  prev?.getMonth() !== date.getMonth() ||
-                  prev.getFullYear() !== date.getFullYear();
-                const isToday = dk === dayKeyOf(now);
-                // A week ends (its strategy subtotal renders below) when the
-                // next, older day belongs to a different week.
-                const wk = weekKeyOf(date);
-                const nextWk =
-                  i < days.length - 1
-                    ? weekKeyOf(new Date(`${days[i + 1]}T00:00:00`))
-                    : null;
-                const weekEnds = nextWk !== wk;
-                return (
-                  <Fragment key={dk}>
-                    {newMonth && (
-                      <div
-                        className="bg-muted/60 border-y backdrop-blur-sm"
-                        style={{ gridColumn: "1 / -1" }}
-                      >
-                        <span className="sticky left-0 inline-block px-2 py-1 text-xs font-semibold">
-                          {fmtMonthYear(date)}
-                        </span>
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        "bg-muted sticky left-0 z-10 flex flex-col justify-start border-b border-r p-2 text-xs",
-                        isToday && "!bg-emerald-500/15",
-                      )}
-                    >
-                      <span className="text-muted-foreground text-[10px]">{fmtWeekday(date)}</span>
-                      <span className="text-sm font-semibold leading-tight">{date.getDate()}</span>
-                      <span className="text-muted-foreground/60 text-[10px] tabular-nums">
-                        {date.toLocaleDateString([], { month: "short" })} {date.getFullYear()} · W{isoWeek(date)}
-                      </span>
-                      {isToday && (
-                        <span className="mt-0.5 text-[10px] font-medium text-emerald-400">
-                          Today
-                        </span>
-                      )}
-                    </div>
-                    {lanes.map((l) => (
-                      <Cell
-                        key={l.key}
-                        entries={cells.get(`${dk}|${l.key}`) ?? []}
-                        mode={cellMode}
-                        selected={selected}
-                        onToggleSelect={toggleSelect}
-                        onFocusIdea={setIdeaFocus}
-                        onFocusSeries={setSeriesFocus}
-                        dimOf={(es) => !!focus && !es.some(inFocus)}
-                      />
-                    ))}
-                    {weekEnds && (
-                      <StrategyRow weekKey={wk} lanes={lanes} weekLane={weekLane} />
-                    )}
-                  </Fragment>
-                );
-              })}
-
-              {/* Load older — extends the past window 3 months at a time. */}
+    <PostOpenCtx.Provider value={openPost}>
+      <div>
+        {/* Header */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Timeline</h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {windowed.length} posts · {lanes.length} lanes · {days.length}{" "}
+              days
               {hasOlder && (
-                <div className="border-t p-3" style={{ gridColumn: "1 / -1" }}>
-                  <button
-                    onClick={() => setPastMonths((p) => p + 3)}
-                    className="border-border hover:bg-accent sticky left-3 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors"
-                  >
-                    Load 3 more months back ↓
-                  </button>
-                </div>
+                <span className="text-muted-foreground/60">
+                  {" "}
+                  · {filtered.length} all-time
+                </span>
               )}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {focus && (
+              <button
+                onClick={() => setFocus(null)}
+                className="flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
+              >
+                <span className="opacity-70">
+                  {focus.kind === "series" ? "Series" : "Idea"}:
+                </span>
+                <span className="max-w-[14rem] truncate">{focus.label}</span>
+                <span className="text-emerald-400/70 tabular-nums">
+                  · {focusCount}
+                </span>
+                <X className="size-3.5" />
+              </button>
+            )}
+            <span className="text-muted-foreground ml-1 text-xs">Lanes</span>
+            <Segmented
+              value={axis}
+              onChange={setAxis}
+              options={[
+                { value: "brand", label: "Brand" },
+                { value: "pillar", label: "Pillar" },
+                { value: "channel", label: "Channel" },
+              ]}
+            />
+            <span className="text-muted-foreground ml-1 text-xs">Group</span>
+            <Segmented
+              value={cellMode}
+              onChange={setCellMode}
+              options={[
+                { value: "content", label: "Ideas" },
+                { value: "channel", label: "Channels" },
+              ]}
+            />
+            <span className="text-muted-foreground ml-1 text-xs">View</span>
+            <Segmented
+              value={metricsMode}
+              onChange={setMetricsMode}
+              options={[
+                { value: "creative", label: "Creative" },
+                { value: "performance", label: "Performance" },
+              ]}
+            />
+          </div>
+        </div>
+
+        {/* Brand filter chips */}
+        <div className="mt-4 flex flex-wrap items-center gap-1.5 border-b pb-4">
+          <span className="text-muted-foreground mr-1 text-xs">Brands</span>
+          <button
+            onClick={() => setBrandSel(new Set(brands.map((b) => b.id)))}
+            className={cn(
+              "rounded-full border px-2 py-0.5 text-xs transition-colors",
+              allBrandsOn
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:bg-accent",
+            )}
+          >
+            All
+          </button>
+          <button
+            onClick={() =>
+              setBrandSel(
+                new Set(
+                  brands.filter((b) => b.role === "owned").map((b) => b.id),
+                ),
+              )
+            }
+            className="border-border text-muted-foreground hover:bg-accent rounded-full border px-2 py-0.5 text-xs transition-colors"
+          >
+            Only owned
+          </button>
+          <span className="bg-border mx-1 h-4 w-px" />
+          {ownedFirst.map((b) => {
+            const on = brandSel.has(b.id);
+            return (
+              <button
+                key={b.id}
+                onClick={() =>
+                  setBrandSel((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(b.id)) {
+                      next.delete(b.id);
+                    } else {
+                      next.add(b.id);
+                    }
+                    return next;
+                  })
+                }
+                className={cn(
+                  "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
+                  on
+                    ? "border-foreground/30 bg-accent"
+                    : "border-border text-muted-foreground/60 hover:bg-accent",
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    on ? ROLE_BADGE[b.role].cls : "bg-muted",
+                  )}
+                />
+                {b.name}
+              </button>
+            );
+          })}
+          <span className="bg-border mx-1 h-4 w-px" />
+          <FilterSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            allLabel="All statuses"
+            options={statusOptions.map((s) => ({
+              value: s,
+              label: s.replace(/_/g, " "),
+            }))}
+          />
+          <FilterSelect
+            value={channelFilter}
+            onChange={setChannelFilter}
+            allLabel="All channels"
+            options={channelOptions.map((p) => ({
+              value: p,
+              label: platformLabel(p),
+            }))}
+          />
+          <FilterSelect
+            value={typeFilter}
+            onChange={setTypeFilter}
+            allLabel="All types"
+            options={typeOptions.map((a) => ({
+              value: a,
+              label: ARCHETYPE_LABEL[a] ?? a,
+            }))}
+          />
+        </div>
+
+        {/* Swimlane grid — time flows down, lanes are columns. */}
+        <MetricsCtx.Provider value={metricsMode === "performance"}>
+          <div ref={ref} style={style} className="mt-5 px-8 sm:px-0">
+            {lanes.length === 0 ? (
+              <p className="text-muted-foreground py-12 text-center text-sm">
+                No lanes — turn on a brand above.
+              </p>
+            ) : (
+              <div className="max-h-[calc(100vh-9rem)] overflow-auto rounded-xl border">
+                <div
+                  className="grid min-w-max"
+                  style={{
+                    gridTemplateColumns: `7rem repeat(${lanes.length}, 26rem)`,
+                  }}
+                >
+                  {/* Header row — sticks to the top; corner sticks to top+left. */}
+                  <div className="bg-muted sticky top-0 left-0 z-30 border-r border-b" />
+                  {lanes.map((l) => (
+                    <LaneHeader key={l.key} lane={l} />
+                  ))}
+
+                  {/* Day rows (with a month divider whenever the month changes) */}
+                  {days.map((dk, i) => {
+                    const date = new Date(`${dk}T00:00:00`);
+                    const prev =
+                      i > 0 ? new Date(`${days[i - 1]}T00:00:00`) : null;
+                    const newMonth =
+                      prev?.getMonth() !== date.getMonth() ||
+                      prev.getFullYear() !== date.getFullYear();
+                    const isToday = dk === dayKeyOf(now);
+                    // A week ends (its strategy subtotal renders below) when the
+                    // next, older day belongs to a different week.
+                    const wk = weekKeyOf(date);
+                    const nextWk =
+                      i < days.length - 1
+                        ? weekKeyOf(new Date(`${days[i + 1]}T00:00:00`))
+                        : null;
+                    const weekEnds = nextWk !== wk;
+                    return (
+                      <Fragment key={dk}>
+                        {newMonth && (
+                          <div
+                            className="bg-muted/60 border-y backdrop-blur-sm"
+                            style={{ gridColumn: "1 / -1" }}
+                          >
+                            <span className="sticky left-0 inline-block px-2 py-1 text-xs font-semibold">
+                              {fmtMonthYear(date)}
+                            </span>
+                          </div>
+                        )}
+                        <div
+                          className={cn(
+                            "bg-muted sticky left-0 z-10 flex flex-col justify-start border-r border-b p-2 text-xs",
+                            isToday && "!bg-emerald-500/15",
+                          )}
+                        >
+                          <span className="text-muted-foreground text-[10px]">
+                            {fmtWeekday(date)}
+                          </span>
+                          <span className="text-sm leading-tight font-semibold">
+                            {date.getDate()}
+                          </span>
+                          <span className="text-muted-foreground/60 text-[10px] tabular-nums">
+                            {date.toLocaleDateString([], { month: "short" })}{" "}
+                            {date.getFullYear()} · W{isoWeek(date)}
+                          </span>
+                          {isToday && (
+                            <span className="mt-0.5 text-[10px] font-medium text-emerald-400">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                        {lanes.map((l) => (
+                          <Cell
+                            key={l.key}
+                            entries={cells.get(`${dk}|${l.key}`) ?? []}
+                            mode={cellMode}
+                            selected={selected}
+                            onToggleSelect={toggleSelect}
+                            onFocusIdea={setIdeaFocus}
+                            onFocusSeries={setSeriesFocus}
+                            dimOf={(es) => !!focus && !es.some(inFocus)}
+                          />
+                        ))}
+                        {weekEnds && (
+                          <StrategyRow
+                            weekKey={wk}
+                            lanes={lanes}
+                            weekLane={weekLane}
+                          />
+                        )}
+                      </Fragment>
+                    );
+                  })}
+
+                  {/* Load older — extends the past window 3 months at a time. */}
+                  {hasOlder && (
+                    <div
+                      className="border-t p-3"
+                      style={{ gridColumn: "1 / -1" }}
+                    >
+                      <button
+                        onClick={() => setPastMonths((p) => p + 3)}
+                        className="border-border hover:bg-accent sticky left-3 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors"
+                      >
+                        Load 3 more months back ↓
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </MetricsCtx.Provider>
+
+        {/* Selection action bar */}
+        {selected.size > 0 && (
+          <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
+            <div className="bg-card flex items-center gap-2 rounded-full border px-3 py-2 shadow-lg">
+              <span className="px-1 text-sm font-medium">
+                {selected.size} selected
+              </span>
+              <span className="bg-border h-5 w-px" />
+              <button
+                onClick={() => setGroupOpen(true)}
+                className="hover:bg-accent flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors"
+              >
+                <Layers className="size-4" /> Group
+              </button>
+              <button
+                onClick={sendToLaunch}
+                className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+              >
+                <Rocket className="size-4" /> Send to Launch
+              </button>
+              <button
+                onClick={() => setSelected(new Set())}
+                className="text-muted-foreground hover:text-foreground flex size-7 items-center justify-center rounded-full transition-colors"
+                aria-label="Clear selection"
+              >
+                <X className="size-4" />
+              </button>
             </div>
           </div>
         )}
-      </div>
-      </MetricsCtx.Provider>
 
-      {/* Selection action bar */}
-      {selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
-          <div className="bg-card flex items-center gap-2 rounded-full border px-3 py-2 shadow-lg">
-            <span className="px-1 text-sm font-medium">{selected.size} selected</span>
-            <span className="bg-border h-5 w-px" />
+        {/* Group dialog */}
+        <SimpleDialog
+          open={groupOpen}
+          onOpenChange={setGroupOpen}
+          title="Group into a content idea"
+        >
+          <p className="text-muted-foreground text-sm">
+            {selected.size} post{selected.size === 1 ? "" : "s"} → one content
+            idea on the board.
+          </p>
+          <label className="mt-3 block">
+            <span className="text-muted-foreground text-xs">Title</span>
+            <input
+              value={groupTitle}
+              onChange={(e) => setGroupTitle(e.target.value)}
+              placeholder="e.g. World Cup 2026 push"
+              className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+            />
+          </label>
+          <div className="mt-3 flex gap-2">
+            {(["single", "series"] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => setGroupUnit(u)}
+                className={cn(
+                  "flex-1 rounded-md border px-3 py-2 text-left text-xs transition-colors",
+                  groupUnit === u
+                    ? "border-foreground/40 bg-accent"
+                    : "border-border hover:bg-accent",
+                )}
+              >
+                <span className="block text-sm font-medium capitalize">
+                  {u}
+                </span>
+                <span className="text-muted-foreground">
+                  {u === "single"
+                    ? "One idea; these posts are its renderings"
+                    : "A series; one idea per post"}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center justify-end gap-2">
             <button
-              onClick={() => setGroupOpen(true)}
-              className="hover:bg-accent flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors"
+              onClick={() => setGroupOpen(false)}
+              className="text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5 text-sm transition-colors"
             >
-              <Layers className="size-4" /> Group
+              Cancel
             </button>
             <button
-              onClick={sendToLaunch}
-              className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+              disabled={createGrouping.isPending}
+              onClick={() =>
+                createGrouping.mutate({
+                  platformPostIds: [...selected],
+                  title: groupTitle.trim() || undefined,
+                  unit: groupUnit,
+                })
+              }
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
             >
-              <Rocket className="size-4" /> Send to Launch
-            </button>
-            <button
-              onClick={() => setSelected(new Set())}
-              className="text-muted-foreground hover:text-foreground flex size-7 items-center justify-center rounded-full transition-colors"
-              aria-label="Clear selection"
-            >
-              <X className="size-4" />
+              {createGrouping.isPending ? "Grouping…" : "Create grouping"}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Group dialog */}
-      <SimpleDialog open={groupOpen} onOpenChange={setGroupOpen} title="Group into a content idea">
-        <p className="text-muted-foreground text-sm">
-          {selected.size} post{selected.size === 1 ? "" : "s"} → one content idea on the board.
-        </p>
-        <label className="mt-3 block">
-          <span className="text-muted-foreground text-xs">Title</span>
-          <input
-            value={groupTitle}
-            onChange={(e) => setGroupTitle(e.target.value)}
-            placeholder="e.g. World Cup 2026 push"
-            className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-          />
-        </label>
-        <div className="mt-3 flex gap-2">
-          {(["single", "series"] as const).map((u) => (
-            <button
-              key={u}
-              onClick={() => setGroupUnit(u)}
-              className={cn(
-                "flex-1 rounded-md border px-3 py-2 text-left text-xs transition-colors",
-                groupUnit === u ? "border-foreground/40 bg-accent" : "border-border hover:bg-accent",
-              )}
-            >
-              <span className="block text-sm font-medium capitalize">{u}</span>
-              <span className="text-muted-foreground">
-                {u === "single"
-                  ? "One idea; these posts are its renderings"
-                  : "A series; one idea per post"}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            onClick={() => setGroupOpen(false)}
-            className="text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5 text-sm transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            disabled={createGrouping.isPending}
-            onClick={() =>
-              createGrouping.mutate({
-                platformPostIds: [...selected],
-                title: groupTitle.trim() || undefined,
-                unit: groupUnit,
-              })
-            }
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            {createGrouping.isPending ? "Grouping…" : "Create grouping"}
-          </button>
-        </div>
-        {createGrouping.error && (
-          <p className="mt-2 text-xs text-rose-400">{createGrouping.error.message}</p>
-        )}
-      </SimpleDialog>
-    </div>
+          {createGrouping.error && (
+            <p className="mt-2 text-xs text-rose-400">
+              {createGrouping.error.message}
+            </p>
+          )}
+        </SimpleDialog>
+        <PostDetailDialog
+          entry={detail}
+          ownedBrands={brands.filter((brand) => brand.role === "owned")}
+          onOpenChange={(open) => !open && void setPostId(null)}
+        />
+      </div>
+    </PostOpenCtx.Provider>
   );
 }
 
@@ -769,14 +907,20 @@ export function V5Client({
 function LaneHeader({ lane }: { lane: Lane }) {
   return (
     <div
-      className="bg-muted sticky top-0 z-20 flex items-center gap-1.5 border-b border-r px-2 py-2 text-xs font-medium [&:nth-last-child(1)]:border-r-0"
-      style={lane.color ? { borderBottom: `2px solid ${lane.color}` } : undefined}
+      className="bg-muted sticky top-0 z-20 flex items-center gap-1.5 border-r border-b px-2 py-2 text-xs font-medium [&:nth-last-child(1)]:border-r-0"
+      style={
+        lane.color ? { borderBottom: `2px solid ${lane.color}` } : undefined
+      }
     >
       {lane.platform ? (
         <ChannelLogo platform={lane.platform} className="size-4 shrink-0" />
       ) : lane.logo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={lane.logo} alt="" className="size-4 shrink-0 rounded object-cover" />
+        <img
+          src={lane.logo}
+          alt=""
+          className="size-4 shrink-0 rounded object-cover"
+        />
       ) : null}
       <span className="truncate">{lane.label}</span>
     </div>
@@ -798,10 +942,12 @@ function StrategyRow({
   return (
     <Fragment>
       <div className="bg-muted/40 sticky left-0 z-10 flex flex-col justify-center border-y-2 border-r p-2">
-        <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wide">
+        <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
           Week
         </span>
-        <span className="text-muted-foreground/70 text-[10px]">of {fmtDay(monday)}</span>
+        <span className="text-muted-foreground/70 text-[10px]">
+          of {fmtDay(monday)}
+        </span>
       </div>
       {lanes.map((l) => (
         <div
@@ -828,14 +974,22 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
     const idx = STRAT_FAMILIES.findIndex((f) => f.id === fam);
     if (idx >= 0) counts[idx]!++;
   }
-  const top = counts.reduce((b, n, i) => (n > b.n ? { n, i } : b), { n: 0, i: -1 });
-  const read =
-    !total ? null : top.n / total >= 0.5 ? `${STRAT_FAMILIES[top.i]!.label}-led` : "Mixed";
+  const top = counts.reduce((b, n, i) => (n > b.n ? { n, i } : b), {
+    n: 0,
+    i: -1,
+  });
+  const read = !total
+    ? null
+    : top.n / total >= 0.5
+      ? `${STRAT_FAMILIES[top.i]!.label}-led`
+      : "Mixed";
   const confident = total >= 6;
   // Performance read: total reach + the week's best post for this lane.
   const totalEng = posts.reduce((s, e) => s + engagementOf(e), 0);
   const best =
-    total > 0 ? posts.reduce((b, e) => (engagementOf(e) > engagementOf(b) ? e : b)) : null;
+    total > 0
+      ? posts.reduce((b, e) => (engagementOf(e) > engagementOf(b) ? e : b))
+      : null;
   return (
     <div className="flex items-center gap-2 px-3 py-1.5">
       <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
@@ -847,7 +1001,9 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
             {fmtNum(totalEng)}
           </span>
           {best && engagementLabel(best) && (
-            <span className="text-muted-foreground truncate">· top {engagementLabel(best)}</span>
+            <span className="text-muted-foreground truncate">
+              · top {engagementLabel(best)}
+            </span>
           )}
         </span>
       )}
@@ -855,7 +1011,10 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
         <span className="flex shrink-0 items-center gap-1.5">
           {STRAT_FAMILIES.map((f, i) =>
             counts[i] === 0 ? (
-              <span key={f.id} className="bg-muted-foreground/25 size-[3px] rounded-full" />
+              <span
+                key={f.id}
+                className="bg-muted-foreground/25 size-[3px] rounded-full"
+              />
             ) : (
               <span
                 key={f.id}
@@ -874,7 +1033,9 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
         <span
           className={cn(
             "truncate text-[11px]",
-            confident ? "font-medium text-emerald-400" : "text-muted-foreground",
+            confident
+              ? "font-medium text-emerald-400"
+              : "text-muted-foreground",
           )}
         >
           {read}
@@ -891,7 +1052,9 @@ function StrategyCell({ entries }: { entries: V5Entry[] }) {
 }
 
 /** Spots grouped by channel within a day (canonical channel order). */
-function channelGroups(entries: V5Entry[]): { platform: string; entries: V5Entry[] }[] {
+function channelGroups(
+  entries: V5Entry[],
+): { platform: string; entries: V5Entry[] }[] {
   const m = new Map<string, V5Entry[]>();
   for (const e of entries)
     (m.get(e.platform) ?? m.set(e.platform, []).get(e.platform)!).push(e);
@@ -923,18 +1086,22 @@ function Cell({
 }) {
   const metrics = useContext(MetricsCtx);
   // In Performance mode, surface winners by sorting on peak engagement.
-  const maxEng = (es: V5Entry[]) => es.reduce((m, e) => Math.max(m, engagementOf(e)), 0);
+  const maxEng = (es: V5Entry[]) =>
+    es.reduce((m, e) => Math.max(m, engagementOf(e)), 0);
   const groups = groupEntries(entries);
   if (metrics) groups.sort((a, b) => maxEng(b.entries) - maxEng(a.entries));
   return (
-    <div className="flex min-h-14 flex-col gap-2 border-b border-r p-1.5 [&:nth-last-child(1)]:border-r-0">
+    <div className="flex min-h-14 flex-col gap-2 border-r border-b p-1.5 [&:nth-last-child(1)]:border-r-0">
       {mode === "content" ? (
         <div className="grid grid-cols-2 gap-1.5">
           {groups.map((g) =>
             g.entries.length >= 2 ? (
               <div
                 key={g.key}
-                className={cn("col-span-2 transition-opacity", dimOf(g.entries) && "opacity-20")}
+                className={cn(
+                  "col-span-2 transition-opacity",
+                  dimOf(g.entries) && "opacity-20",
+                )}
               >
                 <IdeaTray
                   group={g}
@@ -947,7 +1114,10 @@ function Cell({
             ) : (
               <div
                 key={g.key}
-                className={cn("transition-opacity", dimOf(g.entries) && "opacity-20")}
+                className={cn(
+                  "transition-opacity",
+                  dimOf(g.entries) && "opacity-20",
+                )}
               >
                 <SpotCard
                   entry={g.entries[0]!}
@@ -968,12 +1138,17 @@ function Cell({
             </span>
             <div className="grid grid-cols-2 gap-1.5">
               {(metrics
-                ? [...cg.entries].sort((a, b) => engagementOf(b) - engagementOf(a))
+                ? [...cg.entries].sort(
+                    (a, b) => engagementOf(b) - engagementOf(a),
+                  )
                 : cg.entries
               ).map((e) => (
                 <div
                   key={e.id}
-                  className={cn("transition-opacity", dimOf([e]) && "opacity-20")}
+                  className={cn(
+                    "transition-opacity",
+                    dimOf([e]) && "opacity-20",
+                  )}
                 >
                   <SpotCard
                     entry={e}
@@ -1027,15 +1202,17 @@ function IdeaTray({
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
     >
       <button
-        onClick={() => first.contentPostId && onFocusIdea(first.contentPostId, title)}
+        onClick={() =>
+          first.contentPostId && onFocusIdea(first.contentPostId, title)
+        }
         title="Focus this idea across the board"
         className="hover:text-foreground/80 flex w-full items-start px-1.5 pt-1.5 text-left"
       >
-        <span className="line-clamp-2 min-w-0 flex-1 break-words text-xs font-medium leading-tight">
+        <span className="line-clamp-2 min-w-0 flex-1 text-xs leading-tight font-medium break-words">
           {title}
         </span>
       </button>
-      <div className="flex flex-wrap items-center gap-1 px-1.5 pb-1 pt-1">
+      <div className="flex flex-wrap items-center gap-1 px-1.5 pt-1 pb-1">
         {first.seriesName && (
           <SeriesChip
             name={first.seriesName}
@@ -1044,7 +1221,9 @@ function IdeaTray({
           />
         )}
         {formats.length > 0 && (
-          <span className="text-muted-foreground text-[10px]">{formats.join(" · ")}</span>
+          <span className="text-muted-foreground text-[10px]">
+            {formats.join(" · ")}
+          </span>
         )}
         <span className="text-muted-foreground/60 ml-auto text-[10px] tabular-nums">
           {group.entries.length} spots
@@ -1075,21 +1254,24 @@ function SpotThumb({
   onToggle: () => void;
 }) {
   const repost = isRepost(entry);
+  const openPost = useContext(PostOpenCtx);
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onToggle}
+      onClick={() => openPost(entry)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onToggle();
+          openPost(entry);
         }
       }}
       title={entry.text ?? platformLabel(entry.platform)}
       className={cn(
         "group relative size-14 cursor-pointer overflow-hidden rounded",
-        selected ? "ring-2 ring-emerald-500" : "hover:ring-foreground/30 hover:ring-1",
+        selected
+          ? "ring-2 ring-emerald-500"
+          : "hover:ring-foreground/30 hover:ring-1",
         repost && "opacity-50",
       )}
     >
@@ -1099,11 +1281,26 @@ function SpotThumb({
         archetype={entry.archetype}
         className="size-full"
       />
+      <button
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        title={selected ? "Remove from selection" : "Select post"}
+        className={cn(
+          "absolute top-0.5 left-0.5 flex size-4 items-center justify-center rounded border backdrop-blur-sm",
+          selected
+            ? "border-emerald-400 bg-emerald-600 text-white"
+            : "border-white/30 bg-black/45 text-white opacity-0 group-hover:opacity-100",
+        )}
+      >
+        {selected && <Check className="size-2.5" />}
+      </button>
       <span className="absolute bottom-0.5 left-0.5 rounded bg-black/45 p-0.5 backdrop-blur-sm">
         <ChannelLogo platform={entry.platform} className="size-3" />
       </span>
       {repost && (
-        <span className="absolute right-0.5 top-0.5 rounded bg-violet-600/85 px-1 text-[8px] font-medium text-white">
+        <span className="absolute top-0.5 right-0.5 rounded bg-violet-600/85 px-1 text-[8px] font-medium text-white">
           ↻
         </span>
       )}
@@ -1114,7 +1311,7 @@ function SpotThumb({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Open original"
-          className="bg-card/80 text-muted-foreground hover:text-foreground absolute bottom-0.5 right-0.5 flex size-4 items-center justify-center rounded opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+          className="bg-card/80 text-muted-foreground hover:text-foreground absolute right-0.5 bottom-0.5 flex size-4 items-center justify-center rounded opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
         >
           <ExternalLink className="size-2.5" />
         </a>
@@ -1141,15 +1338,16 @@ function SpotCard({
   const typeLabel = postTypeLabel(entry.format, entry.archetype);
   const repost = isRepost(entry);
   const metrics = useContext(MetricsCtx);
+  const openPost = useContext(PostOpenCtx);
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onToggle}
+      onClick={() => openPost(entry)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onToggle();
+          openPost(entry);
         }
       }}
       title={label}
@@ -1166,13 +1364,28 @@ function SpotCard({
         archetype={entry.archetype}
         className="h-20 w-full"
       />
+      <button
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        title={selected ? "Remove from selection" : "Select post"}
+        className={cn(
+          "absolute top-1 right-1 z-10 flex size-5 items-center justify-center rounded border backdrop-blur-sm",
+          selected
+            ? "border-emerald-400 bg-emerald-600 text-white"
+            : "border-white/30 bg-black/45 text-white opacity-0 group-hover:opacity-100",
+        )}
+      >
+        {selected && <Check className="size-3" />}
+      </button>
       {typeLabel && (
-        <span className="absolute left-1 top-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
+        <span className="absolute top-1 left-1 rounded bg-black/55 px-1 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
           {typeLabel}
         </span>
       )}
       {repost && (
-        <span className="absolute right-1 top-1 rounded bg-violet-600/85 px-1 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
+        <span className="absolute top-1 right-7 rounded bg-violet-600/85 px-1 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
           ↻
         </span>
       )}
@@ -1183,21 +1396,28 @@ function SpotCard({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Open original"
-          className="bg-card/80 text-muted-foreground hover:text-foreground absolute bottom-[3.25rem] right-1 flex size-5 items-center justify-center rounded border opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+          className="bg-card/80 text-muted-foreground hover:text-foreground absolute right-1 bottom-[3.25rem] flex size-5 items-center justify-center rounded border opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
         >
           <ExternalLink className="size-3" />
         </a>
       )}
       <div className="flex flex-1 flex-col gap-1 p-1.5">
-        <span className="line-clamp-2 break-words leading-tight">{label}</span>
+        <span className="line-clamp-2 leading-tight break-words">{label}</span>
         <span className="mt-auto flex flex-wrap items-center gap-1">
-          <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[entry.status] ?? "bg-slate-400")} />
+          <span
+            className={cn(
+              "size-1.5 shrink-0 rounded-full",
+              STATUS_DOT[entry.status] ?? "bg-slate-400",
+            )}
+          />
           <ChannelLogo platform={entry.platform} className="size-3" />
           {entry.seriesName && (
             <SeriesChip
               name={entry.seriesName}
               color={entry.seriesColor}
-              onClick={() => onFocusSeries(entry.seriesName!, entry.seriesName!)}
+              onClick={() =>
+                onFocusSeries(entry.seriesName!, entry.seriesName!)
+              }
             />
           )}
           {metrics && (
@@ -1243,7 +1463,7 @@ function SeriesChip({
 /** Post thumbnail with a graceful fallback: scraped IG/peer media lives on
  *  signed CDN URLs (scontent.cdninstagram.com) that EXPIRE, so a once-valid
  *  thumbnail 404s later. On error, fall back to the platform logo rather than
- *  a broken-image icon. (Durable fix = re-host to R2 at scrape time.) */
+ *  a broken-image icon. (Durable fix = re-host to Blob at scrape time.) */
 function Poster({
   src,
   platform,
@@ -1259,7 +1479,12 @@ function Poster({
   const showImg = src && !failed;
   if (showImg) {
     return (
-      <span className={cn("bg-muted relative shrink-0 overflow-hidden", className ?? "size-8 rounded")}>
+      <span
+        className={cn(
+          "bg-muted relative shrink-0 overflow-hidden",
+          className ?? "size-8 rounded",
+        )}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
@@ -1280,10 +1505,12 @@ function Poster({
         className ?? "size-8 rounded",
       )}
     >
-      {Glyph ? <Glyph className="size-6" strokeWidth={1.5} /> : (
+      {Glyph ? (
+        <Glyph className="size-6" strokeWidth={1.5} />
+      ) : (
         <ChannelLogo platform={platform} className="size-5 opacity-50" />
       )}
-      <span className="absolute bottom-0.5 right-0.5 opacity-50">
+      <span className="absolute right-0.5 bottom-0.5 opacity-50">
         <ChannelLogo platform={platform} className="size-3" />
       </span>
     </span>
@@ -1333,7 +1560,7 @@ function EngagementChip({ e }: { e: V5Entry }) {
   if (e.views > 0) parts.push([Eye, e.views]);
   if (!parts.length) return null;
   return (
-    <span className="flex items-center gap-1.5 text-[10px] tabular-nums text-emerald-400">
+    <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 tabular-nums">
       {parts.map(([Icon, n], i) => (
         <span key={i} className="flex items-center gap-0.5">
           <Icon className="size-2.5" /> {fmtNum(n)}

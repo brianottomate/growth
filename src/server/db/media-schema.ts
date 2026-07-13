@@ -1,8 +1,15 @@
 import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  index,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
-import { userTable } from "./auth-schema";
+import { organizationTable, userTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
+import { platformPostTable } from "./content-schema";
 import { createId } from "./utils";
 
 // ---- MEDIA DOMAIN --------------------------------------------------
@@ -10,25 +17,23 @@ import { createId } from "./utils";
 // The brand media library. The reusable source-of-truth for creative that
 // Studio composes into content_post / platform_post / ad_spot.
 //
-// Storage is split by kind:
-//   - images / gifs / static files → Cloudflare R2  (provider = "r2")
-//   - video                        → Cloudflare Stream (provider = "stream")
-//   - heavy working masters        → external link  (provider = "external")
+// Storage is split by provider:
+//   - uploaded assets              → Cloudflare R2 (provider = "r2")
+//   - legacy video                 → Cloudflare Stream (provider = "stream")
+//   - heavy working masters        → external link (provider = "external")
 //
-// Uploads go DIRECT from the browser (presigned R2 PUT, or a Stream one-time
-// upload URL) — bytes never pass through our Vercel functions. A row is created
-// `uploading`, then flipped to `ready` (R2: on client finalize; Stream: on the
-// transcode-complete webhook).
+// Uploads go directly from the browser to R2 via a presigned PUT. A row is
+// created in `uploading` state first, then finalized after the PUT succeeds.
 //
 // `external` assets are just a LINK (Google Drive / Dropbox / Frame.io) — we
 // reference the file, never host its bytes. Ideal for 800MB+ working masters
-// that get `derivedFrom` cut-downs hosted on Stream/R2. Born `ready`.
+// that get `derivedFrom` cut-downs hosted on R2. Born `ready`.
 
 // ---- ENUMS ---------------------------------------------------------
 
 export const mediaProviderEnum = pgEnum("media_provider", [
   "r2",
-  "stream",
+  "stream", // legacy Cloudflare Stream videos; new video uploads go to R2
   "external",
 ]);
 export type MediaProvider = (typeof mediaProviderEnum.enumValues)[number];
@@ -46,11 +51,105 @@ export type MediaKind = (typeof mediaKindEnum.enumValues)[number];
 // Lifecycle of the underlying bytes (not of the creative idea).
 export const mediaStatusEnum = pgEnum("media_status", [
   "uploading", // row created, awaiting bytes / transcode
-  "processing", // Stream is transcoding
+  "processing", // reserved for future media processing
   "ready", // playable / servable
   "error", // upload or transcode failed
 ]);
 export type MediaStatus = (typeof mediaStatusEnum.enumValues)[number];
+
+export const mediaTagSourceEnum = pgEnum("media_tag_source", ["human", "ai"]);
+export type MediaTagSource = (typeof mediaTagSourceEnum.enumValues)[number];
+
+export const mediaVideoAnalysisStatusEnum = pgEnum(
+  "media_video_analysis_status",
+  ["processing", "ready", "error"],
+);
+export type MediaVideoAnalysisStatus =
+  (typeof mediaVideoAnalysisStatusEnum.enumValues)[number];
+
+export type VideoAnalysisBoard = {
+  index: number;
+  url: string;
+  pathname: string;
+  width: number;
+  height: number;
+  firstFrame: number;
+  lastFrame: number;
+};
+
+export type VideoAnalysisFrame = {
+  index: number;
+  timestampMs: number;
+  boardIndex: number;
+  row: number;
+  column: number;
+};
+
+export type VideoTranscriptWord = {
+  text: string;
+  startMs: number;
+  endMs: number;
+};
+
+// ---- FOLDERS + MANAGED TAGS --------------------------------------
+
+export const mediaFolderTable = pgTable(
+  "media_folder",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("mfolder")),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    name: t.text().notNull(),
+    description: t.text(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("media_folder_brand_idx").on(table.brandId),
+    uniqueIndex("media_folder_brand_name_idx").on(table.brandId, table.name),
+  ],
+);
+
+export const mediaTagTable = pgTable(
+  "media_tag",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("mtag")),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    name: t.text().notNull(),
+    description: t.text(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("media_tag_brand_idx").on(table.brandId),
+    uniqueIndex("media_tag_brand_name_idx").on(table.brandId, table.name),
+  ],
+);
 
 // ---- MEDIA ASSET TABLE ---------------------------------------------
 
@@ -67,7 +166,19 @@ export const mediaAssetTable = pgTable(
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
+    folderId: t.text().references(() => mediaFolderTable.id, {
+      onDelete: "set null",
+    }),
+
     uploadedBy: t.text().references(() => userTable.id),
+
+    // Optional provenance for an explicit "save from timeline" capture. One
+    // source post can be saved into several owned brand libraries; uniqueness
+    // is therefore scoped to the destination brand.
+    sourcePlatformPostId: t.text().references(() => platformPostTable.id, {
+      onDelete: "set null",
+    }),
+    sourceMediaIndex: t.integer(),
 
     provider: mediaProviderEnum().notNull(),
     kind: mediaKindEnum().notNull(),
@@ -88,8 +199,8 @@ export const mediaAssetTable = pgTable(
     r2Key: t.text(),
     url: t.text(),
 
-    // Stream — `streamUid` is the Cloudflare Stream video id. Playback / HLS /
-    // thumbnail URLs are derived from it + the customer subdomain at read time.
+    // Stream — legacy Cloudflare Stream video id (no new writes; kept so
+    // existing rows stay addressable/deletable).
     streamUid: t.text(),
 
     // External — a link to a file we DON'T host (Google Drive / Dropbox /
@@ -118,26 +229,199 @@ export const mediaAssetTable = pgTable(
   }),
   (table) => [
     index("media_asset_brand_idx").on(table.brandId),
+    index("media_asset_folder_idx").on(table.folderId),
     index("media_asset_kind_idx").on(table.kind),
     index("media_asset_status_idx").on(table.status),
     index("media_asset_uploaded_by_idx").on(table.uploadedBy),
-    // Stream webhooks look assets up by uid.
+    // Non-unique: a chat image promoted into several brand libraries shares
+    // one underlying object key.
+    index("media_asset_r2_key_idx").on(table.r2Key),
+    // Stream webhooks historically looked assets up by uid.
     uniqueIndex("media_asset_stream_uid_idx").on(table.streamUid),
+    uniqueIndex("media_asset_source_post_item_idx").on(
+      table.brandId,
+      table.sourcePlatformPostId,
+      table.sourceMediaIndex,
+    ),
   ],
 );
 
 export type MediaAsset = typeof mediaAssetTable.$inferSelect;
 export type MediaAssetInsert = typeof mediaAssetTable.$inferInsert;
 
+export const mediaAssetTagTable = pgTable(
+  "media_asset_tag",
+  (t) => ({
+    mediaAssetId: t
+      .text()
+      .references(() => mediaAssetTable.id, { onDelete: "cascade" })
+      .notNull(),
+    tagId: t
+      .text()
+      .references(() => mediaTagTable.id, { onDelete: "cascade" })
+      .notNull(),
+    source: mediaTagSourceEnum().notNull(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    primaryKey({ columns: [table.mediaAssetId, table.tagId, table.source] }),
+    index("media_asset_tag_asset_idx").on(table.mediaAssetId),
+    index("media_asset_tag_tag_idx").on(table.tagId),
+  ],
+);
+
+// ---- VIDEO ANALYSIS ------------------------------------------------
+//
+// A durable analysis of one video item on a canonical timeline post. The
+// browser performs frame extraction on the operator's device; hosted Whisper
+// handles codec-robust transcription. Only derived storyboard boards,
+// transcript, and analysis metadata are persisted. Boards deliberately do not
+// enter the general media library.
+
+export const mediaVideoAnalysisTable = pgTable(
+  "media_video_analysis",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("vanalysis")),
+    organizationId: t
+      .text()
+      .references(() => organizationTable.id, { onDelete: "cascade" })
+      .notNull(),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    platformPostId: t
+      .text()
+      .references(() => platformPostTable.id, { onDelete: "cascade" })
+      .notNull(),
+    sourceMediaIndex: t.integer().notNull(),
+    sourceUrl: t.text().notNull(),
+    status: mediaVideoAnalysisStatusEnum().default("processing").notNull(),
+    rendererVersion: t.integer().default(1).notNull(),
+    durationMs: t.integer(),
+    sampleIntervalMs: t.integer(),
+    gridSize: t.integer(),
+    frameCount: t.integer(),
+    boards: t.jsonb().$type<VideoAnalysisBoard[]>(),
+    frames: t.jsonb().$type<VideoAnalysisFrame[]>(),
+    transcriptLanguage: t.text(),
+    transcriptText: t.text(),
+    transcriptWords: t.jsonb().$type<VideoTranscriptWord[]>(),
+    transcriptError: t.text(),
+    analysis: t.jsonb(),
+    error: t.text(),
+    createdBy: t
+      .text()
+      .references(() => userTable.id, { onDelete: "set null" }),
+    artifactsSavedAt: t.timestamp(),
+    completedAt: t.timestamp(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("media_video_analysis_post_item_idx").on(
+      table.organizationId,
+      table.platformPostId,
+      table.sourceMediaIndex,
+    ),
+    index("media_video_analysis_org_idx").on(table.organizationId),
+    index("media_video_analysis_post_idx").on(table.platformPostId),
+    index("media_video_analysis_status_idx").on(table.status),
+  ],
+);
+
+export type MediaVideoAnalysis = typeof mediaVideoAnalysisTable.$inferSelect;
+export type MediaVideoAnalysisInsert =
+  typeof mediaVideoAnalysisTable.$inferInsert;
+
 // ---- RELATIONS -----------------------------------------------------
 
-export const mediaAssetRelations = relations(mediaAssetTable, ({ one }) => ({
+export const mediaAssetRelations = relations(
+  mediaAssetTable,
+  ({ one, many }) => ({
+    brand: one(brandTable, {
+      fields: [mediaAssetTable.brandId],
+      references: [brandTable.id],
+    }),
+    uploader: one(userTable, {
+      fields: [mediaAssetTable.uploadedBy],
+      references: [userTable.id],
+    }),
+    folder: one(mediaFolderTable, {
+      fields: [mediaAssetTable.folderId],
+      references: [mediaFolderTable.id],
+    }),
+    tagAssignments: many(mediaAssetTagTable),
+  }),
+);
+
+export const mediaFolderRelations = relations(
+  mediaFolderTable,
+  ({ one, many }) => ({
+    brand: one(brandTable, {
+      fields: [mediaFolderTable.brandId],
+      references: [brandTable.id],
+    }),
+    assets: many(mediaAssetTable),
+  }),
+);
+
+export const mediaTagRelations = relations(mediaTagTable, ({ one, many }) => ({
   brand: one(brandTable, {
-    fields: [mediaAssetTable.brandId],
+    fields: [mediaTagTable.brandId],
     references: [brandTable.id],
   }),
-  uploader: one(userTable, {
-    fields: [mediaAssetTable.uploadedBy],
-    references: [userTable.id],
-  }),
+  assignments: many(mediaAssetTagTable),
 }));
+
+export const mediaAssetTagRelations = relations(
+  mediaAssetTagTable,
+  ({ one }) => ({
+    asset: one(mediaAssetTable, {
+      fields: [mediaAssetTagTable.mediaAssetId],
+      references: [mediaAssetTable.id],
+    }),
+    tag: one(mediaTagTable, {
+      fields: [mediaAssetTagTable.tagId],
+      references: [mediaTagTable.id],
+    }),
+  }),
+);
+
+export const mediaVideoAnalysisRelations = relations(
+  mediaVideoAnalysisTable,
+  ({ one }) => ({
+    organization: one(organizationTable, {
+      fields: [mediaVideoAnalysisTable.organizationId],
+      references: [organizationTable.id],
+    }),
+    brand: one(brandTable, {
+      fields: [mediaVideoAnalysisTable.brandId],
+      references: [brandTable.id],
+    }),
+    platformPost: one(platformPostTable, {
+      fields: [mediaVideoAnalysisTable.platformPostId],
+      references: [platformPostTable.id],
+    }),
+    creator: one(userTable, {
+      fields: [mediaVideoAnalysisTable.createdBy],
+      references: [userTable.id],
+    }),
+  }),
+);
+
+export type MediaFolder = typeof mediaFolderTable.$inferSelect;
+export type MediaTag = typeof mediaTagTable.$inferSelect;

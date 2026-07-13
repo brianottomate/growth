@@ -1,8 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTRPC } from "@/trpc/react";
 
@@ -15,20 +23,19 @@ import { Tools } from "./Tools";
 import { Twitter } from "./Twitter";
 import { XListening } from "./XListening";
 
-const TAB_IDS = [
-  "monitor",
-  "reddit",
-  "instagram",
-  "x",
-  "llm",
-  "playbook",
-] as const;
-type TabId = (typeof TAB_IDS)[number];
+type TabId = "monitor" | "reddit" | "instagram" | "x" | "llm" | "playbook";
 
-export function Listen({ defaultTab }: { defaultTab: TabId }) {
+export function Listen({
+  defaultTab,
+  initialBrandId,
+}: {
+  defaultTab: TabId;
+  initialBrandId?: string;
+}) {
   const trpc = useTRPC();
+  const [brandId, setBrandId] = useState<string | undefined>(initialBrandId);
   const { data, isLoading, isError, error } = useQuery(
-    trpc.listening.overview.queryOptions(),
+    trpc.listening.overview.queryOptions(brandId ? { brandId } : undefined),
   );
 
   const [tab, setTab] = useState<TabId>(defaultTab);
@@ -54,14 +61,55 @@ export function Listen({ defaultTab }: { defaultTab: TabId }) {
   if (!data?.brand) {
     return (
       <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
-        No listening brand configured. Run{" "}
-        <code className="font-mono">scripts/seed-listening-sources.ts</code>.
+        Add an owned brand on the{" "}
+        <Link href="/app/brands" className="text-foreground underline">
+          Brands page
+        </Link>{" "}
+        to start listening.
       </div>
     );
   }
 
   return (
-    <Tabs value={tab} onValueChange={onTabChange} className="space-y-6">
+    <Tabs
+      key={data.brand.id}
+      value={tab}
+      onValueChange={onTabChange}
+      className="space-y-6"
+    >
+      <div className="bg-card flex flex-wrap items-center justify-between gap-4 rounded-xl border p-4">
+        <div>
+          <p className="text-sm font-medium">Listening for</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Sources and reply guidance are configured independently for each
+            owned brand.
+          </p>
+        </div>
+        <Select
+          value={data.brand.id}
+          onValueChange={(nextBrandId) => {
+            setBrandId(nextBrandId);
+            if (typeof window !== "undefined") {
+              const url = new URL(window.location.href);
+              url.searchParams.set("brand", nextBrandId);
+              window.history.replaceState(null, "", url);
+            }
+          }}
+        >
+          <SelectTrigger className="w-[220px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {data.brands.map((brand) => (
+              <SelectItem key={brand.id} value={brand.id}>
+                {brand.name}
+                {brand.configured ? " · configured" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <TabsList>
         <TabsTrigger value="monitor">What we monitor</TabsTrigger>
         <TabsTrigger value="reddit">Reddit</TabsTrigger>
@@ -119,7 +167,9 @@ export function Listen({ defaultTab }: { defaultTab: TabId }) {
 
       <TabsContent value="playbook">
         <Playbook
+          key={data.brand.id}
           brandId={data.brand.id}
+          brandName={data.brand.name}
           story={data.story}
           brandVoice={data.brandVoice}
         />

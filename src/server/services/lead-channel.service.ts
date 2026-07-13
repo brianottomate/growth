@@ -57,7 +57,7 @@ const FREEMAIL =
 const ROLE =
   /^(info|hello|contact|admin|office|hi|team|stay|book|bookings|reservations|sales|rentals|owner|owners|support|frontdesk|reception|enquiries|inquiries)@/i;
 const JUNK_DOMAIN =
-  /\.(png|jpg|jpeg|gif|svg|webp|css|js|woff|ttf)$|sentry|wixpress|example\.|schema\.org|w3\.org|googleapis|gstatic|cloudflare|jquery|bootstrap|fontawesome|\.wix|sentry\.io/i;
+  /\.(png|jpg|jpeg|gif|svg|webp|css|js|woff|ttf)$|sentry|wixpress|example\.|schema\.org|w3\.org|googleapis|gstatic|jquery|bootstrap|fontawesome|\.wix|sentry\.io/i;
 const DECISION_MAKER =
   /owner|founder|ceo|president|principal|partner|director|vp|vice|general manager|\bgm\b|coo|cmo|head/i;
 

@@ -19,10 +19,12 @@ type Overview = RouterOutputs["listening"]["overview"];
  */
 export function Playbook({
   brandId,
+  brandName,
   story,
   brandVoice,
 }: {
   brandId: string;
+  brandName: string;
   story: Overview["story"];
   brandVoice: string | null;
 }) {
@@ -31,9 +33,9 @@ export function Playbook({
   const save = useMutation(
     trpc.listening.updateStory.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries(
-          trpc.listening.overview.queryOptions(),
-        );
+        await queryClient.invalidateQueries({
+          queryKey: trpc.listening.overview.queryKey(),
+        });
         toast.success("Playbook saved");
       },
       onError: (e) => toast.error(e.message || "Failed to save"),
@@ -53,8 +55,8 @@ export function Playbook({
           <h2 className="text-lg font-semibold tracking-tight">Playbook</h2>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
             The shared judgment injected into every scan and reply draft — what
-            counts as signal, and how Wander replies. Edit it live; it takes
-            effect on the next scan.
+            counts as signal, and how {brandName} replies. Edit it live; it
+            takes effect on the next scan.
           </p>
         </div>
         <Button
@@ -76,7 +78,9 @@ export function Playbook({
         <p className="bg-muted/40 text-muted-foreground mt-4 rounded-md border border-dashed px-3 py-2 text-xs">
           <span className="text-foreground font-semibold">Voice</span> — shared
           with publishing, edited on the brand fingerprint, not here:{" "}
-          {brandVoice.length > 240 ? `${brandVoice.slice(0, 240)}…` : brandVoice}
+          {brandVoice.length > 240
+            ? `${brandVoice.slice(0, 240)}…`
+            : brandVoice}
         </p>
       )}
 
@@ -92,8 +96,8 @@ export function Playbook({
           />
         </Field>
         <Field
-          label="How we reply — the Wander Test"
-          hint='Etiquette + "could this reply only come from Wander?"'
+          label="How we reply"
+          hint={`Etiquette and judgment specific to ${brandName}.`}
         >
           <Textarea
             value={replyGuidance}

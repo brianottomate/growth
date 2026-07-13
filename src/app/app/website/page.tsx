@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { CoverWall, type CoverItem } from "@/components/cover-wall";
+import { WebsitePortfolioAnalysisPanel } from "@/components/website-portfolio-analysis";
+import { WebsiteLiveAudit } from "@/components/website-live-audit";
+import { readWebsitePortfolioAnalysis } from "@/lib/content-analysis";
 import {
   CATEGORY_LABELS,
   PAGE_TYPE_META,
@@ -10,19 +13,27 @@ import {
   humanizeSlug,
   rollupMeta,
 } from "@/lib/website-pages";
+import { readSocialPreviewMode } from "@/lib/social-preview";
 import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
 import { brandTable, memberTable, webPageTable } from "@/server/db/schema";
 import type { WebPage, WebPageType } from "@/server/db/website-schema";
+import { WebsiteControls } from "./WebsiteControls";
 
 /**
  * Website wall — the marketing-site counterpart to the Blog / Newsletters
- * walls. One row per public wander.com page (synced from sitemap.xml by
- * scripts/import-website.ts), grouped by page type because dynamic pages
- * (locations/properties/articles) measure in the thousands.
+ * walls. One row per public page discovered from the selected owned brand's
+ * sitemap, grouped by page type because dynamic pages can number in the
+ * thousands.
  */
 
-type GroupKey = "brand" | "seo" | "locations" | "property" | "article" | "other";
+type GroupKey =
+  | "brand"
+  | "seo"
+  | "locations"
+  | "property"
+  | "article"
+  | "other";
 
 const GROUPS: { key: GroupKey; label: string; types: WebPageType[] }[] = [
   { key: "brand", label: "Brand", types: ["home", "brand"] },
@@ -58,11 +69,15 @@ const bulkInfo = (arr: WebPage[]) => {
 
 const toCoverItem = (p: WebPage): CoverItem => ({
   id: p.id,
-  href: p.url,
+  href: `/app/website/${p.id}`,
   title: p.title,
   subtitle: p.description ?? p.path,
   date: p.lastmodAt
-    ? p.lastmodAt.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+    ? p.lastmodAt.toLocaleDateString([], {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
     : "—",
   badge: {
     label: PAGE_TYPE_META[p.pageType].label,
@@ -92,7 +107,9 @@ function PathList({ pages, cap }: { pages: WebPage[]; cap?: number }) {
           <span className="text-muted-foreground hidden min-w-0 shrink truncate text-xs sm:block">
             {p.path}
           </span>
-          <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">↗</span>
+          <span className="text-muted-foreground w-4 shrink-0 text-right text-xs">
+            ↗
+          </span>
         </a>
       ))}
       {cap && pages.length > cap && (
@@ -105,10 +122,25 @@ function PathList({ pages, cap }: { pages: WebPage[]; cap?: number }) {
 }
 
 /** Location pages grouped hub → cities → category coverage. */
-function LocationTree({ pages, full }: { pages: WebPage[]; full: boolean }) {
+function LocationTree({
+  pages,
+  full,
+  baseUrl,
+  allHref,
+}: {
+  pages: WebPage[];
+  full: boolean;
+  baseUrl: string;
+  allHref: string;
+}) {
   const hubs = new Map<
     string,
-    { hub?: WebPage; cities: Map<string, WebPage>; categories: Map<string, number>; total: number }
+    {
+      hub?: WebPage;
+      cities: Map<string, WebPage>;
+      categories: Map<string, number>;
+      total: number;
+    }
   >();
   for (const p of pages) {
     if (!p.locationSlug) continue;
@@ -119,9 +151,13 @@ function LocationTree({ pages, full }: { pages: WebPage[]; full: boolean }) {
     }
     h.total++;
     if (p.pageType === "location_hub") h.hub = p;
-    if (p.pageType === "location_city" && p.citySlug) h.cities.set(p.citySlug, p);
+    if (p.pageType === "location_city" && p.citySlug)
+      h.cities.set(p.citySlug, p);
     if (p.pageType === "location_category" && p.categorySlug)
-      h.categories.set(p.categorySlug, (h.categories.get(p.categorySlug) ?? 0) + 1);
+      h.categories.set(
+        p.categorySlug,
+        (h.categories.get(p.categorySlug) ?? 0) + 1,
+      );
   }
   const sorted = [...hubs.entries()].sort((a, b) => b[1].total - a[1].total);
   const shown = full ? sorted : sorted.slice(0, 8);
@@ -133,7 +169,7 @@ function LocationTree({ pages, full }: { pages: WebPage[]; full: boolean }) {
         <div key={slug} className="rounded-xl border p-4">
           <div className="flex items-baseline justify-between gap-2">
             <a
-              href={h.hub?.url ?? `https://www.wander.com/${slug}`}
+              href={h.hub?.url ?? new URL(slug, baseUrl).href}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm font-semibold hover:underline"
@@ -169,14 +205,20 @@ function LocationTree({ pages, full }: { pages: WebPage[]; full: boolean }) {
               Category pages:{" "}
               {[...h.categories.entries()]
                 .sort((a, b) => b[1] - a[1])
-                .map(([cat, n]) => `${CATEGORY_LABELS[cat] ?? humanizeSlug(cat)} ${n}`)
+                .map(
+                  ([cat, n]) =>
+                    `${CATEGORY_LABELS[cat] ?? humanizeSlug(cat)} ${n}`,
+                )
                 .join(" · ")}
             </p>
           )}
         </div>
       ))}
       {!full && sorted.length > shown.length && (
-        <Link href="/app/website?group=locations" className="text-muted-foreground text-xs hover:underline">
+        <Link
+          href={allHref}
+          className="text-muted-foreground text-xs hover:underline"
+        >
           Show all {sorted.length} locations →
         </Link>
       )}
@@ -188,7 +230,7 @@ function LocationTree({ pages, full }: { pages: WebPage[]; full: boolean }) {
  * Location groups rolled up: render the per-hub page counts stored in the
  * rollup metadata (`byLocation`) — the structural view without per-page rows.
  */
-function HubList({ pages }: { pages: WebPage[] }) {
+function HubList({ pages, baseUrl }: { pages: WebPage[]; baseUrl: string }) {
   const totals = new Map<string, number>();
   for (const p of pages) {
     const roll = rollupMeta(p.metadata);
@@ -203,7 +245,7 @@ function HubList({ pages }: { pages: WebPage[] }) {
       {sorted.map(([hub, n]) => (
         <a
           key={hub}
-          href={`https://www.wander.com/${hub}`}
+          href={new URL(hub, baseUrl).href}
           target="_blank"
           rel="noopener noreferrer"
           className="hover:bg-accent/40 -mx-2 flex items-baseline justify-between gap-2 rounded-lg px-2 py-1.5 text-sm"
@@ -223,10 +265,12 @@ function BulkSummary({
   info,
   label,
   note,
+  baseUrl,
 }: {
   info: { count: number; samplePaths: string[] };
   label: string;
   note: string;
+  baseUrl: string;
 }) {
   return (
     <div className="rounded-xl border p-6">
@@ -239,7 +283,7 @@ function BulkSummary({
           {info.samplePaths.map((p) => (
             <a
               key={p}
-              href={`https://www.wander.com${p}`}
+              href={new URL(p, baseUrl).href}
               target="_blank"
               rel="noopener noreferrer"
               className="border-border text-muted-foreground hover:bg-accent rounded-full border px-2 py-0.5 text-[11px]"
@@ -254,14 +298,25 @@ function BulkSummary({
   );
 }
 
-function SectionHeading({ title, count, href }: { title: string; count: number; href?: string }) {
+function SectionHeading({
+  title,
+  count,
+  href,
+}: {
+  title: string;
+  count: number;
+  href?: string;
+}) {
   return (
     <div className="mb-3 flex items-baseline justify-between">
-      <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+      <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
         {title} · {count}
       </h2>
       {href && (
-        <Link href={href} className="text-muted-foreground text-xs hover:underline">
+        <Link
+          href={href}
+          className="text-muted-foreground text-xs hover:underline"
+        >
           View all →
         </Link>
       )}
@@ -272,9 +327,14 @@ function SectionHeading({ title, count, href }: { title: string; count: number; 
 export default async function WebsitePage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string }>;
+  searchParams: Promise<{ group?: string; brand?: string; preview?: string }>;
 }) {
-  const { group: groupParam } = await searchParams;
+  const {
+    group: groupParam,
+    brand: brandParam,
+    preview: previewParam,
+  } = await searchParams;
+  const preview = readSocialPreviewMode(previewParam);
   const group = GROUPS.find((g) => g.key === groupParam) ?? null;
 
   const session = await getSession();
@@ -285,28 +345,43 @@ export default async function WebsitePage({
     with: { organization: true },
   });
   const org = membership?.organization;
-  if (!org) return <div className="text-muted-foreground">No organization found.</div>;
+  if (!org)
+    return <div className="text-muted-foreground">No organization found.</div>;
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
+    orderBy: (brand, { asc }) => asc(brand.createdAt),
   });
-  const brandIds = brands.map((b) => b.id);
+  if (brands.length === 0) {
+    return (
+      <div className="text-muted-foreground">
+        Add an owned brand before mapping a website.
+      </div>
+    );
+  }
+  const selectedBrand = brandParam
+    ? (brands.find((brand) => brand.slug === brandParam) ?? null)
+    : null;
+  const scopedBrandIds = selectedBrand
+    ? [selectedBrand.id]
+    : brands.map((brand) => brand.id);
 
   // Graceful before first provisioning: `web_page` may not exist yet
   // (schema ships in this repo; `bun run db:push` creates it).
   let pages: WebPage[] = [];
   let tableMissing = false;
   try {
-    pages = brandIds.length
-      ? await db.query.webPageTable.findMany({
-          where: and(
-            inArray(webPageTable.brandId, brandIds),
-            eq(webPageTable.isActive, true),
-            isNull(webPageTable.deletedAt),
-          ),
-          orderBy: [desc(webPageTable.lastmodAt)],
-        })
-      : [];
+    pages = await db.query.webPageTable.findMany({
+      where: and(
+        inArray(webPageTable.brandId, scopedBrandIds),
+        eq(webPageTable.isActive, true),
+        isNull(webPageTable.deletedAt),
+      ),
+      orderBy: [desc(webPageTable.lastmodAt)],
+    });
   } catch {
     tableMissing = true;
   }
@@ -317,7 +392,8 @@ export default async function WebsitePage({
     arr.push(p);
     byType.set(p.pageType, arr);
   }
-  const ofGroup = (g: (typeof GROUPS)[number]) => g.types.flatMap((t) => byType.get(t) ?? []);
+  const ofGroup = (g: (typeof GROUPS)[number]) =>
+    g.types.flatMap((t) => byType.get(t) ?? []);
   const lastSynced = pages.reduce<Date | null>(
     (acc, p) => (!acc || p.lastSeenAt > acc ? p.lastSeenAt : acc),
     null,
@@ -339,6 +415,40 @@ export default async function WebsitePage({
     arr.reduce((n, p) => n + (rollupMeta(p.metadata)?.count ?? 1), 0);
   const groupCount = (g: (typeof GROUPS)[number]) => pageCount(ofGroup(g));
   const totalCount = pageCount(pages);
+  const portfolioAnalysis = selectedBrand
+    ? readWebsitePortfolioAnalysis(
+        pages.find((page) => page.pageType === "home")?.metadata ??
+          pages.find((page) => page.path === "/")?.metadata ??
+          pages[0]?.metadata,
+      )
+    : null;
+  const ogToolUrl =
+    selectedBrand?.links?.find(
+      (link) =>
+        link.url &&
+        /(?:og|open graph).*(?:generator|preview)|(?:generator|preview).*(?:og|open graph)/i.test(
+          link.label,
+        ),
+    )?.url ?? null;
+  const baseUrl = selectedBrand?.website
+    ? new URL(
+        /^https?:\/\//i.test(selectedBrand.website)
+          ? selectedBrand.website
+          : `https://${selectedBrand.website}`,
+      ).origin + "/"
+    : pages[0]
+      ? new URL(pages[0].url).origin + "/"
+      : null;
+  const domain = baseUrl
+    ? new URL(baseUrl).hostname.replace(/^www\./, "")
+    : null;
+  const websiteHref = (nextGroup?: GroupKey) => {
+    const params = new URLSearchParams();
+    if (selectedBrand?.slug) params.set("brand", selectedBrand.slug);
+    if (preview !== "original") params.set("preview", preview);
+    if (nextGroup) params.set("group", nextGroup);
+    return `/app/website?${params.toString()}`;
+  };
 
   return (
     <div>
@@ -346,82 +456,137 @@ export default async function WebsitePage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Website</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {totalCount ? `${totalCount.toLocaleString()} pages` : "No pages synced yet"} ·
-            wander.com · via sitemap.xml
+            {totalCount
+              ? `${totalCount.toLocaleString()} pages`
+              : "No pages synced yet"}
+            {selectedBrand
+              ? domain
+                ? ` · ${domain} · via sitemap.xml`
+                : " · no website added"
+              : ` · across ${brands.length} brands`}
             {lastSynced
               ? ` · synced ${lastSynced.toLocaleDateString([], { month: "short", day: "numeric" })}`
               : ""}
           </p>
         </div>
-        <a
-          href="https://www.wander.com/sitemap.xml"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:bg-accent rounded-full border px-3 py-1.5 text-xs font-medium"
-        >
-          sitemap.xml ↗
-        </a>
+        <WebsiteControls
+          brands={brands.flatMap((brand) =>
+            brand.slug
+              ? [
+                  {
+                    id: brand.id,
+                    slug: brand.slug,
+                    name: brand.name,
+                    website: brand.website,
+                  },
+                ]
+              : [],
+          )}
+          selectedBrandSlug={selectedBrand?.slug ?? null}
+        />
       </div>
 
       {/* group facets */}
       <div className="mt-5 flex flex-wrap gap-2 border-b pb-4">
-        <Link href="/app/website" className={chip(!group)}>
+        <Link href={websiteHref()} className={chip(!group)}>
           All · {totalCount.toLocaleString()}
         </Link>
         {GROUPS.map((g) => (
-          <Link key={g.key} href={`/app/website?group=${g.key}`} className={chip(group?.key === g.key)}>
+          <Link
+            key={g.key}
+            href={websiteHref(g.key)}
+            className={chip(group?.key === g.key)}
+          >
             {g.label} · {groupCount(g).toLocaleString()}
           </Link>
         ))}
       </div>
+
+      {selectedBrand && (
+        <WebsiteLiveAudit
+          brandId={selectedBrand.id}
+          brandName={selectedBrand.name}
+          ogToolUrl={ogToolUrl}
+        />
+      )}
+
+      <WebsitePortfolioAnalysisPanel
+        brandId={selectedBrand?.id ?? null}
+        scopeLabel={selectedBrand?.name ?? "all owned brands"}
+        pageCount={pages.length}
+        initialAnalysis={portfolioAnalysis}
+      />
 
       {(tableMissing || pages.length === 0) && (
         <div className="mt-8 rounded-xl border p-6 text-sm">
           <p className="font-medium">No website pages yet.</p>
           <p className="text-muted-foreground mt-2">
             {tableMissing
-              ? "The web_page table isn't provisioned yet — run `bun run db:push`, then sync:"
-              : "Sync the page map from the live sitemap:"}
+              ? "Website storage is not provisioned in this environment yet."
+              : selectedBrand && baseUrl
+                ? "Use Sync sitemap above to map the live site. The workspace will classify the pages and keep this view current."
+                : selectedBrand
+                  ? "Add a website URL to this brand, then return here to sync its sitemap."
+                  : "Choose a brand above, then sync its sitemap. Website remains an all-brand overview by default."}
           </p>
-          <pre className="bg-muted mt-3 rounded-lg p-3 text-xs">
-            bun run scripts/import-website.ts --enrich
-          </pre>
         </div>
       )}
 
       {!group && pages.length > 0 && (
         <>
           <section className="mt-8">
-            <SectionHeading title="Brand pages" count={brandPages.length} href="/app/website?group=brand" />
-            <CoverWall items={brandPages.map(toCoverItem)} />
+            <SectionHeading
+              title="Brand pages"
+              count={brandPages.length}
+              href={websiteHref("brand")}
+            />
+            <CoverWall
+              items={brandPages.map(toCoverItem)}
+              variant="og"
+              preview={preview}
+            />
           </section>
           <section className="mt-10">
-            <SectionHeading title="SEO landing pages" count={seo.count} href="/app/website?group=seo" />
+            <SectionHeading
+              title="SEO landing pages"
+              count={seo.count}
+              href={websiteHref("seo")}
+            />
             {seo.isRollup ? (
               <BulkSummary
                 info={seo}
                 label="SEO landing pages"
                 note="Template group — stored as an aggregate."
+                baseUrl={baseUrl!}
               />
             ) : (
-              <CoverWall items={seoPages.slice(0, 12).map(toCoverItem)} />
+              <CoverWall
+                items={seoPages.slice(0, 12).map(toCoverItem)}
+                variant="og"
+                preview={preview}
+              />
             )}
           </section>
           <section className="mt-10">
             <SectionHeading
               title="Locations"
               count={pageCount(locationPages)}
-              href="/app/website?group=locations"
+              href={websiteHref("locations")}
             />
             {locationsRolled ? (
-              <HubList pages={locationPages} />
+              <HubList pages={locationPages} baseUrl={baseUrl!} />
             ) : (
-              <LocationTree pages={locationPages} full={false} />
+              <LocationTree
+                pages={locationPages}
+                full={false}
+                baseUrl={baseUrl!}
+                allHref={websiteHref("locations")}
+              />
             )}
           </section>
           <section className="mt-10 grid gap-4 sm:grid-cols-2">
             <Link
-              href="/app/website?group=property"
+              href={websiteHref("property")}
               className="hover:border-foreground/30 rounded-xl border p-5 transition-colors"
             >
               <div className="text-2xl font-semibold tabular-nums">
@@ -432,46 +597,71 @@ export default async function WebsitePage({
               </div>
             </Link>
             <Link
-              href="/app/blog"
+              href={
+                selectedBrand?.slug
+                  ? `/app/blog?brand=${selectedBrand.slug}`
+                  : "/app/blog"
+              }
               className="hover:border-foreground/30 rounded-xl border p-5 transition-colors"
             >
               <div className="text-2xl font-semibold tabular-nums">
                 {article.count.toLocaleString()}
               </div>
               <div className="text-muted-foreground mt-1 text-sm">
-                Articles · /article/[slug] → Blog wall
+                Published article pages → Blog wall
               </div>
             </Link>
           </section>
           {otherPages.length > 0 && (
             <section className="mt-10">
-              <SectionHeading title="Legal · Help · Other" count={otherPages.length} />
+              <SectionHeading
+                title="Legal · Help · Other"
+                count={otherPages.length}
+              />
               <PathList pages={otherPages} />
             </section>
           )}
         </>
       )}
 
-      {group?.key === "brand" && <div className="mt-6"><CoverWall items={brandPages.map(toCoverItem)} /></div>}
+      {group?.key === "brand" && (
+        <div className="mt-6">
+          <CoverWall
+            items={brandPages.map(toCoverItem)}
+            variant="og"
+            preview={preview}
+          />
+        </div>
+      )}
       {group?.key === "seo" && (
         <div className="mt-6">
           {seo.isRollup ? (
             <BulkSummary
               info={seo}
               label="SEO landing pages"
-              note="Template group — stored as an aggregate. Raise the threshold (`--rollup-over=N`) to keep per-page rows."
+              note="Template group — stored as an aggregate to keep the site map useful at scale."
+              baseUrl={baseUrl!}
             />
           ) : (
-            <CoverWall items={seoPages.map(toCoverItem)} />
+            <CoverWall
+              items={seoPages.map(toCoverItem)}
+              variant="og"
+              preview={preview}
+            />
           )}
         </div>
       )}
       {group?.key === "locations" && (
         <div className="mt-6">
           {locationsRolled ? (
-            <HubList pages={locationPages} />
+            <HubList pages={locationPages} baseUrl={baseUrl!} />
           ) : (
-            <LocationTree pages={locationPages} full />
+            <LocationTree
+              pages={locationPages}
+              full
+              baseUrl={baseUrl!}
+              allHref={websiteHref("locations")}
+            />
           )}
         </div>
       )}
@@ -481,7 +671,8 @@ export default async function WebsitePage({
             <BulkSummary
               info={property}
               label="property pages"
-              note="Template group — the map tracks the count, not a row per property. Run the importer with `--rollup-over=5000` for per-page rows (e.g. churn analysis)."
+              note="Template group — the map tracks the count without storing thousands of repetitive rows."
+              baseUrl={baseUrl!}
             />
           ) : (
             <PathList pages={propertyPages} cap={120} />
@@ -492,7 +683,14 @@ export default async function WebsitePage({
         <div className="mt-6">
           <p className="text-muted-foreground mb-4 text-sm">
             Articles have their own wall with topics and covers —{" "}
-            <Link href="/app/blog" className="underline">
+            <Link
+              href={
+                selectedBrand?.slug
+                  ? `/app/blog?brand=${selectedBrand.slug}`
+                  : "/app/blog"
+              }
+              className="underline"
+            >
               open the Blog wall
             </Link>
             .
@@ -502,6 +700,7 @@ export default async function WebsitePage({
               info={article}
               label="articles"
               note="Stored as an aggregate here; the Blog wall is the per-article surface."
+              baseUrl={baseUrl!}
             />
           ) : (
             <PathList pages={articlePages} cap={60} />

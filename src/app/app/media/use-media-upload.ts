@@ -9,7 +9,7 @@ import type { MediaItem } from "@/server/db/schema";
 
 // Mirrors the media library's accepted types (src/app/app/media/MediaLibrary.tsx).
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
-const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB (R2)
+const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
@@ -21,8 +21,8 @@ function readImageDimensions(file: File): Promise<{ width: number; height: numbe
 }
 
 /**
- * Reusable image-upload hook (the media library's R2 flow, extracted). Uploads
- * each image to R2 (createUploadUrl → PUT → finalizeUpload) and returns
+ * Reusable image-upload hook backed by the media library's presigned direct
+ * R2 upload flow. It returns
  * `MediaItem`s ready to attach to a `platform_post` (with `assetId` linking back
  * to the library). Video stays on the Drive-link path for now — the team works
  * in Drive and `assetLinks` already carries those.
@@ -48,20 +48,23 @@ export function useMediaUpload(brandId: string) {
         setUploading((c) => c + 1);
         try {
           const dims = await readImageDimensions(file);
-          const { mediaId, uploadUrl, publicUrl } = await createUploadUrl.mutateAsync({
-            brandId,
-            filename: file.name,
-            mimeType: file.type,
-            size: file.size,
-          });
+          const { mediaId, uploadUrl, publicUrl, pathname } =
+            await createUploadUrl.mutateAsync({
+              brandId,
+              filename: file.name,
+              mimeType: file.type,
+              size: file.size,
+            });
           const put = await fetch(uploadUrl, {
             method: "PUT",
-            body: file,
             headers: { "Content-Type": file.type },
+            body: file,
           });
           if (!put.ok) throw new Error(`Upload failed (${put.status})`);
           await finalizeUpload.mutateAsync({
             mediaId,
+            url: publicUrl,
+            pathname,
             width: dims.width || undefined,
             height: dims.height || undefined,
           });
