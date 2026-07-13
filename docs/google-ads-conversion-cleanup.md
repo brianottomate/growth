@@ -9,6 +9,11 @@ at the level that owns them.
 
 ## 1. Remove — self-labeled dead (7 unique actions)
 
+**2026-07-13: all 7 renamed with a `[DELETE]` prefix via computer use**
+(verified through the Zernio destination list) — search "[DELETE]" in the
+Conversions UI and remove them whenever convenient. Removal itself stays
+manual (not cleanly reversible).
+
 In **Demand (325-444-9027)** → Goals → Conversions:
 
 - [ ] `Checkout Started_Segment_ARCHIVED` (#978141561)
