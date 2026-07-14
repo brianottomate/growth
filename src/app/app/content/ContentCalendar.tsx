@@ -22,8 +22,18 @@ type Row = RouterOutputs["content"]["schedule"][number];
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const STATUS_DOT: Record<string, string> = {
@@ -87,8 +97,10 @@ export function ContentCalendar({
   const weeks = useMemo(() => monthWeeks(year, month), [year, month]);
   const todayKey = dayKey(now);
 
-  const prev = () => (month === 0 ? (setYear(year - 1), setMonth(11)) : setMonth(month - 1));
-  const next = () => (month === 11 ? (setYear(year + 1), setMonth(0)) : setMonth(month + 1));
+  const prev = () =>
+    month === 0 ? (setYear(year - 1), setMonth(11)) : setMonth(month - 1);
+  const next = () =>
+    month === 11 ? (setYear(year + 1), setMonth(0)) : setMonth(month + 1);
 
   const onDragEnd = (e: DragEndEvent) => {
     suppressClick.current = true;
@@ -182,7 +194,7 @@ function DayCell({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex min-h-28 flex-col gap-1 border-b border-r p-1.5 [&:nth-child(7n)]:border-r-0",
+        "flex min-h-28 flex-col gap-1 border-r border-b p-1.5 [&:nth-child(7n)]:border-r-0",
         !inMonth && "bg-muted/20 opacity-50",
         isOver && "bg-accent/40",
       )}
@@ -190,14 +202,21 @@ function DayCell({
       <span
         className={cn(
           "flex size-5 items-center justify-center rounded-full text-xs tabular-nums",
-          isToday ? "bg-foreground text-background font-semibold" : "text-muted-foreground",
+          isToday
+            ? "bg-foreground text-background font-semibold"
+            : "text-muted-foreground",
         )}
       >
         {date.getDate()}
       </span>
       <div className="flex flex-col gap-1">
         {spots.map((s) => (
-          <CalChip key={s.id} spot={s} onOpen={onOpen} suppressClick={suppressClick} />
+          <CalChip
+            key={s.id}
+            spot={s}
+            onOpen={onOpen}
+            suppressClick={suppressClick}
+          />
         ))}
       </div>
     </div>
@@ -213,7 +232,9 @@ function CalChip({
   onOpen: (contentPostId: string) => void;
   suppressClick: RefObject<boolean>;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: spot.id });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: spot.id,
+  });
   const pillar = spot.pillar ? PILLAR_BY_SLUG[spot.pillar] : null;
   return (
     <div
@@ -235,7 +256,10 @@ function CalChip({
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
       title={spot.title ?? undefined}
     >
-      <ChannelLogo platform={spot.platform} className="size-3.5 shrink-0" />
+      <ChannelLogo
+        platform={spot.format === "newsletter.blast" ? "blast" : spot.platform}
+        className="size-3.5 shrink-0"
+      />
       {spot.mediaUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -245,9 +269,14 @@ function CalChip({
           onError={(e) => (e.currentTarget.style.display = "none")}
         />
       )}
-      <span className="min-w-0 flex-1 truncate leading-tight">{spot.title ?? "Untitled"}</span>
+      <span className="min-w-0 flex-1 truncate leading-tight">
+        {spot.title ?? "Untitled"}
+      </span>
       <span
-        className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[spot.status] ?? "bg-slate-400")}
+        className={cn(
+          "size-1.5 shrink-0 rounded-full",
+          STATUS_DOT[spot.status] ?? "bg-slate-400",
+        )}
       />
     </div>
   );

@@ -24,12 +24,15 @@ import {
   tavilySearch,
   parallelSearch,
   perplexitySearch,
+  exaSearch,
   isTavilyConfigured,
   isParallelConfigured,
   isPerplexityConfigured,
+  isExaConfigured,
   type TavilyResult,
   type ParallelResult,
   type PerplexityResult,
+  type ExaResult,
 } from "@/server/clients/search-providers.client";
 import { isClaudeConfigured } from "@/server/clients/claude.client";
 import { canVerify, verifyProfile } from "@/server/clients/brightdata.client";
@@ -77,6 +80,12 @@ function formatPerplexity(r: PerplexityResult): string {
     ? `\ncitations:\n${r.citations.map((c) => `- ${c}`).join("\n")}`
     : "";
   return clip(r.content, 4_000) + cites;
+}
+
+function formatExa(r: ExaResult): string {
+  return r.results
+    .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.text, 500)}`)
+    .join("\n");
 }
 
 function formatFirecrawlSearch(
@@ -144,10 +153,11 @@ const SCHEMA = z.object({
 export async function discoverSocialHandles(input: {
   name: string;
   website?: string | null;
+  type?: "company" | "personal";
 }): Promise<SocialSuggestion[]> {
   if (!isClaudeConfigured)
     throw new Error("Claude not configured — discovery needs it.");
-  const { name, website } = input;
+  const { name, website, type } = input;
   const blocks: string[] = [];
 
   // Stage 1: website scrape.
@@ -162,7 +172,7 @@ export async function discoverSocialHandles(input: {
   // Stage 2: search providers (fan out, each isolated). Firecrawl search is
   // the built-in baseline because the same key already powers website reads;
   // the specialist providers remain optional corroboration.
-  const query = `Official social media profile URLs for "${name}"${website ? ` (${website})` : ""}: LinkedIn, Instagram, X/Twitter, Facebook, TikTok, YouTube, Threads. Give full profile URLs.`;
+  const query = `Official social media profile URLs for ${type === "personal" ? "the personal brand/person" : "the brand"} "${name}"${website ? ` (${website})` : ""}: LinkedIn, Instagram, X/Twitter, Facebook, TikTok, YouTube, Threads. Give full profile URLs.`;
   const domain = website
     ? (() => {
         try {
@@ -172,12 +182,13 @@ export async function discoverSocialHandles(input: {
         }
       })()
     : "";
-  const [firecrawlResults, tav, par, perp] = await Promise.all([
+  const [firecrawlResults, tav, par, perp, exa] = await Promise.all([
     envelope(isFirecrawlConfigured, async () => {
       const siteQueries = [
         "instagram.com",
         "x.com",
         "linkedin.com/company",
+        "linkedin.com/in",
         "facebook.com",
         "tiktok.com/@",
         "youtube.com",
@@ -217,6 +228,7 @@ export async function discoverSocialHandles(input: {
       parallelSearch(query, [`${name} official social profiles`]),
     ),
     envelope(isPerplexityConfigured, () => perplexitySearch(query)),
+    envelope(isExaConfigured, () => exaSearch(query)),
   ]);
   if (firecrawlResults?.length) {
     blocks.push(
@@ -226,6 +238,7 @@ export async function discoverSocialHandles(input: {
   if (tav) blocks.push(sourceBlock("tavily", formatTavily(tav)));
   if (par) blocks.push(sourceBlock("parallel", formatParallel(par)));
   if (perp) blocks.push(sourceBlock("perplexity", formatPerplexity(perp)));
+  if (exa) blocks.push(sourceBlock("exa", formatExa(exa)));
 
   if (!blocks.length) {
     throw new Error(
@@ -244,7 +257,10 @@ export async function discoverSocialHandles(input: {
       `(${DISCOVER_PLATFORMS.join(", ")}).\n` +
       `Rules:\n` +
       `- Only return a handle/URL that ACTUALLY appears in the evidence below — never guess or invent.\n` +
-      `- Drop fan pages, regional sub-accounts, employee profiles, and platform chrome (share/intent/etc).\n` +
+      `- Drop fan pages, regional sub-accounts, unrelated employee profiles, and platform chrome (share/intent/etc).\n` +
+      (type === "personal"
+        ? `- This IS a personal brand: keep the person's own LinkedIn /in/ profile and creator accounts when supported by the evidence.\n`
+        : "") +
       `- Omit a platform with no credible candidate.\n` +
       `- confidence = how sure it's the brand's primary official account.\n` +
       `- sources = which labelled sources the handle appears in.\n\n` +
@@ -324,6 +340,7 @@ export async function discoverAndSaveSuggestions(
   const discoveredSuggestions = await discoverSocialHandles({
     name: brand.name,
     website: brand.website,
+    type: brand.type,
   });
   const existingChannels = await db.query.channelTable.findMany({
     where: eq(channelTable.brandId, brandId),
@@ -472,7 +489,10 @@ export async function discoverAmplifierHandles(
   });
   if (!amp) throw new Error(`Amplifier ${amplifierId} not found`);
 
-  const suggestions = await discoverSocialHandles({ name: amp.name });
+  const suggestions = await discoverSocialHandles({
+    name: amp.name,
+    type: amp.type === "creator" ? "personal" : undefined,
+  });
   const min = opts?.minConfidence ?? 0.5;
 
   // Merge into existing handles (dedup by platform:handle, keep what's there).

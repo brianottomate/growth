@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { invitationTable, memberTable } from "@/server/db/schema";
@@ -19,6 +19,7 @@ export default async function PeoplePage() {
   if (!org) {
     return <div className="text-muted-foreground">No organization found.</div>;
   }
+  const canManage = membership.role === "owner" || membership.role === "admin";
 
   const members = await db.query.memberTable.findMany({
     where: eq(memberTable.organizationId, org.id),
@@ -26,12 +27,18 @@ export default async function PeoplePage() {
     orderBy: [desc(memberTable.createdAt)],
   });
 
-  const pending = await db.query.invitationTable.findMany({
-    where: and(
-      eq(invitationTable.organizationId, org.id),
-      eq(invitationTable.status, "pending"),
-    ),
-  });
+  const pending = canManage
+    ? await db.query.invitationTable.findMany({
+        where: and(
+          eq(invitationTable.organizationId, org.id),
+          eq(invitationTable.status, "pending"),
+          or(
+            isNull(invitationTable.expiresAt),
+            gt(invitationTable.expiresAt, new Date()),
+          ),
+        ),
+      })
+    : [];
 
   return (
     <div className="space-y-6">
@@ -39,14 +46,17 @@ export default async function PeoplePage() {
         <div>
           <h1 className="text-xl font-semibold">People</h1>
           <p className="text-muted-foreground text-sm">
-            {members.length} member{members.length === 1 ? "" : "s"} in {org.name}
+            {members.length} member{members.length === 1 ? "" : "s"} in{" "}
+            {org.name}
             {pending.length > 0 && ` · ${pending.length} pending`}
           </p>
         </div>
-        <AddPersonDialog organizationId={org.id} />
+        {canManage && <AddPersonDialog organizationId={org.id} />}
       </div>
 
       <PeopleManager
+        organizationId={org.id}
+        canManage={canManage}
         currentUserId={session.user.id}
         members={members.map((m) => ({
           id: m.id,

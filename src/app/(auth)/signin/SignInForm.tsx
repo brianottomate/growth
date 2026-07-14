@@ -23,6 +23,15 @@ export function SignInForm() {
   const [password, setPassword] = useState("");
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isOAuthRequest =
+    searchParams.has("client_id") && searchParams.has("redirect_uri");
+  const signUpHref = isOAuthRequest
+    ? `/signup?${searchParams.toString()}`
+    : searchParams.get("inviteId")
+      ? `/signup?inviteId=${searchParams.get("inviteId")}`
+      : searchParams.get("orgInviteId")
+        ? `/signup?orgInviteId=${searchParams.get("orgInviteId")}`
+        : "/signup";
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,12 +70,14 @@ export function SignInForm() {
             <div className="flex flex-col gap-6">
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-bold">
-                  {searchParams.get("inviteId") || searchParams.get("orgInviteId")
+                  {searchParams.get("inviteId") ||
+                  searchParams.get("orgInviteId")
                     ? "Sign in to accept invite"
                     : "Welcome back"}
                 </h1>
                 <p className="text-muted-foreground text-balance">
-                  {searchParams.get("inviteId") || searchParams.get("orgInviteId")
+                  {searchParams.get("inviteId") ||
+                  searchParams.get("orgInviteId")
                     ? "Sign in to your account to accept the invitation"
                     : "Sign in to your account"}
                 </p>
@@ -126,13 +137,7 @@ export function SignInForm() {
               <div className="text-center text-sm">
                 Don&apos;t have an account?{" "}
                 <Link
-                  href={
-                    searchParams.get("inviteId")
-                      ? `/signup?inviteId=${searchParams.get("inviteId")}`
-                      : searchParams.get("orgInviteId")
-                        ? `/signup?orgInviteId=${searchParams.get("orgInviteId")}`
-                        : "/signup"
-                  }
+                  href={signUpHref}
                   className="underline underline-offset-4"
                 >
                   Sign up

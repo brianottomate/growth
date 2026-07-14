@@ -1,9 +1,16 @@
+import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin, username, organization } from "better-auth/plugins";
+import {
+  admin,
+  bearer,
+  jwt,
+  username,
+  organization,
+} from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { env } from "@/env";
 import { db } from "@/server/db";
@@ -14,6 +21,12 @@ import {
   trackServerEvent,
   identifyServerUser,
 } from "@/server/services/analytics.service";
+import {
+  GROWTH_AUTH_ISSUER,
+  GROWTH_MCP_RESOURCE,
+  GROWTH_MCP_SCOPE,
+  GROWTH_OAUTH_SCOPES,
+} from "@/server/mcp/config";
 
 // External collaborators allowed past the @wander.com sign-up gate. Keep this
 // short and intentional — each entry is a deliberate exception. Lowercase only
@@ -22,12 +35,47 @@ const ALLOWED_EXTERNAL_EMAILS = new Set<string>([
   "hashimwarren@gmail.com", // Hashim Warren
 ]);
 
+function authHost(value: string | undefined) {
+  if (!value) return undefined;
+
+  try {
+    return new URL(value.includes("://") ? value : `https://${value}`).host;
+  } catch {
+    return undefined;
+  }
+}
+
+const authAllowedHosts = Array.from(
+  new Set(
+    [
+      "localhost:3000",
+      process.env.NODE_ENV === "development" ? "localhost:*" : undefined,
+      authHost(env.NEXT_PUBLIC_BASE_URL),
+      authHost(process.env.VERCEL_URL),
+      authHost(process.env.VERCEL_BRANCH_URL),
+      authHost(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+    ].filter((host): host is string => Boolean(host)),
+  ),
+);
+
+async function hasOrganizationAccess(userId: string, organizationId: string) {
+  return db.query.memberTable.findFirst({
+    where: and(
+      eq(schema.memberTable.userId, userId),
+      eq(schema.memberTable.organizationId, organizationId),
+    ),
+    columns: { id: true },
+  });
+}
+
 export const auth = betterAuth({
-  // Base URL for auth links (verification emails, password reset, etc.)
-  // Falls back to VERCEL_URL in preview/production, or localhost in development
-  baseURL:
-    env.NEXT_PUBLIC_BASE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined),
+  // Resolve auth URLs from approved request hosts so canonical, preview, and
+  // local sessions work without trusting arbitrary Host headers.
+  baseURL: {
+    allowedHosts: authAllowedHosts,
+    protocol: "auto",
+    fallback: env.NEXT_PUBLIC_BASE_URL,
+  },
   // Enable experimental joins for 2-3x performance improvement on session lookups
   experimental: {
     joins: true,
@@ -47,6 +95,11 @@ export const auth = betterAuth({
       invitation: schema.invitationTable,
       team: schema.teamTable,
       teamMember: schema.teamMemberTable,
+      jwks: schema.jwksTable,
+      oauthClient: schema.oauthClientTable,
+      oauthRefreshToken: schema.oauthRefreshTokenTable,
+      oauthAccessToken: schema.oauthAccessTokenTable,
+      oauthConsent: schema.oauthConsentTable,
     },
   }),
   secret: env.BETTER_AUTH_SECRET,
@@ -139,7 +192,10 @@ export const auth = betterAuth({
         // creation path (email/password + Google OAuth).
         before: async (user) => {
           const email = user.email?.toLowerCase() ?? "";
-          if (!email.endsWith("@wander.com") && !ALLOWED_EXTERNAL_EMAILS.has(email)) {
+          if (
+            !email.endsWith("@wander.com") &&
+            !ALLOWED_EXTERNAL_EMAILS.has(email)
+          ) {
             throw new APIError("BAD_REQUEST", {
               message:
                 "Sign-ups are restricted to @wander.com email addresses.",
@@ -173,9 +229,7 @@ export const auth = betterAuth({
                 organizationId: wanderOrg.id,
                 role: "member",
               });
-              console.log(
-                `[Auth] Added ${user.email} to Wander org as member`,
-              );
+              console.log(`[Auth] Added ${user.email} to Wander org as member`);
             } else {
               console.warn("[Auth] Wander org not found; skipped auto-join");
             }
@@ -254,6 +308,9 @@ export const auth = betterAuth({
     "http://localhost:3000",
     "https://kristianeboe-65.beta.localcan.dev",
     "https://growth-red.vercel.app",
+    "https://chatgpt.com",
+    "https://claude.ai",
+    "https://*.claude.ai",
     // Add your production domains and ngrok/localcan.dev tunnels here when deploying
     // Example: "https://yourapp.com", "https://yourapp-staging.localcan.dev"
     // Dev only: port 3000 is often taken by another project, so trust every
@@ -277,6 +334,9 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    // Preserve bearer-session support for the app's server API while MCP
+    // clients use OAuth access tokens below.
+    bearer(),
     username(),
     admin({
       adminUserIds: [], // Add admin user IDs here when needed
@@ -323,6 +383,51 @@ export const auth = betterAuth({
           inviteUrl,
           role: data.role,
         });
+      },
+    }),
+    jwt({
+      jwt: { issuer: GROWTH_AUTH_ISSUER },
+    }),
+    oauthProvider({
+      loginPage: "/signin",
+      consentPage: "/consent",
+      scopes: [...GROWTH_OAUTH_SCOPES],
+      validAudiences: [GROWTH_MCP_RESOURCE],
+      grantTypes: ["authorization_code", "refresh_token"],
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      clientRegistrationDefaultScopes: [...GROWTH_OAUTH_SCOPES],
+      clientRegistrationAllowedScopes: [...GROWTH_OAUTH_SCOPES],
+      silenceWarnings: { oauthAuthServerConfig: true },
+      postLogin: {
+        page: "/oauth/workspace",
+        shouldRedirect: ({ scopes }) => scopes.includes(GROWTH_MCP_SCOPE),
+        consentReferenceId: async ({ user, session, scopes }) => {
+          if (!scopes.includes(GROWTH_MCP_SCOPE)) return undefined;
+          const organizationId = session.activeOrganizationId;
+          if (typeof organizationId !== "string") {
+            throw new Error("Choose a Wander Growth organization to continue");
+          }
+          const membership = await hasOrganizationAccess(
+            user.id,
+            organizationId,
+          );
+          if (!membership) {
+            throw new Error("You no longer have access to that organization");
+          }
+          return organizationId;
+        },
+      },
+      customAccessTokenClaims: async ({ user, referenceId, scopes }) => {
+        if (!scopes.includes(GROWTH_MCP_SCOPE)) return {};
+        if (!user?.id || !referenceId) {
+          throw new Error("The OAuth grant is not attached to an organization");
+        }
+        const membership = await hasOrganizationAccess(user.id, referenceId);
+        if (!membership) {
+          throw new Error("You no longer have access to that organization");
+        }
+        return { org_id: referenceId };
       },
     }),
     // Next.js cookie helper - MUST be last plugin in array

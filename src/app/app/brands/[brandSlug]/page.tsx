@@ -12,6 +12,7 @@ import { getSession } from "@/server/better-auth/server";
 import { getBrandStrategy } from "@/server/services/cadence.service";
 import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
 import { PILLARS } from "@/lib/pillars";
+import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
 
 import { BrandStrategyClient } from "./BrandStrategyClient";
 import { BrandSurfaceMap } from "./BrandSurfaceMap";
@@ -90,6 +91,11 @@ export default async function BrandPage({
             </span>
           </h1>
           <div className="flex items-center gap-3 text-sm">
+            <ContentStructureAssistantButton
+              brandId={brand.id}
+              brandName={brand.name}
+              source="brand"
+            />
             <Link
               href={`/app/brands/${brand.slug}/ads`}
               className="text-muted-foreground hover:underline"
@@ -105,8 +111,8 @@ export default async function BrandPage({
           </div>
         </div>
         <p className="text-muted-foreground text-sm">
-          A shared view of what the workspace knows, how it is structured, and what
-          needs human attention. Activity is observed over the last{" "}
+          A shared view of what the workspace knows, how it is structured, and
+          what needs human attention. Activity is observed over the last{" "}
           {strategy.windowDays} days
           {strategy.peerBrandCount > 0
             ? ` · benchmarked against ${strategy.peerBrandCount} tracked ${

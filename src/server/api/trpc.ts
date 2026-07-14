@@ -9,10 +9,11 @@
 
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 
 import { auth } from "@/server/better-auth";
 import { db } from "@/server/db";
+import { loadOrganizationWithAccess } from "@/server/services/security.service";
 
 /**
  * 1. CONTEXT
@@ -130,6 +131,35 @@ export const protectedProcedure = t.procedure
       ctx: {
         // infers the `session` as non-nullable
         session: { ...ctx.session, user: ctx.session.user },
+      },
+    });
+  });
+
+/**
+ * Organization-scoped procedure. Requires an organizationId input, verifies
+ * the caller's membership, and exposes one shared permission calculation to
+ * every member/invitation handler.
+ */
+export const organizationProcedure = t.procedure
+  .use(timingMiddleware)
+  .input(z.object({ organizationId: z.string() }))
+  .use(async ({ input, ctx, next }) => {
+    if (!ctx.session?.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const { organization, membership, permissions } =
+      await loadOrganizationWithAccess(
+        input.organizationId,
+        ctx.session.user.id,
+      );
+
+    return next({
+      ctx: {
+        session: { ...ctx.session, user: ctx.session.user },
+        organization,
+        membership,
+        orgPermissions: permissions,
       },
     });
   });

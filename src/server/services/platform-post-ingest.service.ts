@@ -10,6 +10,7 @@ import {
   type MediaItem,
   type PlatformPostInsert,
 } from "@/server/db/schema";
+import { reconcileAmplificationTargetsForPosts } from "@/server/services/amplification.service";
 
 type Json = Record<string, unknown>;
 
@@ -113,6 +114,7 @@ export async function ingestPlatformPosts(input: {
   let rehosted = 0;
   const fresh: PlatformPostInsert[] = [];
   const insertedIds: string[] = [];
+  const touchedIds: string[] = [];
 
   for (const row of rows) {
     const key = keyOf(row)!;
@@ -130,7 +132,6 @@ export async function ingestPlatformPosts(input: {
 
     if (!prior) {
       fresh.push(row);
-      if (row.id) insertedIds.push(row.id);
       inserted++;
       continue;
     }
@@ -178,12 +179,24 @@ export async function ingestPlatformPosts(input: {
         },
       })
       .where(eq(platformPostTable.id, prior.id));
+    touchedIds.push(prior.id);
     updated++;
   }
 
   for (let index = 0; index < fresh.length; index += 200) {
-    await db.insert(platformPostTable).values(fresh.slice(index, index + 200));
+    const created = await db
+      .insert(platformPostTable)
+      .values(fresh.slice(index, index + 200))
+      .returning({ id: platformPostTable.id });
+    insertedIds.push(...created.map((row) => row.id));
+    touchedIds.push(...created.map((row) => row.id));
   }
+
+  // Reconciliation must not make a successful content ingest fail. The target
+  // can be picked up on a later refresh if the best-effort pass is interrupted.
+  await reconcileAmplificationTargetsForPosts(touchedIds).catch((error) =>
+    console.error("Amplification target reconciliation failed", error),
+  );
 
   return {
     candidates: rows.length,

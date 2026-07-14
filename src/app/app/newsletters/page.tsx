@@ -28,6 +28,7 @@ import {
   CompetitorNewsletters,
   type CompetitorNewsletterRow,
 } from "./CompetitorNewsletters";
+import { NewsletterChatStart } from "./NewsletterChatStart";
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
@@ -93,6 +94,52 @@ export default async function NewslettersPage({
         orderBy: [desc(platformPostTable.publishedAt)],
       })
     : [];
+
+  const ownedEmails = brandIds.length
+    ? await db.query.platformPostTable.findMany({
+        where: and(
+          inArray(platformPostTable.brandId, brandIds),
+          eq(platformPostTable.source, "owned"),
+          eq(platformPostTable.platform, "newsletter"),
+          inArray(platformPostTable.format, [
+            "newsletter.broadcast",
+            "newsletter.blast",
+          ]),
+        ),
+        with: { contentPost: true },
+        orderBy: [
+          desc(platformPostTable.scheduledAt),
+          desc(platformPostTable.updatedAt),
+        ],
+      })
+    : [];
+  const emailBuckets = [
+    {
+      label: "Slots",
+      description: "Seeded premises waiting for individual drafting",
+      items: ownedEmails.filter((email) => email.status === "slot"),
+    },
+    {
+      label: "Drafts",
+      description: "Authored issues without a content-calendar date",
+      items: ownedEmails.filter(
+        (email) =>
+          email.status !== "slot" &&
+          email.status !== "published" &&
+          !email.scheduledAt,
+      ),
+    },
+    {
+      label: "Planned",
+      description: "Attached to the Wander Growth content calendar",
+      items: ownedEmails.filter(
+        (email) =>
+          email.status !== "slot" &&
+          email.status !== "published" &&
+          Boolean(email.scheduledAt),
+      ),
+    },
+  ].filter((bucket) => bucket.items.length > 0);
 
   // ---- Competitor newsletters (forwarded via inspo+<brandId>@) ----
   // The reference brands our owned brands track, their newsletter-capture
@@ -254,18 +301,82 @@ export default async function NewslettersPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Newsletters</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {tagged.length} issues · {fmt(totalReach)} reached ·{" "}
+            {ownedEmails.filter((email) => email.status !== "published").length}{" "}
+            in editorial production · {tagged.length} sent issues ·{" "}
+            {fmt(totalReach)} reached ·{" "}
             {avgOpen != null ? `${Math.round(avgOpen * 100)}%` : "—"} avg open ·
-            via Customer.io
+            delivery history
             {selectedBrand ? ` · ${selectedBrand.name}` : ""}
           </p>
         </div>
-        <BrandFilterSelect
-          brands={brands.flatMap((brand) =>
-            brand.slug ? [{ slug: brand.slug, name: brand.name }] : [],
-          )}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <NewsletterChatStart
+            brandId={selectedBrand?.id}
+            brandName={selectedBrand?.name}
+          />
+          <BrandFilterSelect
+            brands={brands.flatMap((brand) =>
+              brand.slug ? [{ slug: brand.slug, name: brand.name }] : [],
+            )}
+          />
+        </div>
       </div>
+
+      {emailBuckets.length > 0 && (
+        <section className="mt-6 rounded-2xl border p-4">
+          <div>
+            <h2 className="font-semibold">Editorial pipeline</h2>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Broadcasts and blasts share the same authoring workspace. Only
+              recurring broadcasts count toward newsletter cadence.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            {emailBuckets.map((bucket) => (
+              <div key={bucket.label}>
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-semibold tracking-wide uppercase">
+                      {bucket.label} · {bucket.items.length}
+                    </h3>
+                    <p className="text-muted-foreground mt-0.5 text-[11px]">
+                      {bucket.description}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {bucket.items.map((email) => (
+                    <Link
+                      key={email.id}
+                      href={`/app/newsletters/${email.id}`}
+                      className="hover:bg-accent/40 block rounded-lg border p-3 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-sm font-medium">
+                          {email.contentPost?.title ||
+                            email.text ||
+                            "Untitled email"}
+                        </span>
+                        <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 py-0.5 text-[10px]">
+                          {email.format === "newsletter.blast"
+                            ? "Blast"
+                            : "Issue"}
+                        </span>
+                      </div>
+                      <div className="text-muted-foreground mt-1 text-[11px]">
+                        {email.scheduledAt
+                          ? email.scheduledAt.toLocaleString()
+                          : "No calendar date"}
+                        {email.contentPost?.seriesId ? " · Series" : ""}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Kinds overview */}
       <div className="mt-5 flex flex-wrap gap-2.5">

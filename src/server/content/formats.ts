@@ -76,6 +76,9 @@ export type PlatformFormat = {
   surface?: "feed" | "reels" | "stories" | "explore" | "profile";
   ephemeral?: boolean;
   sequence?: boolean; // thread-like → expands into ordered child rows
+  // False for initiative-driven one-offs that share a publishing surface but
+  // must not satisfy its recurring cadence (for example an email blast).
+  countsTowardCadence?: boolean;
   media: {
     kinds: MediaKind[];
     min?: number;
@@ -89,49 +92,264 @@ export type PlatformFormat = {
 // Constraints are best-effort v1 — refine in place; the registry is the home.
 export const PLATFORM_FORMATS: PlatformFormat[] = [
   // Instagram
-  { id: "instagram.image", platform: "instagram", archetype: "image", label: "Feed Image", surface: "feed", media: { kinds: ["image"], min: 1, max: 1, aspectRatios: ["1:1", "4:5"] } },
-  { id: "instagram.carousel", platform: "instagram", archetype: "carousel", label: "Carousel", surface: "feed", media: { kinds: ["image", "video"], min: 2, max: 10, aspectRatios: ["1:1", "4:5"] } },
-  { id: "instagram.reel", platform: "instagram", archetype: "video_short", label: "Reel", surface: "reels", media: { kinds: ["video"], min: 1, max: 1, aspectRatios: ["9:16"], maxDurationSec: 90 } },
-  { id: "instagram.story", platform: "instagram", archetype: "story", label: "Story", surface: "stories", ephemeral: true, media: { kinds: ["image", "video"], aspectRatios: ["9:16"], maxDurationSec: 60 } },
+  {
+    id: "instagram.image",
+    platform: "instagram",
+    archetype: "image",
+    label: "Feed Image",
+    surface: "feed",
+    media: { kinds: ["image"], min: 1, max: 1, aspectRatios: ["1:1", "4:5"] },
+  },
+  {
+    id: "instagram.carousel",
+    platform: "instagram",
+    archetype: "carousel",
+    label: "Carousel",
+    surface: "feed",
+    media: {
+      kinds: ["image", "video"],
+      min: 2,
+      max: 10,
+      aspectRatios: ["1:1", "4:5"],
+    },
+  },
+  {
+    id: "instagram.reel",
+    platform: "instagram",
+    archetype: "video_short",
+    label: "Reel",
+    surface: "reels",
+    media: {
+      kinds: ["video"],
+      min: 1,
+      max: 1,
+      aspectRatios: ["9:16"],
+      maxDurationSec: 90,
+    },
+  },
+  {
+    id: "instagram.story",
+    platform: "instagram",
+    archetype: "story",
+    label: "Story",
+    surface: "stories",
+    ephemeral: true,
+    media: {
+      kinds: ["image", "video"],
+      aspectRatios: ["9:16"],
+      maxDurationSec: 60,
+    },
+  },
 
   // TikTok — photo mode is a carousel mechanic; template carries the intent.
-  { id: "tiktok.video", platform: "tiktok", archetype: "video_short", label: "Video", media: { kinds: ["video"], min: 1, max: 1, aspectRatios: ["9:16"], maxDurationSec: 600 } },
-  { id: "tiktok.photo", platform: "tiktok", archetype: "carousel", label: "Photo / Slideshow", media: { kinds: ["image"], min: 1, max: 35, aspectRatios: ["9:16"] } },
+  {
+    id: "tiktok.video",
+    platform: "tiktok",
+    archetype: "video_short",
+    label: "Video",
+    media: {
+      kinds: ["video"],
+      min: 1,
+      max: 1,
+      aspectRatios: ["9:16"],
+      maxDurationSec: 600,
+    },
+  },
+  {
+    id: "tiktok.photo",
+    platform: "tiktok",
+    archetype: "carousel",
+    label: "Photo / Slideshow",
+    media: { kinds: ["image"], min: 1, max: 35, aspectRatios: ["9:16"] },
+  },
 
   // X
-  { id: "x.tweet", platform: "x", archetype: "text", label: "Tweet", media: { kinds: ["image", "video"], min: 0, max: 4 }, text: { max: 280 } },
-  { id: "x.thread", platform: "x", archetype: "thread", label: "Thread", sequence: true, media: { kinds: ["image", "video"] }, text: { max: 280 } },
-  { id: "x.video", platform: "x", archetype: "video_short", label: "Video Post", media: { kinds: ["video"], min: 1, max: 1 }, text: { max: 280 } },
+  {
+    id: "x.tweet",
+    platform: "x",
+    archetype: "text",
+    label: "Tweet",
+    media: { kinds: ["image", "video"], min: 0, max: 4 },
+    text: { max: 280 },
+  },
+  {
+    id: "x.thread",
+    platform: "x",
+    archetype: "thread",
+    label: "Thread",
+    sequence: true,
+    media: { kinds: ["image", "video"] },
+    text: { max: 280 },
+  },
+  {
+    id: "x.video",
+    platform: "x",
+    archetype: "video_short",
+    label: "Video Post",
+    media: { kinds: ["video"], min: 1, max: 1 },
+    text: { max: 280 },
+  },
 
   // LinkedIn
-  { id: "linkedin.post", platform: "linkedin", archetype: "text", label: "Post", media: { kinds: ["image", "video"], min: 0, max: 9 }, text: { max: 3000 } },
-  { id: "linkedin.image", platform: "linkedin", archetype: "image", label: "Image Post", media: { kinds: ["image"], min: 1, max: 9 }, text: { max: 3000 } },
-  { id: "linkedin.video", platform: "linkedin", archetype: "video_long", label: "Video", media: { kinds: ["video"], min: 1, max: 1 }, text: { max: 3000 } },
-  { id: "linkedin.document", platform: "linkedin", archetype: "carousel", label: "Document / Carousel", media: { kinds: ["image"], min: 2, max: 300 }, text: { max: 3000 } },
-  { id: "linkedin.article", platform: "linkedin", archetype: "article", label: "Article", media: { kinds: ["image"] } },
+  {
+    id: "linkedin.post",
+    platform: "linkedin",
+    archetype: "text",
+    label: "Post",
+    media: { kinds: ["image", "video"], min: 0, max: 9 },
+    text: { max: 3000 },
+  },
+  {
+    id: "linkedin.image",
+    platform: "linkedin",
+    archetype: "image",
+    label: "Image Post",
+    media: { kinds: ["image"], min: 1, max: 9 },
+    text: { max: 3000 },
+  },
+  {
+    id: "linkedin.video",
+    platform: "linkedin",
+    archetype: "video_long",
+    label: "Video",
+    media: { kinds: ["video"], min: 1, max: 1 },
+    text: { max: 3000 },
+  },
+  {
+    id: "linkedin.document",
+    platform: "linkedin",
+    archetype: "carousel",
+    label: "Document / Carousel",
+    media: { kinds: ["image"], min: 2, max: 300 },
+    text: { max: 3000 },
+  },
+  {
+    id: "linkedin.article",
+    platform: "linkedin",
+    archetype: "article",
+    label: "Article",
+    media: { kinds: ["image"] },
+  },
 
   // Facebook
-  { id: "facebook.post", platform: "facebook", archetype: "text", label: "Post", media: { kinds: ["image", "video"] } },
-  { id: "facebook.image", platform: "facebook", archetype: "image", label: "Image Post", media: { kinds: ["image"], min: 1 } },
-  { id: "facebook.video", platform: "facebook", archetype: "video_long", label: "Video", media: { kinds: ["video"], min: 1, max: 1 } },
-  { id: "facebook.reel", platform: "facebook", archetype: "video_short", label: "Reel", surface: "reels", media: { kinds: ["video"], aspectRatios: ["9:16"], maxDurationSec: 90 } },
-  { id: "facebook.story", platform: "facebook", archetype: "story", label: "Story", ephemeral: true, media: { kinds: ["image", "video"], aspectRatios: ["9:16"] } },
+  {
+    id: "facebook.post",
+    platform: "facebook",
+    archetype: "text",
+    label: "Post",
+    media: { kinds: ["image", "video"] },
+  },
+  {
+    id: "facebook.image",
+    platform: "facebook",
+    archetype: "image",
+    label: "Image Post",
+    media: { kinds: ["image"], min: 1 },
+  },
+  {
+    id: "facebook.video",
+    platform: "facebook",
+    archetype: "video_long",
+    label: "Video",
+    media: { kinds: ["video"], min: 1, max: 1 },
+  },
+  {
+    id: "facebook.reel",
+    platform: "facebook",
+    archetype: "video_short",
+    label: "Reel",
+    surface: "reels",
+    media: { kinds: ["video"], aspectRatios: ["9:16"], maxDurationSec: 90 },
+  },
+  {
+    id: "facebook.story",
+    platform: "facebook",
+    archetype: "story",
+    label: "Story",
+    ephemeral: true,
+    media: { kinds: ["image", "video"], aspectRatios: ["9:16"] },
+  },
 
   // YouTube
-  { id: "youtube.short", platform: "youtube", archetype: "video_short", label: "Short", media: { kinds: ["video"], aspectRatios: ["9:16"], maxDurationSec: 60 } },
-  { id: "youtube.video", platform: "youtube", archetype: "video_long", label: "Video", media: { kinds: ["video"], aspectRatios: ["16:9"] } },
+  {
+    id: "youtube.short",
+    platform: "youtube",
+    archetype: "video_short",
+    label: "Short",
+    media: { kinds: ["video"], aspectRatios: ["9:16"], maxDurationSec: 60 },
+  },
+  {
+    id: "youtube.video",
+    platform: "youtube",
+    archetype: "video_long",
+    label: "Video",
+    media: { kinds: ["video"], aspectRatios: ["16:9"] },
+  },
 
   // Threads
-  { id: "threads.post", platform: "threads", archetype: "text", label: "Post", media: { kinds: ["image", "video"] }, text: { max: 500 } },
-  { id: "threads.thread", platform: "threads", archetype: "thread", label: "Thread", sequence: true, media: { kinds: ["image", "video"] }, text: { max: 500 } },
+  {
+    id: "threads.post",
+    platform: "threads",
+    archetype: "text",
+    label: "Post",
+    media: { kinds: ["image", "video"] },
+    text: { max: 500 },
+  },
+  {
+    id: "threads.thread",
+    platform: "threads",
+    archetype: "thread",
+    label: "Thread",
+    sequence: true,
+    media: { kinds: ["image", "video"] },
+    text: { max: 500 },
+  },
 
   // Pinterest (heavy in the content calendar — pins + idea pins + boards)
-  { id: "pinterest.pin", platform: "pinterest", archetype: "image", label: "Pin", surface: "feed", media: { kinds: ["image"], min: 1, max: 1, aspectRatios: ["2:3"] } },
-  { id: "pinterest.idea_pin", platform: "pinterest", archetype: "carousel", label: "Idea Pin", media: { kinds: ["image", "video"], min: 1, max: 20, aspectRatios: ["9:16"] } },
+  {
+    id: "pinterest.pin",
+    platform: "pinterest",
+    archetype: "image",
+    label: "Pin",
+    surface: "feed",
+    media: { kinds: ["image"], min: 1, max: 1, aspectRatios: ["2:3"] },
+  },
+  {
+    id: "pinterest.idea_pin",
+    platform: "pinterest",
+    archetype: "carousel",
+    label: "Idea Pin",
+    media: {
+      kinds: ["image", "video"],
+      min: 1,
+      max: 20,
+      aspectRatios: ["9:16"],
+    },
+  },
 
   // Owned surfaces
-  { id: "newsletter.broadcast", platform: "newsletter", archetype: "article", label: "Newsletter Issue", media: { kinds: ["image"] } },
-  { id: "blog.post", platform: "blog", archetype: "article", label: "Blog Post", media: { kinds: ["image"] } },
+  {
+    id: "newsletter.broadcast",
+    platform: "newsletter",
+    archetype: "article",
+    label: "Newsletter Issue",
+    media: { kinds: ["image"] },
+  },
+  {
+    id: "newsletter.blast",
+    platform: "newsletter",
+    archetype: "article",
+    label: "Email Blast",
+    countsTowardCadence: false,
+    media: { kinds: ["image"] },
+  },
+  {
+    id: "blog.post",
+    platform: "blog",
+    archetype: "article",
+    label: "Blog Post",
+    media: { kinds: ["image"] },
+  },
 ];
 
 // ---- LOOKUP HELPERS ------------------------------------------------
@@ -142,12 +360,23 @@ export function getPlatformFormat(id: string): PlatformFormat | undefined {
   return FORMAT_BY_ID.get(id);
 }
 
-export function platformFormatsFor(platform: ChannelPlatform): PlatformFormat[] {
+export function platformFormatsFor(
+  platform: ChannelPlatform,
+): PlatformFormat[] {
   return PLATFORM_FORMATS.filter((f) => f.platform === platform);
 }
 
 export function archetypeForFormat(id: string): FormatArchetype | undefined {
   return FORMAT_BY_ID.get(id)?.archetype;
+}
+
+/** Whether a concrete format belongs to the surface's recurring publishing
+ * rhythm. Unknown/legacy formats count by default; only explicit one-offs opt
+ * out, so historical newsletter rows are never silently discarded. */
+export function formatCountsTowardCadence(
+  id: string | null | undefined,
+): boolean {
+  return id ? FORMAT_BY_ID.get(id)?.countsTowardCadence !== false : true;
 }
 
 // ---- VALIDATION ----------------------------------------------------
@@ -170,7 +399,9 @@ export function validateSpot(spot: SpotLike): {
     return { ok: false, errors };
   }
   if (def.platform !== spot.platform) {
-    errors.push(`format "${spot.format}" is ${def.platform}, not ${spot.platform}`);
+    errors.push(
+      `format "${spot.format}" is ${def.platform}, not ${spot.platform}`,
+    );
   }
   if (spot.archetype && spot.archetype !== def.archetype) {
     errors.push(

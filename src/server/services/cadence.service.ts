@@ -7,6 +7,7 @@ import {
   mixTargetTable,
   platformPostTable,
 } from "@/server/db/schema";
+import { formatCountsTowardCadence } from "@/server/content/formats";
 
 /**
  * Cadence service — the shared "are we executing the strategy?" computation.
@@ -24,7 +25,11 @@ const DEFAULT_WINDOW_DAYS = 28;
 
 /** Normalize a target count to per-week so observed and target are comparable. */
 function perWeek(count: number, period: string): number {
-  return period === "week" ? count : period === "day" ? count * 7 : count / 4.345;
+  return period === "week"
+    ? count
+    : period === "day"
+      ? count * 7
+      : count / 4.345;
 }
 
 /** Classify observed against target with a ±20% tolerance band. */
@@ -80,6 +85,7 @@ export type BrandStrategy = {
 type PostRow = {
   brandId: string;
   platform: string;
+  format: string | null;
   archetype: string | null;
   contentPost: { pillar: string | null } | null;
 };
@@ -114,7 +120,7 @@ export async function getBrandStrategy(
         inArray(platformPostTable.brandId, allBrandIds),
         gte(platformPostTable.publishedAt, cutoff),
       ),
-      columns: { brandId: true, platform: true, archetype: true },
+      columns: { brandId: true, platform: true, format: true, archetype: true },
       with: { contentPost: { columns: { pillar: true } } },
     }),
     db.query.cadenceTargetTable.findMany({
@@ -136,6 +142,12 @@ export async function getBrandStrategy(
 
   const ourPosts = (posts as PostRow[]).filter((p) => p.brandId === brandId);
   const peerPosts = (posts as PostRow[]).filter((p) => p.brandId !== brandId);
+  const ourCadencePosts = ourPosts.filter((p) =>
+    formatCountsTowardCadence(p.format),
+  );
+  const peerCadencePosts = peerPosts.filter((p) =>
+    formatCountsTowardCadence(p.format),
+  );
 
   // ---- Pillar mix (observed % vs target %, + peer benchmark) -------------
   const mixCounts = new Map<string, number>();
@@ -165,7 +177,14 @@ export async function getBrandStrategy(
       const peerPct = peerMixTotal
         ? Math.round(((peerMixCounts.get(pillar) ?? 0) / peerMixTotal) * 100)
         : null;
-      return { pillar, count, pct, targetPct, peerPct, status: classify(pct, targetPct) };
+      return {
+        pillar,
+        count,
+        pct,
+        targetPct,
+        peerPct,
+        status: classify(pct, targetPct),
+      };
     })
     .sort((a, b) => b.count - a.count);
 
@@ -173,21 +192,24 @@ export async function getBrandStrategy(
   // Peer benchmark: avg posts/week per peer brand that actually uses the
   // platform — so a competitor that ignores a channel doesn't deflate it.
   const peerBrandsByPlatform = new Map<string, Set<string>>();
-  for (const p of peerPosts) {
+  for (const p of peerCadencePosts) {
     const set = peerBrandsByPlatform.get(p.platform) ?? new Set<string>();
     set.add(p.brandId);
     peerBrandsByPlatform.set(p.platform, set);
   }
   const peerCountByPlatformArch = new Map<string, number>();
-  for (const p of peerPosts) {
+  for (const p of peerCadencePosts) {
     const key = `${p.platform}|${p.archetype ?? "other"}`;
-    peerCountByPlatformArch.set(key, (peerCountByPlatformArch.get(key) ?? 0) + 1);
+    peerCountByPlatformArch.set(
+      key,
+      (peerCountByPlatformArch.get(key) ?? 0) + 1,
+    );
   }
 
   const channelRows: ChannelCadence[] = channels
     .filter((c) => c.kind !== "ad")
     .map((c) => {
-      const cPosts = ourPosts.filter((p) => p.platform === c.platform);
+      const cPosts = ourCadencePosts.filter((p) => p.platform === c.platform);
       const archCounts = new Map<string, number>();
       for (const p of cPosts) {
         const a = p.archetype ?? "other";
@@ -225,7 +247,9 @@ export async function getBrandStrategy(
         );
 
       const observedPerWeek = cPosts.length / weeks;
-      const targets = archetypes.map((a) => a.target).filter((t): t is number => t != null);
+      const targets = archetypes
+        .map((a) => a.target)
+        .filter((t): t is number => t != null);
       const targetPerWeek = targets.length
         ? targets.reduce((n, t) => n + t, 0)
         : null;

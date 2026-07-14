@@ -192,6 +192,12 @@ export const seriesTable = pgTable(
     theme: t.text(), // optional angle / objective
     color: t.text(), // optional UI accent (hex)
 
+    // One primary editorial territory. This deliberately stores the stable
+    // pillar slug rather than a FK: brand defaults can live in the code-backed
+    // pillar registry until somebody customizes them into durable rows. Ideas
+    // in the series inherit this value when they are attached through chat.
+    pillar: t.text(),
+
     status: seriesStatusEnum().default("planned").notNull(),
 
     startAt: t.timestamp({ withTimezone: true }),
@@ -212,6 +218,7 @@ export const seriesTable = pgTable(
     index("series_brand_idx").on(table.brandId),
     index("series_status_idx").on(table.status),
     index("series_initiative_idx").on(table.initiativeId),
+    index("series_pillar_idx").on(table.brandId, table.pillar),
   ],
 );
 
@@ -478,6 +485,13 @@ export const platformPostTable = pgTable(
     // The pipe this spot actually shipped through ("via Zernio").
     provider: deliveryProviderEnum(),
 
+    // The provider-side composer/job ID. This is deliberately separate from
+    // `externalId`, which is the final platform-native post ID used by ingest.
+    deliveryExternalId: t.text(),
+    deliveryStatus: t.text(),
+    deliveryError: t.text(),
+    deliveryUpdatedAt: t.timestamp({ withTimezone: true }),
+
     // The connector that most recently hydrated this mirror. Kept separate
     // from `provider`: a native Instagram post may be ingested through Zernio,
     // Bright Data, or an official API without having been published by it.
@@ -541,6 +555,10 @@ export const platformPostTable = pgTable(
     index("platform_post_published_at_idx").on(table.publishedAt),
     index("platform_post_cleanup_idx").on(table.cleanupStatus),
     index("platform_post_external_idx").on(table.provider, table.externalId),
+    index("platform_post_delivery_external_idx").on(
+      table.provider,
+      table.deliveryExternalId,
+    ),
     uniqueIndex("platform_post_canonical_external_idx")
       .on(table.brandId, table.platform, table.externalId)
       .where(sql`${table.externalId} IS NOT NULL`),
@@ -879,4 +897,5 @@ export const contentSuggestionRelations = relations(
 // NOTE deferred (graduate when their screens are built):
 //   - comment table  → comment COUNTS live in platform_post.stats for now
 //   - media_asset / studio  → media lives inline in platform_post.media
-//   - content_pillar table  → pillar is a text slug on content_post for now
+//   - pillar relationships intentionally remain stable slugs on content_post
+//     and series so code-backed defaults do not need placeholder database rows

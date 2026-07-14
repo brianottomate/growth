@@ -1,18 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { MessageSquare, PanelRightClose, Sparkles, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Copy,
+  Hash,
+  Loader2,
+  MessageSquare,
+  PanelRightClose,
+  Plus,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { cn } from "@/lib/utils";
+import { MOBILE_APP_LANDING } from "@/lib/device";
+import { useTRPC } from "@/trpc/react";
 import {
   ASSISTANT_INTENT_EVENT,
   type AssistantIntent,
   type ContentWorkContext,
 } from "@/lib/assistant-events";
 import { OverviewChat } from "./OverviewChat";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { assistantThreadAsMarkdown } from "@/lib/assistant-thread-markdown";
 
 /**
  * Persistent right-hand workspace for the growth assistant.
@@ -36,6 +62,10 @@ export function OverviewAssistantPopup({
   const [workContext, setWorkContext] = useState<ContentWorkContext | null>(
     null,
   );
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const creatingInitialThread = useRef(false);
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const desktop = useMediaQuery("(min-width: 1280px)");
   const nextMode = pathname === "/app/next";
   const queryBrandId = searchParams.get("brandId") ?? intentBrandId;
@@ -44,6 +74,39 @@ export function OverviewAssistantPopup({
     brands.find((brand) => brand.id === queryBrandId) ??
     brands.find((brand) => brand.slug === brandSlug);
   const visible = nextMode || open;
+  const threadsQuery = useQuery(trpc.creativeWork.listThreads.queryOptions());
+  const createThread = useMutation(
+    trpc.creativeWork.createThread.mutationOptions({
+      onSuccess: (thread) => {
+        creatingInitialThread.current = false;
+        setActiveThreadId(thread.id);
+        void queryClient.invalidateQueries(
+          trpc.creativeWork.listThreads.queryFilter(),
+        );
+      },
+      onError: () => {
+        creatingInitialThread.current = false;
+      },
+    }),
+  );
+  const threadQuery = useQuery({
+    ...trpc.creativeWork.getThread.queryOptions({
+      threadId: activeThreadId ?? "",
+    }),
+    enabled: !!activeThreadId,
+  });
+
+  useEffect(() => {
+    if (activeThreadId || !threadsQuery.data) return;
+    const latest = threadsQuery.data[0];
+    if (latest) {
+      setActiveThreadId(latest.id);
+      return;
+    }
+    if (creatingInitialThread.current) return;
+    creatingInitialThread.current = true;
+    createThread.mutate({ brandId: activeBrand?.id });
+  }, [activeBrand?.id, activeThreadId, createThread, threadsQuery.data]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("growth_assistant_open");
@@ -53,7 +116,7 @@ export function OverviewAssistantPopup({
   useEffect(() => {
     const receiveIntent = (event: Event) => {
       const intent = (event as CustomEvent<AssistantIntent>).detail;
-      setIntentBrandId(intent.brandId);
+      setIntentBrandId(intent.brandId ?? null);
       if (intent.type === "work_content_post") {
         setWorkContext({
           type: intent.type,
@@ -76,6 +139,26 @@ export function OverviewAssistantPopup({
   const setVisible = (next: boolean) => {
     setOpen(next);
     window.localStorage.setItem("growth_assistant_open", String(next));
+  };
+
+  const activeThread = threadsQuery.data?.find(
+    (thread) => thread.id === activeThreadId,
+  );
+  const copyThreadId = async () => {
+    if (!activeThreadId) return;
+    await navigator.clipboard.writeText(activeThreadId);
+    toast.success("Thread ID copied");
+  };
+  const copyThreadMarkdown = async () => {
+    if (!activeThreadId || !activeThread || !threadQuery.data) return;
+    await navigator.clipboard.writeText(
+      assistantThreadAsMarkdown({
+        threadId: activeThreadId,
+        title: activeThread.title,
+        messages: threadQuery.data.messages,
+      }),
+    );
+    toast.success("Thread copied as Markdown");
   };
 
   return (
@@ -101,15 +184,90 @@ export function OverviewAssistantPopup({
             <Sparkles className="size-3.5" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold">
-              {nextMode
-                ? `Next${activeBrand ? ` for ${activeBrand.name}` : ""}`
-                : "Assistant"}
-            </h2>
-            <p className="text-muted-foreground truncate text-[11px]">
-              Context · create · inspect · iterate
-            </p>
+            {threadsQuery.data?.length ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="hover:bg-accent flex max-w-full items-center gap-1 rounded-md px-1 py-0.5 text-left text-sm font-semibold outline-none"
+                    aria-label="Choose assistant session"
+                  >
+                    <span className="truncate">
+                      {activeThread?.title ?? "Session"}
+                    </span>
+                    <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-80 max-w-[calc(100vw-2rem)]"
+                >
+                  <DropdownMenuLabel>Sessions</DropdownMenuLabel>
+                  {threadsQuery.data.map((thread) => (
+                    <DropdownMenuItem
+                      key={thread.id}
+                      onSelect={() => setActiveThreadId(thread.id)}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {thread.title}
+                      </span>
+                      {thread.id === activeThreadId && (
+                        <Check className="size-4" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => void copyThreadMarkdown()}
+                    disabled={!threadQuery.data}
+                  >
+                    <Copy className="size-4" /> Copy thread as Markdown
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => void copyThreadId()}>
+                    <Hash className="size-4" /> Copy thread ID
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <h2 className="text-sm font-semibold">
+                {nextMode
+                  ? `Next${activeBrand ? ` for ${activeBrand.name}` : ""}`
+                  : "Assistant"}
+              </h2>
+            )}
+            <button
+              type="button"
+              onClick={() => void copyThreadId()}
+              disabled={!activeThreadId}
+              title={activeThreadId ?? undefined}
+              className="text-muted-foreground hover:text-foreground block max-w-full truncate text-[11px] disabled:pointer-events-none"
+            >
+              {activeThreadId
+                ? `Persistent session · ${activeThreadId}`
+                : "Persistent session · context · create · inspect"}
+            </button>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={() =>
+              createThread.mutate({
+                brandId: activeBrand?.id,
+                contentPostId: workContext?.contentPostId,
+              })
+            }
+            disabled={createThread.isPending}
+            aria-label="New assistant session"
+            title="New session"
+          >
+            {createThread.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+          </Button>
           {!nextMode && (
             <Button
               type="button"
@@ -123,18 +281,51 @@ export function OverviewAssistantPopup({
               <X className="size-4 xl:hidden" />
             </Button>
           )}
+          {nextMode && (
+            <Button
+              asChild
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 px-2 xl:hidden"
+            >
+              <Link href={MOBILE_APP_LANDING} aria-label="Back to workspace">
+                <ArrowLeft className="size-4" />
+                Workspace
+              </Link>
+            </Button>
+          )}
         </header>
         <div className="min-h-0 flex-1">
-          <OverviewChat
-            userName={userName}
-            variant={nextMode ? "page" : "popup"}
-            active={visible}
-            mode="next"
-            brandId={activeBrand?.id}
-            brandName={activeBrand?.name}
-            intent={searchParams.get("intent") ?? undefined}
-            workContext={workContext ?? undefined}
-          />
+          {activeThreadId && threadQuery.data ? (
+            <OverviewChat
+              key={activeThreadId}
+              threadId={activeThreadId}
+              initialMessages={threadQuery.data.messages}
+              onThreadFinish={() => {
+                void queryClient.invalidateQueries(
+                  trpc.creativeWork.getThread.queryFilter({
+                    threadId: activeThreadId,
+                  }),
+                );
+                void queryClient.invalidateQueries(
+                  trpc.creativeWork.listThreads.queryFilter(),
+                );
+              }}
+              userName={userName}
+              variant={nextMode ? "page" : "popup"}
+              active={visible}
+              mode="next"
+              brandId={activeBrand?.id}
+              brandName={activeBrand?.name}
+              intent={searchParams.get("intent") ?? undefined}
+              workContext={workContext ?? undefined}
+            />
+          ) : (
+            <div className="text-muted-foreground grid h-full place-items-center">
+              <Loader2 className="size-5 animate-spin" />
+            </div>
+          )}
         </div>
       </aside>
 

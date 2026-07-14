@@ -21,6 +21,8 @@ import type { z } from "zod";
 export interface CapabilityContext {
   orgId: string;
   userId: string;
+  /** Durable conversation provenance when a capability is called from chat. */
+  threadId?: string;
 }
 
 export type CapabilityDomain =

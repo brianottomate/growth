@@ -22,6 +22,15 @@ export function SignUpForm() {
   const [password, setPassword] = useState("");
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isOAuthRequest =
+    searchParams.has("client_id") && searchParams.has("redirect_uri");
+  const signInHref = isOAuthRequest
+    ? `/signin?${searchParams.toString()}`
+    : searchParams.get("inviteId")
+      ? `/signin?inviteId=${searchParams.get("inviteId")}`
+      : searchParams.get("orgInviteId")
+        ? `/signin?orgInviteId=${searchParams.get("orgInviteId")}`
+        : "/signin";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,16 +145,7 @@ export function SignUpForm() {
 
       <div className="text-center text-sm">
         Already have an account?{" "}
-        <Link
-          href={
-            searchParams.get("inviteId")
-              ? `/signin?inviteId=${searchParams.get("inviteId")}`
-              : searchParams.get("orgInviteId")
-                ? `/signin?orgInviteId=${searchParams.get("orgInviteId")}`
-                : "/signin"
-          }
-          className="underline underline-offset-4"
-        >
+        <Link href={signInHref} className="underline underline-offset-4">
           Sign in
         </Link>
       </div>

@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { CalendarPlus, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import {
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+} from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { ProduceDrawer } from "@/app/app/studio/ProduceDrawer";
@@ -33,6 +38,7 @@ export type CalEntry = {
   brandName: string;
   tracked?: boolean; // a competitor/inspiration brand we scrape, not our own
   platform: string;
+  format: string | null;
   contentPostId: string | null;
   title: string | null;
   pillar: string | null;
@@ -62,15 +68,43 @@ export type CalAssign = {
 // ---- date helpers (local-time, to avoid UTC off-by-one) ------------------
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 const DAY = 86_400_000;
 
 const pad = (n: number) => String(n).padStart(2, "0");
-const keyOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const keyOf = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 /** Monday=0 … Sunday=6 (week starts Monday). */
 const mondayIndex = (d: Date) => (d.getDay() + 6) % 7;
-const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const addDays = (d: Date, n: number) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
 /** Weeks (Mon-start) covering a month, trailing empty week trimmed. */
 function monthWeeks(year: number, month: number): Date[][] {
@@ -159,7 +193,8 @@ function groupDay(entries: CalEntry[]): DayGroup[] {
 /** Most common pillar among a day's entries (drives mini-month tint). */
 function dominantPillar(entries: CalEntry[]): string | null {
   const counts = new Map<string, number>();
-  for (const e of entries) if (e.pillar) counts.set(e.pillar, (counts.get(e.pillar) ?? 0) + 1);
+  for (const e of entries)
+    if (e.pillar) counts.set(e.pillar, (counts.get(e.pillar) ?? 0) + 1);
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
@@ -198,21 +233,27 @@ export function CalendarClient({
 
   // Default to the Year · Detailed view; a Studio-wheel deep-link that targets a
   // specific month still opens the focused Month zoom.
-  const [zoom, setZoom] = useState<Zoom>(initial?.month != null ? "month" : "year");
+  const [zoom, setZoom] = useState<Zoom>(
+    initial?.month != null ? "month" : "year",
+  );
   const [yearMode, setYearMode] = useState<YearMode>("detailed");
   const [year, setYear] = useState(initial?.year ?? now.getFullYear());
   const [month, setMonth] = useState(initial?.month ?? now.getMonth());
   const [brandFilter, setBrandFilter] = useState(initial?.brandId ?? "all");
   const [pillarFilter, setPillarFilter] = useState(initial?.pillar ?? "all");
   const [mineOnly, setMineOnly] = useState(false);
-  const [dayDetail, setDayDetail] = useState<{ key: string; date: Date } | null>(null);
+  const [dayDetail, setDayDetail] = useState<{
+    key: string;
+    date: Date;
+  } | null>(null);
   const [produceDate, setProduceDate] = useState<string | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
   // Per-month CTAs: "Generate" pre-targets the dialog; "Evaluate" opens the report.
   const [generateMonth, setGenerateMonth] = useState<string | null>(null);
-  const [reportMonth, setReportMonth] = useState<{ year: number; month: number } | null>(
-    null,
-  );
+  const [reportMonth, setReportMonth] = useState<{
+    year: number;
+    month: number;
+  } | null>(null);
   const openGenerateFor = (y: number, mo: number) => {
     setGenerateMonth(`${y}-${String(mo + 1).padStart(2, "0")}`);
     setGenerateOpen(true);
@@ -221,13 +262,21 @@ export function CalendarClient({
   const { ref, style } = useFullBleed();
 
   // Optimistic owner overrides (idea keyed by contentPostId, spot by entry id).
-  const [ideaOverrides, setIdeaOverrides] = useState<Record<string, Member | null>>({});
-  const [spotOverrides, setSpotOverrides] = useState<Record<string, Member | null>>({});
+  const [ideaOverrides, setIdeaOverrides] = useState<
+    Record<string, Member | null>
+  >({});
+  const [spotOverrides, setSpotOverrides] = useState<
+    Record<string, Member | null>
+  >({});
   const setOwner = useMutation(
-    trpc.content.setOwner.mutationOptions({ onSettled: () => router.refresh() }),
+    trpc.content.setOwner.mutationOptions({
+      onSettled: () => router.refresh(),
+    }),
   );
   const setSpotOwner = useMutation(
-    trpc.content.setSpotOwner.mutationOptions({ onSettled: () => router.refresh() }),
+    trpc.content.setSpotOwner.mutationOptions({
+      onSettled: () => router.refresh(),
+    }),
   );
   const memberById = (id: string | null) =>
     id ? (members.find((m) => m.id === id) ?? null) : null;
@@ -239,19 +288,33 @@ export function CalendarClient({
         e.contentPostId && e.contentPostId in ideaOverrides
           ? ideaOverrides[e.contentPostId]!
           : e.ideaOwner,
-      spotOwnerOf: (e) => (e.id in spotOverrides ? spotOverrides[e.id]! : e.spotOwner),
+      spotOwnerOf: (e) =>
+        e.id in spotOverrides ? spotOverrides[e.id]! : e.spotOwner,
       assignIdea: (contentPostId, ownerId) => {
-        setIdeaOverrides((p) => ({ ...p, [contentPostId]: memberById(ownerId) }));
+        setIdeaOverrides((p) => ({
+          ...p,
+          [contentPostId]: memberById(ownerId),
+        }));
         setOwner.mutate({ contentPostId, ownerId });
       },
       assignSpot: (platformPostId, ownerId) => {
-        setSpotOverrides((p) => ({ ...p, [platformPostId]: memberById(ownerId) }));
+        setSpotOverrides((p) => ({
+          ...p,
+          [platformPostId]: memberById(ownerId),
+        }));
         setSpotOwner.mutate({ platformPostId, ownerId });
       },
     }),
     // memberById is derived from members; overrides drive re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [members, currentUserId, ideaOverrides, spotOverrides, setOwner, setSpotOwner],
+    [
+      members,
+      currentUserId,
+      ideaOverrides,
+      spotOverrides,
+      setOwner,
+      setSpotOwner,
+    ],
   );
 
   const selectedBrand = brands.find((b) => b.id === brandFilter) ?? null;
@@ -402,10 +465,14 @@ export function CalendarClient({
           <>
             <NavStepper
               onPrev={() =>
-                month === 0 ? (setYear(year - 1), setMonth(11)) : setMonth(month - 1)
+                month === 0
+                  ? (setYear(year - 1), setMonth(11))
+                  : setMonth(month - 1)
               }
               onNext={() =>
-                month === 11 ? (setYear(year + 1), setMonth(0)) : setMonth(month + 1)
+                month === 11
+                  ? (setYear(year + 1), setMonth(0))
+                  : setMonth(month + 1)
               }
               label={`${MONTHS[month]} ${year}`}
             />
@@ -460,7 +527,9 @@ export function CalendarClient({
           </>
         )}
         <span className="flex-1" />
-        <Legend mode={zoom === "year" && yearMode === "heatmap" ? "heat" : "status"} />
+        <Legend
+          mode={zoom === "year" && yearMode === "heatmap" ? "heat" : "status"}
+        />
       </div>
 
       {/* Body */}
@@ -494,7 +563,12 @@ export function CalendarClient({
             onGenerate={openGenerateFor}
           />
         ) : (
-          <Heatmap year={year} byDay={byDay} todayKey={todayKey} onDayClick={(d) => openMonth(d.getFullYear(), d.getMonth())} />
+          <Heatmap
+            year={year}
+            byDay={byDay}
+            todayKey={todayKey}
+            onDayClick={(d) => openMonth(d.getFullYear(), d.getMonth())}
+          />
         )}
       </div>
 
@@ -635,7 +709,7 @@ function MonthGrid({
               key={k}
               onClick={() => onDayClick(date)}
               className={cn(
-                "group hover:bg-accent/30 flex min-h-28 flex-col gap-1 border-b border-r p-1.5 text-left transition-colors [&:nth-child(7n)]:border-r-0",
+                "group hover:bg-accent/30 flex min-h-28 flex-col gap-1 border-r border-b p-1.5 text-left transition-colors [&:nth-child(7n)]:border-r-0",
                 !inMonth && "bg-muted/20 opacity-50",
               )}
             >
@@ -673,9 +747,10 @@ function ContentChip({ g }: { g: DayGroup }) {
   const pillar = g.pillarSlug ? PILLAR_BY_SLUG[g.pillarSlug] : null;
   const status = g.entries[0]?.status ?? "draft";
   const platform = g.entries[0]?.platform ?? "";
+  const iconPlatform =
+    g.entries[0]?.format === "newsletter.blast" ? "blast" : platform;
   const media = g.entries.find((e) => e.mediaUrl)?.mediaUrl ?? null;
-  const label =
-    g.title ?? g.entries[0]?.text ?? platformLabel(platform);
+  const label = g.title ?? g.entries[0]?.text ?? platformLabel(platform);
   return (
     <span
       className="bg-card flex items-center gap-1.5 overflow-hidden rounded-md border p-1 text-xs"
@@ -688,7 +763,7 @@ function ContentChip({ g }: { g: DayGroup }) {
           <img src={media} alt="" className="size-full object-cover" />
         ) : (
           <span className="text-muted-foreground flex size-full items-center justify-center">
-            <ChannelLogo platform={platform} className="size-4" />
+            <ChannelLogo platform={iconPlatform} className="size-4" />
           </span>
         )}
       </span>
@@ -740,7 +815,9 @@ function YearMonths({
       {months.map(({ year, month }) => (
         <MiniMonth
           key={`${year}-${month}`}
-          name={year === firstYear ? MONTHS[month]! : `${MONTHS[month]} ${year}`}
+          name={
+            year === firstYear ? MONTHS[month]! : `${MONTHS[month]} ${year}`
+          }
           year={year}
           month={month}
           byDay={byDay}
@@ -797,7 +874,9 @@ function MiniMonth({
       className="hover:border-foreground/30 group cursor-pointer rounded-lg border p-2.5 text-left transition-colors"
     >
       <div className="mb-1.5 flex items-center gap-1.5">
-        <span className="text-sm font-semibold group-hover:underline">{name}</span>
+        <span className="text-sm font-semibold group-hover:underline">
+          {name}
+        </span>
         <span className="flex-1" />
         <span
           className="hidden items-center gap-1 group-focus-within:flex group-hover:flex"
@@ -824,7 +903,10 @@ function MiniMonth({
       </div>
       <div className="grid grid-cols-7 gap-[3px]">
         {WEEKDAYS.map((w) => (
-          <span key={w} className="text-muted-foreground text-center text-[9px]">
+          <span
+            key={w}
+            className="text-muted-foreground text-center text-[9px]"
+          >
             {w[0]}
           </span>
         ))}
@@ -869,7 +951,8 @@ function MiniMonth({
                   </span>
                   {dayEntries.length > 0 && (
                     <span className="text-muted-foreground block text-xs">
-                      {dayEntries.length} post{dayEntries.length === 1 ? "" : "s"}
+                      {dayEntries.length} post
+                      {dayEntries.length === 1 ? "" : "s"}
                       {pillar ? ` · mostly ${pillar.name}` : ""}
                     </span>
                   )}
@@ -929,7 +1012,9 @@ function YearMonthsDetailed({
       {months.map(({ year, month }) => (
         <DetailedMonth
           key={`${year}-${month}`}
-          name={year === firstYear ? MONTHS[month]! : `${MONTHS[month]} ${year}`}
+          name={
+            year === firstYear ? MONTHS[month]! : `${MONTHS[month]} ${year}`
+          }
           year={year}
           month={month}
           byDay={byDay}
@@ -1160,7 +1245,9 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
           </span>
         )}
         {pillar && (
-          <span className="text-muted-foreground shrink-0 text-xs">{pillar.name}</span>
+          <span className="text-muted-foreground shrink-0 text-xs">
+            {pillar.name}
+          </span>
         )}
         <span className="text-muted-foreground ml-auto shrink-0 text-xs">
           {first?.brandName}
@@ -1179,10 +1266,22 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
       <div className="flex flex-col gap-1.5">
         {g.entries.map((e) => (
           <div key={e.id} className="flex items-center gap-2 text-xs">
-            <ChannelLogo platform={e.platform} className="size-4 shrink-0" />
-            <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[e.status] ?? "bg-slate-400")} />
-            <span className="text-muted-foreground shrink-0 capitalize">{e.status}</span>
-            {e.text && <span className="min-w-0 flex-1 truncate">· {e.text}</span>}
+            <ChannelLogo
+              platform={e.format === "newsletter.blast" ? "blast" : e.platform}
+              className="size-4 shrink-0"
+            />
+            <span
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                STATUS_DOT[e.status] ?? "bg-slate-400",
+              )}
+            />
+            <span className="text-muted-foreground shrink-0 capitalize">
+              {e.status}
+            </span>
+            {e.text && (
+              <span className="min-w-0 flex-1 truncate">· {e.text}</span>
+            )}
             <span className="ml-auto flex shrink-0 items-center gap-1.5">
               {e.externalUrl && (
                 <a
@@ -1233,7 +1332,9 @@ function NavStepper({
       >
         <ChevronLeft className="size-4" />
       </button>
-      <span className="min-w-32 text-center text-sm font-semibold">{label}</span>
+      <span className="min-w-32 text-center text-sm font-semibold">
+        {label}
+      </span>
       <button
         onClick={onNext}
         className="border-border hover:bg-accent flex size-7 items-center justify-center rounded-md border transition-colors"
@@ -1295,7 +1396,9 @@ function Legend({ mode }: { mode: "status" | "heat" }) {
     <div className="text-muted-foreground flex items-center gap-3 text-[11px]">
       {items.map((it) => (
         <span key={it.status} className="flex items-center gap-1">
-          <span className={cn("size-1.5 rounded-full", STATUS_DOT[it.status])} />
+          <span
+            className={cn("size-1.5 rounded-full", STATUS_DOT[it.status])}
+          />
           {it.label}
         </span>
       ))}
@@ -1306,13 +1409,33 @@ function Legend({ mode }: { mode: "status" | "heat" }) {
 // ---- Month report (the "Evaluate" CTA) -------------------------------------
 
 const REPORT_STATUS: { key: string; label: string; cls: string }[] = [
-  { key: "slot", label: "Open slots", cls: "border-amber-500/40 text-amber-400" },
-  { key: "discovered", label: "Discovered", cls: "border-border text-muted-foreground" },
+  {
+    key: "slot",
+    label: "Open slots",
+    cls: "border-amber-500/40 text-amber-400",
+  },
+  {
+    key: "discovered",
+    label: "Discovered",
+    cls: "border-border text-muted-foreground",
+  },
   { key: "draft", label: "Draft", cls: "border-border text-muted-foreground" },
-  { key: "pending_review", label: "In review", cls: "border-border text-muted-foreground" },
+  {
+    key: "pending_review",
+    label: "In review",
+    cls: "border-border text-muted-foreground",
+  },
   { key: "approved", label: "Approved", cls: "border-sky-500/40 text-sky-400" },
-  { key: "scheduled", label: "Scheduled", cls: "border-sky-500/40 text-sky-400" },
-  { key: "published", label: "Published", cls: "border-emerald-500/40 text-emerald-400" },
+  {
+    key: "scheduled",
+    label: "Scheduled",
+    cls: "border-sky-500/40 text-sky-400",
+  },
+  {
+    key: "published",
+    label: "Published",
+    cls: "border-emerald-500/40 text-emerald-400",
+  },
 ];
 
 /** Month-at-a-glance: what's on the calendar, in what state, on which
@@ -1352,12 +1475,14 @@ function MonthReportDialog({
       ours: rows.filter((e) => !e.tracked),
       trackedCount: rows.filter((e) => e.tracked).length,
       byStatus: count((e) => e.status),
-      byPlatform: [...count((e) => (e.tracked ? null : e.platform)).entries()].sort(
-        (a, b) => b[1] - a[1],
-      ),
-      byPillar: [...count((e) => (e.tracked ? null : (e.pillar ?? "__unsorted"))).entries()].sort(
-        (a, b) => b[1] - a[1],
-      ),
+      byPlatform: [
+        ...count((e) => (e.tracked ? null : e.platform)).entries(),
+      ].sort((a, b) => b[1] - a[1]),
+      byPillar: [
+        ...count((e) =>
+          e.tracked ? null : (e.pillar ?? "__unsorted"),
+        ).entries(),
+      ].sort((a, b) => b[1] - a[1]),
     };
   }, [target, entries]);
 
@@ -1395,8 +1520,8 @@ function MonthReportDialog({
     >
       {report.rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          Nothing on the calendar for {monthLabel} yet — generate the month&apos;s
-          slot skeleton to get started.
+          Nothing on the calendar for {monthLabel} yet — generate the
+          month&apos;s slot skeleton to get started.
         </p>
       ) : (
         <div className="space-y-4">
@@ -1408,7 +1533,10 @@ function MonthReportDialog({
               return (
                 <span
                   key={key}
-                  className={cn("rounded-full border px-2 py-0.5 text-[11px] tabular-nums", cls)}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[11px] tabular-nums",
+                    cls,
+                  )}
                 >
                   {label} {n}
                 </span>
@@ -1425,9 +1553,14 @@ function MonthReportDialog({
           {report.byPlatform.length > 0 && (
             <div className="flex flex-wrap gap-x-3 gap-y-1.5">
               {report.byPlatform.map(([platform, n]) => (
-                <span key={platform} className="flex items-center gap-1.5 text-xs">
+                <span
+                  key={platform}
+                  className="flex items-center gap-1.5 text-xs"
+                >
                   <ChannelLogo platform={platform} className="size-3.5" />
-                  <span className="text-muted-foreground tabular-nums">{n}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {n}
+                  </span>
                 </span>
               ))}
             </div>
@@ -1450,13 +1583,18 @@ function MonthReportDialog({
               </div>
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
                 {report.byPillar.map(([slug, n]) => (
-                  <span key={slug} className="flex items-center gap-1 text-[11px]">
+                  <span
+                    key={slug}
+                    className="flex items-center gap-1 text-[11px]"
+                  >
                     <span
                       className="size-2 rounded-full"
                       style={{ background: pillarColorOf(slug) }}
                     />
                     <span className="text-muted-foreground">
-                      {slug === "__unsorted" ? "Unsorted" : (PILLAR_BY_SLUG[slug]?.name ?? slug)}
+                      {slug === "__unsorted"
+                        ? "Unsorted"
+                        : (PILLAR_BY_SLUG[slug]?.name ?? slug)}
                     </span>
                     <span className="text-muted-foreground/70 tabular-nums">
                       {Math.round((n / pillarTotal) * 100)}%

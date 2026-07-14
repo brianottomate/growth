@@ -7,6 +7,7 @@ import { db } from "@/server/db";
 import {
   contentPostTable,
   platformPostTable,
+  seriesTable,
 } from "@/server/db/content-schema";
 import {
   brandTable,
@@ -16,6 +17,7 @@ import {
 } from "@/server/db/schema";
 import { ContentService } from "@/server/services/content.service";
 import { MediaService } from "@/server/services/media.service";
+import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import { getContentReadiness } from "@/lib/content-readiness";
 import { defineCapability } from "./types";
 import type { CapabilityContext } from "./types";
@@ -117,6 +119,8 @@ export const updateContentWorkItem = defineCapability({
         ctaKeyword: z.string().nullable().optional(),
         kpi: z.string().nullable().optional(),
         plannedAt: z.string().datetime().nullable().optional(),
+        pillar: z.string().nullable().optional(),
+        seriesId: z.string().nullable().optional(),
       })
       .optional(),
     platformDrafts: z
@@ -148,7 +152,34 @@ export const updateContentWorkItem = defineCapability({
       }
     }
     if (input.brief) {
-      await ContentService.updateBrief({ id: content.id, ...input.brief });
+      const brief = { ...input.brief };
+      const targetSeriesId =
+        brief.seriesId === undefined ? content.seriesId : brief.seriesId;
+      if (targetSeriesId) {
+        const series = await db.query.seriesTable.findFirst({
+          where: and(
+            eq(seriesTable.id, targetSeriesId),
+            eq(seriesTable.brandId, content.brandId),
+            isNull(seriesTable.deletedAt),
+          ),
+          columns: { pillar: true },
+        });
+        if (!series) throw new Error("Series not found for this brand.");
+        if (
+          series.pillar &&
+          brief.pillar !== undefined &&
+          brief.pillar !== null &&
+          brief.pillar !== series.pillar
+        ) {
+          throw new Error(
+            `This series belongs to ${series.pillar}. Update the series instead of giving one installment a conflicting pillar.`,
+          );
+        }
+        if (brief.seriesId !== undefined && brief.pillar === undefined) {
+          brief.pillar = series.pillar;
+        }
+      }
+      await ContentService.updateBrief({ id: content.id, ...brief });
     }
     if (input.contentStatus) {
       await ContentService.setContentStatus({
@@ -249,11 +280,29 @@ export const attachChatImageToContent = defineCapability({
         media: [...(post.media ?? []), item],
       });
     }
+    let analysis: Awaited<ReturnType<typeof analyzeStoredMediaAsset>> | null =
+      null;
+    let analysisError: string | null = null;
+    try {
+      analysis = await analyzeStoredMediaAsset({
+        mediaId: asset.id,
+        brandName: content.brand?.name ?? "Brand",
+        steer: `Analyze this pasted asset for ${content.title ?? "the active content item"}.`,
+      });
+    } catch (error) {
+      // The durable save and attachment already succeeded. Keep that useful
+      // result even if the optional enrichment provider is temporarily down.
+      analysisError =
+        error instanceof Error ? error.message : "Analysis failed";
+    }
     return {
       ok: true as const,
       mediaAssetId: asset.id,
       contentPostId: content.id,
       attachedPlatformPostIds: selected.map((post) => post.id),
+      analyzed: Boolean(analysis),
+      analysis,
+      analysisError,
       url: `/app/content/${content.id}`,
     };
   },
@@ -890,8 +939,27 @@ export const promotePlatformPost = defineCapability({
     if (!post || post.brand?.organizationId !== ctx.orgId) {
       return { error: "Owned platform post not found." };
     }
+    let pillar = input.pillar;
+    if (input.seriesId) {
+      const series = await db.query.seriesTable.findFirst({
+        where: and(
+          eq(seriesTable.id, input.seriesId),
+          eq(seriesTable.brandId, post.brandId),
+          isNull(seriesTable.deletedAt),
+        ),
+        columns: { pillar: true },
+      });
+      if (!series) return { error: "Series not found for this brand." };
+      if (series.pillar && pillar && series.pillar !== pillar) {
+        return {
+          error: `This series belongs to ${series.pillar}; the promoted idea cannot use a conflicting pillar.`,
+        };
+      }
+      pillar = series.pillar ?? pillar;
+    }
     const result = await ContentService.promotePlatformPost({
       ...input,
+      pillar,
       ownerId: ctx.userId,
       createdById: ctx.userId,
     });

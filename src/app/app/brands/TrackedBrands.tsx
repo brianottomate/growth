@@ -64,6 +64,16 @@ export function TrackedBrands({
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
   const [purpose, setPurpose] = useState("competitor");
+  const [referenceType, setReferenceType] = useState("company");
+  type TrackedPlatform =
+    | "linkedin"
+    | "instagram"
+    | "x"
+    | "facebook"
+    | "youtube"
+    | "tiktok";
+  const [platform, setPlatform] = useState<TrackedPlatform>("linkedin");
+  const [profileUrl, setProfileUrl] = useState("");
 
   const refresh = () => router.refresh();
   const createM = useMutation(
@@ -73,6 +83,9 @@ export function TrackedBrands({
         setName("");
         setWebsite("");
         setPurpose("competitor");
+        setReferenceType("company");
+        setPlatform("linkedin");
+        setProfileUrl("");
         refresh();
       },
     }),
@@ -87,7 +100,11 @@ export function TrackedBrands({
       scope: "reference",
       ownerBrandId,
       purpose: purpose as never,
+      referenceType: referenceType as "company" | "personal",
       website: website || undefined,
+      profile: profileUrl.trim()
+        ? { platform, url: profileUrl.trim() }
+        : undefined,
     });
 
   return (
@@ -153,6 +170,18 @@ export function TrackedBrands({
               />
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label>Brand type</Label>
+              <Select value={referenceType} onValueChange={setReferenceType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="company">Company</SelectItem>
+                  <SelectItem value="personal">Personal brand</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label>Purpose</Label>
               <Select value={purpose} onValueChange={setPurpose}>
                 <SelectTrigger>
@@ -166,6 +195,38 @@ export function TrackedBrands({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Public profile</Label>
+              <div className="flex gap-2">
+                <Select
+                  value={platform}
+                  onValueChange={(value) =>
+                    setPlatform(value as TrackedPlatform)
+                  }
+                >
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="x">X</SelectItem>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="youtube">YouTube</SelectItem>
+                    <SelectItem value="tiktok">TikTok</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={profileUrl}
+                  onChange={(e) => setProfileUrl(e.target.value)}
+                  placeholder="https://linkedin.com/in/…"
+                />
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Optional — saves the exact public profile immediately, without
+                discovery.
+              </p>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Website</Label>

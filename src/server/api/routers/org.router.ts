@@ -1,18 +1,20 @@
-import { randomBytes } from "crypto";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull, or } from "drizzle-orm";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import {
+  createTRPCRouter,
+  organizationProcedure,
+  protectedProcedure,
+  publicProcedure,
+} from "../trpc";
 import * as schema from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { R2 } from "@/server/clients/r2.client";
-
-// Generate a human-friendly temp password to hand out manually.
-function generateTempPassword() {
-  // 12 url-safe chars + a digit so it satisfies any min-length/complexity rule.
-  return `${randomBytes(9).toString("base64url")}7`;
-}
+import {
+  generateTempPassword,
+  resetUserCredentialPassword,
+} from "@/server/services/account.service";
 
 const MAX_PHOTO_BYTES = 4.5 * 1024 * 1024; // server upload limit
 
@@ -34,7 +36,10 @@ async function uploadUserPhoto(
   if (src.photo) {
     const buffer = Buffer.from(src.photo.base64Data, "base64");
     if (buffer.length > MAX_PHOTO_BYTES) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Photo exceeds 4.5MB" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Photo exceeds 4.5MB",
+      });
     }
     const key = R2.buildUserPhotoKey(userId, src.photo.filename);
     return R2.putBuffer(key, buffer, src.photo.mimeType);
@@ -186,36 +191,28 @@ export const orgRouter = createTRPCRouter({
       };
     }),
 
-  // Update organization
-  update: protectedProcedure
+  // Update organization (admins+)
+  update: organizationProcedure
     .input(
       z.object({
-        organizationId: z.string(),
         name: z.string().min(1).max(100).optional(),
         slug: z.string().min(1).max(100).optional(),
         logo: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Check if user is an admin of the organization
-      const membership = await ctx.db.query.memberTable.findFirst({
-        where: eq(schema.memberTable.userId, ctx.session.user.id),
-      });
-
-      if (!membership || membership.role === "member") {
+      if (!ctx.orgPermissions.canUpdateOrg) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Only admins can update organization settings",
         });
       }
 
-      // If slug is being updated, check if it's available
       if (input.slug) {
         const existing = await ctx.db.query.organizationTable.findFirst({
           where: eq(schema.organizationTable.slug, input.slug),
         });
-
-        if (existing && existing.id !== input.organizationId) {
+        if (existing && existing.id !== ctx.organization.id) {
           throw new TRPCError({
             code: "CONFLICT",
             message: "This slug is already taken",
@@ -223,70 +220,65 @@ export const orgRouter = createTRPCRouter({
         }
       }
 
-      const updated = await ctx.db
+      const [updated] = await ctx.db
         .update(schema.organizationTable)
         .set({
           ...(input.name && { name: input.name }),
           ...(input.slug && { slug: input.slug }),
           ...(input.logo !== undefined && { logo: input.logo }),
         })
-        .where(eq(schema.organizationTable.id, input.organizationId))
+        .where(eq(schema.organizationTable.id, ctx.organization.id))
         .returning();
 
-      return updated[0];
+      return updated;
     }),
 
-  // Delete organization
-  delete: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      // Check if user is the owner
-      const membership = await ctx.db.query.memberTable.findFirst({
-        where: eq(schema.memberTable.userId, ctx.session.user.id),
+  // Delete organization (owner only)
+  delete: organizationProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.orgPermissions.canDeleteOrg) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only the owner can delete the organization",
       });
+    }
 
-      if (membership?.role !== "owner") {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Only the owner can delete the organization",
-        });
-      }
+    await ctx.db
+      .delete(schema.organizationTable)
+      .where(eq(schema.organizationTable.id, ctx.organization.id));
 
-      await ctx.db
-        .delete(schema.organizationTable)
-        .where(eq(schema.organizationTable.id, input.organizationId));
+    return { success: true };
+  }),
 
-      return { success: true };
-    }),
-
-  // Invite member
-  inviteMember: protectedProcedure
+  // Invite member (admins+)
+  inviteMember: organizationProcedure
     .input(
       z.object({
         email: z.string().email(),
         role: z.enum(["admin", "member"]),
-        organizationId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const invitation = await ctx.authApi.createInvitation({
+      if (!ctx.orgPermissions.canInvite) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can invite members",
+        });
+      }
+
+      return ctx.authApi.createInvitation({
         body: {
-          email: input.email,
+          email: input.email.trim().toLowerCase(),
           role: input.role,
-          organizationId: input.organizationId,
+          organizationId: ctx.organization.id,
         },
         headers: ctx.headers,
       });
-      return invitation;
     }),
 
-  // Pre-create a teammate's account (no email sent). Returns a temp password
-  // to hand out manually; they sign in and can change it later. The Better Auth
-  // user.create hooks enforce the @wander.com gate and auto-join the Wander org.
-  createPerson: protectedProcedure
+  // Pre-create a teammate's account (admins+, no email sent).
+  createPerson: organizationProcedure
     .input(
       z.object({
-        organizationId: z.string(),
         name: z.string().min(1).max(120),
         email: z.string().email(),
         role: z.enum(["admin", "member"]).default("member"),
@@ -297,18 +289,20 @@ export const orgRouter = createTRPCRouter({
             filename: z.string(),
           })
           .optional(),
-        // Alternative to an uploaded file: fetch an existing image by URL
-        // (e.g. a Slack avatar). Fetched server-side to sidestep CORS.
         photoUrl: z.string().url().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.orgPermissions.canManageMembers) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can create members",
+        });
+      }
+
       const email = input.email.trim().toLowerCase();
       const tempPassword = generateTempPassword();
 
-      // Create the user via the trusted server path (no headers → Better Auth
-      // skips the admin permission check). Fires the user.create before/after
-      // hooks: @wander.com gate + auto-join Wander org as "member".
       let userId: string;
       try {
         const result = await ctx.authApi.createUser({
@@ -320,9 +314,9 @@ export const orgRouter = createTRPCRouter({
           },
         });
         userId = result.user.id;
-      } catch (err) {
+      } catch (error) {
         const message =
-          err instanceof Error ? err.message : "Failed to create user";
+          error instanceof Error ? error.message : "Failed to create user";
         throw new TRPCError({
           code: message.toLowerCase().includes("already")
             ? "CONFLICT"
@@ -331,13 +325,10 @@ export const orgRouter = createTRPCRouter({
         });
       }
 
-      // Reconcile org membership + role. The auto-join hook adds a "member" row
-      // for the Wander org; here we ensure a row for the target org at the
-      // requested role (updating the hook's row if it already exists).
       const existing = await ctx.db.query.memberTable.findFirst({
         where: and(
           eq(schema.memberTable.userId, userId),
-          eq(schema.memberTable.organizationId, input.organizationId),
+          eq(schema.memberTable.organizationId, ctx.organization.id),
         ),
       });
       if (existing) {
@@ -351,14 +342,11 @@ export const orgRouter = createTRPCRouter({
         await ctx.db.insert(schema.memberTable).values({
           id: createId("mbr"),
           userId,
-          organizationId: input.organizationId,
+          organizationId: ctx.organization.id,
           role: input.role,
         });
       }
 
-      // Optional profile photo → R2, then set user.image. Swallowed on failure
-      // so a bad photo doesn't block account creation; the flag lets the client
-      // warn. (An explicit edit later surfaces errors — see updatePerson.)
       const photoRequested = Boolean(input.photo || input.photoUrl);
       let photoSet = false;
       try {
@@ -370,92 +358,158 @@ export const orgRouter = createTRPCRouter({
             .where(eq(schema.userTable.id, userId));
           photoSet = true;
         }
-      } catch (err) {
-        console.error("[createPerson] photo upload failed:", err);
+      } catch (error) {
+        console.error("[createPerson] photo upload failed:", error);
       }
 
       return { userId, email, tempPassword, photoRequested, photoSet };
     }),
 
-  // List pending invitations
-  listInvitations: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const invitations = await ctx.db.query.invitationTable.findMany({
-        where: eq(schema.invitationTable.organizationId, input.organizationId),
-        with: {
-          inviter: {
-            columns: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+  // Only genuinely pending, unexpired invitations (admins+).
+  listInvitations: organizationProcedure.query(async ({ ctx }) => {
+    if (!ctx.orgPermissions.canInvite) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only admins can view invitations",
       });
+    }
 
-      return invitations;
-    }),
+    return ctx.db.query.invitationTable.findMany({
+      where: and(
+        eq(schema.invitationTable.organizationId, ctx.organization.id),
+        eq(schema.invitationTable.status, "pending"),
+        or(
+          isNull(schema.invitationTable.expiresAt),
+          gt(schema.invitationTable.expiresAt, new Date()),
+        ),
+      ),
+      with: {
+        inviter: {
+          columns: { id: true, name: true, email: true, image: true },
+        },
+      },
+    });
+  }),
 
-  // Cancel invitation
-  cancelInvitation: protectedProcedure
+  cancelInvitation: organizationProcedure
     .input(z.object({ invitationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.orgPermissions.canInvite) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can cancel invitations",
+        });
+      }
+
+      const invitation = await ctx.db.query.invitationTable.findFirst({
+        where: and(
+          eq(schema.invitationTable.id, input.invitationId),
+          eq(schema.invitationTable.organizationId, ctx.organization.id),
+        ),
+        columns: { id: true },
+      });
+      if (!invitation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Invitation not found in this organization",
+        });
+      }
+
       await ctx.db
         .update(schema.invitationTable)
-        .set({ status: "expired" }) // canceled is not a valid status so using expired instead
-        .where(eq(schema.invitationTable.id, input.invitationId));
+        .set({ status: "expired" })
+        .where(eq(schema.invitationTable.id, invitation.id));
 
       return { success: true };
     }),
 
-  // Remove member
-  removeMember: protectedProcedure
+  removeMember: organizationProcedure
     .input(z.object({ memberId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Don't let the caller remove their own membership and lock themselves out.
+      if (!ctx.orgPermissions.canManageMembers) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can remove members",
+        });
+      }
+
       const member = await ctx.db.query.memberTable.findFirst({
-        where: eq(schema.memberTable.id, input.memberId),
+        where: and(
+          eq(schema.memberTable.id, input.memberId),
+          eq(schema.memberTable.organizationId, ctx.organization.id),
+        ),
       });
-      if (member?.userId === ctx.session.user.id) {
+      if (!member) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found in this organization",
+        });
+      }
+      if (member.userId === ctx.session.user.id) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "You can't remove yourself",
         });
       }
+      if (member.role === "owner") {
+        if (ctx.membership.role !== "owner") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only an owner can remove another owner",
+          });
+        }
+        const owners = await ctx.db.query.memberTable.findMany({
+          where: and(
+            eq(schema.memberTable.organizationId, ctx.organization.id),
+            eq(schema.memberTable.role, "owner"),
+          ),
+          columns: { id: true },
+        });
+        if (owners.length <= 1) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "An organization must keep at least one owner",
+          });
+        }
+      }
 
       await ctx.db
         .delete(schema.memberTable)
-        .where(eq(schema.memberTable.id, input.memberId));
+        .where(eq(schema.memberTable.id, member.id));
 
       return { success: true };
     }),
 
-  // Generate a fresh temp password for a member and hand it back to show once.
-  resetPassword: protectedProcedure
+  resetPassword: organizationProcedure
     .input(z.object({ memberId: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.orgPermissions.canManageMembers) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can reset member passwords",
+        });
+      }
+
       const member = await ctx.db.query.memberTable.findFirst({
-        where: eq(schema.memberTable.id, input.memberId),
+        where: and(
+          eq(schema.memberTable.id, input.memberId),
+          eq(schema.memberTable.organizationId, ctx.organization.id),
+        ),
+        columns: { userId: true },
       });
       if (!member) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found in this organization",
+        });
       }
-      const tempPassword = generateTempPassword();
-      // Unlike createUser, the admin-plugin setUserPassword endpoint is guarded
-      // by a session middleware, so the "trusted server path (no headers)"
-      // trick throws FORBIDDEN. Forward the caller's headers — the caller must
-      // be a Better Auth admin (user.role === "admin").
-      await ctx.authApi.setUserPassword({
-        headers: ctx.headers,
-        body: { newPassword: tempPassword, userId: member.userId },
-      });
+
+      const tempPassword = await resetUserCredentialPassword(member.userId);
       return { tempPassword };
     }),
 
-  // Edit a member: name, role, and/or profile photo (one dialog).
-  updatePerson: protectedProcedure
+  // Members may edit themselves; admins may edit other members.
+  updatePerson: organizationProcedure
     .input(
       z.object({
         memberId: z.string(),
@@ -473,15 +527,63 @@ export const orgRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const member = await ctx.db.query.memberTable.findFirst({
-        where: eq(schema.memberTable.id, input.memberId),
+        where: and(
+          eq(schema.memberTable.id, input.memberId),
+          eq(schema.memberTable.organizationId, ctx.organization.id),
+        ),
       });
       if (!member) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found in this organization",
+        });
       }
-      const isSelf = member.userId === ctx.session.user.id;
 
-      // Photo first → if it fails (bad URL etc.) we abort before touching
-      // name/role. Errors surface here since this is an explicit edit.
+      const isSelf = member.userId === ctx.session.user.id;
+      if (!isSelf && !ctx.orgPermissions.canManageMembers) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can edit another member",
+        });
+      }
+
+      if (input.role && input.role !== member.role) {
+        if (isSelf) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You can't change your own role",
+          });
+        }
+        if (!ctx.orgPermissions.canManageMembers) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only admins can change member roles",
+          });
+        }
+        const ownerInvolved = input.role === "owner" || member.role === "owner";
+        if (ownerInvolved && ctx.membership.role !== "owner") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only an owner can assign or change the owner role",
+          });
+        }
+        if (member.role === "owner" && input.role !== "owner") {
+          const owners = await ctx.db.query.memberTable.findMany({
+            where: and(
+              eq(schema.memberTable.organizationId, ctx.organization.id),
+              eq(schema.memberTable.role, "owner"),
+            ),
+            columns: { id: true },
+          });
+          if (owners.length <= 1) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "An organization must keep at least one owner",
+            });
+          }
+        }
+      }
+
       const url = await uploadUserPhoto(member.userId, input);
       if (url) {
         await ctx.db
@@ -498,12 +600,6 @@ export const orgRouter = createTRPCRouter({
       }
 
       if (input.role && input.role !== member.role) {
-        if (isSelf) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "You can't change your own role",
-          });
-        }
         await ctx.db
           .update(schema.memberTable)
           .set({ role: input.role })

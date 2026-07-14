@@ -136,7 +136,9 @@ export type ZernioPostPlatform = {
         [key: string]: unknown;
       };
   status?: string; // pending | published | failed
+  platformPostId?: string;
   platformPostUrl?: string; // published posts only
+  error?: string;
   [key: string]: unknown;
 };
 
@@ -154,6 +156,49 @@ export type ZernioPost = {
   // Media fields are undocumented; left open so the dump captures real shapes.
   [key: string]: unknown;
 };
+
+export type CreateZernioPostInput = {
+  title?: string;
+  content?: string;
+  mediaItems?: Array<{
+    type: "image" | "video";
+    url: string;
+  }>;
+  platforms: Array<{
+    platform: string;
+    accountId: string;
+  }>;
+  scheduledFor?: string;
+  publishNow?: boolean;
+  timezone?: string;
+  metadata?: Record<string, unknown>;
+};
+
+/** Create a Zernio composer post. Supplying `scheduledFor` queues it for the
+ * future; `publishNow` hands it to the platform immediately. */
+export async function createZernioPost(
+  input: CreateZernioPostInput,
+  options: { requestId?: string } = {},
+): Promise<ZernioPost> {
+  const data = await zernioFetch<unknown>("/posts", {
+    method: "POST",
+    headers: options.requestId
+      ? { "x-request-id": options.requestId }
+      : undefined,
+    body: JSON.stringify(input),
+  });
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (obj.post && typeof obj.post === "object") {
+      return obj.post as ZernioPost;
+    }
+    // Idempotent retries return the original under `existingPost`.
+    if (obj.existingPost && typeof obj.existingPost === "object") {
+      return obj.existingPost as ZernioPost;
+    }
+  }
+  throw new Error("Zernio created the post but returned no post object");
+}
 
 export async function listZernioPosts(
   options: {

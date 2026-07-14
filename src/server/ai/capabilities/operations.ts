@@ -17,8 +17,8 @@ import { suggestGroupingsForBrand } from "@/server/services/content-grouping.ser
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import { suggestTargets } from "@/server/services/cadence-suggest.service";
 import { db } from "@/server/db";
-import { mediaAssetTable } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { channelTable, mediaAssetTable } from "@/server/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
 import {
   failContentIngestRun,
   finishContentIngestRun,
@@ -156,7 +156,7 @@ export const syncBrandBlog = defineCapability({
 export const proposeContentGroupings = defineCapability({
   name: "proposeContentGroupings",
   description:
-    "Analyze a brand's existing posts and propose cross-post groupings or recurring series. It only creates pending proposals; the human confirms structure in Review before canonical ideas or series are created.",
+    "Analyze an owned brand's existing posts and propose only two grouping outcomes: multiple channel executions/amplifications of one canonical idea, or multiple distinct ideas forming a series. Existing brand pillars may classify either outcome. It creates pending proposals that can be discussed and resolved in chat or Review.",
   inputSchema: z.object({
     brandId: z.string(),
     platforms: z.array(groupingPlatform).min(1),
@@ -165,9 +165,9 @@ export const proposeContentGroupings = defineCapability({
   readOnly: false,
   domain: "operations",
   execute: async (input, ctx) => {
-    await requireVisibleBrand(input.brandId, ctx);
+    await requireOwnedBrand(input.brandId, ctx);
     const result = await suggestGroupingsForBrand(input);
-    return { ...result, reviewUrl: "/app/review" };
+    return { ...result, reviewUrl: "/app/content/groupings" };
   },
 });
 
@@ -189,6 +189,46 @@ export const analyzeMediaAsset = defineCapability({
     if (!asset) throw new Error("Media asset not found.");
     const brand = await requireOwnedBrand(asset.brandId, ctx);
     return analyzeStoredMediaAsset({ mediaId, brandName: brand.name, steer });
+  },
+});
+
+export const listPublishingConnections = defineCapability({
+  name: "listPublishingConnections",
+  description:
+    "Read the owned publishing connections for one brand, including platform, handle, connection status, and delivery provider such as Zernio. Use this for questions like whether LinkedIn is connected, whether Zernio is configured for a brand, or where a channel will publish. This reads workspace connection metadata; it does not contact or modify the provider.",
+  inputSchema: z.object({ brandId: z.string() }),
+  readOnly: true,
+  domain: "operations",
+  execute: async ({ brandId }, ctx) => {
+    const brand = await requireOwnedBrand(brandId, ctx);
+    const channels = await db.query.channelTable.findMany({
+      where: and(
+        eq(channelTable.brandId, brand.id),
+        eq(channelTable.isActive, true),
+        isNull(channelTable.deletedAt),
+      ),
+      columns: {
+        id: true,
+        kind: true,
+        platform: true,
+        handle: true,
+        displayName: true,
+        connectionStatus: true,
+        defaultProvider: true,
+        externalId: true,
+      },
+    });
+    return {
+      brand: { id: brand.id, name: brand.name },
+      zernioProfileConnected: Boolean(brand.zernioProfileId),
+      channels: channels.map((channel) => ({
+        ...channel,
+        providerAccountConnected: Boolean(channel.externalId),
+        // The opaque provider account ID is intentionally not sent to the model.
+        externalId: undefined,
+      })),
+      channelsUrl: "/app/channels",
+    };
   },
 });
 
@@ -283,6 +323,7 @@ export const OPERATION_CAPABILITIES = [
   syncBrandBlog,
   proposeContentGroupings,
   analyzeMediaAsset,
+  listPublishingConnections,
   openTimelinePost,
   analyzeTimelineVideo,
   proposeStrategyTargets,

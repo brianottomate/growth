@@ -38,12 +38,16 @@ const ROLE_OPTIONS = [
 ];
 
 export function EditPersonDialog({
+  organizationId,
+  canManage,
   member,
   isSelf,
   open,
   onOpenChange,
   onSaved,
 }: {
+  organizationId: string;
+  canManage: boolean;
   member: EditableMember | null;
   isSelf: boolean;
   open: boolean;
@@ -99,9 +103,10 @@ export function EditPersonDialog({
       return;
     }
     updatePerson.mutate({
+      organizationId,
       memberId: member.id,
       name: name.trim(),
-      ...(isSelf ? {} : { role }),
+      ...(!isSelf && canManage ? { role } : {}),
       ...photoPicker.payload,
     });
   }
@@ -139,12 +144,14 @@ export function EditPersonDialog({
               value={role}
               onValueChange={(v) => setRole(v as OrgRole)}
               options={ROLE_OPTIONS}
-              disabled={isSelf}
+              disabled={isSelf || !canManage}
               aria-label="Role"
             />
-            {isSelf && (
+            {(isSelf || !canManage) && (
               <p className="text-muted-foreground text-xs">
-                You can&apos;t change your own role.
+                {isSelf
+                  ? "You can't change your own role."
+                  : "Only an admin or owner can change roles."}
               </p>
             )}
           </div>
@@ -178,13 +185,16 @@ export function EditPersonDialog({
                   )}
                 </Button>
               </div>
-            ) : (
+            ) : canManage ? (
               <Button
                 variant="outline"
                 size="sm"
                 disabled={resetPassword.isPending}
                 onClick={() =>
-                  resetPassword.mutate({ memberId: member.id })
+                  resetPassword.mutate({
+                    organizationId,
+                    memberId: member.id,
+                  })
                 }
               >
                 {resetPassword.isPending ? (
@@ -194,7 +204,7 @@ export function EditPersonDialog({
                 )}
                 Reset password
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -207,7 +217,9 @@ export function EditPersonDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={updatePerson.isPending}>
-            {updatePerson.isPending && <Loader2 className="size-4 animate-spin" />}
+            {updatePerson.isPending && (
+              <Loader2 className="size-4 animate-spin" />
+            )}
             Save
           </Button>
         </DialogFooter>

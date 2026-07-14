@@ -3,7 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull, ne } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { contentPostTable, memberTable } from "@/server/db/schema";
+import {
+  channelTable,
+  contentPostTable,
+  memberTable,
+} from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { getContentReadiness } from "@/lib/content-readiness";
@@ -95,6 +99,21 @@ export default async function ContentDetailPage({
     .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 
   const pillar = content.pillar ? PILLAR_BY_SLUG[content.pillar] : null;
+  const publishingChannels = await db.query.channelTable.findMany({
+    where: and(
+      eq(channelTable.brandId, content.brandId),
+      eq(channelTable.defaultProvider, "zernio"),
+      eq(channelTable.connectionStatus, "connected"),
+      eq(channelTable.isActive, true),
+      isNull(channelTable.deletedAt),
+    ),
+    columns: { platform: true, externalId: true },
+  });
+  const connectedPlatforms = new Set(
+    publishingChannels
+      .filter((channel) => channel.externalId)
+      .map((channel) => channel.platform),
+  );
 
   // Sibling ideas in the same series.
   const siblings = content.seriesId
@@ -297,6 +316,10 @@ export default async function ContentDetailPage({
               publishedAtISO: p.publishedAt
                 ? p.publishedAt.toISOString()
                 : null,
+              deliveryExternalId: p.deliveryExternalId,
+              deliveryStatus: p.deliveryStatus,
+              deliveryError: p.deliveryError,
+              publishingConnected: connectedPlatforms.has(p.platform),
               assetLinks: p.assetLinks,
               media: p.media,
               stats: p.stats,

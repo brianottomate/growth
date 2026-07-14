@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
-import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { ChannelLogo } from "@/components/channel-logos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,15 +39,21 @@ type Seed = (typeof SEEDS)[number]["id"];
 
 // The channels an idea can fan out to at create time (owned spots, primary
 // format). Listening-only + ads platforms are intentionally excluded here.
-const SPOT_PLATFORMS = [
-  "instagram",
-  "tiktok",
-  "x",
-  "facebook",
-  "youtube",
-  "threads",
-  "pinterest",
-  "linkedin",
+const SPOT_TARGETS = [
+  { id: "instagram", platform: "instagram", label: "Instagram" },
+  { id: "tiktok", platform: "tiktok", label: "TikTok" },
+  { id: "x", platform: "x", label: "X" },
+  { id: "facebook", platform: "facebook", label: "Facebook" },
+  { id: "youtube", platform: "youtube", label: "YouTube" },
+  { id: "threads", platform: "threads", label: "Threads" },
+  { id: "pinterest", platform: "pinterest", label: "Pinterest" },
+  { id: "linkedin", platform: "linkedin", label: "LinkedIn" },
+  {
+    id: "newsletter.blast",
+    platform: "newsletter",
+    format: "newsletter.blast",
+    label: "Email blast",
+  },
 ] as const;
 
 /**
@@ -73,14 +79,16 @@ export function AddIdeaDrawer({
   const hookRef = useRef<HTMLInputElement>(null);
 
   const [seed, setSeed] = useState<Seed>("blank");
-  const [brandId, setBrandId] = useState<string>(defaultBrandId ?? brands[0]?.id ?? "");
+  const [brandId, setBrandId] = useState<string>(
+    defaultBrandId ?? brands[0]?.id ?? "",
+  );
   const [title, setTitle] = useState("");
   const [hook, setHook] = useState("");
   const [caption, setCaption] = useState("");
   const [cta, setCta] = useState("");
   const [pillar, setPillar] = useState("");
   const [date, setDate] = useState(""); // yyyy-mm-dd
-  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [spotTargets, setSpotTargets] = useState<string[]>([]);
   const [pasteText, setPasteText] = useState("");
 
   // Reset to a clean slate every time the drawer opens.
@@ -94,7 +102,7 @@ export function AddIdeaDrawer({
       setCta("");
       setPillar("");
       setDate("");
-      setPlatforms([]);
+      setSpotTargets([]);
       setPasteText("");
     }
   }, [open, defaultBrandId, brands]);
@@ -122,8 +130,8 @@ export function AddIdeaDrawer({
     }),
   );
 
-  const togglePlatform = (p: string) =>
-    setPlatforms((prev) =>
+  const toggleSpotTarget = (p: string) =>
+    setSpotTargets((prev) =>
       prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
     );
 
@@ -142,7 +150,9 @@ export function AddIdeaDrawer({
   };
 
   const canSubmit =
-    !!brandId && (title.trim().length > 0 || hook.trim().length > 0) && !create.isPending;
+    !!brandId &&
+    (title.trim().length > 0 || hook.trim().length > 0) &&
+    !create.isPending;
 
   const submit = () => {
     if (!canSubmit) return;
@@ -155,8 +165,13 @@ export function AddIdeaDrawer({
       ctaText: cta.trim() || undefined,
       pillar: pillar || undefined,
       plannedAt: date ? new Date(`${date}T12:00:00`).toISOString() : undefined,
-      platforms: platforms.length
-        ? (platforms as ("instagram" | "tiktok")[])
+      spots: spotTargets.length
+        ? SPOT_TARGETS.filter((target) => spotTargets.includes(target.id)).map(
+            (target) => ({
+              platform: target.platform,
+              ...("format" in target ? { format: target.format } : {}),
+            }),
+          )
         : undefined,
     });
   };
@@ -195,12 +210,12 @@ export function AddIdeaDrawer({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Chat rail — the artifact-molding assistant lights up here next. */}
           <aside className="hidden w-40 shrink-0 border-r p-3 sm:block">
-            <div className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+            <div className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
               Assist
             </div>
             <div className="border-border/60 text-muted-foreground/70 mt-2 rounded-lg border border-dashed p-3 text-xs leading-relaxed">
-              A chat that molds this brief — describe an angle, paste research, or
-              drop a reference, and it fills the fields.
+              A chat that molds this brief — describe an angle, paste research,
+              or drop a reference, and it fills the fields.
               <span className="mt-1 block font-medium">Coming next.</span>
             </div>
           </aside>
@@ -321,13 +336,13 @@ export function AddIdeaDrawer({
             <div className="space-y-1.5">
               <Label>Channels</Label>
               <div className="flex flex-wrap gap-1.5">
-                {SPOT_PLATFORMS.map((p) => {
-                  const on = platforms.includes(p);
+                {SPOT_TARGETS.map((target) => {
+                  const on = spotTargets.includes(target.id);
                   return (
                     <button
-                      key={p}
+                      key={target.id}
                       type="button"
-                      onClick={() => togglePlatform(p)}
+                      onClick={() => toggleSpotTarget(target.id)}
                       className={cn(
                         "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                         on
@@ -335,15 +350,23 @@ export function AddIdeaDrawer({
                           : "border-border text-muted-foreground hover:bg-accent",
                       )}
                     >
-                      <ChannelLogo platform={p} className="size-3.5" />
-                      {platformLabel(p)}
+                      <ChannelLogo
+                        platform={
+                          "format" in target &&
+                          target.format === "newsletter.blast"
+                            ? "blast"
+                            : target.platform
+                        }
+                        className="size-3.5"
+                      />
+                      {target.label}
                     </button>
                   );
                 })}
               </div>
               <p className="text-muted-foreground text-xs">
-                Each selected channel becomes a spot at its primary format — tune
-                them on the idea page.
+                Each selected channel becomes a spot at its primary format —
+                tune them on the idea page.
               </p>
             </div>
           </div>

@@ -1,47 +1,70 @@
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import { oauthProviderResourceClient } from "@better-auth/oauth-provider/resource-client";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { and, eq } from "drizzle-orm";
 
-import { OVERVIEW_CAPABILITIES } from "@/server/ai/capabilities";
+import { MCP_CAPABILITIES } from "@/server/ai/capabilities";
 import { registerMcpCapabilities } from "@/server/ai/capabilities/to-mcp-server";
-import { auth } from "@/server/better-auth";
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
+import {
+  GROWTH_AUTH_ISSUER,
+  GROWTH_JWKS_URL,
+  GROWTH_MCP_RESOURCE,
+  GROWTH_MCP_SCOPE,
+  GROWTH_PUBLIC_ORIGIN,
+} from "@/server/mcp/config";
 
 export const maxDuration = 800;
 
 const mcpHandler = createMcpHandler(
-  (server) => registerMcpCapabilities(server, OVERVIEW_CAPABILITIES),
+  (server) => registerMcpCapabilities(server, MCP_CAPABILITIES),
   {},
   { basePath: "/api", maxDuration, verboseLogs: false },
 );
 
+const { verifyAccessToken } = oauthProviderResourceClient().getActions();
+
 async function verifyToken(
-  request: Request,
+  _request: Request,
   bearerToken?: string,
 ): Promise<AuthInfo | undefined> {
   if (!bearerToken) return undefined;
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user) return undefined;
+  const claims = await verifyAccessToken(bearerToken, {
+    verifyOptions: {
+      audience: GROWTH_MCP_RESOURCE,
+      issuer: GROWTH_AUTH_ISSUER,
+    },
+    jwksUrl: GROWTH_JWKS_URL,
+    scopes: [GROWTH_MCP_SCOPE],
+  });
+  const userId = claims.sub;
+  const organizationId = claims.org_id;
+  if (typeof userId !== "string" || typeof organizationId !== "string") {
+    return undefined;
+  }
 
-  const preferredOrgId = session.session.activeOrganizationId;
+  // Membership is intentionally live rather than copied into a long-lived
+  // connector record. Removing a user from an organization removes MCP access.
   const membership = await db.query.memberTable.findFirst({
-    where: preferredOrgId
-      ? and(
-          eq(memberTable.userId, session.user.id),
-          eq(memberTable.organizationId, preferredOrgId),
-        )
-      : eq(memberTable.userId, session.user.id),
+    where: and(
+      eq(memberTable.userId, userId),
+      eq(memberTable.organizationId, organizationId),
+    ),
     columns: { organizationId: true },
   });
   if (!membership) return undefined;
 
+  const grantedScopes =
+    typeof claims.scope === "string" ? claims.scope.split(" ") : [];
+
   return {
     token: bearerToken,
-    clientId: session.user.id,
-    scopes: ["growth:capabilities"],
+    clientId: typeof claims.azp === "string" ? claims.azp : userId,
+    scopes: grantedScopes,
+    expiresAt: claims.exp,
     extra: {
-      userId: session.user.id,
+      userId,
       orgId: membership.organizationId,
     },
   };
@@ -49,7 +72,8 @@ async function verifyToken(
 
 const handler = withMcpAuth(mcpHandler, verifyToken, {
   required: true,
-  requiredScopes: ["growth:capabilities"],
+  requiredScopes: [GROWTH_MCP_SCOPE],
+  resourceUrl: GROWTH_PUBLIC_ORIGIN,
 });
 
-export { handler as GET, handler as POST };
+export { handler as DELETE, handler as GET, handler as POST };

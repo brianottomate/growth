@@ -29,6 +29,12 @@ const augmentedSchema = {
   invitation: schema.invitationTable,
   team: schema.teamTable,
   teamMember: schema.teamMemberTable,
+  // Better Auth JWT + OAuth provider plugin aliases.
+  jwks: schema.jwksTable,
+  oauthClient: schema.oauthClientTable,
+  oauthRefreshToken: schema.oauthRefreshTokenTable,
+  oauthAccessToken: schema.oauthAccessTokenTable,
+  oauthConsent: schema.oauthConsentTable,
 };
 
 if (!env.DATABASE_URL) {

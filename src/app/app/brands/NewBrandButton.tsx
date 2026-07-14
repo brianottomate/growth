@@ -70,7 +70,7 @@ export function NewBrandButton() {
           <DialogHeader>
             <DialogTitle>New brand</DialogTitle>
             <DialogDescription>
-              Create an owned company or personal brand inside Boe Ventures.
+              Create an owned company or personal brand in Wander Growth.
             </DialogDescription>
           </DialogHeader>
 

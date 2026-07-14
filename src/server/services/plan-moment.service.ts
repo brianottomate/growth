@@ -10,12 +10,19 @@ import {
   amplificationTargetTable,
   amplifierTable,
   brandTable,
+  channelPlatformEnum,
   contentPostTable,
   initiativeTable,
+  channelTable,
+  platformPostTable,
   seriesTable,
   type TargetSpot,
 } from "@/server/db/schema";
-import { FORMAT_ARCHETYPES, TEMPLATE_STARTERS } from "@/server/content/formats";
+import {
+  FORMAT_ARCHETYPES,
+  TEMPLATE_STARTERS,
+  getPlatformFormat,
+} from "@/server/content/formats";
 import { scrapeBasicContent } from "@/server/clients/firecrawl.client";
 
 /**
@@ -44,10 +51,21 @@ export const momentSlotSchema = z.object({
   spots: z
     .array(
       z.object({
-        platform: z.string().describe("x, instagram, linkedin, blog, newsletter, …"),
-        format: z.string().describe("concrete format id, e.g. x.thread, instagram.reel"),
-        archetype: z.string().describe(`one of: ${FORMAT_ARCHETYPES.join(", ")}`),
-        template: z.string().optional().describe(TEMPLATE_STARTERS.slice(0, 5).join(", ")),
+        platform: z
+          .enum(channelPlatformEnum.enumValues)
+          .describe("x, instagram, linkedin, blog, newsletter, …"),
+        format: z
+          .string()
+          .describe(
+            "concrete format id, e.g. x.thread, instagram.reel, newsletter.broadcast (recurring issue), or newsletter.blast (one-off email)",
+          ),
+        archetype: z
+          .string()
+          .describe(`one of: ${FORMAT_ARCHETYPES.join(", ")}`),
+        template: z
+          .string()
+          .optional()
+          .describe(TEMPLATE_STARTERS.slice(0, 5).join(", ")),
       }),
     )
     .describe("channel renderings for this slot (one piece, many channels)"),
@@ -72,15 +90,25 @@ export const momentBlueprintSchema = z.object({
     .describe(
       "'single' = one piece across a few channels (maybe boosted), no multi-day arc; 'arc' = a multi-day, multi-piece launch (gets a series).",
     ),
-  goal: z.string().optional().describe("short goal slug, e.g. fundraise | supply"),
-  seriesName: z.string().optional().describe("series name (only for scale=arc)"),
+  goal: z
+    .string()
+    .optional()
+    .describe("short goal slug, e.g. fundraise | supply"),
+  seriesName: z
+    .string()
+    .optional()
+    .describe("series name (only for scale=arc)"),
   theme: z.string().optional(),
   slots: z
     .array(momentSlotSchema)
-    .describe("the launch arc as slots, ordered by dayOffset (empty if verdict=campaign)"),
+    .describe(
+      "the launch arc as slots, ordered by dayOffset (empty if verdict=campaign)",
+    ),
   amplifierAsks: z
     .array(amplifierAskSchema)
-    .describe("amplifiers to recruit (by role if no names; empty for small/campaign)"),
+    .describe(
+      "amplifiers to recruit (by role if no names; empty for small/campaign)",
+    ),
   missing: z
     .string()
     .optional()
@@ -107,6 +135,7 @@ If reference images/brief are given, treat them as the HERO creative and plan it
 
 slotKind: "anchored" ONLY for hard date-pinned beats; "freeflow" for the reactive/optional/amplification beats. Don't mark everything anchored.
 Keep it tight and high-signal — never 30 slots.
+For email, distinguish the editorial stream from a launch send: use newsletter.broadcast only for a recurring newsletter issue; use newsletter.blast for a one-off announcement, launch, reactivation, waitlist, or experiment email. A blast is a normal calendar spot in the initiative, not part of newsletter cadence.
 Always fill in "missing": an honest note on what you did NOT cover (a channel left out, a cadence gap, a beat you'd expect).`;
 
 /** A pinned beat the operator wants reproduced verbatim during a refine. */
@@ -133,7 +162,9 @@ export type IngestedSources = {
 const IMAGE_URL_RE = /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i;
 const MAX_BRIEF_CHARS = 6_000;
 
-export async function ingestSources(sources: string[]): Promise<IngestedSources> {
+export async function ingestSources(
+  sources: string[],
+): Promise<IngestedSources> {
   const imageUrls: string[] = [];
   const briefs: string[] = [];
   let name: string | undefined;
@@ -191,7 +222,9 @@ export async function generateMomentBlueprint(opts: {
           ? `The operator REJECTED these beats — do NOT re-introduce them or close variants:\n${refine.drop.map((t) => `- ${t}`).join("\n")}`
           : null,
         `Re-propose any non-locked beats as needed for a coherent arc. Do NOT drop or alter the locked beats.`,
-        refine.steer ? `Operator steer (follow this closely): ${refine.steer}` : null,
+        refine.steer
+          ? `Operator steer (follow this closely): ${refine.steer}`
+          : null,
       ]
         .filter(Boolean)
         .join("\n")
@@ -230,7 +263,10 @@ export async function generateMomentBlueprint(opts: {
 
   const { output } = await generateText({
     model: anthropic(MODEL),
-    output: Output.object({ name: "MomentPlan", schema: momentBlueprintSchema }),
+    output: Output.object({
+      name: "MomentPlan",
+      schema: momentBlueprintSchema,
+    }),
     system: SYSTEM,
     messages: [{ role: "user", content }],
   });
@@ -257,7 +293,8 @@ export async function commitMomentBlueprint(opts: {
 
   const bp = opts.blueprint;
   const launch = new Date(opts.launchDateISO);
-  const at = (offset: number) => new Date(launch.getTime() + offset * 86_400_000);
+  const at = (offset: number) =>
+    new Date(launch.getTime() + offset * 86_400_000);
   const offsets = bp.slots.map((s) => s.dayOffset);
   const startAt = at(Math.min(0, ...offsets));
   const endAt = at(Math.max(0, ...offsets));
@@ -274,6 +311,13 @@ export async function commitMomentBlueprint(opts: {
     })
     .returning({ id: initiativeTable.id });
   const momentId = initiative!.id;
+
+  const channels = await db.query.channelTable.findMany({
+    where: eq(channelTable.brandId, opts.brandId),
+  });
+  const channelByPlatform = new Map(
+    channels.map((channel) => [channel.platform, channel]),
+  );
 
   // Only an arc gets a series; a single push attaches slots straight to the moment.
   let seriesId: string | null = null;
@@ -294,25 +338,60 @@ export async function commitMomentBlueprint(opts: {
   }
 
   for (const s of bp.slots) {
+    const scheduledAt = at(s.dayOffset);
     const targetSpots: TargetSpot[] = s.spots.map((sp) => ({
       platform: sp.platform,
       format: sp.format,
       archetype: sp.archetype,
       template: sp.template,
-      scheduledAt: at(s.dayOffset).toISOString(),
+      scheduledAt: scheduledAt.toISOString(),
     }));
-    await db.insert(contentPostTable).values({
-      brandId: opts.brandId,
-      title: s.title,
-      status: "slot",
-      slotKind: s.slotKind,
-      origin: "ai",
-      initiativeId: momentId,
-      seriesId,
-      plannedAt: at(s.dayOffset),
-      targetSpots,
-      metadata: { rationale: s.rationale, isThread: s.isThread },
+    const calendarSpots = s.spots.flatMap((sp) => {
+      const format = getPlatformFormat(sp.format);
+      return format?.platform === sp.platform
+        ? [{ ...sp, archetype: format.archetype }]
+        : [];
     });
+    const [contentPost] = await db
+      .insert(contentPostTable)
+      .values({
+        brandId: opts.brandId,
+        title: s.title,
+        status: "slot",
+        slotKind: s.slotKind,
+        origin: "ai",
+        initiativeId: momentId,
+        seriesId,
+        plannedAt: scheduledAt,
+        targetSpots,
+        metadata: { rationale: s.rationale, isThread: s.isThread },
+      })
+      .returning({ id: contentPostTable.id });
+
+    // A committed plan is already calendar intent. Materialize each target as
+    // an owned slot immediately so X, LinkedIn, blog, and email blasts all show
+    // on the content calendar without waiting for the later drafting step.
+    if (contentPost && calendarSpots.length) {
+      await db.insert(platformPostTable).values(
+        calendarSpots.map((sp) => {
+          const channel = channelByPlatform.get(sp.platform);
+          return {
+            brandId: opts.brandId,
+            contentPostId: contentPost.id,
+            channelId: channel?.id,
+            platform: sp.platform,
+            username: channel?.handle,
+            format: sp.format,
+            archetype: sp.archetype,
+            template: sp.template,
+            source: "owned" as const,
+            status: "slot" as const,
+            origin: "ai" as const,
+            scheduledAt,
+          };
+        }),
+      );
+    }
   }
 
   let amplifierTargets = 0;

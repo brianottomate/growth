@@ -191,6 +191,9 @@ export type CreateIdeaInput = {
   // Channels to fan this idea out to immediately, as owned spots at the
   // platform's primary format. The cross-post manifest, materialized eagerly.
   platforms?: ChannelPlatform[];
+  // Concrete spots when the content type matters beyond the surface default
+  // (for example newsletter.blast vs the recurring newsletter issue).
+  spots?: { platform: ChannelPlatform; format?: string | null }[];
 };
 
 /**
@@ -223,7 +226,9 @@ async function createIdea(
     .returning({ id: contentPostTable.id });
 
   const id = row?.id;
-  if (id && input.platforms?.length) {
+  if (id && input.spots?.length) {
+    await addSpotTargets(id, input.brandId, input.spots);
+  } else if (id && input.platforms?.length) {
     await addSpots(id, input.brandId, input.platforms);
   }
   return { id };
@@ -235,12 +240,30 @@ async function addSpots(
   brandId: string,
   platforms: ChannelPlatform[],
 ): Promise<void> {
-  const rows = [...new Set(platforms)].map((platform) => {
-    const format = platformFormatsFor(platform)[0]?.id;
+  await addSpotTargets(
+    contentPostId,
+    brandId,
+    [...new Set(platforms)].map((platform) => ({ platform })),
+  );
+}
+
+/** Fan an idea out with an explicit concrete format where needed. */
+async function addSpotTargets(
+  contentPostId: string,
+  brandId: string,
+  spots: { platform: ChannelPlatform; format?: string | null }[],
+): Promise<void> {
+  const seen = new Set<string>();
+  const rows = spots.flatMap((spot) => {
+    const format =
+      spot.format ?? platformFormatsFor(spot.platform)[0]?.id ?? undefined;
+    const key = `${spot.platform}|${format ?? ""}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
     return {
       brandId,
       contentPostId,
-      platform,
+      platform: spot.platform,
       format,
       archetype: format ? archetypeForFormat(format) : undefined,
       source: "owned" as const,
@@ -381,6 +404,7 @@ export const ContentService = {
   promotePlatformPost,
   updateBrief,
   addSpots,
+  addSpotTargets,
   setSpotText,
   setPoolMedia,
   setSpotMedia,

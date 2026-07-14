@@ -14,6 +14,7 @@ import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
 import {
   audienceTargetTable,
+  brandInspirationTable,
   brandTable,
   channelSuggestionTable,
   contentSuggestionTable,
@@ -125,8 +126,28 @@ export default async function ReviewPage() {
     );
   }
 
+  const inspirationLinks = await db.query.brandInspirationTable.findMany({
+    where: inArray(brandInspirationTable.brandId, brandIds),
+    columns: { inspirationBrandId: true },
+  });
+  const trackedIds = [
+    ...new Set(inspirationLinks.map((link) => link.inspirationBrandId)),
+  ];
+  const trackedBrands = trackedIds.length
+    ? await db.query.brandTable.findMany({
+        where: inArray(brandTable.id, trackedIds),
+        columns: { id: true, name: true },
+      })
+    : [];
+  const reviewBrandIds = [...brandIds, ...trackedIds];
+  const reviewNames = new Map([
+    ...names,
+    ...trackedBrands.map((brand) => [brand.id, brand.name] as const),
+  ]);
+
   const [
     groupingSuggestions,
+    contentSuggestions,
     channelSuggestions,
     ownedPosts,
     mediaAssets,
@@ -136,6 +157,19 @@ export default async function ReviewPage() {
       where: and(
         inArray(contentSuggestionTable.brandId, brandIds),
         eq(contentSuggestionTable.kind, "grouping"),
+        eq(contentSuggestionTable.status, "pending"),
+      ),
+      columns: { brandId: true },
+    }),
+    db.query.contentSuggestionTable.findMany({
+      where: and(
+        inArray(contentSuggestionTable.brandId, reviewBrandIds),
+        inArray(contentSuggestionTable.kind, [
+          "classification",
+          "amplification",
+          "cross_link",
+          "thread",
+        ]),
         eq(contentSuggestionTable.status, "pending"),
       ),
       columns: { brandId: true },
@@ -198,6 +232,16 @@ export default async function ReviewPage() {
       icon: FileStack,
       total: groupingSuggestions.length,
       byBrand: byBrand(brandIds, names, groupingSuggestions),
+      kind: "decision",
+    },
+    {
+      title: "Content suggestions",
+      description:
+        "Review proposed classifications and amplification links before they change the confirmed content graph.",
+      href: "/app/content/suggestions",
+      icon: FileStack,
+      total: contentSuggestions.length,
+      byBrand: byBrand(reviewBrandIds, reviewNames, contentSuggestions),
       kind: "decision",
     },
     {
@@ -291,8 +335,8 @@ export default async function ReviewPage() {
             Structural gaps · {gapTotal}
           </h2>
           <p className="text-muted-foreground mt-0.5 text-sm">
-            Raw material the assistant can see but cannot yet use as strong, confirmed
-            planning context.
+            Raw material the assistant can see but cannot yet use as strong,
+            confirmed planning context.
           </p>
         </div>
         <div className="grid gap-3 md:grid-cols-2">

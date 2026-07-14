@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArchiveRestore,
   ArrowUpRight,
@@ -13,6 +13,7 @@ import {
   ImageIcon,
   Layers,
   Loader2,
+  Play,
   type LucideIcon,
   Megaphone,
   MessageCircle,
@@ -26,6 +27,9 @@ import {
 
 import { cn } from "@/lib/utils";
 import { CopyButton } from "@/components/copy-button";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
+import type { WorkContentIntent } from "@/lib/assistant-events";
 import { type RouterInputs, type RouterOutputs, useTRPC } from "@/trpc/react";
 
 /**
@@ -123,6 +127,75 @@ export interface ContentPipelineOutput {
   standaloneByStatus: StatusCount[];
 }
 
+export interface ContentStrategyOutput {
+  brand: { id: string; name: string };
+  pillars: {
+    slug: string;
+    name: string;
+    description: string;
+    color: string;
+    source: "default" | "custom";
+    contentCount: number;
+    targetPct: number | null;
+    targetPeriod: string | null;
+  }[];
+  series: {
+    id: string;
+    name: string;
+    description: string | null;
+    theme: string | null;
+    pillarSlug: string | null;
+    status: string;
+    startAt: string | null;
+    endAt: string | null;
+    content: {
+      id: string;
+      title: string | null;
+      pillar: string | null;
+      status: string;
+    }[];
+  }[];
+  groupingProposals: {
+    id: string;
+    confidence: number | null;
+    reasoning: string | null;
+    proposed: {
+      unit?: "single" | "series";
+      title?: string;
+      theme?: string;
+      pillarSlug?: string | null;
+      memberPostIds?: string[];
+      rationale?: string;
+    };
+  }[];
+  reviewUrl: string;
+  pillarsUrl: string;
+}
+
+export interface ContentStructureMutationOutput {
+  ok?: boolean;
+  action?: "saved";
+  change?:
+    | "pillar"
+    | "created"
+    | "updated"
+    | "organized"
+    | "same_idea"
+    | "series"
+    | "rejected";
+  pillar?: { slug: string; name: string };
+  series?: { id?: string; name?: string; pillar?: string | null } | null;
+  title?: string | null;
+  count?: number;
+  attachedIdeas?: number;
+  contentIdeas?: number;
+  channelPosts?: number;
+  pillarSlug?: string | null;
+  removedFromSeries?: boolean;
+  url?: string | null;
+  error?: string;
+}
+
 export interface MediaSuggestionsOutput {
   content: {
     id: string;
@@ -151,6 +224,160 @@ export interface MediaSuggestionsOutput {
       previewAvailable: boolean;
     }[];
   }[];
+}
+
+export interface ProductionPacketOutput {
+  action: "saved";
+  packetId: string;
+  title: string;
+  purpose: string | null;
+  prompt: string;
+  negativePrompt: string | null;
+  aspectRatio: string | null;
+  outputFormat: string | null;
+  suggestedTool: string | null;
+  instructions: string | null;
+  copyText: string;
+  contentPostId: string | null;
+  brandId: string;
+}
+
+/** External handoff is the primary action; Fal is an optional sibling path. */
+export function ProductionPacketCard({
+  output,
+}: {
+  output: ProductionPacketOutput;
+}) {
+  const trpc = useTRPC();
+  const configuration = useQuery(
+    trpc.creativeWork.configuration.queryOptions(),
+  );
+  const [run, setRun] = useState<
+    RouterOutputs["creativeWork"]["submitFal"] | null
+  >(null);
+  const submitFal = useMutation(
+    trpc.creativeWork.submitFal.mutationOptions({
+      onSuccess: setRun,
+      onError: (error) =>
+        toast.error("Fal could not start", { description: error.message }),
+    }),
+  );
+  const refreshRun = useMutation(
+    trpc.creativeWork.refreshRun.mutationOptions({
+      onSuccess: setRun,
+      onError: (error) =>
+        toast.error("Could not refresh generation", {
+          description: error.message,
+        }),
+    }),
+  );
+  const acceptCandidate = useMutation(
+    trpc.creativeWork.acceptCandidate.mutationOptions({
+      onSuccess: ({ run: accepted }) => {
+        setRun(accepted);
+        toast.success("Saved to the brand library");
+      },
+      onError: (error) =>
+        toast.error("Could not save image", { description: error.message }),
+    }),
+  );
+
+  useEffect(() => {
+    if (!run || !["queued", "processing"].includes(run.status)) return;
+    const timer = window.setTimeout(
+      () => refreshRun.mutate({ runId: run.id }),
+      3000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [refreshRun, run]);
+
+  const candidate = run?.candidates[0];
+  return (
+    <ToolCard
+      icon={FileText}
+      title="Production packet"
+      hint={output.suggestedTool ?? "Ready to hand off"}
+    >
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm font-medium">{output.title}</p>
+          {output.purpose && (
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              {output.purpose}
+            </p>
+          )}
+        </div>
+        <div className="bg-muted/40 max-h-40 overflow-y-auto rounded-md border p-2.5 text-xs whitespace-pre-wrap">
+          {output.prompt}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyButton text={output.copyText} label="Copy production packet" />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={
+              !configuration.data?.falConfigured || submitFal.isPending || !!run
+            }
+            onClick={() => submitFal.mutate({ packetId: output.packetId })}
+          >
+            {submitFal.isPending ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Play className="size-3.5" />
+            )}
+            Try with Fal
+          </Button>
+        </div>
+        {!configuration.isLoading && !configuration.data?.falConfigured && (
+          <p className="text-muted-foreground text-[10px]">
+            Fal is optional and is not configured here. The packet is ready for
+            Claude, ChatGPT, or another production tool.
+          </p>
+        )}
+        {run && ["queued", "processing"].includes(run.status) && (
+          <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <Loader2 className="size-3.5 animate-spin" />
+            Fal is producing one candidate. You can leave this session; the run
+            is durable.
+          </p>
+        )}
+        {run?.status === "error" && (
+          <p className="text-destructive text-xs">{run.error}</p>
+        )}
+        {candidate && (
+          <div className="overflow-hidden rounded-lg border">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={candidate.url}
+              alt="Fal image candidate"
+              className="max-h-80 w-full object-cover"
+            />
+            <div className="flex items-center justify-between gap-2 p-2.5">
+              <p className="text-muted-foreground text-[10px]">
+                Preview only until accepted
+              </p>
+              <Button
+                size="sm"
+                disabled={
+                  acceptCandidate.isPending || !!run.acceptedMediaAssetId
+                }
+                onClick={() =>
+                  acceptCandidate.mutate({ runId: run.id, candidateIndex: 0 })
+                }
+              >
+                {acceptCandidate.isPending && (
+                  <Loader2 className="size-3.5 animate-spin" />
+                )}
+                {run.acceptedMediaAssetId
+                  ? "Saved to library"
+                  : "Accept to library"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </ToolCard>
+  );
 }
 
 /** A visual shelf for the real candidates behind the assistant's recommendation. */
@@ -300,6 +527,33 @@ export interface UpcomingContentOutput {
     text: string | null;
     scheduledAt: string | null;
   }[];
+}
+
+export interface ProductionQueueOutput {
+  brand: { id: string; name: string };
+  window: { from: string; through: string };
+  items: {
+    id: string;
+    title: string | null;
+    plannedAt: string | null;
+    status: string;
+    completed: number;
+    total: number;
+    readyForReview: boolean;
+    next: { id: string; label: string; detail: string } | null;
+    platforms: string[];
+    url: string;
+  }[];
+}
+
+export interface NextForBrandOutput {
+  brand: { id: string; name: string; tagline: string | null };
+  horizonDays: number;
+  readiness: { readyToPlan: boolean; gaps: string[] };
+  production: ProductionQueueOutput;
+  recommendation: string;
+  contentUrl: string;
+  calendarUrl: string;
 }
 
 export interface LeadsSummaryOutput {
@@ -900,6 +1154,163 @@ export function ContentPipelineCard({
   );
 }
 
+/** `getContentStrategy` — the small durable hierarchy the operator can shape
+ * conversationally: pillar → series → canonical ideas, plus pending
+ * retrospective reconstruction proposals. */
+export function ContentStrategyCard({
+  output,
+}: {
+  output: ContentStrategyOutput;
+}) {
+  return (
+    <ToolCard
+      icon={Layers}
+      title={`Content structure · ${output.brand.name}`}
+      href={output.pillarsUrl}
+      hint={`${output.pillars.length} pillars · ${output.series.length} series`}
+    >
+      <div className="space-y-3">
+        <div>
+          <p className="text-muted-foreground mb-1.5 text-[10px] font-medium tracking-wide uppercase">
+            Pillars
+          </p>
+          {output.pillars.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {output.pillars.map((pillar) => (
+                <span
+                  key={pillar.slug}
+                  className="bg-muted/50 inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px]"
+                  title={pillar.description}
+                >
+                  <span
+                    className="size-1.5 rounded-full"
+                    style={{ background: pillar.color }}
+                  />
+                  {pillar.name}
+                  <span className="text-muted-foreground tabular-nums">
+                    {pillar.contentCount}
+                    {pillar.targetPct != null ? ` · ${pillar.targetPct}%` : ""}
+                  </span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              No pillars defined yet.
+            </p>
+          )}
+        </div>
+
+        <div className="border-t pt-2.5">
+          <p className="text-muted-foreground mb-1.5 text-[10px] font-medium tracking-wide uppercase">
+            Series
+          </p>
+          {output.series.length ? (
+            <ul className="space-y-1.5">
+              {output.series.slice(0, 6).map((series) => (
+                <li key={series.id} className="flex items-center gap-2 text-xs">
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {series.name}
+                  </span>
+                  {series.pillarSlug && (
+                    <span className="text-muted-foreground max-w-32 truncate">
+                      {series.pillarSlug}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground tabular-nums">
+                    {series.content.length} idea
+                    {series.content.length === 1 ? "" : "s"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              No series defined yet.
+            </p>
+          )}
+        </div>
+
+        {output.groupingProposals.length > 0 && (
+          <Link
+            href={output.reviewUrl}
+            className="flex items-center justify-between rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-600 dark:text-amber-400"
+          >
+            <span>
+              {output.groupingProposals.length} grouping proposal
+              {output.groupingProposals.length === 1 ? "" : "s"} awaiting review
+            </span>
+            <ArrowUpRight className="size-3.5" />
+          </Link>
+        )}
+      </div>
+    </ToolCard>
+  );
+}
+
+/** Friendly completion state for pillar/series/grouping writes. */
+export function ContentStructureMutationCard({
+  output,
+}: {
+  output: ContentStructureMutationOutput;
+}) {
+  if (output.error) {
+    return <p className="text-destructive text-xs">{output.error}</p>;
+  }
+  const label =
+    output.change === "pillar"
+      ? "Pillar saved"
+      : output.change === "created"
+        ? "Series created"
+        : output.change === "updated"
+          ? "Series updated"
+          : output.change === "same_idea"
+            ? "Channel posts grouped as one idea"
+            : output.change === "series"
+              ? "Series created from existing posts"
+              : output.change === "rejected"
+                ? "Grouping proposal dismissed"
+                : output.removedFromSeries
+                  ? "Ideas removed from series"
+                  : "Content structure updated";
+  const title = output.pillar?.name ?? output.series?.name ?? output.title;
+  const affected =
+    output.attachedIdeas ??
+    output.contentIdeas ??
+    output.channelPosts ??
+    output.count;
+  return (
+    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-500">
+        <Sparkles className="size-3.5" />
+        {label}
+      </div>
+      {title && <p className="mt-1 text-sm font-medium">{title}</p>}
+      {(output.pillarSlug || affected != null) && (
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          {[
+            output.pillarSlug ? `Pillar: ${output.pillarSlug}` : null,
+            affected != null
+              ? `${affected} ${output.channelPosts != null ? "channel posts" : "ideas"}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      )}
+      {output.url && (
+        <Link
+          href={output.url}
+          className="text-primary mt-2 inline-flex items-center gap-1 text-xs font-medium hover:underline"
+        >
+          Inspect structure
+          <ArrowUpRight className="size-3" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
 /** `upcomingContent` — soonest-first rows with date chip + status. */
 export function UpcomingContentCard({
   output,
@@ -956,6 +1367,147 @@ export function UpcomingContentCard({
           ))}
         </ul>
       )}
+    </ToolCard>
+  );
+}
+
+function ProductionQueueRows({
+  output,
+  onWork,
+}: {
+  output: ProductionQueueOutput;
+  onWork: (intent: WorkContentIntent) => void;
+}) {
+  const visible = output.items.slice(0, 3);
+
+  if (visible.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        No canonical content items are planned in this window.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <ul className="divide-y">
+        {visible.map((item) => {
+          const title = item.title?.trim() || "Untitled content item";
+          return (
+            <li key={item.id} className="py-2.5 first:pt-0 last:pb-0">
+              <div className="flex items-start gap-3">
+                <span className="text-muted-foreground w-12 shrink-0 pt-0.5 text-xs tabular-nums">
+                  {fmtDate(item.plannedAt)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{title}</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    {item.completed}/{item.total} steps complete
+                    {item.next
+                      ? ` · Next: ${item.next.detail}`
+                      : " · Ready for review"}
+                  </p>
+                  {item.platforms.length > 0 && (
+                    <p className="text-muted-foreground mt-0.5 truncate text-[11px]">
+                      {[...new Set(item.platforms)].join(" · ")}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <Link
+                  href={item.url}
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
+                >
+                  Open
+                  <ArrowUpRight className="size-3" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onWork({
+                      type: "work_content_post",
+                      brandId: output.brand.id,
+                      brandName: output.brand.name,
+                      contentPostId: item.id,
+                      contentTitle: title,
+                      visibleText: `Help me work on “${title}”. Start with the next incomplete production step.`,
+                    })
+                  }
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+                >
+                  <MessageCircle className="size-3" />
+                  Work in chat
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {output.items.length > visible.length && (
+        <p className="text-muted-foreground mt-2 border-t pt-2 text-xs">
+          {output.items.length - visible.length} more item
+          {output.items.length - visible.length === 1 ? "" : "s"} in the
+          look-ahead.
+        </p>
+      )}
+    </>
+  );
+}
+
+/** `productionQueue` — a calm, bounded bridge from planning into execution. */
+export function ProductionQueueCard({
+  output,
+  onWork,
+}: {
+  output: ProductionQueueOutput;
+  onWork: (intent: WorkContentIntent) => void;
+}) {
+  return (
+    <ToolCard
+      icon={CircleDot}
+      title={`Production queue · ${output.brand.name}`}
+      hint={`${output.items.length}`}
+    >
+      <ProductionQueueRows output={output} onWork={onWork} />
+    </ToolCard>
+  );
+}
+
+/** `nextForBrand` — readiness context plus no more than three priorities. */
+export function NextForBrandCard({
+  output,
+  onWork,
+}: {
+  output: NextForBrandOutput;
+  onWork: (intent: WorkContentIntent) => void;
+}) {
+  return (
+    <ToolCard
+      icon={CalendarClock}
+      title={`Next · ${output.brand.name}`}
+      hint={`${output.horizonDays} days`}
+    >
+      <p className="text-sm">{output.recommendation}</p>
+      {output.readiness.gaps.length > 0 && (
+        <p className="text-muted-foreground mt-1.5 text-xs">
+          Planning context still needs: {output.readiness.gaps.join(", ")}.
+        </p>
+      )}
+      <div className="mt-3 border-t pt-3">
+        <ProductionQueueRows output={output.production} onWork={onWork} />
+      </div>
+      <div className="mt-3 flex items-center gap-3 border-t pt-2.5 text-xs font-medium">
+        <Link href={output.contentUrl} className="text-primary hover:underline">
+          Open content
+        </Link>
+        <Link
+          href={output.calendarUrl}
+          className="text-primary hover:underline"
+        >
+          Open calendar
+        </Link>
+      </div>
     </ToolCard>
   );
 }

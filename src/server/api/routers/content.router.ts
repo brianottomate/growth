@@ -23,6 +23,11 @@ import { ContentService } from "@/server/services/content.service";
 import { generateSpotCaption } from "@/server/services/spot-generate.service";
 import { SPOT_PILL_IDS } from "@/lib/spot-pills";
 import { displayPoster } from "@/lib/utils/media";
+import {
+  deliverLinkedInPost,
+  refreshLinkedInDelivery,
+} from "@/server/services/content-publishing.service";
+import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 
 type Ctx = {
   db: typeof import("@/server/db").db;
@@ -152,7 +157,13 @@ export const contentRouter = createTRPCRouter({
       }
 
       return posts.map((c) => {
-        const platforms = [...new Set(c.platformPosts.map((p) => p.platform))];
+        const platforms = [
+          ...new Set(
+            c.platformPosts.map((p) =>
+              p.format === "newsletter.blast" ? "blast" : p.platform,
+            ),
+          ),
+        ];
         const totals = c.platformPosts.reduce(
           (acc, p) => {
             const s = p.stats ?? {};
@@ -254,6 +265,7 @@ export const contentRouter = createTRPCRouter({
             contentPostId: p.contentPostId,
             title: p.contentPost?.title ?? null,
             platform: p.platform,
+            format: p.format,
             status: p.status,
             pillar: p.contentPost?.pillar ?? null,
             seriesName: p.contentPost?.series?.name ?? null,
@@ -559,6 +571,55 @@ export const contentRouter = createTRPCRouter({
       return { id: input.platformPostId };
     }),
 
+  /** Approval-gated LinkedIn-first publishing spike. The same Zernio endpoint
+   * handles future scheduling and publish-now; delivery state is persisted on
+   * the platform post so a later refresh/webhook can close the loop. */
+  deliverLinkedIn: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        mode: z.enum(["schedule", "publish_now"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      try {
+        return await deliverLinkedInPost(input);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Could not publish",
+        });
+      }
+    }),
+
+  refreshLinkedInDelivery: protectedProcedure
+    .input(z.object({ platformPostId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      try {
+        return await refreshLinkedInDelivery(input.platformPostId);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Could not refresh delivery",
+        });
+      }
+    }),
+
   /** Edit the Drive/external link list on a spot (the team's asset workflow). */
   setAssetLinks: protectedProcedure
     .input(
@@ -735,6 +796,14 @@ export const contentRouter = createTRPCRouter({
         kpi: z.string().optional(),
         // Channels to fan out to immediately, as owned spots.
         platforms: z.array(z.enum(channelPlatformEnum.enumValues)).optional(),
+        spots: z
+          .array(
+            z.object({
+              platform: z.enum(channelPlatformEnum.enumValues),
+              format: z.string().optional(),
+            }),
+          )
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -941,6 +1010,7 @@ export const contentRouter = createTRPCRouter({
       title?: string;
       groupKind?: string;
       theme?: string;
+      pillarSlug?: string | null;
       memberPostIds?: string[];
       rationale?: string;
     };
@@ -978,6 +1048,7 @@ export const contentRouter = createTRPCRouter({
         title: p.title ?? "Group",
         groupKind: p.groupKind ?? "group",
         theme: p.theme ?? null,
+        pillarSlug: p.pillarSlug ?? null,
         rationale: s.reasoning,
         confidence: s.confidence,
         members: ids
@@ -1006,137 +1077,14 @@ export const contentRouter = createTRPCRouter({
   resolveGrouping: protectedProcedure
     .input(z.object({ id: z.string(), accept: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const sug = await ctx.db.query.contentSuggestionTable.findFirst({
-        where: eq(contentSuggestionTable.id, input.id),
-        with: { brand: { columns: { organizationId: true } } },
-      });
-      if (!sug) throw new TRPCError({ code: "NOT_FOUND" });
-
-      const orgId = sug.brand?.organizationId;
-      const membership = orgId
-        ? await ctx.db.query.memberTable.findFirst({
-            where: and(
-              eq(memberTable.userId, ctx.session.user.id),
-              eq(memberTable.organizationId, orgId),
-            ),
-          })
-        : null;
-      if (!orgId || !membership) {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-
-      const review = {
-        reviewedById: ctx.session.user.id,
-        reviewedAt: new Date(),
-      };
-
-      if (!input.accept) {
-        await ctx.db
-          .update(contentSuggestionTable)
-          .set({ status: "rejected", ...review })
-          .where(eq(contentSuggestionTable.id, input.id));
-        return { id: input.id, status: "rejected" as const };
-      }
-
-      const p = (sug.proposed ?? {}) as {
-        unit?: string;
-        title?: string;
-        groupKind?: string;
-        theme?: string;
-        memberPostIds?: string[];
-      };
-      const ids = p.memberPostIds ?? [];
-
-      if (p.unit === "series") {
-        // Distinct pieces sharing an arc → a real SERIES (with from→to span)
-        // and one content_post per member.
-        const members = ids.length
-          ? await ctx.db.query.platformPostTable.findMany({
-              where: inArray(platformPostTable.id, ids),
-              columns: { id: true, text: true, publishedAt: true },
-            })
-          : [];
-        const dates = members
-          .map((m) => m.publishedAt)
-          .filter((d): d is Date => !!d)
-          .sort((a, b) => a.getTime() - b.getTime());
-
-        const [series] = await ctx.db
-          .insert(seriesTable)
-          .values({
-            brandId: sug.brandId,
-            name: p.title ?? "Series",
-            theme: p.theme,
-            status: "active",
-            startAt: dates[0],
-            endAt: dates[dates.length - 1],
-          })
-          .returning({ id: seriesTable.id });
-
-        for (const m of members) {
-          const [cp] = await ctx.db
-            .insert(contentPostTable)
-            .values({
-              brandId: sug.brandId,
-              title: m.text?.slice(0, 100).replace(/\s+/g, " ").trim() ?? null,
-              status: "draft",
-              origin: "ai",
-              seriesId: series?.id,
-              metadata: { fromSuggestion: sug.id },
-            })
-            .returning({ id: contentPostTable.id });
-          if (cp) {
-            await ctx.db
-              .update(platformPostTable)
-              .set({ contentPostId: cp.id })
-              .where(eq(platformPostTable.id, m.id));
-          }
-        }
-
-        await ctx.db
-          .update(contentSuggestionTable)
-          .set({ status: "accepted", ...review })
-          .where(eq(contentSuggestionTable.id, input.id));
-        return {
-          id: input.id,
-          status: "accepted" as const,
-          seriesId: series?.id,
-        };
-      }
-
-      // "single": one piece — all members are its renderings/amplifications.
-      const [cp] = await ctx.db
-        .insert(contentPostTable)
-        .values({
-          brandId: sug.brandId,
-          title: p.title ?? "Grouped content",
-          status: "draft",
-          origin: "ai",
-          metadata: {
-            groupKind: p.groupKind,
-            theme: p.theme,
-            fromSuggestion: sug.id,
-          },
-        })
-        .returning({ id: contentPostTable.id });
-
-      if (cp && ids.length) {
-        await ctx.db
-          .update(platformPostTable)
-          .set({ contentPostId: cp.id })
-          .where(inArray(platformPostTable.id, ids));
-      }
-
-      await ctx.db
-        .update(contentSuggestionTable)
-        .set({ status: "accepted", ...review })
-        .where(eq(contentSuggestionTable.id, input.id));
-
-      return {
+      const { org } = await orgContext(ctx);
+      if (!org) throw new TRPCError({ code: "FORBIDDEN" });
+      return resolveGroupingSuggestion({
         id: input.id,
-        status: "accepted" as const,
-        contentPostId: cp?.id,
-      };
+        accept: input.accept,
+        orgId: org.id,
+        userId: ctx.session.user.id,
+      });
     }),
 
   /**

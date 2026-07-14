@@ -2,9 +2,15 @@ import { redirect } from "next/navigation";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { brandTable, contentPostTable, memberTable } from "@/server/db/schema";
+import {
+  brandTable,
+  contentPostTable,
+  memberTable,
+  seriesTable,
+} from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { PILLARS } from "@/lib/pillars";
+import { listBrandPillars } from "@/server/services/content-strategy.service";
+import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
 
 export default async function PillarsPage() {
   const session = await getSession();
@@ -16,11 +22,16 @@ export default async function PillarsPage() {
   });
   const org = membership?.organization;
   if (!org) {
-    return <div className="text-muted-foreground p-8">No organization found.</div>;
+    return (
+      <div className="text-muted-foreground p-8">No organization found.</div>
+    );
   }
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
   });
   const brandIds = brands.map((b) => b.id);
 
@@ -30,22 +41,50 @@ export default async function PillarsPage() {
         columns: { pillar: true },
       })
     : [];
+  const series = brandIds.length
+    ? await db.query.seriesTable.findMany({
+        where: and(
+          inArray(seriesTable.brandId, brandIds),
+          isNull(seriesTable.deletedAt),
+        ),
+        columns: { pillar: true },
+      })
+    : [];
 
   const countByPillar = new Map<string, number>();
   for (const p of posts) {
-    if (p.pillar) countByPillar.set(p.pillar, (countByPillar.get(p.pillar) ?? 0) + 1);
+    if (p.pillar)
+      countByPillar.set(p.pillar, (countByPillar.get(p.pillar) ?? 0) + 1);
+  }
+  const seriesByPillar = new Map<string, number>();
+  for (const item of series) {
+    if (item.pillar) {
+      seriesByPillar.set(
+        item.pillar,
+        (seriesByPillar.get(item.pillar) ?? 0) + 1,
+      );
+    }
   }
 
   // Only show brands that have pillars defined in the registry.
-  const brandsWithPillars = brands
-    .map((b) => ({ brand: b, pillars: PILLARS.filter((p) => p.brandSlug === b.slug) }))
-    .filter((x) => x.pillars.length > 0);
+  const brandsWithPillars = (
+    await Promise.all(
+      brands.map(async (brand) => ({
+        brand,
+        pillars: await listBrandPillars({
+          brandId: brand.id,
+          brandSlug: brand.slug,
+        }),
+      })),
+    )
+  ).filter((x) => x.pillars.length > 0);
 
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Pillars</h1>
       <p className="text-muted-foreground mt-1 text-sm">
-        Content pillars &amp; strategy — the themes each brand publishes against.
+        Content pillars &amp; strategy — the themes each brand publishes
+        against.
       </p>
 
       {brandsWithPillars.map(({ brand, pillars }) => (
@@ -58,10 +97,17 @@ export default async function PillarsPage() {
             <span className="text-muted-foreground text-xs">
               · {pillars.length} pillars
             </span>
+            <span className="flex-1" />
+            <ContentStructureAssistantButton
+              brandId={brand.id}
+              brandName={brand.name}
+              source="pillars"
+            />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {pillars.map((p) => {
               const count = countByPillar.get(p.slug) ?? 0;
+              const seriesCount = seriesByPillar.get(p.slug) ?? 0;
               return (
                 <div
                   key={p.slug}
@@ -80,6 +126,7 @@ export default async function PillarsPage() {
                     <span className="flex-1" />
                     <span className="text-muted-foreground text-[11px] tabular-nums">
                       {count} post{count === 1 ? "" : "s"}
+                      {seriesCount > 0 ? ` · ${seriesCount} series` : ""}
                     </span>
                   </div>
                   <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
@@ -93,8 +140,9 @@ export default async function PillarsPage() {
       ))}
 
       <p className="text-muted-foreground mt-8 text-[11px]">
-        Pillars are defined in code for now (view-only). Posts are tagged to a
-        pillar via the content editor; counts update live.
+        Pillars are brand-specific. Wander defaults ship with the workspace;
+        chat-created and edited pillars are stored as durable brand overrides.
+        Post counts update live.
       </p>
     </div>
   );

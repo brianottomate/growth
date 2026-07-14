@@ -83,6 +83,13 @@ export function getCallbackURL(
 ): string {
   const { includeEmail, includeEmailParam, isNewSignup } = options || {};
 
+  // Better Auth's OAuth provider sends the signed authorization request to the
+  // login page. After authentication, resume that internal authorize endpoint
+  // instead of dropping the user into the app and abandoning the connector.
+  if (searchParams.has("client_id") && searchParams.has("redirect_uri")) {
+    return `/api/auth/oauth2/authorize?${searchParams.toString()}`;
+  }
+
   // Check for organization invite
   const orgInviteId = searchParams.get("orgInviteId");
   if (orgInviteId) {

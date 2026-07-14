@@ -14,6 +14,9 @@ import { fetchNewsletterContent } from "@/server/clients/cio-content";
 import { NEWSLETTER_KIND_META, newsletterKind } from "@/lib/newsletter-kind";
 import { ContentAnalysisPanel } from "@/components/content-analysis-panel";
 import { readContentAnalysis } from "@/lib/content-analysis";
+import { EMAIL_DOCUMENT_FORMATS } from "@/lib/email-document";
+import { ensureEmailDocument } from "@/server/services/email-document.service";
+import { NewsletterIssueWorkspace } from "./NewsletterIssueWorkspace";
 
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
@@ -35,10 +38,7 @@ export default async function NewsletterIssuePage({
   if (!org) notFound();
 
   const issue = await db.query.platformPostTable.findFirst({
-    where: and(
-      eq(platformPostTable.id, id),
-      eq(platformPostTable.externalKind, "broadcast"),
-    ),
+    where: eq(platformPostTable.id, id),
     with: { brand: true },
   });
   if (!issue?.brand) notFound();
@@ -60,6 +60,36 @@ export default async function NewsletterIssuePage({
     }
   }
   if (!hasAccess) notFound();
+
+  const isOwnedEmail =
+    issue.source === "owned" &&
+    issue.platform === "newsletter" &&
+    EMAIL_DOCUMENT_FORMATS.includes(
+      issue.format as (typeof EMAIL_DOCUMENT_FORMATS)[number],
+    );
+  if (isOwnedEmail) {
+    await ensureEmailDocument({
+      platformPostId: issue.id,
+      organizationId: org.id,
+      userId: session.user.id,
+    });
+    return (
+      <div>
+        <div className="text-muted-foreground mb-4 flex items-center gap-1.5 text-xs">
+          <Link href="/app/newsletters" className="hover:text-foreground">
+            Newsletters
+          </Link>
+          <span>/</span>
+          <span className="text-foreground font-medium">
+            {issue.text || "Email workspace"}
+          </span>
+        </div>
+        <NewsletterIssueWorkspace platformPostId={issue.id} />
+      </div>
+    );
+  }
+
+  if (issue.externalKind !== "broadcast") notFound();
 
   const kind = newsletterKind(issue.text ?? "");
   const meta = NEWSLETTER_KIND_META[kind];

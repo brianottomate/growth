@@ -19,7 +19,34 @@ export type WorkContentIntent = {
   visibleText: string;
 };
 
-export type AssistantIntent = PlanTwoWeeksIntent | WorkContentIntent;
+export type BuildChannelStrategyIntent = {
+  type: "build_channel_strategy";
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+};
+
+export type ShapeContentStructureIntent = {
+  type: "shape_content_structure";
+  brandId: string;
+  brandName: string;
+  source: "brand" | "content" | "pillars";
+  visibleText: string;
+};
+
+export type PlanEmailIntent = {
+  type: "plan_email";
+  brandId?: string;
+  brandName?: string;
+  visibleText: string;
+};
+
+export type AssistantIntent =
+  | PlanTwoWeeksIntent
+  | WorkContentIntent
+  | BuildChannelStrategyIntent
+  | ShapeContentStructureIntent
+  | PlanEmailIntent;
 
 export type ContentWorkContext = Omit<WorkContentIntent, "visibleText">;
 

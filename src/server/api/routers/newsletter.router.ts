@@ -1,15 +1,188 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
+import { TRPCError } from "@trpc/server";
+import { waitUntil } from "@vercel/functions";
+import { eq } from "drizzle-orm";
+
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "@/server/api/trpc";
+import { memberTable } from "@/server/db/schema";
+import type { db } from "@/server/db";
 import {
   createContact,
   subscribeToTopics,
   getContactTopicSubscriptions,
 } from "@/server/clients/resend.client";
 import { topicKeySchema, emailSchema } from "@/lib/validators";
+import {
+  EMAIL_DOCUMENT_FORMATS,
+  emailDocumentDraftSchema,
+} from "@/lib/email-document";
+import {
+  createEmailSlot,
+  exportEmailHandoff,
+  getEmailWorkspace,
+  renderEmailPreview,
+  restoreEmailDocumentVersion,
+  runEmailGenerationJob,
+  saveEmailDocument,
+  startEmailGeneration,
+} from "@/server/services/email-document.service";
 
 const ANONYMOUS_EMAIL_DOMAIN = "@anonymous.example.com"; // Update to match your Better Auth anonymous domain
 
+async function organizationIdForUser(database: typeof db, userId: string) {
+  const membership = await database.query.memberTable.findFirst({
+    where: eq(memberTable.userId, userId),
+    columns: { organizationId: true },
+  });
+  if (!membership) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "No organization" });
+  }
+  return membership.organizationId;
+}
+
 export const newsletterRouter = createTRPCRouter({
+  workspace: protectedProcedure
+    .input(z.object({ platformPostId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return getEmailWorkspace({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  createEmailSlot: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        title: z.string().trim().min(1).max(160),
+        format: z.enum(EMAIL_DOCUMENT_FORMATS),
+        hook: z.string().trim().max(2_000).optional(),
+        purpose: z.string().trim().max(5_000).optional(),
+        ctaText: z.string().trim().max(1_000).optional(),
+        pillar: z.string().trim().max(120).optional(),
+        seriesId: z.string().optional(),
+        initiativeId: z.string().optional(),
+        plannedAt: z.string().datetime().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return createEmailSlot({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  generateDraft: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        brief: z.string().trim().max(10_000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      const job = await startEmailGeneration({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+      if (job.status === "queued") {
+        waitUntil(
+          runEmailGenerationJob(job.id).catch((error) =>
+            console.error("[email-generation] background job failed", error),
+          ),
+        );
+      }
+      return job;
+    }),
+
+  saveDocument: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        draft: emailDocumentDraftSchema,
+        note: z.string().trim().max(300).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return saveEmailDocument({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  restoreVersion: protectedProcedure
+    .input(z.object({ platformPostId: z.string(), versionId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return restoreEmailDocumentVersion({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  renderPreview: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        draft: emailDocumentDraftSchema.optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      const html = await renderEmailPreview({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+      return { html };
+    }),
+
+  exportHandoff: protectedProcedure
+    .input(z.object({ platformPostId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return {
+        markdown: await exportEmailHandoff({
+          ...input,
+          organizationId,
+          userId: ctx.session.user.id,
+        }),
+      };
+    }),
+
   subscribe: publicProcedure
     .input(
       z.object({

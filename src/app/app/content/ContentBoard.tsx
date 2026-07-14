@@ -1506,7 +1506,10 @@ function ScheduleRow({
           className="size-10 shrink-0"
           iconClassName="size-4"
         />
-        <ChannelLogo platform={row.platform} className="size-5 shrink-0" />
+        <ChannelLogo
+          platform={row.format === "newsletter.blast" ? "blast" : row.platform}
+          className="size-5 shrink-0"
+        />
         <button
           onClick={() => setOpen((o) => !o)}
           className="min-w-0 flex-1 text-left"

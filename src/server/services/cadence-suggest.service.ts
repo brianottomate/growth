@@ -6,6 +6,7 @@ import { z } from "zod";
 import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
+import { formatCountsTowardCadence } from "@/server/content/formats";
 import {
   brandInspirationTable,
   brandTable,
@@ -73,7 +74,10 @@ export async function suggestTargets(
 
   const [channels, cadence, mix, tracked] = await Promise.all([
     db.query.channelTable.findMany({
-      where: and(eq(channelTable.brandId, brandId), isNull(channelTable.deletedAt)),
+      where: and(
+        eq(channelTable.brandId, brandId),
+        isNull(channelTable.deletedAt),
+      ),
       columns: { id: true, platform: true, kind: true },
     }),
     db.query.cadenceTargetTable.findMany({
@@ -113,13 +117,18 @@ export async function suggestTargets(
     columns: {
       brandId: true,
       platform: true,
+      format: true,
       archetype: true,
       stats: true,
       publishedAt: true,
     },
   });
-  const own = posts.filter((p) => p.brandId === brandId);
-  const peers = posts.filter((p) => p.brandId !== brandId);
+  const own = posts.filter(
+    (p) => p.brandId === brandId && formatCountsTowardCadence(p.format),
+  );
+  const peers = posts.filter(
+    (p) => p.brandId !== brandId && formatCountsTowardCadence(p.format),
+  );
 
   // ---- own performance per platform × archetype ----
   type Perf = { n: number; views: number[]; likes: number[] };
@@ -163,7 +172,9 @@ export async function suggestTargets(
   const peerLines = [...peerByKey.entries()].map(([key, perBrand]) => {
     const [platform, archetype] = key.split("|");
     const brandsHere = [...perBrand.entries()]
-      .map(([id, n]) => `${peerNames.get(id) ?? "?"} ${(n / weeks).toFixed(1)}/wk`)
+      .map(
+        ([id, n]) => `${peerNames.get(id) ?? "?"} ${(n / weeks).toFixed(1)}/wk`,
+      )
       .join(", ");
     return `${platform}/${archetype}: ${brandsHere}`;
   });
@@ -173,7 +184,9 @@ export async function suggestTargets(
   ).map((p) => p.slug);
   if (!pillarSlugs.length) pillarSlugs.push(...PILLARS.map((p) => p.slug));
   const platforms = [
-    ...new Set(channels.filter((c) => c.kind === "social").map((c) => c.platform)),
+    ...new Set(
+      channels.filter((c) => c.kind === "social").map((c) => c.platform),
+    ),
   ];
 
   const suggestionSchema = z.object({
@@ -182,13 +195,20 @@ export async function suggestTargets(
         z.object({
           kind: z.enum(["cadence", "mix"]),
           platform: z
-            .enum((platforms.length ? platforms : ["instagram"]) as [string, ...string[]])
+            .enum(
+              (platforms.length ? platforms : ["instagram"]) as [
+                string,
+                ...string[],
+              ],
+            )
             .nullable()
             .describe("Required for cadence suggestions; null for mix."),
           archetype: z
             .string()
             .nullable()
-            .describe("Required for cadence: image|carousel|video_short|video_long|text|story|thread|article."),
+            .describe(
+              "Required for cadence: image|carousel|video_short|video_long|text|story|thread|article.",
+            ),
           pillar: z
             .enum(pillarSlugs as [string, ...string[]])
             .nullable()
@@ -197,18 +217,24 @@ export async function suggestTargets(
             .number()
             .int()
             .min(0)
-            .describe("Cadence: the new COUNT (the existing target's period is kept). Mix: the new percent."),
+            .describe(
+              "Cadence: the new COUNT (the existing target's period is kept). Mix: the new percent.",
+            ),
           basis: z
             .enum(["peer_benchmark", "own_performance", "both"])
             .describe("Which evidence drives this proposal."),
           rationale: z
             .string()
-            .describe("One or two sentences citing the evidence: own performance, peer cadence, or both."),
+            .describe(
+              "One or two sentences citing the evidence: own performance, peer cadence, or both.",
+            ),
           confidence: z.number().min(0).max(1),
         }),
       )
       .max(10)
-      .describe("Only propose CHANGES — skip targets the evidence supports as-is."),
+      .describe(
+        "Only propose CHANGES — skip targets the evidence supports as-is.",
+      ),
   });
 
   const peerAge = newestPeer

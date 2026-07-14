@@ -2,6 +2,7 @@
 
 // Re-export everything from auth-schema for convenience
 export * from "./auth-schema";
+export * from "./oauth-provider-schema";
 
 // ---- RE-EXPORT DOMAIN SCHEMAS -------------------------------------
 // Each domain lives in its own file; this barrel keeps a single import
@@ -11,6 +12,9 @@ export * from "./ad-account-schema";
 export * from "./brand-schema";
 export * from "./channel-schema";
 export * from "./content-schema";
+export * from "./content-pillar-schema";
+export * from "./creative-work-schema";
+export * from "./email-document-schema";
 export * from "./plan-import-schema";
 export * from "./ads-schema";
 export * from "./affiliate-schema";

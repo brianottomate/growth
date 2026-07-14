@@ -51,10 +51,15 @@ import {
   AudienceTargetsCard,
   BrandsCard,
   ContentPipelineCard,
+  ContentStrategyCard,
+  ContentStructureMutationCard,
   GenericToolCard,
   LeadsSummaryCard,
   MediaSuggestionsCard,
   MentionsCard,
+  NextForBrandCard,
+  ProductionPacketCard,
+  ProductionQueueCard,
   ReadWebPageCard,
   ToolCallPending,
   UpcomingContentCard,
@@ -64,10 +69,15 @@ import {
   type AdsScopeOutput,
   type AudienceTargetsOutput,
   type ContentPipelineOutput,
+  type ContentStrategyOutput,
+  type ContentStructureMutationOutput,
   type LeadsSummaryOutput,
   type ListBrandsOutput,
   type MediaSuggestionsOutput,
   type MentionsOutput,
+  type NextForBrandOutput,
+  type ProductionPacketOutput,
+  type ProductionQueueOutput,
   type ReadWebPageOutput,
   type UpcomingContentOutput,
   type WorkspaceOverviewOutput,
@@ -100,6 +110,11 @@ const PENDING_LABELS: Record<string, string> = {
   upcomingContent: "Checking the calendar…",
   productionQueue: "Checking production readiness…",
   getContentWorkItem: "Reading the production workspace…",
+  getContentStrategy: "Reading pillars, series, and groupings…",
+  saveContentPillar: "Saving the pillar…",
+  saveContentSeries: "Saving the series…",
+  organizeContentIdeas: "Organizing the content ideas…",
+  resolveContentGrouping: "Applying the grouping decision…",
   updateContentWorkItem: "Updating the work item…",
   addContentCrossPost: "Adding channel renderings…",
   attachChatImageToContent: "Saving and attaching the image…",
@@ -130,6 +145,11 @@ const PENDING_LABELS: Record<string, string> = {
   draftMomentBlueprint: "Drafting the moment shape…",
   commitMomentPlan: "Creating the initiative and slots…",
   proposeStrategyTargets: "Comparing strategy with observed performance…",
+  createChannelCadence: "Creating the channel cadence…",
+  updateChannelCadence: "Updating the channel cadence…",
+  createBrandMix: "Creating the content mix…",
+  updateBrandMix: "Updating the content mix…",
+  prepareProductionPacket: "Preparing the production handoff…",
 };
 
 /** Friendly fallback names for tools that error/deny before producing a card. */
@@ -144,7 +164,13 @@ const TOOL_LABELS: Record<string, string> = {
   contentPipelineSummary: "Content pipeline",
   upcomingContent: "Coming up",
   productionQueue: "Production queue",
+  prepareProductionPacket: "Production packet",
   getContentWorkItem: "Content work item",
+  getContentStrategy: "Content structure",
+  saveContentPillar: "Content pillar",
+  saveContentSeries: "Content series",
+  organizeContentIdeas: "Content organization",
+  resolveContentGrouping: "Grouping decision",
   updateContentWorkItem: "Content update",
   addContentCrossPost: "New cross-posts",
   attachChatImageToContent: "Attached image",
@@ -186,11 +212,15 @@ const OVERVIEW_STARTERS: { icon: LucideIcon; text: string }[] = [
 
 const NEXT_STARTERS: { icon: LucideIcon; text: string }[] = [
   { icon: CalendarClock, text: "Plan the next two weeks" },
+  { icon: MessageCircle, text: "Shape our content pillars and series" },
   { icon: Paperclip, text: "Help me use something I already have" },
-  { icon: MessageCircle, text: "Turn one channel post into a reusable idea" },
+  { icon: LayoutDashboard, text: "Turn one channel post into a reusable idea" },
 ];
 
 export function OverviewChat({
+  threadId,
+  initialMessages,
+  onThreadFinish,
   userName,
   variant = "page",
   active = true,
@@ -200,6 +230,9 @@ export function OverviewChat({
   intent,
   workContext,
 }: {
+  threadId: string;
+  initialMessages: UIMessage[];
+  onThreadFinish?: () => void;
   userName: string;
   variant?: "page" | "popup";
   /** Lets the popup focus its composer only when it is actually opened. */
@@ -227,9 +260,12 @@ export function OverviewChat({
     regenerate,
     addToolApprovalResponse,
   } = useChat({
+    id: `overview-${threadId}`,
+    messages: initialMessages,
     transport: new DefaultChatTransport({
       api: "/api/overview/chat",
       body: {
+        threadId,
         surface: mode,
         brandId,
         intent,
@@ -237,28 +273,35 @@ export function OverviewChat({
       },
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    onFinish: onThreadFinish,
   });
 
   const busy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
   const navigatedCalls = useRef(new Set<string>());
 
-  useEffect(() => {
-    const receiveIntent = (event: Event) => {
-      const intent = (event as CustomEvent<AssistantIntent>).detail;
+  const submitAssistantIntent = useCallback(
+    (assistantIntent: AssistantIntent) => {
       if (busy) {
         toast.info("The assistant is still working");
         return;
       }
       void sendMessage(
-        { text: intent.visibleText },
-        { body: { assistantIntent: intent } },
+        { text: assistantIntent.visibleText },
+        { body: { assistantIntent } },
       );
+    },
+    [busy, sendMessage],
+  );
+
+  useEffect(() => {
+    const receiveIntent = (event: Event) => {
+      submitAssistantIntent((event as CustomEvent<AssistantIntent>).detail);
     };
     window.addEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
     return () =>
       window.removeEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
-  }, [busy, sendMessage]);
+  }, [submitAssistantIntent]);
 
   // Navigation is a portable capability result. The in-app adapter follows it
   // with router.push; MCP clients can use the same returned canonical URL.
@@ -444,7 +487,17 @@ export function OverviewChat({
   };
 
   const firstName = userName.split(" ")[0] ?? userName;
-  const starters = mode === "overview" ? OVERVIEW_STARTERS : NEXT_STARTERS;
+  const starters =
+    mode === "overview"
+      ? OVERVIEW_STARTERS
+      : NEXT_STARTERS.map((starter) =>
+          starter.text === "Shape our content pillars and series" && brandName
+            ? {
+                ...starter,
+                text: `Shape ${brandName}’s content pillars and series`,
+              }
+            : starter,
+        );
 
   return (
     <div
@@ -459,7 +512,7 @@ export function OverviewChat({
           onScroll={handleScroll}
           role="log"
           aria-label="Overview assistant conversation"
-          className="h-full overflow-y-auto"
+          className="h-full scrollbar-thin overflow-y-auto"
         >
           <div
             className={cn(
@@ -589,6 +642,7 @@ export function OverviewChat({
                                 });
                             },
                             send,
+                            submitAssistantIntent,
                           );
                         }
                         return null;
@@ -813,6 +867,7 @@ function renderToolPart(
   key: string,
   onApprove: (approved: boolean) => void,
   onPrompt: (prompt: string) => void,
+  onIntent: (intent: AssistantIntent) => void,
 ) {
   const toolName = getToolName(part);
 
@@ -855,6 +910,14 @@ function renderToolPart(
   if (part.state !== "output-available") return null;
 
   switch (toolName) {
+    case "nextForBrand":
+      return (
+        <NextForBrandCard
+          key={key}
+          output={part.output as NextForBrandOutput}
+          onWork={onIntent}
+        />
+      );
     case "workspaceOverview":
       return (
         <WorkspaceOverviewCard
@@ -916,11 +979,33 @@ function renderToolPart(
           output={part.output as ContentPipelineOutput}
         />
       );
+    case "getContentStrategy":
+      return (
+        <ContentStrategyCard
+          key={key}
+          output={part.output as ContentStrategyOutput}
+        />
+      );
     case "upcomingContent":
       return (
         <UpcomingContentCard
           key={key}
           output={part.output as UpcomingContentOutput}
+        />
+      );
+    case "productionQueue":
+      return (
+        <ProductionQueueCard
+          key={key}
+          output={part.output as ProductionQueueOutput}
+          onWork={onIntent}
+        />
+      );
+    case "prepareProductionPacket":
+      return (
+        <ProductionPacketCard
+          key={key}
+          output={part.output as ProductionPacketOutput}
         />
       );
     case "suggestMediaForContent":
@@ -949,6 +1034,16 @@ function renderToolPart(
     case "createIdea":
       return (
         <CreatedIdeaCard key={key} output={part.output as CreatedIdeaOutput} />
+      );
+    case "saveContentPillar":
+    case "saveContentSeries":
+    case "organizeContentIdeas":
+    case "resolveContentGrouping":
+      return (
+        <ContentStructureMutationCard
+          key={key}
+          output={part.output as ContentStructureMutationOutput}
+        />
       );
     case "createAudienceTarget":
     case "saveAudienceTargets":
@@ -983,6 +1078,10 @@ function ApprovalCard({
         scheduledAt?: string;
         name?: string;
         description?: string | null;
+        pillarSlug?: string | null;
+        contentPostIds?: string[];
+        proposalId?: string;
+        decision?: "accept" | "reject";
         intendedChannels?: string[];
         priority?: string;
       }
@@ -990,37 +1089,65 @@ function ApprovalCard({
   const isAudienceWrite =
     toolName === "createAudienceTarget" || toolName === "updateAudienceTarget";
   const heading =
-    toolName === "createPlatformPost"
-      ? "Create this channel draft?"
-      : toolName === "promotePlatformPost"
-        ? "Turn this post into a content idea?"
-        : toolName === "createIdea"
-          ? "Create this idea?"
-          : toolName === "createAudienceTarget"
-            ? "Create this audience target?"
-            : toolName === "updateAudienceTarget"
-              ? "Save these audience changes?"
-              : toolName === "attachLibraryMediaToContent"
-                ? "Attach this library asset?"
-                : toolName === "recoverArchiveMediaToContent"
-                  ? "Recover and attach this archive media?"
-                  : "Confirm this action?";
+    toolName === "saveContentPillar"
+      ? "Save this content pillar?"
+      : toolName === "saveContentSeries"
+        ? "Save this content series?"
+        : toolName === "organizeContentIdeas"
+          ? "Apply this content structure?"
+          : toolName === "resolveContentGrouping"
+            ? inp?.decision === "reject"
+              ? "Dismiss this grouping proposal?"
+              : "Accept this grouping proposal?"
+            : toolName === "createPlatformPost"
+              ? "Create this channel draft?"
+              : toolName === "promotePlatformPost"
+                ? "Turn this post into a content idea?"
+                : toolName === "createIdea"
+                  ? "Create this idea?"
+                  : toolName === "createAudienceTarget"
+                    ? "Create this audience target?"
+                    : toolName === "updateAudienceTarget"
+                      ? "Save these audience changes?"
+                      : toolName === "updateChannelCadence"
+                        ? "Save these cadence changes?"
+                        : toolName === "updateBrandMix"
+                          ? "Save these content mix changes?"
+                          : toolName === "attachLibraryMediaToContent"
+                            ? "Attach this library asset?"
+                            : toolName === "recoverArchiveMediaToContent"
+                              ? "Recover and attach this archive media?"
+                              : "Confirm this action?";
   const primaryLabel =
-    toolName === "createPlatformPost"
-      ? "Create draft"
-      : toolName === "promotePlatformPost"
-        ? "Promote post"
-        : toolName === "createIdea"
-          ? "Create it"
-          : toolName === "createAudienceTarget"
-            ? "Create target"
-            : toolName === "updateAudienceTarget"
-              ? "Save changes"
-              : toolName === "attachLibraryMediaToContent"
-                ? "Attach asset"
-                : toolName === "recoverArchiveMediaToContent"
-                  ? "Recover & attach"
-                  : "Confirm";
+    toolName === "saveContentPillar"
+      ? "Save pillar"
+      : toolName === "saveContentSeries"
+        ? "Save series"
+        : toolName === "organizeContentIdeas"
+          ? "Apply structure"
+          : toolName === "resolveContentGrouping"
+            ? inp?.decision === "reject"
+              ? "Dismiss"
+              : "Accept grouping"
+            : toolName === "createPlatformPost"
+              ? "Create draft"
+              : toolName === "promotePlatformPost"
+                ? "Promote post"
+                : toolName === "createIdea"
+                  ? "Create it"
+                  : toolName === "createAudienceTarget"
+                    ? "Create target"
+                    : toolName === "updateAudienceTarget"
+                      ? "Save changes"
+                      : toolName === "updateChannelCadence"
+                        ? "Save cadence"
+                        : toolName === "updateBrandMix"
+                          ? "Save content mix"
+                          : toolName === "attachLibraryMediaToContent"
+                            ? "Attach asset"
+                            : toolName === "recoverArchiveMediaToContent"
+                              ? "Recover & attach"
+                              : "Confirm";
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
@@ -1033,6 +1160,18 @@ function ApprovalCard({
       {(inp?.hook || inp?.description) && (
         <p className="text-muted-foreground mt-0.5 text-xs">
           {inp.hook ?? inp.description}
+        </p>
+      )}
+      {(inp?.pillarSlug || inp?.contentPostIds?.length) && (
+        <p className="text-muted-foreground mt-1 text-xs">
+          {[
+            inp.pillarSlug ? `Pillar: ${inp.pillarSlug}` : null,
+            inp.contentPostIds?.length
+              ? `${inp.contentPostIds.length} existing idea${inp.contentPostIds.length === 1 ? "" : "s"}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       )}
       {isAudienceWrite && inp?.priority && (

@@ -170,7 +170,7 @@ export const brandTable = pgTable(
     logo: t.text(),
     website: t.text(),
 
-    // One Zernio workspace is shared by Boe Ventures. Each owned brand maps to
+    // One Zernio workspace is shared by Wander. Each owned brand maps to
     // one profile in that workspace; its connected accounts live on `channel`.
     zernioProfileId: t.text(),
 

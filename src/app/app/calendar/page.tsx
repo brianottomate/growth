@@ -33,11 +33,16 @@ export default async function CalendarPage({
   });
   const org = membership?.organization;
   if (!org) {
-    return <div className="text-muted-foreground p-8">No organization found.</div>;
+    return (
+      <div className="text-muted-foreground p-8">No organization found.</div>
+    );
   }
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, org.id),
+      isNull(brandTable.deletedAt),
+    ),
     columns: { id: true, name: true, slug: true, logo: true },
   });
   const brandIds = brands.map((b) => b.id);
@@ -52,7 +57,8 @@ export default async function CalendarPage({
     : [];
   const trackedBrands = new Map<string, string>();
   for (const l of trackedLinks) {
-    if (l.inspirationBrand) trackedBrands.set(l.inspirationBrand.id, l.inspirationBrand.name);
+    if (l.inspirationBrand)
+      trackedBrands.set(l.inspirationBrand.id, l.inspirationBrand.name);
   }
   const allBrandIds = [...brandIds, ...trackedBrands.keys()];
 
@@ -64,7 +70,9 @@ export default async function CalendarPage({
     ? await db.query.platformPostTable.findMany({
         where: inArray(platformPostTable.brandId, allBrandIds),
         with: {
-          contentPost: { with: { series: true, owner: { columns: memberCols } } },
+          contentPost: {
+            with: { series: true, owner: { columns: memberCols } },
+          },
           owner: { columns: memberCols },
         },
       })
@@ -96,6 +104,7 @@ export default async function CalendarPage({
       brandName: brandName.get(p.brandId) ?? "—",
       tracked: trackedBrands.has(p.brandId),
       platform: p.platform,
+      format: p.format,
       contentPostId: p.contentPostId,
       title: p.contentPost?.title ?? null,
       pillar: p.contentPost?.pillar ?? null,
@@ -141,7 +150,9 @@ export default async function CalendarPage({
       ownedBrands={brands
         .map((b) => ({ id: b.id, name: b.name, slug: b.slug }))
         // Flagship first — the default Generate-slots target.
-        .sort((a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"))
+        .sort(
+          (a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"),
+        )
         .map(({ id, name }) => ({ id, name }))}
       members={members}
       currentUserId={session.user.id}

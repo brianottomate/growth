@@ -9,6 +9,7 @@ import {
   brandInspirationTable,
   brandTable,
   brandTypeEnum,
+  type channelPlatformEnum,
   channelTable,
   inspirationPurposeEnum,
   memberTable,
@@ -37,7 +38,10 @@ async function userOrgIds(ctx: Ctx): Promise<string[]> {
  * - Owned brand (organizationId set): user must be a member of that org.
  * - Reference brand (organizationId NULL): user must own a brand that tracks it.
  */
-async function assertBrandManageable(ctx: Ctx, brandId: string): Promise<Brand> {
+async function assertBrandManageable(
+  ctx: Ctx,
+  brandId: string,
+): Promise<Brand> {
   const brand = await ctx.db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
@@ -49,7 +53,10 @@ async function assertBrandManageable(ctx: Ctx, brandId: string): Promise<Brand> 
 
   if (brand.organizationId) {
     if (!orgIds.includes(brand.organizationId)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "No access to this brand" });
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "No access to this brand",
+      });
     }
     return brand;
   }
@@ -61,7 +68,10 @@ async function assertBrandManageable(ctx: Ctx, brandId: string): Promise<Brand> 
   });
   const ownerOrg = link?.brand?.organizationId;
   if (!ownerOrg || !orgIds.includes(ownerOrg)) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this brand" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No access to this brand",
+    });
   }
   return brand;
 }
@@ -71,6 +81,33 @@ function normalizeWebsite(url?: string): string | null {
   const trimmed = url?.trim();
   if (!trimmed) return null;
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+const trackedProfilePlatformEnum = z.enum([
+  "linkedin",
+  "instagram",
+  "x",
+  "facebook",
+  "youtube",
+  "tiktok",
+  "threads",
+  "reddit",
+  "pinterest",
+] satisfies (typeof channelPlatformEnum.enumValues)[number][]);
+
+function normalizeProfileUrl(url?: string): string | null {
+  return normalizeWebsite(url);
+}
+
+/** Best-effort handle extraction for a manually supplied public profile URL. */
+export function handleFromProfileUrl(url: string): string | null {
+  try {
+    const segments = new URL(url).pathname.split("/").filter(Boolean);
+    const last = segments.at(-1)?.replace(/^@/, "").trim();
+    return last || null;
+  } catch {
+    return null;
+  }
 }
 
 /** URL-safe slug from a brand name (used in routes, stable across reseeds). */
@@ -127,6 +164,13 @@ export const brandRouter = createTRPCRouter({
         // reference
         ownerBrandId: z.string().optional(),
         purpose: z.enum(inspirationPurposeEnum.enumValues).optional(),
+        referenceType: z.enum(brandTypeEnum.enumValues).optional(),
+        profile: z
+          .object({
+            platform: trackedProfilePlatformEnum,
+            url: z.string().trim().max(2000),
+          })
+          .optional(),
         enrich: z.boolean().optional(),
       }),
     )
@@ -150,7 +194,8 @@ export const brandRouter = createTRPCRouter({
             eq(brandTable.slug, slug),
           ),
         });
-        if (slugTaken) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+        if (slugTaken)
+          slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
 
         const [brand] = await ctx.db
           .insert(brandTable)
@@ -178,6 +223,13 @@ export const brandRouter = createTRPCRouter({
         });
       }
       await assertBrandManageable(ctx, input.ownerBrandId);
+      const profileUrl = normalizeProfileUrl(input.profile?.url);
+      if (input.profile && !profileUrl) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Profile URL must be a valid public URL",
+        });
+      }
 
       // Dedupe canonical reference rows by website so one Airbnb is shared.
       let reference = website
@@ -196,9 +248,19 @@ export const brandRouter = createTRPCRouter({
             id: createId("brand"),
             name: input.name,
             website,
-            type: "company",
+            type: input.referenceType ?? "company",
           })
           .returning();
+      } else if (
+        input.referenceType &&
+        reference.type !== input.referenceType
+      ) {
+        const [updated] = await ctx.db
+          .update(brandTable)
+          .set({ type: input.referenceType })
+          .where(eq(brandTable.id, reference.id))
+          .returning();
+        reference = updated ?? reference;
       }
 
       if (!reference) {
@@ -218,7 +280,42 @@ export const brandRouter = createTRPCRouter({
         })
         .onConflictDoNothing();
 
-      if (website && shouldEnrich) await applyEnrichment(ctx, reference.id, website);
+      if (input.profile && profileUrl) {
+        const existingChannel = await ctx.db.query.channelTable.findFirst({
+          where: and(
+            eq(channelTable.brandId, reference.id),
+            eq(channelTable.platform, input.profile.platform),
+            isNull(channelTable.deletedAt),
+          ),
+        });
+        const handle = handleFromProfileUrl(profileUrl);
+        if (existingChannel) {
+          await ctx.db
+            .update(channelTable)
+            .set({
+              profileUrl,
+              handle: handle ?? existingChannel.handle,
+              connectionStatus: "disconnected",
+              isActive: true,
+            })
+            .where(eq(channelTable.id, existingChannel.id));
+        } else {
+          await ctx.db.insert(channelTable).values({
+            id: createId("chan"),
+            brandId: reference.id,
+            kind: "social",
+            platform: input.profile.platform,
+            displayName:
+              input.profile.platform === "linkedin" ? "LinkedIn" : undefined,
+            handle,
+            profileUrl,
+            connectionStatus: "disconnected",
+          });
+        }
+      }
+
+      if (website && shouldEnrich)
+        await applyEnrichment(ctx, reference.id, website);
       return reference;
     }),
 
@@ -249,7 +346,9 @@ export const brandRouter = createTRPCRouter({
         .update(brandTable)
         .set({
           ...(input.name !== undefined && { name: input.name }),
-          ...(input.tagline !== undefined && { tagline: input.tagline || null }),
+          ...(input.tagline !== undefined && {
+            tagline: input.tagline || null,
+          }),
           ...(input.description !== undefined && {
             description: input.description || null,
           }),
@@ -311,7 +410,10 @@ export const brandRouter = createTRPCRouter({
         where: eq(brandInspirationTable.id, input.inspirationId),
       });
       if (!link) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Tracking link not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Tracking link not found",
+        });
       }
       await assertBrandManageable(ctx, link.brandId);
       await ctx.db

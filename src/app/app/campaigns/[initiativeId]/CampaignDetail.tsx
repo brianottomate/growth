@@ -2,12 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, Link2, Loader2, Pencil, X } from "lucide-react";
+  ArrowLeft,
+  ExternalLink,
+  Link2,
+  Loader2,
+  Pencil,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,9 +44,7 @@ const CONTENT_STATUS_LABEL: Record<string, string> = {
 };
 
 const fmtDay = (d: Date | null) =>
-  d
-    ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    : null;
+  d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
 
 export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
   const trpc = useTRPC();
@@ -154,14 +155,10 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
       {/* ---- linked content ------------------------------------------- */}
       <section className="mt-10">
         <div className="flex items-center justify-between">
-          <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
             Content · {campaign.contentPosts.length}
           </h2>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setLinkOpen(true)}
-          >
+          <Button size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
             <Link2 className="size-3.5" />
             Link content
           </Button>
@@ -237,7 +234,7 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
 
       {/* ---- linked ad campaigns -------------------------------------- */}
       <section className="mt-10">
-        <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
           Ad campaigns · {campaign.adCampaigns.length}
         </h2>
         {campaign.adCampaigns.length === 0 ? (
@@ -253,7 +250,10 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
                 className="bg-card flex items-center gap-3 rounded-lg border px-3 py-2.5"
               >
                 {c.channel?.platform && (
-                  <ChannelLogo platform={c.channel.platform} className="size-4" />
+                  <ChannelLogo
+                    platform={c.channel.platform}
+                    className="size-4"
+                  />
                 )}
                 <span className="min-w-0 flex-1 truncate text-sm">
                   {c.name}
@@ -299,7 +299,6 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
     </div>
   );
 }
-
 // ---- link picker -----------------------------------------------------
 
 function LinkContentDialog({
@@ -326,9 +325,7 @@ function LinkContentDialog({
     const needle = q.trim().toLowerCase();
     const list = linkable ?? [];
     if (!needle) return list;
-    return list.filter((p) =>
-      (p.title ?? "").toLowerCase().includes(needle),
-    );
+    return list.filter((p) => (p.title ?? "").toLowerCase().includes(needle));
   }, [linkable, q]);
 
   const link = useMutation(

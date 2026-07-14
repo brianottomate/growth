@@ -7,16 +7,24 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  brandTable,
   type ChannelPlatform,
+  contentPostTable,
   contentSuggestionTable,
   platformPostTable,
+  seriesTable,
 } from "@/server/db/schema";
+import {
+  listBrandPillars,
+  requireBrandPillar,
+} from "@/server/services/content-strategy.service";
 
 /**
  * Retroactive content grouping — reconstruct the `content_post` (idea) layer
  * over orphaned `platform_post`s. An AI pass (structured generation) clusters a
- * brand's posts into groups: the SAME content cross-posted, a recurring SERIES
- * ("Where to Stay" guides), a campaign, or a theme. Each group is written as a
+ * brand's posts into groups: the SAME content cross-posted or a recurring SERIES
+ * ("Where to Stay" guides). Pillar is an optional classification on either
+ * outcome, not a third grouping container. Each group is written as a
  * PENDING `content_suggestion` (kind="grouping") for human review in /content.
  *
  * Batched + paginated so large libraries (blog 300, newsletter 238) stay within
@@ -31,20 +39,32 @@ const GroupingsSchema = z.object({
     .array(
       z.object({
         unit: z
-          .string()
+          .enum(["single", "series"])
           .describe(
             "'single' = ONE piece shown many ways (same content cross-posted across channels/time, incl. within-brand reposts amplifying it) → becomes one content idea. 'series' = MULTIPLE DISTINCT pieces sharing a recurring format or one campaign arc → becomes a series of separate ideas.",
           ),
         title: z
           .string()
-          .describe("short group/series name, e.g. 'Where to Stay city guides'"),
+          .describe(
+            "short group/series name, e.g. 'Where to Stay city guides'",
+          ),
         groupKind: z
-          .string()
-          .describe("descriptive: crosspost | series | campaign | theme"),
+          .enum(["crosspost", "series"])
+          .describe(
+            "crosspost for multiple executions/amplifications of one idea; series for multiple distinct installments",
+          ),
         theme: z.string().describe("what unifies these posts"),
+        pillarSlug: z
+          .string()
+          .nullable()
+          .describe(
+            "one supplied brand pillar slug when the fit is clear; otherwise null",
+          ),
         members: z
           .array(z.number())
-          .describe("0-based indexes of the posts in this group; only 2 or more"),
+          .describe(
+            "0-based indexes of the posts in this group; only 2 or more",
+          ),
         rationale: z.string().describe("one sentence on why they group"),
       }),
     )
@@ -69,6 +89,10 @@ STRONG bias toward leaving posts STANDALONE:
 - Do NOT group scattered or unrelated reposts. Only fold a repost into a group
   if it clearly amplifies THAT group's content/campaign.
 - Prefer precise small groups over big loose buckets.
+- Do not invent additional grouping types such as theme or campaign. A broad
+  theme is a pillar classification; an editorial campaign arc is a series.
+- A pillar classifies the resulting idea or series. It never replaces the
+  single-vs-series decision and must use one of the supplied pillar slugs.
 
 Return only groups of 2+; everything else stays standalone (omit it). Use the
 [index] shown in brackets to reference posts.`;
@@ -84,6 +108,23 @@ export async function suggestGroupingsForBrand(opts: {
   platforms: ChannelPlatform[];
   source?: "owned" | "scraped";
 }): Promise<GroupingRun> {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, opts.brandId),
+    columns: { id: true, slug: true },
+  });
+  if (!brand) throw new Error("Brand not found");
+  const pillars = await listBrandPillars({
+    brandId: brand.id,
+    brandSlug: brand.slug,
+  });
+  const pillarContext = pillars.length
+    ? pillars
+        .map(
+          (pillar) =>
+            `- ${pillar.slug}: ${pillar.name} — ${pillar.description}`,
+        )
+        .join("\n")
+    : "- No pillars are defined. Always return pillarSlug: null.";
   const rows = await db
     .select({
       id: platformPostTable.id,
@@ -112,7 +153,7 @@ export async function suggestGroupingsForBrand(opts: {
     // Amplification is a SIGNAL, not an exclusion — reposts/quotes are core to
     // campaigns (a founder amplifying a launch belongs in that campaign group).
     const kind = r.externalKind ?? "";
-    const who = (r.amplifiedFrom)?.username;
+    const who = r.amplifiedFrom?.username;
     const amp =
       kind === "repost" || kind === "retweet"
         ? `↻ repost${who ? ` of @${who}` : ""}`
@@ -149,7 +190,7 @@ export async function suggestGroupingsForBrand(opts: {
         schema: GroupingsSchema,
       }),
       system: SYSTEM,
-      prompt: `Posts:\n${list}`,
+      prompt: `Available brand pillars:\n${pillarContext}\n\nPosts:\n${list}`,
     });
 
     for (const g of output.groups) {
@@ -167,6 +208,7 @@ export async function suggestGroupingsForBrand(opts: {
           groupKind: g.groupKind,
           title: g.title,
           theme: g.theme,
+          pillarSlug: g.pillarSlug,
           memberPostIds: memberIds,
           rationale: g.rationale,
         },
@@ -179,4 +221,171 @@ export async function suggestGroupingsForBrand(opts: {
   }
 
   return { posts: posts.length, groups, suggestions };
+}
+
+/** Apply or reject one reviewable grouping proposal. Both the Review screen
+ * and chat call this service so approval semantics cannot drift between them. */
+export async function resolveGroupingSuggestion(input: {
+  id: string;
+  accept: boolean;
+  orgId: string;
+  userId: string;
+  pillarSlug?: string | null;
+}) {
+  const suggestion = await db.query.contentSuggestionTable.findFirst({
+    where: eq(contentSuggestionTable.id, input.id),
+    with: {
+      brand: { columns: { organizationId: true, slug: true } },
+    },
+  });
+  if (!suggestion) throw new Error("Grouping proposal not found.");
+  if (suggestion.brand?.organizationId !== input.orgId) {
+    throw new Error("Grouping proposal is outside your organization.");
+  }
+  if (suggestion.status !== "pending") {
+    throw new Error("This grouping proposal has already been reviewed.");
+  }
+
+  const review = { reviewedById: input.userId, reviewedAt: new Date() };
+  if (!input.accept) {
+    await db
+      .update(contentSuggestionTable)
+      .set({ status: "rejected", ...review })
+      .where(eq(contentSuggestionTable.id, suggestion.id));
+    return {
+      ok: true as const,
+      action: "saved" as const,
+      change: "rejected" as const,
+      id: suggestion.id,
+      status: "rejected" as const,
+    };
+  }
+
+  const proposed = (suggestion.proposed ?? {}) as {
+    unit?: "single" | "series";
+    title?: string;
+    theme?: string;
+    pillarSlug?: string | null;
+    memberPostIds?: string[];
+  };
+  const pillarSlug =
+    input.pillarSlug === undefined
+      ? (proposed.pillarSlug ?? null)
+      : input.pillarSlug;
+  if (pillarSlug) {
+    await requireBrandPillar({
+      brandId: suggestion.brandId,
+      brandSlug: suggestion.brand.slug,
+      pillarSlug,
+    });
+  }
+  const ids = [...new Set(proposed.memberPostIds ?? [])];
+  const members = ids.length
+    ? await db.query.platformPostTable.findMany({
+        where: and(
+          inArray(platformPostTable.id, ids),
+          eq(platformPostTable.brandId, suggestion.brandId),
+        ),
+        columns: { id: true, text: true, publishedAt: true },
+      })
+    : [];
+  if (members.length !== ids.length || members.length < 2) {
+    throw new Error(
+      "The grouping no longer contains at least two available posts for this brand.",
+    );
+  }
+
+  if (proposed.unit === "series") {
+    const dates = members
+      .map((member) => member.publishedAt)
+      .filter((date): date is Date => !!date)
+      .sort((a, b) => a.getTime() - b.getTime());
+    const [series] = await db
+      .insert(seriesTable)
+      .values({
+        brandId: suggestion.brandId,
+        name: proposed.title ?? "Series",
+        theme: proposed.theme,
+        pillar: pillarSlug,
+        status: "active",
+        startAt: dates[0],
+        endAt: dates[dates.length - 1],
+      })
+      .returning({ id: seriesTable.id, name: seriesTable.name });
+    if (!series) throw new Error("Could not create the series.");
+
+    for (const member of members) {
+      const [idea] = await db
+        .insert(contentPostTable)
+        .values({
+          brandId: suggestion.brandId,
+          title: member.text?.slice(0, 100).replace(/\s+/g, " ").trim() ?? null,
+          status: "draft",
+          origin: "ai",
+          seriesId: series.id,
+          pillar: pillarSlug,
+          metadata: { fromSuggestion: suggestion.id },
+        })
+        .returning({ id: contentPostTable.id });
+      if (idea) {
+        await db
+          .update(platformPostTable)
+          .set({ contentPostId: idea.id })
+          .where(eq(platformPostTable.id, member.id));
+      }
+    }
+    await db
+      .update(contentSuggestionTable)
+      .set({ status: "accepted", ...review })
+      .where(eq(contentSuggestionTable.id, suggestion.id));
+    return {
+      ok: true as const,
+      action: "saved" as const,
+      change: "series" as const,
+      id: suggestion.id,
+      status: "accepted" as const,
+      seriesId: series.id,
+      title: series.name,
+      pillarSlug,
+      contentIdeas: members.length,
+      url: "/app/content",
+    };
+  }
+
+  const [idea] = await db
+    .insert(contentPostTable)
+    .values({
+      brandId: suggestion.brandId,
+      title: proposed.title ?? "Grouped content",
+      status: "draft",
+      origin: "ai",
+      pillar: pillarSlug,
+      metadata: {
+        groupKind: "crosspost",
+        theme: proposed.theme,
+        fromSuggestion: suggestion.id,
+      },
+    })
+    .returning({ id: contentPostTable.id, title: contentPostTable.title });
+  if (!idea) throw new Error("Could not create the content idea.");
+  await db
+    .update(platformPostTable)
+    .set({ contentPostId: idea.id })
+    .where(inArray(platformPostTable.id, ids));
+  await db
+    .update(contentSuggestionTable)
+    .set({ status: "accepted", ...review })
+    .where(eq(contentSuggestionTable.id, suggestion.id));
+  return {
+    ok: true as const,
+    action: "saved" as const,
+    change: "same_idea" as const,
+    id: suggestion.id,
+    status: "accepted" as const,
+    contentPostId: idea.id,
+    title: idea.title,
+    pillarSlug,
+    channelPosts: members.length,
+    url: `/app/content/${idea.id}`,
+  };
 }

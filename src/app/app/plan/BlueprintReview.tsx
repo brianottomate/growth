@@ -6,6 +6,7 @@ import { Pin, Plus, RotateCw, Undo2, X } from "lucide-react";
 import { ChannelLogo } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 import { type RouterOutputs } from "@/trpc/react";
+import { getPlatformFormat } from "@/server/content/formats";
 
 export type Blueprint = RouterOutputs["moment"]["generate"];
 export type Slot = Blueprint["slots"][number];
@@ -33,7 +34,13 @@ type WorkingSlot =
 
 /** A slot rendered as a calendar chip — kind tag + platform spots + title. */
 function BlueprintSlotChip({ slot }: { slot: Slot }) {
-  const platforms = [...new Set(slot.spots.map((s) => s.platform))];
+  const platforms = [
+    ...new Set(
+      slot.spots.map((s) =>
+        s.format === "newsletter.blast" ? "blast" : s.platform,
+      ),
+    ),
+  ];
   return (
     <div className="bg-card rounded-md border p-1.5">
       <div className="mb-1 flex items-center gap-1">
@@ -72,7 +79,10 @@ function BlueprintCalendar({
   const max = Math.max(0, ...offsets);
   const byOffset = new Map<number, Slot[]>();
   for (const s of slots)
-    (byOffset.get(s.dayOffset) ?? byOffset.set(s.dayOffset, []).get(s.dayOffset)!).push(s);
+    (
+      byOffset.get(s.dayOffset) ??
+      byOffset.set(s.dayOffset, []).get(s.dayOffset)!
+    ).push(s);
   const dateOf = (o: number) => {
     const d = new Date(base);
     d.setDate(d.getDate() + o);
@@ -92,7 +102,9 @@ function BlueprintCalendar({
               key={o}
               className={cn(
                 "w-40 shrink-0 rounded-lg border p-2",
-                isLaunch ? "border-emerald-500/40 bg-emerald-500/5" : "border-border",
+                isLaunch
+                  ? "border-emerald-500/40 bg-emerald-500/5"
+                  : "border-border",
               )}
             >
               <div className="mb-1.5 flex items-baseline justify-between">
@@ -106,7 +118,9 @@ function BlueprintCalendar({
                 <span
                   className={cn(
                     "text-[10px]",
-                    isLaunch ? "font-medium text-emerald-400" : "text-muted-foreground",
+                    isLaunch
+                      ? "font-medium text-emerald-400"
+                      : "text-muted-foreground",
                   )}
                 >
                   {isLaunch ? "launch" : rel(o)}
@@ -114,7 +128,9 @@ function BlueprintCalendar({
               </div>
               <div className="flex flex-col gap-1.5">
                 {here.length === 0 ? (
-                  <span className="text-muted-foreground/40 text-[11px]">—</span>
+                  <span className="text-muted-foreground/40 text-[11px]">
+                    —
+                  </span>
                 ) : (
                   here.map((s, i) => <BlueprintSlotChip key={i} slot={s} />)
                 )}
@@ -152,7 +168,9 @@ export function BlueprintReview({
   const nextId = () => (idRef.current += 1);
 
   const [slots, setSlots] = useState<WorkingSlot[]>([]);
-  const [amps, setAmps] = useState<{ ask: AmplifierAsk; removed: boolean }[]>([]);
+  const [amps, setAmps] = useState<{ ask: AmplifierAsk; removed: boolean }[]>(
+    [],
+  );
   const [steer, setSteer] = useState("");
 
   // A fresh proposal resets the working state. Anchored beats start pinned —
@@ -208,7 +226,9 @@ export function BlueprintReview({
 
   const regenerate = () =>
     onRegenerate({
-      keepSlots: realSlots.filter((s) => s.pinned && !s.removed).map((s) => s.slot),
+      keepSlots: realSlots
+        .filter((s) => s.pinned && !s.removed)
+        .map((s) => s.slot),
       blanks: blankCount || undefined,
       drop: realSlots.filter((s) => s.removed).map((s) => s.slot.title),
       steer: steer.trim() || undefined,
@@ -219,8 +239,8 @@ export function BlueprintReview({
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-lg font-semibold">Proposed shape</h2>
         <span className="text-muted-foreground text-xs">
-          {blueprint.scale} · {effectiveSlots.length} slots · {effectiveAmps.length}{" "}
-          amplifiers · not saved yet
+          {blueprint.scale} · {effectiveSlots.length} slots ·{" "}
+          {effectiveAmps.length} amplifiers · not saved yet
         </span>
         <div className="border-border ml-auto flex overflow-hidden rounded-full border">
           {(["list", "calendar"] as const).map((v) => (
@@ -240,7 +260,9 @@ export function BlueprintReview({
         </div>
       </div>
       {blueprint.verdictReason && (
-        <p className="text-muted-foreground mt-0.5 text-xs">{blueprint.verdictReason}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs">
+          {blueprint.verdictReason}
+        </p>
       )}
 
       {blueprint.missing && (
@@ -258,35 +280,37 @@ export function BlueprintReview({
           </p>
 
           <div className="mt-2">
-        {slots.map((s) =>
-          s.kind === "blank" ? (
-            <div
-              key={s.id}
-              className="border-accent/40 flex items-center gap-3 border-l-2 border-dashed py-2 pl-3"
-            >
-              <div className="text-muted-foreground w-12 shrink-0 text-[11px]">?</div>
-              <span className="text-muted-foreground flex-1 text-sm italic">
-                Blank beat — AI fills this on regenerate
-              </span>
-              <button
-                onClick={() => dropBlank(s.id)}
-                className="text-muted-foreground hover:text-foreground shrink-0"
-                title="Remove blank"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-          ) : (
-            <SlotRow
-              key={s.id}
-              slot={s.slot}
-              pinned={s.pinned}
-              removed={s.removed}
-              onTogglePin={() => togglePin(s.id)}
-              onToggleRemove={() => toggleRemove(s.id)}
-            />
-          ),
-        )}
+            {slots.map((s) =>
+              s.kind === "blank" ? (
+                <div
+                  key={s.id}
+                  className="border-accent/40 flex items-center gap-3 border-l-2 border-dashed py-2 pl-3"
+                >
+                  <div className="text-muted-foreground w-12 shrink-0 text-[11px]">
+                    ?
+                  </div>
+                  <span className="text-muted-foreground flex-1 text-sm italic">
+                    Blank beat — AI fills this on regenerate
+                  </span>
+                  <button
+                    onClick={() => dropBlank(s.id)}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                    title="Remove blank"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <SlotRow
+                  key={s.id}
+                  slot={s.slot}
+                  pinned={s.pinned}
+                  removed={s.removed}
+                  onTogglePin={() => togglePin(s.id)}
+                  onToggleRemove={() => toggleRemove(s.id)}
+                />
+              ),
+            )}
           </div>
         </>
       ) : (
@@ -305,7 +329,9 @@ export function BlueprintReview({
           <input
             value={steer}
             onChange={(e) => setSteer(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !regenerating && regenerate()}
+            onKeyDown={(e) =>
+              e.key === "Enter" && !regenerating && regenerate()
+            }
             placeholder="Steer the regenerate — e.g. “more reels, end on a recap, less paid”"
             className="border-border bg-background flex-1 rounded-md border px-2 py-1.5 text-sm"
           />
@@ -319,7 +345,9 @@ export function BlueprintReview({
                 : "Re-propose the whole shape"
             }
           >
-            <RotateCw className={`size-3.5 ${regenerating ? "animate-spin" : ""}`} />
+            <RotateCw
+              className={`size-3.5 ${regenerating ? "animate-spin" : ""}`}
+            />
             {regenerating ? "Regenerating…" : "Regenerate"}
           </button>
         </div>
@@ -370,7 +398,11 @@ function SlotRow({
   return (
     <div
       className={`flex gap-3 border-l-2 py-2 pl-3 ${
-        removed ? "border-border/60 opacity-40" : pinned ? "border-emerald-500/50" : "border-border/60"
+        removed
+          ? "border-border/60 opacity-40"
+          : pinned
+            ? "border-emerald-500/50"
+            : "border-border/60"
       }`}
     >
       <div className="text-muted-foreground w-12 shrink-0 text-[11px] tabular-nums">
@@ -378,7 +410,9 @@ function SlotRow({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${removed ? "line-through" : ""}`}>
+          <span
+            className={`text-sm font-medium ${removed ? "line-through" : ""}`}
+          >
             {slot.title}
           </span>
           <span
@@ -393,8 +427,13 @@ function SlotRow({
               key={i}
               className="bg-muted/50 flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]"
             >
-              <ChannelLogo platform={sp.platform} className="size-3" />
-              {sp.archetype}
+              <ChannelLogo
+                platform={
+                  sp.format === "newsletter.blast" ? "blast" : sp.platform
+                }
+                className="size-3"
+              />
+              {getPlatformFormat(sp.format)?.label ?? sp.archetype}
               {sp.template ? ` · ${sp.template}` : ""}
             </span>
           ))}
@@ -417,7 +456,11 @@ function SlotRow({
           className="text-muted-foreground hover:text-foreground"
           title={removed ? "Restore" : "Remove from plan"}
         >
-          {removed ? <Undo2 className="size-3.5" /> : <X className="size-3.5" />}
+          {removed ? (
+            <Undo2 className="size-3.5" />
+          ) : (
+            <X className="size-3.5" />
+          )}
         </button>
       </div>
     </div>

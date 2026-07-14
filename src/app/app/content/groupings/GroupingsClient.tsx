@@ -12,8 +12,6 @@ type Group = RouterOutputs["content"]["groupingSuggestions"][number];
 const KIND_CLS: Record<string, string> = {
   crosspost: "bg-sky-500/15 text-sky-300",
   series: "bg-violet-500/15 text-violet-300",
-  campaign: "bg-amber-500/15 text-amber-300",
-  theme: "bg-emerald-500/15 text-emerald-300",
 };
 
 const SOCIAL = new Set([
@@ -71,7 +69,7 @@ function MemberTile({ m }: { m: Member }) {
             className="m-auto mt-3 size-5 opacity-40"
           />
         )}
-        <span className="absolute left-0.5 top-0.5 rounded bg-black/40 p-0.5 backdrop-blur-sm">
+        <span className="absolute top-0.5 left-0.5 rounded bg-black/40 p-0.5 backdrop-blur-sm">
           <ChannelLogo platform={m.platform} className="size-3" />
         </span>
       </div>
@@ -189,6 +187,11 @@ function GroupCard({
             <span className="text-muted-foreground text-[11px]">
               {g.members.length} posts · {g.brandName}
             </span>
+            {g.pillarSlug && (
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                {g.pillarSlug}
+              </span>
+            )}
             {(() => {
               const s = dateSpan(g);
               if (!s) return null;
@@ -202,7 +205,9 @@ function GroupCard({
             })()}
           </div>
           {g.rationale && (
-            <p className="text-muted-foreground mt-0.5 text-xs">{g.rationale}</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {g.rationale}
+            </p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -238,7 +243,7 @@ function GroupCard({
       <div className="mt-3 space-y-3">
         {isThread ? (
           <div className="border-border/60 space-y-0.5 border-l-2 pl-3">
-            <div className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
+            <div className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
               Thread · {core.length}
             </div>
             {coreSorted.map((m) => (
@@ -304,7 +309,10 @@ export function GroupingsClient() {
     }),
   );
   const onResolve = (id: string, accept: boolean) => {
-    setResolved((prev) => ({ ...prev, [id]: accept ? "accepted" : "rejected" }));
+    setResolved((prev) => ({
+      ...prev,
+      [id]: accept ? "accepted" : "rejected",
+    }));
     resolve.mutate({ id, accept });
   };
 
@@ -362,8 +370,8 @@ export function GroupingsClient() {
         </Link>
       </div>
       <p className="text-muted-foreground mt-1 text-sm">
-        AI-proposed content ideas reconstructed from your posts. Accept to create
-        the idea and link its posts; reject to dismiss.
+        AI-proposed content ideas reconstructed from your posts. Accept to
+        create the idea and link its posts; reject to dismiss.
       </p>
 
       <div className="mt-4 flex items-center gap-1.5">
@@ -378,13 +386,14 @@ export function GroupingsClient() {
             }`}
           >
             {f.label}{" "}
-            <span className="opacity-60 tabular-nums">{counts[f.key]}</span>
+            <span className="tabular-nums opacity-60">{counts[f.key]}</span>
           </button>
         ))}
         <span className="flex-1" />
         {progress.done > 0 && (
           <span className="text-muted-foreground text-xs tabular-nums">
-            <span className="text-emerald-400">{progress.accepted}</span> accepted
+            <span className="text-emerald-400">{progress.accepted}</span>{" "}
+            accepted
             {" · "}
             <span className="text-rose-400">{progress.rejected}</span> rejected
             {" · "}
@@ -394,9 +403,7 @@ export function GroupingsClient() {
       </div>
 
       <div className="mt-6 space-y-3">
-        {isLoading && (
-          <p className="text-muted-foreground text-sm">Loading…</p>
-        )}
+        {isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
         {!isLoading && visible.length === 0 && (
           <p className="text-muted-foreground text-sm">
             No groupings in this view.

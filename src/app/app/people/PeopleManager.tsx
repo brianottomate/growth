@@ -42,10 +42,14 @@ const fmtDate = (d: Date | null) =>
     : "—";
 
 export function PeopleManager({
+  organizationId,
+  canManage,
   members,
   pending,
   currentUserId,
 }: {
+  organizationId: string;
+  canManage: boolean;
   members: MemberRow[];
   pending: PendingRow[];
   currentUserId: string;
@@ -123,16 +127,18 @@ export function PeopleManager({
               </span>
 
               <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="text-muted-foreground hover:text-foreground size-7"
-                  onClick={() => setEditTarget(m)}
-                  aria-label="Edit member"
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-                {!isSelf && (
+                {(isSelf || canManage) && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-foreground size-7"
+                    onClick={() => setEditTarget(m)}
+                    aria-label="Edit member"
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                )}
+                {canManage && !isSelf && (
                   <Button
                     size="icon"
                     variant="ghost"
@@ -151,7 +157,7 @@ export function PeopleManager({
 
       {pending.length > 0 && (
         <div>
-          <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
             Pending invitations · {pending.length}
           </h2>
           <div className="flex flex-col gap-2">
@@ -161,7 +167,9 @@ export function PeopleManager({
                 className="flex items-center justify-between gap-3 rounded-lg border border-dashed p-3"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{inv.email}</div>
+                  <div className="truncate text-sm font-medium">
+                    {inv.email}
+                  </div>
                   <div className="text-muted-foreground text-xs">
                     Invited {fmtDate(inv.createdAt)} · expires{" "}
                     {fmtDate(inv.expiresAt)}
@@ -181,7 +189,10 @@ export function PeopleManager({
                     className="text-muted-foreground hover:text-destructive"
                     disabled={cancelInvitation.isPending}
                     onClick={() =>
-                      cancelInvitation.mutate({ invitationId: inv.id })
+                      cancelInvitation.mutate({
+                        organizationId,
+                        invitationId: inv.id,
+                      })
                     }
                   >
                     Cancel
@@ -194,6 +205,8 @@ export function PeopleManager({
       )}
 
       <EditPersonDialog
+        organizationId={organizationId}
+        canManage={canManage}
         member={editTarget}
         isSelf={editTarget?.userId === currentUserId}
         open={editTarget !== null}
@@ -205,7 +218,11 @@ export function PeopleManager({
         open={removeTarget !== null}
         onOpenChange={(open) => !open && setRemoveTarget(null)}
         onConfirm={() =>
-          removeTarget && removeMember.mutate({ memberId: removeTarget.id })
+          removeTarget &&
+          removeMember.mutate({
+            organizationId,
+            memberId: removeTarget.id,
+          })
         }
         title={`Remove ${removeTarget?.name ?? removeTarget?.email ?? "this member"}?`}
         description="They'll lose access to this organization. You can add them back later."

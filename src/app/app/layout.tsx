@@ -52,14 +52,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         userEmail={session.user.email ?? ""}
         userImage={session.user.image ?? undefined}
       />
-      <div className="flex min-w-0 flex-1">
-        <SidebarInset className="min-w-0">
+      <div className="flex h-svh min-w-0 flex-1 overflow-hidden">
+        <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden">
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
           </header>
           {/* @container lets wide surfaces (e.g. the content Board) break out of
               the centered column with a cqw-based negative margin. */}
-          <div className="@container flex-1 overflow-auto">
+          <div className="@container min-h-0 flex-1 scrollbar-thin overflow-x-hidden overflow-y-auto">
             <div className="mx-auto w-full max-w-5xl p-8">{children}</div>
           </div>
         </SidebarInset>

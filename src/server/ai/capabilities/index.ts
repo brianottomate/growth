@@ -28,12 +28,15 @@ import {
 } from "./content";
 import { leadsSummary } from "./leads";
 import { recentMentions } from "./listening";
+import { CONTENT_STRATEGY_CAPABILITIES } from "./content-strategy";
 import { navigateWorkspace } from "./navigation";
 import { nextForBrand } from "./next";
 import { OPERATION_CAPABILITIES } from "./operations";
 import { PLANNING_CAPABILITIES } from "./planning";
 import { workspaceOverview } from "./overview";
+import { prepareProductionPacket } from "./production";
 import { readWebPage, webSearch } from "./research";
+import { EMAIL_CAPABILITIES } from "./email";
 
 export { toAiTools } from "./to-ai-tools";
 export { registerMcpCapabilities } from "./to-mcp-server";
@@ -62,7 +65,10 @@ export const OVERVIEW_CAPABILITIES: AnyCapability[] = [
   upcomingContent,
   productionQueue,
   getContentWorkItem,
+  ...EMAIL_CAPABILITIES,
+  ...CONTENT_STRATEGY_CAPABILITIES,
   suggestMediaForContent,
+  prepareProductionPacket,
   // Content writes remain approval-gated; explicit audience saves are direct.
   updateContentWorkItem,
   addContentCrossPost,
@@ -81,3 +87,12 @@ export const OVERVIEW_CAPABILITIES: AnyCapability[] = [
   ...OPERATION_CAPABILITIES,
   ...PLANNING_CAPABILITIES,
 ];
+
+/**
+ * External connector surface. ChatGPT and Claude already have their own
+ * open-world browsing, so Wander Growth contributes durable workspace capabilities
+ * without duplicating web-search tools or widening prompt-injection exposure.
+ */
+export const MCP_CAPABILITIES: AnyCapability[] = OVERVIEW_CAPABILITIES.filter(
+  (capability) => capability.domain !== "research",
+);

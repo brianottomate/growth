@@ -1,6 +1,9 @@
 import "server-only";
 
 import { env } from "@/env";
+import { linkedinProfileDatasetFor } from "./brightdata-datasets";
+
+export { linkedinProfileDatasetFor } from "./brightdata-datasets";
 
 /**
  * Bright Data dataset client — scrapes competitor/peer social posts + profiles.
@@ -238,7 +241,31 @@ export async function verifyProfile(
   platform: string,
   profileUrl: string,
 ): Promise<ProfileVerification | null> {
-  const cfg = VERIFY[platform];
+  const cfg =
+    platform === "linkedin" &&
+    linkedinProfileDatasetFor(profileUrl) === "linkedinPersonProfile"
+      ? {
+          key: "linkedinPersonProfile" as const,
+          extract: (r: Record<string, unknown>): ProfileVerification => ({
+            exists: !r.error && !!(r.name ?? r.id ?? r.url),
+            followerCount:
+              typeof r.followers === "number"
+                ? r.followers
+                : typeof r.followers_count === "number"
+                  ? r.followers_count
+                  : undefined,
+            handle:
+              typeof r.id === "string"
+                ? r.id
+                : handleFromLinkedinUrl(profileUrl),
+            profileImageUrl: firstString(r, [
+              "avatar",
+              "profile_image_url",
+              "profile_picture",
+            ]),
+          }),
+        }
+      : VERIFY[platform];
   if (!cfg) return null;
   // No limit_per_input: the profile datasets return a single record, and that
   // param has been observed to drop the connection on these endpoints.
@@ -248,6 +275,14 @@ export async function verifyProfile(
     | undefined;
   if (!rec) return { exists: false };
   return cfg.extract(rec);
+}
+
+function handleFromLinkedinUrl(url: string): string | undefined {
+  try {
+    return new URL(url).pathname.split("/").filter(Boolean).at(-1);
+  } catch {
+    return undefined;
+  }
 }
 
 // ---- LINKEDIN PERSON PROFILE (trust layer) -------------------------

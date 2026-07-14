@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
 import {
   Images,
@@ -27,6 +28,8 @@ import { MediaPickerDialog } from "./MediaPickerDialog";
 import { MarkScheduledButton } from "../MarkScheduledButton";
 import { SPOT_PILLS, type SpotPill } from "@/lib/spot-pills";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { LinkedInDeliveryControl } from "./LinkedInDeliveryControl";
+import { getPlatformFormat } from "@/server/content/formats";
 
 const STATUS_PILL: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -51,6 +54,10 @@ function formatLabel(
   template: string | null,
 ): string | null {
   if (template) return titleCase(template);
+  if (format) {
+    const registered = getPlatformFormat(format);
+    if (registered) return registered.label;
+  }
   if (format?.includes(".")) return titleCase(format.split(".")[1]!);
   if (archetype) return titleCase(archetype);
   return null;
@@ -80,6 +87,10 @@ export type SpotCardData = {
   provider: string | null;
   scheduledAtISO: string | null;
   publishedAtISO: string | null;
+  deliveryExternalId: string | null;
+  deliveryStatus: string | null;
+  deliveryError: string | null;
+  publishingConnected: boolean;
   assetLinks: string[] | null;
   media: MediaItem[] | null;
   stats: PostStats | null;
@@ -108,6 +119,10 @@ export function SpotCard({
   const trpc = useTRPC();
   const router = useRouter();
   const owned = spot.source === "owned";
+  const isEmail =
+    spot.platform === "newsletter" &&
+    (spot.format === "newsletter.broadcast" ||
+      spot.format === "newsletter.blast");
 
   const refresh = { onSettled: () => router.refresh() };
   const setStatus = useMutation(
@@ -207,12 +222,19 @@ export function SpotCard({
       {/* header */}
       <div className="flex items-start gap-3">
         <span className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-xl">
-          <ChannelLogo platform={spot.platform} className="size-6" />
+          <ChannelLogo
+            platform={
+              spot.format === "newsletter.blast" ? "blast" : spot.platform
+            }
+            className="size-6"
+          />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold">
-              {platformLabel(spot.platform)}
+              {spot.format === "newsletter.blast"
+                ? "Email"
+                : platformLabel(spot.platform)}
             </span>
             {spot.username && (
               <span className="text-muted-foreground text-xs">
@@ -273,12 +295,24 @@ export function SpotCard({
                   className="px-1.5 py-0.5 text-[11px]"
                   aria-label="Scheduled date"
                 />
-                {spot.status !== "published" && (
-                  <MarkScheduledButton
+                {spot.status !== "published" &&
+                  spot.platform !== "linkedin" && (
+                    <MarkScheduledButton
+                      spotId={spot.id}
+                      at={spot.scheduledAtISO}
+                      scheduled={spot.status === "scheduled"}
+                      onChanged={() => router.refresh()}
+                    />
+                  )}
+                {spot.platform === "linkedin" && (
+                  <LinkedInDeliveryControl
                     spotId={spot.id}
-                    at={spot.scheduledAtISO}
-                    scheduled={spot.status === "scheduled"}
-                    onChanged={() => router.refresh()}
+                    status={spot.status}
+                    scheduledAt={spot.scheduledAtISO}
+                    connected={spot.publishingConnected}
+                    deliveryExternalId={spot.deliveryExternalId}
+                    deliveryStatus={spot.deliveryStatus}
+                    deliveryError={spot.deliveryError}
                   />
                 )}
               </>
@@ -344,7 +378,24 @@ export function SpotCard({
       {/* Caption — the concrete platform copy. Editable for owned spots, with an
           AI generate/regenerate that remixes the idea brief in the brand+channel
           voice. Scraped posts show their captured text read-only. */}
-      {owned ? (
+      {owned && isEmail ? (
+        <div className="bg-muted/25 mt-3 rounded-lg border p-3">
+          <p className="text-sm font-medium">
+            This email has a subject, Markdown body, CTA, preview, and revision
+            history in its issue workspace.
+          </p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            The content card holds the premise and calendar placement; the
+            newsletter workspace holds the actual email artifact.
+          </p>
+          <Link
+            href={`/app/newsletters/${spot.id}`}
+            className="border-border hover:bg-accent bg-background mt-3 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium"
+          >
+            Open email workspace
+          </Link>
+        </div>
+      ) : owned ? (
         <div className="mt-3">
           <div className="bg-background min-h-16 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
             {caption.trim() || (
