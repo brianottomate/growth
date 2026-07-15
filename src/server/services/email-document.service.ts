@@ -12,6 +12,7 @@ import {
   type EmailDocumentDraft,
   type EmailDocumentFormat,
 } from "@/lib/email-document";
+import { messageSendSummary } from "@/lib/email-delivery";
 import { db, withTransaction } from "@/server/db";
 import {
   brandTable,
@@ -21,11 +22,12 @@ import {
   emailDocumentVersionTable,
   emailGenerationJobTable,
   initiativeTable,
+  messageSendTable,
   platformPostTable,
   seriesTable,
   type EmailDocumentSnapshot,
 } from "@/server/db/schema";
-import { renderNewsletterHtml } from "@/server/email/newsletter-renderer";
+import { renderDesignSystemNewsletter } from "@/server/email/design-system-newsletter-renderer";
 
 export const EMAIL_GENERATION_MODEL = "claude-sonnet-4-6";
 
@@ -159,6 +161,7 @@ export async function getEmailWorkspace(input: {
   platformPostId: string;
   organizationId: string;
   userId: string;
+  canDeliver?: boolean;
 }) {
   const spot = await requireOwnedEmailSpot(
     input.platformPostId,
@@ -168,7 +171,7 @@ export async function getEmailWorkspace(input: {
     where: eq(emailDocumentTable.platformPostId, spot.id),
   });
   if (!document) throw new Error("Email document has not been initialized.");
-  const [versions, latestJob] = await Promise.all([
+  const [versions, latestJob, rawMessageSends] = await Promise.all([
     db.query.emailDocumentVersionTable.findMany({
       where: eq(emailDocumentVersionTable.emailDocumentId, document.id),
       orderBy: [desc(emailDocumentVersionTable.revision)],
@@ -178,11 +181,33 @@ export async function getEmailWorkspace(input: {
       where: eq(emailGenerationJobTable.emailDocumentId, document.id),
       orderBy: [desc(emailGenerationJobTable.createdAt)],
     }),
+    db.query.messageSendTable.findMany({
+      where: eq(messageSendTable.emailDocumentId, document.id),
+      orderBy: [desc(messageSendTable.createdAt)],
+      limit: 20,
+      columns: {
+        id: true,
+        revision: true,
+        provider: true,
+        providerBroadcastId: true,
+        providerMessageId: true,
+        audienceKind: true,
+        audienceReference: true,
+        audienceLabel: true,
+        status: true,
+        error: true,
+        approvedAt: true,
+        sentAt: true,
+        createdAt: true,
+      },
+    }),
   ]);
   return {
     document,
     versions,
     latestJob,
+    messageSends: rawMessageSends.map(messageSendSummary),
+    canDeliver: input.canDeliver ?? false,
     spot: {
       id: spot.id,
       format: spot.format as EmailDocumentFormat,
@@ -530,15 +555,12 @@ export async function renderEmailPreview(input: {
 }) {
   const { document, spot } = await ensureEmailDocument(input);
   const draft = emailDocumentDraftSchema.parse(input.draft ?? document);
-  return renderNewsletterHtml({
+  const rendered = await renderDesignSystemNewsletter({
     document: draft,
-    brand: {
-      name: spot.brand.name,
-      logo: spot.brand.brandIdentity?.logo ?? spot.brand.logo,
-      website: spot.brand.website,
-      primaryColor: spot.brand.brandIdentity?.colors?.primary,
-    },
+    brandName: spot.brand.name,
+    logo: spot.brand.brandIdentity?.logo ?? spot.brand.logo,
   });
+  return rendered.html;
 }
 
 export async function exportEmailHandoff(input: {

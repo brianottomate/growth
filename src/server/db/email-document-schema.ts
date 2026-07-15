@@ -9,6 +9,10 @@ import {
 import { userTable } from "./auth-schema";
 import { platformPostTable } from "./content-schema";
 import { createId } from "./utils";
+import type {
+  MessageAudienceKind,
+  MessageSendSnapshot,
+} from "@/lib/email-delivery";
 
 export type EmailDocumentSnapshot = {
   subject: string;
@@ -29,6 +33,15 @@ export const emailGenerationStatusEnum = pgEnum("email_generation_status", [
   "queued",
   "running",
   "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+export const messageSendStatusEnum = pgEnum("message_send_status", [
+  "draft",
+  "approved",
+  "sending",
+  "sent",
   "failed",
   "cancelled",
 ]);
@@ -161,7 +174,76 @@ export const emailGenerationJobTable = pgTable(
   ],
 );
 
+/**
+ * Immutable delivery intent and outcome for an approved email revision.
+ * Recipient membership stays in the provider; this table stores only the
+ * provider-managed audience reference and the exact content snapshot.
+ */
+export const messageSendTable = pgTable(
+  "message_send",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("msg")),
+    platformPostId: t
+      .text()
+      .references(() => platformPostTable.id)
+      .notNull(),
+    emailDocumentId: t
+      .text()
+      .references(() => emailDocumentTable.id)
+      .notNull(),
+    emailDocumentVersionId: t
+      .text()
+      .references(() => emailDocumentVersionTable.id)
+      .notNull(),
+    revision: t.integer().notNull(),
+    provider: t.text().$type<"customerio">().default("customerio").notNull(),
+    providerBroadcastId: t.text().notNull(),
+    providerMessageId: t.text(),
+    audienceKind: t.text().$type<MessageAudienceKind>().notNull(),
+    audienceReference: t.text().notNull(),
+    audienceLabel: t.text().notNull(),
+    status: messageSendStatusEnum().default("draft").notNull(),
+    snapshot: jsonb().$type<MessageSendSnapshot>().notNull(),
+    idempotencyKey: t.text().notNull(),
+    error: t.text(),
+    createdBy: t.text().references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    approvedBy: t.text().references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    sentBy: t.text().references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    approvedAt: t.timestamp({ withTimezone: true }),
+    sentAt: t.timestamp({ withTimezone: true }),
+    failedAt: t.timestamp({ withTimezone: true }),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("message_send_idempotency_idx").on(table.idempotencyKey),
+    index("message_send_document_idx").on(
+      table.emailDocumentId,
+      table.createdAt,
+    ),
+    index("message_send_status_idx").on(table.status),
+    index("message_send_platform_post_idx").on(table.platformPostId),
+  ],
+);
+
 export type EmailDocument = typeof emailDocumentTable.$inferSelect;
 export type EmailDocumentVersion =
   typeof emailDocumentVersionTable.$inferSelect;
 export type EmailGenerationJob = typeof emailGenerationJobTable.$inferSelect;
+export type MessageSend = typeof messageSendTable.$inferSelect;

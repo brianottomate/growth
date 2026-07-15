@@ -20,6 +20,7 @@ import {
   EMAIL_DOCUMENT_FORMATS,
   emailDocumentDraftSchema,
 } from "@/lib/email-document";
+import { MESSAGE_AUDIENCE_KINDS } from "@/lib/email-delivery";
 import {
   createEmailSlot,
   exportEmailHandoff,
@@ -30,16 +31,42 @@ import {
   saveEmailDocument,
   startEmailGeneration,
 } from "@/server/services/email-document.service";
+import {
+  approveMessageSend,
+  createMessageSendDraft,
+  sendApprovedMessage,
+} from "@/server/services/email-delivery.service";
 
 const ANONYMOUS_EMAIL_DOMAIN = "@anonymous.example.com"; // Update to match your Better Auth anonymous domain
 
-async function organizationIdForUser(database: typeof db, userId: string) {
+async function organizationMembershipForUser(
+  database: typeof db,
+  userId: string,
+) {
   const membership = await database.query.memberTable.findFirst({
     where: eq(memberTable.userId, userId),
-    columns: { organizationId: true },
+    columns: { organizationId: true, role: true },
   });
   if (!membership) {
     throw new TRPCError({ code: "FORBIDDEN", message: "No organization" });
+  }
+  return membership;
+}
+
+async function organizationIdForUser(database: typeof db, userId: string) {
+  return (await organizationMembershipForUser(database, userId)).organizationId;
+}
+
+async function deliveryOrganizationIdForUser(
+  database: typeof db,
+  userId: string,
+) {
+  const membership = await organizationMembershipForUser(database, userId);
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Only organization owners and admins can approve or send email.",
+    });
   }
   return membership.organizationId;
 }
@@ -48,14 +75,15 @@ export const newsletterRouter = createTRPCRouter({
   workspace: protectedProcedure
     .input(z.object({ platformPostId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const organizationId = await organizationIdForUser(
+      const membership = await organizationMembershipForUser(
         ctx.db,
         ctx.session.user.id,
       );
       return getEmailWorkspace({
         ...input,
-        organizationId,
+        organizationId: membership.organizationId,
         userId: ctx.session.user.id,
+        canDeliver: membership.role === "owner" || membership.role === "admin",
       });
     }),
 
@@ -181,6 +209,61 @@ export const newsletterRouter = createTRPCRouter({
           userId: ctx.session.user.id,
         }),
       };
+    }),
+
+  prepareSend: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        providerBroadcastId: z.number().int().positive(),
+        audienceKind: z.enum(MESSAGE_AUDIENCE_KINDS),
+        segmentId: z.number().int().positive(),
+        audienceLabel: z.string().trim().min(1).max(160),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return createMessageSendDraft({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  approveSend: protectedProcedure
+    .input(z.object({ messageSendId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await deliveryOrganizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return approveMessageSend({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  sendApproved: protectedProcedure
+    .input(
+      z.object({
+        messageSendId: z.string(),
+        confirmation: z.literal("SEND"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await deliveryOrganizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return sendApprovedMessage({
+        messageSendId: input.messageSendId,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
     }),
 
   subscribe: publicProcedure
