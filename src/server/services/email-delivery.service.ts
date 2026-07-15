@@ -3,12 +3,18 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import {
+  assertCustomerIoDeliveryTarget,
+  assertProductUpdateReadyForDelivery,
   customerIoBroadcastData,
   messageSendSummary,
   type MessageAudienceKind,
   type MessageSendSnapshot,
 } from "@/lib/email-delivery";
-import { triggerBroadcast } from "@/server/clients/customerio.client";
+import {
+  getCustomerIoCampaign,
+  getCustomerIoSegment,
+  triggerBroadcast,
+} from "@/server/clients/customerio.client";
 import { db } from "@/server/db";
 import {
   emailDocumentTable,
@@ -51,7 +57,6 @@ export async function createMessageSendDraft(input: {
   providerBroadcastId: number;
   audienceKind: MessageAudienceKind;
   segmentId: number;
-  audienceLabel: string;
 }) {
   const { document, spot } = await ensureEmailDocument(input);
   if (document.currentRevision < 1) {
@@ -65,6 +70,24 @@ export async function createMessageSendDraft(input: {
     ),
   });
   if (!version) throw new Error("The current email revision is unavailable.");
+
+  assertProductUpdateReadyForDelivery({
+    productUpdate: version.snapshot.productUpdate,
+    audienceKind: input.audienceKind,
+  });
+
+  const [providerBroadcast, providerSegment] = await Promise.all([
+    getCustomerIoCampaign(input.providerBroadcastId),
+    getCustomerIoSegment(input.segmentId),
+  ]);
+  assertCustomerIoDeliveryTarget({
+    productUpdate: version.snapshot.productUpdate,
+    broadcast: providerBroadcast,
+    segment: providerSegment,
+  });
+  if (!providerSegment) {
+    throw new Error("Customer.io segment validation failed.");
+  }
 
   const rendered = await renderDesignSystemNewsletter({
     document: version.snapshot,
@@ -88,8 +111,9 @@ export async function createMessageSendDraft(input: {
       kind: input.audienceKind,
       provider: "customerio",
       segmentId: input.segmentId,
-      label: input.audienceLabel,
+      label: providerSegment.name,
     },
+    productUpdate: version.snapshot.productUpdate ?? null,
     preview: {
       renderer: "@wandercom/design-system-emails",
       template: "generic.html",
@@ -116,7 +140,7 @@ export async function createMessageSendDraft(input: {
       .update(messageSendTable)
       .set({
         audienceKind: input.audienceKind,
-        audienceLabel: input.audienceLabel,
+        audienceLabel: providerSegment.name,
         snapshot,
         status: "draft",
         error: null,
@@ -139,7 +163,7 @@ export async function createMessageSendDraft(input: {
       providerBroadcastId: String(input.providerBroadcastId),
       audienceKind: input.audienceKind,
       audienceReference: String(input.segmentId),
-      audienceLabel: input.audienceLabel,
+      audienceLabel: providerSegment.name,
       snapshot,
       idempotencyKey,
       createdBy: input.userId,

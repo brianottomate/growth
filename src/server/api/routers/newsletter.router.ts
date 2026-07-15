@@ -19,10 +19,12 @@ import { topicKeySchema, emailSchema } from "@/lib/validators";
 import {
   EMAIL_DOCUMENT_FORMATS,
   emailDocumentDraftSchema,
+  productUpdateEmailDraftSchema,
 } from "@/lib/email-document";
 import { MESSAGE_AUDIENCE_KINDS } from "@/lib/email-delivery";
 import {
   createEmailSlot,
+  createProductUpdateDraft,
   exportEmailHandoff,
   getEmailWorkspace,
   renderEmailPreview,
@@ -108,6 +110,31 @@ export const newsletterRouter = createTRPCRouter({
         ctx.session.user.id,
       );
       return createEmailSlot({
+        ...input,
+        organizationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
+  createProductUpdateDraft: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        title: z.string().trim().min(1).max(160),
+        format: z.enum(EMAIL_DOCUMENT_FORMATS).default("newsletter.broadcast"),
+        plannedAt: z.string().datetime().optional(),
+        purpose: z.string().trim().max(5_000).optional(),
+        hook: z.string().trim().max(2_000).optional(),
+        pillar: z.string().trim().max(120).optional(),
+        draft: productUpdateEmailDraftSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const organizationId = await organizationIdForUser(
+        ctx.db,
+        ctx.session.user.id,
+      );
+      return createProductUpdateDraft({
         ...input,
         organizationId,
         userId: ctx.session.user.id,
@@ -218,7 +245,6 @@ export const newsletterRouter = createTRPCRouter({
         providerBroadcastId: z.number().int().positive(),
         audienceKind: z.enum(MESSAGE_AUDIENCE_KINDS),
         segmentId: z.number().int().positive(),
-        audienceLabel: z.string().trim().min(1).max(160),
       }),
     )
     .mutation(async ({ ctx, input }) => {

@@ -9,8 +9,10 @@ import {
   EMAIL_DOCUMENT_FORMATS,
   emailDocumentDraftSchema,
   formatEmailImplementationHandoff,
+  productUpdateEmailDraftSchema,
   type EmailDocumentDraft,
   type EmailDocumentFormat,
+  type ProductUpdateEmailDraft,
 } from "@/lib/email-document";
 import { messageSendSummary } from "@/lib/email-delivery";
 import { db, withTransaction } from "@/server/db";
@@ -58,6 +60,7 @@ function snapshotOf(document: EmailDocumentDraft): EmailDocumentSnapshot {
     ctaUrl: document.ctaUrl ?? null,
     templateKey: document.templateKey,
     handoffTargetRepo: document.handoffTargetRepo ?? null,
+    productUpdate: document.productUpdate ?? null,
   };
 }
 
@@ -414,6 +417,47 @@ export async function createEmailSlot(input: {
   });
 }
 
+export async function createProductUpdateDraft(input: {
+  organizationId: string;
+  userId: string;
+  brandId: string;
+  title: string;
+  format: EmailDocumentFormat;
+  plannedAt?: string;
+  purpose?: string;
+  hook?: string;
+  pillar?: string;
+  draft: ProductUpdateEmailDraft;
+}) {
+  const draft = productUpdateEmailDraftSchema.parse(input.draft);
+  const slot = await createEmailSlot({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    brandId: input.brandId,
+    title: input.title,
+    format: input.format,
+    plannedAt: input.plannedAt,
+    purpose:
+      input.purpose ??
+      `Evidence-backed WanderOS product update covering ${draft.productUpdate.periodStart} through ${draft.productUpdate.periodEnd}.`,
+    hook: input.hook,
+    pillar: input.pillar ?? "WanderOS product updates",
+    ctaText: draft.ctaLabel ?? undefined,
+  });
+  const document = await saveEmailDocument({
+    platformPostId: slot.platformPostId,
+    organizationId: input.organizationId,
+    userId: input.userId,
+    draft,
+    note: `Created from ${draft.productUpdate.changes.length} verified product changes`,
+  });
+  return {
+    ...slot,
+    emailDocumentId: document.id,
+    revision: document.currentRevision,
+  };
+}
+
 export async function startEmailGeneration(input: {
   platformPostId: string;
   organizationId: string;
@@ -473,6 +517,9 @@ export async function runEmailGenerationJob(jobId: string) {
     const channelVoice =
       spot.channel?.channelFingerprint?.fingerprintText?.trim();
     const content = spot.contentPost;
+    const productEvidence = document.productUpdate
+      ? JSON.stringify(document.productUpdate, null, 2)
+      : null;
     const { output } = await generateText({
       model: anthropic(EMAIL_GENERATION_MODEL),
       output: Output.object({
@@ -488,6 +535,9 @@ export async function runEmailGenerationJob(jobId: string) {
         brandVoice ? `Brand voice:\n${brandVoice}` : null,
         channelVoice ? `Newsletter voice:\n${channelVoice}` : null,
         "Return an honest, useful draft in Markdown. Do not invent product facts, customer quotes, metrics, dates, or links. Preserve provided URLs exactly. Do not add unsubscribe language; the product sending runtime owns the compliance footer. Use one clear CTA at most.",
+        productEvidence
+          ? "This is an evidence-backed WanderOS product update. Every customer-facing product claim must be supported by verified shipped evidence in the prompt. Omit merged-only, ambiguous, operational, documentation-only, CI, dependency, refactor, or internal changes."
+          : null,
       ]
         .filter(Boolean)
         .join("\n\n"),
@@ -507,6 +557,9 @@ export async function runEmailGenerationJob(jobId: string) {
         job.brief?.trim()
           ? `Latest refinement brief:\n${job.brief.trim()}`
           : null,
+        productEvidence
+          ? `Verified product change evidence (the only allowed source for product claims):\n${productEvidence}`
+          : null,
         document.subject || document.bodyMarkdown
           ? `Current draft to improve:\nSubject: ${document.subject || "(unset)"}\nPreheader: ${document.preheader || "(unset)"}\n\n${document.bodyMarkdown || "(empty)"}`
           : null,
@@ -524,6 +577,7 @@ export async function runEmailGenerationJob(jobId: string) {
         ...output,
         templateKey: document.templateKey,
         handoffTargetRepo: document.handoffTargetRepo,
+        productUpdate: document.productUpdate,
       },
       source: "generation",
       note: job.brief?.trim() || "Generated from the selected content slot",
@@ -577,6 +631,7 @@ export async function exportEmailHandoff(input: {
     ctaUrl: workspace.document.ctaUrl,
     templateKey: workspace.document.templateKey,
     handoffTargetRepo: workspace.document.handoffTargetRepo,
+    productUpdate: workspace.document.productUpdate,
     brandName: workspace.brand.name,
     brandSlug: workspace.brand.slug,
     contentTitle:

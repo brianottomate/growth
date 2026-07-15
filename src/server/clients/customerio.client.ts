@@ -219,6 +219,22 @@ interface CustomerActivitiesResponse {
   }>;
 }
 
+export type CustomerIoCampaign = {
+  id: number;
+  name: string;
+  type: string;
+  state: string;
+  active: boolean;
+};
+
+export type CustomerIoSegment = {
+  id: number;
+  name: string;
+  type: string;
+  state: string;
+  description?: string;
+};
+
 /**
  * Search for a customer by email and return their full profile with attributes.
  *
@@ -276,6 +292,22 @@ export async function getCustomerActivities(customerId: string, limit = 10) {
   );
 
   return response?.activities ?? [];
+}
+
+/** Read one provider campaign before freezing a governed broadcast send. */
+export async function getCustomerIoCampaign(campaignId: number) {
+  const response = await appApiRequest<{ campaign: CustomerIoCampaign }>(
+    `/campaigns/${campaignId}`,
+  );
+  return response?.campaign ?? null;
+}
+
+/** Read one provider-owned audience before freezing a governed send. */
+export async function getCustomerIoSegment(segmentId: number) {
+  const response = await appApiRequest<{ segment: CustomerIoSegment }>(
+    `/segments/${segmentId}`,
+  );
+  return response?.segment ?? null;
 }
 
 // =====================================================

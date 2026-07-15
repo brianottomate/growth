@@ -52,6 +52,17 @@ separate, guarded workflow:
 3. Approve that exact revision and audience reference.
 4. Type `SEND` before Growth calls Customer.io.
 
+Evidence-backed WanderOS product updates add two delivery checks: every change
+must be verified as shipped (not merely merged), and the audience class must be
+`wanderos_operators`. Local agent previews remain available before either check
+passes. See `docs/product-update-previews.md`.
+
+Preparing a send also verifies both provider objects live. The broadcast ID
+must resolve to an active API-triggered broadcast, and product updates require
+a finished dynamic segment so "live WanderOS customers" is evaluated at send
+time. Historical CSV/manual product-update segments must not be reused as the
+weekly audience.
+
 The send ledger stores the approved revision, audience class, provider
 references, design-system preview, status, approver, sender, and outcome. It
 does **not** copy recipient lists, credentials, or suppression state into
@@ -78,6 +89,10 @@ Audience and template ownership stay explicit:
 
 ## Follow-ups (not done)
 
+- Create and activate the reusable Customer.io API-triggered product-update
+  broadcast, and create the dynamic live-WanderOS-operators segment. The July
+  audit found historical manual product-update segments, but no safe reusable
+  API-triggered broadcast/dynamic audience pair.
 - Metrics enrichment is capped at 60 recent sends; older 2026 sends have no stats. A backfill pass (or a nightly cron) could fill the rest.
 - `lifecycle_touchpoint` stores structure (channel/order/externalId) but not message content/copy or per-touchpoint metrics yet.
 - Cleanup is **flagged**, not actioned. A cleanup view + `cio_delete_api` dry-run → delete flow (for `should_delete`) is the natural next step. (Kristian floated a todo-list layer — deferred.)

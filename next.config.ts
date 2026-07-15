@@ -6,6 +6,10 @@ import "./src/env";
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  // The published email registry is ESM-only. Keep it external so the Node
+  // runtime loads its named exports natively instead of passing it through
+  // webpack's CommonJS bridge.
+  serverExternalPackages: ["@wandercom/design-system-emails"],
   turbopack: {
     root: process.cwd(),
   },

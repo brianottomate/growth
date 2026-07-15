@@ -28,7 +28,8 @@
     "email:dev": "email dev",
     "update:design-system": "pnpm up '@wandercom/design-system-*'",
     "cio:diagnose": "bun run src/scripts/diagnose-cio-assignment.ts",
-    "cio:repair": "bun run src/scripts/repair-cio-assignment.ts"
+    "cio:repair": "bun run src/scripts/repair-cio-assignment.ts",
+    "product-update:preview": "bun run src/scripts/render-product-update-preview.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.79",

@@ -70,6 +70,7 @@ test-data/
 
 generated-videos/
 reports/
+runs/
 future-plans/
 
 # Amplitude taxonomy scripts — contain project API/secret keys, keep local

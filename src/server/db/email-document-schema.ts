@@ -13,6 +13,7 @@ import type {
   MessageAudienceKind,
   MessageSendSnapshot,
 } from "@/lib/email-delivery";
+import type { ProductUpdateContext } from "@/lib/email-document";
 
 export type EmailDocumentSnapshot = {
   subject: string;
@@ -22,6 +23,7 @@ export type EmailDocumentSnapshot = {
   ctaUrl: string | null;
   templateKey: string;
   handoffTargetRepo: string | null;
+  productUpdate?: ProductUpdateContext | null;
 };
 
 export const emailDocumentVersionSourceEnum = pgEnum(
@@ -70,6 +72,7 @@ export const emailDocumentTable = pgTable(
     ctaUrl: t.text(),
     templateKey: t.text().default("editorial").notNull(),
     handoffTargetRepo: t.text(),
+    productUpdate: jsonb().$type<ProductUpdateContext>(),
     currentRevision: t.integer().default(0).notNull(),
     createdBy: t.text().references(() => userTable.id, {
       onDelete: "set null",

@@ -1,3 +1,5 @@
+import type { ProductUpdateContext } from "@/lib/email-document";
+
 export const MESSAGE_AUDIENCE_KINDS = [
   "wanderos_operators",
   "guests",
@@ -76,6 +78,7 @@ export type MessageSendSnapshot = {
     segmentId: number;
     label: string;
   };
+  productUpdate: ProductUpdateContext | null;
   preview: {
     renderer: "@wandercom/design-system-emails";
     template: "generic.html";
@@ -83,6 +86,58 @@ export type MessageSendSnapshot = {
     text: string;
   };
 };
+
+/**
+ * Product-update broadcasts are operator communications and may only leave the
+ * planning stage once every supporting change is verified on a release path.
+ */
+export function assertProductUpdateReadyForDelivery(input: {
+  productUpdate?: ProductUpdateContext | null;
+  audienceKind: MessageAudienceKind;
+}) {
+  if (!input.productUpdate) return;
+  if (input.audienceKind !== "wanderos_operators") {
+    throw new Error(
+      "WanderOS product updates can only target the operator audience.",
+    );
+  }
+  const pending = input.productUpdate.changes.filter(
+    (change) => change.releaseStatus !== "shipped",
+  );
+  if (pending.length) {
+    throw new Error(
+      `Verify these changes as shipped before preparing delivery: ${pending
+        .map((change) => `${change.repository}@${change.ref}`)
+        .join(", ")}`,
+    );
+  }
+}
+
+export function assertCustomerIoDeliveryTarget(input: {
+  productUpdate?: ProductUpdateContext | null;
+  broadcast: { type: string; state: string; active: boolean } | null;
+  segment: { type: string; state: string } | null;
+}) {
+  if (
+    input.broadcast?.type !== "api" ||
+    input.broadcast.state !== "running" ||
+    !input.broadcast.active
+  ) {
+    throw new Error(
+      "Choose an active Customer.io API-triggered broadcast before preparing delivery.",
+    );
+  }
+  if (input.segment?.state !== "finished") {
+    throw new Error(
+      "Choose an available Customer.io segment before preparing delivery.",
+    );
+  }
+  if (input.productUpdate && input.segment.type !== "dynamic") {
+    throw new Error(
+      "WanderOS product updates require a dynamic Customer.io segment so live operator membership is evaluated at send time.",
+    );
+  }
+}
 
 /**
  * Data made available to the configured Customer.io broadcast's Liquid

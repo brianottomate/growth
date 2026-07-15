@@ -31,6 +31,7 @@ type Draft = Pick<
   | "ctaUrl"
   | "templateKey"
   | "handoffTargetRepo"
+  | "productUpdate"
 >;
 
 const controlClass =
@@ -50,13 +51,13 @@ function Editor({ workspace }: { workspace: Workspace }) {
     ctaUrl: workspace.document.ctaUrl,
     templateKey: workspace.document.templateKey,
     handoffTargetRepo: workspace.document.handoffTargetRepo,
+    productUpdate: workspace.document.productUpdate,
   });
   const [brief, setBrief] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
   const [copied, setCopied] = useState(false);
   const [providerBroadcastId, setProviderBroadcastId] = useState("");
   const [segmentId, setSegmentId] = useState("");
-  const [audienceLabel, setAudienceLabel] = useState("Live WanderOS customers");
   const [audienceKind, setAudienceKind] = useState<
     "wanderos_operators" | "guests" | "subscribers"
   >("wanderos_operators");
@@ -135,13 +136,20 @@ function Editor({ workspace }: { workspace: Workspace }) {
   const latestSend = workspace.messageSends[0];
   const numericBroadcastId = Number(providerBroadcastId);
   const numericSegmentId = Number(segmentId);
+  const pendingReleaseChanges =
+    draft.productUpdate?.changes.filter(
+      (change) => change.releaseStatus !== "shipped",
+    ) ?? [];
+  const productUpdateAudienceIsValid =
+    !draft.productUpdate || audienceKind === "wanderos_operators";
   const canPrepare =
     workspace.document.currentRevision > 0 &&
+    pendingReleaseChanges.length === 0 &&
+    productUpdateAudienceIsValid &&
     Number.isInteger(numericBroadcastId) &&
     numericBroadcastId > 0 &&
     Number.isInteger(numericSegmentId) &&
-    numericSegmentId > 0 &&
-    audienceLabel.trim().length > 0;
+    numericSegmentId > 0;
   const deliveryError =
     prepareSend.error ?? approveSend.error ?? sendApproved.error;
 
@@ -312,6 +320,75 @@ function Editor({ workspace }: { workspace: Workspace }) {
             )}
           </section>
 
+          {draft.productUpdate && (
+            <section className="bg-card rounded-xl border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold">Verified product evidence</h2>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    Customer-facing claims are grounded in these exact changes.
+                    Only release-verified evidence can enter delivery.
+                  </p>
+                </div>
+                <span className="bg-muted rounded-full px-2 py-1 text-xs font-medium">
+                  {new Date(
+                    draft.productUpdate.periodStart,
+                  ).toLocaleDateString()}
+                  –
+                  {new Date(draft.productUpdate.periodEnd).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="mt-3 divide-y">
+                {draft.productUpdate.changes.map((change) => (
+                  <div
+                    key={`${change.repository}:${change.ref}`}
+                    className="py-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="bg-muted rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase">
+                        {change.category}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${
+                          change.releaseStatus === "shipped"
+                            ? "bg-emerald-500/10 text-emerald-700"
+                            : "bg-amber-500/10 text-amber-700"
+                        }`}
+                      >
+                        {change.releaseStatus}
+                      </span>
+                      <span className="font-medium">{change.title}</span>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs leading-5">
+                      {change.summary}
+                    </p>
+                    {change.customerImpact && (
+                      <p className="mt-1 text-xs">
+                        Customer impact: {change.customerImpact}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground mt-1 font-mono text-[11px]">
+                      {change.url ? (
+                        <a
+                          href={change.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:text-foreground underline underline-offset-2"
+                        >
+                          {change.repository}@{change.ref}
+                        </a>
+                      ) : (
+                        <>
+                          {change.repository}@{change.ref}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="bg-card rounded-xl border p-4">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4" />
@@ -423,6 +500,16 @@ function Editor({ workspace }: { workspace: Workspace }) {
               consent, suppressions, and the unsubscribe footer.
             </p>
 
+            {draft.productUpdate &&
+              (pendingReleaseChanges.length > 0 ||
+                !productUpdateAudienceIsValid) && (
+                <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800">
+                  {pendingReleaseChanges.length > 0
+                    ? `Delivery is locked until ${pendingReleaseChanges.length} merged change${pendingReleaseChanges.length === 1 ? " is" : "s are"} verified as shipped.`
+                    : "WanderOS product updates can only target the operator audience."}
+                </div>
+              )}
+
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label>
                 <span className="mb-1 block text-xs font-medium">
@@ -464,16 +551,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   <option value="subscribers">General subscribers</option>
                 </select>
               </label>
-              <label>
-                <span className="mb-1 block text-xs font-medium">
-                  Audience label
-                </span>
-                <input
-                  value={audienceLabel}
-                  onChange={(event) => setAudienceLabel(event.target.value)}
-                  className={controlClass}
-                />
-              </label>
             </div>
 
             <button
@@ -484,7 +561,6 @@ function Editor({ workspace }: { workspace: Workspace }) {
                   providerBroadcastId: numericBroadcastId,
                   audienceKind,
                   segmentId: numericSegmentId,
-                  audienceLabel: audienceLabel.trim(),
                 })
               }
               disabled={!canPrepare || prepareSend.isPending}

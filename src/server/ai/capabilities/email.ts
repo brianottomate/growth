@@ -6,9 +6,11 @@ import { z } from "zod";
 import {
   EMAIL_DOCUMENT_FORMATS,
   emailDocumentDraftSchema,
+  productUpdateEmailDraftSchema,
 } from "@/lib/email-document";
 import {
   createEmailSlot as createEmailSlotService,
+  createProductUpdateDraft as createProductUpdateDraftService,
   getEmailWorkspace,
   runEmailGenerationJob,
   saveEmailDocument,
@@ -93,6 +95,7 @@ export const updateEmailDraft = defineCapability({
       ctaUrl: workspace.document.ctaUrl,
       templateKey: workspace.document.templateKey,
       handoffTargetRepo: workspace.document.handoffTargetRepo,
+      productUpdate: workspace.document.productUpdate,
       ...changes,
     });
     const saved = await saveEmailDocument({
@@ -108,6 +111,30 @@ export const updateEmailDraft = defineCapability({
       url: `/app/newsletters/${platformPostId}`,
     };
   },
+});
+
+export const createProductUpdateDraft = defineCapability({
+  name: "createProductUpdateDraft",
+  description:
+    "Create one finished, previewable WanderOS product-update email from verified repository evidence. Every claim must cite an exact repository and commit or pull-request ref, and shipped claims require release verification. Use this after inspecting the relevant product repositories locally; omit internal-only changes. Creates a frozen Growth revision but never resolves recipients or sends. Requires approval.",
+  inputSchema: z.object({
+    brandId: z.string(),
+    title: z.string().trim().min(1).max(160),
+    format: z.enum(EMAIL_DOCUMENT_FORMATS).default("newsletter.broadcast"),
+    plannedAt: z.string().datetime().optional(),
+    purpose: z.string().trim().max(5_000).optional(),
+    hook: z.string().trim().max(2_000).optional(),
+    pillar: z.string().trim().max(120).optional(),
+    draft: productUpdateEmailDraftSchema,
+  }),
+  readOnly: false,
+  domain: "content",
+  execute: async (input, ctx) =>
+    createProductUpdateDraftService({
+      ...input,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    }),
 });
 
 export const generateEmailDraft = defineCapability({
@@ -144,6 +171,7 @@ export const generateEmailDraft = defineCapability({
 export const EMAIL_CAPABILITIES = [
   getEmailDraft,
   createEmailSlot,
+  createProductUpdateDraft,
   updateEmailDraft,
   generateEmailDraft,
 ] as const;
