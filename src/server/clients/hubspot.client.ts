@@ -316,8 +316,7 @@ export const AE_SMB_ROUND_ROBIN: Record<string, number> = {
 
 export const AE_MM_ROUND_ROBIN: Record<string, number> = {
   "90936550": 0.5, // James Caswell
-  "626939739": 0.25, // Caleb Cowher
-  "663245691": 0.25, // Matt Tassello
+  "663245691": 0.5, // Matt Tassello
 };
 
 export const AE_ENTERPRISE_ROUND_ROBIN: Record<string, number> = {
@@ -525,7 +524,8 @@ export function computeFieldsToWrite<
   const result: Partial<T> = {};
   for (const key of Object.keys(props) as (keyof T)[]) {
     const newValue = props[key];
-    if (newValue === undefined || newValue === null || newValue === "") continue;
+    if (newValue === undefined || newValue === null || newValue === "")
+      continue;
     const oldValue = existing[key];
     const oldIsEmpty =
       oldValue === null || oldValue === undefined || oldValue === "";
@@ -705,7 +705,8 @@ export async function findCompaniesByDomains(
       for (const found of result.results) {
         const values = {} as Record<CompanyCoreProperty, string | null>;
         for (const prop of COMPANY_CORE_PROPERTIES) {
-          values[prop] = (found.properties?.[prop] as string | undefined) ?? null;
+          values[prop] =
+            (found.properties?.[prop] as string | undefined) ?? null;
         }
         if (values.domain) {
           out.set(values.domain.toLowerCase(), { id: found.id, values });
@@ -761,7 +762,9 @@ function phoneDigits(phone: string): string {
 }
 
 /** Weak candidate match — companies whose name contains the (cleaned) permit name tokens. */
-export async function findCompaniesByName(name: string): Promise<HubspotMatch[]> {
+export async function findCompaniesByName(
+  name: string,
+): Promise<HubspotMatch[]> {
   const q = name
     .replace(/\b(llc|inc|corp|co|ltd|the|holdings?)\b/gi, " ")
     .replace(/[^a-z0-9 ]/gi, " ")
@@ -771,7 +774,15 @@ export async function findCompaniesByName(name: string): Promise<HubspotMatch[]>
   try {
     const result = await client().crm.companies.searchApi.doSearch({
       filterGroups: [
-        { filters: [{ propertyName: "name", operator: FilterOperatorEnum.ContainsToken, value: q }] },
+        {
+          filters: [
+            {
+              propertyName: "name",
+              operator: FilterOperatorEnum.ContainsToken,
+              value: q,
+            },
+          ],
+        },
       ],
       properties: MATCH_PROPS,
       limit: 10,
@@ -786,13 +797,23 @@ export async function findCompaniesByName(name: string): Promise<HubspotMatch[]>
 }
 
 /** High-precision — companies whose phone contains the permit phone digits. */
-export async function findCompaniesByPhone(phone: string): Promise<HubspotMatch[]> {
+export async function findCompaniesByPhone(
+  phone: string,
+): Promise<HubspotMatch[]> {
   const digits = phoneDigits(phone);
   if (digits.length < 10) return [];
   try {
     const result = await client().crm.companies.searchApi.doSearch({
       filterGroups: [
-        { filters: [{ propertyName: "phone", operator: FilterOperatorEnum.ContainsToken, value: digits }] },
+        {
+          filters: [
+            {
+              propertyName: "phone",
+              operator: FilterOperatorEnum.ContainsToken,
+              value: digits,
+            },
+          ],
+        },
       ],
       properties: MATCH_PROPS,
       limit: 10,
@@ -807,17 +828,38 @@ export async function findCompaniesByPhone(phone: string): Promise<HubspotMatch[
 }
 
 /** High-precision — contacts whose phone contains the permit phone digits. */
-export async function findContactsByPhone(phone: string): Promise<
-  Array<{ id: string; email: string | null; ownerId: string | null; companyId: string | null }>
+export async function findContactsByPhone(
+  phone: string,
+): Promise<
+  Array<{
+    id: string;
+    email: string | null;
+    ownerId: string | null;
+    companyId: string | null;
+  }>
 > {
   const digits = phoneDigits(phone);
   if (digits.length < 10) return [];
   try {
     const result = await client().crm.contacts.searchApi.doSearch({
       filterGroups: [
-        { filters: [{ propertyName: "phone", operator: FilterOperatorEnum.ContainsToken, value: digits }] },
+        {
+          filters: [
+            {
+              propertyName: "phone",
+              operator: FilterOperatorEnum.ContainsToken,
+              value: digits,
+            },
+          ],
+        },
       ],
-      properties: ["email", "phone", "hs_lead_status", "hubspot_owner_id", "associatedcompanyid"],
+      properties: [
+        "email",
+        "phone",
+        "hs_lead_status",
+        "hubspot_owner_id",
+        "associatedcompanyid",
+      ],
       limit: 10,
       sorts: [],
     });
@@ -825,7 +867,8 @@ export async function findContactsByPhone(phone: string): Promise<
       id: c.id,
       email: (c.properties?.email as string | undefined) ?? null,
       ownerId: (c.properties?.hubspot_owner_id as string | undefined) ?? null,
-      companyId: (c.properties?.associatedcompanyid as string | undefined) ?? null,
+      companyId:
+        (c.properties?.associatedcompanyid as string | undefined) ?? null,
     }));
   } catch {
     return [];
@@ -836,7 +879,9 @@ export async function findContactsByPhone(phone: string): Promise<
 export async function getCompanyContacts(
   companyId: string,
   limit = 50,
-): Promise<Array<{ id: string; values: Record<ContactCoreProperty, string | null> }>> {
+): Promise<
+  Array<{ id: string; values: Record<ContactCoreProperty, string | null> }>
+> {
   const assoc = await client().crm.associations.v4.basicApi.getPage(
     "companies",
     companyId,
@@ -912,7 +957,7 @@ export async function upsertCompany(
     const created = await createCompany({ domain, ...props });
     const values = {} as Record<CompanyCoreProperty, string | null>;
     for (const key of COMPANY_CORE_PROPERTIES) {
-      values[key] = (props[key]) ?? null;
+      values[key] = props[key] ?? null;
     }
     return { id: created.id, values, created: true };
   }
@@ -925,8 +970,7 @@ export async function upsertCompany(
   const values = {} as Record<CompanyCoreProperty, string | null>;
   for (const key of COMPANY_CORE_PROPERTIES) {
     const old = existing.values[key];
-    values[key] =
-      old != null && old !== "" ? old : ((props[key]) ?? null);
+    values[key] = old != null && old !== "" ? old : (props[key] ?? null);
   }
   return { id: existing.id, values, created: false };
 }
@@ -944,7 +988,8 @@ export async function associateContactToCompany(
       contactId,
       [
         {
-          associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined,
+          associationCategory:
+            AssociationSpecAssociationCategoryEnum.HubspotDefined,
           associationTypeId: 2,
         },
       ],
@@ -1067,7 +1112,7 @@ export async function upsertContact(
     const created = await createContact({ email, ...props });
     const values = {} as Record<ContactCoreProperty, string | null>;
     for (const key of CONTACT_CORE_PROPERTIES) {
-      values[key] = (props[key]) ?? null;
+      values[key] = props[key] ?? null;
     }
     return { id: created.id, values, created: true };
   }
@@ -1080,8 +1125,7 @@ export async function upsertContact(
   const values = {} as Record<ContactCoreProperty, string | null>;
   for (const key of CONTACT_CORE_PROPERTIES) {
     const old = existing.values[key];
-    values[key] =
-      old != null && old !== "" ? old : ((props[key]) ?? null);
+    values[key] = old != null && old !== "" ? old : (props[key] ?? null);
   }
   return { id: existing.id, values, created: false };
 }
@@ -1090,7 +1134,9 @@ export async function upsertContact(
 // DEALS
 // =====================================================
 
-export async function createDeal(props: DealProperties): Promise<{ id: string }> {
+export async function createDeal(
+  props: DealProperties,
+): Promise<{ id: string }> {
   try {
     const created = await client().crm.deals.basicApi.create({
       properties: props,
@@ -1105,7 +1151,10 @@ export async function createDeal(props: DealProperties): Promise<{ id: string }>
   }
 }
 
-export async function updateDeal(id: string, props: DealProperties): Promise<void> {
+export async function updateDeal(
+  id: string,
+  props: DealProperties,
+): Promise<void> {
   try {
     await client().crm.deals.basicApi.update(id, {
       properties: props,
@@ -1128,13 +1177,17 @@ export async function associateDealToContact(
       contactId,
       [
         {
-          associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined,
+          associationCategory:
+            AssociationSpecAssociationCategoryEnum.HubspotDefined,
           associationTypeId: 3,
         },
       ],
     );
   } catch (err) {
-    console.error(`❌ [HUBSPOT] associateDealToContact(${dealId}, ${contactId})`, err);
+    console.error(
+      `❌ [HUBSPOT] associateDealToContact(${dealId}, ${contactId})`,
+      err,
+    );
     throw err;
   }
 }
@@ -1151,13 +1204,17 @@ export async function associateDealToCompany(
       companyId,
       [
         {
-          associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined,
+          associationCategory:
+            AssociationSpecAssociationCategoryEnum.HubspotDefined,
           associationTypeId: 5,
         },
       ],
     );
   } catch (err) {
-    console.error(`❌ [HUBSPOT] associateDealToCompany(${dealId}, ${companyId})`, err);
+    console.error(
+      `❌ [HUBSPOT] associateDealToCompany(${dealId}, ${companyId})`,
+      err,
+    );
     throw err;
   }
 }
@@ -1273,7 +1330,10 @@ export async function newestAssociatedDeal({
 export async function createNote(body: string): Promise<{ id: string }> {
   try {
     const note = await client().crm.objects.notes.basicApi.create({
-      properties: { hs_timestamp: new Date().toISOString(), hs_note_body: body },
+      properties: {
+        hs_timestamp: new Date().toISOString(),
+        hs_note_body: body,
+      },
       associations: [],
     });
     return { id: note.id };
@@ -1294,10 +1354,18 @@ export async function associateNoteToContact(
       noteId,
       "contacts",
       contactId,
-      [{ associationCategory: "HUBSPOT_DEFINED" as never, associationTypeId: 202 }],
+      [
+        {
+          associationCategory: "HUBSPOT_DEFINED" as never,
+          associationTypeId: 202,
+        },
+      ],
     );
   } catch (err) {
-    console.error(`❌ [HUBSPOT] associateNoteToContact(${noteId}, ${contactId})`, err);
+    console.error(
+      `❌ [HUBSPOT] associateNoteToContact(${noteId}, ${contactId})`,
+      err,
+    );
     throw err;
   }
 }
@@ -1312,7 +1380,8 @@ function getRoundRobinForProperties(
   numProperties: number,
   role: "AE" | "BDR",
 ): { rr: Record<string, number>; sizeFilter: PortfolioSizeFilter } | null {
-  if (numProperties < 10) return { rr: UNDER_10_ROUND_ROBIN, sizeFilter: { max: 9 } };
+  if (numProperties < 10)
+    return { rr: UNDER_10_ROUND_ROBIN, sizeFilter: { max: 9 } };
   if (numProperties < 20)
     return {
       rr: role === "BDR" ? BDR_OTE_ROUND_ROBIN : AE_OTE_ROUND_ROBIN,
@@ -1330,7 +1399,8 @@ function getRoundRobinForProperties(
     };
   if (numProperties < 500)
     return {
-      rr: role === "BDR" ? BDR_ENTERPRISE_ROUND_ROBIN : AE_ENTERPRISE_ROUND_ROBIN,
+      rr:
+        role === "BDR" ? BDR_ENTERPRISE_ROUND_ROBIN : AE_ENTERPRISE_ROUND_ROBIN,
       sizeFilter: { min: 200, max: 499 },
     };
   if (numProperties >= 500)
@@ -1371,7 +1441,8 @@ export async function nextRepInRR(
     1,
   ).getTime();
 
-  const inboundOutboundValue = source === "Listed" ? "Inbound" : "Inbound - Sites";
+  const inboundOutboundValue =
+    source === "Listed" ? "Inbound" : "Inbound - Sites";
   const ownerIdPropertyName = role === "AE" ? "hubspot_owner_id" : "bdr_for_rr";
 
   const filters: Array<{
