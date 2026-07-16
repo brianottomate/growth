@@ -55,6 +55,9 @@ export const transactionalRouter = createTRPCRouter({
         inArray(transactionalMessageTable.brandId, brandIds),
         isNull(transactionalMessageTable.deletedAt),
       ),
+      with: {
+        brand: { columns: { id: true, name: true, slug: true } },
+      },
       orderBy: (t, { asc }) => [asc(t.domain), asc(t.key)],
     });
   }),

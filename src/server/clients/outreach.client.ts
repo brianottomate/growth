@@ -886,6 +886,113 @@ export async function getUsers(options?: {
   return response;
 }
 
+// ---- Sequences (read-only mirror source for /app/lifecycle) ----------
+
+export interface OutreachSequence {
+  id: string;
+  attributes: {
+    name: string;
+    description: string | null;
+    enabled: boolean;
+    enabledAt: string | null;
+    lastUsedAt: string | null;
+    locked: boolean;
+    tags: string[];
+    sequenceStepCount: number;
+    numContactedProspects: number;
+    scheduleCount: number;
+    deliverCount: number;
+    openCount: number;
+    clickCount: number;
+    replyCount: number;
+    bounceCount: number;
+    optOutCount: number;
+    failureCount: number;
+    positiveReplyCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+  relationships?: {
+    owner?: { data?: { id: number } | null };
+  };
+}
+
+export interface OutreachSequenceStep {
+  id: string;
+  attributes: {
+    order: number;
+    interval: number; // minutes after the previous step
+    stepType: "auto_email" | "manual_email" | "call" | "task" | "sms";
+    displayName: string | null;
+    taskNote: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  relationships?: {
+    sequence?: { data?: { id: number } | null };
+  };
+}
+
+type SequencesResponse = {
+  data: OutreachSequence[];
+  included?: Array<{
+    id: number;
+    type: string;
+    attributes: { name?: string };
+  }>;
+  meta?: { count?: number };
+};
+
+type SequenceStepsResponse = {
+  data: OutreachSequenceStep[];
+  meta?: { count?: number };
+};
+
+/** Fetch every sequence (paginated), with owner names resolved. */
+export async function getAllSequences(): Promise<{
+  sequences: OutreachSequence[];
+  ownerNames: Map<number, string>;
+}> {
+  if (!isOutreachConfigured) {
+    throw new OutreachError("Outreach is not configured");
+  }
+  const sequences: OutreachSequence[] = [];
+  const ownerNames = new Map<number, string>();
+  const pageSize = 100;
+  for (let offset = 0; ; offset += pageSize) {
+    const response = await outreachRequest<SequencesResponse>(
+      `/sequences?page[limit]=${pageSize}&page[offset]=${offset}&include=owner&sort=-lastUsedAt`,
+      { method: "GET" },
+    );
+    sequences.push(...response.data);
+    for (const inc of response.included ?? []) {
+      if (inc.type === "user" && inc.attributes.name) {
+        ownerNames.set(inc.id, inc.attributes.name);
+      }
+    }
+    if (response.data.length < pageSize) break;
+  }
+  return { sequences, ownerNames };
+}
+
+/** Fetch every sequence step (paginated); map by sequence id in the caller. */
+export async function getAllSequenceSteps(): Promise<OutreachSequenceStep[]> {
+  if (!isOutreachConfigured) {
+    throw new OutreachError("Outreach is not configured");
+  }
+  const steps: OutreachSequenceStep[] = [];
+  const pageSize = 100;
+  for (let offset = 0; ; offset += pageSize) {
+    const response = await outreachRequest<SequenceStepsResponse>(
+      `/sequenceSteps?page[limit]=${pageSize}&page[offset]=${offset}`,
+      { method: "GET" },
+    );
+    steps.push(...response.data);
+    if (response.data.length < pageSize) break;
+  }
+  return steps;
+}
+
 /**
  * Get stages from Outreach.
  *

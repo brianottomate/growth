@@ -40,6 +40,9 @@ export default async function TransactionalPage() {
           inArray(transactionalMessageTable.brandId, brandIds),
           isNull(transactionalMessageTable.deletedAt),
         ),
+        with: {
+          brand: { columns: { id: true, name: true, slug: true } },
+        },
         orderBy: (t, { asc }) => [asc(t.domain), asc(t.key)],
       })
     : [];
@@ -50,10 +53,9 @@ export default async function TransactionalPage() {
       <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
         The registry of product-triggered emails the backend owes users — what
         fires each one, where its template lives, and how far along the
-        CIO-legacy → react-email → in-house migration it is. Growth never
-        sends these; the code is the system of record. Boundary rules in{" "}
-        <span className="font-mono text-xs">docs/transactional-emails.md</span>
-        .
+        CIO-legacy → react-email → in-house migration it is. Growth never sends
+        these; the code is the system of record. Boundary rules in{" "}
+        <span className="font-mono text-xs">docs/transactional-emails.md</span>.
       </p>
       <TransactionalRegistry initialMessages={messages} />
     </div>

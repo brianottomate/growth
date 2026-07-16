@@ -49,6 +49,15 @@ const KIND_LABEL: Record<string, string> = {
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
 
+const PROVIDER_LABEL: Record<string, string> = {
+  customerio: "Customer.io",
+  outreach: "Outreach",
+  instantly: "Instantly",
+  hubspot: "HubSpot",
+  postmark: "Postmark",
+  resend: "Resend",
+};
+
 export default async function LifecyclePage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
@@ -162,8 +171,8 @@ export default async function LifecyclePage() {
                         <span className="text-muted-foreground">
                           {c.externalKind === "transactional"
                             ? "transactional"
-                            : "campaign"}{" "}
-                          · via Customer.io
+                            : (c.externalKind ?? "campaign")}{" "}
+                          · via {PROVIDER_LABEL[c.provider ?? ""] ?? "Customer.io"}
                         </span>
                       </div>
                     </div>
@@ -194,7 +203,7 @@ export default async function LifecyclePage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Lifecycle</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            What we want vs. what runs in Customer.io ·{" "}
+            What we want vs. what runs in Customer.io &amp; Outreach ·{" "}
             <span className="text-amber-300">{cleanupCount} cleanup</span>{" "}
             candidates
           </p>

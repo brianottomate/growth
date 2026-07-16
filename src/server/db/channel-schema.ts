@@ -67,6 +67,7 @@ export const deliveryProviderEnum = pgEnum("delivery_provider", [
   "email_forward", // forwarded inbound email (e.g. a competitor newsletter we subscribed to)
   "postmark", // monolith transactional sender (os-notifications)
   "resend", // growth's own sender (auth emails; lifecycle later)
+  "outreach", // sales engagement sequences mirrored into /lifecycle
 ]);
 export type DeliveryProvider = (typeof deliveryProviderEnum.enumValues)[number];
 

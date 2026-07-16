@@ -21,10 +21,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import type {
-  TransactionalMessage,
-  TransactionalStatus,
-} from "@/server/db/transactional-schema";
+import type { TransactionalStatus } from "@/server/db/transactional-schema";
+import type { RouterOutputs } from "@/trpc/react";
+
+type RegistryMessage = RouterOutputs["transactional"]["list"][number];
 
 const STATUS_META: Record<
   TransactionalStatus,
@@ -45,7 +45,11 @@ const STATUS_META: Record<
     cls: "text-emerald-300",
     dot: "bg-emerald-400",
   },
-  dead: { label: "Dead", cls: "text-muted-foreground", dot: "bg-muted-foreground" },
+  dead: {
+    label: "Dead",
+    cls: "text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
   retired: {
     label: "Retired",
     cls: "text-muted-foreground",
@@ -73,7 +77,7 @@ const CRITICALITY_LABEL: Record<string, string> = {
   informational: "Informational",
 };
 
-function triggerSummary(m: TransactionalMessage) {
+function triggerSummary(m: RegistryMessage) {
   if (m.triggerKind === "event") return m.triggerEvent ?? "Product event";
   const offset = m.triggerOffsetMinutes;
   const offsetLabel =
@@ -90,7 +94,7 @@ function triggerSummary(m: TransactionalMessage) {
 export function TransactionalRegistry({
   initialMessages,
 }: {
-  initialMessages: TransactionalMessage[];
+  initialMessages: RegistryMessage[];
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -113,7 +117,7 @@ export function TransactionalRegistry({
   );
 
   const groups = useMemo(() => {
-    const byDomain = new Map<string, TransactionalMessage[]>();
+    const byDomain = new Map<string, RegistryMessage[]>();
     for (const m of messages) {
       const list = byDomain.get(m.domain) ?? [];
       list.push(m);
@@ -121,6 +125,11 @@ export function TransactionalRegistry({
     }
     return [...byDomain.entries()];
   }, [messages]);
+
+  const showBrand = useMemo(
+    () => new Set(messages.map((message) => message.brandId)).size > 1,
+    [messages],
+  );
 
   const counts = useMemo(() => {
     const live = messages.filter(
@@ -143,8 +152,8 @@ export function TransactionalRegistry({
           live messages
         </span>
         <span>
-          <span className="font-medium text-amber-300">{counts.legacy}</span>{" "}
-          on legacy CIO templates
+          <span className="font-medium text-amber-300">{counts.legacy}</span> on
+          legacy CIO templates
         </span>
         <span>
           <span className="font-medium text-emerald-300">
@@ -188,9 +197,17 @@ export function TransactionalRegistry({
                       {m.name}
                     </span>
                     <span className="text-muted-foreground block truncate text-xs">
-                      {triggerSummary(m)}
+                      {m.subject ?? triggerSummary(m)}
                     </span>
                   </span>
+                  {showBrand && (
+                    <Badge
+                      variant="secondary"
+                      className="hidden md:inline-flex"
+                    >
+                      {m.brand.name}
+                    </Badge>
+                  )}
                   {m.templateKey ? (
                     <Badge variant="outline" className="hidden md:inline-flex">
                       react-email ready
@@ -235,7 +252,7 @@ function MessageSheet({
   onNotesSave,
   savingNotes,
 }: {
-  message: TransactionalMessage | null;
+  message: RegistryMessage | null;
   onClose: () => void;
   onStatusChange: (status: TransactionalStatus) => void;
   onNotesSave: (notes: string) => void;
@@ -267,7 +284,7 @@ function MessageSheet({
         <SheetHeader>
           <SheetTitle>{message.name}</SheetTitle>
           <SheetDescription className="font-mono text-xs">
-            {message.key}
+            {message.brand.name} · {message.key}
           </SheetDescription>
         </SheetHeader>
 
@@ -324,6 +341,13 @@ function MessageSheet({
             )}
           </div>
 
+          {message.subject && (
+            <section>
+              <h3 className="text-sm font-semibold">Subject</h3>
+              <p className="mt-1 text-sm">{message.subject}</p>
+            </section>
+          )}
+
           <section>
             <h3 className="text-sm font-semibold">Trigger</h3>
             <p className="mt-1 text-sm">{triggerSummary(message)}</p>
@@ -339,10 +363,15 @@ function MessageSheet({
 
           {message.codeRefs && message.codeRefs.length > 0 && (
             <section>
-              <h3 className="text-sm font-semibold">Send call sites</h3>
+              <h3 className="text-sm font-semibold">Source references</h3>
               <ul className="mt-1 space-y-1">
                 {message.codeRefs.map((ref) => (
-                  <li key={`${ref.path}:${ref.line ?? 0}`}>
+                  <li key={`${ref.role}:${ref.path}:${ref.line ?? 0}`}>
+                    {ref.role && (
+                      <Badge variant="outline" className="mr-2 text-[10px]">
+                        {ref.role}
+                      </Badge>
+                    )}
                     <a
                       className="font-mono text-xs underline underline-offset-2"
                       href={`https://github.com/${ref.repo}/blob/main/${ref.path}${ref.line ? `#L${ref.line}` : ""}`}
@@ -419,9 +448,7 @@ function MessageSheet({
                 </span>
               </h3>
               {previewLoading && (
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Rendering…
-                </p>
+                <p className="text-muted-foreground mt-1 text-sm">Rendering…</p>
               )}
               {preview && !preview.ok && (
                 <p className="mt-1 text-sm text-amber-300">{preview.error}</p>

@@ -33,15 +33,15 @@ consent and obligation:
 > **Would we still send this to someone who unsubscribed from all marketing?
 > If yes (or legally must) → transactional. If no → lifecycle/marketing.**
 
-| | Transactional | Lifecycle (marketing) |
-|---|---|---|
-| Trigger | Product event, 1:1, immediate | Behavior/segment + timing, journey |
-| Suppression | Must NOT apply (auth, receipts) | Must apply (consent, frequency caps) |
-| Success metric | Delivered, fast, correct | Opened, clicked, converted |
-| Content changes | Rare (rebrand, product change) | Constant (campaigns, experiments) |
-| Owner | Product engineering | Growth/marketing |
-| Shape in Growth | Flat **registry** (audit) | Programs + steps (strategy) |
-| Deliverability stream | Transactional (Postmark/`os-notifications`) | Marketing (CIO now; Resend later) |
+|                       | Transactional                               | Lifecycle (marketing)                |
+| --------------------- | ------------------------------------------- | ------------------------------------ |
+| Trigger               | Product event, 1:1, immediate               | Behavior/segment + timing, journey   |
+| Suppression           | Must NOT apply (auth, receipts)             | Must apply (consent, frequency caps) |
+| Success metric        | Delivered, fast, correct                    | Opened, clicked, converted           |
+| Content changes       | Rare (rebrand, product change)              | Constant (campaigns, experiments)    |
+| Owner                 | Product engineering                         | Growth/marketing                     |
+| Shape in Growth       | Flat **registry** (audit)                   | Programs + steps (strategy)          |
+| Deliverability stream | Transactional (Postmark/`os-notifications`) | Marketing (CIO now; Resend later)    |
 
 **Abandoned cart** is the canonical straddler and the ruling is: **lifecycle**. It is
 behaviorally triggered and feels transactional, but it is promotional in intent — it
@@ -87,6 +87,8 @@ transactional_message
   key           text unique        stable slug, e.g. "auth.magic_link",
                                    "booking.receipt", "os.task_assigned"
   name          text               "Log in to your Wander account"
+  subject       text nullable      exact current subject when source-visible;
+                                   placeholders allowed for dynamic subjects
   description   text
   workspace     lifecycle_workspace  marketplace | os | shared  (reuse enum)
   domain        enum transactional_domain
@@ -97,7 +99,8 @@ transactional_message
 
   -- where it fires (system of record is the CODE, we store the pointer)
   triggerEvent  text               human description of the product event
-  codeRef       jsonb              { repo, path, line, symbol } — the send call site
+  codeRef       jsonb              { repo, path, line, role } — trigger, sender,
+                                   template, or registry source reference
 
   -- how it's delivered today
   provider      delivery_provider  customerio | postmark | resend (extend enum)
@@ -135,7 +138,7 @@ Decisions folded in:
 - **No recipient data, ever.** Same posture as `message_send`: providers own
   recipients/suppression; the registry stores structure only.
 - **`status` is the migration tracker.** `live_legacy → live_rebranded →
-  live_inhouse` is exactly Lauren's path: (1) render react-email with Liquid tokens
+live_inhouse` is exactly Lauren's path: (1) render react-email with Liquid tokens
   into the existing CIO message (env-var flip, zero backend code), (2) later, move
   the send call to Postmark/Resend. Two independent hops, per message.
 
@@ -191,7 +194,7 @@ Not a board — a **control table** (Lauren's migration dashboard):
   legacy truth: CIO UI until each message is rebranded).
 - Webhook ingest / live metrics (ledger project).
 - Modeling operator→guest WanderOS product emails (that's the app.wander.com
-  autopilot surface; its *system* templates appear here only insofar as the
+  autopilot surface; its _system_ templates appear here only insofar as the
   monolith sends them).
 
 ## Build plan (~1 session each)

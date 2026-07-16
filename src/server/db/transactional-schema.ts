@@ -73,6 +73,7 @@ export type TransactionalCodeRef = {
   repo: string; // e.g. "wandercom/wander"
   path: string;
   line?: number;
+  role?: "trigger" | "sender" | "template" | "registry";
   note?: string; // e.g. "reschedule confirm re-uses this template"
 };
 
@@ -91,6 +92,8 @@ export type TransactionalProviderRef = {
   envVar?: string; // e.g. "CIO_MAGIC_LINK_MESSAGE_ID" (Doppler-resolved)
   defaultId?: string; // hardcoded fallback in envs.ts, where one exists
   template?: string; // provider-side template name (Postmark/Resend)
+  from?: string;
+  replyTo?: string;
   note?: string;
 };
 
@@ -110,6 +113,8 @@ export const transactionalMessageTable = pgTable(
     // Stable slug, e.g. "auth.magic_link", "invoicing.hnhl_due_soon".
     key: t.text().notNull(),
     name: t.text().notNull(),
+    // Exact current subject when source-visible; placeholders are allowed.
+    subject: t.text(),
     description: t.text(),
 
     workspace: lifecycleWorkspaceEnum().default("marketplace").notNull(),
