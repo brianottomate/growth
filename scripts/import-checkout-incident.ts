@@ -164,7 +164,9 @@ async function main() {
 
   for (const [email, guestRows] of byEmail) {
     const first = guestRows[0]!;
-    const [firstName, ...restName] = first.guestName.split(" ");
+    // Warehouse returns literal "N/A" for unnamed guests (Apple relay signups)
+    const guestName = first.guestName === "N/A" ? "" : first.guestName.trim();
+    const [firstName, ...restName] = guestName.split(" ").filter(Boolean);
     const phone = cleanPhone(first.guestPhone);
     const [city, country] = first.guestLocation.split(",").map((s) => s.trim());
     const note = buildIncidentNote(guestRows);
