@@ -30,6 +30,7 @@ import {
   Crosshair,
   Plus,
   Radar,
+  MailCheck,
   Repeat,
   Radio,
   Rocket,
@@ -130,6 +131,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
         icon: ClipboardCheck,
       },
       { label: "Lifecycle", href: "/app/lifecycle", icon: Repeat },
+      { label: "Transactional", href: "/app/transactional", icon: MailCheck },
     ],
   },
   {

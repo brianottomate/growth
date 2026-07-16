@@ -22,6 +22,7 @@ import { planImportRouter } from "@/server/api/routers/planImport.router";
 import { instantlyRouter } from "@/server/api/routers/instantly.router";
 import { leadsRouter } from "@/server/api/routers/leads.router";
 import { lifecycleRouter } from "@/server/api/routers/lifecycle.router";
+import { transactionalRouter } from "@/server/api/routers/transactional.router";
 import { listeningRouter } from "@/server/api/routers/listening.router";
 import { mediaRouter } from "@/server/api/routers/media.router";
 import { mentionRouter } from "@/server/api/routers/mention.router";
@@ -65,6 +66,7 @@ export const appRouter = createTRPCRouter({
   instantly: instantlyRouter,
   leads: leadsRouter,
   lifecycle: lifecycleRouter,
+  transactional: transactionalRouter,
   listening: listeningRouter,
   media: mediaRouter,
   mention: mentionRouter,
