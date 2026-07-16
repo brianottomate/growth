@@ -1,8 +1,9 @@
-import { and, eq, gte, isNull, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
   cadenceTargetTable,
+  channelTable,
   contentPostTable,
   mixTargetTable,
   platformPostTable,
@@ -69,12 +70,26 @@ export type SlotGenMix = {
   pillars: { pillar: string; pct: number }[];
 };
 
+export type UnconfiguredChannel = {
+  channelId: string;
+  platform: string;
+  handle: string | null;
+};
+
+type SlotGenerationResult = {
+  rows: SlotGenRow[];
+  created: number;
+  mix: SlotGenMix[];
+  unconfiguredChannels: UnconfiguredChannel[];
+  unconfiguredMixChannels: UnconfiguredChannel[];
+};
+
 export async function generateMonthSlots(opts: {
   brandId: string;
   year: number;
   month: number; // 1-12
   dryRun?: boolean;
-}): Promise<{ rows: SlotGenRow[]; created: number; mix: SlotGenMix[] }> {
+}): Promise<SlotGenerationResult> {
   const { brandId, year, month, dryRun } = opts;
   return generateSlotsForRange({
     brandId,
@@ -90,7 +105,7 @@ export async function generateRangeSlots(opts: {
   rangeStart: Date;
   rangeEnd: Date;
   dryRun?: boolean;
-}): Promise<{ rows: SlotGenRow[]; created: number; mix: SlotGenMix[] }> {
+}): Promise<SlotGenerationResult> {
   return generateSlotsForRange({ ...opts, fullMonth: false });
 }
 
@@ -100,14 +115,14 @@ async function generateSlotsForRange(opts: {
   rangeEnd: Date;
   dryRun?: boolean;
   fullMonth: boolean;
-}): Promise<{ rows: SlotGenRow[]; created: number; mix: SlotGenMix[] }> {
+}): Promise<SlotGenerationResult> {
   const { brandId, rangeStart, rangeEnd, dryRun, fullMonth } = opts;
   const days = Math.max(
     1,
     Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000),
   );
 
-  const [cadence, mix, existingSlots] = await Promise.all([
+  const [cadence, mix, existingSlots, channels] = await Promise.all([
     db.query.cadenceTargetTable.findMany({
       where: and(
         eq(cadenceTargetTable.brandId, brandId),
@@ -130,7 +145,36 @@ async function generateSlotsForRange(opts: {
       ),
       columns: { platform: true, archetype: true },
     }),
+    db.query.channelTable.findMany({
+      where: and(
+        eq(channelTable.brandId, brandId),
+        inArray(channelTable.kind, ["social", "blog", "newsletter"]),
+        eq(channelTable.isActive, true),
+        isNull(channelTable.deletedAt),
+      ),
+      columns: { id: true, platform: true, handle: true },
+    }),
   ]);
+
+  const planningChannels = channels.filter(
+    (channel) => platformFormatsFor(channel.platform).length > 0,
+  );
+  const activeChannelIds = new Set(
+    planningChannels.map((channel) => channel.id),
+  );
+  const cadenceForPlanning = cadence.filter((target) =>
+    activeChannelIds.has(target.channelId),
+  );
+  const configuredChannelIds = new Set(
+    cadenceForPlanning.map((target) => target.channelId),
+  );
+  const unconfiguredChannels = planningChannels
+    .filter((channel) => !configuredChannelIds.has(channel.id))
+    .map((channel) => ({
+      channelId: channel.id,
+      platform: channel.platform,
+      handle: channel.handle,
+    }));
 
   // Every scheduled owned post counts against the rhythm, including
   // platform-first drafts and cadence slots that have since been claimed.
@@ -153,12 +197,35 @@ async function generateSlotsForRange(opts: {
 
   // Group targets per channel so pillar allocation spans the channel's whole
   // month (all archetypes), not each archetype separately.
-  const byChannel = new Map<string, typeof cadence>();
-  for (const t of cadence) {
+  const byChannel = new Map<string, typeof cadenceForPlanning>();
+  for (const t of cadenceForPlanning) {
     if (NOT_SLOT_PLANNED.has(`${t.platform}|${t.archetype}`)) continue;
     const list = byChannel.get(t.channelId) ?? [];
     list.push(t);
     byChannel.set(t.channelId, list);
+  }
+
+  const channelById = new Map(
+    planningChannels.map((channel) => [channel.id, channel]),
+  );
+  const unconfiguredMixChannels = [...byChannel.keys()]
+    .filter((channelId) => mixForChannel(channelId).length === 0)
+    .flatMap((channelId) => {
+      const channel = channelById.get(channelId);
+      return channel
+        ? [
+            {
+              channelId: channel.id,
+              platform: channel.platform,
+              handle: channel.handle,
+            },
+          ]
+        : [];
+    });
+  if (!dryRun && unconfiguredMixChannels.length > 0) {
+    throw new Error(
+      `Set a brand or channel content mix before generating ${unconfiguredMixChannels.map((channel) => channel.platform).join(", ")} slots.`,
+    );
   }
 
   // The resolved per-channel mix, for the preview UI ("what strategy is this
@@ -204,6 +271,7 @@ async function generateSlotsForRange(opts: {
         existing,
         created: need,
       });
+      createdTotal += need;
       for (let i = 0; i < need; i++) {
         const dayOffset = Math.min(
           days - 1,
@@ -222,6 +290,7 @@ async function generateSlotsForRange(opts: {
     // Largest-remainder pillar allocation over the channel's new slots, then
     // hand out by "most remaining first" so the mix spreads across the month.
     const weights = mixForChannel(channelId);
+    if (weights.length === 0) continue;
     const totalPct = weights.reduce((n, w) => n + w.targetPct, 0) || 1;
     const alloc = new Map<string, number>();
     let allocated = 0;
@@ -254,7 +323,6 @@ async function generateSlotsForRange(opts: {
         .filter(Boolean)
         .join(" ");
 
-      createdTotal++;
       if (dryRun) continue;
 
       const [idea] = await db
@@ -294,5 +362,11 @@ async function generateSlotsForRange(opts: {
     }
   }
 
-  return { rows, created: createdTotal, mix: mixSummary };
+  return {
+    rows,
+    created: createdTotal,
+    mix: mixSummary,
+    unconfiguredChannels,
+    unconfiguredMixChannels,
+  };
 }

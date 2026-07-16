@@ -16,15 +16,12 @@ import {
   saveEmailDocument,
   startEmailGeneration,
 } from "@/server/services/email-document.service";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 
-export const getEmailDraft = defineCapability({
-  name: "getEmailDraft",
+export const getEmailDraft = growthTool({
   description:
     "Read the canonical subject, Markdown body, CTA, revisions, planning context, and latest generation job for one owned newsletter issue or blast. Use this when the conversation is about a specific email slot; do not treat platform_post.text as the email body.",
   inputSchema: z.object({ platformPostId: z.string() }),
-  readOnly: true,
-  domain: "content",
   execute: async ({ platformPostId }, ctx) => {
     const workspace = await getEmailWorkspace({
       platformPostId,
@@ -38,10 +35,9 @@ export const getEmailDraft = defineCapability({
   },
 });
 
-export const createEmailSlot = defineCapability({
-  name: "createEmailSlot",
+export const createEmailSlot = growthTool({
   description:
-    "Create one empty newsletter issue or one-off blast as a Wander Growth content-calendar slot. Use after the operator has chosen the premise and timing. This deliberately does not generate the full email; generation happens only for an individually selected slot. Requires approval.",
+    "Create one empty newsletter issue or one-off blast as a Growth content-calendar slot after the operator has chosen the premise and timing. This deliberately does not generate the full email; generation happens only for an individually selected slot.",
   inputSchema: z.object({
     brandId: z.string(),
     title: z.string().trim().min(1).max(160),
@@ -57,11 +53,9 @@ export const createEmailSlot = defineCapability({
       .datetime()
       .optional()
       .describe(
-        "Wander Growth content-calendar time, never the operator's private calendar.",
+        "Growth content-calendar time, never the operator's private calendar.",
       ),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) =>
     createEmailSlotService({
       ...input,
@@ -70,17 +64,14 @@ export const createEmailSlot = defineCapability({
     }),
 });
 
-export const updateEmailDraft = defineCapability({
-  name: "updateEmailDraft",
+export const updateEmailDraft = growthTool({
   description:
-    "Save an approved conversational refinement to one email's canonical document and create a revision checkpoint. Pass only the fields that changed. Requires approval.",
+    "Save an agreed conversational refinement to one email's canonical document and create a revision checkpoint. Pass only the fields that changed.",
   inputSchema: z.object({
     platformPostId: z.string(),
     changes: emailDocumentDraftSchema.partial(),
     note: z.string().trim().max(300).optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async ({ platformPostId, changes, note }, ctx) => {
     const workspace = await getEmailWorkspace({
       platformPostId,
@@ -103,7 +94,7 @@ export const updateEmailDraft = defineCapability({
       organizationId: ctx.orgId,
       userId: ctx.userId,
       draft: document,
-      note: note ?? "Saved from the Wander Growth conversation",
+      note: note ?? "Saved from the Growth conversation",
     });
     return {
       ok: true as const,
@@ -113,10 +104,9 @@ export const updateEmailDraft = defineCapability({
   },
 });
 
-export const createProductUpdateDraft = defineCapability({
-  name: "createProductUpdateDraft",
+export const createProductUpdateDraft = growthTool({
   description:
-    "Create one finished, previewable WanderOS product-update email from verified repository evidence. Every claim must cite an exact repository and commit or pull-request ref, and shipped claims require release verification. Use this after inspecting the relevant product repositories locally; omit internal-only changes. Creates a frozen Growth revision but never resolves recipients or sends. Requires approval.",
+    "Create one finished, previewable product-update email from verified repository evidence. Each claim must cite an exact repository and commit or pull-request ref. Use this after inspecting the relevant product repositories locally; omit internal-only changes. Creates a frozen Growth revision but never resolves recipients or sends.",
   inputSchema: z.object({
     brandId: z.string(),
     title: z.string().trim().min(1).max(160),
@@ -127,8 +117,6 @@ export const createProductUpdateDraft = defineCapability({
     pillar: z.string().trim().max(120).optional(),
     draft: productUpdateEmailDraftSchema,
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) =>
     createProductUpdateDraftService({
       ...input,
@@ -137,16 +125,13 @@ export const createProductUpdateDraft = defineCapability({
     }),
 });
 
-export const generateEmailDraft = defineCapability({
-  name: "generateEmailDraft",
+export const generateEmailDraft = growthTool({
   description:
-    "Start one deliberate AI draft or refinement job for the selected newsletter issue or blast. Never use this to batch-write a bank of slots. The job uses the slot brief, brand voice, current draft, and optional refinement instruction. Requires approval.",
+    "Start one deliberate AI draft or refinement job for the selected newsletter issue or blast. Never use this to batch-write a bank of slots. The job uses the slot brief, brand voice, current draft, and optional refinement instruction.",
   inputSchema: z.object({
     platformPostId: z.string(),
     brief: z.string().trim().max(10_000).optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const job = await startEmailGeneration({
       ...input,
@@ -168,10 +153,10 @@ export const generateEmailDraft = defineCapability({
   },
 });
 
-export const EMAIL_CAPABILITIES = [
+export const EMAIL_TOOLS = {
   getEmailDraft,
   createEmailSlot,
   createProductUpdateDraft,
   updateEmailDraft,
   generateEmailDraft,
-] as const;
+} as const;

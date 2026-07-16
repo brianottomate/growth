@@ -19,7 +19,7 @@ import { ContentService } from "@/server/services/content.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import { getContentReadiness } from "@/lib/content-readiness";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 import type { CapabilityContext } from "./types";
 import { orgBrandIds } from "./brands";
 
@@ -44,13 +44,10 @@ async function requireContentWorkItem(
   return content;
 }
 
-export const getContentWorkItem = defineCapability({
-  name: "getContentWorkItem",
+export const getContentWorkItem = growthTool({
   description:
     "Read one canonical content work item with its brief, media pool, platform drafts, schedule, and deterministic production-readiness checklist. Call this FIRST when the active conversation is about finishing or refining a content item.",
   inputSchema: z.object({ contentPostId: z.string() }),
-  readOnly: true,
-  domain: "content",
   execute: async ({ contentPostId }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
     const readiness = getContentReadiness({
@@ -102,10 +99,9 @@ export const getContentWorkItem = defineCapability({
   },
 });
 
-export const updateContentWorkItem = defineCapability({
-  name: "updateContentWorkItem",
+export const updateContentWorkItem = growthTool({
   description:
-    "Apply approved edits to a canonical content brief and/or its existing owned platform drafts. Use concrete copy and dates agreed in conversation; do not use this merely to save vague suggestions. Requires operator approval.",
+    "Apply agreed edits to a canonical content brief and/or its existing owned platform drafts. Use concrete copy and dates agreed in conversation; do not use this merely to save vague suggestions.",
   inputSchema: z.object({
     contentPostId: z.string(),
     contentStatus: contentStatus.optional(),
@@ -135,8 +131,6 @@ export const updateContentWorkItem = defineCapability({
       .max(12)
       .optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const content = await requireContentWorkItem(input.contentPostId, ctx);
     const ownedById = new Map(
@@ -200,16 +194,13 @@ export const updateContentWorkItem = defineCapability({
   },
 });
 
-export const addContentCrossPost = defineCapability({
-  name: "addContentCrossPost",
+export const addContentCrossPost = growthTool({
   description:
-    "Add one or more approved channel renderings to an existing canonical content work item. Creates empty owned drafts for the selected platforms; use updateContentWorkItem afterward to write channel-native copy. Requires operator approval.",
+    "Add one or more agreed channel renderings to an existing canonical content work item. Creates empty owned drafts for the selected platforms; use updateContentWorkItem afterward to write channel-native copy.",
   inputSchema: z.object({
     contentPostId: z.string(),
     platforms: z.array(z.enum(channelPlatformEnum.enumValues)).min(1).max(8),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async ({ contentPostId, platforms }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
     const existing = new Set(
@@ -229,10 +220,9 @@ export const addContentCrossPost = defineCapability({
   },
 });
 
-export const attachChatImageToContent = defineCapability({
-  name: "attachChatImageToContent",
+export const attachChatImageToContent = growthTool({
   description:
-    "Save the operator's current pasted chat image into the active brand's durable media library and attach it to the active content pool, selected platform drafts, or every owned draft. Use only when the operator explicitly asks to use/save/attach the pasted image. Requires approval.",
+    "Save the operator's current pasted chat image into the active brand's durable media library and attach it to the active content pool, selected platform drafts, or every owned draft. Use only when the operator explicitly asks to use, save, or attach the pasted image.",
   inputSchema: z.object({
     contentPostId: z.string(),
     imageUrl: z.string().url(),
@@ -241,8 +231,6 @@ export const attachChatImageToContent = defineCapability({
     attachTo: z.enum(["pool", "all_spots", "platform_posts"]).default("pool"),
     platformPostIds: z.array(z.string()).max(12).optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const content = await requireContentWorkItem(input.contentPostId, ctx);
     const asset = await MediaService.promoteChatImage({
@@ -348,16 +336,13 @@ async function attachMediaItem(
  * The model does the editorial ranking; this tool only retrieves real options
  * without mutating the library or silently recovering archived bytes.
  */
-export const suggestMediaForContent = defineCapability({
-  name: "suggestMediaForContent",
+export const suggestMediaForContent = growthTool({
   description:
     "Retrieve media options for an active content work item from three honest lanes: ready assets already in the brand library, media found on the brand's historical platform posts, and the brief/context needed to write one strong AI image-generation prompt. Call after getContentWorkItem when the operator asks what visual or media to use. Return at most one recommendation per lane in your answer, explain why it fits, and distinguish immediately usable library media from archive media that still needs recovery. Never recommend a library asset solely from its dimensions, filename, or recency: it needs semantic evidence in its title, alt text, or tags.",
   inputSchema: z.object({
     contentPostId: z.string(),
     limitPerLane: z.number().int().min(3).max(12).default(8),
   }),
-  readOnly: true,
-  domain: "content",
   execute: async ({ contentPostId, limitPerLane }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
     const [library, archive] = await Promise.all([
@@ -477,18 +462,15 @@ export const suggestMediaForContent = defineCapability({
   },
 });
 
-export const attachLibraryMediaToContent = defineCapability({
-  name: "attachLibraryMediaToContent",
+export const attachLibraryMediaToContent = growthTool({
   description:
-    "Attach an approved, ready asset that already exists in the active brand's media library to the content pool and optionally selected/all owned platform drafts. Use the mediaAssetId returned by suggestMediaForContent. Requires operator approval.",
+    "Attach a chosen, ready asset that already exists in the active brand's media library to the content pool and optionally selected or all owned platform drafts. Use the mediaAssetId returned by suggestMediaForContent.",
   inputSchema: z.object({
     contentPostId: z.string(),
     mediaAssetId: z.string(),
     attachTo: mediaAttachTarget.default("pool"),
     platformPostIds: z.array(z.string()).max(12).optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const content = await requireContentWorkItem(input.contentPostId, ctx);
     const asset = await db.query.mediaAssetTable.findFirst({
@@ -527,10 +509,9 @@ export const attachLibraryMediaToContent = defineCapability({
   },
 });
 
-export const recoverArchiveMediaToContent = defineCapability({
-  name: "recoverArchiveMediaToContent",
+export const recoverArchiveMediaToContent = growthTool({
   description:
-    "Recover one approved media item from the active brand's own historical platform-post archive into its durable media library, then attach it to the active content pool and optionally selected/all owned platform drafts. Use the platformPostId and mediaIndex returned by suggestMediaForContent. This preserves the original media type; recovering a video does not extract a still frame. Requires operator approval.",
+    "Recover one chosen media item from the active brand's own historical platform-post archive into its durable media library, then attach it to the active content pool and optionally selected or all owned platform drafts. Use the platformPostId and mediaIndex returned by suggestMediaForContent. This preserves the original media type; recovering a video does not extract a still frame.",
   inputSchema: z.object({
     contentPostId: z.string(),
     platformPostId: z.string(),
@@ -538,8 +519,6 @@ export const recoverArchiveMediaToContent = defineCapability({
     attachTo: mediaAttachTarget.default("pool"),
     platformPostIds: z.array(z.string()).max(12).optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const content = await requireContentWorkItem(input.contentPostId, ctx);
     const source = await db.query.platformPostTable.findFirst({
@@ -585,13 +564,10 @@ export const recoverArchiveMediaToContent = defineCapability({
   },
 });
 
-export const contentPipelineSummary = defineCapability({
-  name: "contentPipelineSummary",
+export const contentPipelineSummary = growthTool({
   description:
     "Summarize the content pipeline for the organization: a count of content posts grouped by status (slot, draft, discovered, pending_review, approved, scheduled, published, rejected, archived). Use for 'what's in the pipeline / how much is scheduled / what needs review' questions.",
   inputSchema: z.object({}),
-  readOnly: true,
-  domain: "content",
   execute: async (_input, ctx) => {
     const brandIds = await orgBrandIds(ctx.orgId);
     if (brandIds.length === 0) return { total: 0, byStatus: [] };
@@ -637,8 +613,7 @@ export const contentPipelineSummary = defineCapability({
   },
 });
 
-export const upcomingContent = defineCapability({
-  name: "upcomingContent",
+export const upcomingContent = growthTool({
   description:
     "List content planned inside a bounded upcoming window, soonest first. Defaults to the next 14 days and can focus one owned brand. Use for 'what's next / what's planned in the next two weeks / what's on the calendar' questions.",
   inputSchema: z.object({
@@ -646,8 +621,6 @@ export const upcomingContent = defineCapability({
     brandId: z.string().optional(),
     days: z.number().int().min(1).max(62).default(14),
   }),
-  readOnly: true,
-  domain: "content",
   execute: async (input, ctx) => {
     const now = new Date();
     const through = new Date(now.getTime() + input.days * 86_400_000);
@@ -724,19 +697,23 @@ export const upcomingContent = defineCapability({
   },
 });
 
-export const productionQueue = defineCapability({
-  name: "productionQueue",
+export const productionQueue = growthTool({
   description:
     "List canonical content work items in the next 14 days with deterministic readiness checks and the next incomplete production step. Use for 'what should I work on?', 'what is blocked?', or after planning to move from slots into execution.",
   inputSchema: z.object({
     brandId: z.string(),
     days: z.number().int().min(1).max(62).default(14),
   }),
-  readOnly: true,
-  domain: "content",
   execute: async ({ brandId, days }, ctx) => {
-    const orgBrands = await orgBrandIds(ctx.orgId);
-    if (!orgBrands.includes(brandId)) {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true, name: true },
+    });
+    if (!brand) {
       throw new Error("That brand is not available in this organization.");
     }
     const now = new Date();
@@ -753,6 +730,7 @@ export const productionQueue = defineCapability({
     });
 
     return {
+      brand,
       window: { from: now.toISOString(), through: through.toISOString() },
       items: items.map((item) => {
         const readiness = getContentReadiness({
@@ -785,10 +763,9 @@ export const productionQueue = defineCapability({
   },
 });
 
-export const createIdea = defineCapability({
-  name: "createIdea",
+export const createIdea = growthTool({
   description:
-    "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Optionally seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt) and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This WRITES to the workspace, so treat it as a proposal: gather the essentials (which brand, a title, ideally a hook + channels), reflect the idea back in one line, and only call this once the operator agrees — the call also surfaces an approval card to confirm. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you (a hook, a theme, a pasted snippet) — turn that into the fields.",
+    "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Optionally seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt) and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This writes to the workspace: gather the essentials (which brand, a title, ideally a hook and channels), reflect the idea back in one line, and call it once the operator agrees. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you — turn that into the fields.",
   inputSchema: z.object({
     brandId: z
       .string()
@@ -812,8 +789,6 @@ export const createIdea = defineCapability({
       .optional()
       .describe("Channels to fan the idea out to as spots."),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     // Auth at the edge: the brand must belong to the caller's org.
     const brand = await db.query.brandTable.findFirst({
@@ -855,8 +830,7 @@ export const createIdea = defineCapability({
   },
 });
 
-export const createPlatformPost = defineCapability({
-  name: "createPlatformPost",
+export const createPlatformPost = growthTool({
   description:
     "Create one platform-native draft for an owned brand without creating a canonical content idea. Use this as the default when the operator says they want to post something on one channel, react to a specific observed post, or fill one concrete date. It can be promoted later into a content idea, series, grouping, or cross-post plan. This writes to the workspace and requires approval.",
   inputSchema: z.object({
@@ -880,8 +854,6 @@ export const createPlatformPost = defineCapability({
       .optional()
       .describe("Observed platform post that inspired this draft."),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const brand = await db.query.brandTable.findFirst({
       where: and(
@@ -916,8 +888,7 @@ export const createPlatformPost = defineCapability({
   },
 });
 
-export const promotePlatformPost = defineCapability({
-  name: "promotePlatformPost",
+export const promotePlatformPost = growthTool({
   description:
     "Promote an existing standalone platform post into a canonical content idea. Optionally attach it to a series and add cross-post renderings. Use only after the operator decides the post should become reusable structure. This writes to the workspace and requires approval.",
   inputSchema: z.object({
@@ -929,8 +900,6 @@ export const promotePlatformPost = defineCapability({
       .array(z.enum(channelPlatformEnum.enumValues))
       .optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const post = await db.query.platformPostTable.findFirst({
       where: eq(platformPostTable.id, input.platformPostId),

@@ -6,10 +6,9 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
 import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 
-export const getBrandMap = defineCapability({
-  name: "getBrandMap",
+export const getBrandMap = growthTool({
   description:
     "Read the shared Brand Map for one brand or every owned brand: live counts for channels, audience targets, website pages, blog articles, media, canonical content ideas, series, tracked peers, strategy targets, and pending structural reviews. Use this before cross-surface brand questions, when deciding what context is mapped vs missing, or before proposing what the team should do next.",
   inputSchema: z.object({
@@ -20,8 +19,6 @@ export const getBrandMap = defineCapability({
         "Optional brand id from listBrands. Omit to compare every owned brand.",
       ),
   }),
-  readOnly: true,
-  domain: "brands",
   execute: async (input, ctx) => {
     const brands = await db.query.brandTable.findMany({
       where: and(

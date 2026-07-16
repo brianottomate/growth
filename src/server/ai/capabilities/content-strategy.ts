@@ -18,7 +18,7 @@ import {
 } from "@/server/services/content-strategy.service";
 import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 import { requireOwnedBrand } from "./brand-access";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 
 const slug = z
   .string()
@@ -44,13 +44,10 @@ async function requireBrandContentIdeas(
   return ideas;
 }
 
-export const getContentStrategy = defineCapability({
-  name: "getContentStrategy",
+export const getContentStrategy = growthTool({
   description:
     "Read one brand's content strategy vocabulary and structure: brand-specific pillars and target mix, recurring series and their content counts, plus pending grouping proposals awaiting review. Use this before discussing pillars, series, editorial arcs, recurring formats, or whether past posts should be grouped.",
   inputSchema: z.object({ brandId: z.string() }),
-  readOnly: true,
-  domain: "content",
   execute: async ({ brandId }, ctx) => {
     const brand = await requireOwnedBrand(brandId, ctx);
     const [pillars, series, mix, groupings] = await Promise.all([
@@ -140,10 +137,9 @@ export const getContentStrategy = defineCapability({
   },
 });
 
-export const saveContentPillar = defineCapability({
-  name: "saveContentPillar",
+export const saveContentPillar = growthTool({
   description:
-    "Create a new brand-specific content pillar or update an existing pillar's name, description, or color after discussing the change. Pillar slugs are stable because content posts and mix targets reference them. Requires operator approval.",
+    "Create a new brand-specific content pillar or update an existing pillar's name, description, or color after agreeing on the change. Pillar slugs are stable because content posts and mix targets reference them.",
   inputSchema: z.object({
     brandId: z.string(),
     slug,
@@ -151,8 +147,6 @@ export const saveContentPillar = defineCapability({
     description: z.string().trim().min(1).max(800).optional(),
     color: z.string().trim().min(1).max(80).optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const brand = await requireOwnedBrand(input.brandId, ctx);
     const pillar = await saveBrandPillar({
@@ -170,10 +164,9 @@ export const saveContentPillar = defineCapability({
   },
 });
 
-export const saveContentSeries = defineCapability({
-  name: "saveContentSeries",
+export const saveContentSeries = growthTool({
   description:
-    "Create a new recurring content series or update an existing series for one owned brand after the arc, theme, and rough timing are agreed. A series groups distinct content ideas under a shared editorial arc; it is not the same as a retrospective grouping proposal. Requires operator approval.",
+    "Create a new recurring content series or update an existing series for one owned brand after the arc, theme, and rough timing are agreed. A series groups distinct content ideas under a shared editorial arc; it is not the same as a retrospective grouping proposal.",
   inputSchema: z.object({
     brandId: z.string(),
     seriesId: z.string().optional(),
@@ -193,8 +186,6 @@ export const saveContentSeries = defineCapability({
         "Existing canonical content ideas to place into this series. Omit when only defining the series.",
       ),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const brand = await requireOwnedBrand(input.brandId, ctx);
     if (input.pillarSlug) {
@@ -309,10 +300,9 @@ export const saveContentSeries = defineCapability({
   },
 });
 
-export const organizeContentIdeas = defineCapability({
-  name: "organizeContentIdeas",
+export const organizeContentIdeas = growthTool({
   description:
-    "Apply an agreed structural relationship to existing canonical content ideas: place them in an existing series, classify standalone ideas under a pillar, or remove them from a series. This does not merge raw channel posts; retrospective same-idea proposals use resolveContentGrouping. Requires operator approval.",
+    "Apply an agreed structural relationship to existing canonical content ideas: place them in an existing series, classify standalone ideas under a pillar, or remove them from a series. This does not merge raw channel posts; retrospective same-idea proposals use resolveContentGrouping.",
   inputSchema: z
     .object({
       brandId: z.string(),
@@ -330,8 +320,6 @@ export const organizeContentIdeas = defineCapability({
       (input) => !(input.seriesId && input.removeFromSeries),
       "Cannot assign and remove a series in the same action.",
     ),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const brand = await requireOwnedBrand(input.brandId, ctx);
     const ideas = await requireBrandContentIdeas(
@@ -422,18 +410,15 @@ export const organizeContentIdeas = defineCapability({
   },
 });
 
-export const resolveContentGrouping = defineCapability({
-  name: "resolveContentGrouping",
+export const resolveContentGrouping = growthTool({
   description:
-    "Accept or reject one pending retrospective grouping proposal after discussing it. Accepting a same-idea proposal creates one canonical idea over its channel executions and amplifications. Accepting a series proposal creates one series with one idea per distinct post. Either outcome can be classified under an existing pillar. Requires operator approval.",
+    "Accept or reject one pending retrospective grouping proposal after discussing it. Accepting a same-idea proposal creates one canonical idea over its channel executions and amplifications. Accepting a series proposal creates one series with one idea per distinct post. Either outcome can be classified under an existing pillar.",
   inputSchema: z.object({
     brandId: z.string(),
     proposalId: z.string(),
     decision: z.enum(["accept", "reject"]),
     pillarSlug: slug.nullable().optional(),
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const brand = await requireOwnedBrand(input.brandId, ctx);
     const proposal = await db.query.contentSuggestionTable.findFirst({
@@ -453,10 +438,10 @@ export const resolveContentGrouping = defineCapability({
   },
 });
 
-export const CONTENT_STRATEGY_CAPABILITIES = [
+export const CONTENT_STRATEGY_TOOLS = {
   getContentStrategy,
   saveContentPillar,
   saveContentSeries,
   organizeContentIdeas,
   resolveContentGrouping,
-];
+} as const;

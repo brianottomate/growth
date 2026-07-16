@@ -27,7 +27,7 @@ import {
   audienceTargetTable,
   brandTable,
 } from "@/server/db/schema";
-import { defineCapability, type CapabilityContext } from "./types";
+import { growthTool, type CapabilityContext } from "./types";
 
 const targetStatusSchema = z.enum(audienceTargetStatusEnum.enumValues);
 const targetPrioritySchema = z.enum(audienceTargetPriorityEnum.enumValues);
@@ -146,8 +146,7 @@ async function upsertProfile(
   return target;
 }
 
-export const listAudienceTargets = defineCapability({
-  name: "listAudienceTargets",
+export const listAudienceTargets = growthTool({
   description:
     "Read the strategic audience/ICP profiles for the organization, optionally for one brand. Returns reusable geography, descriptive demographics, needs and messaging context, research evidence, planned channel activations, linked real platform audiences, and coverage gaps. Use this before audience, messaging, content, or campaign recommendations.",
   inputSchema: z.object({
@@ -156,8 +155,6 @@ export const listAudienceTargets = defineCapability({
       .optional()
       .describe("Optional brand id from listBrands. Omit to read every brand."),
   }),
-  readOnly: true,
-  domain: "audiences",
   execute: async (input, ctx) => {
     const brands = await db.query.brandTable.findMany({
       where: and(
@@ -249,16 +246,12 @@ export const listAudienceTargets = defineCapability({
   },
 });
 
-export const createAudienceTarget = defineCapability({
-  name: "createAudienceTarget",
+export const createAudienceTarget = growthTool({
   description:
     "Create or idempotently update one strategic audience/ICP profile after the operator explicitly asks. Intended channels create activation plans but never real ad-platform audiences. Use saveAudienceTargets for two or more profiles.",
   inputSchema: audienceProfileInput.extend({
     brandId: z.string().describe("Brand id from listBrands."),
   }),
-  readOnly: false,
-  needsApproval: false,
-  domain: "audiences",
   execute: async (input, ctx) => {
     const brand = await findOrgBrand(input.brandId, ctx);
     if (!brand) return { error: "That brand isn't in your organization." };
@@ -276,17 +269,13 @@ export const createAudienceTarget = defineCapability({
   },
 });
 
-export const saveAudienceTargets = defineCapability({
-  name: "saveAudienceTargets",
+export const saveAudienceTargets = growthTool({
   description:
     "Create or idempotently update 2-10 audience/ICP profiles for one brand in one transaction after the operator explicitly asks. Prefer this over repeated createAudienceTarget calls. It creates requested activation plans but not real platform audiences.",
   inputSchema: z.object({
     brandId: z.string().describe("Brand id from listBrands."),
     targets: z.array(audienceProfileInput).min(2).max(10),
   }),
-  readOnly: false,
-  needsApproval: false,
-  domain: "audiences",
   execute: async ({ brandId, targets }, ctx) => {
     const brand = await findOrgBrand(brandId, ctx);
     if (!brand) {
@@ -310,8 +299,7 @@ export const saveAudienceTargets = defineCapability({
   },
 });
 
-export const updateAudienceTarget = defineCapability({
-  name: "updateAudienceTarget",
+export const updateAudienceTarget = growthTool({
   description:
     "Update an existing strategic audience/ICP profile after reading it and after the operator explicitly requests the change. Geography and demographics update reusable profile context; intended channels update activation plans. It does not edit synced platform audiences.",
   inputSchema: z.object({
@@ -330,9 +318,6 @@ export const updateAudienceTarget = defineCapability({
     sizeGoalLabel: z.string().max(100).nullable().optional(),
     evidence: z.array(audienceEvidenceInputSchema).max(20).optional(),
   }),
-  readOnly: false,
-  needsApproval: false,
-  domain: "audiences",
   execute: async (input, ctx) => {
     const { id, name, intendedChannels, evidence, ...changes } = input;
     const existing = await db.query.audienceTargetTable.findFirst({
@@ -387,8 +372,7 @@ export const updateAudienceTarget = defineCapability({
   },
 });
 
-export const updateAudienceActivation = defineCapability({
-  name: "updateAudienceActivation",
+export const updateAudienceActivation = growthTool({
   description:
     "Update a planned per-platform audience activation after reading it with listAudienceTargets and after the operator explicitly requests the change. Use this for campaign targeting geography, demographics, prompt/structured targeting, compliance category, or run state. Profile demographics are descriptive; only this explicit activation layer represents intended ad targeting.",
   inputSchema: z.object({
@@ -405,9 +389,6 @@ export const updateAudienceActivation = defineCapability({
     complianceNotes: z.string().max(3000).nullable().optional(),
     reachEstimateLabel: z.string().max(100).nullable().optional(),
   }),
-  readOnly: false,
-  needsApproval: false,
-  domain: "audiences",
   execute: async ({ id, ...changes }, ctx) => {
     const activation = await db.query.audienceActivationTable.findFirst({
       where: eq(audienceActivationTable.id, id),

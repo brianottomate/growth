@@ -92,6 +92,93 @@ export const assistantMessageTable = pgTable(
   ],
 );
 
+/** One bounded assistant execution; conversation content remains in messages. */
+export const assistantRunTable = pgTable(
+  "assistant_run",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("arun")),
+    organizationId: t
+      .text()
+      .references(() => organizationTable.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: t.text().references(() => userTable.id, { onDelete: "set null" }),
+    threadId: t
+      .text()
+      .references(() => assistantThreadTable.id, { onDelete: "set null" }),
+    surface: t.text().notNull(),
+    status: t
+      .text({ enum: ["running", "completed", "failed"] })
+      .default("running")
+      .notNull(),
+    model: t.text(),
+    contextManifest: t.jsonb().$type<{
+      surface: string;
+      characters: number;
+      sections: Array<{ id: string; characters: number; cache: string }>;
+    }>(),
+    summary: t.jsonb().$type<Record<string, unknown>>(),
+    error: t.jsonb().$type<Record<string, unknown>>(),
+    startedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    finishedAt: t.timestamp(),
+  }),
+  (table) => [
+    index("assistant_run_org_started_idx").on(
+      table.organizationId,
+      table.startedAt,
+    ),
+    index("assistant_run_thread_started_idx").on(
+      table.threadId,
+      table.startedAt,
+    ),
+  ],
+);
+
+export const assistantToolReceiptTable = pgTable(
+  "assistant_tool_receipt",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("atrc")),
+    runId: t
+      .text()
+      .references(() => assistantRunTable.id, { onDelete: "cascade" })
+      .notNull(),
+    threadId: t
+      .text()
+      .references(() => assistantThreadTable.id, { onDelete: "set null" }),
+    toolCallId: t.text().notNull(),
+    toolName: t.text().notNull(),
+    status: t
+      .text({ enum: ["running", "completed", "failed"] })
+      .default("running")
+      .notNull(),
+    policy: t.jsonb().$type<Record<string, unknown>>().notNull(),
+    input: t.jsonb().$type<unknown>(),
+    output: t.jsonb().$type<unknown>(),
+    error: t.jsonb().$type<Record<string, unknown>>(),
+    startedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    finishedAt: t.timestamp(),
+    durationMs: t.integer(),
+  }),
+  (table) => [
+    uniqueIndex("assistant_tool_receipt_run_call_uidx").on(
+      table.runId,
+      table.toolCallId,
+    ),
+    index("assistant_tool_receipt_run_idx").on(table.runId),
+  ],
+);
+
 export type ProductionPacketReference = {
   mediaAssetId: string;
   role?: "reference" | "source" | "style";
@@ -326,5 +413,8 @@ export const creativeRunRelations = relations(creativeRunTable, ({ one }) => ({
 }));
 
 export type AssistantThread = typeof assistantThreadTable.$inferSelect;
+export type AssistantRun = typeof assistantRunTable.$inferSelect;
+export type AssistantToolReceipt =
+  typeof assistantToolReceiptTable.$inferSelect;
 export type ProductionPacket = typeof productionPacketTable.$inferSelect;
 export type CreativeRun = typeof creativeRunTable.$inferSelect;

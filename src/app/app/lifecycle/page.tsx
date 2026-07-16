@@ -2,13 +2,10 @@ import { redirect } from "next/navigation";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import {
-  brandTable,
-  lifecycleCampaignTable,
-  memberTable,
-} from "@/server/db/schema";
+import { brandTable, lifecycleCampaignTable } from "@/server/db/schema";
 import type { LifecycleRunState } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
+import { resolveLifecycleOrganizationId } from "@/server/services/lifecycle.service";
 import { LifecycleTabs } from "./LifecycleTabs";
 
 const RUN_STATE: Record<
@@ -17,11 +14,27 @@ const RUN_STATE: Record<
 > = {
   running: { label: "Running", dot: "bg-emerald-400", cls: "text-emerald-300" },
   paused: { label: "Paused", dot: "bg-amber-400", cls: "text-amber-300" },
-  needs_fixing: { label: "Needs fixing", dot: "bg-red-400", cls: "text-red-300" },
+  needs_fixing: {
+    label: "Needs fixing",
+    dot: "bg-red-400",
+    cls: "text-red-300",
+  },
   planned: { label: "Planned", dot: "bg-sky-400", cls: "text-sky-300" },
-  draft: { label: "Draft", dot: "bg-muted-foreground", cls: "text-muted-foreground" },
-  stopped: { label: "Stopped", dot: "bg-muted-foreground", cls: "text-muted-foreground" },
-  ended: { label: "Ended", dot: "bg-muted-foreground", cls: "text-muted-foreground" },
+  draft: {
+    label: "Draft",
+    dot: "bg-muted-foreground",
+    cls: "text-muted-foreground",
+  },
+  stopped: {
+    label: "Stopped",
+    dot: "bg-muted-foreground",
+    cls: "text-muted-foreground",
+  },
+  ended: {
+    label: "Ended",
+    dot: "bg-muted-foreground",
+    cls: "text-muted-foreground",
+  },
 };
 
 // Display order — most operationally relevant first.
@@ -62,17 +75,16 @@ export default async function LifecyclePage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
-    with: { organization: true },
+  const organizationId = await resolveLifecycleOrganizationId({
+    userId: session.user.id,
+    preferredOrganizationId: session.session.activeOrganizationId,
   });
-  const org = membership?.organization;
-  if (!org) {
-    return <div className="text-muted-foreground">No organization found.</div>;
-  }
 
   const brands = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, organizationId),
+      isNull(brandTable.deletedAt),
+    ),
   });
   const brandIds = brands.map((b) => b.id);
 
@@ -87,7 +99,8 @@ export default async function LifecyclePage() {
     : [];
 
   const cleanupCount = campaigns.filter(
-    (c) => c.cleanupStatus === "candidate" || c.cleanupStatus === "should_delete",
+    (c) =>
+      c.cleanupStatus === "candidate" || c.cleanupStatus === "should_delete",
   ).length;
   const byState = (s: LifecycleRunState) =>
     campaigns
@@ -128,7 +141,7 @@ export default async function LifecyclePage() {
         const meta = RUN_STATE[s];
         return (
           <section key={s} className="mt-8">
-            <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
+            <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider uppercase">
               <span className={`size-1.5 rounded-full ${meta.dot}`} />
               {meta.label} · {list.length}
             </h2>
@@ -172,7 +185,8 @@ export default async function LifecyclePage() {
                           {c.externalKind === "transactional"
                             ? "transactional"
                             : (c.externalKind ?? "campaign")}{" "}
-                          · via {PROVIDER_LABEL[c.provider ?? ""] ?? "Customer.io"}
+                          · via{" "}
+                          {PROVIDER_LABEL[c.provider ?? ""] ?? "Customer.io"}
                         </span>
                       </div>
                     </div>
@@ -181,7 +195,7 @@ export default async function LifecyclePage() {
                         <div className="text-sm font-semibold tabular-nums">
                           {fmt(matched)}
                         </div>
-                        <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                        <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
                           reached
                         </div>
                       </div>

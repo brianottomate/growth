@@ -1,6 +1,6 @@
-# the growth workspace MCP capability surface
+# Growth MCP tool surface
 
-the growth workspace exposes its canonical AI capability registry over Streamable HTTP at:
+Growth exposes its canonical AI capability registry over Streamable HTTP at:
 
 ```text
 POST /api/mcp
@@ -18,25 +18,33 @@ GET /.well-known/openid-configuration
 
 Dynamic client registration and PKCE are supported. The grant is deliberately
 simple (`growth:all` plus the standard identity/offline scopes), but each
-capability retains its read/write metadata so the grant can become more granular
+tool retains its policy metadata so the grant can become more granular
 later without rewriting handlers.
 
-During authorization the user chooses one Wander organization. Better Auth
+During authorization the user chooses one Growth organization. Better Auth
 stores that organization in the consent, access token, and refresh token
 `referenceId`; it is also signed into the access token as `org_id`. The MCP
 endpoint verifies token issuer, audience, expiry, and scope and then re-checks
 the user's live organization membership on every request. There is no parallel
 connector table and no fallback to the browser session's active or first org.
 
-The MCP tools and the in-app Growth assistant are adapters over the same registry
-in `src/server/ai/capabilities`. Read-only and destructive annotations are derived
-from each capability. In chat, mutating capabilities pause for an approval card.
-MCP clients should use their normal confirmation policy for tools carrying a
-destructive hint.
+The MCP tools and the in-app Growth assistant are projections of the same native
+AI SDK 7 `ToolSet` in `src/server/ai/capabilities`. Read-only, destructive, and
+idempotency annotations are derived from the separate policy map. Growth runs
+ordinary drafts, plans, and reversible workspace edits immediately once the
+operator's intent is clear. A future tool that publishes or sends externally
+must opt into user approval in policy; MCP clients can additionally honor the
+standard destructive hint.
 
-The external MCP registry omits Wander Growth's `research` capabilities. ChatGPT and
-Claude already provide open-world browsing; Wander Growth contributes the durable
+The external MCP projection omits Growth's `research` tools. ChatGPT and
+Claude already provide open-world browsing; Growth contributes the durable
 workspace, strategy, content, media, and publishing operations.
+
+Alongside the 20 precise capability tools, MCP exposes `invoke_growth`. This coarse facade
+accepts one natural-language workspace request and delegates it to an internal
+Growth run over those same tools. It is useful for hosts that prefer one agent
+tool over loading the full detailed interface; the capability tools remain
+available for deterministic composition and inspection.
 
 Notable portable workflows:
 

@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 
 const surfaceSchema = z.enum([
   "overview",
@@ -67,10 +67,9 @@ const ROUTES: Record<
  * A portable navigation request. In-app chat executes it with router.push;
  * other adapters (including MCP) receive the canonical app URL to open.
  */
-export const navigateWorkspace = defineCapability({
-  name: "navigateWorkspace",
+export const navigateWorkspace = growthTool({
   description:
-    "Navigate the operator to a workspace surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. /app/next is the single conversational home; the other surfaces are for inspection and editing. For a specific brand map or brand-aware Next conversation, pass a brandId from listBrands. The in-app client follows the returned route; MCP clients receive the same canonical URL.",
+    "Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. /app/next is the single conversational home; the other surfaces are for inspection and editing. For a specific brand map or brand-aware Next conversation, pass a brandId from listBrands. The in-app client follows the returned route; MCP clients receive the same canonical URL.",
   inputSchema: z.object({
     surface: surfaceSchema,
     brandId: z
@@ -80,8 +79,6 @@ export const navigateWorkspace = defineCapability({
         "Used for a specific brand_map or brand-aware Next conversation; use an id from listBrands.",
       ),
   }),
-  readOnly: true,
-  domain: "overview",
   execute: async (input, ctx) => {
     if (input.surface === "next" && input.brandId) {
       const brand = await db.query.brandTable.findFirst({

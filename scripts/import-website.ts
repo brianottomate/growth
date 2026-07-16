@@ -162,12 +162,12 @@ async function generateSiteSpec(paths: string[]): Promise<SiteSpec> {
     .map(([seg, e]) => `${seg} — ${e.count} pages, e.g. ${e.samples.join(" ")}`)
     .join("\n");
 
-  const { experimental_output } = await generateText({
+  const { output } = await generateText({
     model: anthropic("claude-sonnet-4-6"),
-    experimental_output: Output.object({ schema: SPEC_SCHEMA }),
+    output: Output.object({ schema: SPEC_SCHEMA }),
     prompt: `You are mapping a marketing website's sitemap (${BASE_URL}, ${paths.length} URLs) into page groups. Below is a histogram of first path segments with counts and sample paths. Produce classification groups that cover the whole site: hand-built static pages vs stamped-out template groups (listings, articles, location pages, …). Prefer few, meaningful groups.\n\n${summary}`,
   });
-  return experimental_output;
+  return output;
 }
 
 /** Classify all paths against an AI spec → per-page rows + rollups. */

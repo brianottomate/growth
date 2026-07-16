@@ -19,7 +19,15 @@ import {
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { OVERVIEW_AGENT_PERSONA } from "@/server/ai/overview-agent/persona";
-import { OVERVIEW_CAPABILITIES, toAiTools } from "@/server/ai/capabilities";
+import { OVERVIEW_TOOLS } from "@/server/ai/capabilities";
+import { composeGrowthContext } from "@/server/ai/kernel/context";
+import { compactGrowthError } from "@/server/ai/kernel/errors";
+import {
+  completeAssistantRun,
+  failAssistantRun,
+  startAssistantRun,
+} from "@/server/ai/kernel/journal";
+import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
 import type {
   AssistantIntent,
   ContentWorkContext,
@@ -63,13 +71,26 @@ export async function POST(req: Request): Promise<Response> {
   const session = await getSession();
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
 
-  const membership = await db.query.memberTable.findFirst({
-    where: eq(memberTable.userId, session.user.id),
+  const activeOrganizationId = session.session.activeOrganizationId;
+  const memberships = await db.query.memberTable.findMany({
+    where: activeOrganizationId
+      ? and(
+          eq(memberTable.userId, session.user.id),
+          eq(memberTable.organizationId, activeOrganizationId),
+        )
+      : eq(memberTable.userId, session.user.id),
     columns: { organizationId: true },
+    limit: 2,
   });
-  if (!membership?.organizationId) {
-    return new Response("No organization", { status: 403 });
+  if (memberships.length !== 1 || !memberships[0]?.organizationId) {
+    return new Response(
+      memberships.length > 1
+        ? "Select an active organization"
+        : "No organization",
+      { status: 403 },
+    );
   }
+  const membership = memberships[0];
 
   const {
     messages,
@@ -159,21 +180,21 @@ export async function POST(req: Request): Promise<Response> {
 
   const surfaceContext =
     surface === "create" || surface === "next"
-      ? `\n\n# Current surface\nThe operator is in the unified Next conversation${brand ? ` for ${brand.name} (brandId: ${brand.id})` : ""}${intent ? ` with intent \"${intent}\"` : ""}. The default operating horizon is the next 14 days. Treat questions, pasted images, links, and rough thoughts as one continuous iteration loop. First establish readiness with nextForBrand when a brand is known. Do not pretend this is an editing studio. Prefer the smallest useful action, keep suggestions to at most three and usually one, follow each write tool's approval contract, then point or navigate the operator to the existing content, schedule, calendar, media, or review surface where the result belongs. When the creative direction is genuinely ready for production, save a provider-neutral production packet. Copying that packet into Claude Design, ChatGPT, a video editor, or an agency workflow is a first-class outcome; Fal is only an optional experiment that consumes the same reviewed packet.`
+      ? `\n\n# Current surface\nThe operator is in the unified Next conversation${brand ? ` for ${brand.name} (brandId: ${brand.id})` : ""}${intent ? ` with intent \"${intent}\"` : ""}. The default operating horizon is the next 14 days. Treat questions, pasted images, links, and rough thoughts as one continuous iteration loop. First establish readiness with nextForBrand when a brand is known. Do not pretend this is an editing studio. Prefer the smallest useful action, keep suggestions to at most three and usually one, execute authorized workspace changes without redundant approval cards, then point or navigate the operator to the existing content, schedule, calendar, media, or review surface where the result belongs. When the creative direction is genuinely ready for production, save a provider-neutral production packet. Copying that packet into Claude Design, ChatGPT, a video editor, or an agency workflow is a first-class outcome; Fal is only an optional experiment that consumes the same reviewed packet.`
       : "";
   const intentContext =
     assistantIntent?.type === "plan_two_weeks" && brand
       ? `\n\n# Triggered intent\nThe operator clicked Plan next two weeks on the Content surface for ${brand.name}. Call nextForBrand first, then previewTwoWeekSlots only when readiness and the existing 14-day pipeline indicate it is useful. Create slots only after the operator explicitly agrees to the preview; their conversational agreement is sufficient and must not be followed by a second confirmation.`
       : assistantIntent?.type === "build_channel_strategy" && brand
-        ? `\n\n# Triggered intent\nThe operator clicked Build channel strategy for ${brand.name}. Call nextForBrand first. Propose a modest starter content mix and platform-appropriate cadence only for genuinely missing configuration. Explain the complete proposal clearly, ask for one conversational go-ahead, then create the agreed missing mix and channel cadences without redundant approval cards. Do not overwrite existing targets; use the approval-gated update tools only after explaining an explicit before/after change.`
+        ? `\n\n# Triggered intent\nThe operator clicked Build channel strategy for ${brand.name}. Call nextForBrand first. Propose a modest starter content mix and platform-appropriate cadence only for genuinely missing configuration. Explain the complete proposal clearly, ask for one conversational go-ahead, then create the agreed missing mix and channel cadences. Do not overwrite existing targets without explaining an explicit before/after change.`
         : assistantIntent?.type === "shape_content_structure" && brand
-          ? `\n\n# Triggered intent\nThe operator opened the content-structure conversation for ${brand.name}. Call getContentStrategy first. Then help them reason about pillars, series, canonical ideas, and any pending retrospective groupings using the three-operation model in your persona. Start with a concise read of what already exists and one useful question or concrete proposal. Do not write structure until the operator has discussed and agreed to the exact change; the write tool will then show its approval card.`
+          ? `\n\n# Triggered intent\nThe operator opened the content-structure conversation for ${brand.name}. Call getContentStrategy first. Then help them reason about pillars, series, canonical ideas, and any pending retrospective groupings using the three-operation model in your persona. Start with a concise read of what already exists and one useful question or concrete proposal. Once the operator agrees to the exact change, write it directly and report what changed.`
           : assistantIntent?.type === "plan_email"
             ? `\n\n# Triggered intent\nThe operator wants to plan a newsletter issue or one-off blast${brand ? ` for ${brand.name}` : ""}. First distinguish a recurring newsletter.broadcast from a cadence-independent newsletter.blast. Talk through the premise, pillar or series relationship, CTA, and Wander Growth content-calendar timing. Use createEmailSlot only after the operator agrees to the exact empty slot. Do not generate the full email during batch or cadence planning; call generateEmailDraft only later for one individually selected slot.`
             : "";
   const workContextPrompt =
     activeWorkContext && brand
-      ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call getContentWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists. Use approval-gated content tools for writes.`
+      ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call getContentWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists, and apply authorized writes directly.`
       : "";
   const safeAttachment =
     chatAttachment?.url &&
@@ -237,17 +258,52 @@ export async function POST(req: Request): Promise<Response> {
     sanitizeForModel(history).slice(-30),
   );
 
-  const result = streamText({
-    model: anthropic(MODEL),
-    system: `${OVERVIEW_AGENT_PERSONA}${surfaceContext}${intentContext}${workContextPrompt}${attachmentPrompt}`,
-    messages: modelMessages,
-    tools: toAiTools(OVERVIEW_CAPABILITIES, {
+  const context = composeGrowthContext({
+    surface: "overview-chat",
+    maximumCharacters: 80_000,
+    sections: [
+      { id: "persona", content: OVERVIEW_AGENT_PERSONA, cache: "session" },
+      { id: "surface", content: surfaceContext },
+      { id: "intent", content: intentContext },
+      { id: "work-item", content: workContextPrompt },
+      { id: "attachment", content: attachmentPrompt },
+    ],
+  });
+  const runId = await startAssistantRun({
+    organizationId: membership.organizationId,
+    userId: session.user.id,
+    threadId: thread.id,
+    surface: "overview-chat",
+    model: MODEL,
+    contextManifest: context.manifest,
+  });
+  const runtime = buildGrowthToolRuntime({
+    tools: OVERVIEW_TOOLS,
+    identity: {
       orgId: membership.organizationId,
       userId: session.user.id,
       threadId: thread.id,
-    }),
-    stopWhen: stepCountIs(8),
+    },
+    runId,
+    surface: "overview-chat",
   });
+
+  const result = await (async () => {
+    try {
+      return streamText({
+        model: anthropic(MODEL),
+        messages: [...context.messages, ...modelMessages],
+        allowSystemInMessages: true,
+        tools: runtime.tools,
+        toolsContext: runtime.toolsContext,
+        toolApproval: runtime.toolApproval,
+        stopWhen: stepCountIs(8),
+      });
+    } catch (error) {
+      await failAssistantRun(runId, compactGrowthError(error));
+      throw error;
+    }
+  })();
 
   // Keep the tool loop alive when the browser navigates away. Accepted writes
   // and the final answer will still be waiting in this durable session.
@@ -255,6 +311,7 @@ export async function POST(req: Request): Promise<Response> {
     try {
       await result.consumeStream();
     } catch (error) {
+      await failAssistantRun(runId, compactGrowthError(error));
       console.error("[overview-chat] stream drain failed", error);
     }
   })();
@@ -311,6 +368,9 @@ export async function POST(req: Request): Promise<Response> {
           updatedAt: new Date(),
         })
         .where(eq(assistantThreadTable.id, thread.id));
+      await completeAssistantRun(runId, {
+        persistedMessages: updatedMessages.length,
+      });
     },
   });
 }

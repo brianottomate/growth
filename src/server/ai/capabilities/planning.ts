@@ -9,7 +9,7 @@ import {
   momentSlotSchema,
 } from "@/server/services/plan-moment.service";
 import { requireOwnedBrand } from "./brand-access";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 import { generateRangeSlots } from "@/server/services/slot-generate.service";
 
 function twoWeekWindow(startDateISO?: string) {
@@ -26,16 +26,13 @@ function twoWeekWindow(startDateISO?: string) {
   return { start, end };
 }
 
-export const previewTwoWeekSlots = defineCapability({
-  name: "previewTwoWeekSlots",
+export const previewTwoWeekSlots = growthTool({
   description:
     "Preview the concrete empty content slots implied by an owned brand's active cadence and content-mix targets for the next 14 days. Saves nothing. Use after nextForBrand says the brand is ready to plan; summarize the result briefly before offering to create it.",
   inputSchema: z.object({
     brandId: z.string(),
     startDateISO: z.string().date().optional(),
   }),
-  readOnly: true,
-  domain: "content",
   execute: async ({ brandId, startDateISO }, ctx) => {
     await requireOwnedBrand(brandId, ctx);
     const { start, end } = twoWeekWindow(startDateISO);
@@ -48,6 +45,8 @@ export const previewTwoWeekSlots = defineCapability({
     return {
       created: result.created,
       mix: result.mix,
+      unconfiguredChannels: result.unconfiguredChannels,
+      unconfiguredMixChannels: result.unconfiguredMixChannels,
       slots: result.rows.map((row) => ({
         platform: row.platform,
         archetype: row.archetype,
@@ -60,23 +59,27 @@ export const previewTwoWeekSlots = defineCapability({
       interpretation:
         "targetInWindow and existingInWindow are totals for the full 14-day window. authoredCadence is the underlying weekly/monthly setting; do not describe targetInWindow as a per-week value.",
       next:
-        result.created > 0
-          ? "Ask the operator to approve creating this two-week slot plan."
-          : "The window already satisfies the active cadence targets.",
+        result.unconfiguredChannels.length > 0
+          ? "Establish cadence for the unconfigured channels before creating the plan."
+          : result.unconfiguredMixChannels.length > 0
+            ? "Establish a brand or channel content mix before creating the plan."
+            : result.created > 0
+              ? "Ask the operator for an explicit conversational go-ahead to create this two-week slot plan."
+              : "The window already satisfies the active cadence targets.",
     };
   },
 });
 
-export const generateTwoWeekSlots = defineCapability({
-  name: "generateTwoWeekSlots",
+export const generateTwoWeekSlots = growthTool({
   description:
     "Create the approved 14-day set of empty content slots implied by an owned brand's active cadence and content-mix targets. This is idempotent and only tops up missing cadence slots. Use only after previewTwoWeekSlots and explicit operator agreement.",
   inputSchema: z.object({
     brandId: z.string(),
     startDateISO: z.string().date().optional(),
   }),
-  readOnly: false,
-  domain: "content",
+  // The assistant must preview first and receive an explicit conversational
+  // go-ahead. Requiring another generic approval card after "yes" is redundant;
+  // slot creation is idempotent and does not overwrite existing content.
   execute: async ({ brandId, startDateISO }, ctx) => {
     await requireOwnedBrand(brandId, ctx);
     const { start, end } = twoWeekWindow(startDateISO);
@@ -86,8 +89,11 @@ export const generateTwoWeekSlots = defineCapability({
       rangeEnd: end,
     });
     return {
+      action: "saved" as const,
       created: result.created,
       mix: result.mix,
+      unconfiguredChannels: result.unconfiguredChannels,
+      unconfiguredMixChannels: result.unconfiguredMixChannels,
       slots: result.rows.map((row) => ({
         platform: row.platform,
         archetype: row.archetype,
@@ -102,8 +108,7 @@ export const generateTwoWeekSlots = defineCapability({
   },
 });
 
-export const draftMomentBlueprint = defineCapability({
-  name: "draftMomentBlueprint",
+export const draftMomentBlueprint = growthTool({
   description:
     "Propose a reviewable content moment shape: verdict, scale, slots, channel renderings, and amplifier asks. Saves nothing. Use this after the brand context and desired outcome are clear; the operator can refine the blueprint before committing it.",
   inputSchema: z.object({
@@ -122,8 +127,6 @@ export const draftMomentBlueprint = defineCapability({
       })
       .optional(),
   }),
-  readOnly: true,
-  domain: "content",
   execute: async (input, ctx) => {
     const brand = await requireOwnedBrand(input.brandId, ctx);
     const blueprint = await generateMomentBlueprint({
@@ -140,8 +143,7 @@ export const draftMomentBlueprint = defineCapability({
   },
 });
 
-export const commitMomentPlan = defineCapability({
-  name: "commitMomentPlan",
+export const commitMomentPlan = growthTool({
   description:
     "Materialize an explicitly approved moment blueprint into one initiative, optional series for an arc, concrete content slots, and amplifier targets. Call only with the final reviewed blueprint and launch date.",
   inputSchema: z.object({
@@ -150,8 +152,6 @@ export const commitMomentPlan = defineCapability({
     launchDateISO: z.string(),
     blueprint: momentBlueprintSchema,
   }),
-  readOnly: false,
-  domain: "content",
   execute: async (input, ctx) => {
     await requireOwnedBrand(input.brandId, ctx);
     const result = await commitMomentBlueprint(input);
@@ -162,9 +162,9 @@ export const commitMomentPlan = defineCapability({
   },
 });
 
-export const PLANNING_CAPABILITIES = [
+export const PLANNING_TOOLS = {
   previewTwoWeekSlots,
   generateTwoWeekSlots,
   draftMomentBlueprint,
   commitMomentPlan,
-];
+} as const;

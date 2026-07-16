@@ -3,12 +3,11 @@ import "server-only";
 import { z } from "zod";
 
 import { createProductionPacket } from "@/server/services/creative-work.service";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 
-export const prepareProductionPacket = defineCapability({
-  name: "prepareProductionPacket",
+export const prepareProductionPacket = growthTool({
   description:
-    "Save a complete, provider-neutral production packet after the operator and assistant have developed a usable creative direction. This is the first-class handoff for Claude Design, ChatGPT, a video editor, an agency, or Wander Growth's optional Fal experiment. Preserve the operator's reviewed intent; include enough visual and execution detail that another tool can produce the asset without reconstructing the conversation. Do not call while the brief is still vague.",
+    "Save a complete, provider-neutral production packet after the operator and assistant have developed a usable creative direction. This is the first-class handoff for Claude Design, ChatGPT, a video editor, an agency, or Growth's optional Fal experiment. Preserve the operator's reviewed intent; include enough visual and execution detail that another tool can produce the asset without reconstructing the conversation. Do not call while the brief is still vague.",
   inputSchema: z.object({
     brandId: z.string(),
     contentPostId: z.string().optional(),
@@ -22,9 +21,6 @@ export const prepareProductionPacket = defineCapability({
     instructions: z.string().trim().optional(),
     referenceMediaAssetIds: z.array(z.string()).max(12).optional(),
   }),
-  readOnly: false,
-  needsApproval: false,
-  domain: "content",
   execute: async (input, ctx) => {
     const packet = await createProductionPacket({
       ...input,

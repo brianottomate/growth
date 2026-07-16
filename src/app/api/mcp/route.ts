@@ -3,8 +3,8 @@ import { oauthProviderResourceClient } from "@better-auth/oauth-provider/resourc
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { and, eq } from "drizzle-orm";
 
-import { MCP_CAPABILITIES } from "@/server/ai/capabilities";
-import { registerMcpCapabilities } from "@/server/ai/capabilities/to-mcp-server";
+import { MCP_TOOLS } from "@/server/ai/capabilities";
+import { registerMcpTools } from "@/server/ai/capabilities/to-mcp-server";
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import {
@@ -18,7 +18,7 @@ import {
 export const maxDuration = 800;
 
 const mcpHandler = createMcpHandler(
-  (server) => registerMcpCapabilities(server, MCP_CAPABILITIES),
+  (server) => registerMcpTools(server, MCP_TOOLS),
   {},
   { basePath: "/api", maxDuration, verboseLogs: false },
 );

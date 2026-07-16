@@ -1,98 +1,38 @@
 import "server-only";
 
-import type { AnyCapability } from "./types";
-import { adsScope, topAds } from "./ads";
-import {
-  createAudienceTarget,
-  listAudienceTargets,
-  saveAudienceTargets,
-  updateAudienceActivation,
-  updateAudienceTarget,
-} from "./audiences";
-import { getBrandMap } from "./brand-map";
-import { listBrands } from "./brands";
-import {
-  addContentCrossPost,
-  attachChatImageToContent,
-  attachLibraryMediaToContent,
-  contentPipelineSummary,
-  createIdea,
-  createPlatformPost,
-  getContentWorkItem,
-  promotePlatformPost,
-  productionQueue,
-  recoverArchiveMediaToContent,
-  suggestMediaForContent,
-  updateContentWorkItem,
-  upcomingContent,
-} from "./content";
-import { leadsSummary } from "./leads";
-import { recentMentions } from "./listening";
-import { CONTENT_STRATEGY_CAPABILITIES } from "./content-strategy";
-import { navigateWorkspace } from "./navigation";
-import { nextForBrand } from "./next";
-import { OPERATION_CAPABILITIES } from "./operations";
-import { PLANNING_CAPABILITIES } from "./planning";
-import { workspaceOverview } from "./overview";
-import { prepareProductionPacket } from "./production";
-import { readWebPage, webSearch } from "./research";
-import { EMAIL_CAPABILITIES } from "./email";
+import type { ToolSet } from "ai";
 
-export { toAiTools } from "./to-ai-tools";
-export { registerMcpCapabilities } from "./to-mcp-server";
-export { defineCapability } from "./types";
-export type { Capability, AnyCapability, CapabilityContext } from "./types";
+import { GROUPED_CAPABILITY_TOOLS } from "./grouped";
+import { leadsSummary } from "./leads";
+import { LIFECYCLE_TOOLS } from "./lifecycle";
+import { recentMentions } from "./listening";
+import { navigateWorkspace } from "./navigation";
+import { workspaceOverview } from "./overview";
+import { policyForGrowthTool } from "../kernel/policy";
+
+export { registerMcpTools } from "./to-mcp-server";
+export { growthTool } from "./types";
+export type { GrowthTool as Capability, CapabilityContext } from "./types";
 
 /**
- * Capabilities exposed to the /overview chat agent — and the list a future MCP
- * server adapter will iterate over. Order is the order the model sees them;
- * lead with the aggregator so broad questions resolve in one call.
+ * Overview's executable source of truth. These are ordinary AI SDK tools: a
+ * product surface is just a typed map assembled with object spreads.
  */
-export const OVERVIEW_CAPABILITIES: AnyCapability[] = [
+export const OVERVIEW_TOOLS = {
   workspaceOverview,
   navigateWorkspace,
-  listBrands,
-  nextForBrand,
-  getBrandMap,
-  listAudienceTargets,
-  webSearch,
-  readWebPage,
-  createAudienceTarget,
-  saveAudienceTargets,
-  updateAudienceActivation,
-  updateAudienceTarget,
-  contentPipelineSummary,
-  upcomingContent,
-  productionQueue,
-  getContentWorkItem,
-  ...EMAIL_CAPABILITIES,
-  ...CONTENT_STRATEGY_CAPABILITIES,
-  suggestMediaForContent,
-  prepareProductionPacket,
-  // Content writes remain approval-gated; explicit audience saves are direct.
-  updateContentWorkItem,
-  addContentCrossPost,
-  attachChatImageToContent,
-  attachLibraryMediaToContent,
-  recoverArchiveMediaToContent,
-  createPlatformPost,
-  promotePlatformPost,
-  createIdea,
+  ...GROUPED_CAPABILITY_TOOLS,
   leadsSummary,
+  ...LIFECYCLE_TOOLS,
   recentMentions,
-  // Ads: scope FIRST (cheap lay-of-the-land), then drill with topAds.
-  adsScope,
-  topAds,
-  // Portable, approval-gated operational workflows shared by chat and MCP.
-  ...OPERATION_CAPABILITIES,
-  ...PLANNING_CAPABILITIES,
-];
+} as const satisfies ToolSet;
 
 /**
- * External connector surface. ChatGPT and Claude already have their own
- * open-world browsing, so Wander Growth contributes durable workspace capabilities
- * without duplicating web-search tools or widening prompt-injection exposure.
+ * The OAuth MCP is a projection of the same native tools. Open-world research
+ * stays with the host agent rather than widening Growth's connector surface.
  */
-export const MCP_CAPABILITIES: AnyCapability[] = OVERVIEW_CAPABILITIES.filter(
-  (capability) => capability.domain !== "research",
-);
+export const MCP_TOOLS = Object.fromEntries(
+  Object.entries(OVERVIEW_TOOLS).filter(
+    ([name]) => policyForGrowthTool(name).mcp,
+  ),
+) as ToolSet;

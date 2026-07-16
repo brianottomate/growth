@@ -7,7 +7,7 @@ import {
   computeAdsScope,
   computeTopAds,
 } from "@/server/services/ads-analytics.service";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
 // service). The model only needs to pass dates when the operator names a range.
@@ -24,18 +24,14 @@ const windowSchema = {
     .describe("Window end YYYY-MM-DD. Default: today."),
 };
 
-export const adsScope = defineCapability({
-  name: "adsScope",
+export const adsScope = growthTool({
   description:
     "CHEAP lay-of-the-land for Wander's Meta (Facebook) ad performance over a window (default last 365 days): totals (impressions/clicks/CTR/spend/engagement), spend-by-month, and breakdowns by objective (OUTCOME_SALES≈consumer marketplace vs OUTCOME_LEADS≈PM/WanderOS) and by ad DESTINATION (audit / os / marketplace / lead-form / …). Includes flags like hasAuditAds. CALL THIS FIRST for any 'which ads / ad performance / what are we running / are we driving to X' question — it grounds your follow-ups (e.g. it tells you instantly that we've run zero audit-destination ads). Then call topAds to drill in.",
   inputSchema: z.object(windowSchema),
-  readOnly: true,
-  domain: "ads",
   execute: async (input) => computeAdsScope(input),
 });
 
-export const topAds = defineCapability({
-  name: "topAds",
+export const topAds = growthTool({
   description:
     "Ranked top Wander Meta ads for a window, by a chosen metric (impressions | clicks | ctr | engagement | spend), with creative copy + thumbnail + destination. Optionally filter by objective (e.g. OUTCOME_LEADS for the PM/WanderOS funnel) or destination. Use AFTER adsScope once the scope is narrowed. CTR ranking applies a 5k-impression delivery floor. Returns at most `limit` ads (default 15).",
   inputSchema: z.object({
@@ -49,18 +45,20 @@ export const topAds = defineCapability({
     destination: z
       .enum(AD_DESTINATIONS)
       .optional()
-      .describe("Filter to one destination bucket (audit, os, marketplace, lead-form, …)."),
+      .describe(
+        "Filter to one destination bucket (audit, os, marketplace, lead-form, …).",
+      ),
     status: z
       .enum(["all", "active", "non-paused"])
       .default("all")
-      .describe("Ad delivery status filter. Default all (includes paused/historical)."),
+      .describe(
+        "Ad delivery status filter. Default all (includes paused/historical).",
+      ),
     metric: z
       .enum(["impressions", "clicks", "ctr", "engagement", "spend"])
       .default("impressions")
       .describe("Ranking metric."),
     limit: z.number().int().min(1).max(30).default(15),
   }),
-  readOnly: true,
-  domain: "ads",
   execute: async (input) => computeTopAds(input),
 });

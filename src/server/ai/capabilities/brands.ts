@@ -5,24 +5,24 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
-import { defineCapability } from "./types";
+import { growthTool } from "./types";
 
 /** Brand ids for the org — shared by other org-scoped capabilities. */
 export async function orgBrandIds(orgId: string): Promise<string[]> {
   const rows = await db.query.brandTable.findMany({
-    where: and(eq(brandTable.organizationId, orgId), isNull(brandTable.deletedAt)),
+    where: and(
+      eq(brandTable.organizationId, orgId),
+      isNull(brandTable.deletedAt),
+    ),
     columns: { id: true },
   });
   return rows.map((r) => r.id);
 }
 
-export const listBrands = defineCapability({
-  name: "listBrands",
+export const listBrands = growthTool({
   description:
     "List the brands in the current organization (id, name, tagline). Use when the operator asks about brands or you need a brand's name/id.",
   inputSchema: z.object({}),
-  readOnly: true,
-  domain: "brands",
   execute: async (_input, ctx) => {
     const brands = await db.query.brandTable.findMany({
       where: and(

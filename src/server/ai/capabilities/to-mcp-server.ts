@@ -1,47 +1,223 @@
 import "server-only";
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import type { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { anthropic } from "@ai-sdk/anthropic";
+import {
+  generateText,
+  stepCountIs,
+  type Tool,
+  type ToolExecutionOptions,
+  type ToolSet,
+} from "ai";
+import { z } from "zod";
 
-import type { AnyCapability, CapabilityContext } from "./types";
+import { createId } from "@/server/db/utils";
+import { composeGrowthContext } from "../kernel/context";
+import { compactGrowthError } from "../kernel/errors";
+import {
+  completeAssistantRun,
+  failAssistantRun,
+  startAssistantRun,
+} from "../kernel/journal";
+import { policyForGrowthTool } from "../kernel/policy";
+import { buildGrowthToolRuntime } from "../kernel/runtime";
+import type { GrowthExecutionContext } from "../kernel/tool";
 
 type ToolExtra = { authInfo?: AuthInfo };
 
-function contextFrom(extra: ToolExtra): CapabilityContext {
+function identityFrom(extra: ToolExtra) {
   const values = extra.authInfo?.extra as
     | { orgId?: unknown; userId?: unknown }
     | undefined;
   if (typeof values?.orgId !== "string" || typeof values.userId !== "string") {
-    throw new Error("The MCP token is not attached to a workspace organization.");
+    throw new Error("The MCP token is not attached to a Growth organization.");
   }
   return { orgId: values.orgId, userId: values.userId };
 }
 
-/** Register the canonical capability list on any MCP server instance. */
-export function registerMcpCapabilities(
-  server: McpServer,
-  capabilities: AnyCapability[],
-) {
-  for (const capability of capabilities) {
-    const schema = capability.inputSchema as z.ZodObject<z.ZodRawShape>;
+function mcpContextManifest() {
+  return {
+    surface: "mcp" as const,
+    characters: 0,
+    sections: [],
+  };
+}
+
+function isCompactError(value: unknown): value is { error: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "error" in value &&
+    typeof value.error === "string"
+  );
+}
+
+const invokeGrowthInput = z.object({
+  request: z
+    .string()
+    .trim()
+    .min(1)
+    .max(20_000)
+    .describe("The growth workspace question or operation to complete."),
+});
+
+const INVOKE_GROWTH_PERSONA = `You are Growth, invoked as one coarse-grained MCP tool.
+Use the detailed Growth workspace tools to answer the request with live organization data.
+You may read, draft, plan, and apply authorized workspace changes. Prefer acting over producing another suggestion layer when the request is clear.
+Report exactly what changed and include the canonical Growth route when useful.
+You do not have open-world web research on this surface. Never invent workspace state.`;
+
+function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
+  server.registerTool(
+    "invoke_growth",
+    {
+      title: "Invoke Growth",
+      description:
+        "Delegate a natural-language growth workspace question or operation to Growth. It can use the same organization-scoped read and write tools exposed individually by this MCP.",
+      inputSchema: invokeGrowthInput.shape,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (input, extra) => {
+      let runId: string | undefined;
+      try {
+        const identity = identityFrom(extra);
+        const context = composeGrowthContext({
+          surface: "invoke-growth",
+          maximumCharacters: 40_000,
+          sections: [
+            {
+              id: "persona",
+              content: INVOKE_GROWTH_PERSONA,
+              cache: "session",
+            },
+          ],
+        });
+        runId = await startAssistantRun({
+          organizationId: identity.orgId,
+          userId: identity.userId,
+          surface: "invoke-growth",
+          model: "claude-sonnet-4-6",
+          contextManifest: context.manifest,
+        });
+        const runtime = buildGrowthToolRuntime({
+          tools: toolSet,
+          identity,
+          runId,
+          surface: "invoke-growth",
+        });
+        const result = await generateText({
+          model: anthropic("claude-sonnet-4-6"),
+          messages: [
+            ...context.messages,
+            { role: "user", content: input.request },
+          ],
+          allowSystemInMessages: true,
+          tools: runtime.tools,
+          toolsContext: runtime.toolsContext,
+          toolApproval: runtime.toolApproval,
+          stopWhen: stepCountIs(8),
+        });
+        await completeAssistantRun(runId, {
+          finishReason: result.finishReason,
+          steps: result.steps.length,
+        });
+        return {
+          content: [{ type: "text" as const, text: result.text }],
+          structuredContent: {
+            response: result.text,
+            finishReason: result.finishReason,
+            steps: result.steps.length,
+          },
+        };
+      } catch (error) {
+        const compact = compactGrowthError(error);
+        if (runId) await failAssistantRun(runId, compact);
+        return {
+          isError: true,
+          content: [{ type: "text" as const, text: JSON.stringify(compact) }],
+          structuredContent: { ...compact },
+        };
+      }
+    },
+  );
+}
+
+/** Project native AI SDK tools onto the authenticated OAuth MCP surface. */
+export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
+  for (const [name, definition] of Object.entries(toolSet)) {
+    const policy = policyForGrowthTool(name);
+    const mutatesWorkspace = [
+      "local-write",
+      "provider-write",
+      "model-write",
+      "background-run",
+    ].includes(policy.consequence);
+    const inputSchema = definition.inputSchema as z.ZodObject<z.ZodRawShape>;
     server.registerTool(
-      capability.name,
+      name,
       {
-        title: capability.name,
-        description: capability.description,
-        inputSchema: schema.shape,
+        title: name,
+        description:
+          typeof definition.description === "string"
+            ? definition.description
+            : undefined,
+        inputSchema: inputSchema.shape,
         annotations: {
-          readOnlyHint: capability.readOnly,
-          destructiveHint: !capability.readOnly,
-          idempotentHint: capability.readOnly,
-          openWorldHint: capability.domain === "research",
+          readOnlyHint: policy.consequence.endsWith("read"),
+          destructiveHint: mutatesWorkspace && !policy.reversible,
+          idempotentHint: policy.idempotent,
+          openWorldHint: policy.domain === "research",
         },
       },
       async (input, extra) => {
+        let runId: string | undefined;
         try {
-          const output = await capability.execute(input, contextFrom(extra));
+          const identity = identityFrom(extra);
+          const manifest = mcpContextManifest();
+          runId = await startAssistantRun({
+            organizationId: identity.orgId,
+            userId: identity.userId,
+            surface: "mcp",
+            contextManifest: manifest,
+          });
+          const runtime = buildGrowthToolRuntime({
+            tools: { [name]: definition },
+            identity,
+            runId,
+            surface: "mcp",
+          });
+          const executable = runtime.tools[name] as Tool<
+            unknown,
+            unknown,
+            GrowthExecutionContext
+          >;
+          if (!executable.execute) throw new Error(`${name} is not executable`);
+          const options: ToolExecutionOptions<GrowthExecutionContext> = {
+            toolCallId: createId("mcp_call"),
+            messages: [],
+            context: runtime.context,
+          };
+          const output = await executable.execute(input, options);
+          if (
+            typeof output === "object" &&
+            output !== null &&
+            Symbol.asyncIterator in output
+          ) {
+            throw new Error("Streaming MCP tool outputs are not supported");
+          }
+          if (isCompactError(output)) {
+            await failAssistantRun(runId, compactGrowthError(output.error));
+          } else {
+            await completeAssistantRun(runId, { toolName: name });
+          }
           return {
+            ...(isCompactError(output) ? { isError: true } : {}),
             content: [{ type: "text" as const, text: JSON.stringify(output) }],
             structuredContent:
               output && typeof output === "object"
@@ -49,18 +225,16 @@ export function registerMcpCapabilities(
                 : { result: output },
           };
         } catch (error) {
+          const compact = compactGrowthError(error);
+          if (runId) await failAssistantRun(runId, compact);
           return {
             isError: true,
-            content: [
-              {
-                type: "text" as const,
-                text:
-                  error instanceof Error ? error.message : "Capability failed",
-              },
-            ],
+            content: [{ type: "text" as const, text: JSON.stringify(compact) }],
+            structuredContent: { ...compact },
           };
         }
       },
     );
   }
+  registerInvokeGrowth(server, toolSet);
 }
