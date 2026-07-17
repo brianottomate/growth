@@ -1,6 +1,7 @@
 import "server-only";
 
 import { adsScope, topAds } from "./ads";
+import { diagnoseAlignment } from "./alignment";
 import {
   createAudienceTarget,
   listAudienceTargets,
@@ -112,8 +113,8 @@ export const contentStrategyWrite = groupGrowthTools({
 
 export const adsRead = groupGrowthTools({
   description:
-    "Read paid-ad scope and performance. Start with adsScope for a compact inventory, then use topAds only when a ranked campaign drill-down is needed.",
-  actions: { adsScope, topAds },
+    "Read paid-ad scope and performance, or diagnose strategy alignment. adsScope for a compact inventory; topAds for a ranked campaign drill-down; diagnoseAlignment to compare the strategy layer (intended channels/budget/audiences) against what's actually running and get ranked suggested updates.",
+  actions: { adsScope, topAds, diagnoseAlignment },
 });
 
 export const operationsRead = groupGrowthTools({
