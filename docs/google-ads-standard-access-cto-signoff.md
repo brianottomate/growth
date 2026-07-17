@@ -34,7 +34,7 @@ operations/day, defer the application until there is a concrete internal need.
 - **Headroom for verified internal automation.** Subject to the quota forecast
   below, Standard avoids an avoidable production cap for scheduled reporting,
   inventory sync, and internal analysis.
-- **Internal tools are exempt from the Required Minimum Functionality (RMF) review.** The heavyweight part of Standard applications only applies to tools offered to third parties. Our framing avoids it truthfully.
+- **Internal tools are exempt from the Required Minimum Functionality (RMF) review** — verified against the [RMF policy](https://developers.google.com/google-ads/api/docs/api-policy/rmf) 2026-07-16: "individual advertiser or agency use only; no third-party access to tool" does not require RMF compliance. Two nuances: (1) RMF taxonomy has three categories — Full-Service, **Reporting Only (= dashboards offered to end-advertisers, i.e. still third-party-facing)**, and Internal Use Only. We are *Internal Use Only whose functionality is reporting* — do NOT self-describe as a "Reporting Only tool" on the form, since that RMF category carries its own required-columns obligations. (2) RMF attaches to Standard-access tokens on an ongoing basis, so if scope ever drifts to third-party use, RMF obligations begin at that moment — reinforcing the signed scope boundary below.
 - **The token is shared infrastructure.** Whatever tier the token has, every consumer (crons, MCP, future ads product) inherits it.
 
 ## What we will say (draft form answers)
