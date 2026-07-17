@@ -64,3 +64,25 @@ The **full-service tool** application — Wander managing Google Ads campaigns *
 - [ ] Green-light submission via MCC → Tools → API Center
 
 **On approval:** Kristian (or Claude, in-browser with Kristian) submits in the API Center, saves a copy of every submitted answer to this folder, and monitors the MCC email for reviewer questions.
+
+## The actual form (verified 2026-07-16)
+
+Location: **MCC → Admin → API center → Access level → "Apply for Standard Access"** → `support.google.com/adspolicy/contact/standard_token_application?hl=en` (use `hl=en`; it dead-ends in Norwegian). 13 questions + acknowledgments + **a required design-doc file upload (.pdf/.doc/.rtf)**. Review ≈ 10 business days. The form itself warns: only apply when approaching Basic limits — our justification (crons + agents headroom) should say so explicitly.
+
+| # | Question | Our answer |
+| --- | --- | --- |
+| 1 | API contact email accurate? | Yes (kristian@wander.com — already in API Center) |
+| 2 | Google Cloud project NUMBER (11-12 digits) | **430811523548** (`wander-growth-ads-mcp`, the quota project our API access runs through) |
+| 3 | MCC ID | 152-064-2156 |
+| 4 | Contact email | kristian@wander.com (consider creating google-ads-api@wander.com alias — form prefers a group) |
+| 5 | Ongoing relationship with a Google rep? | ❓ **Kristian/Brooke to confirm** (account rep exists?) |
+| 6 | Company website | https://www.wander.com |
+| 7 | Business model, tool, audience | Adapt the internal-tool use-case paragraph above |
+| 8 | Design documentation (file upload) | 📄 **To produce**: 2-3 page PDF — architecture (growth app + crons + official MCP), account model (MCC → own accounts), auth (user OAuth/ADC, internal operators only), workflows (reporting, sync, conversion hygiene), quota estimate. Draft from this pack. |
+| 9 | Tool accessible outside the organization? | **No** |
+| 10 | Token used with a tool developed by someone else? | ⚠️ Nuance: our tooling is in-house on Google's official client libraries + Google's own open-source MCP server. Intent of the question is third-party commercial tools → **No**, but note the official-MCP usage in Q7/Q8 for full transparency. |
+| 11 | Campaign types supported | Search, Performance Max (what the accounts actually run — don't overclaim) |
+| 12 | Capabilities provided | Account Management, Campaign Management, Reporting (NOT account/campaign creation) |
+| 13 | Public homepage URL | https://www.wander.com |
+
+**Remaining prep before submission:** (a) Nathan's sign-off, (b) the design-doc PDF (Q8), (c) answer to Q5, (d) optional email alias for Q4.
