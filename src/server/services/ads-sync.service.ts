@@ -148,6 +148,12 @@ const ADS_PLATFORM_MAP: Record<string, ChannelPlatform> = {
   x_ads: "x_ads",
   linkedin: "linkedin_ads",
   linkedinads: "linkedin_ads",
+  tiktok: "tiktok_ads",
+  tiktokads: "tiktok_ads",
+  tiktok_ads: "tiktok_ads",
+  pinterest: "pinterest_ads",
+  pinterestads: "pinterest_ads",
+  pinterest_ads: "pinterest_ads",
 };
 function campaignPlatform(c: Record<string, unknown>): string {
   const raw = str(c.platform)?.toLowerCase();
