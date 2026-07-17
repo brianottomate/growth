@@ -35,12 +35,12 @@ const DEFAULT_RELEVANCE_DESCRIPTION =
 
 // ---- Partner guardrail ---------------------------------------------------
 //
-// Brands Wander has a commercial partnership with (Guesty powers PMS sync for
-// marketplace supply). They stay on the watchlists — a partner's public pain
-// is still market intel — but a Wander reply that dunks on a partner is a
-// business problem no matter how strong the engagement looks. Composed into
-// every listening scoring and drafting prompt.
-export const PARTNER_BRANDS = ["Guesty"] as const;
+// Brands Wander has a commercial partnership with (the PMS integrations that
+// power sync for marketplace supply). They stay on the watchlists — a
+// partner's public pain is still market intel — but a Wander reply that dunks
+// on a partner is a business problem no matter how strong the engagement
+// looks. Composed into every listening scoring and drafting prompt.
+export const PARTNER_BRANDS = ["Guesty", "Hostaway", "Escapia"] as const;
 
 export function partnerGuardrail(mode: "score" | "draft"): string {
   const list = PARTNER_BRANDS.join(", ");
