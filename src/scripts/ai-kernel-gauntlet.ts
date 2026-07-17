@@ -68,7 +68,23 @@ async function main() {
 
   for (const [name, definition] of Object.entries(OVERVIEW_TOOLS)) {
     assert("run" in definition, `${name} is not a native Growth tool`);
-    z.toJSONSchema(definition.inputSchema as z.ZodType);
+    const raw = definition.inputSchema as unknown;
+    const serialized =
+      raw && typeof raw === "object" && "jsonSchema" in raw
+        ? (raw as { jsonSchema: Record<string, unknown> }).jsonSchema
+        : z.toJSONSchema(raw as z.ZodType);
+    // Anthropic rejects any tool whose input_schema lacks a root
+    // type: "object" or uses anyOf/oneOf/allOf at the top level — a
+    // bare-union root fails at request time, which contracts must catch
+    // before a live call does.
+    const root: Record<string, unknown> = serialized;
+    assert(
+      root.type === "object" &&
+        !("anyOf" in root) &&
+        !("oneOf" in root) &&
+        !("allOf" in root),
+      `${name} input schema must be a plain top-level object (no root union) for Anthropic`,
+    );
   }
   assert(
     policyForGrowthTool("contentWrite", {
