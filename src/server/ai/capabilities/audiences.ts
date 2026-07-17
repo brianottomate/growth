@@ -5,6 +5,7 @@ import { and, eq, inArray, isNull, notInArray } from "drizzle-orm";
 
 import { AD_PLATFORM_VALUES } from "@/lib/ad-platforms";
 import {
+  audienceActiveWindowSchema,
   audienceContextSchema,
   audienceActivationDemographicModeSchema,
   audienceActivationGeoModeSchema,
@@ -15,6 +16,7 @@ import {
   audienceProfileScopeSchema,
   audienceResearchMaturitySchema,
   audienceSlug,
+  audienceSourceSchema,
 } from "@/lib/audience-model";
 import { db, withTransaction } from "@/server/db";
 import {
@@ -49,7 +51,12 @@ const audienceProfileInput = z.object({
   geography: audienceGeographySchema
     .optional()
     .describe(
-      "The audience's market geography. Omit when unknown; mode=global means genuinely global.",
+      "Where the audience IS (origin). Omit when unknown; mode=global means genuinely global.",
+    ),
+  destinationGeography: audienceGeographySchema
+    .optional()
+    .describe(
+      "For travel intent, where we want to send them (e.g. origin=Pacific NW, destination=California). Omit for non-travel audiences.",
     ),
   demographics: audienceDemographicsSchema
     .optional()
@@ -57,6 +64,23 @@ const audienceProfileInput = z.object({
       "Descriptive context for research and messaging, never automatic ad targeting.",
     ),
   context: audienceContextSchema.optional(),
+  source: audienceSourceSchema
+    .default("manual")
+    .describe(
+      "Provenance: pixel_event (logged-out retargeting), customer_list (logged-in/first-party upload), amplitude_cohort (behavioural/geo/temporal segment), lookalike_seed, or manual.",
+    ),
+  sourceRef: z
+    .string()
+    .max(500)
+    .optional()
+    .describe(
+      "External handle for the source — pixel event name, Amplitude cohort id, or seed audience id.",
+    ),
+  activeWindow: audienceActiveWindowSchema
+    .optional()
+    .describe(
+      "Seasonal/temporal intent — when this audience is worth reaching (e.g. seasonal May–Aug for summer travel).",
+    ),
   intendedChannels: z
     .array(paidPlatformSchema)
     .default([])
@@ -312,8 +336,12 @@ export const updateAudienceTarget = growthTool({
     marketSide: audienceMarketSideSchema.optional(),
     researchMaturity: audienceResearchMaturitySchema.optional(),
     geography: audienceGeographySchema.nullable().optional(),
+    destinationGeography: audienceGeographySchema.nullable().optional(),
     demographics: audienceDemographicsSchema.nullable().optional(),
     context: audienceContextSchema.nullable().optional(),
+    source: audienceSourceSchema.optional(),
+    sourceRef: z.string().max(500).nullable().optional(),
+    activeWindow: audienceActiveWindowSchema.nullable().optional(),
     intendedChannels: z.array(paidPlatformSchema).optional(),
     sizeGoalLabel: z.string().max(100).nullable().optional(),
     evidence: z.array(audienceEvidenceInputSchema).max(20).optional(),

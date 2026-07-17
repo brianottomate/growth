@@ -17,6 +17,7 @@ import {
   memberTable,
 } from "@/server/db/schema";
 import {
+  audienceActiveWindowSchema,
   audienceContextSchema,
   audienceActivationDemographicModeSchema,
   audienceActivationGeoModeSchema,
@@ -27,6 +28,7 @@ import {
   audienceProfileScopeSchema,
   audienceResearchMaturitySchema,
   audienceSlug,
+  audienceSourceSchema,
 } from "@/lib/audience-model";
 import { withTransaction } from "@/server/db";
 import type { db as database } from "@/server/db";
@@ -95,8 +97,12 @@ const targetInput = {
   marketSide: audienceMarketSideSchema.optional(),
   researchMaturity: audienceResearchMaturitySchema.optional(),
   geography: audienceGeographySchema.nullish(),
+  destinationGeography: audienceGeographySchema.nullish(),
   demographics: audienceDemographicsSchema.nullish(),
   context: audienceContextSchema.nullish(),
+  source: audienceSourceSchema.optional(),
+  sourceRef: z.string().max(500).nullish(),
+  activeWindow: audienceActiveWindowSchema.nullish(),
   evidence: z.array(audienceEvidenceInputSchema).max(30).optional(),
 };
 

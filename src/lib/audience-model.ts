@@ -113,6 +113,54 @@ export const audienceContextSchema = z.object({
 });
 export type AudienceContext = z.infer<typeof audienceContextSchema>;
 
+/**
+ * Where an audience comes from — its provenance. This is what makes retargeting
+ * and hyper-segmentation first-class rather than implied by campaign names:
+ * - `pixel_event`   — logged-out retargeting: built from pixel/site events
+ *                     (e.g. viewed a property, no booking). Rule lives on-platform.
+ * - `customer_list` — logged-in retargeting: a hashed user list we upload
+ *                     ("targeted user list upload"). First-party.
+ * - `amplitude_cohort` — a behavioural/geo/temporal cohort synced from Amplitude
+ *                     (the hyper-segmentation path: "NW → CA in summer").
+ * - `lookalike_seed`— a lookalike modelled off a seed audience.
+ * - `manual`        — hand-authored ICP with no automated source.
+ */
+export const audienceSourceSchema = z.enum([
+  "manual",
+  "pixel_event",
+  "customer_list",
+  "amplitude_cohort",
+  "lookalike_seed",
+]);
+export type AudienceSource = z.infer<typeof audienceSourceSchema>;
+
+/**
+ * When an audience is *worth reaching*, for seasonal/temporal intent —
+ * "NW travellers book CA around late spring for summer stays". `seasonal`
+ * repeats every year (month range); `date_range` is a one-off flight. This is
+ * intent (strategy), not the campaign schedule — the alignment diff can flag
+ * "declared for summer, no campaign flighted in that window".
+ */
+export const audienceActiveWindowSchema = z
+  .object({
+    kind: z.enum(["seasonal", "date_range"]).default("seasonal"),
+    // seasonal: 1-12 inclusive, may wrap (e.g. 11 → 2 = Nov–Feb).
+    startMonth: z.number().int().min(1).max(12).optional(),
+    endMonth: z.number().int().min(1).max(12).optional(),
+    // date_range: ISO date strings.
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    notes: z.string().max(1000).optional(),
+  })
+  .refine(
+    (w) =>
+      w.kind === "seasonal"
+        ? w.startMonth != null && w.endMonth != null
+        : w.startDate != null && w.endDate != null,
+    "Seasonal windows need start/end months; date_range windows need start/end dates.",
+  );
+export type AudienceActiveWindow = z.infer<typeof audienceActiveWindowSchema>;
+
 export const audienceActivationGeoModeSchema = z.enum([
   "inherit",
   "narrow",

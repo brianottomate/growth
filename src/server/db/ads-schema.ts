@@ -6,6 +6,7 @@ import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { MediaItem } from "./content-schema";
 import { createId } from "./utils";
 import type {
+  AudienceActiveWindow,
   AudienceContext,
   AudienceDemographics,
   AudienceGeography,
@@ -86,6 +87,18 @@ export const audienceActivationStatusEnum = pgEnum(
 );
 export type AudienceActivationStatus =
   (typeof audienceActivationStatusEnum.enumValues)[number];
+
+// Provenance of an audience — makes retargeting (pixel_event = logged-out,
+// customer_list = logged-in) and hyper-segmentation (amplitude_cohort) explicit
+// instead of implied by campaign names. Keep in sync with audienceSourceSchema.
+export const audienceSourceEnum = pgEnum("audience_source", [
+  "manual",
+  "pixel_event",
+  "customer_list",
+  "amplitude_cohort",
+  "lookalike_seed",
+]);
+export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
 
 // ---- INITIATIVE (top-level, goal-driven push across ad channels) ----
 
@@ -336,9 +349,21 @@ export const audienceTargetTable = pgTable(
     researchMaturity: audienceResearchMaturityEnum()
       .default("hypothesis")
       .notNull(),
+    // `geography` = where the audience IS (origin). For travel intent, the place
+    // we want to send them lives on `destinationGeography` — e.g. origin =
+    // Pacific NW, destination = California. "California for California" is the
+    // degenerate case where the two are equal.
     geography: t.jsonb().$type<AudienceGeography>(),
+    destinationGeography: t.jsonb().$type<AudienceGeography>(),
     demographics: t.jsonb().$type<AudienceDemographics>(),
     context: t.jsonb().$type<AudienceContext>(),
+
+    // Provenance + optional external handle (pixel event name, Amplitude cohort
+    // id, seed audience id). Drives how this target is effectuated downstream.
+    source: audienceSourceEnum().default("manual").notNull(),
+    sourceRef: t.text(),
+    // Seasonal/temporal intent — when this audience is worth reaching.
+    activeWindow: t.jsonb().$type<AudienceActiveWindow>(),
 
     type: audienceTypeEnum().notNull(),
     status: audienceTargetStatusEnum().default("planned").notNull(),
@@ -488,6 +513,8 @@ export const audienceTable = pgTable(
 
     name: t.text().notNull(),
     type: audienceTypeEnum().notNull(),
+    source: audienceSourceEnum().default("manual").notNull(),
+    externalId: t.text(), // the platform's audience id (parity with campaign.externalId)
     sizeLabel: t.text(), // "~1.2M", "~40K/mo" — coarse, mirrored from platform
 
     definition: t.jsonb(), // loose source data for later (context hints, geo, etc.)
