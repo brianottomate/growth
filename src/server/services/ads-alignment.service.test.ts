@@ -6,7 +6,7 @@ import {
   nameTokens,
   scoreSuggestion,
   windowsOverlap,
-} from "./ads-alignment.core";
+} from "./ads-alignment.service";
 
 // Minimal fixture builders — only fields the diff reads, cast to full rows.
 function initiative(overrides: Partial<Initiative> = {}): Initiative {
