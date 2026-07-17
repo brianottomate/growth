@@ -31,6 +31,7 @@ export const env = createEnv({
     OUTREACH_OAUTH_CLIENT_ID: z.string().optional(), // For Outreach OAuth
     OUTREACH_OAUTH_CLIENT_SECRET: z.string().optional(), // For Outreach OAuth
     OUTREACH_WEBHOOK_SECRET: z.string().optional(), // For Outreach webhook verification
+    PREGEN_WEBHOOK_SECRET: z.string().optional(), // Shared secret for monolith pregen lifecycle webhooks
     OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK: z.coerce
       .boolean()
       .default(false), // Dev-only escape hatch for webhook debugging
@@ -160,6 +161,7 @@ export const env = createEnv({
     OUTREACH_OAUTH_CLIENT_ID: process.env.OUTREACH_OAUTH_CLIENT_ID,
     OUTREACH_OAUTH_CLIENT_SECRET: process.env.OUTREACH_OAUTH_CLIENT_SECRET,
     OUTREACH_WEBHOOK_SECRET: process.env.OUTREACH_WEBHOOK_SECRET,
+    PREGEN_WEBHOOK_SECRET: process.env.PREGEN_WEBHOOK_SECRET,
     OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK:
       process.env.OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK,
     // Customer.io
