@@ -14,7 +14,11 @@ import {
 } from "@/server/db/listening-schema";
 
 import { postMentionsToRadio } from "./listening-notify.service";
-import { type ScoringChannel, scoreItems } from "./triage.service";
+import {
+  partnerGuardrail,
+  scoreItems,
+  type ScoringChannel,
+} from "./triage.service";
 
 // F5Bot pipeline: a forwarded F5Bot alert email lands on the Resend inbound
 // webhook → we pull the body → AI-extract the mention(s) → persist → score via
@@ -129,7 +133,8 @@ poster's problem and a reply would add value.
 
 High-signal: people complaining about / switching from OTAs (Airbnb, VRBO) or
 competitors (Hostaway, Guesty, OwnerRez, Hospitable, Lodgify), asking for direct
-booking solutions, or evaluating alternatives. Tag those competitor/high-intent.
+booking solutions, or evaluating alternatives. Tag those competitor/high-intent
+— but see the PARTNERS rule below before suggesting "engage".
 Brand mentions of Wander itself → brand. Generic chatter → noise.
 
 Signal quality matters as much as topical match:
@@ -142,7 +147,9 @@ Signal quality matters as much as topical match:
   complaint, or decision in progress where a reply from Wander adds value.
 - banRisk: judge whether the SOURCE post survives its community's moderation.
   Self-promo in software/PMS subs is removed within hours far more often than
-  not — a Slack ping for a thread that dies is pure friction for the team.`;
+  not — a Slack ping for a thread that dies is pure friction for the team.
+
+${partnerGuardrail("score")}`;
 
 const mentionScoringChannel: ScoringChannel<Mention, MentionIntentTag> = {
   intentTags: MENTION_INTENT_TAGS,

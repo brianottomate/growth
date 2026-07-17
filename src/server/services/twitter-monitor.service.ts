@@ -19,6 +19,7 @@ import { postMentionsToRadio } from "@/server/services/listening-notify.service"
 import {
   composeListeningSystemPrompt,
   draftReply,
+  partnerGuardrail,
   scoreItems,
   type ScoringChannel,
 } from "@/server/services/triage.service";
@@ -42,7 +43,7 @@ the OP's problem and a reply would add value to the thread.
 Key competitors (mentions are high-signal):
 - Hostaway, Guesty, OwnerRez, Hospitable, Lodgify, Streamline, Escapia
 - Tweets complaining about or comparing these competitors are prime
-  engagement opportunities.
+  engagement opportunities — except partners (see PARTNERS rule below).
 
 Signal quality matters as much as topical match:
 - Self-promotional growth-hacking content — hashtag walls, "free ebook" /
@@ -55,7 +56,9 @@ Signal quality matters as much as topical match:
 - Use the engagement + audience numbers: a tweet with negligible views and
   interactions from an author with a tiny following is almost never worth
   engaging — suggest monitor (if topically strong) or skip. A modest-reach
-  tweet can still be "engage" when the intent is unmistakably high.`;
+  tweet can still be "engage" when the intent is unmistakably high.
+
+${partnerGuardrail("score")}`;
 
 // The posting identity decides the disclosure rule: replies sent from the
 // brand's own X account need no affiliation disclaimer (the handle IS the

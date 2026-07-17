@@ -9,6 +9,7 @@ import {
   SUGGESTED_ACTIONS,
   composeListeningSystemPrompt,
   draftReply,
+  partnerGuardrail,
   scoreItems,
   type ScoringChannel,
   type SuggestedAction,
@@ -51,7 +52,8 @@ solves the OP's problem and engaging would add value to the thread.
 Key competitors to watch for (mentions of these are high-signal):
 - Hostaway, Guesty, OwnerRez, Hospitable, Lodgify, Streamline, Escapia
 - Posts complaining about or switching from these competitors are prime
-  engagement opportunities for Wander.
+  engagement opportunities for Wander — except partners (see PARTNERS rule
+  below).
 
 High-intent language to watch for:
 - "alternative to [competitor]", "switching from", "looking for",
@@ -62,7 +64,9 @@ Some items carry a "sub posture" line — our standing, AI-evaluated read on tha
 subreddit's fit and the risk of replying as a disclosed vendor. Weight it: a sub
 with stance=avoid, or flagged anti-vendor / anti-AI / bot-policed, should pull
 suggestedAction toward monitor or skip even when the post itself is on-topic —
-engaging there costs us more than it returns.`;
+engaging there costs us more than it returns.
+
+${partnerGuardrail("score")}`;
 
 // Reddit-specific reply MECHANICS only. Voice + product framing + the Wander
 // Test now come from the brand listening story (composed in at draft time).

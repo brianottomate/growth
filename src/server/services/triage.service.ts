@@ -33,6 +33,31 @@ const SUGGESTED_ACTION_DESCRIPTION =
 const DEFAULT_RELEVANCE_DESCRIPTION =
   "0 = noise/off-topic. 5 = adjacent or ambiguous. 8+ = clear, high-value engagement opportunity.";
 
+// ---- Partner guardrail ---------------------------------------------------
+//
+// Brands Wander has a commercial partnership with (Guesty powers PMS sync for
+// marketplace supply). They stay on the watchlists — a partner's public pain
+// is still market intel — but a Wander reply that dunks on a partner is a
+// business problem no matter how strong the engagement looks. Composed into
+// every listening scoring and drafting prompt.
+export const PARTNER_BRANDS = ["Guesty"] as const;
+
+export function partnerGuardrail(mode: "score" | "draft"): string {
+  const list = PARTNER_BRANDS.join(", ");
+  return mode === "score"
+    ? `PARTNERS — NEVER PITCH AGAINST (overrides any competitor guidance above):
+Wander partners commercially with: ${list}. A complaint about a partner is
+market intel, not an insertion point. Never suggest "engage" when the only
+angle is positioning a Wander product as the escape from a partner — score
+those monitor (topically strong) or skip.`
+    : `PARTNERS — NEVER DISPARAGE (overrides any other guidance):
+Wander partners commercially with: ${list}. Never criticize a partner, echo or
+amplify the OP's complaint about them, or pitch a Wander product as the
+alternative to them. If the OP is upset with a partner, you may empathize with
+their situation, but stay strictly neutral about the partner and do not turn
+the thread into a switch pitch.`;
+}
+
 // ---- Scoring -----------------------------------------------------------------
 
 export interface ScoringChannel<TItem, TIntent extends string> {
@@ -251,6 +276,7 @@ export function composeListeningSystemPrompt(input: {
     blocks.push(lines.join("\n"));
   }
 
+  blocks.push(partnerGuardrail(mode));
   blocks.push(input.channelMechanics.trim());
 
   return blocks.join("\n\n");
