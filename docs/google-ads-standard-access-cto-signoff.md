@@ -1,6 +1,6 @@
 # Google Ads API Standard Access — CTO sign-off pack
 
-**Date:** 2026-07-16 · **Requested by:** Kristian · **Approver:** Masi (CTO)
+**Date:** 2026-07-16 · **Requested by:** Kristian · **Approver:** Nathan (CTO)
 **Decision requested:** approve submitting a Google Ads API **Standard access** application for Wander's existing developer token, using the **internal-tool framing** described below.
 
 ## TL;DR
@@ -56,7 +56,7 @@ The **full-service tool** application — Wander managing Google Ads campaigns *
 | Token suspension | Only a risk for misrepresentation or ToS abuse. The internal framing is factually what runs today. |
 | Nothing changes | Worst case we stay effectively as-is: Basic keeps working; we reapply later with more evidence. |
 
-## Approval checklist (Masi)
+## Approval checklist (Nathan)
 
 - [ ] Approve internal-tool framing (vs. waiting to apply as full-service)
 - [ ] Confirm Kristian as technical contact, Brooke as business contact
