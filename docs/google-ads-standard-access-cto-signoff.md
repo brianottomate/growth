@@ -1,7 +1,24 @@
 # Google Ads API Standard Access — CTO sign-off pack
 
+> **DECISION (2026-07-16): PARKED — no application filed.** Basic access
+> (15k ops/day) covers all internal use for the foreseeable future; measured
+> usage is ≈ 0 and an application now would risk a "not yet necessary"
+> rejection per the form's own warning. Two tripwires re-open this:
+> 1. **Internal quota pressure** — after the direct read-only connector ships,
+>    the seven-day baseline projects a peak day credibly approaching 15k ops
+>    → file THIS internal-framing application.
+> 2. **PerformanceAgent / WanderOS ads product becomes demonstrable** — skip
+>    this pack and file once, directly, with the full-service framing + RMF
+>    evidence per [the playbook](./google-ads-standard-access-application.md).
+>    (Quota tier is the only thing an early internal application would carry
+>    over; the third-party declaration + RMF review happen at product launch
+>    regardless, so applying early buys little.)
+> Everything below is kept submission-ready for whichever tripwire fires
+> first. The Q8 design document lives at
+> [google-ads-api-design-doc.md](./google-ads-api-design-doc.md) (+ rendered PDF).
+
 **Date:** 2026-07-16 · **Requested by:** Kristian · **Approver:** Nathan (CTO)
-**Decision requested:** approve submitting a Google Ads API **Standard access** application for Wander's existing developer token, using the **internal-tool framing** described below.
+**Decision requested (superseded by the PARKED decision above):** approve submitting a Google Ads API **Standard access** application for Wander's existing developer token, using the **internal-tool framing** described below.
 
 ## TL;DR
 
