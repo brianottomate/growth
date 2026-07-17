@@ -136,7 +136,12 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 
 - `/api/cron/spend` — daily 05:30 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
 - `/api/cron/growth?job=daily_comprehensive_sync&...` — daily 03:00 (comprehensive CIO/lead sync)
-- `/api/cron/reddit` — hourly (Reddit monitor)
+- `/api/cron/growth?job=funnel_abandonment_sweep&...` — every 20 min (abandonment sweep)
+- `/api/cron/growth?job=funnel_email_backfill` — every 6h at :30 (funnel email backfill)
+- `/api/cron/instagram` — daily 19:00 UTC (Instagram account watch)
+- `/api/cron/x` — every 6h (X listening scan)
+- `/api/cron/affiliate` — daily 09:00 + weekly report Mon 14:00 (Impact.com monitor)
+- `/api/cron/channels` — daily 04:00 (channel stats refresh)
 
 Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
 `api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
