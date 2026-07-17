@@ -4,6 +4,10 @@ import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
+  computeAlignmentOverview,
+  computeInitiativeAlignment,
+} from "@/server/services/ads-alignment.service";
+import {
   brandTable,
   campaignTable,
   channelPlatformEnum,
@@ -284,6 +288,62 @@ export const initiativeRouter = createTRPCRouter({
           and(
             eq(contentPostTable.id, input.contentPostId),
             eq(contentPostTable.initiativeId, input.initiativeId),
+          ),
+        );
+      return { ok: true };
+    }),
+
+  // ---- intent vs. actual (strategy layer ↔ Zernio-synced reality) --------
+
+  /** Full alignment diff for one initiative (detail page). */
+  alignment: protectedProcedure
+    .input(z.object({ initiativeId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertInitiativeAccess(ctx, input.initiativeId);
+      return computeInitiativeAlignment(input.initiativeId);
+    }),
+
+  /** Per-initiative drift rollup across the org's brands (index page). */
+  alignmentOverview: protectedProcedure.query(async ({ ctx }) => {
+    const orgId = await getOrgId(ctx);
+    const brandIds = await orgBrandIds(ctx, orgId);
+    return computeAlignmentOverview(brandIds);
+  }),
+
+  /** Attach synced ad campaigns to the initiative they implement. */
+  linkCampaigns: protectedProcedure
+    .input(
+      z.object({
+        initiativeId: z.string(),
+        campaignIds: z.array(z.string()).min(1).max(100),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const initiative = await assertInitiativeAccess(ctx, input.initiativeId);
+      // Same-brand only — an initiative never claims another brand's campaign.
+      await ctx.db
+        .update(campaignTable)
+        .set({ initiativeId: initiative.id })
+        .where(
+          and(
+            inArray(campaignTable.id, input.campaignIds),
+            eq(campaignTable.brandId, initiative.brandId),
+          ),
+        );
+      return { ok: true };
+    }),
+
+  unlinkCampaign: protectedProcedure
+    .input(z.object({ initiativeId: z.string(), campaignId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertInitiativeAccess(ctx, input.initiativeId);
+      await ctx.db
+        .update(campaignTable)
+        .set({ initiativeId: null })
+        .where(
+          and(
+            eq(campaignTable.id, input.campaignId),
+            eq(campaignTable.initiativeId, input.initiativeId),
           ),
         );
       return { ok: true };

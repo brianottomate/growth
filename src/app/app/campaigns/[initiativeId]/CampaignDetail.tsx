@@ -29,6 +29,7 @@ import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { useTRPC } from "@/trpc/react";
 import { CampaignDialog } from "../CampaignDialog";
 import { fmtRange, STATUS_META } from "../CampaignsClient";
+import { AlignmentPanel } from "./AlignmentPanel";
 import { MomentAmplifiers } from "./MomentAmplifiers";
 
 const CONTENT_STATUS_LABEL: Record<string, string> = {
@@ -64,6 +65,9 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
       queryClient.invalidateQueries(trpc.initiative.overview.queryOptions()),
       queryClient.invalidateQueries(
         trpc.initiative.linkableContent.queryOptions({ initiativeId }),
+      ),
+      queryClient.invalidateQueries(
+        trpc.initiative.alignment.queryOptions({ initiativeId }),
       ),
     ]);
   };
@@ -266,6 +270,9 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
           </div>
         )}
       </section>
+
+      {/* ---- intent vs. actual (strategy ↔ synced reality) ----------- */}
+      <AlignmentPanel initiativeId={initiativeId} onChanged={invalidate} />
 
       {/* ---- amplifiers (earned reach) -------------------------------- */}
       <MomentAmplifiers momentId={initiativeId} />
