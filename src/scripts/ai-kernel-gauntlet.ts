@@ -1,5 +1,10 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
-import type { Tool, ToolExecutionOptions } from "ai";
+import {
+  asSchema,
+  type FlexibleSchema,
+  type Tool,
+  type ToolExecutionOptions,
+} from "ai";
 import { z } from "zod";
 
 import { MCP_TOOLS, OVERVIEW_TOOLS } from "@/server/ai/capabilities";
@@ -13,7 +18,10 @@ import {
   policyForGrowthTool,
 } from "@/server/ai/kernel/policy";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
-import type { GrowthExecutionContext } from "@/server/ai/kernel/tool";
+import type {
+  GrowthExecutionContext,
+  GrowthTool,
+} from "@/server/ai/kernel/tool";
 import { db } from "@/server/db";
 import {
   assistantToolReceiptTable,
@@ -23,6 +31,48 @@ import {
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+type JsonSchemaObject = {
+  type?: unknown;
+  anyOf?: unknown;
+  oneOf?: unknown;
+  allOf?: unknown;
+  properties?: Record<string, JsonSchemaObject>;
+  const?: unknown;
+  enum?: unknown[];
+};
+
+function assertProviderObjectSchema(name: string, schema: JsonSchemaObject) {
+  assert(schema.type === "object", `${name} must serialize as an object`);
+  assert(
+    schema.anyOf === undefined &&
+      schema.oneOf === undefined &&
+      schema.allOf === undefined,
+    `${name} cannot use a top-level anyOf/oneOf/allOf`,
+  );
+}
+
+function actionValuesFromSchema(schema: JsonSchemaObject): string[] {
+  const direct =
+    typeof schema.const === "string"
+      ? [schema.const]
+      : (schema.enum ?? []).filter(
+          (value): value is string => typeof value === "string",
+        );
+  if (direct.length) return direct;
+  const variants: JsonSchemaObject[] = [];
+  for (const value of [schema.oneOf, schema.anyOf]) {
+    if (!Array.isArray(value)) continue;
+    for (const candidate of value) {
+      if (typeof candidate === "object" && candidate !== null) {
+        variants.push(candidate as JsonSchemaObject);
+      }
+    }
+  }
+  return variants.flatMap((variant) =>
+    actionValuesFromSchema(variant.properties?.action ?? {}),
+  );
 }
 
 async function executeTool<I, O>(
@@ -68,22 +118,79 @@ async function main() {
 
   for (const [name, definition] of Object.entries(OVERVIEW_TOOLS)) {
     assert("run" in definition, `${name} is not a native Growth tool`);
-    const raw = definition.inputSchema as unknown;
-    const serialized =
-      raw && typeof raw === "object" && "jsonSchema" in raw
-        ? (raw as { jsonSchema: Record<string, unknown> }).jsonSchema
-        : z.toJSONSchema(raw as z.ZodType);
-    // Anthropic rejects any tool whose input_schema lacks a root
-    // type: "object" or uses anyOf/oneOf/allOf at the top level — a
-    // bare-union root fails at request time, which contracts must catch
-    // before a live call does.
-    const root: Record<string, unknown> = serialized;
+    const nativeDefinition = definition as GrowthTool<unknown, unknown>;
+    const modelSchema = (await asSchema(
+      definition.inputSchema as FlexibleSchema<unknown>,
+    ).jsonSchema) as JsonSchemaObject | undefined;
+    assert(modelSchema, `${name} has no model input schema`);
+    assertProviderObjectSchema(`${name} model schema`, modelSchema);
+
+    const transportSchema = z.toJSONSchema(
+      nativeDefinition.transportInputSchema,
+    ) as JsonSchemaObject;
+    assertProviderObjectSchema(`${name} transport schema`, transportSchema);
+
+    const validationSchema = z.toJSONSchema(
+      nativeDefinition.validationSchema,
+    ) as JsonSchemaObject;
+    const expectedActions = [
+      ...new Set(actionValuesFromSchema(validationSchema)),
+    ].sort();
+    if (expectedActions.length) {
+      const advertisedActions = [
+        ...new Set(
+          actionValuesFromSchema(modelSchema.properties?.action ?? {}),
+        ),
+      ].sort();
+      assert(
+        JSON.stringify(advertisedActions) === JSON.stringify(expectedActions),
+        `${name} model schema lost actions: expected ${expectedActions.join(", ")}, got ${advertisedActions.join(", ")}`,
+      );
+    }
+  }
+
+  const lifecycleWriteDefinition = OVERVIEW_TOOLS.lifecycleWrite as GrowthTool<
+    unknown,
+    unknown
+  >;
+  const lifecycleTransport = lifecycleWriteDefinition.transportInputSchema;
+  for (const input of [
+    {
+      action: "link_campaign",
+      campaignId: "campaign_contract",
+      programId: null,
+    },
+    {
+      action: "update_program",
+      programId: "program_contract",
+      changes: { priority: "must_have" },
+    },
+    {
+      action: "update_step",
+      stepId: "step_contract",
+      changes: { channel: "email" },
+    },
+    {
+      action: "create_program",
+      brandId: "brand_contract",
+      name: "Program contract",
+      status: "planned",
+    },
+    {
+      action: "add_step",
+      programId: "program_contract",
+      name: "Step contract",
+      status: "missing",
+    },
+    { action: "restore_program", programId: "program_contract" },
+  ]) {
     assert(
-      root.type === "object" &&
-        !("anyOf" in root) &&
-        !("oneOf" in root) &&
-        !("allOf" in root),
-      `${name} input schema must be a plain top-level object (no root union) for Anthropic`,
+      lifecycleTransport.safeParse(input).success,
+      `Lifecycle transport schema rejected ${input.action}`,
+    );
+    assert(
+      lifecycleWriteDefinition.validationSchema.safeParse(input).success,
+      `Lifecycle runtime schema rejected ${input.action}`,
     );
   }
   assert(

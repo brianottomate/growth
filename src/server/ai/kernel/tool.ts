@@ -1,6 +1,11 @@
 import "server-only";
 
-import { tool, type Tool, type ToolExecutionOptions } from "ai";
+import {
+  tool,
+  type FlexibleSchema,
+  type Tool,
+  type ToolExecutionOptions,
+} from "ai";
 import { z } from "zod";
 
 export const growthExecutionContextSchema = z.object({
@@ -22,6 +27,10 @@ export type GrowthTool<INPUT = unknown, OUTPUT = unknown> = Tool<
 > & {
   /** Compose product logic without manufacturing AI SDK execution options. */
   run: (input: INPUT, context: GrowthExecutionContext) => Promise<OUTPUT>;
+  /** Strict application contract used after a transport produces tool input. */
+  validationSchema: z.ZodType<INPUT>;
+  /** Provider-safe schema advertised by transports such as the OAuth MCP. */
+  transportInputSchema: z.ZodType<unknown>;
 };
 
 /**
@@ -32,11 +41,13 @@ export type GrowthTool<INPUT = unknown, OUTPUT = unknown> = Tool<
 export function growthTool<I extends z.ZodTypeAny, O>(definition: {
   description: string;
   inputSchema: I;
+  modelInputSchema?: FlexibleSchema<z.infer<I>>;
+  transportInputSchema?: z.ZodType<unknown>;
   execute: (input: z.infer<I>, ctx: GrowthExecutionContext) => Promise<O>;
 }): GrowthTool<z.infer<I>, O> {
   const nativeTool = tool({
     description: definition.description,
-    inputSchema: definition.inputSchema,
+    inputSchema: definition.modelInputSchema ?? definition.inputSchema,
     contextSchema: growthExecutionContextSchema,
     execute: (
       input: z.infer<I>,
@@ -49,5 +60,8 @@ export function growthTool<I extends z.ZodTypeAny, O>(definition: {
   } as unknown as Tool<z.infer<I>, O, GrowthExecutionContext>);
   return Object.assign(nativeTool, {
     run: definition.execute,
-  });
+    validationSchema: definition.inputSchema,
+    transportInputSchema:
+      definition.transportInputSchema ?? definition.inputSchema,
+  }) as unknown as GrowthTool<z.infer<I>, O>;
 }

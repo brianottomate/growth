@@ -1,6 +1,6 @@
 import "server-only";
 
-import { jsonSchema } from "ai";
+import { jsonSchema, type FlexibleSchema } from "ai";
 import { z } from "zod";
 
 import { growthTool, type GrowthTool } from "./tool";
@@ -34,82 +34,139 @@ type GroupOutput<Tools extends Record<string, unknown>> = {
   [Name in keyof Tools]: OutputOf<Tools[Name]>;
 }[keyof Tools];
 
-type SerializedVariant = {
-  properties?: Record<string, Record<string, unknown>>;
-  required?: string[];
-};
+type ActionObject = z.ZodObject<z.ZodRawShape>;
+
+function actionValues(schema: z.ZodTypeAny) {
+  const serialized = z.toJSONSchema(schema) as {
+    const?: unknown;
+    enum?: unknown[];
+  };
+  const values =
+    typeof serialized.const === "string"
+      ? [serialized.const]
+      : (serialized.enum ?? []).filter(
+          (value): value is string => typeof value === "string",
+        );
+  if (values.length === 0) {
+    throw new Error(
+      "Every action-union variant must use a string literal or enum",
+    );
+  }
+  return values;
+}
+
+function uniqueSchemas(schemas: z.ZodTypeAny[]) {
+  const unique = new Map<string, z.ZodTypeAny>();
+  for (const schema of schemas) {
+    const key = JSON.stringify(z.toJSONSchema(schema));
+    if (!unique.has(key)) unique.set(key, schema);
+  }
+  return [...unique.values()];
+}
 
 /**
- * Make an action-discriminated union usable as a tool input schema. Anthropic
- * rejects tool schemas without a top-level `type: "object"` AND any use of
- * anyOf/oneOf/allOf at the top level, so a union can't ship as-is. Instead,
- * serialize to one flat object: an `action` enum whose description carries
- * each variant's summary and required fields, plus the merged (optional)
- * per-action properties. The discriminated union remains the runtime
- * validator, so per-action requirements are still strictly enforced.
+ * Build provider and MCP representations of an action-discriminated union.
+ *
+ * Anthropic requires a top-level object and rejects a root oneOf/anyOf/allOf.
+ * The advertised object therefore makes every action field optional and
+ * combines fields that differ between actions with nested unions. The original
+ * discriminated union remains the strict validator, so action-specific
+ * required fields and refinements are still enforced before execution.
  */
-export function actionUnionInputSchema<Input>(union: z.ZodType<Input>) {
-  const serialized = z.toJSONSchema(union) as {
-    anyOf?: SerializedVariant[];
-    oneOf?: SerializedVariant[];
-  };
-  const variants = serialized.oneOf ?? serialized.anyOf ?? [];
-  if (!variants.length) {
-    throw new Error("actionUnionInputSchema expects a union of objects");
-  }
-
-  const actionNames: string[] = [];
-  const actionSummaries: string[] = [];
-  const mergedProperties: Record<string, Record<string, unknown>> = {};
-  for (const variant of variants) {
-    const properties = variant.properties ?? {};
-    const actionProperty = properties.action ?? {};
-    const actionName =
-      (actionProperty.const as string | undefined) ??
-      (actionProperty.enum as string[] | undefined)?.[0];
-    if (typeof actionName !== "string") {
-      throw new Error("Every union variant needs an `action` literal");
-    }
-    actionNames.push(actionName);
-    const requiredFields = (variant.required ?? []).filter(
-      (field) => field !== "action",
+export function actionUnionTransportSchemas<Input>(union: z.ZodType<Input>): {
+  modelInputSchema: FlexibleSchema<Input>;
+  transportInputSchema: ActionObject;
+} {
+  const validationSchema = union;
+  if (!(union instanceof z.ZodDiscriminatedUnion)) {
+    throw new Error(
+      "actionUnionTransportSchemas expects a discriminated union",
     );
-    const summaryParts = [
-      actionName,
-      requiredFields.length ? `(requires ${requiredFields.join(", ")})` : "",
-      typeof actionProperty.description === "string"
-        ? `— ${actionProperty.description}`
-        : "",
-    ].filter(Boolean);
-    actionSummaries.push(summaryParts.join(" "));
-    for (const [field, fieldSchema] of Object.entries(properties)) {
-      if (field === "action" || field in mergedProperties) continue;
-      mergedProperties[field] = fieldSchema;
+  }
+
+  const variants = union.options as ActionObject[];
+  const names: string[] = [];
+  const actionGuide: string[] = [];
+  const fieldSchemas = new Map<string, z.ZodTypeAny[]>();
+
+  for (const variant of variants) {
+    const shape = variant.shape as Record<string, z.ZodTypeAny>;
+    const actionSchema = shape.action;
+    if (!actionSchema) {
+      throw new Error("Every action-union variant needs an `action` field");
+    }
+
+    const variantActions = actionValues(actionSchema);
+    const serialized = z.toJSONSchema(variant) as {
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+    const required = new Set(serialized.required ?? []);
+    const fields = Object.keys(shape).filter((field) => field !== "action");
+    const requiredFields = fields.filter((field) => required.has(field));
+    const optionalFields = fields.filter((field) => !required.has(field));
+    const fieldGuide = [
+      requiredFields.length
+        ? `requires ${requiredFields.join(", ")}`
+        : "requires no fields",
+      optionalFields.length ? `optional ${optionalFields.join(", ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("; ");
+    const description = actionSchema.description;
+
+    for (const action of variantActions) {
+      if (names.includes(action)) {
+        throw new Error(`Duplicate action in discriminated union: ${action}`);
+      }
+      names.push(action);
+      actionGuide.push(
+        `${action} (${fieldGuide})${description ? ` — ${description}` : ""}`,
+      );
+    }
+
+    for (const [field, schema] of Object.entries(shape)) {
+      if (field === "action") continue;
+      const existing = fieldSchemas.get(field) ?? [];
+      existing.push(schema);
+      fieldSchemas.set(field, existing);
     }
   }
 
-  const flattened = {
-    type: "object",
-    properties: {
-      action: {
-        type: "string",
-        enum: actionNames,
-        description: `One of: ${actionSummaries.join(" | ")}`,
-      },
-      ...mergedProperties,
-    },
-    required: ["action"],
-    additionalProperties: false,
-  } as unknown as Parameters<typeof jsonSchema>[0];
+  if (names.length < 2) {
+    throw new Error("An action union needs at least two distinct actions");
+  }
 
-  return jsonSchema<Input>(flattened, {
+  const transportShape: Record<string, z.ZodTypeAny> = {
+    action: z
+      .enum(names as [string, ...string[]])
+      .describe(`Choose one action. ${actionGuide.join(" | ")}`),
+  };
+  for (const [field, schemas] of fieldSchemas) {
+    const alternatives = uniqueSchemas(schemas);
+    const fieldSchema =
+      alternatives.length === 1
+        ? alternatives[0]!
+        : z.union(
+            alternatives as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]],
+          );
+    transportShape[field] = fieldSchema.optional();
+  }
+
+  const transportInputSchema = z.object(transportShape).strict();
+  const { $schema: _, ...providerSchema } = z.toJSONSchema(
+    transportInputSchema,
+  ) as Record<string, unknown>;
+  const modelInputSchema = jsonSchema<Input>(providerSchema, {
     validate: (value) => {
-      const parsed = union.safeParse(value);
+      const parsed = validationSchema.safeParse(value);
       return parsed.success
         ? { success: true, value: parsed.data }
         : { success: false, error: parsed.error };
     },
   });
+
+  return { modelInputSchema, transportInputSchema };
 }
 
 /**
@@ -125,7 +182,7 @@ export function groupGrowthTools<
 }): GrowthTool<GroupInput<Tools>, GroupOutput<Tools>> {
   const variants = Object.entries(input.actions).map(([action, value]) => {
     const definition = value as GrowthTool<unknown, unknown>;
-    const actionInputSchema = definition.inputSchema as unknown;
+    const actionInputSchema = definition.validationSchema;
     if (!(actionInputSchema instanceof z.ZodObject)) {
       throw new Error(`Grouped Growth action ${action} must use z.object()`);
     }
@@ -143,16 +200,18 @@ export function groupGrowthTools<
     throw new Error("A grouped Growth capability needs at least two actions");
   }
 
-  const unionSchema = z.discriminatedUnion(
+  const validationSchema = z.discriminatedUnion(
     "action",
     variants as unknown as [z.ZodObject, z.ZodObject, ...z.ZodObject[]],
-  );
-  const inputSchema = actionUnionInputSchema(
-    unionSchema as unknown as z.ZodType<GroupInput<Tools>>,
-  );
+  ) as unknown as z.ZodType<GroupInput<Tools>>;
+  const { modelInputSchema, transportInputSchema } =
+    actionUnionTransportSchemas(validationSchema);
+
   return growthTool({
     description: input.description,
-    inputSchema: inputSchema as unknown as z.ZodType<GroupInput<Tools>>,
+    inputSchema: validationSchema,
+    modelInputSchema,
+    transportInputSchema,
     execute: async (value, context) => {
       const action = String(value.action);
       const selected = input.actions[action];

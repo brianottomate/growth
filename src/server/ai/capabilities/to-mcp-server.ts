@@ -22,7 +22,7 @@ import {
 } from "../kernel/journal";
 import { policyForGrowthTool } from "../kernel/policy";
 import { buildGrowthToolRuntime } from "../kernel/runtime";
-import type { GrowthExecutionContext } from "../kernel/tool";
+import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
 
 type ToolExtra = { authInfo?: AuthInfo };
 
@@ -158,7 +158,8 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
       "model-write",
       "background-run",
     ].includes(policy.consequence);
-    const inputSchema = definition.inputSchema as z.ZodObject<z.ZodRawShape>;
+    const nativeDefinition = definition as GrowthTool<unknown, unknown>;
+    const inputSchema = nativeDefinition.transportInputSchema;
     server.registerTool(
       name,
       {
@@ -167,7 +168,7 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
           typeof definition.description === "string"
             ? definition.description
             : undefined,
-        inputSchema: inputSchema.shape,
+        inputSchema,
         annotations: {
           readOnlyHint: policy.consequence.endsWith("read"),
           destructiveHint: mutatesWorkspace && !policy.reversible,
@@ -178,6 +179,7 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
       async (input, extra) => {
         let runId: string | undefined;
         try {
+          const validatedInput = nativeDefinition.validationSchema.parse(input);
           const identity = identityFrom(extra);
           const manifest = mcpContextManifest();
           runId = await startAssistantRun({
@@ -203,7 +205,7 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
             messages: [],
             context: runtime.context,
           };
-          const output = await executable.execute(input, options);
+          const output = await executable.execute(validatedInput, options);
           if (
             typeof output === "object" &&
             output !== null &&

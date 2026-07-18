@@ -21,7 +21,7 @@ import {
   updateLifecycleProgram,
   updateLifecycleStep,
 } from "@/server/services/lifecycle.service";
-import { actionUnionInputSchema } from "@/server/ai/kernel/group";
+import { actionUnionTransportSchemas } from "@/server/ai/kernel/group";
 import { growthTool } from "./types";
 
 const lifecycleReadInputSchema = z.discriminatedUnion("action", [
@@ -75,13 +75,19 @@ const lifecycleWriteInputSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+const lifecycleReadTransport = actionUnionTransportSchemas(
+  lifecycleReadInputSchema,
+);
+const lifecycleWriteTransport = actionUnionTransportSchemas(
+  lifecycleWriteInputSchema,
+);
+
 /** One read contract for the lifecycle capability. */
 export const lifecycleRead = growthTool({
   description:
     "Read lifecycle strategy and mirrored delivery reality. Use action=overview for compact program coverage, inspect_program for one complete journey, search_campaigns to find matching Customer.io/Outreach/HubSpot mirrors, or find_gaps for uncovered programs, unlinked campaigns, and cleanup candidates. Reads never change provider state.",
-  inputSchema: actionUnionInputSchema(
-    lifecycleReadInputSchema,
-  ) as unknown as typeof lifecycleReadInputSchema,
+  inputSchema: lifecycleReadInputSchema,
+  ...lifecycleReadTransport,
   execute: async (input, ctx) => {
     switch (input.action) {
       case "overview":
@@ -115,9 +121,8 @@ export const lifecycleRead = growthTool({
 export const lifecycleWrite = growthTool({
   description:
     "Apply an explicit lifecycle workspace change. It can create or update strategic programs and steps, link or unlink a mirrored campaign, classify a cleanup candidate, or archive/restore a program. It never edits, starts, stops, sends, or deletes anything in Customer.io, Outreach, HubSpot, or another provider.",
-  inputSchema: actionUnionInputSchema(
-    lifecycleWriteInputSchema,
-  ) as unknown as typeof lifecycleWriteInputSchema,
+  inputSchema: lifecycleWriteInputSchema,
+  ...lifecycleWriteTransport,
   execute: async (input, ctx) => {
     switch (input.action) {
       case "create_program": {
