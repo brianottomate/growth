@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
+  AppWindow,
   Building2,
   Calendar,
   Check,
@@ -95,6 +96,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Brands", href: "/app/brands", icon: Building2 },
       { label: "Channels", href: "/app/channels", icon: Radio },
       { label: "Website", href: "/app/website", icon: Globe },
+      { label: "Apps & marketplaces", href: "/app/apps", icon: AppWindow },
       { label: "Audiences", href: "/app/audiences", icon: Target },
     ],
   },

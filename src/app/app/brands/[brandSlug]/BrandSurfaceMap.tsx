@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  AppWindow,
   ArrowRight,
   BookOpen,
   FileStack,
@@ -89,6 +90,15 @@ export function BrandSurfaceMap({
             : "empty",
     },
     {
+      title: "Apps & marketplaces",
+      description:
+        "Store pages, connector discovery, visual proof, and trust placements.",
+      href: "/app/apps",
+      icon: AppWindow,
+      facts: ["4 surface playbooks", "Evidence-aware"],
+      state: "mapped",
+    },
+    {
       title: "Content & schedule",
       description:
         "Canonical ideas, recurring series, and the upcoming worklist.",
@@ -123,9 +133,9 @@ export function BrandSurfaceMap({
             Brand map
           </h2>
           <p className="text-muted-foreground mt-0.5 max-w-2xl text-sm">
-            The confirmed surfaces the assistant can reason across. Open a surface to
-            inspect the underlying reality or refine the structure layered over
-            it.
+            The confirmed surfaces the assistant can reason across. Open a
+            surface to inspect the underlying reality or refine the structure
+            layered over it.
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs">
