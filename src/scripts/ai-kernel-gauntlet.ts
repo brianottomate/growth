@@ -100,8 +100,8 @@ async function main() {
   const overviewNames = Object.keys(OVERVIEW_TOOLS).sort();
   const policyNames = Object.keys(growthToolPolicies).sort();
   assert(
-    overviewNames.length === 21,
-    `Expected 21 grouped tools, got ${overviewNames.length}`,
+    overviewNames.length === 23,
+    `Expected 23 grouped tools, got ${overviewNames.length}`,
   );
   assert(
     JSON.stringify(overviewNames) === JSON.stringify(policyNames),
@@ -112,8 +112,8 @@ async function main() {
     "MCP must omit open-world research tools",
   );
   assert(
-    Object.keys(MCP_TOOLS).length === 20,
-    `Expected 20 MCP tools, got ${Object.keys(MCP_TOOLS).length}`,
+    Object.keys(MCP_TOOLS).length === 22,
+    `Expected 22 MCP tools, got ${Object.keys(MCP_TOOLS).length}`,
   );
 
   for (const [name, definition] of Object.entries(OVERVIEW_TOOLS)) {
@@ -203,6 +203,24 @@ async function main() {
     policyForGrowthTool("lifecycleWrite", { action: "link_campaign" })
       .idempotent,
     "Grouped lifecycle policy lost action-level idempotency",
+  );
+  assert(
+    policyForGrowthTool("sourceSyncWrite", {
+      action: "syncBrandWebsite",
+    }).consequence === "background-run",
+    "Source sync policy lost its background-run consequence",
+  );
+  assert(
+    policyForGrowthTool("contentAnalysisWrite", {
+      action: "proposeContentGroupings",
+    }).consequence === "model-read",
+    "Grouping proposals must remain review-only model reads",
+  );
+  assert(
+    policyForGrowthTool("strategyWrite", {
+      action: "updateChannelCadence",
+    }).idempotent,
+    "Strategy updates lost action-level idempotency",
   );
 
   const composed = composeGrowthContext({

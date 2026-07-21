@@ -125,30 +125,17 @@ export const growthToolPolicies = {
   operationsRead: byAction(read("operations", "provider-read"), {
     proposeStrategyTargets: { consequence: "model-read" },
   }),
-  operationsWrite: byAction(write("operations"), {
-    discoverBrandChannels: {
-      consequence: "background-run",
-      reversible: false,
+  sourceSyncWrite: write("operations", {
+    consequence: "background-run",
+    reversible: false,
+  }),
+  contentAnalysisWrite: byAction(
+    write("operations", { consequence: "model-write" }),
+    {
+      proposeContentGroupings: { consequence: "model-read" },
     },
-    scrapeBrandPosts: {
-      consequence: "background-run",
-      reversible: false,
-    },
-    syncOwnedBrandContent: {
-      consequence: "background-run",
-      reversible: false,
-    },
-    syncBrandWebsite: {
-      consequence: "background-run",
-      reversible: false,
-    },
-    syncBrandBlog: {
-      consequence: "background-run",
-      reversible: false,
-    },
-    proposeContentGroupings: { consequence: "model-read" },
-    analyzeMediaAsset: { consequence: "model-write" },
-    analyzeTimelineVideo: { consequence: "model-write" },
+  ),
+  strategyWrite: byAction(write("operations"), {
     updateChannelCadence: { idempotent: true },
     updateBrandMix: { idempotent: true },
   }),

@@ -127,18 +127,32 @@ export const operationsRead = groupGrowthTools({
   },
 });
 
-export const operationsWrite = groupGrowthTools({
+export const sourceSyncWrite = groupGrowthTools({
   description:
-    "Run an explicit growth operation: discover/sync content surfaces, analyze media/video, propose content groupings, or create/update cadence and brand-mix targets. Inspect each action description before calling it because provider/background consequences differ.",
+    "Discover or refresh external brand surfaces and ingest their content into Growth. These actions start provider-backed background work and should only run for an explicit refresh, discovery, or backfill request.",
   actions: {
     discoverBrandChannels: OPERATION_TOOLS.discoverBrandChannels,
     scrapeBrandPosts: OPERATION_TOOLS.scrapeBrandPosts,
     syncOwnedBrandContent: OPERATION_TOOLS.syncOwnedBrandContent,
     syncBrandWebsite: OPERATION_TOOLS.syncBrandWebsite,
     syncBrandBlog: OPERATION_TOOLS.syncBrandBlog,
+  },
+});
+
+export const contentAnalysisWrite = groupGrowthTools({
+  description:
+    "Analyze existing Growth content or media and save reviewable model-generated analysis. Use it for explicit grouping, media-analysis, or video-analysis requests; it does not publish externally.",
+  actions: {
     proposeContentGroupings: OPERATION_TOOLS.proposeContentGroupings,
     analyzeMediaAsset: OPERATION_TOOLS.analyzeMediaAsset,
     analyzeTimelineVideo: OPERATION_TOOLS.analyzeTimelineVideo,
+  },
+});
+
+export const strategyWrite = groupGrowthTools({
+  description:
+    "Create or update the local channel-cadence and brand-mix strategy targets after the operator has agreed to the desired plan. These actions change Growth strategy state, not provider delivery settings.",
+  actions: {
     createChannelCadence: OPERATION_TOOLS.createChannelCadence,
     updateChannelCadence: OPERATION_TOOLS.updateChannelCadence,
     createBrandMix: OPERATION_TOOLS.createBrandMix,
@@ -177,7 +191,9 @@ export const GROUPED_CAPABILITY_TOOLS = {
   contentStrategyWrite,
   adsRead,
   operationsRead,
-  operationsWrite,
+  sourceSyncWrite,
+  contentAnalysisWrite,
+  strategyWrite,
   planningRead,
   planningWrite,
 } as const;

@@ -100,6 +100,25 @@ import {
 /** While-running labels per tool — keyed by capability name. */
 const PENDING_LABELS: Record<string, string> = {
   workspaceOverview: "Pulling the workspace snapshot…",
+  brandsRead: "Reading brand context…",
+  audiencesRead: "Reading audience strategy…",
+  audiencesWrite: "Updating audience strategy…",
+  researchRead: "Researching…",
+  contentRead: "Reading content operations…",
+  contentWrite: "Updating content operations…",
+  emailRead: "Reading the email workspace…",
+  emailWrite: "Updating the email workspace…",
+  contentStrategyRead: "Reading content strategy…",
+  contentStrategyWrite: "Updating content strategy…",
+  adsRead: "Reading paid media…",
+  operationsRead: "Reading operational state…",
+  sourceSyncWrite: "Refreshing external sources…",
+  contentAnalysisWrite: "Analyzing content…",
+  strategyWrite: "Updating strategy targets…",
+  planningRead: "Drafting a plan…",
+  planningWrite: "Saving the plan…",
+  lifecycleRead: "Reading lifecycle operations…",
+  lifecycleWrite: "Updating lifecycle operations…",
   getBrandMap: "Reading the brand map…",
   nextForBrand: "Checking the next two weeks…",
   previewTwoWeekSlots: "Previewing the two-week rhythm…",
@@ -142,6 +161,7 @@ const PENDING_LABELS: Record<string, string> = {
   syncBrandBlog: "Refreshing the editorial stream…",
   proposeContentGroupings: "Proposing content structure…",
   analyzeMediaAsset: "Analyzing the media asset…",
+  analyzeTimelineVideo: "Analyzing the timeline video…",
   draftMomentBlueprint: "Drafting the moment shape…",
   commitMomentPlan: "Creating the initiative and slots…",
   proposeStrategyTargets: "Comparing strategy with observed performance…",
@@ -155,6 +175,25 @@ const PENDING_LABELS: Record<string, string> = {
 /** Friendly fallback names for tools that error/deny before producing a card. */
 const TOOL_LABELS: Record<string, string> = {
   workspaceOverview: "Workspace snapshot",
+  brandsRead: "Brand context",
+  audiencesRead: "Audience strategy",
+  audiencesWrite: "Audience strategy update",
+  researchRead: "Research",
+  contentRead: "Content operations",
+  contentWrite: "Content update",
+  emailRead: "Email workspace",
+  emailWrite: "Email workspace update",
+  contentStrategyRead: "Content strategy",
+  contentStrategyWrite: "Content strategy update",
+  adsRead: "Paid media",
+  operationsRead: "Operational state",
+  sourceSyncWrite: "Source refresh",
+  contentAnalysisWrite: "Content analysis",
+  strategyWrite: "Strategy update",
+  planningRead: "Plan preview",
+  planningWrite: "Plan update",
+  lifecycleRead: "Lifecycle operations",
+  lifecycleWrite: "Lifecycle update",
   getBrandMap: "Brand map",
   nextForBrand: "What’s next",
   previewTwoWeekSlots: "Two-week slot preview",
@@ -198,10 +237,30 @@ const TOOL_LABELS: Record<string, string> = {
   syncBrandBlog: "Blog sync",
   proposeContentGroupings: "Content grouping analysis",
   analyzeMediaAsset: "Media analysis",
+  analyzeTimelineVideo: "Video analysis",
   draftMomentBlueprint: "Moment blueprint",
   commitMomentPlan: "Committed moment plan",
   proposeStrategyTargets: "Strategy target proposals",
 };
+
+function toolAction(part: ToolUIPart) {
+  const input = (part as { input?: unknown }).input;
+  if (typeof input !== "object" || input === null || !("action" in input))
+    return undefined;
+  return typeof input.action === "string" ? input.action : undefined;
+}
+
+function humanizeToolName(value: string) {
+  const words = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function toolLabel(toolName: string, action?: string) {
+  const key = action ?? toolName;
+  return TOOL_LABELS[key] ?? humanizeToolName(key);
+}
 
 const OVERVIEW_STARTERS: { icon: LucideIcon; text: string }[] = [
   { icon: LayoutDashboard, text: "Catch me up on the whole workspace" },
@@ -870,6 +929,8 @@ function renderToolPart(
   onIntent: (intent: AssistantIntent) => void,
 ) {
   const toolName = getToolName(part);
+  const action = toolAction(part);
+  const presentationName = action ?? toolName;
 
   // Write tools (createIdea) pause for the operator's go-ahead. These states
   // aren't in the base ToolUIPart union in this SDK version — read them loosely.
@@ -878,7 +939,7 @@ function renderToolPart(
     return (
       <ApprovalCard
         key={key}
-        toolName={toolName}
+        toolName={presentationName}
         input={loose.input}
         onApprove={onApprove}
       />
@@ -887,7 +948,7 @@ function renderToolPart(
   if (loose.state === "output-denied") {
     return (
       <p key={key} className="text-muted-foreground text-xs">
-        {TOOL_LABELS[toolName] ?? toolName} — skipped.
+        {toolLabel(toolName, action)} — skipped.
       </p>
     );
   }
@@ -896,20 +957,23 @@ function renderToolPart(
     return (
       <ToolCallPending
         key={key}
-        label={PENDING_LABELS[toolName] ?? `Running ${toolName}…`}
+        label={
+          PENDING_LABELS[presentationName] ??
+          `Running ${toolLabel(toolName, action)}…`
+        }
       />
     );
   }
   if (part.state === "output-error") {
     return (
       <p key={key} className="text-destructive text-xs">
-        {TOOL_LABELS[toolName] ?? toolName} failed: {part.errorText}
+        {toolLabel(toolName, action)} failed: {part.errorText}
       </p>
     );
   }
   if (part.state !== "output-available") return null;
 
-  switch (toolName) {
+  switch (presentationName) {
     case "nextForBrand":
       return (
         <NextForBrandCard
@@ -1055,7 +1119,15 @@ function renderToolPart(
         />
       );
     default:
-      return <GenericToolCard key={key} name={toolName} output={part.output} />;
+      return (
+        <GenericToolCard
+          key={key}
+          name={toolName}
+          label={toolLabel(toolName, action)}
+          action={action}
+          output={part.output}
+        />
+      );
   }
 }
 

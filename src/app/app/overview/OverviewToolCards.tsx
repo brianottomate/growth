@@ -2057,15 +2057,24 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
 /** Fallback for any tool without a typed card yet — collapsible raw JSON. */
 export function GenericToolCard({
   name,
+  label,
+  action,
   output,
 }: {
   name: string;
+  label?: string;
+  action?: string;
   output: unknown;
 }) {
   return (
     <details className="bg-card rounded-lg border px-3.5 py-2.5">
       <summary className="text-muted-foreground cursor-pointer text-xs font-medium">
-        {name}
+        <span className="text-foreground">{label ?? action ?? name}</span>
+        {action && (
+          <span className="ml-2 font-mono text-[10px] font-normal opacity-60">
+            {action}
+          </span>
+        )}
       </summary>
       <pre className="mt-2 overflow-x-auto text-xs">
         {JSON.stringify(output, null, 2)}
