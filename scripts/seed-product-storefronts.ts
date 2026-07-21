@@ -15,10 +15,8 @@ import {
   storefrontTable,
 } from "../src/server/db/schema";
 import {
-  confirmStorefrontUpToDate,
   createProduct,
   createStorefront,
-  markStorefrontStale,
   type ProductStorefrontActor,
 } from "../src/server/services/product-storefront.service";
 
@@ -394,8 +392,10 @@ const assistantContent = (host: "ChatGPT" | "Claude"): StorefrontContent =>
     promotionalAssets: [],
     videos: [],
     platformFields: {
-      currentMcpEndpoint: "https://wander-mcp.wndr.workers.dev/mcp",
-      targetMcpEndpoint: "https://mcp.wander.com/mcp",
+      mcpEndpoint: "https://www.wander.com/mcp",
+      implementationEndpoint: "https://wander-mcp.wndr.workers.dev/mcp",
+      distributionAssumption:
+        "Modeled as live for storefront planning. Reverify routing before directory submission.",
       authentication: "none",
       runtimeTools: ["search_listings", "get_listing_details"],
       appResource: "ui://wander/search.html",
@@ -437,20 +437,45 @@ const definitions: {
   },
   {
     surface: "chatgpt_connector",
-    listingStatus: "draft",
+    listingStatus: "live",
+    publicUrl: "https://www.wander.com/mcp",
     content: assistantContent("ChatGPT"),
-    freshness: {
-      state: "stale",
-      note: "The live Worker rejects the ChatGPT origin and no current Plugin Directory submission is verified.",
-    },
+    freshness: { state: "unknown" },
   },
   {
     surface: "claude_connector",
-    listingStatus: "draft",
+    listingStatus: "live",
+    publicUrl: "https://www.wander.com/mcp",
     content: assistantContent("Claude"),
     freshness: { state: "unknown" },
   },
 ];
+
+async function applyInitialFreshness(
+  storefrontId: string,
+  freshness: (typeof definitions)[number]["freshness"],
+) {
+  if (freshness.state === "unknown") return;
+  const now = new Date();
+  await db
+    .update(storefrontTable)
+    .set(
+      freshness.state === "confirmed"
+        ? {
+            freshnessStatus: "up_to_date",
+            staleNote: null,
+            staleMarkedAt: null,
+            confirmedAt: now,
+          }
+        : {
+            freshnessStatus: "stale",
+            staleNote: freshness.note,
+            staleMarkedAt: now,
+            confirmedAt: null,
+          },
+    )
+    .where(eq(storefrontTable.id, storefrontId));
+}
 
 const brand = await db.query.brandTable.findFirst({
   where: and(
@@ -490,7 +515,12 @@ for (const definition of definitions) {
       isNull(storefrontTable.deletedAt),
     ),
   });
-  if (existing) continue;
+  if (existing) {
+    if (existing.freshnessStatus === "unknown") {
+      await applyInitialFreshness(existing.id, definition.freshness);
+    }
+    continue;
+  }
 
   const created = await createStorefront(actor, {
     productId: product.id,
@@ -501,19 +531,7 @@ for (const definition of definitions) {
     listingStatus: definition.listingStatus,
     content: definition.content,
   });
-  if (definition.freshness.state === "confirmed") {
-    await confirmStorefrontUpToDate(actor, {
-      storefrontId: created.id,
-      expectedUpdatedAt: created.updatedAt.toISOString(),
-      note: definition.freshness.note,
-    });
-  } else if (definition.freshness.state === "stale") {
-    await markStorefrontStale(actor, {
-      storefrontId: created.id,
-      expectedUpdatedAt: created.updatedAt.toISOString(),
-      note: definition.freshness.note,
-    });
-  }
+  await applyInitialFreshness(created.id, definition.freshness);
   storefrontsCreated++;
 }
 

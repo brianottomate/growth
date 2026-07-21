@@ -29,12 +29,14 @@ import {
 import { cn } from "@/lib/utils";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
+import { StorefrontPreview } from "./StorefrontPreview";
+
 type Storefront = RouterOutputs["productStorefront"]["getStorefront"];
 type Editors = RouterOutputs["productStorefront"]["listEditors"];
 type Assets = RouterOutputs["productStorefront"]["listBrandAssets"];
 type Sibling =
   RouterOutputs["productStorefront"]["getProduct"]["storefronts"][number];
-type Tab = "content" | "assets" | "json" | "history";
+type Tab = "content" | "preview" | "assets" | "json" | "history";
 type PickerTarget = "icon" | "screenshot" | "promotional" | "video";
 
 const itemId = (prefix: string) =>
@@ -246,20 +248,22 @@ export function StorefrontEditor({
       </section>
 
       <nav className="flex gap-1 border-b">
-        {(["content", "assets", "json", "history"] as Tab[]).map((item) => (
-          <button
-            key={item}
-            onClick={() => setTab(item)}
-            className={cn(
-              "border-b-2 px-3 py-2 text-xs font-medium capitalize",
-              tab === item
-                ? "border-foreground"
-                : "text-muted-foreground border-transparent",
-            )}
-          >
-            {item}
-          </button>
-        ))}
+        {(["content", "preview", "assets", "json", "history"] as Tab[]).map(
+          (item) => (
+            <button
+              key={item}
+              onClick={() => setTab(item)}
+              className={cn(
+                "border-b-2 px-3 py-2 text-xs font-medium capitalize",
+                tab === item
+                  ? "border-foreground"
+                  : "text-muted-foreground border-transparent",
+              )}
+            >
+              {item}
+            </button>
+          ),
+        )}
       </nav>
 
       {tab === "content" && (
@@ -278,6 +282,14 @@ export function StorefrontEditor({
             if (key === "managementUrl") setManagementUrl(value);
             if (key === "localizedContentUrl") setLocalizedContentUrl(value);
           }}
+        />
+      )}
+      {tab === "preview" && (
+        <StorefrontPreview
+          content={content}
+          surface={storefront.surface}
+          listingStatus={listingStatus}
+          assets={assets}
         />
       )}
       {tab === "assets" && (

@@ -128,7 +128,7 @@ export const wanderMarketplaceListings: MarketplaceListing[] = [
       "Travelers planning a trip in ChatGPT or Codex who want real Wander inventory",
     strategy:
       "Let travelers search real stays, inspect the best options, and continue to Wander with the trip context intact.",
-    availability: "unverified",
+    availability: "public",
     fields: [
       {
         fieldId: "name",
@@ -167,9 +167,10 @@ export const wanderMarketplaceListings: MarketplaceListing[] = [
       },
       {
         fieldId: "setup",
-        truth: "verify",
-        content: "Public read-only MCP with booking completed on Wander.",
-        next: "Add the custom domain, pass ChatGPT origin checks, configure the verification challenge, and complete the current submission tests.",
+        truth: "draft",
+        content:
+          "Connect https://www.wander.com/mcp, then search public Wander inventory and continue to Wander to book.",
+        next: "Reverify the branded route and complete the current submission tests before directory review.",
       },
       {
         fieldId: "privacy",
@@ -201,7 +202,7 @@ export const wanderMarketplaceListings: MarketplaceListing[] = [
       "Travelers planning a trip with Claude who want current Wander inventory",
     strategy:
       "Give Claude a small public catalog surface with a clean handoff to direct booking.",
-    availability: "private",
+    availability: "public",
     fields: [
       {
         fieldId: "name",
@@ -245,13 +246,13 @@ export const wanderMarketplaceListings: MarketplaceListing[] = [
       },
       {
         fieldId: "endpoint",
-        truth: "verified_live",
-        content: "https://wander-mcp.wndr.workers.dev/mcp",
-        next: "Move distribution to https://mcp.wander.com/mcp after its certificate and route are live.",
+        truth: "draft",
+        content: "https://www.wander.com/mcp",
+        next: "Reverify the branded route immediately before directory review.",
         evidence: [
           {
             source: "public",
-            label: "Live Worker endpoint",
+            label: "Worker implementation endpoint",
             checkedAt,
             url: "https://wander-mcp.wndr.workers.dev/mcp",
           },
@@ -261,7 +262,7 @@ export const wanderMarketplaceListings: MarketplaceListing[] = [
         fieldId: "setup",
         truth: "draft",
         content:
-          "Add https://mcp.wander.com/mcp as a custom connector, then ask Claude to find a Wander by destination, dates, and guest count.",
+          "Add https://www.wander.com/mcp as a custom connector, then ask Claude to find a Wander by destination, dates, and guest count.",
         next: "Verify plan and admin requirements in a clean account.",
       },
       {

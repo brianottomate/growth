@@ -56,11 +56,12 @@ Growth must re-check those platform surfaces before any submission instead of tr
   screenshot set, support URL, keywords, and App Store Connect-only fields
   still need an operator check.
 - Wander for ChatGPT/Codex: the Worker, two public read tools, and interactive
-  search resource exist. The live Worker currently rejects the ChatGPT origin,
-  and no Plugin Directory submission is verified.
+  search resource exist. Growth models `https://www.wander.com/mcp` as the
+  distribution endpoint so the storefront and preview can move as one product.
+  The route and any directory submission still require a final live check.
 - Wander for Claude: the current Worker responds to Claude and has returned
-  live inventory. A dedicated `mcp.wander.com` endpoint and public connector
-  review remain unfinished.
+  live inventory. Growth uses the same modeled branded endpoint; public
+  connector review remains a separate evidence gate.
 - Chrome: the field map exists, but no Wander extension listing is invented.
 
 ## Ownership
