@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "bun run scripts/seed.ts",
+    "db:seed:product-storefronts": "bun --conditions=react-server scripts/seed-product-storefronts.ts",
     "db:unseed": "bun run scripts/unseed.ts",
     "db:studio": "drizzle-kit studio",
     "dev": "next dev --turbo",

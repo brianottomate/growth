@@ -92,10 +92,10 @@ export function BrandSurfaceMap({
     {
       title: "Apps & marketplaces",
       description:
-        "Store pages, connector discovery, visual proof, and trust placements.",
+        "Persistent store pages, connector discovery, and their marketing placements.",
       href: "/app/apps",
       icon: AppWindow,
-      facts: ["4 surface playbooks", "Evidence-aware"],
+      facts: ["6 surface types", "Freshness workflow"],
       state: "mapped",
     },
     {

@@ -1,7 +1,24 @@
-import { MarketplaceWorkspace } from "./MarketplaceWorkspace";
+import { redirect } from "next/navigation";
 
-import { wanderMarketplaceListings } from "@/data/marketplace-content";
+import { getSession } from "@/server/better-auth/server";
+import {
+  listStorefronts,
+  resolveProductOrganizationId,
+} from "@/server/services/product-storefront.service";
 
-export default function AppsPage() {
-  return <MarketplaceWorkspace listings={wanderMarketplaceListings} />;
+import { StorefrontOperations } from "./StorefrontOperations";
+
+export default async function AppsPage() {
+  const session = await getSession();
+  if (!session?.user) redirect("/signin");
+  const orgId = await resolveProductOrganizationId({
+    userId: session.user.id,
+    preferredOrganizationId: session.session.activeOrganizationId,
+  });
+  const storefronts = await listStorefronts({
+    orgId,
+    userId: session.user.id,
+    kind: "human",
+  });
+  return <StorefrontOperations storefronts={storefronts} />;
 }

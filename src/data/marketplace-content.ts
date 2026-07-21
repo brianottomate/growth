@@ -1,6 +1,6 @@
 import type { MarketplaceListing } from "@/lib/marketplace-content";
 
-const checkedAt = "2026-07-20";
+const checkedAt = "2026-07-21";
 const repo = (label: string) => [
   { source: "repository" as const, label, checkedAt },
 ];
@@ -8,197 +8,272 @@ const repo = (label: string) => [
 export const wanderMarketplaceListings: MarketplaceListing[] = [
   {
     id: "wander-ios",
-    product: "Wander mobile",
+    product: "Wander",
     surfaceId: "app_store",
-    audience: "Guests discovering and managing Wander stays on iPhone",
+    audience: "Guests finding, booking, and managing Wander stays on iPhone",
     strategy:
-      "Make the path from aspiration to a confidently managed stay visually obvious.",
-    availability: "testing",
+      "Show the quality of the homes, the direct booking path, and the support guests receive after booking.",
+    availability: "public",
     fields: [
       {
         fieldId: "name",
-        truth: "source_verified",
-        content: "Wander Staging",
-        next: "Visible in TestFlight build 1.15.0 (309); verify the public App Store name independently.",
+        truth: "verified_live",
+        content: "Wander",
         evidence: [
           {
-            source: "operator",
-            label: "Visible in TestFlight on iPhone",
+            source: "public",
+            label: "Apple App Store listing",
             checkedAt,
+            url: "https://apps.apple.com/us/app/wa-nder/id1582777762",
           },
         ],
       },
       {
         fieldId: "icon",
-        truth: "source_verified",
+        truth: "verified_live",
         content: "Black globe-mark icon",
-        next: "TestFlight evidence only; confirm the public product-page asset.",
         evidence: [
-          { source: "operator", label: "TestFlight icon capture", checkedAt },
+          {
+            source: "public",
+            label: "Apple App Store listing",
+            checkedAt,
+            url: "https://apps.apple.com/us/app/wa-nder/id1582777762",
+          },
         ],
       },
       {
         fieldId: "subtitle",
-        truth: "missing",
-        next: "Map guest search intent before drafting.",
+        truth: "verified_live",
+        content: "Vacation homes, but better",
+        evidence: [
+          {
+            source: "public",
+            label: "Apple App Store listing",
+            checkedAt,
+            url: "https://apps.apple.com/us/app/wa-nder/id1582777762",
+          },
+        ],
       },
       {
         fieldId: "screenshots",
-        truth: "missing",
-        next: "Storyboard discover, inspect, book, arrive, and manage-stay outcomes from current production UI.",
+        truth: "verified_live",
+        content:
+          "The public iPhone listing has a live screenshot set for search, property discovery, booking, and trip support.",
+        next: "Import the current masters into Media Library before changing the sequence.",
+        evidence: [
+          {
+            source: "public",
+            label: "Apple App Store listing",
+            checkedAt,
+            url: "https://apps.apple.com/us/app/wa-nder/id1582777762",
+          },
+        ],
       },
       {
         fieldId: "previews",
-        truth: "deferred",
-        next: "Defer until motion proves incremental value.",
+        truth: "verify",
+        next: "Check App Store Connect before assuming a preview is published.",
       },
       {
         fieldId: "promo",
-        truth: "missing",
-        next: "Use only for a current, evidenced launch message.",
+        truth: "verify",
+        next: "Check the current promotional text in App Store Connect.",
       },
       {
         fieldId: "description",
-        truth: "missing",
-        next: "Draft from verified mobile capabilities and current marketplace positioning.",
+        truth: "verified_live",
+        content:
+          "The public listing describes curated vacation homes, direct booking, trip management, and 24/7 concierge service.",
+        evidence: [
+          {
+            source: "public",
+            label: "Apple App Store listing",
+            checkedAt,
+            url: "https://apps.apple.com/us/app/wa-nder/id1582777762",
+          },
+        ],
       },
       {
         fieldId: "keywords",
-        truth: "missing",
-        next: "Build a real ASO intent map from guest language.",
+        truth: "verify",
+        next: "Read the current keyword field in App Store Connect and compare it with guest search language.",
       },
       {
         fieldId: "support",
         truth: "verify",
-        next: "Verify the exact maintained mobile support destination.",
+        content: "https://www.wander.com/contact",
+        next: "Check the maintained Support URL in App Store Connect. The public web page exposes the developer website and privacy policy, but not a separate support link.",
       },
       {
         fieldId: "privacy",
-        truth: "verify",
-        next: "Reconcile the live policy with booking, identity, payment, location, and messaging flows.",
+        truth: "verified_live",
+        content: "https://www.wander.com/privacy",
+        next: "Reconcile the App Privacy answers with the current mobile runtime before the next release.",
+        evidence: [
+          {
+            source: "public",
+            label: "Apple App Store privacy link",
+            checkedAt,
+            url: "https://apps.apple.com/us/app/wa-nder/id1582777762",
+          },
+        ],
       },
     ],
   },
   {
-    id: "growth-chatgpt",
-    product: "Wander Growth",
+    id: "wander-chatgpt",
+    product: "Wander",
     surfaceId: "chatgpt_plugin",
     audience:
-      "Wander operators working with marketing context in ChatGPT or Codex",
+      "Travelers planning a trip in ChatGPT or Codex who want real Wander inventory",
     strategy:
-      "Turn conversational intent into reviewable work inside the Wander Growth workspace.",
-    availability: "private",
+      "Let travelers search real stays, inspect the best options, and continue to Wander with the trip context intact.",
+    availability: "unverified",
     fields: [
       {
         fieldId: "name",
         truth: "source_verified",
-        content: "Growth",
-        evidence: repo("src/server/mcp/config.ts"),
+        content: "Wander",
+        evidence: repo("wander-mcp/src/server.ts"),
       },
       {
         fieldId: "icon",
-        truth: "missing",
-        next: "Create a recognizably Wander, small-format plugin mark.",
+        truth: "source_verified",
+        content: "Wander brand mark used by the interactive MCP resource",
+        next: "Export and validate the exact Plugin Directory asset set.",
+        evidence: repo("wander-mcp/public/wander-mark.svg"),
       },
       {
         fieldId: "promise",
         truth: "draft",
         content:
-          "Plan, create, and inspect Wander growth work with the right workspace context.",
-        next: "Tighten around the first repeatable operator workflow.",
+          "Find an exceptional vacation home and continue to direct booking.",
+        next: "Test this against a real planning conversation before submission.",
       },
       {
         fieldId: "capabilities",
         truth: "source_verified",
         content:
-          "20 focused tools plus invoke_growth across brands, content, media, audiences, campaigns, newsletters, and analytics.",
-        evidence: repo("docs/mcp-capabilities.md"),
+          "Search public inventory by destination, dates, guests, price, bedrooms, and amenities. Inspect property facts and availability. Open a Wander booking page with the trip context preserved.",
+        evidence: repo("wander-mcp/src/tools"),
       },
       {
         fieldId: "proof",
-        truth: "missing",
-        next: "Capture a real operator brief-to-reviewed-output flow.",
+        truth: "source_verified",
+        content:
+          "The Worker returned live Lake Tahoe inventory and rendered an interactive multi-image stay carousel during connector testing.",
+        next: "Capture the same flow from ChatGPT after the origin fix.",
+        evidence: repo("wander-mcp/test"),
       },
       {
         fieldId: "setup",
-        truth: "source_verified",
-        content:
-          "OAuth 2.1 protected remote MCP at /api/mcp with organization-bound access.",
-        next: "Translate implementation facts into account, permissions, and first-prompt guidance.",
-        evidence: repo("docs/mcp-capabilities.md"),
+        truth: "verify",
+        content: "Public read-only MCP with booking completed on Wander.",
+        next: "Add the custom domain, pass ChatGPT origin checks, configure the verification challenge, and complete the current submission tests.",
       },
       {
         fieldId: "privacy",
         truth: "verify",
-        next: "Verify public policy scope against tools and OAuth access.",
+        content: "https://www.wander.com/privacy",
+        next: "Confirm that the policy describes assistant requests, retention, and the external booking handoff.",
       },
       {
         fieldId: "terms",
-        truth: "verify",
-        next: "Verify terms and a monitored operator support route.",
+        truth: "source_verified",
+        content:
+          "Terms: https://www.wander.com/terms\nSupport: https://www.wander.com/contact",
+        evidence: [
+          {
+            source: "public",
+            label: "Wander terms and support pages",
+            checkedAt,
+            url: "https://www.wander.com/terms",
+          },
+        ],
       },
     ],
   },
   {
-    id: "growth-claude",
-    product: "Wander Growth",
+    id: "wander-claude",
+    product: "Wander",
     surfaceId: "claude_connector",
-    audience: "Wander operators using Claude for marketing work",
+    audience:
+      "Travelers planning a trip with Claude who want current Wander inventory",
     strategy:
-      "Give Claude direct, bounded access to the current Growth workspace and its reviewable operations.",
+      "Give Claude a small public catalog surface with a clean handoff to direct booking.",
     availability: "private",
     fields: [
       {
         fieldId: "name",
         truth: "source_verified",
-        content: "Growth",
-        evidence: repo("src/server/mcp/config.ts"),
+        content: "Wander",
+        evidence: repo("wander-mcp/src/server.ts"),
       },
       {
         fieldId: "icon",
-        truth: "missing",
-        next: "Prepare a stable connector-directory mark.",
+        truth: "source_verified",
+        content: "Wander brand mark used by the interactive MCP resource",
+        next: "Export and validate the exact connector-directory asset.",
+        evidence: repo("wander-mcp/public/wander-mark.svg"),
       },
       {
         fieldId: "promise",
         truth: "draft",
-        content: "Bring Wander's growth context and tools into Claude.",
-        next: "Replace the generic promise with a demonstrated high-value workflow.",
+        content:
+          "Search Wander stays while you plan, then book directly on Wander.",
+        next: "Test the wording with a complete Claude planning flow.",
       },
       {
         fieldId: "capabilities",
         truth: "source_verified",
         content:
-          "20 focused tools plus invoke_growth; open-world research remains owned by the host.",
-        evidence: repo("docs/mcp-capabilities.md"),
+          "Search public Wander inventory and inspect property details. Booking and payment stay on Wander.",
+        evidence: repo("wander-mcp/src/tools"),
       },
       {
         fieldId: "proof",
-        truth: "missing",
-        next: "Record an authenticated prompt, tool run, review step, and result.",
+        truth: "verified_live",
+        content:
+          "The current Worker initialized from Claude and returned live Lake Tahoe inventory on 21 July 2026.",
+        evidence: [
+          {
+            source: "operator",
+            label: "Live Claude-origin MCP check",
+            checkedAt,
+          },
+        ],
       },
       {
         fieldId: "endpoint",
-        truth: "source_verified",
-        content: "Configured public origin + /api/mcp",
-        next: "Resolve and live-check the production origin before distributing a connector URL.",
-        evidence: repo("src/server/mcp/config.ts"),
+        truth: "verified_live",
+        content: "https://wander-mcp.wndr.workers.dev/mcp",
+        next: "Move distribution to https://mcp.wander.com/mcp after its certificate and route are live.",
+        evidence: [
+          {
+            source: "public",
+            label: "Live Worker endpoint",
+            checkedAt,
+            url: "https://wander-mcp.wndr.workers.dev/mcp",
+          },
+        ],
       },
       {
         fieldId: "setup",
         truth: "draft",
-        content: "Add the endpoint, authenticate, enable relevant tools.",
-        next: "Add plan/admin constraints and a first useful prompt.",
+        content:
+          "Add https://mcp.wander.com/mcp as a custom connector, then ask Claude to find a Wander by destination, dates, and guest count.",
+        next: "Verify plan and admin requirements in a clean account.",
       },
       {
         fieldId: "privacy",
         truth: "verify",
-        next: "Verify collection, use, retention, and deletion disclosure.",
+        content: "https://www.wander.com/privacy",
+        next: "Confirm that the policy describes assistant requests, retention, and the external booking handoff.",
       },
       {
         fieldId: "review",
         truth: "missing",
-        next: "Run the current Anthropic MCP directory policy checklist.",
+        next: "Run the current Anthropic directory policy checklist and record each piece of evidence.",
       },
     ],
   },

@@ -3,6 +3,7 @@ import "server-only";
 export type GrowthToolDomain =
   | "overview"
   | "brands"
+  | "products"
   | "audiences"
   | "content"
   | "leads"
@@ -89,6 +90,15 @@ export const growthToolPolicies = {
   workspaceOverview: read("overview"),
   navigateWorkspace: read("overview"),
   brandsRead: read("brands"),
+  productsRead: read("products"),
+  productsWrite: byAction(write("products"), {
+    updateProductAtlas: { idempotent: true },
+    updateProductStorefront: { idempotent: true },
+    markProductStorefrontStale: { idempotent: true },
+    confirmProductStorefrontCurrent: { idempotent: true },
+    assignProductStorefrontManager: { idempotent: true },
+    copySiblingStorefrontContent: { idempotent: true },
+  }),
   audiencesRead: read("audiences"),
   audiencesWrite: byAction(write("audiences"), {
     saveAudienceTargets: { idempotent: true },

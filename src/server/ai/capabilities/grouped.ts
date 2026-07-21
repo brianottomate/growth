@@ -32,6 +32,20 @@ import { nextForBrand } from "./next";
 import { OPERATION_TOOLS } from "./operations";
 import { PLANNING_TOOLS } from "./planning";
 import { prepareProductionPacket } from "./production";
+import {
+  assignProductStorefrontManager,
+  confirmProductStorefrontCurrent,
+  copySiblingStorefrontContent,
+  createProductAtlasProduct,
+  createProductStorefront,
+  listProductAtlasProducts,
+  listProductStorefronts,
+  markProductStorefrontStale,
+  readProductAtlas,
+  readProductStorefront,
+  updateProductAtlas,
+  updateProductStorefront,
+} from "./product-storefront";
 import { readWebPage, webSearch } from "./research";
 import { groupGrowthTools } from "../kernel/group";
 
@@ -39,6 +53,32 @@ export const brandsRead = groupGrowthTools({
   description:
     "Read owned/tracked brands, inspect their mapped surfaces, or determine what one owned brand should do next. Choose the action that matches the question.",
   actions: { listBrands, getBrandMap, nextForBrand },
+});
+
+export const productsRead = groupGrowthTools({
+  description:
+    "Read Product Atlas and storefront state for the current organization. Use list actions for orientation and read actions for complete documents.",
+  actions: {
+    listProductAtlasProducts,
+    readProductAtlas,
+    listProductStorefronts,
+    readProductStorefront,
+  },
+});
+
+export const productsWrite = groupGrowthTools({
+  description:
+    "Create or update Product Atlas and storefront records, route storefront responsibility, and operate the stale-to-confirmed workflow.",
+  actions: {
+    createProductAtlasProduct,
+    updateProductAtlas,
+    createProductStorefront,
+    updateProductStorefront,
+    markProductStorefrontStale,
+    confirmProductStorefrontCurrent,
+    assignProductStorefrontManager,
+    copySiblingStorefrontContent,
+  },
 });
 
 export const audiencesRead = listAudienceTargets;
@@ -180,6 +220,8 @@ export const planningWrite = groupGrowthTools({
 
 export const GROUPED_CAPABILITY_TOOLS = {
   brandsRead,
+  productsRead,
+  productsWrite,
   audiencesRead,
   audiencesWrite,
   researchRead,

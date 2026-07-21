@@ -2,9 +2,13 @@
 
 Status: implemented first iteration, 20 July 2026
 
-Wander Growth now has an evidence-aware workspace at `/app/apps` for Apple App Store, Chrome Web Store, ChatGPT plugin, and Claude connector marketing content.
+Wander Growth has an evidence-aware field playbook at `/app/apps/playbook` for
+Apple App Store, Chrome Web Store, ChatGPT plugin, and Claude connector content.
+The database-backed operations workspace lives at `/app/apps`.
 
-This implements the `/app/apps` and `external_app` direction reserved in the product architecture map without adding database tables or version-history machinery.
+The playbook records marketplace requirements and evidence quality. Product
+Atlas and storefront records hold the operational state, ownership, target
+content, and freshness history.
 
 ## Shape
 
@@ -31,7 +35,12 @@ The surface playbook answers “what goes where.” The listing inventory answer
 | `missing`         | No useful content, asset, or evidence is available.                                                |
 | `deferred`        | Intentionally outside the first pass.                                                              |
 
-The accepted Wander Staging TestFlight build proves that build 1.15.0 (309), its displayed name, and its icon were present on the operator’s iPhone on 20 July 2026. It does not prove the public App Store name, page, screenshots, description, keywords, support, or privacy fields.
+The public Apple page and the mobile repository confirm the current Wander app
+identity. The page showed version 1.15.0, Travel, iPhone support, developer
+Wander.com Inc, a 4.8 rating, and 1.2K ratings on 21 July 2026. The repository
+identifies App Store Connect app 1582777762, bundle `com.wander.com.app`, and
+source build 309. App Store Connect remains authoritative for unpublished
+metadata and locale-specific fields.
 
 ## Exact versus directional surfaces
 
@@ -43,9 +52,15 @@ Growth must re-check those platform surfaces before any submission instead of tr
 
 ## Current Growth inventory
 
-- Wander mobile: TestFlight evidence is recorded; the public product page and its marketing placements are not claimed live.
-- Wander Growth for ChatGPT/Codex: the MCP/OAuth capability surface is repository-verified; the plugin identity, visual proof, public privacy, and support presentation are incomplete.
-- Wander Growth for Claude: the MCP endpoint shape and tools are repository-verified; the production origin needs a live check and directory review remains unstarted.
+- Wander mobile: the public Apple listing and mobile source are verified. The
+  screenshot set, support URL, keywords, and App Store Connect-only fields
+  still need an operator check.
+- Wander for ChatGPT/Codex: the Worker, two public read tools, and interactive
+  search resource exist. The live Worker currently rejects the ChatGPT origin,
+  and no Plugin Directory submission is verified.
+- Wander for Claude: the current Worker responds to Claude and has returned
+  live inventory. A dedicated `mcp.wander.com` endpoint and public connector
+  review remain unfinished.
 - Chrome: the field map exists, but no Wander extension listing is invented.
 
 ## Ownership
@@ -54,14 +69,14 @@ Wander Growth owns Wander-specific marketplace inventory and execution context. 
 
 ## Deferred
 
-- Version history and diffs
-- Database persistence and migrations
 - Localization
 - Store API publishing
 - Automated screenshot production
 - Submission workflows
 
-The next persistence iteration should attach listings to the existing brand and media models, reuse media provenance, and add review snapshots. It should not force persistent storefronts into the dated `platform_post` channel model.
+Storefront persistence uses the existing brand and Media Library models. It
+does not force marketplace listings into the dated `platform_post` channel
+model.
 
 ## Official references
 
