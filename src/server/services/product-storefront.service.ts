@@ -39,11 +39,7 @@ export type ProductStorefrontActor = {
 
 export class ProductStorefrontError extends Error {
   constructor(
-    public readonly code:
-      | "NOT_FOUND"
-      | "FORBIDDEN"
-      | "BAD_REQUEST"
-      | "CONFLICT",
+    public readonly code: "NOT_FOUND" | "FORBIDDEN" | "BAD_REQUEST",
     message: string,
   ) {
     super(message);
@@ -51,7 +47,6 @@ export class ProductStorefrontError extends Error {
 }
 
 const nullableUrl = z.string().trim().url().nullable();
-const expectedUpdatedAtSchema = z.string().datetime();
 
 export const createProductSchema = z.object({
   brandId: z.string().min(1),
@@ -70,7 +65,6 @@ export const createProductSchema = z.object({
 
 export const updateProductSchema = z.object({
   productId: z.string().min(1),
-  expectedUpdatedAt: expectedUpdatedAtSchema,
   name: z.string().trim().min(1).max(160).optional(),
   description: z.string().trim().max(2_000).nullable().optional(),
   lifecycleStatus: z.enum(productLifecycleStatuses).optional(),
@@ -92,7 +86,6 @@ export const createStorefrontSchema = z.object({
 
 export const updateStorefrontSchema = z.object({
   storefrontId: z.string().min(1),
-  expectedUpdatedAt: expectedUpdatedAtSchema,
   staleNote: z.string().trim().min(1).max(2_000),
   externalListingId: z.string().trim().max(500).nullable().optional(),
   publicUrl: nullableUrl.optional(),
@@ -104,26 +97,22 @@ export const updateStorefrontSchema = z.object({
 
 export const markStorefrontStaleSchema = z.object({
   storefrontId: z.string().min(1),
-  expectedUpdatedAt: expectedUpdatedAtSchema,
   note: z.string().trim().min(1).max(2_000),
 });
 
 export const confirmStorefrontSchema = z.object({
   storefrontId: z.string().min(1),
-  expectedUpdatedAt: expectedUpdatedAtSchema,
   note: z.string().trim().max(2_000).optional(),
 });
 
 export const assignStorefrontManagerSchema = z.object({
   storefrontId: z.string().min(1),
-  expectedUpdatedAt: expectedUpdatedAtSchema,
   managerUserId: z.string().nullable(),
 });
 
 export const copyStorefrontContentSchema = z.object({
   sourceStorefrontId: z.string().min(1),
   targetStorefrontId: z.string().min(1),
-  expectedTargetUpdatedAt: expectedUpdatedAtSchema,
   staleNote: z.string().trim().min(1).max(2_000),
 });
 
@@ -334,15 +323,6 @@ async function validateStorefrontMedia(
   }
 }
 
-function assertCurrent(actual: Date, expected: string) {
-  if (actual.getTime() !== new Date(expected).getTime()) {
-    throw new ProductStorefrontError(
-      "CONFLICT",
-      "This record changed after it was opened. Refresh before saving.",
-    );
-  }
-}
-
 export async function listProducts(actor: ProductStorefrontActor) {
   await assertMembership(actor);
   return db.query.productTable.findMany({
@@ -487,7 +467,6 @@ export async function updateProduct(
 ) {
   const input = updateProductSchema.parse(rawInput);
   const product = await getProductForActor(actor, input.productId);
-  assertCurrent(product.updatedAt, input.expectedUpdatedAt);
   if (input.managerUserId !== undefined) {
     await assertManager(actor, input.managerUserId);
   }
@@ -510,19 +489,10 @@ export async function updateProduct(
       ...(input.atlas !== undefined && { atlas: input.atlas }),
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(productTable.id, product.id),
-        eq(productTable.updatedAt, new Date(input.expectedUpdatedAt)),
-      ),
-    )
+    .where(eq(productTable.id, product.id))
     .returning();
-  if (!updated) {
-    throw new ProductStorefrontError(
-      "CONFLICT",
-      "Product changed while saving",
-    );
-  }
+  if (!updated)
+    throw new ProductStorefrontError("NOT_FOUND", "Product not found");
   return updated;
 }
 
@@ -556,7 +526,6 @@ export async function updateStorefront(
 ) {
   const input = updateStorefrontSchema.parse(rawInput);
   const storefront = await getStorefrontForActor(actor, input.storefrontId);
-  assertCurrent(storefront.updatedAt, input.expectedUpdatedAt);
   if (input.content) {
     await validateStorefrontMedia(storefront.product.brandId, input.content);
   }
@@ -613,19 +582,10 @@ export async function updateStorefront(
       changelog: nextChangelog,
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(storefrontTable.id, storefront.id),
-        eq(storefrontTable.updatedAt, new Date(input.expectedUpdatedAt)),
-      ),
-    )
+    .where(eq(storefrontTable.id, storefront.id))
     .returning();
-  if (!updated) {
-    throw new ProductStorefrontError(
-      "CONFLICT",
-      "Storefront changed while saving",
-    );
-  }
+  if (!updated)
+    throw new ProductStorefrontError("NOT_FOUND", "Storefront not found");
   return updated;
 }
 
@@ -635,7 +595,6 @@ export async function markStorefrontStale(
 ) {
   const input = markStorefrontStaleSchema.parse(rawInput);
   const storefront = await getStorefrontForActor(actor, input.storefrontId);
-  assertCurrent(storefront.updatedAt, input.expectedUpdatedAt);
   const snapshot = await actorSnapshot(actor);
   const now = new Date();
   const [updated] = await db
@@ -655,15 +614,10 @@ export async function markStorefrontStale(
       ],
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(storefrontTable.id, storefront.id),
-        eq(storefrontTable.updatedAt, new Date(input.expectedUpdatedAt)),
-      ),
-    )
+    .where(eq(storefrontTable.id, storefront.id))
     .returning();
   if (!updated)
-    throw new ProductStorefrontError("CONFLICT", "Storefront changed");
+    throw new ProductStorefrontError("NOT_FOUND", "Storefront not found");
   return updated;
 }
 
@@ -673,7 +627,6 @@ export async function confirmStorefrontUpToDate(
 ) {
   const input = confirmStorefrontSchema.parse(rawInput);
   const storefront = await getStorefrontForActor(actor, input.storefrontId);
-  assertCurrent(storefront.updatedAt, input.expectedUpdatedAt);
   const snapshot = await actorSnapshot(actor);
   const now = new Date();
   const [updated] = await db
@@ -693,15 +646,10 @@ export async function confirmStorefrontUpToDate(
       ],
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(storefrontTable.id, storefront.id),
-        eq(storefrontTable.updatedAt, new Date(input.expectedUpdatedAt)),
-      ),
-    )
+    .where(eq(storefrontTable.id, storefront.id))
     .returning();
   if (!updated)
-    throw new ProductStorefrontError("CONFLICT", "Storefront changed");
+    throw new ProductStorefrontError("NOT_FOUND", "Storefront not found");
   return updated;
 }
 
@@ -711,7 +659,6 @@ export async function assignStorefrontManager(
 ) {
   const input = assignStorefrontManagerSchema.parse(rawInput);
   const storefront = await getStorefrontForActor(actor, input.storefrontId);
-  assertCurrent(storefront.updatedAt, input.expectedUpdatedAt);
   await assertManager(actor, input.managerUserId);
   const snapshot = await actorSnapshot(actor);
   const now = new Date();
@@ -731,15 +678,10 @@ export async function assignStorefrontManager(
       ],
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(storefrontTable.id, storefront.id),
-        eq(storefrontTable.updatedAt, new Date(input.expectedUpdatedAt)),
-      ),
-    )
+    .where(eq(storefrontTable.id, storefront.id))
     .returning();
   if (!updated)
-    throw new ProductStorefrontError("CONFLICT", "Storefront changed");
+    throw new ProductStorefrontError("NOT_FOUND", "Storefront not found");
   return updated;
 }
 
@@ -764,7 +706,6 @@ export async function copyStorefrontContent(
       "Content can only be copied between sibling storefront surfaces",
     );
   }
-  assertCurrent(target.updatedAt, input.expectedTargetUpdatedAt);
   await validateStorefrontMedia(target.product.brandId, source.content);
   const snapshot = await actorSnapshot(actor);
   const now = new Date();
@@ -791,15 +732,10 @@ export async function copyStorefrontContent(
       ],
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(storefrontTable.id, target.id),
-        eq(storefrontTable.updatedAt, new Date(input.expectedTargetUpdatedAt)),
-      ),
-    )
+    .where(eq(storefrontTable.id, target.id))
     .returning();
   if (!updated)
-    throw new ProductStorefrontError("CONFLICT", "Storefront changed");
+    throw new ProductStorefrontError("NOT_FOUND", "Storefront not found");
   return updated;
 }
 

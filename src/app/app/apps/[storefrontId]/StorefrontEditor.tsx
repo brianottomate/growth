@@ -131,7 +131,6 @@ export function StorefrontEditor({
     }
     updateMutation.mutate({
       storefrontId: storefront.id,
-      expectedUpdatedAt: storefront.updatedAt.toISOString(),
       staleNote,
       externalListingId: externalListingId.trim() || null,
       publicUrl: publicUrl.trim() || null,
@@ -210,7 +209,6 @@ export function StorefrontEditor({
             onChange={(event) =>
               managerMutation.mutate({
                 storefrontId: storefront.id,
-                expectedUpdatedAt: storefront.updatedAt.toISOString(),
                 managerUserId: event.target.value || null,
               })
             }
@@ -381,7 +379,6 @@ export function StorefrontEditor({
               if (!staleNote.trim()) return toast.error("Add a stale note");
               staleMutation.mutate({
                 storefrontId: storefront.id,
-                expectedUpdatedAt: storefront.updatedAt.toISOString(),
                 note: staleNote,
               });
             }}
@@ -407,7 +404,6 @@ export function StorefrontEditor({
             onClick={() =>
               confirmMutation.mutate({
                 storefrontId: storefront.id,
-                expectedUpdatedAt: storefront.updatedAt.toISOString(),
                 note: confirmNote || undefined,
               })
             }
@@ -442,7 +438,6 @@ export function StorefrontEditor({
                 copyMutation.mutate({
                   sourceStorefrontId: siblingId,
                   targetStorefrontId: storefront.id,
-                  expectedTargetUpdatedAt: storefront.updatedAt.toISOString(),
                   staleNote,
                 });
               }}

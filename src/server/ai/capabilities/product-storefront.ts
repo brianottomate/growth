@@ -99,7 +99,7 @@ export const createProductAtlasProduct = growthAction({
 
 export const updateProductAtlas = growthAction({
   description:
-    "Update product identity, manager, lifecycle, or the complete atlas document. Pass the previously read updatedAt to prevent overwrites.",
+    "Update product identity, manager, lifecycle, or the complete atlas document. The latest write wins.",
   inputSchema: updateProductSchema,
   execute: (input, ctx) => updateProduct(actorFrom(ctx), input),
 });

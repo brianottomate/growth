@@ -101,7 +101,6 @@ export function ProductAtlasWorkspace({
     }
     saveProduct.mutate({
       productId: product.id,
-      expectedUpdatedAt: product.updatedAt.toISOString(),
       atlas: parsed.data,
     });
   };
@@ -128,7 +127,6 @@ export function ProductAtlasWorkspace({
             onChange={(event) =>
               saveProduct.mutate({
                 productId: product.id,
-                expectedUpdatedAt: product.updatedAt.toISOString(),
                 managerUserId: event.target.value || null,
               })
             }
