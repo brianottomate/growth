@@ -1,78 +1,50 @@
 # Growth AI kernel
 
-Growth's kernel is a product pattern, not a second framework and not a shared
-package. The executable source of truth is an ordinary AI SDK 7 `ToolSet`.
-Growth adds only the product-specific behavior that every execution needs.
+Growth's executable contract is an ordinary AI SDK 7 `ToolSet`. It has no
+parallel atomic registry and no post-hoc grouping layer.
 
-## Shape
+## Canonical capabilities
 
-- `src/server/ai/capabilities/*.ts` exports native AI SDK tools. `growthTool`
-  injects typed execution context and adds a small `run(input, context)` method
-  for composing product logic without manufacturing AI SDK call metadata.
-- `src/server/ai/kernel/group.ts` combines related implementations behind one
-  read or write tool with an `action`-discriminated Zod union. The original
-  implementations remain independently composable through `run`; grouping only
-  reduces the model-facing surface.
-- `src/server/ai/capabilities/index.ts` composes surfaces with object spreads.
-  `OVERVIEW_TOOLS` is the full in-app set; `MCP_TOOLS` is the policy-filtered
-  OAuth connector projection.
-- `src/server/ai/kernel/policy.ts` is a separate keyed map for access,
-  consequences, approval, idempotency, reversibility, and MCP exposure. Policy
-  never wraps or replaces a tool's typed input/output contract.
-- `src/server/ai/kernel/runtime.ts` rechecks live organization membership at
-  execution time, normalizes JSON output, returns compact actionable errors,
-  and writes one durable receipt for each tool call.
-- `src/server/ai/kernel/context.ts` composes named prompt sections with explicit
-  budgets and optional Anthropic session caching. It fails rather than silently
-  truncating context.
-- `assistant_run` stores one bounded agent execution; `assistant_tool_receipt`
-  stores its child tool calls and deduplicates `(run, toolCallId)` so a replay
-  returns the prior result instead of repeating the side effect.
+- `src/server/ai/capabilities/domains.ts` directly constructs coherent domain
+  tools from typed service actions. Those actions are plain handlers, not hidden
+  AI tools.
+- Specialized `workspaceOverview`, `navigateWorkspace`, and
+  `prepareProductionPacket` tools sit beside the domain tools.
+- `src/lib/growth-capabilities.ts` is the client-safe ID/action catalog used by
+  UI progress and retired-result handling.
+- `src/server/ai/kernel/policy.ts` defines consequence, approval, idempotency,
+  reversibility, undo metadata, and allowed surfaces once per advertised action.
+- Every capability uses a provider-compatible root object with an `action`
+  field. A strict action-discriminated schema validates the actual call.
+- Outputs use `{ ok: true, action, data }` or
+  `{ ok: false, action?, error: { code, message, retryable, suggestedAction } }`.
 
-The Overview route starts one parent run, passes typed per-tool context through
-AI SDK 7's `toolsContext`, and persists its messages as before. The OAuth MCP starts a
-one-tool parent run and executes the same wrapped native tool. It also exposes
-`invoke_growth`, a coarse agent-as-tool facade over the 20 detailed MCP tools;
-delegated child calls still receive the same receipts. Both surfaces therefore
-get the same access checks, policy, errors, and lineage.
+`OVERVIEW_TOOLS` contains the 31 canonical in-app capabilities. `MCP_TOOLS` is
+the same catalog projected by action policy; it contains 30 capabilities because
+open-world `researchRead` stays with the host. The optional `invoke_growth`
+facade receives only that MCP-safe projection, cannot invoke itself, and stops
+after eight steps.
 
-## Consequences and approval
+The older `/plan` product surface does not own another registry. `PLAN_TOOLS`
+is a deterministic three-capability projection (`brandRead`, `researchRead`,
+and `planningRead`) of the same definitions and uses the same runtime.
 
-Policy is resolved from both the model-facing tool name and, for grouped tools,
-the selected `action`. This keeps one read/write pair per coherent capability
-without flattening idempotency, reversibility, consequence, or approval into a
-single least-common-denominator rule.
+## Runtime guarantees
 
-The policy is action-first for Growth's current tools: reads, drafts, plans,
-reversible workspace changes, and background analysis execute when the request
-is explicit or the conversational intent is already clear. The assistant then
-reports the resulting object or route so the operator can correct or redo it.
+The runtime passes organization and user scope through AI SDK `toolsContext`,
+rechecks live membership and allowed-surface policy for every execution,
+normalizes portable JSON, and writes one receipt per domain tool call. The
+receipt input includes the action, so no schema migration is needed. Replayed
+tool-call IDs return the prior output instead of repeating effects.
 
-This is not permission to auto-publish. A future external send, publish,
-destructive deletion, or irreversible provider mutation must be classified
-explicitly and normally use `approval: "user"`. The in-app route derives AI SDK
-7 `toolApproval` behavior from policy; the MCP projection derives standard read-only,
-destructive, and idempotency annotations from the same entry.
+Action policy drives in-app approvals and MCP read-only, destructive, and
+idempotency hints. Local reversible changes may run after a clear conversational
+instruction. Any future external send/publish, destructive deletion, or
+irreversible provider mutation must declare that consequence and approval.
 
 ## Contract gauntlet
 
-`bun run ai:gauntlet` checks the kernel against a real, isolated Neon branch:
-
-1. exactly one policy for each of the 21 Overview tools;
-2. Zod-to-JSON-Schema conversion for every tool input;
-3. the 20-tool MCP projection and omission of grouped open-world research;
-4. named context composition and budgeting;
-5. a real organization-scoped brand read;
-6. receipt persistence and idempotent replay of a repeated tool-call id;
-7. execute-time denial after membership context is invalidated.
-
-The gauntlet requires the normal Growth environment pointed at a non-production
-database branch with the current Drizzle schema applied.
-
-## Porting the pattern
-
-Other applications should share these invariants, not identical source:
-native typed tools, coherent read/write capability pairs, explicit context, separate policy,
-execute-time authorization, compact errors, and durable run/receipt lineage.
-Each repo should keep its own domain semantics, approval boundaries, and
-orchestration. That is the portable kernel.
+`bun run ai:contracts` verifies registry/catalog/policy parity, root-object model
+and MCP schemas, strict action coverage, connector projection, and consequence
+guards. `bun run ai:gauntlet` additionally uses configured organization data to
+verify a real domain read, receipt replay, and execute-time membership denial.

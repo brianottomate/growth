@@ -20,7 +20,7 @@ import {
   failAssistantRun,
   startAssistantRun,
 } from "../kernel/journal";
-import { policyForGrowthTool } from "../kernel/policy";
+import { growthActionPolicies } from "../kernel/policy";
 import { buildGrowthToolRuntime } from "../kernel/runtime";
 import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
 
@@ -44,13 +44,35 @@ function mcpContextManifest() {
   };
 }
 
-function isCompactError(value: unknown): value is { error: string } {
+function isCapabilityError(value: unknown): value is {
+  ok: false;
+  error: { message: string };
+} {
   return (
     typeof value === "object" &&
     value !== null &&
+    "ok" in value &&
+    value.ok === false &&
     "error" in value &&
-    typeof value.error === "string"
+    typeof value.error === "object" &&
+    value.error !== null &&
+    "message" in value.error &&
+    typeof value.error.message === "string"
   );
+}
+
+function capabilityFailure(error: unknown, action?: string) {
+  const compact = compactGrowthError(error);
+  return {
+    ok: false as const,
+    ...(action ? { action } : {}),
+    error: {
+      code: compact.code,
+      message: compact.error,
+      retryable: compact.retryable,
+      suggestedAction: compact.suggestedAction,
+    },
+  };
 }
 
 const invokeGrowthInput = z.object({
@@ -151,13 +173,21 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
 /** Project native AI SDK tools onto the authenticated OAuth MCP surface. */
 export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
   for (const [name, definition] of Object.entries(toolSet)) {
-    const policy = policyForGrowthTool(name);
-    const mutatesWorkspace = [
-      "local-write",
-      "provider-write",
-      "model-write",
-      "background-run",
-    ].includes(policy.consequence);
+    const policies = Object.values(
+      (
+        growthActionPolicies as Record<
+          string,
+          Record<
+            string,
+            {
+              consequence: string;
+              reversible: boolean;
+              idempotent: boolean;
+            }
+          >
+        >
+      )[name] ?? {},
+    );
     const nativeDefinition = definition as GrowthTool<unknown, unknown>;
     const inputSchema = nativeDefinition.transportInputSchema;
     server.registerTool(
@@ -170,10 +200,15 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
             : undefined,
         inputSchema,
         annotations: {
-          readOnlyHint: policy.consequence.endsWith("read"),
-          destructiveHint: mutatesWorkspace && !policy.reversible,
-          idempotentHint: policy.idempotent,
-          openWorldHint: policy.domain === "research",
+          readOnlyHint: policies.every((policy) =>
+            policy.consequence.endsWith("read"),
+          ),
+          destructiveHint: policies.some(
+            (policy) =>
+              !policy.reversible && !policy.consequence.endsWith("read"),
+          ),
+          idempotentHint: policies.every((policy) => policy.idempotent),
+          openWorldHint: name === "researchRead",
         },
       },
       async (input, extra) => {
@@ -213,13 +248,16 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
           ) {
             throw new Error("Streaming MCP tool outputs are not supported");
           }
-          if (isCompactError(output)) {
-            await failAssistantRun(runId, compactGrowthError(output.error));
+          if (isCapabilityError(output)) {
+            await failAssistantRun(
+              runId,
+              compactGrowthError(output.error.message),
+            );
           } else {
             await completeAssistantRun(runId, { toolName: name });
           }
           return {
-            ...(isCompactError(output) ? { isError: true } : {}),
+            ...(isCapabilityError(output) ? { isError: true } : {}),
             content: [{ type: "text" as const, text: JSON.stringify(output) }],
             structuredContent:
               output && typeof output === "object"
@@ -229,10 +267,19 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
         } catch (error) {
           const compact = compactGrowthError(error);
           if (runId) await failAssistantRun(runId, compact);
+          const failure = capabilityFailure(
+            error,
+            typeof input === "object" &&
+              input !== null &&
+              "action" in input &&
+              typeof input.action === "string"
+              ? input.action
+              : undefined,
+          );
           return {
             isError: true,
-            content: [{ type: "text" as const, text: JSON.stringify(compact) }],
-            structuredContent: { ...compact },
+            content: [{ type: "text" as const, text: JSON.stringify(failure) }],
+            structuredContent: failure,
           };
         }
       },

@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 import { requireOwnedBrand, requireVisibleBrand } from "./brand-access";
 import { discoverAndSaveSuggestions } from "@/server/services/social-discovery.service";
 import {
@@ -21,9 +21,10 @@ import {
   cadenceTargetTable,
   channelTable,
   mediaAssetTable,
+  mediaVideoAnalysisTable,
   mixTargetTable,
 } from "@/server/db/schema";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   replaceBrandMixTargets,
   replaceChannelCadence,
@@ -114,7 +115,7 @@ const brandMixInput = z.object({
     ),
 });
 
-export const discoverBrandChannels = growthTool({
+export const discoverBrandChannels = growthAction({
   description:
     "Discover and verify official social handles for an owned or tracked brand, then save them as pending suggestions for human review. Use only when the operator asks to discover or refresh channels.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -124,7 +125,7 @@ export const discoverBrandChannels = growthTool({
   },
 });
 
-export const scrapeBrandPosts = growthTool({
+export const scrapeBrandPosts = growthAction({
   description:
     "Start an on-demand scrape of recent public posts for one owned or tracked brand and platform. The durable ingest run records progress and failures; new posts also receive pending classification suggestions.",
   inputSchema: z.object({
@@ -169,7 +170,7 @@ export const scrapeBrandPosts = growthTool({
   },
 });
 
-export const syncOwnedBrandContent = growthTool({
+export const syncOwnedBrandContent = growthAction({
   description:
     "Sync owned social history from the brand's connected providers into the canonical timeline. Use when the operator asks to refresh or backfill owned content.",
   inputSchema: z.object({
@@ -182,7 +183,7 @@ export const syncOwnedBrandContent = growthTool({
   },
 });
 
-export const syncBrandWebsite = growthTool({
+export const syncBrandWebsite = growthAction({
   description:
     "Refresh the structural website map from an owned brand's sitemap, including page-type rollups and lightweight metadata. This maps the surface; it does not create pages.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -194,7 +195,7 @@ export const syncBrandWebsite = growthTool({
   },
 });
 
-export const syncBrandBlog = growthTool({
+export const syncBrandBlog = growthAction({
   description:
     "Refresh an owned brand's dated editorial stream from its discovered RSS or Atom feed. Use for explicit blog refresh requests.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -210,7 +211,7 @@ export const syncBrandBlog = growthTool({
   },
 });
 
-export const proposeContentGroupings = growthTool({
+export const proposeContentGroupings = growthAction({
   description:
     "Analyze an owned brand's existing posts and propose only two grouping outcomes: multiple channel executions/amplifications of one canonical idea, or multiple distinct ideas forming a series. Existing brand pillars may classify either outcome. It creates pending proposals that can be discussed and resolved in chat or Review.",
   inputSchema: z.object({
@@ -225,7 +226,7 @@ export const proposeContentGroupings = growthTool({
   },
 });
 
-export const analyzeMediaAsset = growthTool({
+export const analyzeMediaAsset = growthAction({
   description:
     "Analyze one ready image in an owned brand's media library using the brand's human-managed tag vocabulary. Saves literal visual analysis, suggested managed tags, alt text, and optional human steering; it does not invent a campaign strategy.",
   inputSchema: z.object({
@@ -243,7 +244,7 @@ export const analyzeMediaAsset = growthTool({
   },
 });
 
-export const listPublishingConnections = growthTool({
+export const listPublishingConnections = growthAction({
   description:
     "Read the owned publishing connections for one brand, including platform, handle, connection status, and delivery provider such as Zernio. Use this for questions like whether LinkedIn is connected, whether Zernio is configured for a brand, or where a channel will publish. This reads workspace connection metadata; it does not contact or modify the provider.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -280,7 +281,7 @@ export const listPublishingConnections = growthTool({
   },
 });
 
-export const openTimelinePost = growthTool({
+export const openTimelinePost = growthAction({
   description:
     "Open one exact timeline post in Growth. Optionally select a media item and a reel view. Use when the operator asks to inspect, show, open, or navigate to a specific post or reel.",
   inputSchema: z.object({
@@ -307,7 +308,7 @@ export const openTimelinePost = growthTool({
   },
 });
 
-export const analyzeTimelineVideo = growthTool({
+export const analyzeTimelineVideo = growthAction({
   description:
     "Prepare one timeline video for permanent browser-local storyboard analysis, then navigate the operator to the exact reel and start it. Use only after an explicit request because it copies the source video and persists derived boards, transcript, and creative analysis.",
   inputSchema: z.object({
@@ -340,7 +341,83 @@ export const analyzeTimelineVideo = growthTool({
   },
 });
 
-export const proposeStrategyTargets = growthTool({
+export const listMediaAnalyses = growthAction({
+  description:
+    "List saved image and durable video analyses visible to the organization, optionally narrowed to one owned brand.",
+  inputSchema: z.object({ brandId: z.string().optional() }),
+  execute: async ({ brandId }, ctx) => {
+    if (brandId) await requireOwnedBrand(brandId, ctx);
+    const [videos, images] = await Promise.all([
+      db.query.mediaVideoAnalysisTable.findMany({
+        where: and(
+          eq(mediaVideoAnalysisTable.organizationId, ctx.orgId),
+          ...(brandId ? [eq(mediaVideoAnalysisTable.brandId, brandId)] : []),
+        ),
+        orderBy: [desc(mediaVideoAnalysisTable.updatedAt)],
+        limit: 100,
+      }),
+      brandId
+        ? db.query.mediaAssetTable.findMany({
+            where: and(
+              eq(mediaAssetTable.brandId, brandId),
+              eq(mediaAssetTable.kind, "image"),
+              isNull(mediaAssetTable.deletedAt),
+            ),
+            orderBy: [desc(mediaAssetTable.updatedAt)],
+            limit: 100,
+          })
+        : Promise.resolve([]),
+    ]);
+    return {
+      videos,
+      images: images.filter(
+        (asset) =>
+          asset.metadata &&
+          typeof asset.metadata === "object" &&
+          "aiAnalysis" in asset.metadata,
+      ),
+    };
+  },
+});
+
+export const getMediaAnalysis = growthAction({
+  description:
+    "Read one saved image or durable video analysis by its canonical ID.",
+  inputSchema: z.object({
+    kind: z.enum(["image", "video"]),
+    analysisId: z.string(),
+  }),
+  execute: async ({ kind, analysisId }, ctx) => {
+    if (kind === "video") {
+      const analysis = await db.query.mediaVideoAnalysisTable.findFirst({
+        where: and(
+          eq(mediaVideoAnalysisTable.id, analysisId),
+          eq(mediaVideoAnalysisTable.organizationId, ctx.orgId),
+        ),
+      });
+      if (!analysis) throw new Error("Video analysis not found.");
+      return analysis;
+    }
+    const asset = await db.query.mediaAssetTable.findFirst({
+      where: and(
+        eq(mediaAssetTable.id, analysisId),
+        eq(mediaAssetTable.kind, "image"),
+        isNull(mediaAssetTable.deletedAt),
+      ),
+    });
+    if (!asset) throw new Error("Image analysis not found.");
+    await requireOwnedBrand(asset.brandId, ctx);
+    const metadata =
+      asset.metadata && typeof asset.metadata === "object"
+        ? asset.metadata
+        : {};
+    if (!("aiAnalysis" in metadata))
+      throw new Error("That image has not been analyzed yet.");
+    return { asset, analysis: metadata.aiAnalysis };
+  },
+});
+
+export const proposeStrategyTargets = growthAction({
   description:
     "Compare an owned brand's current cadence and mix targets with recent own performance and tracked-peer behavior. Returns evidence-backed target changes without saving them, so the human can review what the system learned before applying strategy changes.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -351,6 +428,32 @@ export const proposeStrategyTargets = growthTool({
       ...result,
       strategyUrl: brand.slug ? `/app/brands/${brand.slug}` : "/app/brands",
     };
+  },
+});
+
+export const getStrategyTargets = growthAction({
+  description:
+    "Read the current channel cadence and brand-default content-mix targets for one owned brand.",
+  inputSchema: z.object({ brandId: z.string() }),
+  execute: async ({ brandId }, ctx) => {
+    const brand = await requireOwnedBrand(brandId, ctx);
+    const [cadence, mix] = await Promise.all([
+      db.query.cadenceTargetTable.findMany({
+        where: and(
+          eq(cadenceTargetTable.brandId, brandId),
+          eq(cadenceTargetTable.isActive, true),
+          isNull(cadenceTargetTable.deletedAt),
+        ),
+      }),
+      db.query.mixTargetTable.findMany({
+        where: and(
+          eq(mixTargetTable.brandId, brandId),
+          eq(mixTargetTable.isActive, true),
+          isNull(mixTargetTable.channelId),
+        ),
+      }),
+    ]);
+    return { brand: { id: brand.id, name: brand.name }, cadence, mix };
   },
 });
 
@@ -413,14 +516,14 @@ async function saveChannelCadence(
   };
 }
 
-export const createChannelCadence = growthTool({
+export const createChannelCadence = growthAction({
   description:
     "Create the first recurring cadence baseline for one owned publishing channel after the operator explicitly agrees to a proposed baseline. Supports every publishing platform documented in the input schema. This is a reversible configuration creation, so the operator's conversational instruction is sufficient and no second approval card is needed. Use only platform-valid archetypes.",
   inputSchema: channelCadenceInput,
   execute: async (input, ctx) => saveChannelCadence(input, ctx, "create"),
 });
 
-export const updateChannelCadence = growthTool({
+export const updateChannelCadence = growthAction({
   description:
     "Replace an existing owned publishing-channel cadence with a complete reviewed target set. Supports every publishing platform documented in the input schema. Use only after reading the current cadence and explaining the before/after change; omitted formats are removed.",
   inputSchema: channelCadenceInput,
@@ -475,14 +578,14 @@ async function saveBrandMix(
   };
 }
 
-export const createBrandMix = growthTool({
+export const createBrandMix = growthAction({
   description:
     "Create the first brand-default pillar mix after proposing a complete 100% allocation and receiving explicit conversational agreement. This reversible configuration creation does not need a second approval card.",
   inputSchema: brandMixInput,
   execute: async (input, ctx) => saveBrandMix(input, ctx, "create"),
 });
 
-export const updateBrandMix = growthTool({
+export const updateBrandMix = growthAction({
   description:
     "Replace an existing brand-default pillar mix with a complete 100% allocation. Explain the before/after change first; omitted pillars are removed.",
   inputSchema: brandMixInput,

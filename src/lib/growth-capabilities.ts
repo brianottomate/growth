@@ -1,0 +1,140 @@
+/**
+ * Client-safe catalog for the canonical Growth capability surface.
+ *
+ * Server tools, action policies, chat progress labels, and retired-result
+ * handling all key off this one public ID/action map.
+ */
+export const GROWTH_CAPABILITY_ACTIONS = {
+  workspaceOverview: ["overview"],
+  navigateWorkspace: ["navigate"],
+  prepareProductionPacket: ["prepare"],
+  brandRead: ["list", "getMap", "next"],
+  productAtlasRead: ["list", "get"],
+  productAtlasWrite: ["create", "update"],
+  storefrontRead: ["list", "get"],
+  storefrontWrite: [
+    "create",
+    "update",
+    "markStale",
+    "confirmCurrent",
+    "assignManager",
+    "copySiblingContent",
+  ],
+  audienceRead: ["list"],
+  audienceWrite: [
+    "createTarget",
+    "saveTargets",
+    "updateTarget",
+    "updateActivation",
+  ],
+  researchRead: ["search", "readPage"],
+  contentRead: [
+    "pipeline",
+    "upcoming",
+    "productionQueue",
+    "getWorkItem",
+    "suggestMedia",
+  ],
+  contentWrite: [
+    "createIdea",
+    "updateWorkItem",
+    "addCrossPost",
+    "createPlatformPost",
+    "promotePlatformPost",
+  ],
+  contentMediaWrite: [
+    "attachChatImage",
+    "attachLibraryMedia",
+    "recoverArchiveMedia",
+  ],
+  emailRead: ["get"],
+  emailWrite: [
+    "createSlot",
+    "createProductUpdate",
+    "updateDraft",
+    "generateDraft",
+  ],
+  contentStrategyRead: ["get"],
+  contentStrategyWrite: [
+    "savePillar",
+    "saveSeries",
+    "organizeIdeas",
+    "proposeGroupings",
+    "resolveGrouping",
+  ],
+  adsRead: ["scope", "top", "diagnoseAlignment", "inspectConversions"],
+  publishingRead: ["connections", "openTimelinePost"],
+  sourceSyncWrite: [
+    "discoverChannels",
+    "scrapePosts",
+    "syncOwnedContent",
+    "syncWebsite",
+    "syncBlog",
+  ],
+  mediaAnalysisRead: ["list", "get"],
+  mediaAnalysisWrite: ["analyzeImage", "prepareVideo"],
+  strategyRead: ["getTargets", "proposeTargets"],
+  strategyWrite: [
+    "createCadence",
+    "updateCadence",
+    "createBrandMix",
+    "updateBrandMix",
+  ],
+  planningRead: ["previewSlots", "draftMomentBlueprint"],
+  planningWrite: ["generateSlots", "commitMomentPlan"],
+  leadsRead: ["summary"],
+  lifecycleRead: ["overview", "inspectProgram", "searchCampaigns", "findGaps"],
+  lifecycleWrite: [
+    "createProgram",
+    "updateProgram",
+    "addStep",
+    "updateStep",
+    "linkCampaign",
+    "setCleanupStatus",
+    "archiveProgram",
+    "restoreProgram",
+  ],
+  listeningRead: ["recent"],
+} as const;
+
+export type GrowthCapabilityId = keyof typeof GROWTH_CAPABILITY_ACTIONS;
+
+export const GROWTH_CAPABILITY_LABELS = {
+  workspaceOverview: "Reading workspace overview",
+  navigateWorkspace: "Opening workspace",
+  prepareProductionPacket: "Preparing production packet",
+  brandRead: "Reading brands",
+  productAtlasRead: "Reading Product Atlas",
+  productAtlasWrite: "Updating Product Atlas",
+  storefrontRead: "Reading storefronts",
+  storefrontWrite: "Updating storefronts",
+  audienceRead: "Reading audiences",
+  audienceWrite: "Updating audiences",
+  researchRead: "Researching",
+  contentRead: "Reading content",
+  contentWrite: "Updating content",
+  contentMediaWrite: "Updating content media",
+  emailRead: "Reading email",
+  emailWrite: "Updating email",
+  contentStrategyRead: "Reading content strategy",
+  contentStrategyWrite: "Updating content strategy",
+  adsRead: "Reading ads",
+  publishingRead: "Reading publishing state",
+  sourceSyncWrite: "Synchronizing sources",
+  mediaAnalysisRead: "Reading media analysis",
+  mediaAnalysisWrite: "Analyzing media",
+  strategyRead: "Reading strategy",
+  strategyWrite: "Updating strategy",
+  planningRead: "Reading plan",
+  planningWrite: "Updating plan",
+  leadsRead: "Reading leads",
+  lifecycleRead: "Reading lifecycle",
+  lifecycleWrite: "Updating lifecycle",
+  listeningRead: "Reading mentions",
+} as const satisfies Record<GrowthCapabilityId, string>;
+
+export function isGrowthCapabilityId(
+  value: string,
+): value is GrowthCapabilityId {
+  return value in GROWTH_CAPABILITY_ACTIONS;
+}

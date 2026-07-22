@@ -6,9 +6,9 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
 import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
-export const getBrandMap = growthTool({
+export const getBrandMap = growthAction({
   description:
     "Read the shared Brand Map for one brand or every owned brand: live counts for channels, audience targets, website pages, blog articles, media, canonical content ideas, series, tracked peers, strategy targets, and pending structural reviews. Use this before cross-surface brand questions, when deciding what context is mapped vs missing, or before proposing what the team should do next.",
   inputSchema: z.object({

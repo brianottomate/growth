@@ -7,7 +7,7 @@ import {
   computeAdsScope,
   computeTopAds,
 } from "@/server/services/ads-analytics.service";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
 // service). The model only needs to pass dates when the operator names a range.
@@ -24,14 +24,14 @@ const windowSchema = {
     .describe("Window end YYYY-MM-DD. Default: today."),
 };
 
-export const adsScope = growthTool({
+export const adsScope = growthAction({
   description:
     "CHEAP lay-of-the-land for Wander's Meta (Facebook) ad performance over a window (default last 365 days): totals (impressions/clicks/CTR/spend/engagement), spend-by-month, and breakdowns by objective (OUTCOME_SALES≈consumer marketplace vs OUTCOME_LEADS≈PM/WanderOS) and by ad DESTINATION (audit / os / marketplace / lead-form / …). Includes flags like hasAuditAds. CALL THIS FIRST for any 'which ads / ad performance / what are we running / are we driving to X' question — it grounds your follow-ups (e.g. it tells you instantly that we've run zero audit-destination ads). Then call topAds to drill in.",
   inputSchema: z.object(windowSchema),
   execute: async (input) => computeAdsScope(input),
 });
 
-export const topAds = growthTool({
+export const topAds = growthAction({
   description:
     "Ranked top Wander Meta ads for a window, by a chosen metric (impressions | clicks | ctr | engagement | spend), with creative copy + thumbnail + destination. Optionally filter by objective (e.g. OUTCOME_LEADS for the PM/WanderOS funnel) or destination. Use AFTER adsScope once the scope is narrowed. CTR ranking applies a 5k-impression delivery floor. Returns at most `limit` ads (default 15).",
   inputSchema: z.object({

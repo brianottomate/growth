@@ -5,14 +5,14 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { MENTION_SOURCES, mentionTable } from "@/server/db/listening-schema";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
 /**
  * Recent social mentions from the listening pipeline. Like `leads`, the
  * listening tables are single-tenant/global here, so this mirrors the
  * `mention.list` tRPC query rather than scoping by org.
  */
-export const recentMentions = growthTool({
+export const recentMentions = growthAction({
   description:
     "List recent social mentions captured by the listening pipeline (Reddit/X/etc.), newest first. Each carries the source, author, a snippet, and the system's suggestedAction (engage | monitor | skip) + relevance score. Use for 'what are people saying / any mentions worth replying to / what's in the listening queue' questions. Set onlyEngageWorthy to surface just the act-today items.",
   inputSchema: z.object({

@@ -16,9 +16,9 @@ import {
   saveEmailDocument,
   startEmailGeneration,
 } from "@/server/services/email-document.service";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
-export const getEmailDraft = growthTool({
+export const getEmailDraft = growthAction({
   description:
     "Read the canonical subject, Markdown body, CTA, revisions, planning context, and latest generation job for one owned newsletter issue or blast. Use this when the conversation is about a specific email slot; do not treat platform_post.text as the email body.",
   inputSchema: z.object({ platformPostId: z.string() }),
@@ -35,7 +35,7 @@ export const getEmailDraft = growthTool({
   },
 });
 
-export const createEmailSlot = growthTool({
+export const createEmailSlot = growthAction({
   description:
     "Create one empty newsletter issue or one-off blast as a Growth content-calendar slot after the operator has chosen the premise and timing. This deliberately does not generate the full email; generation happens only for an individually selected slot.",
   inputSchema: z.object({
@@ -64,7 +64,7 @@ export const createEmailSlot = growthTool({
     }),
 });
 
-export const updateEmailDraft = growthTool({
+export const updateEmailDraft = growthAction({
   description:
     "Save an agreed conversational refinement to one email's canonical document and create a revision checkpoint. Pass only the fields that changed.",
   inputSchema: z.object({
@@ -104,7 +104,7 @@ export const updateEmailDraft = growthTool({
   },
 });
 
-export const createProductUpdateDraft = growthTool({
+export const createProductUpdateDraft = growthAction({
   description:
     "Create one finished, previewable product-update email from verified repository evidence. Each claim must cite an exact repository and commit or pull-request ref. Use this after inspecting the relevant product repositories locally; omit internal-only changes. Creates a frozen Growth revision but never resolves recipients or sends.",
   inputSchema: z.object({
@@ -125,7 +125,7 @@ export const createProductUpdateDraft = growthTool({
     }),
 });
 
-export const generateEmailDraft = growthTool({
+export const generateEmailDraft = growthAction({
   description:
     "Start one deliberate AI draft or refinement job for the selected newsletter issue or blast. Never use this to batch-write a bank of slots. The job uses the slot brief, brand voice, current draft, and optional refinement instruction.",
   inputSchema: z.object({

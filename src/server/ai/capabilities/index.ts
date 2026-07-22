@@ -2,13 +2,12 @@ import "server-only";
 
 import type { ToolSet } from "ai";
 
-import { GROUPED_CAPABILITY_TOOLS } from "./grouped";
-import { leadsSummary } from "./leads";
+import { DOMAIN_CAPABILITY_TOOLS } from "./domains";
 import { LIFECYCLE_TOOLS } from "./lifecycle";
-import { recentMentions } from "./listening";
 import { navigateWorkspace } from "./navigation";
 import { workspaceOverview } from "./overview";
-import { policyForGrowthTool } from "../kernel/policy";
+import { prepareProductionPacket } from "./production";
+import { capabilityAllowsSurface } from "../kernel/policy";
 
 export { registerMcpTools } from "./to-mcp-server";
 export { growthTool } from "./types";
@@ -21,10 +20,9 @@ export type { GrowthTool as Capability, CapabilityContext } from "./types";
 export const OVERVIEW_TOOLS = {
   workspaceOverview,
   navigateWorkspace,
-  ...GROUPED_CAPABILITY_TOOLS,
-  leadsSummary,
+  prepareProductionPacket,
+  ...DOMAIN_CAPABILITY_TOOLS,
   ...LIFECYCLE_TOOLS,
-  recentMentions,
 } as const satisfies ToolSet;
 
 /**
@@ -32,7 +30,14 @@ export const OVERVIEW_TOOLS = {
  * stays with the host agent rather than widening Growth's connector surface.
  */
 export const MCP_TOOLS = Object.fromEntries(
-  Object.entries(OVERVIEW_TOOLS).filter(
-    ([name]) => policyForGrowthTool(name).mcp,
+  Object.entries(OVERVIEW_TOOLS).filter(([name]) =>
+    capabilityAllowsSurface(name, "mcp"),
   ),
 ) as ToolSet;
+
+/** The focused, read-only projection used by the ephemeral moment planner. */
+export const PLAN_TOOLS = {
+  brandRead: OVERVIEW_TOOLS.brandRead,
+  researchRead: OVERVIEW_TOOLS.researchRead,
+  planningRead: OVERVIEW_TOOLS.planningRead,
+} as const satisfies ToolSet;

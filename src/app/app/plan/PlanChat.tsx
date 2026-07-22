@@ -14,8 +14,8 @@ import type { Blueprint } from "./BlueprintReview";
  * and render each message's `parts`. Text parts stream as text; tool calls
  * arrive as `tool-<name>` parts carrying a `state` and (when done) an `output`.
  *
- * When the agent's `draftBlueprint` tool resolves, we lift the blueprint up to
- * LaunchClient via `onDraft` so it flows into the shared review/Save panel.
+ * When `planningRead.draftMomentBlueprint` resolves, we lift the blueprint to
+ * LaunchClient so it flows into the shared review/Save panel.
  */
 
 // A loose view of an AI SDK v6 tool-invocation part — enough to render it
@@ -23,13 +23,18 @@ import type { Blueprint } from "./BlueprintReview";
 type ToolPart = {
   type: string;
   toolCallId: string;
-  state: "input-streaming" | "input-available" | "output-available" | "output-error";
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "output-available"
+    | "output-error";
   input?: unknown;
   output?: unknown;
   errorText?: string;
 };
 
-const isToolPart = (p: { type: string }): p is ToolPart => p.type.startsWith("tool-");
+const isToolPart = (p: { type: string }): p is ToolPart =>
+  p.type.startsWith("tool-");
 
 export type PlanDraft = {
   blueprint: Blueprint;
@@ -60,7 +65,7 @@ export function PlanChat({
   const { messages, sendMessage, status } = useChat({ transport });
   const busy = status === "submitted" || status === "streaming";
 
-  // Lift the latest completed draftBlueprint into the parent — once per call.
+  // Lift the latest completed blueprint into the parent — once per call.
   const firedRef = useRef<string | null>(null);
   useEffect(() => {
     let latest: { id: string; bp: Blueprint; input?: unknown } | null = null;
@@ -68,17 +73,34 @@ export function PlanChat({
       for (const part of m.parts) {
         if (
           isToolPart(part) &&
-          part.type === "tool-draftBlueprint" &&
+          part.type === "tool-planningRead" &&
           part.state === "output-available"
         ) {
-          const out = part.output as { blueprint?: Blueprint } | undefined;
-          if (out?.blueprint) latest = { id: part.toolCallId, bp: out.blueprint, input: part.input };
+          const out = part.output as
+            | {
+                ok?: boolean;
+                action?: string;
+                data?: { blueprint?: Blueprint };
+              }
+            | undefined;
+          if (
+            out?.ok &&
+            out.action === "draftMomentBlueprint" &&
+            out.data?.blueprint
+          )
+            latest = {
+              id: part.toolCallId,
+              bp: out.data.blueprint,
+              input: part.input,
+            };
         }
       }
     }
     if (latest && firedRef.current !== latest.id) {
       firedRef.current = latest.id;
-      const inp = latest.input as { brandId?: string; name?: string } | undefined;
+      const inp = latest.input as
+        | { brandId?: string; name?: string }
+        | undefined;
       onDraft({ blueprint: latest.bp, brandId: inp?.brandId, name: inp?.name });
     }
   }, [messages, onDraft]);
@@ -105,7 +127,8 @@ export function PlanChat({
           // Animate only the last text part of the assistant message that's
           // still streaming — same rule Homi's MessageList uses.
           const isLast = mi === messages.length - 1;
-          const streaming = status === "streaming" && isLast && m.role !== "user";
+          const streaming =
+            status === "streaming" && isLast && m.role !== "user";
           let lastTextIdx = -1;
           m.parts.forEach((p, idx) => {
             if (p.type === "text") lastTextIdx = idx;
@@ -113,7 +136,7 @@ export function PlanChat({
 
           return (
             <div key={m.id} className="space-y-2">
-              <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+              <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
                 {m.role === "user" ? "You" : "Planner"}
               </div>
               {m.parts.map((part, i) => {
@@ -183,18 +206,41 @@ function ToolCard({ part }: { part: ToolPart }) {
     );
   }
 
-  const out = part.output as Record<string, unknown> | undefined;
+  const out = part.output as
+    | {
+        ok?: boolean;
+        action?: string;
+        data?: Record<string, unknown>;
+        error?: { message?: string };
+      }
+    | undefined;
+
+  if (out?.ok === false) {
+    return (
+      <div className="rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-300">
+        {out.error?.message ?? `${name} failed`}
+      </div>
+    );
+  }
 
   // Special-case the blueprint so the headline shape is legible inline (the
   // full editable version renders in the review panel below).
-  if (name === "draftBlueprint" && out?.blueprint) {
-    return <BlueprintCard bp={out.blueprint as Blueprint} />;
+  if (
+    name === "planningRead" &&
+    out?.action === "draftMomentBlueprint" &&
+    out.data?.blueprint
+  ) {
+    return <BlueprintCard bp={out.data.blueprint as Blueprint} />;
   }
 
   return (
     <div className="bg-card rounded-md border px-3 py-2">
-      <div className="text-muted-foreground mb-1 text-[11px] font-medium">{name}</div>
-      <pre className="overflow-x-auto text-xs">{JSON.stringify(out, null, 2)}</pre>
+      <div className="text-muted-foreground mb-1 text-[11px] font-medium">
+        {out?.action ? `${name}.${out.action}` : name}
+      </div>
+      <pre className="overflow-x-auto text-xs">
+        {JSON.stringify(out?.data ?? out, null, 2)}
+      </pre>
     </div>
   );
 }
@@ -203,7 +249,9 @@ function BlueprintCard({ bp }: { bp: Blueprint }) {
   if (bp.verdict === "campaign") {
     return (
       <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
-        <span className="font-medium text-amber-300">Not a content moment.</span>{" "}
+        <span className="font-medium text-amber-300">
+          Not a content moment.
+        </span>{" "}
         {bp.verdictReason}
       </div>
     );
@@ -219,14 +267,15 @@ function BlueprintCard({ bp }: { bp: Blueprint }) {
       <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
         {bp.slots.map((s, i) => (
           <li key={i}>
-            <span className="text-foreground">{s.title}</span> — day {s.dayOffset},{" "}
-            {s.spots.map((sp) => sp.platform).join(", ")}
+            <span className="text-foreground">{s.title}</span> — day{" "}
+            {s.dayOffset}, {s.spots.map((sp) => sp.platform).join(", ")}
           </li>
         ))}
       </ul>
       {bp.amplifierAsks.length > 0 && (
         <div className="text-muted-foreground mt-2 text-xs">
-          Amplifiers: {bp.amplifierAsks.map((a) => `${a.name} (${a.type})`).join(", ")}
+          Amplifiers:{" "}
+          {bp.amplifierAsks.map((a) => `${a.name} (${a.type})`).join(", ")}
         </div>
       )}
     </div>

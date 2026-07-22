@@ -26,7 +26,7 @@ import {
   type ProductStorefrontActor,
 } from "@/server/services/product-storefront.service";
 
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
 const actorFrom = (ctx: { orgId: string; userId: string }) =>
   ({
@@ -35,7 +35,7 @@ const actorFrom = (ctx: { orgId: string; userId: string }) =>
     kind: "agent",
   }) satisfies ProductStorefrontActor;
 
-export const listProductAtlasProducts = growthTool({
+export const listProductAtlasProducts = growthAction({
   description:
     "List products in the organization with their brand, manager, lifecycle, atlas counts, and storefront summaries.",
   inputSchema: z.object({}),
@@ -69,77 +69,77 @@ export const listProductAtlasProducts = growthTool({
   },
 });
 
-export const readProductAtlas = growthTool({
+export const readProductAtlas = growthAction({
   description:
     "Read one complete Product Atlas document, including jobs, journeys, stories, views, connections, implementation references, observations, and its storefronts.",
   inputSchema: z.object({ productId: z.string() }),
   execute: (input, ctx) => getProduct(actorFrom(ctx), input.productId),
 });
 
-export const listProductStorefronts = growthTool({
+export const listProductStorefronts = growthAction({
   description:
     "List storefront records and their product, surface, manager, listing state, freshness, stale note, and confirmation time.",
   inputSchema: z.object({}),
   execute: (_input, ctx) => listStorefronts(actorFrom(ctx)),
 });
 
-export const readProductStorefront = growthTool({
+export const readProductStorefront = growthAction({
   description:
     "Read one complete storefront record, including target copy, Media Library references, external links, freshness state, and changelog.",
   inputSchema: z.object({ storefrontId: z.string() }),
   execute: (input, ctx) => getStorefront(actorFrom(ctx), input.storefrontId),
 });
 
-export const createProductAtlasProduct = growthTool({
+export const createProductAtlasProduct = growthAction({
   description:
     "Create a product owned by an existing brand, optionally with its complete typed Product Atlas graph.",
   inputSchema: createProductSchema,
   execute: (input, ctx) => createProduct(actorFrom(ctx), input),
 });
 
-export const updateProductAtlas = growthTool({
+export const updateProductAtlas = growthAction({
   description:
     "Update product identity, manager, lifecycle, or the complete atlas document. Pass the previously read updatedAt to prevent overwrites.",
   inputSchema: updateProductSchema,
   execute: (input, ctx) => updateProduct(actorFrom(ctx), input),
 });
 
-export const createProductStorefront = growthTool({
+export const createProductStorefront = growthAction({
   description:
     "Create one storefront surface for a product. Asset ids must be ready Media Library items owned by the product brand.",
   inputSchema: createStorefrontSchema,
   execute: (input, ctx) => createStorefront(actorFrom(ctx), input),
 });
 
-export const updateProductStorefront = growthTool({
+export const updateProductStorefront = growthAction({
   description:
     "Update storefront copy, assets, links, or listing state. This always marks the storefront stale and requires a note explaining the external update needed.",
   inputSchema: updateStorefrontSchema,
   execute: (input, ctx) => updateStorefront(actorFrom(ctx), input),
 });
 
-export const markProductStorefrontStale = growthTool({
+export const markProductStorefrontStale = growthAction({
   description:
     "Mark a storefront stale without changing its target content. The note must state what changed or needs updating.",
   inputSchema: markStorefrontStaleSchema,
   execute: (input, ctx) => markStorefrontStale(actorFrom(ctx), input),
 });
 
-export const confirmProductStorefrontCurrent = growthTool({
+export const confirmProductStorefrontCurrent = growthAction({
   description:
     "Confirm that the external storefront now matches Growth's target content. This stamps the actor and time and clears the active stale note.",
   inputSchema: confirmStorefrontSchema,
   execute: (input, ctx) => confirmStorefrontUpToDate(actorFrom(ctx), input),
 });
 
-export const assignProductStorefrontManager = growthTool({
+export const assignProductStorefrontManager = growthAction({
   description:
     "Assign or clear the organization member responsible for one storefront. Assignment routes responsibility and does not change permissions.",
   inputSchema: assignStorefrontManagerSchema,
   execute: (input, ctx) => assignStorefrontManager(actorFrom(ctx), input),
 });
 
-export const copySiblingStorefrontContent = growthTool({
+export const copySiblingStorefrontContent = growthAction({
   description:
     "Copy target content between sibling surfaces for the same product, such as ChatGPT and Claude. The target is marked stale.",
   inputSchema: copyStorefrontContentSchema,

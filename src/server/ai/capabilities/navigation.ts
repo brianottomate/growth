@@ -69,14 +69,15 @@ const ROUTES: Record<
  */
 export const navigateWorkspace = growthTool({
   description:
-    "Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. /app/next is the single conversational home; the other surfaces are for inspection and editing. For a specific brand map or brand-aware Next conversation, pass a brandId from listBrands. The in-app client follows the returned route; MCP clients receive the same canonical URL.",
+    "Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. /app/next is the single conversational home; the other surfaces are for inspection and editing. For a specific brand map or brand-aware Next conversation, pass a brandId from brandRead.list. The in-app client follows the returned route; MCP clients receive the same canonical URL.",
   inputSchema: z.object({
+    action: z.literal("navigate"),
     surface: surfaceSchema,
     brandId: z
       .string()
       .optional()
       .describe(
-        "Used for a specific brand_map or brand-aware Next conversation; use an id from listBrands.",
+        "Used for a specific brand_map or brand-aware Next conversation; use an id from brandRead.list.",
       ),
   }),
   execute: async (input, ctx) => {
@@ -91,32 +92,48 @@ export const navigateWorkspace = growthTool({
       });
       if (!brand) {
         return {
-          error: "That brand is not available in this organization.",
-          href: "/app/next",
+          ok: false as const,
+          action: input.action,
+          error: {
+            code: "not_found",
+            message: "That brand is not available in this organization.",
+            retryable: false,
+            suggestedAction:
+              "Open the brand index and choose an available brand.",
+          },
         };
       }
       return {
-        action: "navigate" as const,
-        surface: "next" as const,
-        brandName: brand.name,
-        href: `/app/next?brandId=${encodeURIComponent(brand.id)}`,
+        ok: true as const,
+        action: input.action,
+        data: {
+          surface: "next" as const,
+          brandName: brand.name,
+          href: `/app/next?brandId=${encodeURIComponent(brand.id)}`,
+        },
       };
     }
 
     if (input.surface !== "brand_map") {
       return {
-        action: "navigate" as const,
-        surface: input.surface,
-        href: ROUTES[input.surface],
+        ok: true as const,
+        action: input.action,
+        data: {
+          surface: input.surface,
+          href: ROUTES[input.surface],
+        },
       };
     }
 
     if (!input.brandId) {
       return {
-        action: "navigate" as const,
-        surface: "brands" as const,
-        href: "/app/brands",
-        note: "No brandId was supplied, so the brand index was opened.",
+        ok: true as const,
+        action: input.action,
+        data: {
+          surface: "brands" as const,
+          href: "/app/brands",
+          note: "No brandId was supplied, so the brand index was opened.",
+        },
       };
     }
 
@@ -130,16 +147,26 @@ export const navigateWorkspace = growthTool({
     });
     if (!brand?.slug) {
       return {
-        error: "That brand is not available in this organization.",
-        href: "/app/brands",
+        ok: false as const,
+        action: input.action,
+        error: {
+          code: "not_found",
+          message: "That brand is not available in this organization.",
+          retryable: false,
+          suggestedAction:
+            "Open the brand index and choose an available brand.",
+        },
       };
     }
 
     return {
-      action: "navigate" as const,
-      surface: "brand_map" as const,
-      brandName: brand.name,
-      href: `/app/brands/${brand.slug}`,
+      ok: true as const,
+      action: input.action,
+      data: {
+        surface: "brand_map" as const,
+        brandName: brand.name,
+        href: `/app/brands/${brand.slug}`,
+      },
     };
   },
 });

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { computeAlignmentOverview } from "@/server/services/ads-alignment.service";
 import { computeAudienceAlignment } from "@/server/services/audience-alignment.service";
 import { orgBrandIds } from "./brands";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -30,9 +30,7 @@ const DiagnosisSchema = z.object({
         entity: z
           .string()
           .describe("Initiative or audience-target name the finding is about."),
-        finding: z
-          .string()
-          .describe("What is misaligned, stated concretely."),
+        finding: z.string().describe("What is misaligned, stated concretely."),
         suggestedUpdate: z
           .string()
           .describe(
@@ -55,7 +53,7 @@ Your job: identify where INTENT and ACTUAL diverge and suggest what to update. R
 - suggestedUpdate must be a concrete action the operator can take (link campaign X to initiative Y in Growth; launch a Google campaign for initiative Z; mark audience target as retired; correct the intended channels). NEVER state that you performed an action — you only diagnose and suggest.
 - If grounding shows full alignment, return an empty findings array and say so in the summary.`;
 
-export const diagnoseAlignment = growthTool({
+export const diagnoseAlignment = growthAction({
   description:
     "Diagnose paid-strategy alignment: compares the growth strategy layer (initiative intended channels/budget/dates + audience targets) against platform reality (campaigns/audiences synced via Zernio) and returns ranked misalignments with concrete suggested updates. Use for 'are our ads running what we planned', 'what's misaligned', 'what should we update on paid'. Read-only — it suggests, it does not change anything.",
   inputSchema: z.object({}),

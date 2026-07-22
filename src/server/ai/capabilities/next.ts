@@ -13,12 +13,12 @@ import {
 import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
 import { platformFormatsFor } from "@/server/content/formats";
 import { PILLARS } from "@/lib/pillars";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 import { requireOwnedBrand } from "./brand-access";
 import { productionQueue, upcomingContent } from "./content";
 
 /** One grounded answer to “what is next for this brand?” */
-export const nextForBrand = growthTool({
+export const nextForBrand = growthAction({
   description:
     "Read one owned brand's readiness and the next 14 days in a single call: mapped surfaces, owned post history, active content mix and cadence targets, and already planned content. Call this FIRST for 'what's next for this brand?', before recommending setup, research, or planning work.",
   inputSchema: z.object({ brandId: z.string() }),

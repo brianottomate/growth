@@ -2,7 +2,12 @@ import "server-only";
 
 import type { ModelMessage } from "ai";
 
-export type GrowthSurface = "overview-chat" | "mcp" | "invoke-growth" | "test";
+export type GrowthSurface =
+  | "overview-chat"
+  | "plan-chat"
+  | "mcp"
+  | "invoke-growth"
+  | "test";
 
 export interface GrowthContextSection {
   id: string;

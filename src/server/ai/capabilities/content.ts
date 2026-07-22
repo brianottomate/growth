@@ -19,7 +19,7 @@ import { ContentService } from "@/server/services/content.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import { getContentReadiness } from "@/lib/content-readiness";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 import type { CapabilityContext } from "./types";
 import { orgBrandIds } from "./brands";
 
@@ -44,7 +44,7 @@ async function requireContentWorkItem(
   return content;
 }
 
-export const getContentWorkItem = growthTool({
+export const getContentWorkItem = growthAction({
   description:
     "Read one canonical content work item with its brief, media pool, platform drafts, schedule, and deterministic production-readiness checklist. Call this FIRST when the active conversation is about finishing or refining a content item.",
   inputSchema: z.object({ contentPostId: z.string() }),
@@ -99,7 +99,7 @@ export const getContentWorkItem = growthTool({
   },
 });
 
-export const updateContentWorkItem = growthTool({
+export const updateContentWorkItem = growthAction({
   description:
     "Apply agreed edits to a canonical content brief and/or its existing owned platform drafts. Use concrete copy and dates agreed in conversation; do not use this merely to save vague suggestions.",
   inputSchema: z.object({
@@ -194,7 +194,7 @@ export const updateContentWorkItem = growthTool({
   },
 });
 
-export const addContentCrossPost = growthTool({
+export const addContentCrossPost = growthAction({
   description:
     "Add one or more agreed channel renderings to an existing canonical content work item. Creates empty owned drafts for the selected platforms; use updateContentWorkItem afterward to write channel-native copy.",
   inputSchema: z.object({
@@ -220,7 +220,7 @@ export const addContentCrossPost = growthTool({
   },
 });
 
-export const attachChatImageToContent = growthTool({
+export const attachChatImageToContent = growthAction({
   description:
     "Save the operator's current pasted chat image into the active brand's durable media library and attach it to the active content pool, selected platform drafts, or every owned draft. Use only when the operator explicitly asks to use, save, or attach the pasted image.",
   inputSchema: z.object({
@@ -336,7 +336,7 @@ async function attachMediaItem(
  * The model does the editorial ranking; this tool only retrieves real options
  * without mutating the library or silently recovering archived bytes.
  */
-export const suggestMediaForContent = growthTool({
+export const suggestMediaForContent = growthAction({
   description:
     "Retrieve media options for an active content work item from three honest lanes: ready assets already in the brand library, media found on the brand's historical platform posts, and the brief/context needed to write one strong AI image-generation prompt. Call after getContentWorkItem when the operator asks what visual or media to use. Return at most one recommendation per lane in your answer, explain why it fits, and distinguish immediately usable library media from archive media that still needs recovery. Never recommend a library asset solely from its dimensions, filename, or recency: it needs semantic evidence in its title, alt text, or tags.",
   inputSchema: z.object({
@@ -462,7 +462,7 @@ export const suggestMediaForContent = growthTool({
   },
 });
 
-export const attachLibraryMediaToContent = growthTool({
+export const attachLibraryMediaToContent = growthAction({
   description:
     "Attach a chosen, ready asset that already exists in the active brand's media library to the content pool and optionally selected or all owned platform drafts. Use the mediaAssetId returned by suggestMediaForContent.",
   inputSchema: z.object({
@@ -509,7 +509,7 @@ export const attachLibraryMediaToContent = growthTool({
   },
 });
 
-export const recoverArchiveMediaToContent = growthTool({
+export const recoverArchiveMediaToContent = growthAction({
   description:
     "Recover one chosen media item from the active brand's own historical platform-post archive into its durable media library, then attach it to the active content pool and optionally selected or all owned platform drafts. Use the platformPostId and mediaIndex returned by suggestMediaForContent. This preserves the original media type; recovering a video does not extract a still frame.",
   inputSchema: z.object({
@@ -564,7 +564,7 @@ export const recoverArchiveMediaToContent = growthTool({
   },
 });
 
-export const contentPipelineSummary = growthTool({
+export const contentPipelineSummary = growthAction({
   description:
     "Summarize the content pipeline for the organization: a count of content posts grouped by status (slot, draft, discovered, pending_review, approved, scheduled, published, rejected, archived). Use for 'what's in the pipeline / how much is scheduled / what needs review' questions.",
   inputSchema: z.object({}),
@@ -613,7 +613,7 @@ export const contentPipelineSummary = growthTool({
   },
 });
 
-export const upcomingContent = growthTool({
+export const upcomingContent = growthAction({
   description:
     "List content planned inside a bounded upcoming window, soonest first. Defaults to the next 14 days and can focus one owned brand. Use for 'what's next / what's planned in the next two weeks / what's on the calendar' questions.",
   inputSchema: z.object({
@@ -697,7 +697,7 @@ export const upcomingContent = growthTool({
   },
 });
 
-export const productionQueue = growthTool({
+export const productionQueue = growthAction({
   description:
     "List canonical content work items in the next 14 days with deterministic readiness checks and the next incomplete production step. Use for 'what should I work on?', 'what is blocked?', or after planning to move from slots into execution.",
   inputSchema: z.object({
@@ -763,7 +763,7 @@ export const productionQueue = growthTool({
   },
 });
 
-export const createIdea = growthTool({
+export const createIdea = growthAction({
   description:
     "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Optionally seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt) and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This writes to the workspace: gather the essentials (which brand, a title, ideally a hook and channels), reflect the idea back in one line, and call it once the operator agrees. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you — turn that into the fields.",
   inputSchema: z.object({
@@ -830,7 +830,7 @@ export const createIdea = growthTool({
   },
 });
 
-export const createPlatformPost = growthTool({
+export const createPlatformPost = growthAction({
   description:
     "Create one platform-native draft for an owned brand without creating a canonical content idea. Use this as the default when the operator says they want to post something on one channel, react to a specific observed post, or fill one concrete date. It can be promoted later into a content idea, series, grouping, or cross-post plan. This writes to the workspace and requires approval.",
   inputSchema: z.object({
@@ -888,7 +888,7 @@ export const createPlatformPost = growthTool({
   },
 });
 
-export const promotePlatformPost = growthTool({
+export const promotePlatformPost = growthAction({
   description:
     "Promote an existing standalone platform post into a canonical content idea. Optionally attach it to a series and add cross-post renderings. Use only after the operator decides the post should become reusable structure. This writes to the workspace and requires approval.",
   inputSchema: z.object({

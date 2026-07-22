@@ -7,20 +7,25 @@ import {
 } from "ai";
 import { z } from "zod";
 
-import { MCP_TOOLS, OVERVIEW_TOOLS } from "@/server/ai/capabilities";
+import {
+  MCP_TOOLS,
+  OVERVIEW_TOOLS,
+  PLAN_TOOLS,
+} from "@/server/ai/capabilities";
 import { composeGrowthContext } from "@/server/ai/kernel/context";
 import {
   completeAssistantRun,
   startAssistantRun,
 } from "@/server/ai/kernel/journal";
 import {
-  growthToolPolicies,
+  growthActionPolicies,
   policyForGrowthTool,
 } from "@/server/ai/kernel/policy";
+import { GROWTH_CAPABILITY_ACTIONS } from "@/lib/growth-capabilities";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
-import type {
-  GrowthExecutionContext,
-  GrowthTool,
+import {
+  type GrowthExecutionContext,
+  type GrowthTool,
 } from "@/server/ai/kernel/tool";
 import { db } from "@/server/db";
 import {
@@ -31,6 +36,16 @@ import {
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (typeof value !== "object" || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, canonicalJson(child)]),
+  );
 }
 
 type JsonSchemaObject = {
@@ -98,10 +113,10 @@ async function executeTool<I, O>(
 async function main() {
   const contractsOnly = process.argv.includes("--contracts-only");
   const overviewNames = Object.keys(OVERVIEW_TOOLS).sort();
-  const policyNames = Object.keys(growthToolPolicies).sort();
+  const policyNames = Object.keys(growthActionPolicies).sort();
   assert(
-    overviewNames.length === 23,
-    `Expected 23 grouped tools, got ${overviewNames.length}`,
+    overviewNames.length === 31,
+    `Expected 31 direct capabilities, got ${overviewNames.length}`,
   );
   assert(
     JSON.stringify(overviewNames) === JSON.stringify(policyNames),
@@ -112,9 +127,27 @@ async function main() {
     "MCP must omit open-world research tools",
   );
   assert(
-    Object.keys(MCP_TOOLS).length === 22,
-    `Expected 22 MCP tools, got ${Object.keys(MCP_TOOLS).length}`,
+    Object.keys(MCP_TOOLS).length === 30,
+    `Expected 30 MCP tools, got ${Object.keys(MCP_TOOLS).length}`,
   );
+  assert(
+    JSON.stringify(Object.keys(PLAN_TOOLS).sort()) ===
+      JSON.stringify(["brandRead", "planningRead", "researchRead"]),
+    "Plan chat must use its deterministic canonical read projection",
+  );
+  for (const name of Object.keys(PLAN_TOOLS)) {
+    assert(
+      policyForGrowthTool(name, {
+        action:
+          name === "brandRead"
+            ? "list"
+            : name === "researchRead"
+              ? "readPage"
+              : "draftMomentBlueprint",
+      }).surfaces.includes("plan-chat"),
+      `${name} is missing plan-chat surface policy`,
+    );
+  }
 
   for (const [name, definition] of Object.entries(OVERVIEW_TOOLS)) {
     assert("run" in definition, `${name} is not a native Growth tool`);
@@ -146,6 +179,22 @@ async function main() {
         JSON.stringify(advertisedActions) === JSON.stringify(expectedActions),
         `${name} model schema lost actions: expected ${expectedActions.join(", ")}, got ${advertisedActions.join(", ")}`,
       );
+      const catalogActions =
+        GROWTH_CAPABILITY_ACTIONS[
+          name as keyof typeof GROWTH_CAPABILITY_ACTIONS
+        ];
+      assert(catalogActions, `${name} is missing from the client-safe catalog`);
+      assert(
+        JSON.stringify([...catalogActions].sort()) ===
+          JSON.stringify(expectedActions),
+        `${name} catalog and runtime actions diverged`,
+      );
+      for (const action of expectedActions) {
+        assert(
+          policyForGrowthTool(name, { action }).surfaces.length > 0,
+          `${name}.${action} has no allowed surface`,
+        );
+      }
     }
   }
 
@@ -156,33 +205,33 @@ async function main() {
   const lifecycleTransport = lifecycleWriteDefinition.transportInputSchema;
   for (const input of [
     {
-      action: "link_campaign",
+      action: "linkCampaign",
       campaignId: "campaign_contract",
       programId: null,
     },
     {
-      action: "update_program",
+      action: "updateProgram",
       programId: "program_contract",
       changes: { priority: "must_have" },
     },
     {
-      action: "update_step",
+      action: "updateStep",
       stepId: "step_contract",
       changes: { channel: "email" },
     },
     {
-      action: "create_program",
+      action: "createProgram",
       brandId: "brand_contract",
       name: "Program contract",
       status: "planned",
     },
     {
-      action: "add_step",
+      action: "addStep",
       programId: "program_contract",
       name: "Step contract",
       status: "missing",
     },
-    { action: "restore_program", programId: "program_contract" },
+    { action: "restoreProgram", programId: "program_contract" },
   ]) {
     assert(
       lifecycleTransport.safeParse(input).success,
@@ -194,31 +243,31 @@ async function main() {
     );
   }
   assert(
-    policyForGrowthTool("contentWrite", {
-      action: "recoverArchiveMediaToContent",
+    policyForGrowthTool("contentMediaWrite", {
+      action: "recoverArchiveMedia",
     }).consequence === "provider-write",
-    "Grouped content policy lost its provider-write consequence",
+    "Content media policy lost its provider-write consequence",
   );
   assert(
-    policyForGrowthTool("lifecycleWrite", { action: "link_campaign" })
+    policyForGrowthTool("lifecycleWrite", { action: "linkCampaign" })
       .idempotent,
     "Grouped lifecycle policy lost action-level idempotency",
   );
   assert(
     policyForGrowthTool("sourceSyncWrite", {
-      action: "syncBrandWebsite",
+      action: "syncWebsite",
     }).consequence === "background-run",
     "Source sync policy lost its background-run consequence",
   );
   assert(
-    policyForGrowthTool("contentAnalysisWrite", {
-      action: "proposeContentGroupings",
-    }).consequence === "model-read",
-    "Grouping proposals must remain review-only model reads",
+    policyForGrowthTool("mediaAnalysisWrite", {
+      action: "analyzeImage",
+    }).consequence === "model-write",
+    "Media analysis lost its model-write consequence",
   );
   assert(
     policyForGrowthTool("strategyWrite", {
-      action: "updateChannelCadence",
+      action: "updateCadence",
     }).idempotent,
     "Strategy updates lost action-level idempotency",
   );
@@ -238,8 +287,9 @@ async function main() {
       JSON.stringify({
         tools: overviewNames.length,
         mcpTools: Object.keys(MCP_TOOLS).length,
+        planTools: Object.keys(PLAN_TOOLS).length,
         schemas: "valid",
-        groupedPolicy: "valid",
+        actionPolicy: "valid",
         contextCharacters: composed.manifest.characters,
       }),
     );
@@ -275,39 +325,45 @@ async function main() {
     contextManifest: composed.manifest,
   });
   const runtime = buildGrowthToolRuntime({
-    tools: { brandsRead: OVERVIEW_TOOLS.brandsRead },
+    tools: { brandRead: OVERVIEW_TOOLS.brandRead },
     identity,
     runId,
     surface: "test",
   });
   const toolCallId = `gauntlet-brands-read-${runId}`;
   const first = await executeTool(
-    runtime.tools.brandsRead,
-    { action: "listBrands" },
+    runtime.tools.brandRead,
+    { action: "list" },
     runtime.context,
     toolCallId,
   );
   assert(
     typeof first === "object" &&
       first !== null &&
-      "brands" in first &&
-      Array.isArray(first.brands) &&
-      first.brands.length > 0,
+      "ok" in first &&
+      first.ok === true &&
+      "data" in first &&
+      typeof first.data === "object" &&
+      first.data !== null &&
+      "brands" in first.data &&
+      Array.isArray(first.data.brands) &&
+      first.data.brands.length > 0,
     "Real-data read did not return brands",
   );
   const replay = await executeTool(
-    runtime.tools.brandsRead,
-    { action: "listBrands" },
+    runtime.tools.brandRead,
+    { action: "list" },
     runtime.context,
     toolCallId,
   );
   assert(
-    JSON.stringify(first) === JSON.stringify(replay),
+    JSON.stringify(canonicalJson(first)) ===
+      JSON.stringify(canonicalJson(replay)),
     "A repeated toolCallId did not replay its receipt",
   );
   await completeAssistantRun(runId, {
     check: "real-data-read-and-idempotent-replay",
-    brandCount: first.brands.length,
+    brandCount: first.data.brands.length,
   });
 
   const deniedRunId = await startAssistantRun({
@@ -318,22 +374,27 @@ async function main() {
     contextManifest: composed.manifest,
   });
   const denied = buildGrowthToolRuntime({
-    tools: { brandsRead: OVERVIEW_TOOLS.brandsRead },
+    tools: { brandRead: OVERVIEW_TOOLS.brandRead },
     identity: { orgId: identity.orgId, userId: "missing-user" },
     runId: deniedRunId,
     surface: "test",
   });
   const deniedOutput = await executeTool(
-    denied.tools.brandsRead,
-    { action: "listBrands" },
+    denied.tools.brandRead,
+    { action: "list" },
     denied.context,
     `gauntlet-denied-${deniedRunId}`,
   );
   assert(
     typeof deniedOutput === "object" &&
       deniedOutput !== null &&
-      "code" in deniedOutput &&
-      deniedOutput.code === "forbidden",
+      "ok" in deniedOutput &&
+      deniedOutput.ok === false &&
+      "error" in deniedOutput &&
+      typeof deniedOutput.error === "object" &&
+      deniedOutput.error !== null &&
+      "code" in deniedOutput.error &&
+      deniedOutput.error.code === "forbidden",
     "Execute-time membership revocation was not enforced",
   );
   await completeAssistantRun(deniedRunId, { check: "permission-denied" });
@@ -355,7 +416,8 @@ async function main() {
     JSON.stringify({
       tools: overviewNames.length,
       mcpTools: Object.keys(MCP_TOOLS).length,
-      realBrands: first.brands.length,
+      planTools: Object.keys(PLAN_TOOLS).length,
+      realBrands: first.data.brands.length,
       receiptReplay: true,
       permissionDenial: true,
       contextCharacters: composed.manifest.characters,

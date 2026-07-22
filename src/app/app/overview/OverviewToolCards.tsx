@@ -501,7 +501,7 @@ export function MediaSuggestionsCard({
         <p className="text-muted-foreground border-t px-3 py-2 text-[10px]">
           {output.libraryAssetsWithoutSemanticMetadata} more library asset
           {output.libraryAssetsWithoutSemanticMetadata === 1 ? "" : "s"} need
-          analysis before the assistant can recommend them confidently.
+          analysis before Growth can recommend them confidently.
         </p>
       )}
     </div>
@@ -890,7 +890,7 @@ export function WorkspaceOverviewCard({
   );
 }
 
-/** `listBrands` — name + tagline rows. */
+/** `brandRead.list` — name + tagline rows. */
 export function BrandsCard({ output }: { output: ListBrandsOutput }) {
   const { brands } = output;
   return (
@@ -2080,5 +2080,105 @@ export function GenericToolCard({
         {JSON.stringify(output, null, 2)}
       </pre>
     </details>
+  );
+}
+
+type ProductCardRecord = Record<string, unknown>;
+
+const asProductCardRecord = (value: unknown): ProductCardRecord | null =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as ProductCardRecord)
+    : null;
+
+const productActionLabels: Record<string, string> = {
+  "productAtlasRead.list": "Product Atlas overview",
+  "productAtlasRead.get": "Product Atlas",
+  "storefrontRead.list": "Storefront overview",
+  "storefrontRead.get": "Storefront details",
+  "productAtlasWrite.create": "Product created",
+  "productAtlasWrite.update": "Product Atlas updated",
+  "storefrontWrite.create": "Storefront created",
+  "storefrontWrite.update": "Storefront target updated",
+  "storefrontWrite.markStale": "Storefront marked stale",
+  "storefrontWrite.confirmCurrent": "Storefront confirmed current",
+  "storefrontWrite.assignManager": "Storefront manager updated",
+  "storefrontWrite.copySiblingContent": "Storefront content copied",
+};
+
+/** Compact first-class result for Product Atlas and storefront chat actions. */
+export function ProductCapabilityCard({
+  action,
+  output,
+}: {
+  action?: string;
+  output: unknown;
+}) {
+  const record = asProductCardRecord(output);
+  const products = Array.isArray(record?.products) ? record.products : null;
+  const storefronts = Array.isArray(output)
+    ? output
+    : Array.isArray(record?.storefronts)
+      ? record.storefronts
+      : null;
+  const product =
+    asProductCardRecord(record?.product) ??
+    (record && (record.atlas || record.lifecycleStatus) ? record : null);
+  const storefront =
+    asProductCardRecord(record?.storefront) ??
+    (record?.surface && record.freshnessStatus ? record : null);
+  const productId = typeof product?.id === "string" ? product.id : undefined;
+  const storefrontId =
+    typeof storefront?.id === "string" ? storefront.id : undefined;
+  const href = storefrontId
+    ? `/app/apps/${storefrontId}`
+    : productId
+      ? `/app/product-atlas/${productId}`
+      : undefined;
+
+  const summary = products
+    ? `${products.length} product${products.length === 1 ? "" : "s"}`
+    : storefronts
+      ? `${storefronts.length} storefront${storefronts.length === 1 ? "" : "s"}`
+      : storefront
+        ? [
+            storefront.surface,
+            storefront.listingStatus,
+            storefront.freshnessStatus,
+          ]
+            .filter((value): value is string => typeof value === "string")
+            .join(" · ")
+        : typeof product?.name === "string"
+          ? [product.name, product.lifecycleStatus]
+              .filter((value): value is string => typeof value === "string")
+              .join(" · ")
+          : "Product workspace updated";
+
+  return (
+    <div className="bg-card rounded-lg border px-3.5 py-2.5">
+      <div className="flex items-center gap-2">
+        <CircleDot className="h-3.5 w-3.5 text-emerald-500" />
+        <p className="text-xs font-medium">
+          {productActionLabels[action ?? ""] ?? "Product workspace"}
+        </p>
+        {href && (
+          <Link
+            href={href}
+            className="text-primary ml-auto flex items-center gap-1 text-xs hover:underline"
+          >
+            Open
+            <ArrowUpRight className="h-3 w-3" />
+          </Link>
+        )}
+      </div>
+      <p className="text-muted-foreground mt-1 text-xs">{summary}</p>
+      <details className="mt-2">
+        <summary className="text-muted-foreground cursor-pointer text-[11px]">
+          Inspect data
+        </summary>
+        <pre className="mt-2 max-h-80 overflow-auto text-xs">
+          {JSON.stringify(output, null, 2)}
+        </pre>
+      </details>
+    </div>
   );
 }

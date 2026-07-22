@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DefaultChatTransport,
   getToolName,
@@ -41,6 +41,10 @@ import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
 import { cn } from "@/lib/utils";
 import {
+  GROWTH_CAPABILITY_LABELS,
+  isGrowthCapabilityId,
+} from "@/lib/growth-capabilities";
+import {
   ASSISTANT_INTENT_EVENT,
   type AssistantIntent,
   type ContentWorkContext,
@@ -60,6 +64,7 @@ import {
   NextForBrandCard,
   ProductionPacketCard,
   ProductionQueueCard,
+  ProductCapabilityCard,
   ReadWebPageCard,
   ToolCallPending,
   UpcomingContentCard,
@@ -97,152 +102,6 @@ import {
  * into the app's home screen.
  */
 
-/** While-running labels per tool — keyed by capability name. */
-const PENDING_LABELS: Record<string, string> = {
-  workspaceOverview: "Pulling the workspace snapshot…",
-  brandsRead: "Reading brand context…",
-  audiencesRead: "Reading audience strategy…",
-  audiencesWrite: "Updating audience strategy…",
-  researchRead: "Researching…",
-  contentRead: "Reading content operations…",
-  contentWrite: "Updating content operations…",
-  emailRead: "Reading the email workspace…",
-  emailWrite: "Updating the email workspace…",
-  contentStrategyRead: "Reading content strategy…",
-  contentStrategyWrite: "Updating content strategy…",
-  adsRead: "Reading paid media…",
-  operationsRead: "Reading operational state…",
-  sourceSyncWrite: "Refreshing external sources…",
-  contentAnalysisWrite: "Analyzing content…",
-  strategyWrite: "Updating strategy targets…",
-  planningRead: "Drafting a plan…",
-  planningWrite: "Saving the plan…",
-  lifecycleRead: "Reading lifecycle operations…",
-  lifecycleWrite: "Updating lifecycle operations…",
-  getBrandMap: "Reading the brand map…",
-  nextForBrand: "Checking the next two weeks…",
-  previewTwoWeekSlots: "Previewing the two-week rhythm…",
-  generateTwoWeekSlots: "Creating the two-week slots…",
-  navigateWorkspace: "Opening the workspace surface…",
-  listBrands: "Looking up brands…",
-  contentPipelineSummary: "Counting the content pipeline…",
-  upcomingContent: "Checking the calendar…",
-  productionQueue: "Checking production readiness…",
-  getContentWorkItem: "Reading the production workspace…",
-  getContentStrategy: "Reading pillars, series, and groupings…",
-  saveContentPillar: "Saving the pillar…",
-  saveContentSeries: "Saving the series…",
-  organizeContentIdeas: "Organizing the content ideas…",
-  resolveContentGrouping: "Applying the grouping decision…",
-  updateContentWorkItem: "Updating the work item…",
-  addContentCrossPost: "Adding channel renderings…",
-  attachChatImageToContent: "Saving and attaching the image…",
-  suggestMediaForContent: "Looking through the library and archives…",
-  attachLibraryMediaToContent: "Attaching the library asset…",
-  recoverArchiveMediaToContent: "Recovering the archived media…",
-  leadsSummary: "Tallying the leads pool…",
-  recentMentions: "Scanning the listening queue…",
-  adsScope: "Scanning ad performance…",
-  topAds: "Ranking ads…",
-  listAudienceTargets: "Reading audience strategy…",
-  webSearch: "Researching the web…",
-  readWebPage: "Reading the source…",
-  createAudienceTarget: "Creating the audience target…",
-  saveAudienceTargets: "Saving audience profiles…",
-  updateAudienceActivation: "Updating campaign targeting…",
-  updateAudienceTarget: "Updating the audience target…",
-  createPlatformPost: "Creating the channel draft…",
-  promotePlatformPost: "Promoting the post into a content idea…",
-  createIdea: "Creating the idea…",
-  discoverBrandChannels: "Discovering official channels…",
-  scrapeBrandPosts: "Scraping recent public posts…",
-  syncOwnedBrandContent: "Syncing owned content history…",
-  syncBrandWebsite: "Refreshing the website map…",
-  syncBrandBlog: "Refreshing the editorial stream…",
-  proposeContentGroupings: "Proposing content structure…",
-  analyzeMediaAsset: "Analyzing the media asset…",
-  analyzeTimelineVideo: "Analyzing the timeline video…",
-  draftMomentBlueprint: "Drafting the moment shape…",
-  commitMomentPlan: "Creating the initiative and slots…",
-  proposeStrategyTargets: "Comparing strategy with observed performance…",
-  createChannelCadence: "Creating the channel cadence…",
-  updateChannelCadence: "Updating the channel cadence…",
-  createBrandMix: "Creating the content mix…",
-  updateBrandMix: "Updating the content mix…",
-  prepareProductionPacket: "Preparing the production handoff…",
-};
-
-/** Friendly fallback names for tools that error/deny before producing a card. */
-const TOOL_LABELS: Record<string, string> = {
-  workspaceOverview: "Workspace snapshot",
-  brandsRead: "Brand context",
-  audiencesRead: "Audience strategy",
-  audiencesWrite: "Audience strategy update",
-  researchRead: "Research",
-  contentRead: "Content operations",
-  contentWrite: "Content update",
-  emailRead: "Email workspace",
-  emailWrite: "Email workspace update",
-  contentStrategyRead: "Content strategy",
-  contentStrategyWrite: "Content strategy update",
-  adsRead: "Paid media",
-  operationsRead: "Operational state",
-  sourceSyncWrite: "Source refresh",
-  contentAnalysisWrite: "Content analysis",
-  strategyWrite: "Strategy update",
-  planningRead: "Plan preview",
-  planningWrite: "Plan update",
-  lifecycleRead: "Lifecycle operations",
-  lifecycleWrite: "Lifecycle update",
-  getBrandMap: "Brand map",
-  nextForBrand: "What’s next",
-  previewTwoWeekSlots: "Two-week slot preview",
-  generateTwoWeekSlots: "Two-week slots",
-  navigateWorkspace: "Workspace navigation",
-  listBrands: "Brands",
-  contentPipelineSummary: "Content pipeline",
-  upcomingContent: "Coming up",
-  productionQueue: "Production queue",
-  prepareProductionPacket: "Production packet",
-  getContentWorkItem: "Content work item",
-  getContentStrategy: "Content structure",
-  saveContentPillar: "Content pillar",
-  saveContentSeries: "Content series",
-  organizeContentIdeas: "Content organization",
-  resolveContentGrouping: "Grouping decision",
-  updateContentWorkItem: "Content update",
-  addContentCrossPost: "New cross-posts",
-  attachChatImageToContent: "Attached image",
-  suggestMediaForContent: "Media suggestions",
-  attachLibraryMediaToContent: "Attached library asset",
-  recoverArchiveMediaToContent: "Recovered archive media",
-  leadsSummary: "Leads pool",
-  recentMentions: "Social mentions",
-  adsScope: "Ad performance",
-  topAds: "Top ads",
-  listAudienceTargets: "Audience strategy",
-  webSearch: "Web research",
-  readWebPage: "Page read",
-  createAudienceTarget: "New audience target",
-  saveAudienceTargets: "Audience profiles",
-  updateAudienceActivation: "Campaign targeting",
-  updateAudienceTarget: "Audience target update",
-  createPlatformPost: "New channel draft",
-  promotePlatformPost: "Promoted content idea",
-  createIdea: "New idea",
-  discoverBrandChannels: "Channel discovery",
-  scrapeBrandPosts: "Public post scrape",
-  syncOwnedBrandContent: "Owned content sync",
-  syncBrandWebsite: "Website map sync",
-  syncBrandBlog: "Blog sync",
-  proposeContentGroupings: "Content grouping analysis",
-  analyzeMediaAsset: "Media analysis",
-  analyzeTimelineVideo: "Video analysis",
-  draftMomentBlueprint: "Moment blueprint",
-  commitMomentPlan: "Committed moment plan",
-  proposeStrategyTargets: "Strategy target proposals",
-};
-
 function toolAction(part: ToolUIPart) {
   const input = (part as { input?: unknown }).input;
   if (typeof input !== "object" || input === null || !("action" in input))
@@ -258,8 +117,31 @@ function humanizeToolName(value: string) {
 }
 
 function toolLabel(toolName: string, action?: string) {
-  const key = action ?? toolName;
-  return TOOL_LABELS[key] ?? humanizeToolName(key);
+  if (!isGrowthCapabilityId(toolName)) return humanizeToolName(toolName);
+  const capability = GROWTH_CAPABILITY_LABELS[toolName].replace(
+    /^(Reading|Updating|Opening|Preparing|Synchronizing|Analyzing) /,
+    "",
+  );
+  return action ? `${capability} · ${humanizeToolName(action)}` : capability;
+}
+
+function pendingLabel(toolName: string, action?: string) {
+  if (!isGrowthCapabilityId(toolName))
+    return `Running ${humanizeToolName(action ?? toolName)}…`;
+  const base = GROWTH_CAPABILITY_LABELS[toolName];
+  return action ? `${base} · ${humanizeToolName(action)}…` : `${base}…`;
+}
+
+function completedCapability(part: { output?: unknown }) {
+  const output = part.output;
+  if (typeof output !== "object" || output === null || !("ok" in output))
+    return null;
+  const envelope = output as {
+    ok: boolean;
+    action?: string;
+    data?: Record<string, unknown>;
+  };
+  return envelope.ok ? envelope : null;
 }
 
 const OVERVIEW_STARTERS: { icon: LucideIcon; text: string }[] = [
@@ -303,6 +185,7 @@ export function OverviewChat({
   workContext?: ContentWorkContext;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -338,6 +221,42 @@ export function OverviewChat({
   const busy = status === "submitted" || status === "streaming";
   const isEmpty = messages.length === 0;
   const navigatedCalls = useRef(new Set<string>());
+  const reconciledCalls = useRef(new Set<string>());
+  const historicalToolEffectsInitialized = useRef(false);
+
+  // A persisted thread can contain completed navigate/save tool results. They
+  // should still render in the transcript, but replaying their side effects on
+  // every mount would move the operator away from the page they just opened
+  // (and repeatedly invalidate data for old saves). Only results completed
+  // after this chat instance mounts may trigger those effects.
+  if (!historicalToolEffectsInitialized.current) {
+    for (const message of initialMessages) {
+      for (const part of message.parts) {
+        if (!isToolUIPart(part)) continue;
+        const loose = part as { toolCallId?: string; state: string };
+        if (loose.state !== "output-available") continue;
+        const completed = completedCapability(part);
+        if (!completed) continue;
+        const toolName = getToolName(part);
+        const key =
+          loose.toolCallId ??
+          `${message.id}:${toolName}:${completed.action ?? "output"}`;
+        if (
+          toolName === "navigateWorkspace" ||
+          completed.data?.action === "navigate"
+        ) {
+          navigatedCalls.current.add(key);
+        }
+        if (
+          toolName.endsWith("Write") ||
+          toolName === "prepareProductionPacket"
+        ) {
+          reconciledCalls.current.add(key);
+        }
+      }
+    }
+    historicalToolEffectsInitialized.current = true;
+  }
 
   const submitAssistantIntent = useCallback(
     (assistantIntent: AssistantIntent) => {
@@ -362,32 +281,47 @@ export function OverviewChat({
       window.removeEventListener(ASSISTANT_INTENT_EVENT, receiveIntent);
   }, [submitAssistantIntent]);
 
-  // Navigation is a portable capability result. The in-app adapter follows it
-  // with router.push; MCP clients can use the same returned canonical URL.
+  // Portable capability results can either navigate or report a durable save.
+  // After a save, reconcile both server components and active React Query
+  // consumers so the surrounding page reflects the chat write immediately.
   useEffect(() => {
     for (const message of messages) {
       for (const part of message.parts) {
         if (!isToolUIPart(part)) continue;
-        const loose = part as {
-          toolCallId?: string;
-          state: string;
-          output?: { action?: string; href?: string; error?: string };
-        };
-        if (
-          loose.state !== "output-available" ||
-          loose.output?.action !== "navigate" ||
-          !loose.output.href
-        )
-          continue;
+        const loose = part as { toolCallId?: string; state: string };
+        if (loose.state !== "output-available") continue;
+        const completed = completedCapability(part);
+        if (!completed) continue;
+        const toolName = getToolName(part);
         const key =
           loose.toolCallId ??
-          `${message.id}:${getToolName(part)}:${loose.output.href}`;
+          `${message.id}:${toolName}:${completed.action ?? "output"}`;
+        if (
+          (toolName.endsWith("Write") ||
+            toolName === "prepareProductionPacket") &&
+          !reconciledCalls.current.has(key)
+        ) {
+          reconciledCalls.current.add(key);
+          void queryClient.invalidateQueries();
+          router.refresh();
+          continue;
+        }
+        const href =
+          typeof completed.data?.href === "string"
+            ? completed.data.href
+            : undefined;
+        if (
+          (toolName !== "navigateWorkspace" &&
+            completed.data?.action !== "navigate") ||
+          !href
+        )
+          continue;
         if (navigatedCalls.current.has(key)) continue;
         navigatedCalls.current.add(key);
-        router.push(loose.output.href);
+        router.push(href);
       }
     }
-  }, [messages, router]);
+  }, [messages, queryClient, router]);
 
   // ---- image attachment (transient Blob URL → AI SDK file part) ----
   const trpc = useTRPC();
@@ -869,7 +803,7 @@ export function OverviewChat({
         </form>
         {variant === "page" && (
           <p className="text-muted-foreground/60 mt-1.5 text-center text-[11px]">
-            Reads live workspace context · asks before writing
+            Reads live Growth context · asks before writing
           </p>
         )}
       </div>
@@ -930,7 +864,7 @@ function renderToolPart(
 ) {
   const toolName = getToolName(part);
   const action = toolAction(part);
-  const presentationName = action ?? toolName;
+  const presentationName = action ? `${toolName}.${action}` : toolName;
 
   // Write tools (createIdea) pause for the operator's go-ahead. These states
   // aren't in the base ToolUIPart union in this SDK version — read them loosely.
@@ -954,15 +888,7 @@ function renderToolPart(
   }
 
   if (part.state === "input-streaming" || part.state === "input-available") {
-    return (
-      <ToolCallPending
-        key={key}
-        label={
-          PENDING_LABELS[presentationName] ??
-          `Running ${toolLabel(toolName, action)}…`
-        }
-      />
-    );
+    return <ToolCallPending key={key} label={pendingLabel(toolName, action)} />;
   }
   if (part.state === "output-error") {
     return (
@@ -973,46 +899,92 @@ function renderToolPart(
   }
   if (part.state !== "output-available") return null;
 
-  switch (presentationName) {
-    case "nextForBrand":
+  if (!isGrowthCapabilityId(toolName)) {
+    return (
+      <div
+        key={key}
+        className="bg-muted/40 text-muted-foreground rounded-lg border px-3 py-2 text-xs"
+      >
+        This result came from an older Growth assistant version. The surrounding
+        conversation is still available; send a new message to use the current
+        capability.
+      </div>
+    );
+  }
+  const envelope = part.output as
+    | { ok: true; action: string; data: unknown }
+    | {
+        ok: false;
+        action?: string;
+        error: { message: string; suggestedAction?: string };
+      };
+  if (!envelope.ok) {
+    return (
+      <div
+        key={key}
+        className="border-destructive/30 bg-destructive/5 rounded-lg border px-3 py-2 text-xs"
+      >
+        <p className="text-destructive">{envelope.error.message}</p>
+        {envelope.error.suggestedAction && (
+          <p className="text-muted-foreground mt-1">
+            {envelope.error.suggestedAction}
+          </p>
+        )}
+      </div>
+    );
+  }
+  const output = envelope.data;
+  const outputAction = envelope.action || action;
+  const presentationKey = `${toolName}.${outputAction}`;
+
+  if (
+    toolName === "productAtlasRead" ||
+    toolName === "productAtlasWrite" ||
+    toolName === "storefrontRead" ||
+    toolName === "storefrontWrite"
+  ) {
+    return (
+      <ProductCapabilityCard
+        key={key}
+        action={presentationKey}
+        output={output}
+      />
+    );
+  }
+
+  switch (presentationKey) {
+    case "brandRead.next":
       return (
         <NextForBrandCard
           key={key}
-          output={part.output as NextForBrandOutput}
+          output={output as NextForBrandOutput}
           onWork={onIntent}
         />
       );
-    case "workspaceOverview":
+    case "workspaceOverview.overview":
       return (
         <WorkspaceOverviewCard
           key={key}
-          output={part.output as WorkspaceOverviewOutput}
+          output={output as WorkspaceOverviewOutput}
         />
       );
-    case "listBrands":
-      return <BrandsCard key={key} output={part.output as ListBrandsOutput} />;
-    case "navigateWorkspace": {
-      const output = part.output as {
+    case "brandRead.list":
+      return <BrandsCard key={key} output={output as ListBrandsOutput} />;
+    case "navigateWorkspace.navigate": {
+      const navigation = output as {
         href?: string;
         brandName?: string;
-        error?: string;
       };
-      if (output.error)
-        return (
-          <p key={key} className="text-destructive text-xs">
-            {output.error}
-          </p>
-        );
       return (
         <div
           key={key}
           className="bg-muted/40 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
         >
           <Check className="size-3.5 text-emerald-500" />
-          Opened {output.brandName ?? "the requested surface"}
-          {output.href && (
+          Opened {navigation.brandName ?? "the requested surface"}
+          {navigation.href && (
             <Link
-              href={output.href}
+              href={navigation.href}
               className="text-primary ml-auto hover:underline"
             >
               Open again
@@ -1021,101 +993,90 @@ function renderToolPart(
         </div>
       );
     }
-    case "listAudienceTargets":
+    case "audienceRead.list":
       return (
         <AudienceTargetsCard
           key={key}
-          output={part.output as AudienceTargetsOutput}
+          output={output as AudienceTargetsOutput}
         />
       );
-    case "webSearch":
-      return (
-        <WebSearchCard key={key} output={part.output as WebSearchOutput} />
-      );
-    case "readWebPage":
-      return (
-        <ReadWebPageCard key={key} output={part.output as ReadWebPageOutput} />
-      );
-    case "contentPipelineSummary":
+    case "researchRead.search":
+      return <WebSearchCard key={key} output={output as WebSearchOutput} />;
+    case "researchRead.readPage":
+      return <ReadWebPageCard key={key} output={output as ReadWebPageOutput} />;
+    case "contentRead.pipeline":
       return (
         <ContentPipelineCard
           key={key}
-          output={part.output as ContentPipelineOutput}
+          output={output as ContentPipelineOutput}
         />
       );
-    case "getContentStrategy":
+    case "contentStrategyRead.get":
       return (
         <ContentStrategyCard
           key={key}
-          output={part.output as ContentStrategyOutput}
+          output={output as ContentStrategyOutput}
         />
       );
-    case "upcomingContent":
+    case "contentRead.upcoming":
       return (
         <UpcomingContentCard
           key={key}
-          output={part.output as UpcomingContentOutput}
+          output={output as UpcomingContentOutput}
         />
       );
-    case "productionQueue":
+    case "contentRead.productionQueue":
       return (
         <ProductionQueueCard
           key={key}
-          output={part.output as ProductionQueueOutput}
+          output={output as ProductionQueueOutput}
           onWork={onIntent}
         />
       );
-    case "prepareProductionPacket":
+    case "prepareProductionPacket.prepare":
       return (
         <ProductionPacketCard
           key={key}
-          output={part.output as ProductionPacketOutput}
+          output={output as ProductionPacketOutput}
         />
       );
-    case "suggestMediaForContent":
+    case "contentRead.suggestMedia":
       return (
         <MediaSuggestionsCard
           key={key}
-          output={part.output as MediaSuggestionsOutput}
+          output={output as MediaSuggestionsOutput}
           onPrompt={onPrompt}
         />
       );
-    case "leadsSummary":
+    case "leadsRead.summary":
       return (
-        <LeadsSummaryCard
-          key={key}
-          output={part.output as LeadsSummaryOutput}
-        />
+        <LeadsSummaryCard key={key} output={output as LeadsSummaryOutput} />
       );
-    case "recentMentions":
-      return <MentionsCard key={key} output={part.output as MentionsOutput} />;
-    case "adsScope":
-      return <AdsScopeCard key={key} output={part.output as AdsScopeOutput} />;
-    case "topAds":
-      return (
-        <AdsRankedCard key={key} output={part.output as AdsRankedOutput} />
-      );
-    case "createIdea":
-      return (
-        <CreatedIdeaCard key={key} output={part.output as CreatedIdeaOutput} />
-      );
-    case "saveContentPillar":
-    case "saveContentSeries":
-    case "organizeContentIdeas":
-    case "resolveContentGrouping":
+    case "listeningRead.recent":
+      return <MentionsCard key={key} output={output as MentionsOutput} />;
+    case "adsRead.scope":
+      return <AdsScopeCard key={key} output={output as AdsScopeOutput} />;
+    case "adsRead.top":
+      return <AdsRankedCard key={key} output={output as AdsRankedOutput} />;
+    case "contentWrite.createIdea":
+      return <CreatedIdeaCard key={key} output={output as CreatedIdeaOutput} />;
+    case "contentStrategyWrite.savePillar":
+    case "contentStrategyWrite.saveSeries":
+    case "contentStrategyWrite.organizeIdeas":
+    case "contentStrategyWrite.resolveGrouping":
       return (
         <ContentStructureMutationCard
           key={key}
-          output={part.output as ContentStructureMutationOutput}
+          output={output as ContentStructureMutationOutput}
         />
       );
-    case "createAudienceTarget":
-    case "saveAudienceTargets":
-    case "updateAudienceTarget":
+    case "audienceWrite.createTarget":
+    case "audienceWrite.saveTargets":
+    case "audienceWrite.updateTarget":
       return (
         <AudienceTargetMutationCard
           key={key}
-          output={part.output as AudienceTargetMutationOutput}
+          output={output as AudienceTargetMutationOutput}
         />
       );
     default:
@@ -1124,8 +1085,8 @@ function renderToolPart(
           key={key}
           name={toolName}
           label={toolLabel(toolName, action)}
-          action={action}
-          output={part.output}
+          action={outputAction}
+          output={output}
         />
       );
   }
@@ -1159,65 +1120,68 @@ function ApprovalCard({
       }
     | undefined;
   const isAudienceWrite =
-    toolName === "createAudienceTarget" || toolName === "updateAudienceTarget";
+    toolName === "audienceWrite.createTarget" ||
+    toolName === "audienceWrite.updateTarget";
   const heading =
-    toolName === "saveContentPillar"
+    toolName === "contentStrategyWrite.savePillar"
       ? "Save this content pillar?"
-      : toolName === "saveContentSeries"
+      : toolName === "contentStrategyWrite.saveSeries"
         ? "Save this content series?"
-        : toolName === "organizeContentIdeas"
+        : toolName === "contentStrategyWrite.organizeIdeas"
           ? "Apply this content structure?"
-          : toolName === "resolveContentGrouping"
+          : toolName === "contentStrategyWrite.resolveGrouping"
             ? inp?.decision === "reject"
               ? "Dismiss this grouping proposal?"
               : "Accept this grouping proposal?"
-            : toolName === "createPlatformPost"
+            : toolName === "contentWrite.createPlatformPost"
               ? "Create this channel draft?"
-              : toolName === "promotePlatformPost"
+              : toolName === "contentWrite.promotePlatformPost"
                 ? "Turn this post into a content idea?"
-                : toolName === "createIdea"
+                : toolName === "contentWrite.createIdea"
                   ? "Create this idea?"
-                  : toolName === "createAudienceTarget"
+                  : toolName === "audienceWrite.createTarget"
                     ? "Create this audience target?"
-                    : toolName === "updateAudienceTarget"
+                    : toolName === "audienceWrite.updateTarget"
                       ? "Save these audience changes?"
-                      : toolName === "updateChannelCadence"
+                      : toolName === "strategyWrite.updateCadence"
                         ? "Save these cadence changes?"
-                        : toolName === "updateBrandMix"
+                        : toolName === "strategyWrite.updateBrandMix"
                           ? "Save these content mix changes?"
-                          : toolName === "attachLibraryMediaToContent"
+                          : toolName === "contentMediaWrite.attachLibraryMedia"
                             ? "Attach this library asset?"
-                            : toolName === "recoverArchiveMediaToContent"
+                            : toolName ===
+                                "contentMediaWrite.recoverArchiveMedia"
                               ? "Recover and attach this archive media?"
                               : "Confirm this action?";
   const primaryLabel =
-    toolName === "saveContentPillar"
+    toolName === "contentStrategyWrite.savePillar"
       ? "Save pillar"
-      : toolName === "saveContentSeries"
+      : toolName === "contentStrategyWrite.saveSeries"
         ? "Save series"
-        : toolName === "organizeContentIdeas"
+        : toolName === "contentStrategyWrite.organizeIdeas"
           ? "Apply structure"
-          : toolName === "resolveContentGrouping"
+          : toolName === "contentStrategyWrite.resolveGrouping"
             ? inp?.decision === "reject"
               ? "Dismiss"
               : "Accept grouping"
-            : toolName === "createPlatformPost"
+            : toolName === "contentWrite.createPlatformPost"
               ? "Create draft"
-              : toolName === "promotePlatformPost"
+              : toolName === "contentWrite.promotePlatformPost"
                 ? "Promote post"
-                : toolName === "createIdea"
+                : toolName === "contentWrite.createIdea"
                   ? "Create it"
-                  : toolName === "createAudienceTarget"
+                  : toolName === "audienceWrite.createTarget"
                     ? "Create target"
-                    : toolName === "updateAudienceTarget"
+                    : toolName === "audienceWrite.updateTarget"
                       ? "Save changes"
-                      : toolName === "updateChannelCadence"
+                      : toolName === "strategyWrite.updateCadence"
                         ? "Save cadence"
-                        : toolName === "updateBrandMix"
+                        : toolName === "strategyWrite.updateBrandMix"
                           ? "Save content mix"
-                          : toolName === "attachLibraryMediaToContent"
+                          : toolName === "contentMediaWrite.attachLibraryMedia"
                             ? "Attach asset"
-                            : toolName === "recoverArchiveMediaToContent"
+                            : toolName ===
+                                "contentMediaWrite.recoverArchiveMedia"
                               ? "Recover & attach"
                               : "Confirm";
   return (

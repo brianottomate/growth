@@ -9,7 +9,7 @@ import {
   momentSlotSchema,
 } from "@/server/services/plan-moment.service";
 import { requireOwnedBrand } from "./brand-access";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 import { generateRangeSlots } from "@/server/services/slot-generate.service";
 
 function twoWeekWindow(startDateISO?: string) {
@@ -26,7 +26,7 @@ function twoWeekWindow(startDateISO?: string) {
   return { start, end };
 }
 
-export const previewTwoWeekSlots = growthTool({
+export const previewTwoWeekSlots = growthAction({
   description:
     "Preview the concrete empty content slots implied by an owned brand's active cadence and content-mix targets for the next 14 days. Saves nothing. Use after nextForBrand says the brand is ready to plan; summarize the result briefly before offering to create it.",
   inputSchema: z.object({
@@ -70,7 +70,7 @@ export const previewTwoWeekSlots = growthTool({
   },
 });
 
-export const generateTwoWeekSlots = growthTool({
+export const generateTwoWeekSlots = growthAction({
   description:
     "Create the approved 14-day set of empty content slots implied by an owned brand's active cadence and content-mix targets. This is idempotent and only tops up missing cadence slots. Use only after previewTwoWeekSlots and explicit operator agreement.",
   inputSchema: z.object({
@@ -108,7 +108,7 @@ export const generateTwoWeekSlots = growthTool({
   },
 });
 
-export const draftMomentBlueprint = growthTool({
+export const draftMomentBlueprint = growthAction({
   description:
     "Propose a reviewable content moment shape: verdict, scale, slots, channel renderings, and amplifier asks. Saves nothing. Use this after the brand context and desired outcome are clear; the operator can refine the blueprint before committing it.",
   inputSchema: z.object({
@@ -143,7 +143,7 @@ export const draftMomentBlueprint = growthTool({
   },
 });
 
-export const commitMomentPlan = growthTool({
+export const commitMomentPlan = growthAction({
   description:
     "Materialize an explicitly approved moment blueprint into one initiative, optional series for an arc, concrete content slots, and amplifier targets. Call only with the final reviewed blueprint and launch date.",
   inputSchema: z.object({

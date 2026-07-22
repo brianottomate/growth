@@ -11,25 +11,24 @@ import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { PLAN_AGENT_PERSONA } from "@/server/ai/plan-agent/persona";
-import { buildPlanTools } from "@/server/ai/plan-agent/tools";
+import { PLAN_TOOLS } from "@/server/ai/capabilities";
+import { composeGrowthContext } from "@/server/ai/kernel/context";
+import { compactGrowthError } from "@/server/ai/kernel/errors";
+import {
+  completeAssistantRun,
+  failAssistantRun,
+  startAssistantRun,
+} from "@/server/ai/kernel/journal";
+import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
 
 /**
- * /plan chat agent — the repo's reference tool-use agent.
- *
- * The whole pattern, in one file: resolve the caller's org, build an
- * org-scoped tool registry, and run `streamText` with those tools in a
- * multi-step loop (`stopWhen: stepCountIs`). The model converses in free text
- * and calls tools as it needs them; `toUIMessageStreamResponse()` streams both
- * the text and the tool parts to the client `useChat`.
- *
- * Deliberately minimal: no persistence, no approvals (every tool is read-only).
- * See homi's collection onboarding / capient's IQ for the fuller version
- * (DB-backed history, per-tool needsApproval, prompt caching).
+ * /plan is a deterministic product-surface projection of the same canonical
+ * definitions used by overview chat and MCP. It remains ephemeral, but runs
+ * through the shared policy, access-check, receipt, and error pipeline.
  */
 export const maxDuration = 60;
 
 const MODEL = "claude-sonnet-4-6";
-
 export async function POST(req: Request): Promise<Response> {
   const session = await getSession();
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
@@ -50,22 +49,68 @@ export async function POST(req: Request): Promise<Response> {
 
   // The /plan UI knows which brand is selected; pin it so the agent doesn't
   // have to guess (it can still switch if the user explicitly asks).
-  const system = brandId
-    ? `${PLAN_AGENT_PERSONA}\n\n# Selected brand\nThe operator has selected "${brandName ?? brandId}" (brandId: ${brandId}). Use this brandId for draftBlueprint unless they clearly ask for a different brand.`
-    : PLAN_AGENT_PERSONA;
+  const selectedBrand = brandId
+    ? `The operator has selected "${brandName ?? brandId}" (brandId: ${brandId}). Use this brandId for planningRead.draftMomentBlueprint unless they clearly ask for a different brand.`
+    : "";
 
   const modelMessages = await convertToModelMessages(messages);
-
-  const result = streamText({
-    model: anthropic(MODEL),
-    system,
-    messages: modelMessages,
-    tools: buildPlanTools({
+  const context = composeGrowthContext({
+    surface: "plan-chat",
+    maximumCharacters: 24_000,
+    sections: [
+      { id: "persona", content: PLAN_AGENT_PERSONA, cache: "session" },
+      { id: "selected-brand", content: selectedBrand },
+    ],
+  });
+  const runId = await startAssistantRun({
+    organizationId: membership.organizationId,
+    userId: session.user.id,
+    surface: "plan-chat",
+    model: MODEL,
+    contextManifest: context.manifest,
+  });
+  const runtime = buildGrowthToolRuntime({
+    tools: PLAN_TOOLS,
+    identity: {
       orgId: membership.organizationId,
       userId: session.user.id,
-    }),
-    stopWhen: stepCountIs(8),
+    },
+    runId,
+    surface: "plan-chat",
   });
 
-  return result.toUIMessageStreamResponse();
+  const result = await (async () => {
+    try {
+      return streamText({
+        model: anthropic(MODEL),
+        messages: [...context.messages, ...modelMessages],
+        allowSystemInMessages: true,
+        tools: runtime.tools,
+        toolsContext: runtime.toolsContext,
+        toolApproval: runtime.toolApproval,
+        stopWhen: stepCountIs(8),
+      });
+    } catch (error) {
+      await failAssistantRun(runId, compactGrowthError(error));
+      throw error;
+    }
+  })();
+
+  void (async () => {
+    try {
+      await result.consumeStream();
+    } catch (error) {
+      await failAssistantRun(runId, compactGrowthError(error));
+      console.error("[plan-chat] stream drain failed", error);
+    }
+  })();
+
+  return result.toUIMessageStreamResponse({
+    onFinish: async ({ messages: updatedMessages }) => {
+      await completeAssistantRun(runId, {
+        persistedMessages: 0,
+        streamedMessages: updatedMessages.length,
+      });
+    },
+  });
 }

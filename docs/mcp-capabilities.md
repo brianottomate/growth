@@ -28,27 +28,32 @@ endpoint verifies token issuer, audience, expiry, and scope and then re-checks
 the user's live organization membership on every request. There is no parallel
 connector table and no fallback to the browser session's active or first org.
 
-The MCP tools and the in-app Growth assistant are projections of the same native
-AI SDK 7 `ToolSet` in `src/server/ai/capabilities`. Read-only, destructive, and
-idempotency annotations are derived from the separate policy map. Growth runs
+The MCP tools and the in-app Growth assistant are projections of the same 31-tool
+native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 30
+connector-safe capabilities and omits only open-world `researchRead`. Read-only,
+destructive, and idempotency annotations are derived from the same action policy
+used by chat receipts and approvals. Growth runs
 ordinary drafts, plans, and reversible workspace edits immediately once the
 operator's intent is clear. A future tool that publishes or sends externally
 must opt into user approval in policy; MCP clients can additionally honor the
 standard destructive hint.
 
-The external MCP projection omits Growth's `research` tools. ChatGPT and
+The external MCP projection omits Growth's `researchRead` tool. ChatGPT and
 Claude already provide open-world browsing; Growth contributes the durable
 workspace, strategy, content, media, and publishing operations.
 
-Alongside the 20 precise capability tools, MCP exposes `invoke_growth`. This coarse facade
+Alongside the precise capability tools, MCP exposes `invoke_growth`. This coarse facade
 accepts one natural-language workspace request and delegates it to an internal
-Growth run over those same tools. It is useful for hosts that prefer one agent
+Growth run over those same connector-safe tools, bounded to eight steps and
+without recursive access to itself. It is useful for hosts that prefer one agent
 tool over loading the full detailed interface; the capability tools remain
 available for deterministic composition and inspection.
 
 Notable portable workflows:
 
 - inspect the workspace, brands, brand maps, audiences, content, ads, and signals;
+- inspect and edit Product Atlas graphs and storefront target content;
+- route stale storefront updates and confirm external surfaces after completion;
 - return canonical navigation URLs;
 - discover brand handles and save reviewable channel suggestions;
 - scrape public posts with a durable ingest-run record;

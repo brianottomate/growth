@@ -29,7 +29,7 @@ import {
   audienceTargetTable,
   brandTable,
 } from "@/server/db/schema";
-import { growthTool, type CapabilityContext } from "./types";
+import { growthAction, type CapabilityContext } from "./types";
 
 const targetStatusSchema = z.enum(audienceTargetStatusEnum.enumValues);
 const targetPrioritySchema = z.enum(audienceTargetPriorityEnum.enumValues);
@@ -170,7 +170,7 @@ async function upsertProfile(
   return target;
 }
 
-export const listAudienceTargets = growthTool({
+export const listAudienceTargets = growthAction({
   description:
     "Read the strategic audience/ICP profiles for the organization, optionally for one brand. Returns reusable geography, descriptive demographics, needs and messaging context, research evidence, planned channel activations, linked real platform audiences, and coverage gaps. Use this before audience, messaging, content, or campaign recommendations.",
   inputSchema: z.object({
@@ -270,7 +270,7 @@ export const listAudienceTargets = growthTool({
   },
 });
 
-export const createAudienceTarget = growthTool({
+export const createAudienceTarget = growthAction({
   description:
     "Create or idempotently update one strategic audience/ICP profile after the operator explicitly asks. Intended channels create activation plans but never real ad-platform audiences. Use saveAudienceTargets for two or more profiles.",
   inputSchema: audienceProfileInput.extend({
@@ -293,7 +293,7 @@ export const createAudienceTarget = growthTool({
   },
 });
 
-export const saveAudienceTargets = growthTool({
+export const saveAudienceTargets = growthAction({
   description:
     "Create or idempotently update 2-10 audience/ICP profiles for one brand in one transaction after the operator explicitly asks. Prefer this over repeated createAudienceTarget calls. It creates requested activation plans but not real platform audiences.",
   inputSchema: z.object({
@@ -323,7 +323,7 @@ export const saveAudienceTargets = growthTool({
   },
 });
 
-export const updateAudienceTarget = growthTool({
+export const updateAudienceTarget = growthAction({
   description:
     "Update an existing strategic audience/ICP profile after reading it and after the operator explicitly requests the change. Geography and demographics update reusable profile context; intended channels update activation plans. It does not edit synced platform audiences.",
   inputSchema: z.object({
@@ -400,7 +400,7 @@ export const updateAudienceTarget = growthTool({
   },
 });
 
-export const updateAudienceActivation = growthTool({
+export const updateAudienceActivation = growthAction({
   description:
     "Update a planned per-platform audience activation after reading it with listAudienceTargets and after the operator explicitly requests the change. Use this for campaign targeting geography, demographics, prompt/structured targeting, compliance category, or run state. Profile demographics are descriptive; only this explicit activation layer represents intended ad targeting.",
   inputSchema: z.object({

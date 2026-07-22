@@ -17,8 +17,8 @@ import { recentMentions } from "./listening";
 export const workspaceOverview = growthTool({
   description:
     "One-shot snapshot of the whole growth workspace: brand count, content pipeline by status, how many posts await a human, leads headline numbers, and the count of engage-worthy social mentions. Call this FIRST for broad 'give me an overview / what's going on / catch me up' questions, then drill in with the more specific tools.",
-  inputSchema: z.object({}),
-  execute: async (_input, ctx) => {
+  inputSchema: z.object({ action: z.literal("overview") }),
+  execute: async ({ action }, ctx) => {
     const [brands, content, needsAttention, leads, engage] = await Promise.all([
       listBrands.run({}, ctx),
       contentPipelineSummary.run({}, ctx),
@@ -28,19 +28,23 @@ export const workspaceOverview = growthTool({
     ]);
 
     return {
-      brands: brands.brands.length,
-      content: {
-        total: content.total,
-        byStatus: content.byStatus,
-        needsAttention,
+      ok: true as const,
+      action,
+      data: {
+        brands: brands.brands.length,
+        content: {
+          total: content.total,
+          byStatus: content.byStatus,
+          needsAttention,
+        },
+        leads: {
+          domains: leads.domains,
+          contacts: leads.contacts,
+          netNew: leads.netNew,
+          inInstantly: leads.inInstantly,
+        },
+        engageWorthyMentions: engage.count,
       },
-      leads: {
-        domains: leads.domains,
-        contacts: leads.contacts,
-        netNew: leads.netNew,
-        inInstantly: leads.inInstantly,
-      },
-      engageWorthyMentions: engage.count,
     };
   },
 });

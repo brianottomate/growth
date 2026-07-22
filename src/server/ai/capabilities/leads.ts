@@ -5,14 +5,14 @@ import { and, desc, eq, exists, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { leadContactTable, leadDomainTable } from "@/server/db/leads-schema";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
 /**
  * Leads headline numbers. NOTE: the `leads` schema is single-tenant / global in
  * this app (decoupled, droppable), so this ignores `ctx.orgId` — it mirrors the
  * `leads.stats` tRPC query the /app/leads page already shows.
  */
-export const leadsSummary = growthTool({
+export const leadsSummary = growthAction({
   description:
     "Headline numbers for the lead prospecting database: total domains & contacts, how many are in HubSpot / Instantly / pregen, the untouched expansion pool, the net-new sendable cohort, and the top PMS platforms. Use for 'how big is the leads pool / how many leads are we ready to send / what PMS do prospects use' questions.",
   inputSchema: z.object({}),

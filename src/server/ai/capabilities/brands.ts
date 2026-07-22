@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
 /** Brand ids for the org — shared by other org-scoped capabilities. */
 export async function orgBrandIds(orgId: string): Promise<string[]> {
@@ -19,7 +19,7 @@ export async function orgBrandIds(orgId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-export const listBrands = growthTool({
+export const listBrands = growthAction({
   description:
     "List the brands in the current organization (id, name, tagline). Use when the operator asks about brands or you need a brand's name/id.",
   inputSchema: z.object({}),

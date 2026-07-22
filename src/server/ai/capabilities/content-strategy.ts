@@ -18,7 +18,7 @@ import {
 } from "@/server/services/content-strategy.service";
 import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 import { requireOwnedBrand } from "./brand-access";
-import { growthTool } from "./types";
+import { growthAction } from "./types";
 
 const slug = z
   .string()
@@ -44,7 +44,7 @@ async function requireBrandContentIdeas(
   return ideas;
 }
 
-export const getContentStrategy = growthTool({
+export const getContentStrategy = growthAction({
   description:
     "Read one brand's content strategy vocabulary and structure: brand-specific pillars and target mix, recurring series and their content counts, plus pending grouping proposals awaiting review. Use this before discussing pillars, series, editorial arcs, recurring formats, or whether past posts should be grouped.",
   inputSchema: z.object({ brandId: z.string() }),
@@ -137,7 +137,7 @@ export const getContentStrategy = growthTool({
   },
 });
 
-export const saveContentPillar = growthTool({
+export const saveContentPillar = growthAction({
   description:
     "Create a new brand-specific content pillar or update an existing pillar's name, description, or color after agreeing on the change. Pillar slugs are stable because content posts and mix targets reference them.",
   inputSchema: z.object({
@@ -164,7 +164,7 @@ export const saveContentPillar = growthTool({
   },
 });
 
-export const saveContentSeries = growthTool({
+export const saveContentSeries = growthAction({
   description:
     "Create a new recurring content series or update an existing series for one owned brand after the arc, theme, and rough timing are agreed. A series groups distinct content ideas under a shared editorial arc; it is not the same as a retrospective grouping proposal.",
   inputSchema: z.object({
@@ -300,7 +300,7 @@ export const saveContentSeries = growthTool({
   },
 });
 
-export const organizeContentIdeas = growthTool({
+export const organizeContentIdeas = growthAction({
   description:
     "Apply an agreed structural relationship to existing canonical content ideas: place them in an existing series, classify standalone ideas under a pillar, or remove them from a series. This does not merge raw channel posts; retrospective same-idea proposals use resolveContentGrouping.",
   inputSchema: z
@@ -410,7 +410,7 @@ export const organizeContentIdeas = growthTool({
   },
 });
 
-export const resolveContentGrouping = growthTool({
+export const resolveContentGrouping = growthAction({
   description:
     "Accept or reject one pending retrospective grouping proposal after discussing it. Accepting a same-idea proposal creates one canonical idea over its channel executions and amplifications. Accepting a series proposal creates one series with one idea per distinct post. Either outcome can be classified under an existing pillar.",
   inputSchema: z.object({

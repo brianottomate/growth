@@ -1,18 +1,16 @@
 import "server-only";
 
-export type GrowthToolDomain =
-  | "overview"
-  | "brands"
-  | "products"
-  | "audiences"
-  | "content"
-  | "leads"
-  | "lifecycle"
-  | "listening"
-  | "ads"
-  | "research"
-  | "operations";
+import type {
+  GROWTH_CAPABILITY_ACTIONS,
+  GrowthCapabilityId,
+} from "@/lib/growth-capabilities";
 
+export type GrowthSurface =
+  | "overview-chat"
+  | "plan-chat"
+  | "mcp"
+  | "invoke-growth"
+  | "test";
 export type GrowthToolConsequence =
   | "local-read"
   | "provider-read"
@@ -22,166 +20,184 @@ export type GrowthToolConsequence =
   | "provider-write"
   | "background-run";
 
-export interface GrowthToolPolicy {
-  domain: GrowthToolDomain;
+export interface GrowthActionPolicy {
   access: "organization-member";
   consequence: GrowthToolConsequence;
   approval: "none" | "user";
   idempotent: boolean;
   reversible: boolean;
-  mcp: boolean;
   undoWith?: string;
+  surfaces: readonly GrowthSurface[];
 }
 
-export type GrowthToolPolicyOverride = Partial<
-  Omit<GrowthToolPolicy, "domain" | "access">
->;
-
-export interface GrowthActionPolicy {
-  default: GrowthToolPolicy;
-  actions: Record<string, GrowthToolPolicyOverride>;
-}
-
-export type GrowthToolPolicyDefinition = GrowthToolPolicy | GrowthActionPolicy;
-
+const ALL = ["overview-chat", "mcp", "invoke-growth", "test"] as const;
+const PRODUCT = ["overview-chat", "plan-chat", "test"] as const;
+const PLAN_READ = [
+  "overview-chat",
+  "plan-chat",
+  "mcp",
+  "invoke-growth",
+  "test",
+] as const;
 const read = (
-  domain: GrowthToolDomain,
   consequence: GrowthToolConsequence = "local-read",
-  mcp = true,
-): GrowthToolPolicy => ({
-  domain,
+  surfaces: readonly GrowthSurface[] = ALL,
+): GrowthActionPolicy => ({
   access: "organization-member",
   consequence,
   approval: "none",
   idempotent: true,
   reversible: false,
-  mcp,
+  surfaces,
 });
-
 const write = (
-  domain: GrowthToolDomain,
-  options: Partial<Omit<GrowthToolPolicy, "domain" | "access">> = {},
-): GrowthToolPolicy => ({
-  domain,
+  options: Partial<Omit<GrowthActionPolicy, "access">> = {},
+): GrowthActionPolicy => ({
   access: "organization-member",
   consequence: options.consequence ?? "local-write",
   approval: options.approval ?? "none",
   idempotent: options.idempotent ?? false,
   reversible: options.reversible ?? true,
-  mcp: options.mcp ?? true,
+  surfaces: options.surfaces ?? ALL,
   ...(options.undoWith ? { undoWith: options.undoWith } : {}),
 });
 
-/**
- * Group related operations under one tool without flattening their safety
- * semantics. The tool input must use a string `action` discriminator.
- */
-export const byAction = (
-  defaultPolicy: GrowthToolPolicy,
-  actions: Record<string, GrowthToolPolicyOverride>,
-): GrowthActionPolicy => ({ default: defaultPolicy, actions });
-
-/**
- * Cross-cutting behavior only. AI SDK tools remain the executable source of
- * truth. Growth drafts, plans, and reversible workspace edits run immediately;
- * future external publish/send tools must opt into user approval here.
- */
-export const growthToolPolicies = {
-  workspaceOverview: read("overview"),
-  navigateWorkspace: read("overview"),
-  brandsRead: read("brands"),
-  productsRead: read("products"),
-  productsWrite: byAction(write("products"), {
-    updateProductAtlas: { idempotent: true },
-    updateProductStorefront: { idempotent: true },
-    markProductStorefrontStale: { idempotent: true },
-    confirmProductStorefrontCurrent: { idempotent: true },
-    assignProductStorefrontManager: { idempotent: true },
-    copySiblingStorefrontContent: { idempotent: true },
-  }),
-  audiencesRead: read("audiences"),
-  audiencesWrite: byAction(write("audiences"), {
-    saveAudienceTargets: { idempotent: true },
-    updateAudienceActivation: { idempotent: true },
-    updateAudienceTarget: { idempotent: true },
-  }),
-  researchRead: read("research", "provider-read", false),
-  contentRead: byAction(read("content"), {
-    suggestMediaForContent: { consequence: "model-read" },
-  }),
-  contentWrite: byAction(write("content"), {
-    updateContentWorkItem: { idempotent: true },
-    attachChatImageToContent: { idempotent: true },
-    attachLibraryMediaToContent: { idempotent: true },
-    recoverArchiveMediaToContent: { consequence: "provider-write" },
-    promotePlatformPost: { reversible: false },
-  }),
-  emailRead: read("content"),
-  emailWrite: byAction(write("content"), {
-    updateEmailDraft: { idempotent: true },
-    generateEmailDraft: {
+export const growthActionPolicies = {
+  workspaceOverview: { overview: read() },
+  navigateWorkspace: { navigate: read() },
+  prepareProductionPacket: { prepare: write() },
+  brandRead: {
+    list: read("local-read", PLAN_READ),
+    getMap: read("local-read", PLAN_READ),
+    next: read("local-read", PLAN_READ),
+  },
+  productAtlasRead: { list: read(), get: read() },
+  productAtlasWrite: { create: write(), update: write({ idempotent: true }) },
+  storefrontRead: { list: read(), get: read() },
+  storefrontWrite: {
+    create: write(),
+    update: write({ idempotent: true }),
+    markStale: write({ idempotent: true }),
+    confirmCurrent: write({ idempotent: true }),
+    assignManager: write({ idempotent: true }),
+    copySiblingContent: write({ idempotent: true }),
+  },
+  audienceRead: { list: read() },
+  audienceWrite: {
+    createTarget: write(),
+    saveTargets: write({ idempotent: true }),
+    updateTarget: write({ idempotent: true }),
+    updateActivation: write({ idempotent: true }),
+  },
+  researchRead: {
+    search: read("provider-read", PRODUCT),
+    readPage: read("provider-read", PRODUCT),
+  },
+  contentRead: {
+    pipeline: read(),
+    upcoming: read(),
+    productionQueue: read(),
+    getWorkItem: read(),
+    suggestMedia: read("model-read"),
+  },
+  contentWrite: {
+    createIdea: write(),
+    updateWorkItem: write({ idempotent: true }),
+    addCrossPost: write(),
+    createPlatformPost: write(),
+    promotePlatformPost: write({ reversible: false }),
+  },
+  contentMediaWrite: {
+    attachChatImage: write({ idempotent: true }),
+    attachLibraryMedia: write({ idempotent: true }),
+    recoverArchiveMedia: write({ consequence: "provider-write" }),
+  },
+  emailRead: { get: read() },
+  emailWrite: {
+    createSlot: write(),
+    createProductUpdate: write(),
+    updateDraft: write({ idempotent: true }),
+    generateDraft: write({ consequence: "background-run" }),
+  },
+  contentStrategyRead: { get: read() },
+  contentStrategyWrite: {
+    savePillar: write({ idempotent: true }),
+    saveSeries: write({ idempotent: true }),
+    organizeIdeas: write({ idempotent: true }),
+    proposeGroupings: write({ consequence: "model-write" }),
+    resolveGrouping: write({ idempotent: true }),
+  },
+  adsRead: {
+    scope: read("provider-read"),
+    top: read("provider-read"),
+    diagnoseAlignment: read("model-read"),
+    inspectConversions: read(),
+  },
+  publishingRead: { connections: read(), openTimelinePost: read() },
+  sourceSyncWrite: {
+    discoverChannels: write({
       consequence: "background-run",
-      reversible: true,
-    },
-  }),
-  contentStrategyRead: read("content"),
-  contentStrategyWrite: byAction(write("content"), {
-    saveContentPillar: { idempotent: true },
-    saveContentSeries: { idempotent: true },
-    organizeContentIdeas: { idempotent: true },
-    resolveContentGrouping: { idempotent: true },
-  }),
-  adsRead: read("ads", "provider-read"),
-  operationsRead: byAction(read("operations", "provider-read"), {
-    proposeStrategyTargets: { consequence: "model-read" },
-  }),
-  sourceSyncWrite: write("operations", {
-    consequence: "background-run",
-    reversible: false,
-  }),
-  contentAnalysisWrite: byAction(
-    write("operations", { consequence: "model-write" }),
-    {
-      proposeContentGroupings: { consequence: "model-read" },
-    },
-  ),
-  strategyWrite: byAction(write("operations"), {
-    updateChannelCadence: { idempotent: true },
-    updateBrandMix: { idempotent: true },
-  }),
-  planningRead: read("content", "model-read"),
-  planningWrite: write("content"),
-  leadsSummary: read("leads"),
-  lifecycleRead: read("lifecycle"),
-  lifecycleWrite: byAction(write("lifecycle"), {
-    update_program: { idempotent: true },
-    update_step: { idempotent: true },
-    link_campaign: { idempotent: true },
-    set_cleanup_status: { idempotent: true },
-    archive_program: { idempotent: true },
-    restore_program: { idempotent: true },
-  }),
-  recentMentions: read("listening"),
-} as const satisfies Record<string, GrowthToolPolicyDefinition>;
-
-export type GrowthToolName = keyof typeof growthToolPolicies;
-
-function isActionPolicy(
-  definition: GrowthToolPolicyDefinition,
-): definition is GrowthActionPolicy {
-  return "default" in definition && "actions" in definition;
-}
+      reversible: false,
+    }),
+    scrapePosts: write({ consequence: "background-run", reversible: false }),
+    syncOwnedContent: write({
+      consequence: "background-run",
+      reversible: false,
+    }),
+    syncWebsite: write({ consequence: "background-run", reversible: false }),
+    syncBlog: write({ consequence: "background-run", reversible: false }),
+  },
+  mediaAnalysisRead: { list: read(), get: read() },
+  mediaAnalysisWrite: {
+    analyzeImage: write({ consequence: "model-write" }),
+    prepareVideo: write({ consequence: "model-write" }),
+  },
+  strategyRead: { getTargets: read(), proposeTargets: read("model-read") },
+  strategyWrite: {
+    createCadence: write(),
+    updateCadence: write({ idempotent: true }),
+    createBrandMix: write(),
+    updateBrandMix: write({ idempotent: true }),
+  },
+  planningRead: {
+    previewSlots: read("model-read", PLAN_READ),
+    draftMomentBlueprint: read("model-read", PLAN_READ),
+  },
+  planningWrite: { generateSlots: write(), commitMomentPlan: write() },
+  leadsRead: { summary: read() },
+  lifecycleRead: {
+    overview: read(),
+    inspectProgram: read(),
+    searchCampaigns: read(),
+    findGaps: read(),
+  },
+  lifecycleWrite: {
+    createProgram: write(),
+    updateProgram: write({ idempotent: true }),
+    addStep: write(),
+    updateStep: write({ idempotent: true }),
+    linkCampaign: write({ idempotent: true }),
+    setCleanupStatus: write({ idempotent: true }),
+    archiveProgram: write({ idempotent: true }),
+    restoreProgram: write({ idempotent: true }),
+  },
+  listeningRead: { recent: read() },
+} as const satisfies {
+  [Capability in GrowthCapabilityId]: Record<
+    (typeof GROWTH_CAPABILITY_ACTIONS)[Capability][number],
+    GrowthActionPolicy
+  >;
+};
 
 export function policyForGrowthTool(
   name: string,
   input?: unknown,
-): GrowthToolPolicy {
-  const definition = (
-    growthToolPolicies as Record<string, GrowthToolPolicyDefinition>
+): GrowthActionPolicy {
+  const policies = (
+    growthActionPolicies as Record<string, Record<string, GrowthActionPolicy>>
   )[name];
-  if (!definition) throw new Error(`Missing Growth tool policy for ${name}`);
-  if (!isActionPolicy(definition)) return definition;
-
+  if (!policies)
+    throw new Error(`Missing Growth capability policy for ${name}`);
   const action =
     typeof input === "object" &&
     input !== null &&
@@ -189,6 +205,19 @@ export function policyForGrowthTool(
     typeof input.action === "string"
       ? input.action
       : undefined;
-  const override = action ? definition.actions[action] : undefined;
-  return { ...definition.default, ...override };
+  if (!action) return Object.values(policies)[0]!;
+  const policy = policies[action];
+  if (!policy)
+    throw new Error(`Missing Growth action policy for ${name}.${action}`);
+  return policy;
+}
+
+export function capabilityAllowsSurface(name: string, surface: GrowthSurface) {
+  const policies = (
+    growthActionPolicies as Record<string, Record<string, GrowthActionPolicy>>
+  )[name];
+  return Boolean(
+    policies &&
+    Object.values(policies).some((policy) => policy.surfaces.includes(surface)),
+  );
 }

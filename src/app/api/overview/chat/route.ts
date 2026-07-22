@@ -45,6 +45,25 @@ import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
 export const maxDuration = 60;
 
 const MODEL = "claude-sonnet-4-6";
+const NEXT_ACTIVE_TOOLS = [
+  "workspaceOverview",
+  "navigateWorkspace",
+  "prepareProductionPacket",
+  "brandRead",
+  "contentRead",
+  "contentWrite",
+  "contentMediaWrite",
+  "contentStrategyRead",
+  "contentStrategyWrite",
+  "researchRead",
+  "publishingRead",
+  "mediaAnalysisRead",
+  "mediaAnalysisWrite",
+  "strategyRead",
+  "strategyWrite",
+  "planningRead",
+  "planningWrite",
+] as const satisfies readonly (keyof typeof OVERVIEW_TOOLS)[];
 
 function sanitizeForModel(history: UIMessage[]) {
   return history
@@ -180,21 +199,21 @@ export async function POST(req: Request): Promise<Response> {
 
   const surfaceContext =
     surface === "create" || surface === "next"
-      ? `\n\n# Current surface\nThe operator is in the unified Next conversation${brand ? ` for ${brand.name} (brandId: ${brand.id})` : ""}${intent ? ` with intent \"${intent}\"` : ""}. The default operating horizon is the next 14 days. Treat questions, pasted images, links, and rough thoughts as one continuous iteration loop. First establish readiness with nextForBrand when a brand is known. Do not pretend this is an editing studio. Prefer the smallest useful action, keep suggestions to at most three and usually one, execute authorized workspace changes without redundant approval cards, then point or navigate the operator to the existing content, schedule, calendar, media, or review surface where the result belongs. When the creative direction is genuinely ready for production, save a provider-neutral production packet. Copying that packet into Claude Design, ChatGPT, a video editor, or an agency workflow is a first-class outcome; Fal is only an optional experiment that consumes the same reviewed packet.`
+      ? `\n\n# Current surface\nThe operator is in the unified Next conversation${brand ? ` for ${brand.name} (brandId: ${brand.id})` : ""}${intent ? ` with intent \"${intent}\"` : ""}. The default operating horizon is the next 14 days. Treat questions, pasted images, links, and rough thoughts as one continuous iteration loop. First establish readiness with brandRead action next when a brand is known. Do not pretend this is an editing studio. Prefer the smallest useful action, keep suggestions to at most three and usually one, execute authorized workspace changes without redundant approval cards, then point or navigate the operator to the existing content, schedule, calendar, media, or review surface where the result belongs. When the creative direction is genuinely ready for production, call prepareProductionPacket action prepare. Copying that packet into Claude Design, ChatGPT, a video editor, or an agency workflow is a first-class outcome; Fal is only an optional experiment that consumes the same reviewed packet.`
       : "";
   const intentContext =
     assistantIntent?.type === "plan_two_weeks" && brand
-      ? `\n\n# Triggered intent\nThe operator clicked Plan next two weeks on the Content surface for ${brand.name}. Call nextForBrand first, then previewTwoWeekSlots only when readiness and the existing 14-day pipeline indicate it is useful. Create slots only after the operator explicitly agrees to the preview; their conversational agreement is sufficient and must not be followed by a second confirmation.`
+      ? `\n\n# Triggered intent\nThe operator clicked Plan next two weeks on the Content surface for ${brand.name}. Call brandRead action next first, then planningRead action previewSlots only when readiness and the existing 14-day pipeline indicate it is useful. Create slots only after the operator explicitly agrees to the preview; their conversational agreement is sufficient and must not be followed by a second confirmation.`
       : assistantIntent?.type === "build_channel_strategy" && brand
-        ? `\n\n# Triggered intent\nThe operator clicked Build channel strategy for ${brand.name}. Call nextForBrand first. Propose a modest starter content mix and platform-appropriate cadence only for genuinely missing configuration. Explain the complete proposal clearly, ask for one conversational go-ahead, then create the agreed missing mix and channel cadences. Do not overwrite existing targets without explaining an explicit before/after change.`
+        ? `\n\n# Triggered intent\nThe operator clicked Build channel strategy for ${brand.name}. Call brandRead action next first. Propose a modest starter content mix and platform-appropriate cadence only for genuinely missing configuration. Explain the complete proposal clearly, ask for one conversational go-ahead, then use strategyWrite for the agreed missing mix and channel cadences. Do not overwrite existing targets without explaining an explicit before/after change.`
         : assistantIntent?.type === "shape_content_structure" && brand
-          ? `\n\n# Triggered intent\nThe operator opened the content-structure conversation for ${brand.name}. Call getContentStrategy first. Then help them reason about pillars, series, canonical ideas, and any pending retrospective groupings using the three-operation model in your persona. Start with a concise read of what already exists and one useful question or concrete proposal. Once the operator agrees to the exact change, write it directly and report what changed.`
+          ? `\n\n# Triggered intent\nThe operator opened the content-structure conversation for ${brand.name}. Call contentStrategyRead action get first. Then help them reason about pillars, series, canonical ideas, and any pending retrospective groupings using the three-operation model in your persona. Start with a concise read of what already exists and one useful question or concrete proposal. Once the operator agrees to the exact change, write it directly and report what changed.`
           : assistantIntent?.type === "plan_email"
-            ? `\n\n# Triggered intent\nThe operator wants to plan a newsletter issue or one-off blast${brand ? ` for ${brand.name}` : ""}. First distinguish a recurring newsletter.broadcast from a cadence-independent newsletter.blast. Talk through the premise, pillar or series relationship, CTA, and Wander Growth content-calendar timing. Use createEmailSlot only after the operator agrees to the exact empty slot. Do not generate the full email during batch or cadence planning; call generateEmailDraft only later for one individually selected slot.`
+            ? `\n\n# Triggered intent\nThe operator wants to plan a newsletter issue or one-off blast${brand ? ` for ${brand.name}` : ""}. First distinguish a recurring newsletter.broadcast from a cadence-independent newsletter.blast. Talk through the premise, pillar or series relationship, CTA, and Growth content-calendar timing. Use emailWrite action createSlot only after the operator agrees to the exact empty slot. Do not generate the full email during batch or cadence planning; use action generateDraft only later for one individually selected slot.`
             : "";
   const workContextPrompt =
     activeWorkContext && brand
-      ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call getContentWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists, and apply authorized writes directly.`
+      ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call contentRead action getWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists, and apply authorized writes directly.`
       : "";
   const safeAttachment =
     chatAttachment?.url &&
@@ -204,7 +223,7 @@ export async function POST(req: Request): Promise<Response> {
       : null;
   const attachmentPrompt =
     safeAttachment && activeWorkContext
-      ? `\n\n# Current pasted image\nThe operator attached an image stored at ${safeAttachment.url} (${safeAttachment.mediaType}). You can analyze it visually now. If the operator asks to use, save, or attach it to the active work item, call attachChatImageToContent with this exact URL. Do not save it merely because it was pasted.`
+      ? `\n\n# Current pasted image\nThe operator attached an image stored at ${safeAttachment.url} (${safeAttachment.mediaType}). You can analyze it visually now. If the operator asks to use, save, or attach it to the active work item, call contentMediaWrite action attachChatImage with this exact URL. Do not save it merely because it was pasted.`
       : "";
 
   // Persisted messages are the content truth. The client contributes only its
@@ -295,6 +314,10 @@ export async function POST(req: Request): Promise<Response> {
         messages: [...context.messages, ...modelMessages],
         allowSystemInMessages: true,
         tools: runtime.tools,
+        activeTools:
+          surface === "create" || surface === "next"
+            ? [...NEXT_ACTIVE_TOOLS]
+            : undefined,
         toolsContext: runtime.toolsContext,
         toolApproval: runtime.toolApproval,
         stopWhen: stepCountIs(8),
