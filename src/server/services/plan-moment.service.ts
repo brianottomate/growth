@@ -7,7 +7,6 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  amplificationTargetTable,
   amplifierTable,
   brandTable,
   channelPlatformEnum,
@@ -394,6 +393,10 @@ export async function commitMomentBlueprint(opts: {
     }
   }
 
+  // Amplifier asks land in the org rolodex only. Concrete amplification
+  // targets are per-platform-post asks made later (by a human or the
+  // assistant's requestAmplification) once the posts worth boosting exist —
+  // recruitment is a judgment call per post, not a launch-wide rule.
   let amplifierTargets = 0;
   if (brand.organizationId && bp.amplifierAsks.length) {
     const orgId = brand.organizationId;
@@ -406,20 +409,17 @@ export async function commitMomentBlueprint(opts: {
       if (!amp) {
         const [created] = await db
           .insert(amplifierTable)
-          .values({ organizationId: orgId, name: ask.name, type: ask.type })
+          .values({
+            organizationId: orgId,
+            name: ask.name,
+            type: ask.type,
+            notes: ask.why,
+          })
           .returning();
         amp = created;
         if (amp) byName.set(amp.name.toLowerCase(), amp);
       }
-      if (amp) {
-        await db.insert(amplificationTargetTable).values({
-          momentId,
-          amplifierId: amp.id,
-          ask: "planned",
-          notes: ask.why,
-        });
-        amplifierTargets++;
-      }
+      if (amp) amplifierTargets++;
     }
   }
 

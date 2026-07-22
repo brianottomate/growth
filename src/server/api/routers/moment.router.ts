@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -9,6 +9,7 @@ import {
   contentPostTable,
   initiativeTable,
   memberTable,
+  platformPostTable,
 } from "@/server/db/schema";
 import {
   commitMomentBlueprint,
@@ -123,10 +124,30 @@ export const momentRouter = createTRPCRouter({
         ),
         orderBy: [asc(contentPostTable.plannedAt)],
       });
-      const targets = await ctx.db.query.amplificationTargetTable.findMany({
-        where: eq(amplificationTargetTable.momentId, input.initiativeId),
-        with: { amplifier: true },
+      // Targets hang off platform posts now; roll up across the initiative's
+      // content items.
+      const contents = await ctx.db.query.contentPostTable.findMany({
+        where: eq(contentPostTable.initiativeId, input.initiativeId),
+        columns: { id: true },
       });
+      const posts = contents.length
+        ? await ctx.db.query.platformPostTable.findMany({
+            where: inArray(
+              platformPostTable.contentPostId,
+              contents.map((content) => content.id),
+            ),
+            columns: { id: true },
+          })
+        : [];
+      const targets = posts.length
+        ? await ctx.db.query.amplificationTargetTable.findMany({
+            where: inArray(
+              amplificationTargetTable.platformPostId,
+              posts.map((post) => post.id),
+            ),
+            with: { amplifier: true },
+          })
+        : [];
       return { initiative, slots, targets };
     }),
 });

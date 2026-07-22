@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -10,8 +10,10 @@ import {
   brandTable,
   channelPlatformEnum,
   channelTable,
+  contentPostTable,
   initiativeTable,
   memberTable,
+  platformPostTable,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { discoverAmplifierHandles } from "@/server/services/social-discovery.service";
@@ -61,17 +63,63 @@ async function assertMomentAccess(ctx: Ctx, id: string) {
   return { moment, brand };
 }
 
+async function assertPostAccess(ctx: Ctx, id: string) {
+  const post = await ctx.db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.id, id),
+  });
+  if (!post) throw new TRPCError({ code: "NOT_FOUND" });
+  const brand = await ctx.db.query.brandTable.findFirst({
+    where: and(eq(brandTable.id, post.brandId), isNull(brandTable.deletedAt)),
+  });
+  if (!brand?.organizationId) throw new TRPCError({ code: "NOT_FOUND" });
+  await assertOrgMembership(ctx, brand.organizationId);
+  return { post, brand };
+}
+
 async function assertTargetAccess(ctx: Ctx, id: string) {
   const target = await ctx.db.query.amplificationTargetTable.findFirst({
     where: eq(amplificationTargetTable.id, id),
   });
   if (!target) throw new TRPCError({ code: "NOT_FOUND" });
   const amplifier = await assertAmplifierAccess(ctx, target.amplifierId);
-  const { brand } = await assertMomentAccess(ctx, target.momentId);
+  const { brand } = await assertPostAccess(ctx, target.platformPostId);
   if (brand.organizationId !== amplifier.organizationId) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
   return target;
+}
+
+/** The initiative's platform posts (via its content items) — the candidates an
+ * amplification ask can anchor to. */
+async function platformPostsForInitiative(ctx: Ctx, initiativeId: string) {
+  const contents = await ctx.db.query.contentPostTable.findMany({
+    where: and(
+      eq(contentPostTable.initiativeId, initiativeId),
+      isNull(contentPostTable.deletedAt),
+    ),
+    columns: { id: true, title: true },
+  });
+  if (contents.length === 0) return [];
+  const titleById = new Map(contents.map((c) => [c.id, c.title]));
+  const posts = await ctx.db.query.platformPostTable.findMany({
+    where: inArray(
+      platformPostTable.contentPostId,
+      contents.map((c) => c.id),
+    ),
+    columns: {
+      id: true,
+      contentPostId: true,
+      platform: true,
+      status: true,
+      scheduledAt: true,
+    },
+  });
+  return posts.map((post) => ({
+    ...post,
+    title: post.contentPostId
+      ? (titleById.get(post.contentPostId) ?? null)
+      : null,
+  }));
 }
 
 export function profileUrlForAmplifierHandle(platform: string, handle: string) {
@@ -263,11 +311,11 @@ export const amplifierRouter = createTRPCRouter({
       return tracked;
     }),
 
-  /** Recruit an amplifier for a moment (the raised initiative). */
+  /** Recruit an amplifier for one platform post. */
   addTarget: protectedProcedure
     .input(
       z.object({
-        momentId: z.string(),
+        platformPostId: z.string(),
         amplifierId: z.string(),
         ask: z.string().optional(),
         plannedAt: z.string().optional(),
@@ -275,7 +323,7 @@ export const amplifierRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const [{ brand }, amplifier] = await Promise.all([
-        assertMomentAccess(ctx, input.momentId),
+        assertPostAccess(ctx, input.platformPostId),
         assertAmplifierAccess(ctx, input.amplifierId),
       ]);
       if (brand.organizationId !== amplifier.organizationId) {
@@ -284,7 +332,7 @@ export const amplifierRouter = createTRPCRouter({
       const [t] = await ctx.db
         .insert(amplificationTargetTable)
         .values({
-          momentId: input.momentId,
+          platformPostId: input.platformPostId,
           amplifierId: input.amplifierId,
           ask: input.ask ?? "planned",
           plannedAt: input.plannedAt ? new Date(input.plannedAt) : undefined,
@@ -293,12 +341,35 @@ export const amplifierRouter = createTRPCRouter({
       return t;
     }),
 
-  targetsForMoment: protectedProcedure
-    .input(z.object({ momentId: z.string() }))
+  /** All targets across an initiative's posts (the campaign roll-up view). */
+  targetsForInitiative: protectedProcedure
+    .input(z.object({ initiativeId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await assertMomentAccess(ctx, input.momentId);
+      await assertMomentAccess(ctx, input.initiativeId);
+      const posts = await platformPostsForInitiative(ctx, input.initiativeId);
+      if (posts.length === 0) return { targets: [], posts: [] };
+      const targets = await ctx.db.query.amplificationTargetTable.findMany({
+        where: inArray(
+          amplificationTargetTable.platformPostId,
+          posts.map((post) => post.id),
+        ),
+        with: { amplifier: true },
+        orderBy: [desc(amplificationTargetTable.createdAt)],
+      });
+      return { targets, posts };
+    }),
+
+  targetsForPosts: protectedProcedure
+    .input(z.object({ platformPostIds: z.array(z.string()).min(1).max(50) }))
+    .query(async ({ ctx, input }) => {
+      await Promise.all(
+        input.platformPostIds.map((id) => assertPostAccess(ctx, id)),
+      );
       return ctx.db.query.amplificationTargetTable.findMany({
-        where: eq(amplificationTargetTable.momentId, input.momentId),
+        where: inArray(
+          amplificationTargetTable.platformPostId,
+          input.platformPostIds,
+        ),
         with: { amplifier: true },
         orderBy: [desc(amplificationTargetTable.createdAt)],
       });

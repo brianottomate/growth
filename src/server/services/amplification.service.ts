@@ -7,16 +7,14 @@ import {
   amplificationTargetTable,
   amplifierTable,
   brandTable,
-  contentPostTable,
-  initiativeTable,
   platformPostTable,
 } from "@/server/db/schema";
 import { amplifierHandlesAccount } from "./amplification-matching";
 
 /**
- * Best-effort reconciliation after canonical post ingest. A repost/quote made by
- * a recruited account fulfills its target when the original post belongs to a
- * content item attached to that moment.
+ * Best-effort reconciliation after canonical post ingest. A repost/quote made
+ * by a recruited account fulfills its target on the original post directly —
+ * targets are keyed by (platformPostId, amplifierId).
  */
 export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
   if (!postIds.length) return 0;
@@ -35,18 +33,11 @@ export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
       ),
     });
     const original = originals.find((candidate) => candidate.contentPostId);
-    if (!original?.contentPostId) continue;
+    if (!original) continue;
 
-    const content = await db.query.contentPostTable.findFirst({
-      where: eq(contentPostTable.id, original.contentPostId),
-    });
-    if (!content?.initiativeId) continue;
-    const initiative = await db.query.initiativeTable.findFirst({
-      where: eq(initiativeTable.id, content.initiativeId),
-    });
-    if (!initiative) continue;
+    // Amplifiers are org-scoped; resolve the org from the original's brand.
     const brand = await db.query.brandTable.findFirst({
-      where: eq(brandTable.id, initiative.brandId),
+      where: eq(brandTable.id, original.brandId),
     });
     if (!brand?.organizationId) continue;
 
@@ -73,7 +64,7 @@ export async function reconcileAmplificationTargetsForPosts(postIds: string[]) {
       })
       .where(
         and(
-          eq(amplificationTargetTable.momentId, initiative.id),
+          eq(amplificationTargetTable.platformPostId, original.id),
           eq(amplificationTargetTable.amplifierId, amplifier.id),
         ),
       )

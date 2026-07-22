@@ -44,13 +44,19 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
 
-  const { data: targets, isLoading } = useQuery(
-    trpc.amplifier.targetsForMoment.queryOptions({ momentId }),
+  const { data, isLoading } = useQuery(
+    trpc.amplifier.targetsForInitiative.queryOptions({
+      initiativeId: momentId,
+    }),
   );
+  const targets = data?.targets;
+  const posts = data?.posts ?? [];
 
   const invalidate = () =>
     queryClient.invalidateQueries(
-      trpc.amplifier.targetsForMoment.queryOptions({ momentId }),
+      trpc.amplifier.targetsForInitiative.queryOptions({
+        initiativeId: momentId,
+      }),
     );
 
   const setAsk = useMutation(
@@ -150,7 +156,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
       <AddAmplifierDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        momentId={momentId}
+        posts={posts}
         existingAmplifierIds={new Set((targets ?? []).map((t) => t.amplifierId))}
         onAdded={invalidate}
       />
@@ -158,24 +164,41 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   );
 }
 
+type InitiativePost = {
+  id: string;
+  platform: string;
+  title: string | null;
+  scheduledAt: Date | string | null;
+};
+
+const postLabel = (post: InitiativePost) =>
+  `${post.platform} · ${post.title ?? "Untitled"}${
+    post.scheduledAt
+      ? ` · ${new Date(post.scheduledAt).toLocaleDateString()}`
+      : ""
+  }`;
+
 // ---- add / recruit dialog -------------------------------------------
 
 function AddAmplifierDialog({
   open,
   onOpenChange,
-  momentId,
+  posts,
   existingAmplifierIds,
   onAdded,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  momentId: string;
+  posts: InitiativePost[];
   existingAmplifierIds: Set<string>;
   onAdded: () => Promise<void> | void;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"pick" | "new">("pick");
+  // Asks anchor to one platform post; default to the first of the launch.
+  const [postId, setPostId] = useState<string>("");
+  const selectedPostId = postId || posts[0]?.id || "";
 
   // ---- pick from the org rolodex ----
   const [q, setQ] = useState("");
@@ -209,11 +232,14 @@ function AddAmplifierDialog({
   const createAndAdd = useMutation(
     trpc.amplifier.create.mutationOptions({
       onSuccess: async (amp) => {
-        if (!amp) return;
+        if (!amp || !selectedPostId) return;
         await queryClient.invalidateQueries(
           trpc.amplifier.list.queryOptions(),
         );
-        addTarget.mutate({ momentId, amplifierId: amp.id });
+        addTarget.mutate({
+          platformPostId: selectedPostId,
+          amplifierId: amp.id,
+        });
         setName("");
         setHandle("");
       },
@@ -229,10 +255,28 @@ function AddAmplifierDialog({
         <DialogHeader>
           <DialogTitle>Add amplifier</DialogTitle>
           <DialogDescription>
-            Recruit someone to boost this launch. Amplifiers are shared across
-            the whole org — pick an existing one or create a new contact.
+            Recruit someone to boost one post of this launch. Amplifiers are
+            shared across the whole org — pick an existing one or create a new
+            contact.
           </DialogDescription>
         </DialogHeader>
+
+        {posts.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            This launch has no posts yet — create content first, then recruit
+            amplification for the post that matters.
+          </p>
+        ) : (
+          <SimpleSelect
+            value={selectedPostId}
+            onValueChange={setPostId}
+            options={posts.map((post) => ({
+              value: post.id,
+              label: postLabel(post),
+            }))}
+            aria-label="Post to amplify"
+          />
+        )}
 
         <div className="bg-muted flex gap-1 rounded-lg p-1">
           {(["pick", "new"] as const).map((t) => (
@@ -281,9 +325,12 @@ function AddAmplifierDialog({
                     <button
                       key={a.id}
                       type="button"
-                      disabled={busy}
+                      disabled={busy || !selectedPostId}
                       onClick={() =>
-                        addTarget.mutate({ momentId, amplifierId: a.id })
+                        addTarget.mutate({
+                          platformPostId: selectedPostId,
+                          amplifierId: a.id,
+                        })
                       }
                       className="hover:bg-accent/40 flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors disabled:opacity-50"
                     >

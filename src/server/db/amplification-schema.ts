@@ -1,19 +1,22 @@
 import { relations } from "drizzle-orm";
 import { index, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
-import { initiativeTable } from "./ads-schema";
 import { organizationTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
+import { platformPostTable } from "./content-schema";
 import { createId } from "./utils";
 
 /**
- * The earned-amplification layer of a "moment" (the raised initiative).
+ * The earned-amplification layer.
  *
- * An `amplifier` is a lightweight CONTACT we recruit to boost a launch
- * (investor, press, partner, creator, team) — NOT a brand: no channels,
- * enrichment, or content. `amplification_target` is the per-moment row tying an
- * amplifier to a launch with a recruitment status — the live version of the
- * "who's reposting" spreadsheet.
+ * An `amplifier` is a lightweight CONTACT we recruit to boost a post
+ * (investor, press, partner, creator, team). `promotedBrandId` optionally
+ * links one to an owned brand (e.g. a founder's personal brand) — for those
+ * we can mint the repost draft ourselves instead of asking.
+ * `amplification_target` ties an amplifier to ONE platform_post with a
+ * recruitment status — the live version of the "who's reposting" spreadsheet.
+ * Which posts deserve amplification is a judgment call made per post (by a
+ * human or the assistant), deliberately not a standing rule in the schema.
  */
 
 // One handle on a platform — a "proto-channel". Used to match a hero post's
@@ -73,10 +76,10 @@ export const amplificationTargetTable = pgTable(
       .primaryKey()
       .$defaultFn(() => createId("atgt")),
 
-    // The moment (raised initiative) and the amplifier we want to recruit.
-    momentId: t
+    // The post being boosted and the amplifier we want to recruit.
+    platformPostId: t
       .text()
-      .references(() => initiativeTable.id, { onDelete: "cascade" })
+      .references(() => platformPostTable.id, { onDelete: "cascade" })
       .notNull(),
     amplifierId: t
       .text()
@@ -105,10 +108,10 @@ export const amplificationTargetTable = pgTable(
       .notNull(),
   }),
   (table) => [
-    index("amplification_target_moment_idx").on(table.momentId),
+    index("amplification_target_post_idx").on(table.platformPostId),
     index("amplification_target_amplifier_idx").on(table.amplifierId),
     uniqueIndex("amplification_target_unique_idx").on(
-      table.momentId,
+      table.platformPostId,
       table.amplifierId,
     ),
   ],
@@ -138,9 +141,9 @@ export const amplifierRelations = relations(
 export const amplificationTargetRelations = relations(
   amplificationTargetTable,
   ({ one }) => ({
-    moment: one(initiativeTable, {
-      fields: [amplificationTargetTable.momentId],
-      references: [initiativeTable.id],
+    platformPost: one(platformPostTable, {
+      fields: [amplificationTargetTable.platformPostId],
+      references: [platformPostTable.id],
     }),
     amplifier: one(amplifierTable, {
       fields: [amplificationTargetTable.amplifierId],
