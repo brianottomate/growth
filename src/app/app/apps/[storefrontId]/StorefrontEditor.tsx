@@ -55,7 +55,7 @@ export function StorefrontEditor({
 }) {
   const trpc = useTRPC();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("content");
+  const [tab, setTab] = useState<Tab>("preview");
   const [content, setContent] = useState<StorefrontContent>(storefront.content);
   const [rawJson, setRawJson] = useState(
     JSON.stringify(storefront.content, null, 2),
