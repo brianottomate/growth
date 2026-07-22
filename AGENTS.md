@@ -1,396 +1,222 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides repository-specific guidance to coding agents.
 
-**Jetpack** is a modern Next.js SaaS starter template for rapid application development.
+## What this is
 
-## Development Commands
+The Wander **Growth team back-office** app — an internal tool that unifies brand/content
+operations, lead prospecting, lifecycle/outreach automation, and social listening. It
+started from a T3 "Jetpack" SaaS template (hence leftover scaffolding like the org/team
+auth model), but the live product is the growth tooling. Treat the README and any
+"Jetpack starter template" language as historical — the demos and example `post` router
+have been removed.
+
+> Sibling repos and the wandercom monorepo layout are documented in `../CLAUDE.md`.
+> This file is scoped to the `growth/` repo only.
+
+## Commands
+
+Package manager is **Bun** (not npm/yarn/pnpm).
 
 ```bash
-# Development
-bun dev                    # Start Next.js dev server with Turbo
-bun run velite:dev         # Watch MDX content changes (run in parallel)
-bun run email:dev          # Preview email templates
+bun dev                 # Next.js dev server (Turbopack)
+bun run velite:dev      # Watch MDX/blog content (run alongside dev)
+bun run email:dev       # Preview React Email templates
 
-# Database
-bun run db:push            # Push schema changes to database (for development)
-bun run db:generate        # Generate migration files
-bun run db:migrate         # Run migrations (for production)
-bun run db:studio          # Open Drizzle Studio to view/edit data
+bun run check           # eslint + tsc --noEmit — run this before considering work done
+bun run typecheck       # tsc --noEmit only
+bun test                 # Bun unit tests
+bun run ai:contracts    # AI catalog/schema/policy contract gate
+bun run ai:gauntlet     # Contract gate plus isolated live DB access/receipt checks
+bun run lint:fix        # eslint --fix
+bun run format:write    # prettier
 
-# Code Quality
-bun run check              # Run linter and type checker
-bun run typecheck          # Type check only
-bun run lint               # Lint code
-bun run lint:fix           # Fix linting issues
-bun run format:check       # Check code formatting
-bun run format:write       # Format code
+bun run db:push         # Push schema to DB (dev iteration)
+bun run db:generate     # Generate migration files
+bun run db:migrate      # Apply migrations (production)
+bun run db:studio       # Drizzle Studio
+bun run db:seed         # scripts/seed.ts (seeded rows get isSeed=true)
+bun run db:unseed       # Remove seeded rows
 
-# Building
-bun run build              # Build Velite content + Next.js (for production)
-bun run preview            # Build and start production server locally
-bun start                  # Start production server
+bun run build           # velite build + next build
 ```
 
-## Architecture Overview
-
-This is a T3 Stack Next.js 16 SaaS application using the App Router with a modern, type-safe architecture.
-
-### Core Stack
-
-- **Framework**: Next.js 16 with App Router and React 19
-- **Database**: PostgreSQL (Neon) with Drizzle ORM (snake_case convention)
-- **API Layer**: tRPC v11 for type-safe APIs with SuperJSON transformer
-- **Auth**: Better Auth with organization/team support
-- **Styling**: Tailwind CSS 4 with Radix UI components
-- **Content**: Velite for MDX blog posts
-- **Package Manager**: Bun (not npm/yarn)
-
-### Project Structure
-
-```
-src/
-├── app/                           # Next.js App Router
-│   ├── (auth)/                   # Auth pages (signin, signup, etc.)
-│   ├── (marketing)/              # Public marketing pages
-│   ├── app/                      # Protected app pages (requires auth)
-│   │   ├── app/dashboard/       # User dashboard
-│   │   ├── app/account/         # User account settings
-│   │   ├── app/org/[orgSlug]/  # Organization pages
-│   │   ├── app/onboarding/     # User onboarding flow
-│   │   └── app/demos/          # Demo pages for features
-│   └── api/                      # API routes
-│       ├── trpc/[trpc]/         # tRPC endpoint
-│       ├── auth/[...all]/       # Better Auth endpoints
-│       └── blob/                # File upload endpoints
-├── server/                        # Backend code
-│   ├── api/                      # tRPC routers and setup
-│   │   ├── root.ts              # Main tRPC router (add new routers here)
-│   │   ├── trpc.ts              # tRPC context, procedures (publicProcedure, protectedProcedure, adminProcedure)
-│   │   └── routers/             # Feature routers (user, org, post, blob, newsletter)
-│   ├── db/                       # Database layer
-│   │   ├── schema.ts            # Main schema (imports auth-schema)
-│   │   ├── auth-schema.ts       # Better Auth tables + organizations/teams
-│   │   ├── index.ts             # Database client export
-│   │   └── utils.ts             # ID generation (createId with prefixes)
-│   ├── better-auth/              # Authentication config
-│   │   ├── config.ts            # Better Auth setup with plugins
-│   │   ├── client.ts            # Client-side auth utilities
-│   │   └── server.ts            # Server-side auth utilities
-│   ├── services/                 # Business logic services
-│   └── clients/                  # External service clients (Resend, etc.)
-├── components/                    # React components
-│   ├── ui/                       # Radix UI-based components (generated by shadcn)
-│   └── mdx/                      # MDX components for blog
-├── lib/                          # Shared utilities
-│   ├── validators/               # Zod schemas for validation
-│   ├── utils/                    # Helper functions
-│   └── auth-utils.ts            # Auth helper functions
-├── trpc/                         # tRPC client setup
-│   ├── react.tsx                # Client-side tRPC provider
-│   └── server.tsx               # Server-side tRPC caller
-└── env.ts                        # Environment variables schema (using @t3-oss/env-nextjs)
-
-emails/                            # React Email templates
-content/posts/                     # MDX blog posts (processed by Velite)
-```
-
-### Database Schema
-
-The database uses **snake_case** naming (configured in `drizzle.config.ts`).
-
-**Core Auth Tables** (managed by Better Auth):
-- `user` - User accounts with preferences (dateFormat, unitSystem, currency, timezone)
-- `session` - Sessions with organization context (activeOrganizationId, activeTeamId)
-- `account` - OAuth and credential accounts
-- `verification` - Email verification tokens
-
-**Organization Tables**:
-- `organization` - Organizations with billing fields (plan, subscriptionId, subscriptionStatus)
-- `member` - Organization memberships with roles (owner/admin/member)
-- `team` - Teams within organizations
-- `team_member` - Team memberships
-- `invitation` - Pending organization invitations
-
-**App Tables**:
-- `post` - Example posts table
-- `attachment` - File uploads with Vercel Blob (resourceType + resourceId pattern)
-
-**ID Conventions**: Use `createId()` from `src/server/db/utils.ts` with prefixes:
-- `usr_*` for users
-- `org_*` for organizations
-- `mbr_*` for members
-- `team_*` for teams
-- `att_*` for attachments
-- `pst_*` for posts
-- `inv_*` for invitations
-
-### Authentication Flow
-
-Better Auth is configured with these plugins:
-- **username**: Username support (username + displayUsername fields)
-- **admin**: Admin roles, user banning, session impersonation
-- **anonymous**: Anonymous user support with data migration on signup
-- **organization**: Multi-tenant organizations with teams and invitations
-
-**Auth Procedures**:
-- `publicProcedure` - No auth required (session optional)
-- `protectedProcedure` - Requires authenticated user
-- `adminProcedure` - Requires admin in production, unrestricted in development
-
-**Session Context**: The tRPC context includes `session`, `db`, and `authApi` (Better Auth API for server actions).
-
-### tRPC Patterns
-
-**Adding New Routers**:
-1. Create router in `src/server/api/routers/yourRouter.ts`
-2. Export it from `src/server/api/root.ts` in the `appRouter`
-3. Use `protectedProcedure` for auth-required endpoints
-
-**Client Usage**:
-```tsx
-// In Client Components
-'use client';
-import { useTRPC } from '@/trpc/react';
-
-const MyComponent = () => {
-  const { data } = useTRPC.user.me.useQuery();
-  const updateMutation = useTRPC.user.update.useMutation();
-};
-
-// In Server Components
-import { createCaller } from '@/server/api/root';
-import { createTRPCContext } from '@/server/api/trpc';
-
-const trpc = createCaller(await createTRPCContext({ headers: headers() }));
-const data = await trpc.user.me();
-```
-
-**Timing Middleware**: All procedures have artificial 100-400ms delay in development to catch waterfalls.
-
-### File Upload Pattern
-
-Vercel Blob is used for file storage with a structured approach:
-
-1. **Attachment Table**: Track all uploads with `resourceType` + `resourceId` pattern
-2. **Upload Routes**:
-   - `/api/blob/upload` - Server-side upload (used by admin/automated processes)
-   - `/api/blob/client-upload` - Client-side upload with presigned URLs
-
-**Adding New Resource Types**:
-1. Add to `RESOURCE_TYPES` in `src/server/db/constants.ts`
-2. Update `resourceType` enum in attachment table if needed
-
-### Onboarding System
-
-Simple example in `src/app/app/onboarding/page.tsx` demonstrating:
-- Multi-step progress tracking
-- Client-side timezone detection (Intl API)
-- Server-side geo detection (Vercel headers)
-- Shared Zod schema (`src/lib/validators/onboarding.ts`)
-
-Customize the steps and fields for your app's needs.
-
-### Analytics Architecture
-
-A two-layer architecture separates provider clients from application logic:
-
-**Layer 1: Provider Clients** (`src/server/clients/`)
-- **PostHog** (`posthog.client.ts`): Server-side analytics and feature flags
-  - Initialized at module load time - fails fast if `NEXT_PUBLIC_POSTHOG_KEY` missing
-  - Direct usage discouraged - use analytics service instead
-  - Export `isPostHogConfigured` for conditional feature flag usage
-  - All functions use `posthog` singleton directly (no repeated checks)
-
-**Layer 2: Analytics Service** (`src/server/services/analytics.service.ts`)
-- **Multi-provider abstraction** with graceful degradation
-- Conditionally registers PostHog only if configured (checks `isPostHogConfigured`)
-- Always includes Vercel Analytics
-- Fire-and-forget with `waitUntil()` - never blocks HTTP responses
-- Use this service for all application analytics needs
-
-**Key Pattern**: Provider clients fail fast (throw errors), service layer handles graceful degradation.
-
-**Usage**:
-```ts
-// ✅ CORRECT: Use analytics service
-import { trackServerEvent } from '@/server/services/analytics.service';
-trackServerEvent(userId, 'user_signed_up', { method: 'google' });
-
-// ❌ AVOID: Direct PostHog usage (unless feature flags)
-import { captureEvent } from '@/server/clients/posthog.client';
-await captureEvent({ ... }); // Will throw if not configured
-
-// ✅ OK: Feature flags (check first)
-import { isPostHogConfigured, isFeatureEnabled } from '@/server/clients/posthog.client';
-if (isPostHogConfigured) {
-  const enabled = await isFeatureEnabled({ ... });
-}
-```
-
-### Codex/Anthropic Client
-
-A comprehensive client for the Anthropic Codex API in `src/server/clients/Codex.client.ts`.
-
-**Provider Client** (`Codex.client.ts`):
-- Official `@anthropic-ai/sdk` package
-- Initialized at module load time - fails fast if `ANTHROPIC_API_KEY` missing
-- Export `isClaudeConfigured` for conditional feature usage
-- Model constants: `CLAUDE_MODELS.SONNET_4_5` (default), `OPUS_4_5`, `HAIKU_3_5`, etc.
-
-**Key Wrapper Functions**:
-- `createMessage()` - Basic message creation
-- `completeText()` - Simplified text completion (no message array needed)
-- `streamMessage()` - Streaming responses
-- `collectStreamedResponse()` - Stream internally but return full result
-- `continueConversation()` - Multi-turn conversations with history management
-- `analyzeImage()` / `analyzeImageFromUrl()` - Vision capabilities
-- `createMessageWithPrefill()` - Response shaping (e.g., force JSON format)
-
-**Utilities**:
-- `extractText()` - Get text content from response
-- `calculateTokenUsage()` - Token counting and cost estimation
-- `handleAnthropicError()` - Graceful error handling with type guards
-
-**Usage**:
-```ts
-// ✅ Simple completion
-import { completeText, CLAUDE_MODELS } from '@/server/clients/Codex.client';
-const result = await completeText({
-  prompt: "Explain React hooks",
-  system: "You are a technical educator",
-  model: CLAUDE_MODELS.SONNET_4_5
-});
-
-// ✅ Streaming
-import { streamMessage } from '@/server/clients/Codex.client';
-const stream = await streamMessage({
-  messages: [{ role: "user", content: "Write a story" }],
-});
-for await (const event of stream) {
-  if (event.type === "content_block_delta") {
-    // Handle streaming chunk
-  }
-}
-
-// ✅ Vision
-import { analyzeImageFromUrl } from '@/server/clients/Codex.client';
-const result = await analyzeImageFromUrl({
-  imageUrl: "https://example.com/image.jpg",
-  prompt: "What's in this image?",
-});
-
-// ✅ Direct SDK usage (when you need more control)
-import { anthropic } from '@/server/clients/Codex.client';
-const response = await anthropic.messages.create({ ... });
-```
-
-### Content Management (Blog)
-
-Velite processes MDX files from `content/posts/` into type-safe data:
-- Run `bun run velite:dev` during development to watch for changes
-- Posts support frontmatter (h1, metaTitle, author, category, tags, thumbnail)
-- Auto-detects thumbnails from `public/images/blog/thumbnails/{slug}.png`
-- Configuration in `velite.config.ts`
-- Blog authors defined in `src/lib/blog-authors.ts`
-
-### Environment Variables
-
-All env vars are validated in `src/env.ts` using `@t3-oss/env-nextjs`:
-- Required in production: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `OPENAI_API_KEY`, `ADMIN_TOKEN`
-- Optional: `RESEND_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `ANTHROPIC_API_KEY`, `FIRECRAWL_API_KEY`, `NEXT_PUBLIC_POSTHOG_KEY`
-
-Use `envSelect({ prod: X, test: Y })` helper for environment-aware values (production vs preview/development).
-
-### Key Patterns
-
-**Multi-Tenancy**: Organizations are stored in session (`session.activeOrganizationId`) and used for data scoping.
-
-**Type Safety**:
-- Use `RouterInputs` and `RouterOutputs` types from `@/trpc/react` for tRPC type inference
-- Database types: `User`, `Organization`, `Post`, etc. exported from schema files
-- Zod validators in `src/lib/validators/` shared between frontend and backend
-
-**Server-Only Code**: Mark sensitive files with `import "server-only"` to prevent client bundling.
-
-**Admin Operations**: The `adminProcedure` allows unrestricted access in development mode for rapid testing.
-
-## Growth Platform: Customer.io → Outreach Sync
-
-This playground is the **TypeScript successor** to `wander-growth-api` (Python/FastAPI), focused on real-time lead synchronization between Customer.io and Outreach. The Python API is the reference implementation at `../wander-growth-api/`.
-
-### Infrastructure Decisions (Feb 2026)
-
-| Layer | Choice | Notes |
-|-------|--------|-------|
-| **Compute** | Vercel Pro + Fluid Compute | Up to 15min execution, `waitUntil()` for background processing |
-| **Database** | Neon PostgreSQL | Org preference, branching for preview envs, Drizzle ORM (existing) |
-| **Cron** | Vercel Cron | Pro plan supports every-minute granularity |
-| **File Storage** | Cloudflare R2 | Already in use org-wide |
-| **Queues (future)** | QStash / Inngest | For retry guarantees; not needed day 1 — backfill cron catches failures |
-
-**Rejected alternatives**: Cloudflare D1 (SQLite limitations, needs proxy for Vercel access), Supabase (org prefers Neon). Neon was chosen over D1 despite org being on Cloudflare because the playground already uses Neon/Postgres and the D1 driver requires Workers runtime bindings.
-
-**Row-change triggers**: Neon doesn't have Supabase's `pg_net`. Not needed — all writes go through tRPC, so trigger workflows from mutations directly. For future CDC needs, Neon supports [logical replication + Inngest](https://www.inngest.com/blog/neon-postgres-database-triggers-for-durable-functions).
-
-### What Exists (Outreach integration)
-
-- **Outreach client** (`src/server/clients/outreach.client.ts`): S2S JWT auth + OAuth 2.0 with token caching
-- **Outreach types** (`src/server/clients/outreach.types.ts`): Full TypeScript types for prospects, accounts, sequences
-- **API routes** (`src/app/api/outreach/`): Test, search, accounts, stats, OAuth flow, install, webhook (app lifecycle only)
-- **tRPC router** (`src/server/api/routers/outreach.router.ts`): `testAuth`, `getProspects`
-
-### What Needs to Be Built
-
-1. **Customer.io client** (`src/server/clients/customerio.client.ts`) — read/write customers, manage attributes
-2. **CIO webhook endpoint** (`POST /api/cio/webhook`) — HMAC-SHA256 validation, immediate 200, `waitUntil()` for processing
-3. **Sync service** (`src/server/services/sync.service.ts`) — orchestrate CIO → Outreach with field mapping
-4. **Sync DB tables** — `sync_events` (audit log), `field_mappings`, `sync_state`
-5. **Cron jobs** — daily comprehensive sync, backfill, auto-healing (via Vercel Cron)
-6. **BDR assignment** — round-robin logic (reference: `wander-growth-api/app/services/bdr/`)
-
-### CIO Webhook Pipeline (target architecture)
-
-```
-Customer.io fires webhook (payment_info_entered, checkout_started, user_signed_up, order_completed)
-  → POST /api/cio/webhook
-  → Validate HMAC-SHA256 signature
-  → Return 200 OK immediately
-  → waitUntil(processLead())
-       ├─ Fetch/enrich lead data
-       ├─ Assign BDR (round-robin)
-       ├─ Create/update Outreach prospect (30+ field mapping)
-       ├─ Write sync_event to Neon (audit trail)
-       └─ Notify assigned BDR via Slack
-```
-
-### Reference: Python API Cron Jobs
-
-The Python API (`wander-growth-api/app/cron/jobs.py`) runs these active cron jobs that may need porting:
-
-| Job | Schedule | Purpose |
-|-----|----------|---------|
-| `customer_io_daily` | 00:00 UTC | Property collections, recommendations, BDR sync |
-| `daily_comprehensive_sync` | 03:00 UTC | Full 24h lead sync CIO → Outreach (15m timeout) |
-| `outreach_auto_healing` | 03:30 UTC | Fix CIO/Outreach assignment mismatches |
-| `outreach_backfill_sync` | 04:00 UTC | Catch `late_sync` and `never_synced` profiles (30m timeout) |
-| `bdr_alignment_backfill` | 08:00 UTC | Round-robin assign unassigned leads |
-| `bdr_alignment_polling` | Every 20m | Process queued webhooks + BigQuery drift check |
-| `booker_recency_hourly` | Every hour | Recent bookings → Outreach Stage 68 |
-| `orphaned_sync_events_cleanup` | Every 5m | Cleanup stuck sync events |
-
-### Future: Wander Sites Contacts Database
-
-A separate major project will use this same Neon database for storing 100K+ property management contacts for programmatic website generation. Key needs:
-- Contact list with inspection/management tools
-- tRPC procedures for triggering generation workflows
-- Workflow triggers from tRPC mutations (not DB triggers)
-
-## Important Notes
-
-- **Never run `npm` or `yarn`** - this project uses Bun as the package manager
-- **Database migrations**: Deployments currently use `db:push`. Do not treat the partial `drizzle/meta/_journal.json` as a valid migration chain; follow `docs/database-migration-transition.md` for the planned baseline and cutover.
-- **Auth routes**: All auth handled by Better Auth at `/api/auth/[...all]`
-- **tRPC endpoint**: Single endpoint at `/api/trpc/[trpc]` handles all tRPC calls
-- **Image optimization**: Configure remote patterns in `next.config.ts` for external images
-- **Content builds**: Run `velite build` before `next build` (automated in build script)
+`bun run check`, `bun test`, and `bun run ai:contracts` are the normal gates.
+Use the full `ai:gauntlet` only with a current non-production Neon branch.
+
+One-off scripts live in `scripts/` (run via `bun run scripts/<file>.ts`) and
+`src/scripts/` (operational tooling, e.g. CIO sync/repair — see `cio:diagnose`/`cio:repair`).
+
+## Stack
+
+Next.js 16 (App Router, React 19) · tRPC v11 + TanStack Query (SuperJSON) · Drizzle ORM on
+Neon Postgres · Better Auth (organization/admin/username plugins) · Tailwind CSS 4 + Radix ·
+Velite for MDX · React Email + Resend · Vercel (deploy, Blob, Cron) · Vercel AI SDK +
+Anthropic. Deployed on Vercel as the **`wanderdev/growth`** project (org slug is
+`wanderdev`, not `wander` — `vercel list` needs the linked project, not `wander/growth`).
+
+## MCP
+
+Growth exposes the same canonical AI capability registry over Streamable HTTP at
+`src/app/api/mcp`. Better Auth provides OAuth 2.1, dynamic client registration,
+PKCE, and organization-scoped access tokens. The MCP route must re-check live
+organization membership and must not fall back to a browser session or first
+organization.
+
+Read `docs/mcp-capabilities.md` before changing OAuth, organization selection,
+the capability registry, or connector exposure. Vercel is the application and
+MCP deployment pipeline. Do not create a duplicate MCP deployment elsewhere.
+
+## Architecture
+
+### tRPC
+
+- Routers live in `src/server/api/routers/*.router.ts` and must be registered in
+  `src/server/api/root.ts` (`appRouter`). Current routers: user, ads, amplifier,
+  audience, brand, cadence, channel, channelSuggestion, content, conversion, inbox,
+  initiative, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
+  listening, media, mention, moment, reddit, reschedule, spend, studio, twitter.
+  Note: `apply` is a
+  tRPC-reserved procedure name.
+- The monthly content loop (strategy targets → slot generation → workbook import →
+  review → apply) is documented in `docs/content-monthly-loop.md`.
+- Procedures (`src/server/api/trpc.ts`): `publicProcedure`, `protectedProcedure`
+  (requires session), `adminProcedure` (admin in prod, unrestricted in dev).
+- Context exposes `session`, `db`, and the Better Auth `authApi`.
+- See the `trpc-patterns` skill for client/server usage conventions.
+
+### Database schema — domain-split with a barrel constraint
+
+Schema is split by domain under `src/server/db/`:
+
+| File                      | Domain                                                                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `auth-schema.ts`          | Better Auth: user, session, account, verification + organization, member, team, team_member, invitation                                                |
+| `brand-schema.ts`         | brand, brand_inspiration, access (Notion-style grants)                                                                                                 |
+| `channel-schema.ts`       | channel (per-brand social/marketing channels), channel_suggestion                                                                                      |
+| `content-schema.ts`       | series, content_post (planned/internal), platform_post + platform_post_link (published, synced), content_assignee, content_comment, content_suggestion |
+| `ads-schema.ts`           | initiative, campaign, ad_spot, audience, audience_target (intent layer)                                                                                |
+| `amplification-schema.ts` | amplifier (influencers/partners), amplification_target                                                                                                 |
+| `cadence-schema.ts`       | cadence_target, mix_target (observed/target cadence + format mix)                                                                                      |
+| `listening-schema.ts`     | mention (persisted social mentions), listening_source (evolvable per-channel config)                                                                   |
+| `media-schema.ts`         | media_asset (R2 images / Cloudflare Stream video)                                                                                                      |
+| `leads-schema.ts`         | **separate `leads` Postgres schema** — lead_domain, lead_contact, lead_import                                                                          |
+| `lifecycle-schema.ts`     | lifecycle_program + lifecycle_program_step (intent), lifecycle_campaign, lifecycle_touchpoint (mirrored CIO/outbound)                                  |
+| `schema.ts`               | attachment table + **barrel that re-exports every domain file**                                                                                        |
+
+**Critical:** `schema.ts` must `export *` every domain file. `drizzle.config.ts` points at
+`schema.ts`, and Better Auth does `import * as schema` — both only see tables re-exported
+through the barrel. Adding a domain file without re-exporting it makes its tables invisible
+to migrations and auth. When you add a domain schema file, add it to the barrel.
+
+Other conventions:
+
+- **snake_case** column casing (set via `casing: "snake_case"` in `drizzle.config.ts` and
+  the db client). Use camelCase in TS; Drizzle maps it.
+- IDs via `createId("prefix")` from `db/utils.ts` (e.g. `usr_`, `org_`, `att_`, `pst_`).
+- `leads` lives in its **own Postgres schema** so it stays decoupled/droppable —
+  `drizzle.config.ts` has `schemaFilter: ["public", "leads"]`; don't drop the filter.
+- DB client (`db/index.ts`): HTTP-based `db` for normal queries; `withTransaction()` spins
+  up a WebSocket pool for transactions. The exported schema is _augmented_ with Better Auth
+  model-name aliases (`user`, `session`, …) for its experimental joins feature.
+- Tables that participate in sync carry an `isSeed` marker so `db:unseed` can strip seed data.
+
+### Auth (Better Auth) — internal tool posture
+
+- Config in `src/server/better-auth/config.ts`. Plugins: username, admin, organization.
+- **Email verification is temporarily disabled** (`requireEmailVerification: false`,
+  `sendOnSignUp: false`) so teammates sign in immediately. Comments mark how to restore it.
+- Signup is gated to `@wander.com` emails; new users auto-join the Wander org. The anonymous
+  plugin was removed.
+- **Agent/local testing:** `GET /api/dev/login` mints a real session without a password
+  (dev-only, 404s in deploys; works on any localhost port) — see `docs/dev-login.md`.
+
+### External integrations (`src/server/clients/`)
+
+Each integration has a thin client; orchestration lives in `src/server/services/`.
+
+- **Zernio** (`zernio.client.ts`) — social publishing/analytics. Wander doesn't compose in
+  Zernio, so `/posts` is empty; the real list-posts endpoint is `/analytics?source=external`.
+- **CustomerIO** (`customerio.client.ts`, `cio-content.ts`) — lifecycle/messaging. Workflow
+  bridges in `cio-to-outreach-workflow.service.ts` and `outreach-to-cio-workflow.service.ts`.
+- **Instantly** (`instantly.client.ts`) — cold-email projection of the leads system-of-record.
+- **Outreach** (`outreach.client.ts`) — sales engagement (OAuth + webhooks).
+- **HubSpot** (`hubspot.client.ts`) — CRM pull/merge/write-back for leads.
+- **Apify / X / Twitter scraper / Reddit / Meta** — social listening & scraping.
+- **BigQuery, Firecrawl, Minerva, Claude, PostHog, Slack, search providers** — supporting.
+
+The leads pipeline is the system-of-record in Neon (`leads.*`); Instantly/HubSpot are
+projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
+
+### Cron jobs (`vercel.json` → `src/app/api/cron/`)
+
+- `/api/cron/spend` — daily 05:30 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
+- `/api/cron/growth?job=daily_comprehensive_sync&...` — daily 03:00 (comprehensive CIO/lead sync)
+- `/api/cron/growth?job=funnel_abandonment_sweep&...` — every 20 min (abandonment sweep)
+- `/api/cron/growth?job=funnel_email_backfill` — every 6h at :30 (funnel email backfill)
+- `/api/cron/instagram` — daily 19:00 UTC (Instagram account watch)
+- `/api/cron/x` — every 6h (X listening scan)
+- `/api/cron/affiliate` — daily 09:00 + weekly report Mon 14:00 (Impact.com monitor)
+- `/api/cron/channels` — daily 04:00 (channel stats refresh)
+
+Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
+`api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
+`api/outreach`, `api/workflows`, `api/og`, `api/admin`, `api/plan/chat` (plan-agent
+streaming endpoint).
+
+### AI (`src/server/ai/`)
+
+- `src/server/ai/capabilities/domains.ts` builds the canonical model-facing
+  domain tools from typed service actions. There is no parallel atomic tool
+  registry and no post-hoc grouping layer.
+- `src/lib/growth-capabilities.ts` is the client-safe capability/action catalog.
+  UI labels and retired-result handling must use it rather than duplicating IDs.
+- `src/server/ai/kernel/policy.ts` defines consequences, approval, idempotency,
+  reversibility, and allowed surfaces once per advertised action.
+- Overview chat, plan chat, and MCP use projections of the same tool definitions
+  through the same execute-time membership, receipt, replay, and error runtime.
+- `PLAN_TOOLS` is the focused read-only projection for the Form|Chat planner.
+- Run `bun run ai:contracts` after any capability, action, policy, schema, MCP,
+  chat-card, or persona change.
+- All structured AI generation uses `generateText`/`streamText` with
+  `Output.object`. Do not add `generateObject` or `streamObject`.
+
+### Frontend
+
+- `src/app/(marketing)/` — public pages (home, blog, brand, zernio, design-system, contact).
+- `src/app/app/` — authed back-office: brands, content, leads, lifecycle, channels,
+  newsletters, pillars, dashboard, org, account, onboarding, plus the newer surfaces
+  `overview` (canonical assistant), `plan` (organic authoring + Form|Chat AI agent),
+  `apps` (marketplace and assistant storefront operations), `product-atlas`,
+  `studio` (content wheel), `media`
+  (asset library), `listen` (social listening + reply drafts), `inbox`, `campaigns`,
+  `audiences`, `people`, `calendar`. `feed-v5` is the live swimlane timeline; older
+  `feed*` variants are retired/in-progress prototypes.
+- `src/app/lab/` — Kristian's private workspace (system maps, whiteboard, one-off
+  tools), admin-gated via `src/server/lab-access.ts` (404 for non-admins; dev mode
+  open). Diagnostic JSON endpoints live under `src/app/api/lab/*` behind the same
+  gate (+ `Bearer ADMIN_TOKEN` for curl). Never link /lab from public pages, and
+  never add an ungated "test" route outside it — the old open /api/test/\* routes
+  leaked lead PII (removed 2026-07-10).
+- UI components in `src/components/ui/` are shadcn/Radix-based.
+- **Styling bridge:** `src/styles/globals.css` maps wandercom design-system tokens
+  (`@wandercom/design-system-*`) into shadcn variables. Theming is via a `data-theme`
+  attribute, **not** a `.dark` class.
+
+## Env
+
+Validated in `src/env.ts` via `@t3-oss/env-nextjs` (add new vars there). Manage Vercel env
+vars with the `vercel-env` skill; inspect deploy logs with the `vercel-logs` skill.
+
+## Important boundaries
+
+- Use Bun. Do not run npm or yarn in this repository.
+- `bun run build` includes `drizzle-kit push`; do not run it casually against an
+  unknown database URL.
+- Preserve the default-deny ad-account allowlist. Aggregator OAuth grants can
+  expose unrelated personal or portfolio accounts.
+- Provider sends, publishes, deletes, campaign changes, and conversion-action
+  mutations require explicit policy and operator approval. Read-only audits do
+  not authorize provider changes.
+- Keep Wander credentials, Google Ads contexts, and provider identities separate
+  from Bifrost, Homi, and other portfolio projects.
