@@ -3,9 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import {
-  commitMomentBlueprint,
   generateMomentBlueprint,
-  momentBlueprintSchema,
   momentSlotSchema,
 } from "@/server/services/plan-moment.service";
 import { requireOwnedBrand } from "./brand-access";
@@ -139,25 +137,13 @@ export const draftMomentBlueprint = growthAction({
       scaleHint: input.scaleHint,
       refine: input.refine,
     });
-    return { blueprint, next: "Review or refine, then call commitMomentPlan." };
-  },
-});
-
-export const commitMomentPlan = growthAction({
-  description:
-    "Materialize an explicitly approved moment blueprint into one initiative, optional series for an arc, concrete content slots, and amplifier targets. Call only with the final reviewed blueprint and launch date.",
-  inputSchema: z.object({
-    brandId: z.string(),
-    name: z.string().min(1),
-    launchDateISO: z.string(),
-    blueprint: momentBlueprintSchema,
-  }),
-  execute: async (input, ctx) => {
-    await requireOwnedBrand(input.brandId, ctx);
-    const result = await commitMomentBlueprint(input);
+    // There is deliberately no commit macro: materialize the approved shape
+    // by composing the small verbs (saveContentSeries, setSeriesCadence,
+    // createIdea, generateSlots, requestAmplification) so each step stays
+    // reviewable and steerable.
     return {
-      ...result,
-      planUrl: `/app/content?brandId=${input.brandId}&view=schedule`,
+      blueprint,
+      next: "Review or refine, then materialize the approved pieces with the granular write actions (series, cadence, ideas, slots, amplification).",
     };
   },
 });
@@ -166,5 +152,4 @@ export const PLANNING_TOOLS = {
   previewTwoWeekSlots,
   generateTwoWeekSlots,
   draftMomentBlueprint,
-  commitMomentPlan,
 } as const;

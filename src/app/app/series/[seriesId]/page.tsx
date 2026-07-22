@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { and, eq, gte, isNull, lt, ne, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  amplificationTargetTable,
   cadenceTargetTable,
   contentPostTable,
   memberTable,
@@ -130,6 +131,35 @@ export default async function SeriesDetailPage({
     ? pillars.find((p) => p.slug === series.pillar)
     : undefined;
 
+  // Amplification asks are anchored to platform posts; group them per
+  // installment for the boost strip.
+  const allSpotIds = installments.flatMap((post) =>
+    post.platformPosts.map((spot) => spot.id),
+  );
+  const amplificationTargets = allSpotIds.length
+    ? await db.query.amplificationTargetTable.findMany({
+        where: inArray(amplificationTargetTable.platformPostId, allSpotIds),
+        with: { amplifier: { columns: { name: true } } },
+        columns: { id: true, platformPostId: true, ask: true },
+      })
+    : [];
+  const spotPlatform = new Map(
+    installments.flatMap((post) =>
+      post.platformPosts.map((spot) => [spot.id, spot.platform] as const),
+    ),
+  );
+  const boostsFor = (post: (typeof installments)[number]) => {
+    const spotIds = new Set(post.platformPosts.map((spot) => spot.id));
+    return amplificationTargets
+      .filter((target) => spotIds.has(target.platformPostId))
+      .map((target) => ({
+        id: target.id,
+        name: target.amplifier.name,
+        platform: spotPlatform.get(target.platformPostId) ?? "",
+        ask: target.ask,
+      }));
+  };
+
   type WeekBucket = {
     start: Date;
     installments: typeof installments;
@@ -243,6 +273,7 @@ export default async function SeriesDetailPage({
                 key={post.id}
                 post={post}
                 spots={spotsFor(post)}
+                boosts={boostsFor(post)}
               />
             ))}
           </div>
@@ -287,6 +318,7 @@ export default async function SeriesDetailPage({
                       key={post.id}
                       post={post}
                       spots={spotsFor(post)}
+                      boosts={boostsFor(post)}
                     />
                   ))}
                   {week.context.slice(0, 3).map((post) => (
@@ -388,9 +420,24 @@ function SpotTile({ spot }: { spot: SpotPreview }) {
   );
 }
 
+type Boost = {
+  id: string;
+  name: string;
+  platform: string;
+  ask: string;
+};
+
+const ASK_DOT: Record<string, string> = {
+  planned: "bg-neutral-500",
+  asked: "bg-amber-400",
+  confirmed: "bg-sky-400",
+  fulfilled: "bg-emerald-400",
+};
+
 function InstallmentCard({
   post,
   spots,
+  boosts,
 }: {
   post: {
     id: string;
@@ -400,6 +447,7 @@ function InstallmentCard({
     owner?: { id: string; name: string | null } | null;
   };
   spots: SpotPreview[];
+  boosts: Boost[];
 }) {
   return (
     <Link
@@ -427,6 +475,25 @@ function InstallmentCard({
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {spots.map((spot) => (
             <SpotTile key={spot.id} spot={spot} />
+          ))}
+        </div>
+      ) : null}
+      {boosts.length > 0 ? (
+        <div className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+          <span className="text-muted-foreground/70">Boost</span>
+          {boosts.map((boost) => (
+            <span
+              key={boost.id}
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"
+              title={`${boost.platform} · ${boost.ask}`}
+            >
+              <span
+                className={`size-1.5 rounded-full ${
+                  ASK_DOT[boost.ask] ?? ASK_DOT.planned
+                }`}
+              />
+              {boost.name} · {boost.platform}
+            </span>
           ))}
         </div>
       ) : null}

@@ -2,6 +2,7 @@ import "server-only";
 
 import { adsScope, topAds } from "./ads";
 import { diagnoseAlignment } from "./alignment";
+import { AMPLIFICATION_TOOLS } from "./amplification";
 import {
   createAudienceTarget,
   listAudienceTargets,
@@ -264,11 +265,22 @@ export const planningRead = growthDomainTool({
 });
 
 export const planningWrite = growthDomainTool({
-  description: "Generate slots or commit a reviewed moment blueprint.",
+  description: "Generate cadence-driven content slots.",
   actions: {
     generateSlots: PLANNING_TOOLS.generateTwoWeekSlots,
-    commitMomentPlan: PLANNING_TOOLS.commitMomentPlan,
   },
+});
+
+export const amplificationRead = growthDomainTool({
+  description:
+    "Read the amplifier rolodex with per-contact ask history — who can boost a post and how reliably they deliver.",
+  actions: { list: AMPLIFICATION_TOOLS.listAmplifiers },
+});
+
+export const amplificationWrite = growthDomainTool({
+  description:
+    "Recruit amplifiers for a specific platform post; owned-brand amplifiers get their repost draft minted and linked immediately.",
+  actions: { request: AMPLIFICATION_TOOLS.requestAmplification },
 });
 
 export const leadsRead = growthDomainTool({
@@ -306,6 +318,8 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   strategyWrite,
   planningRead,
   planningWrite,
+  amplificationRead,
+  amplificationWrite,
   leadsRead,
   listeningRead,
 } as const;

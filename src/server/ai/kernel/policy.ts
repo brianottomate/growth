@@ -165,7 +165,9 @@ export const growthActionPolicies = {
     previewSlots: read("model-read", PLAN_READ),
     draftMomentBlueprint: read("model-read", PLAN_READ),
   },
-  planningWrite: { generateSlots: write(), commitMomentPlan: write() },
+  planningWrite: { generateSlots: write() },
+  amplificationRead: { list: read() },
+  amplificationWrite: { request: write({ idempotent: true }) },
   leadsRead: { summary: read() },
   lifecycleRead: {
     overview: read(),
