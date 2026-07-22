@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authClient } from "@/server/better-auth/client";
-import { getCallbackURL } from "@/lib/auth-utils";
+import { getAuthPageHref, getCallbackURL } from "@/lib/auth-utils";
 import { InAppBrowserAlert } from "../components/InAppBrowserAlert";
 
 export function SignInForm() {
@@ -27,11 +27,7 @@ export function SignInForm() {
     searchParams.has("client_id") && searchParams.has("redirect_uri");
   const signUpHref = isOAuthRequest
     ? `/signup?${searchParams.toString()}`
-    : searchParams.get("inviteId")
-      ? `/signup?inviteId=${searchParams.get("inviteId")}`
-      : searchParams.get("orgInviteId")
-        ? `/signup?orgInviteId=${searchParams.get("orgInviteId")}`
-        : "/signup";
+    : getAuthPageHref("/signup", searchParams);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

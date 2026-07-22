@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { AUTH_RETURN_TO_HEADER, getSafeInternalPath } from "@/lib/auth-utils";
 import {
   SidebarInset,
   SidebarProvider,
@@ -24,7 +26,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
 
   if (!session?.user) {
-    redirect("/signin");
+    const returnTo = getSafeInternalPath(
+      (await headers()).get(AUTH_RETURN_TO_HEADER),
+    );
+    redirect(
+      returnTo ? `/signin?returnTo=${encodeURIComponent(returnTo)}` : "/signin",
+    );
   }
 
   // Active organization for the sidebar header. Falls back to the user's first

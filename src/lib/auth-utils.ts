@@ -4,6 +4,45 @@
  */
 
 export const DEFAULT_PASSWORD_RESET_REDIRECT = "/reset-password";
+export const AUTH_RETURN_TO_HEADER = "x-auth-return-to";
+
+const INTERNAL_URL_BASE = "https://growth.invalid";
+
+/** Accept only same-app paths, including query strings and fragments. */
+export function getSafeInternalPath(value: string | null): string | null {
+  if (!value?.startsWith("/")) return null;
+
+  try {
+    const url = new URL(value, INTERNAL_URL_BASE);
+    if (url.origin !== INTERNAL_URL_BASE) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Preserve safe auth context when moving between sign-in and sign-up. */
+export function getAuthPageHref(
+  pathname: "/signin" | "/signup",
+  searchParams: URLSearchParams,
+): string {
+  const params = new URLSearchParams();
+
+  for (const key of ["inviteId", "orgInviteId", "email"] as const) {
+    const value = searchParams.get(key);
+    if (value) params.set(key, value);
+  }
+
+  const returnTo = getSafeInternalPath(
+    searchParams.get("returnTo") ??
+      searchParams.get("callbackUrl") ??
+      searchParams.get("redirect"),
+  );
+  if (returnTo) params.set("returnTo", returnTo);
+
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
 
 /**
  * Email provider configurations for sniper links (direct inbox access)
@@ -112,9 +151,12 @@ export function getCallbackURL(
 
   // Check for explicit callback URL
   const explicitCallback =
-    searchParams.get("callbackUrl") || searchParams.get("redirect");
+    searchParams.get("returnTo") ??
+    searchParams.get("callbackUrl") ??
+    searchParams.get("redirect");
   if (explicitCallback) {
-    return explicitCallback;
+    const fallback = isNewSignup ? "/app/onboarding" : "/app";
+    return getSafeInternalPath(explicitCallback) ?? fallback;
   }
 
   // Default behavior based on whether this is a new signup
