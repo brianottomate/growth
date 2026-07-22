@@ -18,8 +18,9 @@ export type MixTargetInput = {
   targetPct: number;
 };
 
-/** Replace one channel's ordinary cadence as one transaction. Template-scoped
- * targets are intentionally preserved; this editor owns the channel baseline. */
+/** Replace one channel's ordinary cadence as one transaction. Template- and
+ * series-scoped targets are intentionally preserved; this editor owns the
+ * channel baseline. */
 export async function replaceChannelCadence(input: {
   brandId: string;
   channelId: string;
@@ -51,6 +52,7 @@ export async function replaceChannelCadence(input: {
         and(
           eq(cadenceTargetTable.channelId, input.channelId),
           isNull(cadenceTargetTable.template),
+          isNull(cadenceTargetTable.seriesId),
         ),
       );
 
@@ -69,6 +71,67 @@ export async function replaceChannelCadence(input: {
         })),
       )
       .returning({
+        archetype: cadenceTargetTable.archetype,
+        count: cadenceTargetTable.count,
+        period: cadenceTargetTable.period,
+      });
+  });
+}
+
+export type SeriesCadenceTargetInput = CadenceTargetInput & {
+  channelId: string;
+  platform: ChannelPlatform;
+};
+
+/** Replace one series' recurring rhythm (across channels) as one transaction.
+ * Channel baselines are untouched; the slot generator gives series slots the
+ * series' pillar instead of a brand-mix allocation. */
+export async function replaceSeriesCadence(input: {
+  brandId: string;
+  seriesId: string;
+  targets: SeriesCadenceTargetInput[];
+}) {
+  const seen = new Set<string>();
+  for (const target of input.targets) {
+    const supported = new Set<string>(
+      platformFormatsFor(target.platform).map((format) => format.archetype),
+    );
+    if (!supported.has(target.archetype)) {
+      throw new Error(
+        `${target.archetype} is not a supported ${target.platform} format.`,
+      );
+    }
+    const key = `${target.channelId}|${target.archetype}|${target.period}`;
+    if (seen.has(key)) {
+      throw new Error(
+        `Duplicate ${target.platform}/${target.archetype} series target.`,
+      );
+    }
+    seen.add(key);
+  }
+
+  return withTransaction(async (tx) => {
+    await tx
+      .delete(cadenceTargetTable)
+      .where(eq(cadenceTargetTable.seriesId, input.seriesId));
+
+    if (input.targets.length === 0) return [];
+    return tx
+      .insert(cadenceTargetTable)
+      .values(
+        input.targets.map((target) => ({
+          brandId: input.brandId,
+          channelId: target.channelId,
+          platform: target.platform,
+          archetype: target.archetype,
+          count: target.count,
+          period: target.period,
+          seriesId: input.seriesId,
+          isActive: true,
+        })),
+      )
+      .returning({
+        platform: cadenceTargetTable.platform,
         archetype: cadenceTargetTable.archetype,
         count: cadenceTargetTable.count,
         period: cadenceTargetTable.period,

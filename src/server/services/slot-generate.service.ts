@@ -7,6 +7,7 @@ import {
   contentPostTable,
   mixTargetTable,
   platformPostTable,
+  seriesTable,
 } from "@/server/db/schema";
 import type { ChannelPlatform } from "@/server/db/channel-schema";
 import { platformFormatsFor } from "@/server/content/formats";
@@ -60,6 +61,9 @@ export type SlotGenRow = {
   target: number;
   existing: number;
   created: number;
+  // Set when the row comes from a series-scoped target rather than the
+  // channel baseline.
+  series?: string | null;
 };
 
 /** The resolved pillar mix a channel's slots are allocated from (its
@@ -143,7 +147,7 @@ async function generateSlotsForRange(opts: {
         gte(platformPostTable.scheduledAt, rangeStart),
         lt(platformPostTable.scheduledAt, rangeEnd),
       ),
-      columns: { platform: true, archetype: true },
+      columns: { platform: true, archetype: true, contentPostId: true },
     }),
     db.query.channelTable.findMany({
       where: and(
@@ -195,15 +199,23 @@ async function generateSlotsForRange(opts: {
   const rows: SlotGenRow[] = [];
   let createdTotal = 0;
 
-  // Group targets per channel so pillar allocation spans the channel's whole
-  // month (all archetypes), not each archetype separately.
+  // Group baseline targets per channel so pillar allocation spans the
+  // channel's whole month (all archetypes), not each archetype separately.
+  // Series-scoped targets are planned separately below: they inherit the
+  // series' pillar instead of a brand-mix allocation.
   const byChannel = new Map<string, typeof cadenceForPlanning>();
   for (const t of cadenceForPlanning) {
+    if (t.seriesId) continue;
     if (NOT_SLOT_PLANNED.has(`${t.platform}|${t.archetype}`)) continue;
     const list = byChannel.get(t.channelId) ?? [];
     list.push(t);
     byChannel.set(t.channelId, list);
   }
+  const seriesTargets = cadenceForPlanning.filter(
+    (t) =>
+      t.seriesId !== null &&
+      !NOT_SLOT_PLANNED.has(`${t.platform}|${t.archetype}`),
+  );
 
   const channelById = new Map(
     planningChannels.map((channel) => [channel.id, channel]),
@@ -358,6 +370,116 @@ async function generateSlotsForRange(opts: {
           origin: "ai",
           scheduledAt: atNoon(rangeStart, slot.dayOffset),
         });
+      }
+    }
+  }
+
+  // ---- Series-scoped targets: one lane per (series, channel, archetype). --
+  // Existing installments of the series count against its own rhythm (they
+  // also count against the channel baseline above — a series post still
+  // occupies its place in the channel's month).
+  if (seriesTargets.length > 0) {
+    const seriesRows = await db.query.seriesTable.findMany({
+      where: inArray(seriesTable.id, [
+        ...new Set(seriesTargets.map((t) => t.seriesId!)),
+      ]),
+      columns: { id: true, name: true, pillar: true },
+    });
+    const seriesById = new Map(seriesRows.map((row) => [row.id, row]));
+
+    const slotPostIds = [
+      ...new Set(
+        existingSlots
+          .map((post) => post.contentPostId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const seriesByPostId = new Map<string, string>();
+    if (slotPostIds.length > 0) {
+      const posts = await db.query.contentPostTable.findMany({
+        where: inArray(contentPostTable.id, slotPostIds),
+        columns: { id: true, seriesId: true },
+      });
+      for (const post of posts) {
+        if (post.seriesId) seriesByPostId.set(post.id, post.seriesId);
+      }
+    }
+    const existingBySeriesKey = new Map<string, number>();
+    for (const post of existingSlots) {
+      const seriesId = post.contentPostId
+        ? seriesByPostId.get(post.contentPostId)
+        : undefined;
+      if (!seriesId) continue;
+      const key = `${seriesId}|${post.platform}|${post.archetype ?? ""}`;
+      existingBySeriesKey.set(key, (existingBySeriesKey.get(key) ?? 0) + 1);
+    }
+
+    for (const t of seriesTargets) {
+      if (!activeChannelIds.has(t.channelId)) continue;
+      const series = seriesById.get(t.seriesId!);
+      if (!series) continue;
+      const target = rangeTotal(t.count, t.period, days, fullMonth);
+      const existing =
+        existingBySeriesKey.get(
+          `${series.id}|${t.platform}|${t.archetype}`,
+        ) ?? 0;
+      const need = Math.max(0, target - existing);
+      rows.push({
+        platform: t.platform,
+        archetype: t.archetype,
+        count: t.count,
+        period: t.period,
+        target,
+        existing,
+        created: need,
+        series: series.name,
+      });
+      createdTotal += need;
+      if (dryRun || need === 0) continue;
+
+      const format = platformFormatsFor(t.platform).find(
+        (f) => f.archetype === t.archetype,
+      );
+      for (let i = 0; i < need; i++) {
+        const dayOffset = Math.min(
+          days - 1,
+          Math.max(0, Math.round(((i + 0.5) * days) / need) - 1),
+        );
+        const [idea] = await db
+          .insert(contentPostTable)
+          .values({
+            brandId,
+            title: `${series.name}: ${format?.label ?? t.archetype}`,
+            pillar: series.pillar ?? undefined,
+            seriesId: series.id,
+            status: "slot",
+            slotKind: "cadence",
+            origin: "ai",
+            plannedAt: atNoon(rangeStart, dayOffset),
+            targetSpots: format
+              ? [
+                  {
+                    platform: t.platform,
+                    format: format.id,
+                    archetype: t.archetype,
+                  },
+                ]
+              : undefined,
+          })
+          .returning({ id: contentPostTable.id });
+        if (idea) {
+          await db.insert(platformPostTable).values({
+            brandId,
+            contentPostId: idea.id,
+            platform: t.platform,
+            format: format?.id,
+            archetype: t.archetype,
+            source: "owned",
+            status: "slot",
+            origin: "ai",
+            scheduledAt: atNoon(rangeStart, dayOffset),
+          });
+        }
       }
     }
   }

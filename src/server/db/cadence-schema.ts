@@ -3,6 +3,7 @@ import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { brandTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
+import { seriesTable } from "./content-schema";
 import { createId } from "./utils";
 
 // ---- ENUMS ---------------------------------------------------------
@@ -30,6 +31,12 @@ export type CadencePeriod = (typeof cadencePeriodEnum.enumValues)[number];
  *
  * `template` optionally narrows a target to an editorial structure
  * ("a property_roundup weekly"). Targets exist for owned brands only.
+ *
+ * `seriesId` scopes a target to one editorial series ("The AI Moment in
+ * Travel publishes one blog article per week"). Series targets sit alongside
+ * the channel baseline (they share the unique key via seriesId), are ignored
+ * by the baseline editor, and generated slots inherit the series and its
+ * pillar instead of the brand mix allocation.
  */
 export const cadenceTargetTable = pgTable(
   "cadence_target",
@@ -52,6 +59,10 @@ export const cadenceTargetTable = pgTable(
     // Soft registry values (see content-schema TargetSpot / formats registry).
     archetype: t.text().notNull(), // the cadence axis, e.g. "video_short"
     template: t.text(), // optional finer target, e.g. "informational_deck"
+    // Null = channel baseline; set = this series' own recurring rhythm.
+    seriesId: t.text().references(() => seriesTable.id, {
+      onDelete: "cascade",
+    }),
 
     count: t.integer().notNull(),
     period: cadencePeriodEnum().notNull(),
@@ -73,12 +84,15 @@ export const cadenceTargetTable = pgTable(
   (table) => [
     index("cadence_target_brand_idx").on(table.brandId),
     index("cadence_target_channel_idx").on(table.channelId),
-    // One target per channel × archetype × template × period.
+    index("cadence_target_series_idx").on(table.seriesId),
+    // One target per channel × archetype × template × period × series, so a
+    // series rhythm can coexist with the channel baseline on the same axes.
     uniqueIndex("cadence_target_unique_idx").on(
       table.channelId,
       table.archetype,
       table.template,
       table.period,
+      table.seriesId,
     ),
   ],
 );
