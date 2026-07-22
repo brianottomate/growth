@@ -45,7 +45,9 @@ import {
   openTimelinePost,
   proposeContentGroupings,
   proposeStrategyTargets,
+  registerBrandChannel,
   scrapeBrandPosts,
+  setSeriesCadence,
   syncBrandBlog,
   syncBrandWebsite,
   syncOwnedBrandContent,
@@ -207,9 +209,11 @@ export const publishingRead = growthDomainTool({
 });
 
 export const sourceSyncWrite = growthDomainTool({
-  description: "Discover and synchronize provider-backed brand sources.",
+  description:
+    "Discover, register, and synchronize provider-backed brand sources.",
   actions: {
     discoverChannels: discoverBrandChannels,
+    registerChannel: registerBrandChannel,
     scrapePosts: scrapeBrandPosts,
     syncOwnedContent: syncOwnedBrandContent,
     syncWebsite: syncBrandWebsite,
@@ -240,10 +244,12 @@ export const strategyRead = growthDomainTool({
 });
 
 export const strategyWrite = growthDomainTool({
-  description: "Create or update channel cadence and brand-mix targets.",
+  description:
+    "Create or update channel cadence, series cadence, and brand-mix targets.",
   actions: {
     createCadence: createChannelCadence,
     updateCadence: updateChannelCadence,
+    setSeriesCadence,
     createBrandMix,
     updateBrandMix,
   },

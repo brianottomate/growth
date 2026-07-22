@@ -66,6 +66,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   publishingRead: ["connections", "openTimelinePost"],
   sourceSyncWrite: [
     "discoverChannels",
+    "registerChannel",
     "scrapePosts",
     "syncOwnedContent",
     "syncWebsite",
@@ -77,6 +78,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   strategyWrite: [
     "createCadence",
     "updateCadence",
+    "setSeriesCadence",
     "createBrandMix",
     "updateBrandMix",
   ],

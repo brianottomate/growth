@@ -19,15 +19,20 @@ import { suggestTargets } from "@/server/services/cadence-suggest.service";
 import { db } from "@/server/db";
 import {
   cadenceTargetTable,
+  channelKindEnum,
+  channelPlatformEnum,
   channelTable,
+  connectionStatusEnum,
   mediaAssetTable,
   mediaVideoAnalysisTable,
   mixTargetTable,
+  seriesTable,
 } from "@/server/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import {
   replaceBrandMixTargets,
   replaceChannelCadence,
+  replaceSeriesCadence,
 } from "@/server/services/cadence-target.service";
 import { PILLARS } from "@/lib/pillars";
 import {
@@ -592,8 +597,141 @@ export const updateBrandMix = growthAction({
   execute: async (input, ctx) => saveBrandMix(input, ctx, "update"),
 });
 
+const seriesCadenceInput = z.object({
+  brandId: z.string(),
+  seriesId: z.string(),
+  targets: z
+    .array(
+      z.object({
+        platform: cadencePlatform,
+        archetype: z.enum([
+          "image",
+          "carousel",
+          "video_short",
+          "story",
+          "text",
+          "thread",
+          "video_long",
+          "article",
+        ]),
+        ...cadenceTargetFields,
+      }),
+    )
+    .min(1)
+    .max(8)
+    .describe(
+      "The series' complete recurring rhythm across channels (replaces any prior series cadence). Each entry targets one owned channel by platform.",
+    ),
+});
+
+export const setSeriesCadence = growthAction({
+  description:
+    "Set an editorial series' own recurring publishing rhythm (e.g. one blog article and one Instagram video_short per week). Replaces the series' prior cadence; channel baselines are untouched. The slot generator then creates series-attached slots carrying the series' pillar.",
+  inputSchema: seriesCadenceInput,
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    const series = await db.query.seriesTable.findFirst({
+      where: and(
+        eq(seriesTable.id, input.seriesId),
+        eq(seriesTable.brandId, input.brandId),
+        isNull(seriesTable.deletedAt),
+      ),
+      columns: { id: true, name: true },
+    });
+    if (!series)
+      throw new Error(`That series does not belong to ${brand.name}.`);
+
+    const targets = [];
+    for (const target of input.targets) {
+      const channel = await db.query.channelTable.findFirst({
+        where: and(
+          eq(channelTable.brandId, input.brandId),
+          eq(channelTable.platform, target.platform),
+          eq(channelTable.isActive, true),
+          isNull(channelTable.deletedAt),
+        ),
+        columns: { id: true },
+      });
+      if (!channel)
+        throw new Error(
+          `${brand.name} does not have a ${target.platform} channel.`,
+        );
+      targets.push({ ...target, channelId: channel.id });
+    }
+    const saved = await replaceSeriesCadence({
+      brandId: input.brandId,
+      seriesId: input.seriesId,
+      targets,
+    });
+    return {
+      ok: true as const,
+      series: series.name,
+      targets: saved,
+      url: "/app/pillars",
+    };
+  },
+});
+
+const registerChannelInput = z.object({
+  brandId: z.string(),
+  kind: z.enum(channelKindEnum.enumValues),
+  platform: z.enum(channelPlatformEnum.enumValues),
+  handle: z.string().trim().min(1).max(200).optional(),
+  displayName: z.string().trim().max(200).optional(),
+  profileUrl: z.string().trim().url().max(2000).optional(),
+  manageUrl: z.string().trim().url().max(2000).optional(),
+  connectionStatus: z.enum(connectionStatusEnum.enumValues).optional(),
+});
+
+export const registerBrandChannel = growthAction({
+  description:
+    "Register an owned publishing channel (social handle, blog, or newsletter) for a brand so it is tracked in Growth. Registration only records the surface — delivery-provider wiring (e.g. Zernio) is connected later from the Channels page. Use when the user names a handle or channel URL that is not yet tracked.",
+  inputSchema: registerChannelInput,
+  execute: async (input, ctx) => {
+    await requireOwnedBrand(input.brandId, ctx);
+    const duplicate = await db.query.channelTable.findFirst({
+      where: and(
+        eq(channelTable.brandId, input.brandId),
+        eq(channelTable.platform, input.platform),
+        isNull(channelTable.deletedAt),
+        ...(input.handle ? [eq(channelTable.handle, input.handle)] : []),
+      ),
+      columns: { id: true, handle: true },
+    });
+    if (duplicate) {
+      return {
+        ok: false as const,
+        reason: `A ${input.platform} channel${duplicate.handle ? ` (${duplicate.handle})` : ""} already exists for this brand.`,
+        channelId: duplicate.id,
+        url: "/app/channels",
+      };
+    }
+    const [created] = await db
+      .insert(channelTable)
+      .values({
+        brandId: input.brandId,
+        kind: input.kind,
+        platform: input.platform,
+        handle: input.handle ?? null,
+        displayName: input.displayName ?? null,
+        profileUrl: input.profileUrl ?? null,
+        manageUrl: input.manageUrl ?? null,
+        connectionStatus: input.connectionStatus ?? "connected",
+        followerHistory: [],
+      })
+      .returning({
+        id: channelTable.id,
+        platform: channelTable.platform,
+        handle: channelTable.handle,
+        connectionStatus: channelTable.connectionStatus,
+      });
+    return { ok: true as const, channel: created, url: "/app/channels" };
+  },
+});
+
 export const OPERATION_TOOLS = {
   discoverBrandChannels,
+  registerBrandChannel,
   scrapeBrandPosts,
   syncOwnedBrandContent,
   syncBrandWebsite,
@@ -606,6 +744,7 @@ export const OPERATION_TOOLS = {
   proposeStrategyTargets,
   createChannelCadence,
   updateChannelCadence,
+  setSeriesCadence,
   createBrandMix,
   updateBrandMix,
 } as const;

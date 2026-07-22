@@ -139,6 +139,7 @@ export const growthActionPolicies = {
       consequence: "background-run",
       reversible: false,
     }),
+    registerChannel: write(),
     scrapePosts: write({ consequence: "background-run", reversible: false }),
     syncOwnedContent: write({
       consequence: "background-run",
@@ -156,6 +157,7 @@ export const growthActionPolicies = {
   strategyWrite: {
     createCadence: write(),
     updateCadence: write({ idempotent: true }),
+    setSeriesCadence: write({ idempotent: true }),
     createBrandMix: write(),
     updateBrandMix: write({ idempotent: true }),
   },
