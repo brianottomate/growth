@@ -202,9 +202,13 @@ export default async function SeriesDetailPage({
           archetype: spot.archetype,
           status: spot.status,
           text: spot.text,
+          // Spot's own media wins; drafted copy beats the shared pool image
+          // (a text preview says more than the same card repeated six times).
           thumb: spot.media?.[0]
             ? (spot.media[0].thumbnail ?? spot.media[0].url)
-            : poolThumb,
+            : spot.text
+              ? null
+              : poolThumb,
         }))
       : (post.targetSpots ?? []).map((spot, index) => ({
           id: `target-${index}`,
