@@ -563,6 +563,60 @@ const PROGRAMS: SeedProgram[] = [
       },
     ],
   },
+  {
+    // Marketplace listing is moving behind a $1/month subscription (mandatory
+    // card capture) inside the app.wander.com/welcome wizard. Hosts who stall
+    // at that step already have an account and an email, so this is an
+    // abandoned-cart shape on the OS side. Prerequisite before this can run:
+    // instrument "Listing CC Capture Started" and "Listing Subscription
+    // Activated" in the wizard's tracking plan.
+    name: "Listing subscription capture recovery",
+    kind: "abandoned_cart",
+    priority: "must_have",
+    status: "planned",
+    workspace: "os",
+    description:
+      "Hosts who reach the $1/month card-capture step for listing on the wander.com marketplace but don't complete it. They are signed up and reachable by email; recover them like an abandoned cart. Trigger: 'Listing CC Capture Started' with no 'Listing Subscription Activated' within 1 hour. Tracking events not yet instrumented.",
+    intendedTrigger: "Listing CC Capture Started",
+    intendedChannels: ["email", "bdr_task"],
+    steps: [
+      {
+        name: "Your listing is almost live",
+        channel: "email",
+        status: "planned",
+        system: "customerio",
+        delayMinutes: 1 * HOUR,
+        subject: "Your listing is almost live",
+      },
+      {
+        name: "Why we ask for a card",
+        channel: "email",
+        status: "planned",
+        system: "customerio",
+        delayMinutes: 1 * DAY,
+        subject: "It is $1 a month. Here is what it unlocks",
+      },
+      {
+        name: "Concierge outreach (high value)",
+        channel: "bdr_task",
+        status: "planned",
+        system: "human",
+        delayMinutes: 2 * DAY,
+        branchOf: "Why we ask for a card",
+        branchLabel: "multi-property or PMS connected",
+        subject: "Personal follow-up to finish marketplace listing",
+      },
+      {
+        name: "Pick up where you left off",
+        channel: "email",
+        status: "planned",
+        system: "customerio",
+        delayMinutes: 3 * DAY,
+        subject: "Finish listing on the Wander marketplace",
+        url: "https://app.wander.com/welcome",
+      },
+    ],
+  },
 
   // ---- Shared (spans both product lines) ----------------------------
   {
