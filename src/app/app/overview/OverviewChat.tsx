@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -185,6 +185,7 @@ export function OverviewChat({
   workContext?: ContentWorkContext;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -192,6 +193,20 @@ export function OverviewChat({
   const [atBottom, setAtBottom] = useState(true);
   // Autofocus pops the soft keyboard on touch devices — desktop only.
   const desktop = useMediaQuery("(min-width: 768px)");
+
+  // useChat captures the transport when the chat instance is created, but this
+  // dock stays mounted across route changes. Read the request body through a
+  // ref so every send carries the page the operator is on *now* (and the
+  // current brand/work context), not whatever was true at mount.
+  const requestBodyRef = useRef<Record<string, unknown>>({});
+  requestBodyRef.current = {
+    threadId,
+    surface: mode,
+    brandId,
+    intent,
+    workContext,
+    pagePath: pathname,
+  };
 
   const {
     messages,
@@ -206,13 +221,7 @@ export function OverviewChat({
     messages: initialMessages,
     transport: new DefaultChatTransport({
       api: "/api/overview/chat",
-      body: {
-        threadId,
-        surface: mode,
-        brandId,
-        intent,
-        workContext,
-      },
+      body: () => requestBodyRef.current,
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onFinish: onThreadFinish,

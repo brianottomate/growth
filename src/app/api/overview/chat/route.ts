@@ -21,6 +21,7 @@ import { createId } from "@/server/db/utils";
 import { OVERVIEW_AGENT_PERSONA } from "@/server/ai/overview-agent/persona";
 import { OVERVIEW_TOOLS } from "@/server/ai/capabilities";
 import { composeGrowthContext } from "@/server/ai/kernel/context";
+import { composePageContextSection } from "@/server/ai/kernel/page-context";
 import { compactGrowthError } from "@/server/ai/kernel/errors";
 import {
   completeAssistantRun,
@@ -120,6 +121,7 @@ export async function POST(req: Request): Promise<Response> {
     workContext,
     chatAttachment,
     threadId,
+    pagePath,
   } = (await req.json()) as {
     messages: UIMessage[];
     surface?: "overview" | "create" | "next";
@@ -129,6 +131,7 @@ export async function POST(req: Request): Promise<Response> {
     workContext?: ContentWorkContext;
     chatAttachment?: { url?: string; mediaType?: string };
     threadId?: string;
+    pagePath?: string;
   };
   if (!threadId || messages.length === 0) {
     return Response.json(
@@ -225,6 +228,10 @@ export async function POST(req: Request): Promise<Response> {
     safeAttachment && activeWorkContext
       ? `\n\n# Current pasted image\nThe operator attached an image stored at ${safeAttachment.url} (${safeAttachment.mediaType}). You can analyze it visually now. If the operator asks to use, save, or attach it to the active work item, call contentMediaWrite action attachChatImage with this exact URL. Do not save it merely because it was pasted.`
       : "";
+  const pageContextPrompt = await composePageContextSection({
+    pagePath,
+    organizationId: membership.organizationId,
+  });
 
   // Persisted messages are the content truth. The client contributes only its
   // final message: a fresh user turn, approval continuation, or regeneration.
@@ -283,6 +290,7 @@ export async function POST(req: Request): Promise<Response> {
     sections: [
       { id: "persona", content: OVERVIEW_AGENT_PERSONA, cache: "session" },
       { id: "surface", content: surfaceContext },
+      { id: "page", content: pageContextPrompt },
       { id: "intent", content: intentContext },
       { id: "work-item", content: workContextPrompt },
       { id: "attachment", content: attachmentPrompt },
