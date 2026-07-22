@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
@@ -47,7 +48,14 @@ export default async function PillarsPage() {
           inArray(seriesTable.brandId, brandIds),
           isNull(seriesTable.deletedAt),
         ),
-        columns: { pillar: true },
+        columns: {
+          id: true,
+          brandId: true,
+          name: true,
+          status: true,
+          pillar: true,
+        },
+        orderBy: (row, { asc }) => [asc(row.name)],
       })
     : [];
 
@@ -104,6 +112,24 @@ export default async function PillarsPage() {
               source="pillars"
             />
           </div>
+          {series.some((s) => s.brandId === brand.id) ? (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {series
+                .filter((s) => s.brandId === brand.id)
+                .map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/app/series/${s.id}`}
+                    className="bg-card hover:border-neutral-500 rounded-full border px-3 py-1 text-xs transition"
+                  >
+                    {s.name}
+                    <span className="text-muted-foreground ml-1.5 text-[10px] capitalize">
+                      {s.status}
+                    </span>
+                  </Link>
+                ))}
+            </div>
+          ) : null}
           <div className="grid gap-3 md:grid-cols-2">
             {pillars.map((p) => {
               const count = countByPillar.get(p.slug) ?? 0;
