@@ -42,10 +42,18 @@ export const productTable = pgTable(
       .default("active")
       .notNull(),
     atlas: t.jsonb().$type<ProductAtlas>().notNull(),
-    createdAt: t.timestamp().defaultNow().notNull(),
+    // Timestamps are set app-side ($defaultFn), not by Postgres now(). A DB
+    // now() default stores microseconds, which a JS Date round-trip silently
+    // truncates — that mismatch caused false CONFLICTs back when updatedAt was
+    // an optimistic-lock key (locking removed in be9df3f, but stored values
+    // should stay round-trip-exact). Matches the media-schema.ts convention.
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
     updatedAt: t
       .timestamp()
-      .defaultNow()
+      .$defaultFn(() => new Date())
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: t.timestamp(),
@@ -100,10 +108,14 @@ export const storefrontTable = pgTable(
       onDelete: "set null",
     }),
     changelog: t.jsonb().$type<StorefrontChange[]>().default([]).notNull(),
-    createdAt: t.timestamp().defaultNow().notNull(),
+    // App-side ms-precision defaults — see the note on productTable.
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
     updatedAt: t
       .timestamp()
-      .defaultNow()
+      .$defaultFn(() => new Date())
       .$onUpdate(() => new Date())
       .notNull(),
     deletedAt: t.timestamp(),
