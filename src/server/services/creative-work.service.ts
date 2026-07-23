@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { env } from "@/env";
 import type { MediaItem } from "@/server/db/content-schema";
@@ -17,7 +17,7 @@ import {
 import { createId } from "@/server/db/utils";
 import { R2 } from "@/server/clients/r2.client";
 import {
-  FAL_IMAGE_MODEL,
+  buildFalImageRequest,
   getFalImageResult,
   getFalImageStatus,
   isFalConfigured,
@@ -211,13 +211,33 @@ export async function submitPacketToFal(input: {
   const runId = createId("crun");
   const imageSize = falImageSize(packet.aspectRatio);
   const format = outputFormat(packet.outputFormat);
-  const providerInput = {
+
+  // Reference assets on the packet steer generation: their public R2 URLs go
+  // straight to the image-conditioned model (mixing real brand imagery into
+  // the output). Without references this stays cheap text-to-image.
+  const referenceAssetIds = (packet.references ?? []).map(
+    (reference) => reference.mediaAssetId,
+  );
+  const referenceAssets = referenceAssetIds.length
+    ? await db.query.mediaAssetTable.findMany({
+        where: and(
+          inArray(mediaAssetTable.id, referenceAssetIds),
+          eq(mediaAssetTable.brandId, packet.brandId),
+        ),
+        columns: { id: true, url: true, kind: true },
+      })
+    : [];
+  const referenceImageUrls = referenceAssets
+    .filter((asset) => asset.kind === "image" && asset.url)
+    .map((asset) => asset.url!);
+
+  const { model, providerInput } = buildFalImageRequest({
     prompt: packet.prompt,
-    image_size: imageSize,
-    output_format: format,
-    num_images: 1,
-    enable_safety_checker: true,
-  };
+    imageSize,
+    outputFormat: format,
+    referenceImageUrls,
+  });
+
   await db.insert(creativeRunTable).values({
     id: runId,
     organizationId: input.organizationId,
@@ -227,7 +247,7 @@ export async function submitPacketToFal(input: {
     packetId: packet.id,
     provider: "fal",
     kind: "image",
-    model: FAL_IMAGE_MODEL,
+    model,
     prompt: packet.prompt,
     input: providerInput,
     webhookTokenHash: sha256(token),
@@ -237,9 +257,8 @@ export async function submitPacketToFal(input: {
 
   try {
     const submitted = await submitFalImage({
-      prompt: packet.prompt,
-      imageSize,
-      outputFormat: format,
+      model,
+      providerInput,
       webhookUrl: falWebhookUrl(runId, token),
     });
     const [run] = await db
@@ -274,7 +293,7 @@ export async function refreshCreativeRun(input: {
   if (run.provider !== "fal" || !run.providerRequestId) return run;
   if (["ready", "error", "cancelled"].includes(run.status)) return run;
 
-  const status = await getFalImageStatus(run.providerRequestId);
+  const status = await getFalImageStatus(run.model, run.providerRequestId);
   if (status.status !== "COMPLETED") {
     const [updated] = await db
       .update(creativeRunTable)
@@ -286,7 +305,7 @@ export async function refreshCreativeRun(input: {
     return updated ?? run;
   }
 
-  const result = await getFalImageResult(run.providerRequestId);
+  const result = await getFalImageResult(run.model, run.providerRequestId);
   const payload = result.data as FalPayload;
   const candidates = normalizeCandidates(payload);
   const [updated] = await db
