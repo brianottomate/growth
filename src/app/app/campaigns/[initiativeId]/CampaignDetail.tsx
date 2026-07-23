@@ -4,11 +4,15 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   ArrowLeft,
+  Copy,
   ExternalLink,
+  FileText,
   Link2,
   Loader2,
   Pencil,
+  ShieldCheck,
   X,
 } from "lucide-react";
 
@@ -46,6 +50,228 @@ const CONTENT_STATUS_LABEL: Record<string, string> = {
 
 const fmtDay = (d: Date | null) =>
   d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+
+type LaunchPacketMetadata = {
+  order?: number;
+  platform?: string;
+  phase?: number;
+  dailyBudget?: number;
+  days?: number;
+  reviewItems?: string[];
+  launchGates?: string[];
+  conversionEvents?: Array<{
+    conversion: string;
+    analyticsEvent: string;
+    meta: string;
+    google: string;
+    role: string;
+  }>;
+};
+
+type LaunchPacket = {
+  id: string;
+  title: string;
+  purpose: string | null;
+  prompt: string;
+  negativePrompt: string | null;
+  aspectRatio: string | null;
+  outputFormat: string | null;
+  suggestedTool: string | null;
+  instructions: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+function packetMetadata(packet: LaunchPacket): LaunchPacketMetadata {
+  return packet.metadata ?? {};
+}
+
+function packetClipboardText(packet: LaunchPacket) {
+  return [
+    packet.title,
+    packet.purpose,
+    packet.prompt,
+    packet.negativePrompt ? `Avoid: ${packet.negativePrompt}` : null,
+    packet.aspectRatio ? `Aspect ratio: ${packet.aspectRatio}` : null,
+    packet.outputFormat ? `Output: ${packet.outputFormat}` : null,
+    packet.suggestedTool ? `Suggested tool: ${packet.suggestedTool}` : null,
+    packet.instructions,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function LaunchReview({ packets }: { packets: LaunchPacket[] }) {
+  const sorted = [...packets].sort(
+    (a, b) => (packetMetadata(a).order ?? 99) - (packetMetadata(b).order ?? 99),
+  );
+
+  const copyPacket = async (packet: LaunchPacket) => {
+    try {
+      await navigator.clipboard.writeText(packetClipboardText(packet));
+      toast.success("Production brief copied");
+    } catch {
+      toast.error("Could not copy the production brief");
+    }
+  };
+
+  return (
+    <section className="mt-10">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="text-muted-foreground size-4" />
+        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+          Launch review · {packets.length} packets
+        </h2>
+      </div>
+      <p className="text-muted-foreground mt-2 max-w-3xl text-sm">
+        Review the plan, copy, creative directions, measurement contract, and
+        launch gates here. These packets do not activate provider campaigns.
+      </p>
+
+      <div className="mt-4 grid gap-3">
+        {sorted.map((packet) => {
+          const metadata = packetMetadata(packet);
+          const budgetLabel =
+            metadata.dailyBudget && metadata.days
+              ? `$${metadata.dailyBudget}/day for ${metadata.days} days`
+              : null;
+
+          return (
+            <article key={packet.id} className="bg-card rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FileText className="text-muted-foreground size-4" />
+                    <h3 className="font-medium">{packet.title}</h3>
+                    {metadata.platform && (
+                      <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[10px] uppercase">
+                        {metadata.platform.replaceAll("_", " ")}
+                      </span>
+                    )}
+                    {metadata.phase && (
+                      <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[10px]">
+                        Phase {metadata.phase}
+                      </span>
+                    )}
+                    {budgetLabel && (
+                      <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[10px]">
+                        {budgetLabel}
+                      </span>
+                    )}
+                  </div>
+                  {packet.purpose && (
+                    <p className="text-muted-foreground mt-1.5 text-sm">
+                      {packet.purpose}
+                    </p>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => copyPacket(packet)}
+                >
+                  <Copy className="size-3.5" />
+                  Copy brief
+                </Button>
+              </div>
+
+              {(metadata.reviewItems?.length ?? 0) > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-xs font-medium">Decisions to review</h4>
+                  <ul className="text-muted-foreground mt-2 space-y-1.5 text-sm">
+                    {metadata.reviewItems?.map((item) => (
+                      <li key={item} className="flex gap-2">
+                        <span aria-hidden="true">•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {(metadata.conversionEvents?.length ?? 0) > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                  <h4 className="mb-2 text-xs font-medium">
+                    Conversion contract
+                  </h4>
+                  <table className="w-full min-w-3xl text-left text-xs">
+                    <thead className="text-muted-foreground">
+                      <tr className="border-b">
+                        <th className="py-2 pr-4 font-medium">Conversion</th>
+                        <th className="py-2 pr-4 font-medium">
+                          Analytics event
+                        </th>
+                        <th className="py-2 pr-4 font-medium">Meta</th>
+                        <th className="py-2 pr-4 font-medium">Google</th>
+                        <th className="py-2 font-medium">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metadata.conversionEvents?.map((event) => (
+                        <tr
+                          key={event.conversion}
+                          className="border-b last:border-0"
+                        >
+                          <td className="py-2 pr-4">{event.conversion}</td>
+                          <td className="py-2 pr-4 font-mono">
+                            {event.analyticsEvent}
+                          </td>
+                          <td className="py-2 pr-4">{event.meta}</td>
+                          <td className="py-2 pr-4">{event.google}</td>
+                          <td className="py-2">{event.role}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {(metadata.launchGates?.length ?? 0) > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <AlertTriangle className="size-3.5 text-amber-600" />
+                    Launch gates
+                  </div>
+                  <ul className="text-muted-foreground mt-2 space-y-1.5 text-sm">
+                    {metadata.launchGates?.map((gate) => (
+                      <li key={gate} className="flex gap-2">
+                        <span aria-hidden="true">□</span>
+                        <span>{gate}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <details className="mt-4 rounded-lg border px-3 py-2">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Production brief
+                </summary>
+                <div className="text-muted-foreground mt-3 space-y-3 text-sm">
+                  <pre className="font-sans whitespace-pre-wrap">
+                    {packet.prompt}
+                  </pre>
+                  {packet.negativePrompt && (
+                    <p>
+                      <span className="text-foreground font-medium">
+                        Avoid:
+                      </span>{" "}
+                      {packet.negativePrompt}
+                    </p>
+                  )}
+                  {packet.instructions && (
+                    <pre className="font-sans whitespace-pre-wrap">
+                      {packet.instructions}
+                    </pre>
+                  )}
+                </div>
+              </details>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
   const trpc = useTRPC();
@@ -235,6 +461,10 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
           </div>
         )}
       </section>
+
+      {campaign.productionPackets.length > 0 && (
+        <LaunchReview packets={campaign.productionPackets} />
+      )}
 
       {/* ---- linked ad campaigns -------------------------------------- */}
       <section className="mt-10">

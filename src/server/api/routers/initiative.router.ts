@@ -15,6 +15,7 @@ import {
   initiativeStatusEnum,
   initiativeTable,
   memberTable,
+  productionPacketTable,
 } from "@/server/db/schema";
 
 type Ctx = {
@@ -186,7 +187,25 @@ export const initiativeRouter = createTRPCRouter({
         }),
       ]);
 
-      return { ...initiative, brand, contentPosts, adCampaigns };
+      const contentPostIds = contentPosts.map((post) => post.id);
+      const productionPackets =
+        contentPostIds.length > 0
+          ? await ctx.db.query.productionPacketTable.findMany({
+              where: and(
+                eq(productionPacketTable.brandId, initiative.brandId),
+                inArray(productionPacketTable.contentPostId, contentPostIds),
+              ),
+              orderBy: [productionPacketTable.createdAt],
+            })
+          : [];
+
+      return {
+        ...initiative,
+        brand,
+        contentPosts,
+        adCampaigns,
+        productionPackets,
+      };
     }),
 
   create: protectedProcedure
@@ -276,9 +295,7 @@ export const initiativeRouter = createTRPCRouter({
     }),
 
   unlinkContent: protectedProcedure
-    .input(
-      z.object({ initiativeId: z.string(), contentPostId: z.string() }),
-    )
+    .input(z.object({ initiativeId: z.string(), contentPostId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertInitiativeAccess(ctx, input.initiativeId);
       await ctx.db
