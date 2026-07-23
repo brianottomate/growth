@@ -72,6 +72,19 @@ Key insight: webprobe's authenticated pass repurposes as a **post-consent pass**
 - **Merchant opt-in-everywhere toggle**: per-merchant "consent-required globally" config option (EU-heavy merchants will want it; don't make it the default — US signal loss).
 - **Osano decision** after the UC technical session: buy records/DSAR console or build internal view.
 
+## 6b. Remaining launch-blockers — ownership (debrief view)
+
+| Item | Where | Status | Owner | Blocks launch? |
+|---|---|---|---|---|
+| Server-side enforcement (pkg) | tracking-server | draft PR [tracking#66](https://github.com/wandercom/tracking/pull/66): `isProviderAllowed`, `meta.consent ?? loadConsent(userId) ?? parseConsentCookie` chain, `bypassConsent` | Kristian | Yes |
+| Server-side caller wiring | monolith (Segment→CIO/Meta fan-out, BQ→Outreach abandoned-cart) | NOT started; the mechanism exists in #66, callers must pass cookieHeader/userId + populate operationalEvents | **Camille** | Yes |
+| Pre-consent-leak CI test | wander.com e2e (+ per-PR CI) | in progress | Kristian → Platform | Yes (the one control worth keeping; scanning half is the `gdpr-scan` agent, §4) |
+| WanderOS sanitizer + CSP | wander-sites-website | NOT started; being reframed as a "limit merchant GTM containers" handoff-talk topic | CPA / Camille + a handoff-talk decision | Yes for PM-site coverage |
+| /cookies → DB mirror | wander.com/app client | endpoint exists (#20620); client mirror-on-login NOT wired | Kristian | Needed for logged-in server enforcement |
+| Vendor CMP adapter (banner + consume signals) | tracking-web | NOT started; pending vendor pick | Kristian | Once vendor signed |
+| DSAR deletion propagation | monolith + tracking-server | NOT started (`bypassConsent` hook exists) | Compliance + Camille | Before EU launch |
+| Login reconciliation (stricter-wins) | monolith + tracking-web | designed not built (§6) | Kristian + Camille | No (phase-2) |
+
 ## 7. Gotchas for whoever picks this up
 
 - The wander.com consent worktree carries an **uncommitted dev-only harness** (consentHarness.ts, `api/__probe/`, vendor-tracking/, pnpm pins, un-gate edits in analytics.ts). Strip before #3206 merges. The Google fix is already in the package — don't re-add it app-side.
