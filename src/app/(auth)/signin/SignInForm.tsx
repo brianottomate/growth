@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authClient } from "@/server/better-auth/client";
 import { getAuthPageHref, getCallbackURL } from "@/lib/auth-utils";
 import { InAppBrowserAlert } from "../components/InAppBrowserAlert";
+import { ForgotPasswordDialog } from "./ForgotPasswordDialog";
 
 export function SignInForm() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export function SignInForm() {
   const [password, setPassword] = useState("");
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const isOAuthRequest =
     searchParams.has("client_id") && searchParams.has("redirect_uri");
   const signUpHref = isOAuthRequest
@@ -60,6 +62,11 @@ export function SignInForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      <ForgotPasswordDialog
+        open={forgotPasswordOpen}
+        onOpenChange={setForgotPasswordOpen}
+        defaultEmail={email}
+      />
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
           <div className="p-6 md:p-8">
@@ -102,7 +109,16 @@ export function SignInForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => setForgotPasswordOpen(true)}
+                      className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                   <Input
                     id="password"
                     type="password"
