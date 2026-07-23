@@ -1,13 +1,24 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
   channelTable,
   contentPostTable,
   memberTable,
+  platformPostLinkTable,
 } from "@/server/db/schema";
+import {
+  extractFirstUrl,
+  resolveLinkCard,
+  type LinkCard,
+} from "@/server/services/unfurl.service";
+import {
+  LinkCardStrip,
+  RepostSimulation,
+  type RepostSim,
+} from "./RepostSimulation";
 import { getSession } from "@/server/better-auth/server";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { getContentReadiness } from "@/lib/content-readiness";
@@ -139,6 +150,70 @@ export default async function ContentDetailPage({
     const tb = (b.publishedAt ?? b.scheduledAt ?? b.createdAt).getTime();
     return ta - tb;
   });
+  // Simulate how planned reposts unfold on the amplifier's feed. A repost of
+  // one of our posts renders as a quote-embed; a repost of the blog article
+  // renders as the og-card the platform will build from the (predicted) page.
+  const repostEdges = posts.length
+    ? await db.query.platformPostLinkTable.findMany({
+        where: and(
+          inArray(
+            platformPostLinkTable.toPlatformPostId,
+            posts.map((p) => p.id),
+          ),
+          inArray(platformPostLinkTable.kind, ["repost", "quote", "reposts", "quotes"]),
+        ),
+        with: { from: { with: { brand: { columns: { name: true } } } } },
+      })
+    : [];
+  const simsBySpot = new Map<string, RepostSim[]>();
+  for (const edge of repostEdges) {
+    const target = posts.find((p) => p.id === edge.toPlatformPostId);
+    if (!target || !edge.from) continue;
+    const embed: RepostSim["embed"] =
+      target.platform === "blog" && target.externalUrl
+        ? {
+            kind: "article",
+            card: (await resolveLinkCard(target.externalUrl)) ?? {
+              url: target.externalUrl,
+              domain: new URL(target.externalUrl).hostname.replace(/^www\./, ""),
+              title: content.title,
+              description: content.hook,
+              image: target.media?.[0]?.url ?? content.media?.[0]?.url ?? null,
+              predicted: true,
+            },
+          }
+        : {
+            kind: "quote",
+            authorName: content.brand?.name ?? "Brand",
+            text: target.text,
+            thumb:
+              target.media?.[0]?.thumbnail ??
+              target.media?.[0]?.url ??
+              content.media?.[0]?.thumbnail ??
+              content.media?.[0]?.url ??
+              null,
+          };
+    const sims = simsBySpot.get(edge.toPlatformPostId) ?? [];
+    sims.push({
+      linkId: edge.id,
+      actorName: edge.from.brand?.name ?? "Amplifier",
+      actorHandle: edge.from.username,
+      platform: edge.from.platform,
+      comment: edge.from.text,
+      embed,
+    });
+    simsBySpot.set(edge.toPlatformPostId, sims);
+  }
+
+  // Unfurl any URL already sitting in drafted copy.
+  const linkCardBySpot = new Map<string, LinkCard>();
+  for (const post of posts) {
+    const url = extractFirstUrl(post.text);
+    if (!url) continue;
+    const card = await resolveLinkCard(url);
+    if (card) linkCardBySpot.set(post.id, card);
+  }
+
   const readiness = getContentReadiness({
     hook: content.hook,
     status: content.status,
@@ -297,8 +372,8 @@ export default async function ContentDetailPage({
       </h2>
       <div className="flex flex-col gap-2.5">
         {posts.map((p) => (
+          <div key={p.id}>
           <SpotCard
-            key={p.id}
             brandId={content.brandId}
             members={members}
             currentUserId={session.user.id}
@@ -338,6 +413,9 @@ export default async function ContentDetailPage({
               owner: toMember(p.owner),
             }}
           />
+          <LinkCardStrip card={linkCardBySpot.get(p.id) ?? null} />
+          <RepostSimulation sims={simsBySpot.get(p.id) ?? []} />
+          </div>
         ))}
       </div>
 
