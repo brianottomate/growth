@@ -317,6 +317,10 @@ export default async function ContentDetailPage({
               text: p.text,
               externalUrl: p.externalUrl,
               editorUrl: editorUrlOf(p.metadata),
+              previewPath:
+                p.platform === "blog" && p.externalId
+                  ? `/app/dato-preview/${p.externalId}`
+                  : null,
               provider: p.provider,
               scheduledAtISO: p.scheduledAt
                 ? p.scheduledAt.toISOString()

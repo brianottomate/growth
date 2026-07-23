@@ -126,6 +126,35 @@ export async function createUploadFromUrl(
   throw new Error("DatoCMS upload timed out.");
 }
 
+/** Fetch a single item (draft content included — the CMA always sees the
+ * current version, which is exactly what a draft preview needs). */
+export async function getItem(itemId: string): Promise<{
+  id: string;
+  attributes: Record<string, unknown>;
+  meta: { status: string };
+}> {
+  const { data } = await request<
+    JsonApi<{
+      id: string;
+      attributes: Record<string, unknown>;
+      meta: { status: string };
+    }>
+  >(`/items/${itemId}?version=current`);
+  return data;
+}
+
+/** Resolve an upload's public CDN URL. */
+export async function getUploadUrl(uploadId: string): Promise<string | null> {
+  try {
+    const { data } = await request<
+      JsonApi<{ attributes: { url: string | null } }>
+    >(`/uploads/${uploadId}`);
+    return data.attributes.url;
+  } catch {
+    return null;
+  }
+}
+
 /** Resolve a blog author item by (case-insensitive) name. */
 export async function findAuthorIdByName(name: string): Promise<string | null> {
   const authorTypeId = await resolveItemTypeId("blog_author");

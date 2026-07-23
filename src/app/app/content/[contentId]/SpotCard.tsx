@@ -86,6 +86,8 @@ export type SpotCardData = {
   externalUrl: string | null;
   /** CMS editor deep link (Dato) — the preview surface while the item is a draft. */
   editorUrl: string | null;
+  /** In-app rendered preview (/app/dato-preview/…) for CMS-linked drafts. */
+  previewPath: string | null;
   provider: string | null;
   scheduledAtISO: string | null;
   publishedAtISO: string | null;
@@ -325,6 +327,16 @@ export function SpotCard({
               <span>· posted {fmtWhen(spot.publishedAtISO)}</span>
             )}
             {via && <span>· via {via}</span>}
+            {spot.previewPath && (
+              <a
+                href={spot.previewPath}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground underline"
+              >
+                Preview ↗
+              </a>
+            )}
             {spot.editorUrl && (
               <a
                 href={spot.editorUrl}
