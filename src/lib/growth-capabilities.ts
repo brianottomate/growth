@@ -43,6 +43,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "addCrossPost",
     "createPlatformPost",
     "promotePlatformPost",
+    "publishBlogDraft",
   ],
   contentMediaWrite: [
     "attachChatImage",

@@ -24,6 +24,7 @@ export const env = createEnv({
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
     FAL_AI_API_KEY: z.string().optional(), // fal.ai image/video generation
+    DATOCMS_CMA_TOKEN: z.string().optional(), // wander.com blog publishing (Content Management API)
     FIRECRAWL_API_KEY: z.string().min(1), // For web scraping
     OUTREACH_S2S_GUID: z.string().optional(), // For Outreach S2S auth
     OUTREACH_PRIVATE_KEY: z.string().optional(), // For Outreach S2S JWT signing
@@ -154,6 +155,7 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     FAL_AI_API_KEY: process.env.FAL_AI_API_KEY,
+    DATOCMS_CMA_TOKEN: process.env.DATOCMS_CMA_TOKEN,
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
     OUTREACH_S2S_GUID: process.env.OUTREACH_S2S_GUID,
     OUTREACH_PRIVATE_KEY: process.env.OUTREACH_PRIVATE_KEY,

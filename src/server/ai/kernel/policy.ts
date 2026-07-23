@@ -111,6 +111,8 @@ export const growthActionPolicies = {
     addCrossPost: write(),
     createPlatformPost: write(),
     promotePlatformPost: write({ reversible: false }),
+    // Creates a DRAFT in the external CMS; deletable there, never auto-published.
+    publishBlogDraft: write({ consequence: "provider-write" }),
   },
   contentMediaWrite: {
     attachChatImage: write({ idempotent: true }),

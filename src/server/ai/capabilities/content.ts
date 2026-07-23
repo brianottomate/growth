@@ -15,6 +15,7 @@ import {
   contentStatusEnum,
   mediaAssetTable,
 } from "@/server/db/schema";
+import { publishBlogDraft as publishBlogDraftToDato } from "@/server/services/blog-publish.service";
 import { ContentService } from "@/server/services/content.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
@@ -884,6 +885,32 @@ export const createPlatformPost = growthAction({
       scheduledAt: input.scheduledAt ?? null,
       feedUrl: "/app/feed",
       next: "Keep it platform-native, or promote it if it earns a wider life.",
+    };
+  },
+});
+
+export const publishBlogDraft = growthAction({
+  description:
+    "Push a drafted blog platform post into the wander.com CMS (DatoCMS) as a DRAFT article: converts the markdown draft to structured text, uploads the hero image, and links the spot to the created item. Never publishes; a human reviews and publishes in the Dato editor. Requires drafted text and a hero image on the spot or its idea pool.",
+  inputSchema: z.object({
+    platformPostId: z.string(),
+  }),
+  execute: async (input, ctx) => {
+    const post = await db.query.platformPostTable.findFirst({
+      where: eq(platformPostTable.id, input.platformPostId),
+      with: { brand: { columns: { organizationId: true } } },
+    });
+    if (!post || post.brand?.organizationId !== ctx.orgId) {
+      return { error: "Owned platform post not found." };
+    }
+    const result = await publishBlogDraftToDato({
+      platformPostId: input.platformPostId,
+    });
+    return {
+      ok: true as const,
+      ...result,
+      note: "Created as a DRAFT in DatoCMS. Review and publish in the editor.",
+      url: `/app/content/${post.contentPostId ?? ""}`,
     };
   },
 });

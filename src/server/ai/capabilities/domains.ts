@@ -24,6 +24,7 @@ import {
   getContentWorkItem,
   productionQueue,
   promotePlatformPost,
+  publishBlogDraft,
   recoverArchiveMediaToContent,
   suggestMediaForContent,
   upcomingContent,
@@ -157,6 +158,7 @@ export const contentWrite = growthDomainTool({
     addCrossPost: addContentCrossPost,
     createPlatformPost,
     promotePlatformPost,
+    publishBlogDraft,
   },
 });
 
