@@ -28,6 +28,17 @@ const config: NextConfig = {
         hostname: "**.public.blob.vercel-storage.com",
         pathname: "/**",
       },
+      // The public R2 bucket hosting the brand media library. Derived from
+      // R2_PUBLIC_BASE_URL so a bucket swap can't silently break next/image.
+      ...(process.env.R2_PUBLIC_BASE_URL
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: new URL(process.env.R2_PUBLIC_BASE_URL).hostname,
+              pathname: "/**",
+            },
+          ]
+        : []),
     ],
     localPatterns: [
       {
