@@ -187,14 +187,17 @@ export default async function SeriesDetailPage({
     .filter((week) => week.installments.length > 0 || week.context.length > 0)
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
+  // The installment's hero image (first pool item) — shown as the card's
+  // leading social-card thumbnail.
+  const heroFor = (post: (typeof installments)[number]) =>
+    post.media?.[0] ? (post.media[0].thumbnail ?? post.media[0].url) : null;
+
   // Prefer the real platform_post rows; fall back to the targetSpots intent
   // manifest for ideas whose spots haven't materialized yet. Thumbnails read
   // the spot's own media first, then the idea's shared media pool — same
   // fallback SpotCard uses (m.thumbnail ?? m.url).
   const spotsFor = (post: (typeof installments)[number]) => {
-    const poolThumb = post.media?.[0]
-      ? (post.media[0].thumbnail ?? post.media[0].url)
-      : null;
+    const poolThumb = heroFor(post);
     return post.platformPosts.length > 0
       ? post.platformPosts.map((spot) => ({
           id: spot.id,
@@ -277,6 +280,7 @@ export default async function SeriesDetailPage({
                 key={post.id}
                 post={post}
                 spots={spotsFor(post)}
+                hero={heroFor(post)}
                 boosts={boostsFor(post)}
               />
             ))}
@@ -322,6 +326,7 @@ export default async function SeriesDetailPage({
                       key={post.id}
                       post={post}
                       spots={spotsFor(post)}
+                hero={heroFor(post)}
                       boosts={boostsFor(post)}
                     />
                   ))}
@@ -442,6 +447,7 @@ function InstallmentCard({
   post,
   spots,
   boosts,
+  hero,
 }: {
   post: {
     id: string;
@@ -452,28 +458,43 @@ function InstallmentCard({
   };
   spots: SpotPreview[];
   boosts: Boost[];
+  hero: string | null;
 }) {
   return (
     <Link
       href={`/app/content/${post.id}`}
       className="bg-card block rounded-lg border px-3 py-2 transition hover:border-neutral-500"
     >
-      <div className="flex items-center gap-2">
-        <span className="truncate text-sm font-medium">
-          {post.title ?? "Untitled"}
-        </span>
-        <span className="flex-1" />
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
-            STATUS[post.status] ?? STATUS.draft
-          }`}
-        >
-          {post.status.replace("_", " ")}
-        </span>
-      </div>
-      <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[11px]">
-        {post.plannedAt ? <span>{dayLabel(post.plannedAt)}</span> : null}
-        {post.owner?.name ? <span>· {post.owner.name}</span> : null}
+      <div className="flex items-start gap-3">
+        {/* Social-card hero: the installment's pool image. Its absence is the
+            "no visual yet" signal, so no placeholder box when missing. */}
+        {hero ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={hero}
+            alt=""
+            className="mt-0.5 aspect-video w-36 shrink-0 rounded-md border object-cover"
+          />
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">
+              {post.title ?? "Untitled"}
+            </span>
+            <span className="flex-1" />
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
+                STATUS[post.status] ?? STATUS.draft
+              }`}
+            >
+              {post.status.replace("_", " ")}
+            </span>
+          </div>
+          <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[11px]">
+            {post.plannedAt ? <span>{dayLabel(post.plannedAt)}</span> : null}
+            {post.owner?.name ? <span>· {post.owner.name}</span> : null}
+          </div>
+        </div>
       </div>
       {spots.length > 0 ? (
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
