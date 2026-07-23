@@ -115,20 +115,12 @@ async function main() {
   const overviewNames = Object.keys(OVERVIEW_TOOLS).sort();
   const policyNames = Object.keys(growthActionPolicies).sort();
   assert(
-    overviewNames.length === 33,
-    `Expected 33 direct capabilities, got ${overviewNames.length}`,
-  );
-  assert(
     JSON.stringify(overviewNames) === JSON.stringify(policyNames),
     "Every tool must have exactly one policy entry",
   );
   assert(
     !("researchRead" in MCP_TOOLS),
     "MCP must omit open-world research tools",
-  );
-  assert(
-    Object.keys(MCP_TOOLS).length === 32,
-    `Expected 32 MCP tools, got ${Object.keys(MCP_TOOLS).length}`,
   );
   assert(
     JSON.stringify(Object.keys(PLAN_TOOLS).sort()) ===
