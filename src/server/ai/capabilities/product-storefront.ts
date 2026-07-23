@@ -25,6 +25,13 @@ import {
   updateStorefrontSchema,
   type ProductStorefrontActor,
 } from "@/server/services/product-storefront.service";
+import {
+  captureStorefrontReference,
+  captureStorefrontReferenceSchema,
+  listStorefrontReferences,
+  removeStorefrontReference,
+  removeStorefrontReferenceSchema,
+} from "@/server/services/storefront-reference.service";
 
 import { growthAction } from "./types";
 
@@ -90,6 +97,14 @@ export const readProductStorefront = growthAction({
   execute: (input, ctx) => getStorefront(actorFrom(ctx), input.storefrontId),
 });
 
+export const listProductStorefrontReferences = growthAction({
+  description:
+    "List point-in-time competitor and inspiration snapshots captured for one storefront, including source provenance and structured comparisons.",
+  inputSchema: z.object({ storefrontId: z.string().min(1) }),
+  execute: (input, ctx) =>
+    listStorefrontReferences(actorFrom(ctx), input.storefrontId),
+});
+
 export const createProductAtlasProduct = growthAction({
   description:
     "Create a product owned by an existing brand, optionally with its complete typed Product Atlas graph.",
@@ -144,4 +159,17 @@ export const copySiblingStorefrontContent = growthAction({
     "Copy target content between sibling surfaces for the same product, such as ChatGPT and Claude. The target is marked stale.",
   inputSchema: copyStorefrontContentSchema,
   execute: (input, ctx) => copyStorefrontContent(actorFrom(ctx), input),
+});
+
+export const captureProductStorefrontReference = growthAction({
+  description:
+    "Read a public competitor or inspiration storefront and save a source-grounded, point-in-time structured snapshot for human and AI comparison.",
+  inputSchema: captureStorefrontReferenceSchema,
+  execute: (input, ctx) => captureStorefrontReference(actorFrom(ctx), input),
+});
+
+export const removeProductStorefrontReference = growthAction({
+  description: "Permanently remove one saved storefront reference snapshot.",
+  inputSchema: removeStorefrontReferenceSchema,
+  execute: (input, ctx) => removeStorefrontReference(actorFrom(ctx), input),
 });

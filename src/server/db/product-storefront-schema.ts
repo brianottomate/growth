@@ -8,11 +8,12 @@ import type {
   StorefrontContent,
   StorefrontFreshnessStatus,
   StorefrontListingStatus,
+  StorefrontReferenceSnapshot,
   StorefrontSurfaceId,
 } from "@/lib/product-atlas";
 
 import { organizationTable, userTable } from "./auth-schema";
-import { brandTable } from "./brand-schema";
+import { brandTable, inspirationPurposeEnum } from "./brand-schema";
 import { createId } from "./utils";
 
 export const productTable = pgTable(
@@ -130,6 +131,49 @@ export const storefrontTable = pgTable(
   ],
 );
 
+export const storefrontReferenceTable = pgTable(
+  "storefront_reference",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("sref")),
+    storefrontId: t
+      .text()
+      .references(() => storefrontTable.id, { onDelete: "cascade" })
+      .notNull(),
+    referenceBrandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    purpose: inspirationPurposeEnum().notNull(),
+    name: t.text().notNull(),
+    sourceUrl: t.text().notNull(),
+    observedAt: t.timestamp({ withTimezone: true }).defaultNow().notNull(),
+    captureMethod: t
+      .text()
+      .$type<"ai_scrape" | "structured_import">()
+      .notNull(),
+    sourceProvider: t.text(),
+    sourceContentHash: t.text(),
+    model: t.text(),
+    snapshot: t.jsonb().$type<StorefrontReferenceSnapshot>().notNull(),
+    notes: t.text(),
+    createdBy: t.text().references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    createdAt: t.timestamp({ withTimezone: true }).defaultNow().notNull(),
+  }),
+  (table) => [
+    index("storefront_reference_storefront_idx").on(table.storefrontId),
+    index("storefront_reference_brand_idx").on(table.referenceBrandId),
+    index("storefront_reference_observed_idx").on(
+      table.storefrontId,
+      table.observedAt,
+    ),
+  ],
+);
+
 export const productRelations = relations(productTable, ({ one, many }) => ({
   organization: one(organizationTable, {
     fields: [productTable.organizationId],
@@ -147,29 +191,52 @@ export const productRelations = relations(productTable, ({ one, many }) => ({
   storefronts: many(storefrontTable),
 }));
 
-export const storefrontRelations = relations(storefrontTable, ({ one }) => ({
-  product: one(productTable, {
-    fields: [storefrontTable.productId],
-    references: [productTable.id],
+export const storefrontRelations = relations(
+  storefrontTable,
+  ({ one, many }) => ({
+    product: one(productTable, {
+      fields: [storefrontTable.productId],
+      references: [productTable.id],
+    }),
+    manager: one(userTable, {
+      fields: [storefrontTable.managerUserId],
+      references: [userTable.id],
+      relationName: "storefront_manager",
+    }),
+    staleMarker: one(userTable, {
+      fields: [storefrontTable.staleMarkedBy],
+      references: [userTable.id],
+      relationName: "storefront_stale_marker",
+    }),
+    confirmer: one(userTable, {
+      fields: [storefrontTable.confirmedBy],
+      references: [userTable.id],
+      relationName: "storefront_confirmer",
+    }),
+    references: many(storefrontReferenceTable),
   }),
-  manager: one(userTable, {
-    fields: [storefrontTable.managerUserId],
-    references: [userTable.id],
-    relationName: "storefront_manager",
+);
+
+export const storefrontReferenceRelations = relations(
+  storefrontReferenceTable,
+  ({ one }) => ({
+    storefront: one(storefrontTable, {
+      fields: [storefrontReferenceTable.storefrontId],
+      references: [storefrontTable.id],
+    }),
+    referenceBrand: one(brandTable, {
+      fields: [storefrontReferenceTable.referenceBrandId],
+      references: [brandTable.id],
+    }),
+    creator: one(userTable, {
+      fields: [storefrontReferenceTable.createdBy],
+      references: [userTable.id],
+    }),
   }),
-  staleMarker: one(userTable, {
-    fields: [storefrontTable.staleMarkedBy],
-    references: [userTable.id],
-    relationName: "storefront_stale_marker",
-  }),
-  confirmer: one(userTable, {
-    fields: [storefrontTable.confirmedBy],
-    references: [userTable.id],
-    relationName: "storefront_confirmer",
-  }),
-}));
+);
 
 export type Product = typeof productTable.$inferSelect;
 export type ProductInsert = typeof productTable.$inferInsert;
 export type Storefront = typeof storefrontTable.$inferSelect;
 export type StorefrontInsert = typeof storefrontTable.$inferInsert;
+export type StorefrontReference = typeof storefrontReferenceTable.$inferSelect;

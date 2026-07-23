@@ -11,7 +11,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   brandRead: ["list", "getMap", "next"],
   productAtlasRead: ["list", "get"],
   productAtlasWrite: ["create", "update"],
-  storefrontRead: ["list", "get"],
+  storefrontRead: ["list", "get", "listReferences"],
   storefrontWrite: [
     "create",
     "update",
@@ -19,6 +19,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "confirmCurrent",
     "assignManager",
     "copySiblingContent",
+    "captureReference",
+    "removeReference",
   ],
   audienceRead: ["list"],
   audienceWrite: [

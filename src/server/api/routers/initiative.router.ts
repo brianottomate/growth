@@ -15,7 +15,6 @@ import {
   initiativeStatusEnum,
   initiativeTable,
   memberTable,
-  productionPacketTable,
 } from "@/server/db/schema";
 
 type Ctx = {
@@ -187,25 +186,7 @@ export const initiativeRouter = createTRPCRouter({
         }),
       ]);
 
-      const contentPostIds = contentPosts.map((post) => post.id);
-      const productionPackets =
-        contentPostIds.length > 0
-          ? await ctx.db.query.productionPacketTable.findMany({
-              where: and(
-                eq(productionPacketTable.brandId, initiative.brandId),
-                inArray(productionPacketTable.contentPostId, contentPostIds),
-              ),
-              orderBy: [productionPacketTable.createdAt],
-            })
-          : [];
-
-      return {
-        ...initiative,
-        brand,
-        contentPosts,
-        adCampaigns,
-        productionPackets,
-      };
+      return { ...initiative, brand, contentPosts, adCampaigns };
     }),
 
   create: protectedProcedure

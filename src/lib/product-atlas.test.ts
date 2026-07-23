@@ -6,6 +6,7 @@ import {
   productAtlasSchema,
   storefrontContentSchema,
   storefrontMediaAssetIds,
+  storefrontReferenceSnapshotSchema,
   storefrontSurfaceRegistry,
 } from "./product-atlas";
 
@@ -52,6 +53,59 @@ describe("Product Atlas document", () => {
         "missing surface",
       ),
     ).toBe(true);
+  });
+});
+
+describe("Storefront reference snapshots", () => {
+  test("accepts a bounded marketplace comparison snapshot", () => {
+    const snapshot = storefrontReferenceSnapshotSchema.parse({
+      listing: {
+        title: "Notion Web Clipper",
+        publisher: "Notion Labs",
+        category: "Productivity",
+        openingLine: "Save any page to your workspace.",
+        summary: "A focused browser-extension listing.",
+      },
+      copyStructure: ["Problem", "Workflow", "Trust"],
+      imageSequence: [
+        {
+          position: 1,
+          caption: "Capture a page",
+          purpose: "Shows the primary action before secondary features",
+        },
+      ],
+      coverageDimensions: ["opening line", "screenshot sequence"],
+      strengths: ["Leads with one clear job"],
+      gaps: [],
+      patternsToBorrow: ["Put the main action in the first frame"],
+      contrasts: [
+        {
+          dimension: "Opening line",
+          referenceObservation: "Starts with a direct verb.",
+          targetObservation: "Starts with a category description.",
+          takeaway: "Test a task-led opening.",
+        },
+      ],
+    });
+
+    expect(snapshot.schemaVersion).toBe(1);
+    expect(snapshot.imageSequence[0]?.position).toBe(1);
+    expect(snapshot.contrasts[0]?.dimension).toBe("Opening line");
+  });
+
+  test("rejects unbounded or invalid image evidence", () => {
+    const parsed = storefrontReferenceSnapshotSchema.safeParse({
+      listing: {},
+      imageSequence: [
+        {
+          position: 0,
+          caption: "Invalid position",
+          purpose: "",
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
   });
 });
 

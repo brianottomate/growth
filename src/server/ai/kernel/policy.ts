@@ -73,7 +73,7 @@ export const growthActionPolicies = {
   },
   productAtlasRead: { list: read(), get: read() },
   productAtlasWrite: { create: write(), update: write({ idempotent: true }) },
-  storefrontRead: { list: read(), get: read() },
+  storefrontRead: { list: read(), get: read(), listReferences: read() },
   storefrontWrite: {
     create: write(),
     update: write({ idempotent: true }),
@@ -81,6 +81,11 @@ export const growthActionPolicies = {
     confirmCurrent: write({ idempotent: true }),
     assignManager: write({ idempotent: true }),
     copySiblingContent: write({ idempotent: true }),
+    captureReference: write({
+      consequence: "background-run",
+      undoWith: "storefrontWrite.removeReference",
+    }),
+    removeReference: write({ reversible: false }),
   },
   audienceRead: { list: read() },
   audienceWrite: {

@@ -28,6 +28,14 @@ import {
   updateStorefrontSchema,
   type ProductStorefrontActor,
 } from "@/server/services/product-storefront.service";
+import {
+  captureStorefrontReference,
+  captureStorefrontReferenceSchema,
+  listStorefrontReferenceBrands,
+  listStorefrontReferences,
+  removeStorefrontReference,
+  removeStorefrontReferenceSchema,
+} from "@/server/services/storefront-reference.service";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -91,6 +99,18 @@ export const productStorefrontRouter = createTRPCRouter({
     .query(({ ctx, input }) =>
       run(ctx, (actor) => listProductBrandAssets(actor, input.brandId)),
     ),
+  listReferenceBrands: protectedProcedure
+    .input(z.object({ storefrontId: z.string().min(1) }))
+    .query(({ ctx, input }) =>
+      run(ctx, (actor) =>
+        listStorefrontReferenceBrands(actor, input.storefrontId),
+      ),
+    ),
+  listReferences: protectedProcedure
+    .input(z.object({ storefrontId: z.string().min(1) }))
+    .query(({ ctx, input }) =>
+      run(ctx, (actor) => listStorefrontReferences(actor, input.storefrontId)),
+    ),
   createProduct: protectedProcedure
     .input(createProductSchema)
     .mutation(({ ctx, input }) =>
@@ -130,5 +150,15 @@ export const productStorefrontRouter = createTRPCRouter({
     .input(copyStorefrontContentSchema)
     .mutation(({ ctx, input }) =>
       run(ctx, (actor) => copyStorefrontContent(actor, input)),
+    ),
+  captureReference: protectedProcedure
+    .input(captureStorefrontReferenceSchema)
+    .mutation(({ ctx, input }) =>
+      run(ctx, (actor) => captureStorefrontReference(actor, input)),
+    ),
+  removeReference: protectedProcedure
+    .input(removeStorefrontReferenceSchema)
+    .mutation(({ ctx, input }) =>
+      run(ctx, (actor) => removeStorefrontReference(actor, input)),
     ),
 });

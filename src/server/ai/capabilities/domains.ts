@@ -58,15 +58,18 @@ import {
 import { PLANNING_TOOLS } from "./planning";
 import {
   assignProductStorefrontManager,
+  captureProductStorefrontReference,
   confirmProductStorefrontCurrent,
   copySiblingStorefrontContent,
   createProductAtlasProduct,
   createProductStorefront,
   listProductAtlasProducts,
   listProductStorefronts,
+  listProductStorefrontReferences,
   markProductStorefrontStale,
   readProductAtlas,
   readProductStorefront,
+  removeProductStorefrontReference,
   updateProductAtlas,
   updateProductStorefront,
 } from "./product-storefront";
@@ -89,8 +92,13 @@ export const productAtlasWrite = growthDomainTool({
 });
 
 export const storefrontRead = growthDomainTool({
-  description: "List product storefronts or read one complete storefront.",
-  actions: { list: listProductStorefronts, get: readProductStorefront },
+  description:
+    "List product storefronts, read one complete storefront, or inspect its point-in-time references.",
+  actions: {
+    list: listProductStorefronts,
+    get: readProductStorefront,
+    listReferences: listProductStorefrontReferences,
+  },
 });
 
 export const storefrontWrite = growthDomainTool({
@@ -103,6 +111,8 @@ export const storefrontWrite = growthDomainTool({
     confirmCurrent: confirmProductStorefrontCurrent,
     assignManager: assignProductStorefrontManager,
     copySiblingContent: copySiblingStorefrontContent,
+    captureReference: captureProductStorefrontReference,
+    removeReference: removeProductStorefrontReference,
   },
 });
 

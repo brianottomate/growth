@@ -403,6 +403,56 @@ export const emptyStorefrontContent: StorefrontContent = {
   platformFields: {},
 };
 
+export const storefrontReferenceImageSchema = z.object({
+  position: z.number().int().min(1),
+  caption: z.string().trim().max(500).default(""),
+  purpose: z.string().trim().max(1_000).default(""),
+  sourceUrl: z.string().trim().url().optional(),
+});
+
+export const storefrontReferenceContrastSchema = z.object({
+  dimension: z.string().trim().min(1).max(160),
+  referenceObservation: z.string().trim().min(1).max(1_000),
+  targetObservation: z.string().trim().min(1).max(1_000),
+  takeaway: z.string().trim().min(1).max(1_000),
+});
+
+/**
+ * A bounded, source-grounded observation of a public storefront at one point
+ * in time. The row carrying this snapshot owns provenance and relationship
+ * data; this payload stays flexible as marketplace fields evolve.
+ */
+export const storefrontReferenceSnapshotSchema = z.object({
+  schemaVersion: z.literal(1).default(1),
+  listing: z.object({
+    title: z.string().trim().max(240).default(""),
+    publisher: z.string().trim().max(240).default(""),
+    category: z.string().trim().max(160).default(""),
+    openingLine: z.string().trim().max(1_000).default(""),
+    summary: z.string().trim().max(2_000).default(""),
+  }),
+  copyStructure: z
+    .array(z.string().trim().min(1).max(1_000))
+    .max(20)
+    .default([]),
+  imageSequence: z.array(storefrontReferenceImageSchema).max(20).default([]),
+  coverageDimensions: z
+    .array(z.string().trim().min(1).max(100))
+    .max(30)
+    .default([]),
+  strengths: z.array(z.string().trim().min(1).max(1_000)).max(20).default([]),
+  gaps: z.array(z.string().trim().min(1).max(1_000)).max(20).default([]),
+  patternsToBorrow: z
+    .array(z.string().trim().min(1).max(1_000))
+    .max(20)
+    .default([]),
+  contrasts: z.array(storefrontReferenceContrastSchema).max(20).default([]),
+});
+
+export type StorefrontReferenceSnapshot = z.infer<
+  typeof storefrontReferenceSnapshotSchema
+>;
+
 export const storefrontChangeActions = [
   "created",
   "content_updated",
