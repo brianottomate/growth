@@ -84,6 +84,8 @@ export type SpotCardData = {
   username: string | null;
   text: string | null;
   externalUrl: string | null;
+  /** CMS editor deep link (Dato) — the preview surface while the item is a draft. */
+  editorUrl: string | null;
   provider: string | null;
   scheduledAtISO: string | null;
   publishedAtISO: string | null;
@@ -323,12 +325,27 @@ export function SpotCard({
               <span>· posted {fmtWhen(spot.publishedAtISO)}</span>
             )}
             {via && <span>· via {via}</span>}
+            {spot.editorUrl && (
+              <a
+                href={spot.editorUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground underline"
+              >
+                Edit in Dato ↗
+              </a>
+            )}
             {spot.externalUrl && (
               <a
                 href={spot.externalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-foreground underline"
+                title={
+                  spot.editorUrl && spot.status !== "published"
+                    ? "Public URL — live after the draft is published in Dato"
+                    : undefined
+                }
               >
                 Open ↗
               </a>

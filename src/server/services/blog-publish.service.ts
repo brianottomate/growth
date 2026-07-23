@@ -131,16 +131,23 @@ export async function publishBlogDraft(input: {
   });
 
   const plannedPublicUrl = `${BLOG_BASE}/${slug}`;
+  const editorUrl = adminDomain
+    ? `https://${adminDomain}/editor/item_types/${itemTypeId}/items/${created.id}/edit`
+    : null;
   await db
     .update(platformPostTable)
     .set({
       externalId: created.id,
+      // The public URL only resolves once a human publishes in Dato; until
+      // then wander.com 307s unknown slugs to /blog. The UI offers the
+      // editorUrl from metadata as the draft preview surface.
       externalUrl: plannedPublicUrl,
       metadata: {
         ...(spot.metadata ?? {}),
         datocms: {
           itemId: created.id,
           uploadId,
+          editorUrl,
           createdAsDraft: true,
           publishedVia: "blog-publish.service",
         },
@@ -151,9 +158,7 @@ export async function publishBlogDraft(input: {
   return {
     itemId: created.id,
     slug,
-    editorUrl: adminDomain
-      ? `https://${adminDomain}/editor/item_types/${itemTypeId}/items/${created.id}/edit`
-      : null,
+    editorUrl,
     plannedPublicUrl,
   };
 }

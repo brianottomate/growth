@@ -41,6 +41,13 @@ const STATUS: Record<string, string> = {
 const fmt = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
 
+/** CMS editor deep link stashed by blog-publish.service in untyped metadata. */
+const editorUrlOf = (metadata: unknown): string | null => {
+  const url = (metadata as { datocms?: { editorUrl?: unknown } } | null)
+    ?.datocms?.editorUrl;
+  return typeof url === "string" ? url : null;
+};
+
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
@@ -309,6 +316,7 @@ export default async function ContentDetailPage({
               username: p.username,
               text: p.text,
               externalUrl: p.externalUrl,
+              editorUrl: editorUrlOf(p.metadata),
               provider: p.provider,
               scheduledAtISO: p.scheduledAt
                 ? p.scheduledAt.toISOString()
