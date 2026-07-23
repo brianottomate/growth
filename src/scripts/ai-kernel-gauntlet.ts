@@ -115,8 +115,8 @@ async function main() {
   const overviewNames = Object.keys(OVERVIEW_TOOLS).sort();
   const policyNames = Object.keys(growthActionPolicies).sort();
   assert(
-    overviewNames.length === 31,
-    `Expected 31 direct capabilities, got ${overviewNames.length}`,
+    overviewNames.length === 33,
+    `Expected 33 direct capabilities, got ${overviewNames.length}`,
   );
   assert(
     JSON.stringify(overviewNames) === JSON.stringify(policyNames),
@@ -127,8 +127,8 @@ async function main() {
     "MCP must omit open-world research tools",
   );
   assert(
-    Object.keys(MCP_TOOLS).length === 30,
-    `Expected 30 MCP tools, got ${Object.keys(MCP_TOOLS).length}`,
+    Object.keys(MCP_TOOLS).length === 32,
+    `Expected 32 MCP tools, got ${Object.keys(MCP_TOOLS).length}`,
   );
   assert(
     JSON.stringify(Object.keys(PLAN_TOOLS).sort()) ===
