@@ -7,6 +7,22 @@ import { z } from "zod";
 export const MEDIA_ANALYSIS_VERSION = 1;
 export const MEDIA_ANALYSIS_MODEL = "claude-sonnet-4-6";
 
+/** Best-effort image media type from a URL's extension, for AI SDK file
+ * parts (the "image" content part is deprecated). Unknown → image/jpeg. */
+export function imageMediaType(url: string): string {
+  const extension = new URL(url).pathname.split(".").pop()?.toLowerCase();
+  const byExtension: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    gif: "image/gif",
+    heic: "image/heic",
+    avif: "image/avif",
+  };
+  return (extension && byExtension[extension]) ?? "image/jpeg";
+}
+
 const analysisSchema = z.object({
   name: z.string().describe("A concise, useful 2-7 word asset name."),
   description: z
@@ -63,7 +79,11 @@ ${vocabulary}${
                 : ""
             }`,
           },
-          { type: "image", image: new URL(input.url) },
+          {
+            type: "file",
+            mediaType: imageMediaType(input.url),
+            data: new URL(input.url),
+          },
         ],
       },
     ],

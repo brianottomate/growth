@@ -13,6 +13,7 @@ import {
   type WebsitePortfolioAnalysis,
 } from "@/lib/content-analysis";
 import { scrapeBasicContent } from "@/server/clients/firecrawl.client";
+import { imageMediaType } from "@/server/services/media-analysis.service";
 
 const MAX_SOURCE_CHARS = 36_000;
 
@@ -229,7 +230,11 @@ Return 2-7 concise themes, 2-5 strengths, any real risks, and 3-8 prioritized re
         content: input.imageUrl
           ? [
               { type: "text", text: sourcePrompt },
-              { type: "image", image: new URL(input.imageUrl) },
+              {
+                type: "file",
+                mediaType: imageMediaType(input.imageUrl),
+                data: new URL(input.imageUrl),
+              },
             ]
           : sourcePrompt,
       },
