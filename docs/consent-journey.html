@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wander Consent Journey — GeoIP → Middleware → Bundle → Consent → Trackers</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --ink: #1a2233;
+    --muted: #5b6577;
+    --line: #e3e7ee;
+    --accent: #2563eb;
+    --accent-soft: #eff4ff;
+    --green: #16a34a;
+    --green-soft: #ecfdf3;
+    --red: #dc2626;
+    --red-soft: #fef2f2;
+    --amber: #d97706;
+    --amber-soft: #fffbeb;
+    --purple: #7c3aed;
+    --purple-soft: #f5f1ff;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
+  }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+  code { font-family: var(--mono); font-size: 12px; background: #f1f3f7; padding: 1px 5px; border-radius: 4px; }
+
+  /* Controls */
+  .controls {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end;
+    box-shadow: 0 4px 14px rgba(20,30,60,.06); margin-bottom: 18px;
+  }
+  .ctl label.title { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 5px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    border: 0; background: transparent; padding: 6px 12px; font: inherit; font-size: 13px;
+    cursor: pointer; color: var(--muted); border-right: 1px solid var(--line); white-space: nowrap;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); cursor: pointer; padding: 6px 0; }
+  .chk input { accent-color: var(--purple); }
+
+  /* Layout */
+  .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } .panel { position: static !important; } }
+
+  /* Timeline */
+  .timeline { position: relative; padding-left: 34px; }
+  .timeline::before { content: ""; position: absolute; left: 13px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+  .stage { position: relative; margin-bottom: 14px; }
+  .stage .dot {
+    position: absolute; left: -34px; top: 10px; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--card); border: 2px solid var(--accent); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+  }
+  .stage.dim .dot { border-color: var(--line); color: var(--muted); }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  }
+  .stage.dim .card { opacity: .55; }
+  .card h3 { margin: 0 0 4px; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card .where { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .card p { margin: 5px 0; color: var(--ink); }
+  .card .note { color: var(--muted); font-size: 12.5px; }
+  .badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .b-green { background: var(--green-soft); color: var(--green); }
+  .b-red { background: var(--red-soft); color: var(--red); }
+  .b-amber { background: var(--amber-soft); color: var(--amber); }
+  .b-blue { background: var(--accent-soft); color: var(--accent); }
+  .b-purple { background: var(--purple-soft); color: var(--purple); }
+
+  /* CMP overlay */
+  .cmp-card { border: 2px dashed var(--purple); background: var(--purple-soft); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+  .cmp-card h4 { margin: 0 0 4px; font-size: 13px; color: var(--purple); }
+  .cmp-card p { margin: 4px 0; font-size: 12.5px; color: var(--ink); }
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 6px; background: #fff; }
+  .cmp-table th, .cmp-table td { border: 1px solid #ddd0f5; padding: 4px 7px; text-align: left; vertical-align: top; }
+  .cmp-table th { background: #ece4fb; color: var(--purple); }
+
+  /* Banner mock */
+  .banner-mock {
+    margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+    background: linear-gradient(180deg,#fff, #f6f8fc); box-shadow: 0 6px 16px rgba(20,30,60,.08);
+  }
+  .banner-mock .btns { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .banner-mock .btn { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
+  .banner-mock .btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* Provider chips */
+  .provgroup { margin-top: 8px; }
+  .provgroup .gtitle { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 8px 0 5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; color: var(--muted); transition: all .15s;
+  }
+  .chip.lit { background: var(--green-soft); border-color: #b7e4c7; color: var(--green); }
+  .chip.dark { opacity: .5; text-decoration: line-through; }
+
+  /* State panel */
+  .panel { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 12px; }
+  .panel .card h3 { font-size: 13px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12.5px; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-weight: 600; text-align: right; }
+  pre.json {
+    font-family: var(--mono); font-size: 11px; line-height: 1.45; background: #0f172a; color: #d8e3f5;
+    border-radius: 8px; padding: 10px; overflow-x: auto; margin: 6px 0 0; white-space: pre;
+  }
+  .cm-strip { display: flex; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 11.5px; margin-top: 6px; }
+  .cm-strip .row { padding: 5px 8px; border-radius: 6px; }
+  .cm-denied { background: var(--red-soft); color: var(--red); }
+  .cm-granted { background: var(--green-soft); color: var(--green); }
+  .cm-off { background: #f1f3f7; color: var(--muted); }
+  .bigstat { font-size: 24px; font-weight: 800; }
+  .flag { font-size: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Consent journey: GeoIP → middleware → bundle → consent → trackers</h1>
+<div class="sub">Grounded in the consent branch: <code>wander.com/src/proxy.ts</code>, <code>@wandercom/tracking-core consent.ts</code>, <code>TrackingProviderWrapper.tsx</code>, and WanderOS <code>Trackers.astro</code> + <code>/api/geo</code>. Toggle the scenario and watch every stage update.</div>
+
+<div class="controls">
+  <div class="ctl">
+    <label class="title">Visitor</label>
+    <div class="seg" id="seg-loc">
+      <button data-v="DE">🇩🇪 Germany</button>
+      <button data-v="US">🇺🇸 California</button>
+      <button data-v="BR">🇧🇷 Brazil</button>
+      <button data-v="CA">🇨🇦 Québec</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label class="title">Site</label>
+    <div class="seg" id="seg-site">
+      <button data-v="wander">wander.com</button>
+      <button data-v="merchant">germanvacationstays.de</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label class="title">User's consent action</label>
+    <div class="seg" id="seg-dec">
+      <button data-v="none">No decision</button>
+      <button data-v="accept">Accept all</button>
+      <button data-v="analytics">Analytics only</button>
+      <button data-v="reject">Reject</button>
+    </div>
+  </div>
+  <div class="ctl">
+    <label class="title">What-ifs</label>
+    <label class="chk"><input type="checkbox" id="chk-geo"> Geo signal missing (VPN / non-edge env)</label>
+    <label class="chk"><input type="checkbox" id="chk-cmp" checked> Show hypothetical CMP (Osano / OneTrust)</label>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="timeline" id="timeline"></div>
+
+  <div class="panel">
+    <div class="card">
+      <h3>Resolved state</h3>
+      <div class="kv" id="kv-state"></div>
+    </div>
+    <div class="card">
+      <h3>Cookies on the visitor's browser</h3>
+      <div id="cookie-box"></div>
+    </div>
+    <div class="card">
+      <h3>Google Consent Mode v2</h3>
+      <div class="cm-strip" id="cm-strip"></div>
+      <p class="note" id="cm-note" style="font-size:11.5px;margin-top:6px;"></p>
+    </div>
+    <div class="card">
+      <h3>Tracker network requests</h3>
+      <div class="bigstat" id="req-count">—</div>
+      <p class="note" id="req-note"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const S = { loc: 'DE', site: 'wander', decision: 'none', geoMissing: false, cmp: true };
+
+const LOCS = {
+  DE: { flag: '🇩🇪', city: 'Berlin',            tz: 'Europe/Berlin' },
+  US: { flag: '🇺🇸', city: 'Los Angeles',       tz: 'America/Los_Angeles' },
+  BR: { flag: '🇧🇷', city: 'São Paulo',         tz: 'America/Sao_Paulo' },
+  CA: { flag: '🇨🇦', city: 'Montréal (Québec)', tz: 'America/Toronto' },
+};
+
+const PROVIDERS = {
+  analytics: ['Segment', 'Amplitude', 'Vercel Analytics'],
+  advertising: ['Google (gtag / GA4 / Ads)', 'Meta Pixel', 'Reddit', 'LinkedIn', 'Bidr ×3', 'Innovid', 'PebblePost', 'OpenAI'],
+};
+
+function resolveRegime(country, tz) {
+  if (country) return ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'].includes(country) ? 'opt-in' : 'opt-out';
+  if (tz) return tz.startsWith('Europe/') ? 'opt-in' : 'opt-out';
+  return 'opt-in';
+}
+
+function derive() {
+  const country = S.geoMissing ? null : S.loc;
+  const tz = LOCS[S.loc].tz;
+  const isWander = S.site === 'wander';
+  // wander.com: client-side fallback to device timezone.
+  // merchant: /api/geo returns resolveRegime(cf.country, null) — server has no
+  // device timezone, so a null country fail-stricts to opt-in (bootstrap only
+  // falls back to timezone if the fetch itself FAILS).
+  const regime = isWander ? resolveRegime(country, tz) : resolveRegime(country, null);
+  const optIn = regime === 'opt-in';
+
+  let prefs;
+  if (S.decision === 'none')            prefs = optIn ? {analytics:false, advertising:false, functional:false} : {analytics:true, advertising:true, functional:true};
+  else if (S.decision === 'accept')     prefs = {analytics:true, advertising:true, functional:true};
+  else if (S.decision === 'analytics')  prefs = {analytics:true, advertising:false, functional:false};
+  else                                  prefs = {analytics:false, advertising:false, functional:false};
+
+  const record = S.decision === 'none' ? null : {
+    preferences: { essential: true, ...prefs },
+    regime,
+    version: 1,
+    decidedAt: new Date().toISOString().slice(0,19) + 'Z',
+    surface: isWander ? 'wander.com' : 'wos:germanvacationstays.de',
+  };
+  return { country, tz, regime, optIn, prefs, record, isWander };
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function stage(n, title, where, whereCls, bodyHtml, dim) {
+  return `<div class="stage${dim ? ' dim' : ''}">
+    <div class="dot">${n}</div>
+    <div class="card">
+      <h3>${title} <span class="where" style="${whereCls||''}">${where}</span></h3>
+      ${bodyHtml}
+    </div>
+  </div>`;
+}
+
+function cmpCard(text) {
+  if (!S.cmp) return '';
+  return `<div class="cmp-card"><h4>⬦ Hypothetical: Osano / OneTrust here</h4>${text}</div>`;
+}
+
+function render() {
+  const d = derive();
+  const flag = LOCS[S.loc].flag;
+  const city = LOCS[S.loc].city;
+  const candNote = S.loc === 'BR'
+    ? `<p><span class="badge b-purple">Future candidate</span> <code>BR</code> resolves <strong>opt-out</strong> today — Brazil's LGPD is an opt-in-style law explicitly listed as an extension candidate in <code>OPT_IN_COUNTRIES</code>. Flipping it is a one-line change in tracking-core (plus the vendored sites contract + shared conformance vectors).</p>`
+    : S.loc === 'CA'
+    ? `<p><span class="badge b-purple">Future candidate</span> <code>CA</code> resolves <strong>opt-out</strong> today — Québec's Law 25 is opt-in-style and listed as an extension candidate in <code>OPT_IN_COUNTRIES</code>. Caveat: Law 25 is <em>province</em>-level but the geo signal is <em>country</em>-level, so flipping <code>CA</code> flips all of Canada — a region-level signal (<code>x-vercel-ip-country-region</code> / <code>cf.region</code>) would be needed to scope it to QC.</p>`
+    : '';
+  const host = d.isWander ? 'wander.com' : 'germanvacationstays.de';
+  const stages = [];
+
+  // 1 — Request
+  stages.push(stage(1, `${flag} Visitor in ${city} requests <code>https://${host}/</code>`, 'Browser', '',
+    `<p class="note">Plain HTTPS GET. Nothing consent-related has happened yet — the browser carries only whatever cookies it already has (${S.decision==='none' ? 'none on a first visit' : 'the consent record from a previous decision'}).</p>`));
+
+  // 2 — Edge GeoIP
+  if (d.isWander) {
+    stages.push(stage(2, 'GeoIP resolution', 'Vercel Edge', '',
+      `<p>Vercel resolves the source IP and sets <code>x-vercel-ip-country: ${d.country ?? '∅ (absent)'}</code> on the request — <strong>this is the only GeoIP lookup in the whole flow</strong>. No third-party geo service.</p>
+       ${d.country ? '' : `<p class="note"><span class="badge b-amber">Signal missing</span> Local dev, self-hosted, or stripped header — middleware sets nothing; the client will fall back to the device timezone.</p>`}` +
+      cmpCard(`<p>A CMP does its <em>own</em> geo lookup — OneTrust via a dedicated geolocation endpoint its script calls home to, Osano inside the script itself — to decide which banner rules apply. Our Vercel header + <code>resolveRegime()</code> would become redundant, trading the auditable 32-country <code>OPT_IN_COUNTRIES</code> set in tracking-core's git history for jurisdiction config in a vendor dashboard. (Both vendors accept a geolocation <em>override</em> — so the better integration feeds our middleware signal <em>into</em> the CMP, keeping one source of truth.)</p>`)));
+  } else {
+    stages.push(stage(2, 'GeoIP resolution', 'Cloudflare Worker', 'background:#fff3e6;color:#c2570a;',
+      `<p>Cloudflare exposes <code>request.cf.country = ${d.country ?? '∅'}</code>. <strong>But the HTML response can't use it:</strong> WanderOS sites serve from a shared SWR HTML cache keyed only by path/build/locale — a cached page must never bake in one visitor's country and serve it to another.</p>
+       <p class="note">So geo is deliberately <em>not</em> stamped here. It's resolved out-of-band in stage 5 via <code>GET /api/geo</code> (<code>Cache-Control: no-store</code>).</p>` +
+      cmpCard(`<p>Same cache constraint applies to a CMP: its banner config would also have to resolve client-side. Most CMPs handle this natively (their JS geolocates on load), so the cached-HTML architecture is CMP-compatible — at the cost of a ~50–100 KB third-party script on every page, pre-consent.</p>`)));
+  }
+
+  // 3 — Middleware
+  if (d.isWander) {
+    stages.push(stage(3, 'Middleware stamps the regime cookie', 'src/proxy.ts', '',
+      `<p>${d.country
+        ? `Stamps <code>wander_regime=${d.country}</code> (raw ISO country, 24 h, <code>.wander.com</code>-wide in prod) — done here, <em>before the route cache</em>, so pages stay static instead of forcing every route dynamic by reading <code>headers()</code>.`
+        : `No country header → <span class="badge b-amber">no cookie stamped</span>. Client will resolve from timezone.`}</p>
+      <p class="note">It also re-echoes any existing <code>wander_consent</code> cookie server-side: Safari ITP caps JS-written cookies at 7 days, but server-set cookies keep the full 12-month lifetime (GDPR-standard consent validity).</p>`));
+  } else {
+    stages.push(stage(3, 'Middleware stamps the regime cookie <span class="badge b-purple">in PR</span>', 'src/middleware.ts', 'background:#fff3e6;color:#c2570a;',
+      `<p class="note">Today the sites middleware does nothing for consent (locale suggestion etc. only) — the shared HTML cache was assumed to make per-visitor stamping impossible.</p>
+       <p><span class="badge b-purple">PR: feat/consent-geo-middleware</span> The insight: only the <em>body</em> must stay universal — headers are per-visitor. The middleware ${d.country ? `stamps <code>wos_regime=${d.country}</code> (24 h, host-only per merchant domain)` : 'stamps nothing (no CF geo)'} from <code>request.cf.country</code>; cookies merge onto the response <em>after</em> the shared-cache write, so a <code>Set-Cookie</code> can never enter a cached entry. It also re-affirms <code>wos_consent</code> server-side (Safari ITP escape) — full parity with wander.com's <code>proxy.ts</code>.</p>`));
+  }
+
+  // 4 — Bundle delivery
+  stages.push(stage(4, 'HTML + JS bundle delivered — identical for everyone', d.isWander ? 'Next.js' : 'Astro (cached)', '',
+    `<p><strong>Key property: there is no geo-variant bundle.</strong> A visitor in Berlin and one in LA get byte-identical ${d.isWander ? 'Next.js chunks' : 'cached Astro HTML'}. The consent engine (<code>@wandercom/tracking-core</code>${d.isWander ? ' + <code>tracking-web</code>' : ' contract, vendored in <code>consent-contract.ts</code>'}) ships <em>inside</em> the bundle and decides at runtime.</p>
+     <p class="note">No tracker <code>&lt;script&gt;</code> tags exist in the HTML at all — every provider is lazy-loaded by the engine only after its category is allowed. ${d.isWander ? '' : 'On sites, an inline bootstrap in <code>Trackers.astro</code> runs before any tracker code.'}</p>` +
+    cmpCard(`<p>With a CMP, one pre-consent script <em>would</em> ship in <code>&lt;head&gt;</code>: the vendor loader itself (CMPs are exempt as strictly-necessary). Provider gating below would still need a mapping layer from CMP category IDs (e.g. OneTrust <code>OnetrustActiveGroups</code> C0002/C0004) → our <code>ConsentCategory</code> so <code>createProviderSpecs()</code> keeps working unchanged.</p>
+      <p><strong>Banner ownership — our component vs. a CSS-reskinned vendor banner:</strong></p>
+      <table class="cmp-table">
+        <tr><th></th><th>Our <code>ConsentBanner</code> (in the bundle)</th><th>Vendor banner, CSS-themed</th></tr>
+        <tr><td><strong>Bytes / timing</strong></td><td>0 extra bytes; renders with the app frame — no pop-in, no CLS</td><td>Vendor JS fetches config, then injects its DOM → visible late pop-in + layout shift on first paint</td></tr>
+        <tr><td><strong>Styling</strong></td><td>Design-system components; pixel-identical to the site</td><td>Dashboard themes + CSS overrides against DOM you don't own — fragile when the vendor ships new markup</td></tr>
+        <tr><td><strong>Copy / i18n / a11y</strong></td><td>Ours end-to-end, testable in CI</td><td>Vendor's templates and locale packs; a11y depends on their release cycle</td></tr>
+        <tr><td><strong>Trust boundary</strong></td><td>Banner and enforcement are the same reviewed code</td><td>The restyled banner is also remote-updated code — a skin over a script you re-audit on their schedule</td></tr>
+      </table>
+      <p><strong>Where each vendor actually earns its keep</strong> <span class="note">(as commonly positioned — verify current feature matrices before any buy decision):</span></p>
+      <table class="cmp-table">
+        <tr><th>Capability</th><th>OneTrust</th><th>Osano</th><th>Our engine</th></tr>
+        <tr><td>IAB TCF 2.2 consent strings</td><td>Yes — registered CMP, deep vendor-list mgmt</td><td>Yes — registered, lighter tooling</td><td>No (only matters if programmatic partners demand it)</td></tr>
+        <tr><td>Unknown-script auto-blocking</td><td>Site scanning + per-tag blocking rules; mature GTM integration</td><td>Listener-based blocking, simpler setup</td><td>No — gates only what's registered (the merchant-GTM gap)</td></tr>
+        <tr><td>Geo / jurisdiction rules</td><td>Dedicated geolocation service + rule templates per law</td><td>Geo resolved inside its script</td><td>Ours: platform edge signal + auditable <code>OPT_IN_COUNTRIES</code> in git</td></tr>
+        <tr><td>Legal-facing audit trail</td><td>Consent receipts, dashboards, DSAR suite</td><td>Consent records, basic DSAR</td><td>Versioned <code>ConsentRecord</code>s exist but no UI for legal (gap)</td></tr>
+        <tr><td>Enforcement at load</td><td colspan="2">Depends on correct per-site blocking config — commonly degrades to banner-hiding</td><td><strong>Structural: unregistered code never loads (verified live: 0 pre-consent requests)</strong></td></tr>
+      </table>`)));
+
+  // 5 — Regime resolution
+  if (d.isWander) {
+    stages.push(stage(5, `Client resolves regime → <span class="badge ${d.optIn?'b-red':'b-green'}">${d.regime}</span>`, 'TrackingProviderWrapper', '',
+      `<p><code>resolveRegime(country, timeZone)</code> — country from the <code>wander_regime</code> cookie is the <strong>primary signal</strong>${d.country ? ` (<code>${d.country}</code> → ${d.optIn ? 'in the 32-country opt-in set: EU-27 + IS/LI/NO + GB/CH' : 'not in the opt-in set → opt-out'})` : ''}.</p>
+      ${!d.country ? `<p><span class="badge b-amber">Fallback used</span> No cookie → device timezone <code>${d.tz}</code> ${d.tz.startsWith('Europe/') ? 'starts with <code>Europe/</code> → <strong>opt-in</strong> (deliberately over-inclusive: better a harmless banner for a Turkish visitor than a missed EEA one)' : 'is not <code>Europe/*</code> → opt-out'}. If both signals were missing: <strong>fail-strict → opt-in</strong>.</p>` : ''}` + candNote));
+  } else {
+    stages.push(stage(5, `Bootstrap resolves regime → <span class="badge ${d.optIn?'b-red':'b-green'}">${d.regime}</span>`, 'Trackers.astro', 'background:#fff3e6;color:#c2570a;',
+      `<p>The inline bootstrap first reads <code>wos_consent</code> synchronously. ${S.decision!=='none' ? '<span class="badge b-green">Record found</span> — applies the stored preferences immediately; <code>/api/geo</code> is skipped entirely.' : `No record → one fetch to <code>GET /api/geo</code>, which reads <code>request.cf.country</code> and returns <code>{country: ${d.country ? '"'+d.country+'"' : 'null'}, regime: "${d.regime}"}</code>.`}</p>
+      ${S.decision==='none' && !d.country ? `<p><span class="badge b-amber">Note the asymmetry</span> The server has no device timezone, so a null country <strong>fail-stricts to opt-in</strong> — even this ${city} visitor would see the banner. (The timezone fallback only kicks in if the fetch itself fails.)</p>` : ''}
+      <p class="note">The geo response is <code>no-store</code> and its <code>Accept: */*</code> bypasses the shared HTML cache both ways — a cached country would be some other visitor's country.</p>
+      <p><span class="badge b-purple">in PR</span> With the middleware-stamped <code>wos_regime</code> cookie, the bootstrap resolves <strong>synchronously before paint</strong> — no <code>/api/geo</code> round trip, and the fail-strict asymmetry disappears (<code>/api/geo</code> stays as fallback for cookie-blocking clients + the first-response race, where the timezone check still applies).</p>` + candNote));
+  }
+
+  // 6 — Default config
+  const preBody = d.optIn
+    ? `<p><span class="badge b-red">Default: everything OFF except essential</span> — <code>defaultConsentForRegime('opt-in')</code> = <code>ALL_OFF</code>. Zero non-essential providers initialize; zero tracker network requests fire.</p>
+       ${S.decision==='none' ? `<div class="banner-mock"><strong>🍪 We value your privacy</strong>
+         <p class="note" style="margin:4px 0 0">We use cookies for analytics and advertising. See our <u>privacy policy</u> or manage <u>cookie preferences</u>.</p>
+         <div class="btns"><span class="btn primary">Accept all</span><span class="btn">Reject non-essential</span><span class="btn">Customize</span></div></div>
+         <p class="note" style="margin-top:8px">The <code>ConsentBanner</code> renders because <code>needsConsentDecision</code> is true (opt-in regime + no stored record).</p>` : `<p class="note">Banner ${S.decision==='none'?'shown':'was shown on first visit'} — a stored record now exists, so it stays hidden on this visit.</p>`}`
+    : `<p><span class="badge b-green">Default: everything ON</span> — <code>DEFAULT_CONSENT</code> (US / CCPA opt-out model). <strong>No banner.</strong> All providers lazy-load immediately. The user can opt out any time via the “Cookie preferences” footer link → <code>/cookies</code>.</p>`;
+  stages.push(stage(6, `Default tracking config under <em>${d.regime}</em>`, 'Consent engine', '', preBody +
+    cmpCard(`<p>This banner (and the record storage in stage 7) is exactly what a CMP would replace: their injected UI, their cookie (OneTrust <code>OptanonConsent</code> / Osano <code>osano_consentmanager</code>), their audit log — OneTrust adds consent receipts + a legal dashboard, Osano keeps it lighter. What neither replaces is the enforcement: provider gating stays ours, and the CMP's decision would need bridging into <code>window.__wanderConsent</code> / the provider specs.</p>`)));
+
+  // 7 — Decision
+  if (d.optIn || S.decision !== 'none') {
+    const decLabel = {none:'', accept:'Accept all', analytics:'Analytics only (partial)', reject:'Reject non-essential'}[S.decision];
+    stages.push(stage(7,
+      S.decision==='none' ? 'Awaiting decision…' : `Decision: <span class="badge b-blue">${decLabel}</span>${!d.optIn ? ' <span class="badge b-amber">via /cookies page</span>' : ''}`,
+      'Consent record', '',
+      S.decision==='none'
+        ? `<p class="note">Until the visitor decides, the opt-in default above stands. Silence is not consent — a dismissed or ignored banner loads nothing.</p>`
+        : `<p>A versioned, timestamped <code>ConsentRecord</code> (GDPR Art. 7(1) demonstrable consent) is written to <code>${d.isWander ? 'wander_consent' : 'wos_consent'}</code> (12 months${d.isWander ? ', <code>.wander.com</code>-wide so app.wander.com shares it' : ', scoped to this merchant domain'}). The engine re-evaluates: providers whose category flipped to allowed <strong>load now</strong>; a revoke tears the allowed set back down. Withdrawal is one click on <code>/cookies</code> (Art. 7(3)).</p>`,
+      false));
+  }
+
+  // 8 — What loads
+  const chips = (cat) => PROVIDERS[cat].map(p => {
+    const lit = d.prefs[cat === 'analytics' ? 'analytics' : 'advertising'];
+    return `<span class="chip ${lit ? 'lit' : 'dark'}">${p}</span>`;
+  }).join('');
+  const litCount = (d.prefs.analytics ? PROVIDERS.analytics.length : 0) + (d.prefs.advertising ? PROVIDERS.advertising.length : 0);
+  stages.push(stage(8, `What actually loads (${litCount} of ${PROVIDERS.analytics.length + PROVIDERS.advertising.length} provider groups)`, d.isWander ? 'createProviderSpecs()' : 'registry dispatch gate', '',
+    `<div class="provgroup"><div class="gtitle">Essential — always on</div><div class="chips"><span class="chip lit">Error monitoring / core</span></div>
+     <div class="gtitle">Analytics ${d.prefs.analytics ? '✓ allowed' : '✗ blocked'}</div><div class="chips">${chips('analytics')}</div>
+     <div class="gtitle">Advertising ${d.prefs.advertising ? '✓ allowed' : '✗ blocked'}</div><div class="chips">${chips('advertising')}</div></div>
+     <p class="note" style="margin-top:8px">${d.isWander
+       ? 'Each spec\'s <code>load()</code> only runs for allowed categories — blocked vendors are never fetched, not merely muted (verified live: opt-in/no-decision = 0 tracker requests; opt-out = all groups load).'
+       : 'Sites gate at dispatch: every event awaits <code>consentReady()</code> then fans out only to adapters whose category is allowed. The adapter set is per-merchant config — <code>Trackers.astro</code> already boots merchant-supplied GA4, <strong>GTM</strong>, and Meta pixel IDs (sanitized, gated through <code>__wanderConsent</code>). GTM is the soft spot: tags <em>inside</em> a merchant container are remote-updated and invisible to our gate — the one place vendor CMP auto-blocking genuinely helps, and the argument for a no-GTM policy / catalog instead.'}</p>`));
+
+  document.getElementById('timeline').innerHTML = stages.join('');
+
+  // ---- Right panel ----
+  document.getElementById('kv-state').innerHTML = `
+    <span class="k">GeoIP country</span><span class="v">${d.country ?? '∅ missing'}</span>
+    <span class="k">Device timezone</span><span class="v">${d.tz}</span>
+    <span class="k">Regime</span><span class="v" style="color:${d.optIn ? 'var(--red)' : 'var(--green)'}">${d.regime}</span>
+    <span class="k">Banner</span><span class="v">${d.optIn && S.decision==='none' ? 'shown' : d.optIn ? 'hidden (record exists)' : 'never (footer link only)'}</span>
+    <span class="k">Surface</span><span class="v">${d.isWander ? 'wander.com' : 'wos:germanvacationstays.de'}</span>`;
+
+  const regimeCookie = d.isWander && d.country ? `<div class="kv"><span class="k"><code>wander_regime</code></span><span class="v">${d.country} <span style="color:var(--muted);font-weight:400">(24 h)</span></span></div>` :
+    d.isWander ? `<div class="kv"><span class="k"><code>wander_regime</code></span><span class="v" style="color:var(--muted)">not set</span></div>` : '';
+  const consentCookieName = d.isWander ? 'wander_consent' : 'wos_consent';
+  document.getElementById('cookie-box').innerHTML = regimeCookie + (d.record
+    ? `<div class="kv" style="margin-top:4px"><span class="k"><code>${consentCookieName}</code></span><span class="v">12 mo</span></div><pre class="json">${esc(JSON.stringify(d.record, null, 1))}</pre>`
+    : `<div class="kv" style="margin-top:4px"><span class="k"><code>${consentCookieName}</code></span><span class="v" style="color:var(--muted)">none — no decision yet</span></div>`);
+
+  const googleLoads = d.prefs.advertising;
+  const cm = document.getElementById('cm-strip');
+  if (!d.optIn) {
+    cm.innerHTML = googleLoads
+      ? `<div class="row cm-granted">default: granted (opt-out regime)</div>`
+      : `<div class="row cm-denied">consent revoked → denied</div>`;
+    document.getElementById('cm-note').textContent = 'Under opt-out, gtag loads with Consent Mode granted by default.';
+  } else if (!googleLoads) {
+    cm.innerHTML = `<div class="row cm-off">gtag not loaded — nothing to signal</div>`;
+    document.getElementById('cm-note').textContent = 'Pre-consent (or advertising rejected), the Google SDK is never fetched, so no Consent Mode ping exists at all.';
+  } else {
+    cm.innerHTML = `<div class="row cm-denied">default: denied  (set at load)</div><div class="row cm-granted">update: granted  (grant applied in load())</div>`;
+    document.getElementById('cm-note').textContent = 'The grant is applied inside the provider\'s load() — self-healing against the effect-ordering race where GoogleConsentSync fired before the lazy load set its instance (fixed in tracking#56 + 3 regression tests).';
+  }
+
+  const reqCount = document.getElementById('req-count');
+  const reqNote = document.getElementById('req-note');
+  if (d.optIn && S.decision === 'none') { reqCount.textContent = '0'; reqNote.textContent = 'Verified live: no gtag, fbevents.js, Segment, or Amplitude request pre-consent — window.gtag / fbq / analytics all undefined.'; }
+  else if (!d.prefs.analytics && !d.prefs.advertising) { reqCount.textContent = '0'; reqNote.textContent = 'Rejected / revoked: identical network silence to the pre-consent state.'; }
+  else if (d.prefs.analytics && !d.prefs.advertising) { reqCount.textContent = 'analytics only'; reqNote.textContent = 'Segment + Amplitude (+ Vercel Analytics) fire; all ad-vendor hosts stay dark.'; }
+  else { reqCount.textContent = 'all allowed'; reqNote.textContent = 'googletagmanager.com, region1.google-analytics.com, connect.facebook.net/fbevents.js, cdn.segment.com, api2.amplitude.com, … (per allowed category).'; }
+
+  // sync controls
+  for (const [id, key] of [['seg-loc','loc'],['seg-site','site'],['seg-dec','decision']]) {
+    document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === S[key]));
+  }
+}
+
+document.getElementById('seg-loc').addEventListener('click', e => { if (e.target.dataset.v) { S.loc = e.target.dataset.v; render(); } });
+document.getElementById('seg-site').addEventListener('click', e => { if (e.target.dataset.v) { S.site = e.target.dataset.v; render(); } });
+document.getElementById('seg-dec').addEventListener('click', e => { if (e.target.dataset.v) { S.decision = e.target.dataset.v; render(); } });
+document.getElementById('chk-geo').addEventListener('change', e => { S.geoMissing = e.target.checked; render(); });
+document.getElementById('chk-cmp').addEventListener('change', e => { S.cmp = e.target.checked; render(); });
+render();
+</script>
+</body>
+</html>
