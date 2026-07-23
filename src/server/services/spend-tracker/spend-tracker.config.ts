@@ -249,8 +249,10 @@ export const FIXED_COSTS: FixedCostEntry[] = [
   // ---- June 2026 (migration 014) ----
   { category: "seo", partner: "Digitaloft", monthlyAmount: 0, effectiveMonth: "2026-06", note: "SEO cut from June onward (Decision #9i)" },
 
-  // ---- August 2026 (migration 013) ----
-  { category: "influencer", partner: null, monthlyAmount: 0, effectiveMonth: "2026-08", note: "no active influencer spend after Lefty cancels" },
+  // ---- August 2026 (migration 013 + Kyle Slack 2026-07-23) ----
+  { category: "influencer", partner: null, monthlyAmount: 0, effectiveMonth: "2026-08", note: "no active influencer spend after Lefty cancels; reconfirmed by Kyle 2026-07-23" },
+  { category: "affiliate", partner: "Acceleration Partners", monthlyAmount: 0, effectiveMonth: "2026-08", note: "Kyle Slack 2026-07-23: AP goes to $0 for August. NB: Kyle quoted the current amount as $6,500/mo; this config has carried $10,000 since 2026-05 (Decision #9a reconciliation) — discrepancy flagged, moot from August" },
+  { category: "tv_linear", partner: "Comcast + Ad IDs", monthlyAmount: 0, effectiveMonth: "2026-08", note: "Kyle Slack 2026-07-23: Comcast paused while improving the marketplace" },
 ];
 
 /**

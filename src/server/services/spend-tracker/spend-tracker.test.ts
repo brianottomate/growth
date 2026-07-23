@@ -226,6 +226,13 @@ describe("resolveFixedCostsForMonth", () => {
 
     const august = resolveFixedCostsForMonth("2026-08");
     expect(august.find((f) => f.category === "influencer")?.monthlyAmount).toBe(0);
+
+    // Kyle Slack 2026-07-23: AP affiliate + Comcast paused from August.
+    expect(august.find((f) => f.category === "affiliate")?.monthlyAmount).toBe(0);
+    expect(august.find((f) => f.category === "tv_linear")?.monthlyAmount).toBe(0);
+    // July untouched by the August overrides.
+    expect(july.find((f) => f.category === "affiliate")?.monthlyAmount).toBe(10_000);
+    expect(july.find((f) => f.category === "tv_linear")?.monthlyAmount).toBe(12_900);
   });
 
   it("returns seed values for pre-override months", () => {
