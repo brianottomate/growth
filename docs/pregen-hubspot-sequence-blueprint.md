@@ -11,6 +11,11 @@ happens in HubSpot's UI.
 
 **Name:** `PILOT - Pre-Gen Sites - Personalized 2-Touch - DO NOT ENROLL`
 
+**HubSpot sequence:** [308080004](https://app.hubspot.com/sequences/22480390/sequence/308080004/edit)
+
+Created as a private sequence owned by Kristian Boe on July 24, 2026. It had
+zero sends and zero enrollments at creation.
+
 Keep the sequence dormant until a reviewed contact has all five contract
 properties populated. Do not make enrollment part of copy approval.
 
