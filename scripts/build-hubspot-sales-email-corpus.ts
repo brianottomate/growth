@@ -1,6 +1,6 @@
 /**
- * Build a private, redacted writing corpus from recent outbound HubSpot sales
- * emails. HubSpot is read-only; output stays under gitignored reports/private/.
+ * Build a private writing corpus from recent outbound HubSpot sales emails.
+ * HubSpot is read-only; output stays under gitignored reports/private/.
  *
  * Required private-app scope: sales-email-read
  *
@@ -8,8 +8,10 @@
  *   bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts \
  *     --limit 2000 --scan-limit 10000 --days 365
  *
- * The corpus intentionally omits raw HTML, raw headers, recipient addresses,
- * phone numbers, tracking URLs, quoted reply history, and signature blocks.
+ * The corpus intentionally preserves the names, companies, and prospect-specific
+ * language that make the messages useful for personalization. It omits raw
+ * HTML, raw headers, addresses, phone numbers, tracking URLs, quoted reply
+ * history, and signature blocks.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -206,13 +208,9 @@ function redactText(
   text = stripRepSignature(text, from);
 
   text = replaceLiteral(text, from.email, "[REP_EMAIL]");
-  text = replaceLiteral(text, from.firstName, "[REP_NAME]");
-  text = replaceLiteral(text, from.lastName, "[REP_NAME]");
 
   for (const recipient of recipients) {
     text = replaceLiteral(text, recipient.email, "[RECIPIENT_EMAIL]");
-    text = replaceLiteral(text, recipient.firstName, "[FIRST_NAME]");
-    text = replaceLiteral(text, recipient.lastName, "[LAST_NAME]");
   }
 
   text = text.replace(/https?:\/\/[^\s<>"')\]]+/gi, (url) => {

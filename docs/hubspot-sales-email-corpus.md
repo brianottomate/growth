@@ -1,7 +1,12 @@
 # HubSpot sales-email corpus
 
 This is the private writing-reference pipeline for learning from one-to-one
-emails that Wander reps have already sent through HubSpot.
+emails that Wander reps have already sent through HubSpot. It has two distinct
+views:
+
+- the broad outbound corpus shows how the team writes across prospects;
+- the company-aware corpus supplies the real correspondence for one company
+  when generating that company's draft.
 
 ## Access
 
@@ -42,12 +47,34 @@ The retained JSONL omits raw HTML and raw headers. It also:
 - removes quoted reply history and common legal footers;
 - truncates deterministic rep signature blocks;
 - replaces email addresses, phone numbers, and URLs with semantic tokens;
-- replaces known sender and recipient names with role tokens;
 - hashes rep and recipient/thread identifiers.
 
-This is deterministic redaction, not a claim of full anonymization. Company
-names or other facts that a rep typed into the body can remain. Treat the
-result as confidential local working data.
+Names, company references, prospect observations, and personalized subject/body
+copy are deliberately preserved. The earlier role-token replacement removed
+useful context and is no longer part of this pipeline. Direct contact details
+remain unnecessary for drafting and are still omitted. Treat the result as
+confidential local working data.
+
+## Company-aware history
+
+Build the correspondence view for one company:
+
+```bash
+bun --conditions=react-server scripts/build-hubspot-company-email-corpus.ts \
+  --domain cascadiagetaways.com
+```
+
+This resolves the HubSpot company, reads its associated email activities, and
+writes a private JSON file under
+`reports/private/hubspot-company-email-corpus/`. It preserves:
+
+- sender and prospect names written in the message;
+- the company name and company-specific facts;
+- subject, date, message direction, and body copy;
+- the prospect's actual questions and replies.
+
+It omits raw headers, direct email addresses, phone numbers, and URLs. The
+unmodified activity remains in HubSpot.
 
 ## Intended use
 
@@ -61,22 +88,22 @@ Use the corpus to measure and distill how Wander reps actually write:
 - words, claims, or constructions the team consistently avoids.
 
 Do not retrieve a prospect's history and send generated copy in one automatic
-step. Corpus-derived guidance informs a draft; a rep still reviews the actual
-company facts, claim support, formatting, and final enrollment.
+step. Company history grounds a draft; a rep still reviews the actual facts,
+claim support, formatting, and final enrollment.
 
 ## First snapshot: July 24, 2026
 
-The initial bounded build retained 1,000 outbound emails from 14 Wander senders
-after scanning 1,005 recent engagements. This is descriptive evidence of how
+The current bounded build retained 1,000 outbound emails from 14 Wander senders
+after scanning 1,006 recent engagements. This is descriptive evidence of how
 the team currently writes, not a performance ranking and not a mandate to copy
 every habit.
 
 Observed shape:
 
-- median subject length: 29 characters;
-- median body length: 195 words across 11 text blocks;
-- 84.8% ended with at least one question;
-- 81.0% contained a link.
+- median subject length: 30 characters;
+- median body length: 194 words across 11 text blocks;
+- 83.9% ended with at least one question;
+- 80.1% contained a link.
 
 Useful recurring moves:
 

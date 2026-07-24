@@ -116,6 +116,9 @@ const contactWriteProps = z.strictObject({
   growth_pregen_touch_1_body: z.string().optional(),
   growth_pregen_touch_2_subject: z.string().optional(),
   growth_pregen_touch_2_body: z.string().optional(),
+  growth_pregen_touch_1_observation: z.string().optional(),
+  growth_pregen_touch_2_fit: z.string().optional(),
+  growth_pregen_touch_3_subject: z.string().optional(),
 }) satisfies z.ZodType<ContactProperties>;
 
 export const upsertContactBody = z.strictObject({

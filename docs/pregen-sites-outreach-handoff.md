@@ -52,12 +52,13 @@ enrollments.
 
 ### Sequence posture
 
-- **Re-engagement:** acknowledge that Wander has been in touch before without
-  inventing a prior conversation.
+- **Re-engagement:** use the company's actual HubSpot correspondence when it
+  provides a legitimate reason to return. Never invent a prior conversation.
 - **Fresh outreach:** introduce WanderOS as the direct-booking platform for
   property managers from the team behind Wander.com.
 - Touches 2 through 4 remain in the original email thread.
-- Static copy and blank paragraphs live in the HubSpot template.
+- The model owns the substantive copy. The HubSpot template owns the greeting,
+  blank paragraphs, preview-link slot, and default signature.
 - The sender's HubSpot default signature is included automatically.
 - No template says "I built"; the approved framing is "our team put together."
 
@@ -74,11 +75,10 @@ HubSpot contact properties:
 - `growth_pregen_touch_2_fit`
 - `growth_pregen_touch_3_subject`
 
-The current four-touch drafts actively use:
+The first two live template steps actively use:
 
-- touch 1 reviewed subject;
-- reviewed pregen preview URL;
-- touch 2 reviewed fit paragraph;
+- touch 1 reviewed subject, opening, preview URL, and closing;
+- touch 2 reviewed subject, opening, and closing;
 - HubSpot's built-in first name token, with `there` as fallback.
 
 Every custom token must have a visibly unsendable fallback:
@@ -87,20 +87,31 @@ Every custom token must have a visibly unsendable fallback:
 [... NOT REVIEWED — DO NOT SEND]
 ```
 
-The full-body properties remain for the original two-touch pilot. New sequence
-templates should not inject an entire multiline email through one contact
-property; HubSpot should own the paragraph spacing.
+The prose is split into a small number of large model-owned properties only
+because HubSpot did not preserve reliable paragraph formatting when one
+multiline property contained the full email.
+
+## Company-aware correspondence
+
+The generation path reads email activities associated with the HubSpot company.
+It preserves names, company facts, subject lines, direction, and message copy so
+an actual prior question can shape the re-engagement draft. It strips raw
+headers and direct contact details, not the personalization.
+
+The broad sales corpus remains useful for tone and structure, while the
+company-aware history is the source for prospect-specific context.
 
 ## Current email formatting
 
-Touch 1 now isolates the long signed preview URL:
+Touch 1 now renders the model-written opening, signed preview URL, and
+model-written closing as three separate paragraphs:
 
 ```text
-Preview:
+<reviewed company-specific opening>
 
 <reviewed preview URL>
 
-Would it be worth 15 minutes to compare notes?
+<reviewed company-specific closing and CTA>
 ```
 
 This materially improves mobile readability. A short branded redirect would be
@@ -131,12 +142,15 @@ Verified on July 24:
 
 - Sender: Kristian's connected `kristian@wander.com` inbox.
 - Recipient: Kristian's personal HubSpot test contact.
-- Sequence: Fresh Outreach 4-Touch.
-- Subject: `A private direct-booking concept for Cascadia`.
+- Sequence: Re-engagement 4-Touch.
+- Subject: `A concrete answer to Ryan's WanderOS question`.
+- The first two touches are grounded in Cascadia's actual HubSpot correspondence,
+  current website, Guesty lead record, and working Native+ preview.
 - HubSpot default signature rendered correctly.
 - The original test automatically finished when the recipient replied.
-- A second enrollment was created after replacing the stale preview URL and
-  improving the paragraph spacing.
+- The stale Fresh Outreach test enrollment was explicitly ended before creating
+  the Re-engagement test enrollment.
+- Re-engagement enrollment `3749631088` was accepted by HubSpot on July 24, 2026. HubSpot initially displayed it as scheduled.
 
 ## Growth implementation
 
@@ -150,6 +164,18 @@ bun --conditions=react-server scripts/ensure-hubspot-pregen-properties.ts
 bun --conditions=react-server scripts/apply-hubspot-pregen-list-schema.ts
 bun --conditions=react-server scripts/import-hubspot-pregen-lists.ts --dry
 bun --conditions=react-server scripts/import-hubspot-pregen-lists.ts
+
+# Generate a private company-aware review draft (no HubSpot write or enrollment)
+bun --conditions=react-server scripts/generate-hubspot-pregen-personalization.ts \
+  --domain example.com \
+  --contact-email test@example.com \
+  --motion reengagement \
+  --preview-url 'https://...'
+
+# Apply an explicitly reviewed private JSON draft (still no enrollment)
+bun --conditions=react-server scripts/apply-reviewed-hubspot-pregen-draft.ts \
+  --file reports/private/reviewed-draft.json \
+  --apply
 ```
 
 The import is idempotent and only reconciles the four explicit list IDs above.

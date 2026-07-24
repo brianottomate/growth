@@ -30,6 +30,11 @@ import {
 } from "@/server/services/lead-extraction.service";
 import { generateOutreachDraft } from "@/server/services/lead-outreach.service";
 import {
+  generatePregenHubspotDraft,
+  PregenMotionSchema,
+} from "@/server/services/pregen-hubspot-outreach.service";
+import { hubspotPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
+import {
   isFreemailEmail,
   parseContactChannel,
   scoreLeadChannel,
@@ -52,6 +57,7 @@ import {
   getCompanyContacts,
   HUBSPOT_ACCOUNT_ID,
   isHubspotConfigured,
+  updateContact,
   updateCompany,
   type CompanyProperties,
 } from "@/server/clients/hubspot.client";
@@ -481,6 +487,133 @@ export const leadsRouter = createTRPCRouter({
         })
         .returning();
       return created!;
+    }),
+
+  // Generate the HubSpot pregen motion from live company correspondence,
+  // current website evidence, and the assigned preview. The prose is split
+  // into reliable HubSpot paragraph slots, but the stored review shows the
+  // complete rendered emails.
+  generatePregenOutreach: protectedProcedure
+    .input(
+      z.object({
+        domainId: z.string(),
+        motion: PregenMotionSchema,
+        previewUrl: z.url().optional(),
+        steer: z.string().trim().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+      }
+      const previewUrl = input.previewUrl ?? row.pregenSiteUrl;
+      if (!previewUrl) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Assign a real pregen preview before generating HubSpot copy",
+        });
+      }
+
+      const result = await generatePregenHubspotDraft(row.domain, {
+        motion: input.motion,
+        previewUrl,
+        steer: input.steer,
+      });
+      await ctx.db
+        .delete(leadOutreachTable)
+        .where(
+          and(
+            eq(leadOutreachTable.domainId, input.domainId),
+            eq(leadOutreachTable.status, "draft"),
+          ),
+        );
+      const [created] = await ctx.db
+        .insert(leadOutreachTable)
+        .values({
+          domainId: row.id,
+          domain: row.domain,
+          status: "draft",
+          angle: result.draft.angle,
+          personalizedOn: [
+            ...result.draft.personalizedOn,
+            ...result.draft.historyUsed.map((value) => `History: ${value}`),
+          ],
+          steps: result.renderedSteps,
+          model: result.model,
+        })
+        .returning();
+      return created!;
+    }),
+
+  // Human approval boundary: copy the latest reviewed pregen draft into one
+  // associated HubSpot contact. This does not enroll the contact.
+  publishPregenOutreach: protectedProcedure
+    .input(
+      z.object({
+        domainId: z.string(),
+        contactId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row?.pregenSiteUrl) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "This lead has no assigned pregen preview",
+        });
+      }
+      const contact = await ctx.db.query.leadContactTable.findFirst({
+        where: and(
+          eq(leadContactTable.id, input.contactId),
+          eq(leadContactTable.domainId, input.domainId),
+          isNull(leadContactTable.deletedAt),
+        ),
+      });
+      if (!contact?.hubspotContactId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Choose a contact linked to HubSpot",
+        });
+      }
+      const [outreach] = await ctx.db
+        .select()
+        .from(leadOutreachTable)
+        .where(
+          and(
+            eq(leadOutreachTable.domainId, input.domainId),
+            eq(leadOutreachTable.status, "draft"),
+          ),
+        )
+        .orderBy(desc(leadOutreachTable.createdAt))
+        .limit(1);
+      if (!outreach?.steps?.length) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Generate and review a pregen sequence first",
+        });
+      }
+
+      const properties = hubspotPropertiesFromRenderedSteps(
+        outreach.steps,
+        row.pregenSiteUrl,
+      );
+      await updateContact(contact.hubspotContactId, properties);
+      await ctx.db
+        .update(leadOutreachTable)
+        .set({ status: "approved" })
+        .where(eq(leadOutreachTable.id, outreach.id));
+      return {
+        outreachId: outreach.id,
+        contactId: contact.id,
+        hubspotContactId: contact.hubspotContactId,
+        propertyNames: Object.keys(properties),
+      };
     }),
 
   // Push a lead's draft into the shared headless "Personalized" Instantly

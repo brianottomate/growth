@@ -434,6 +434,9 @@ export type ContactProperties = {
   growth_pregen_touch_1_body?: string;
   growth_pregen_touch_2_subject?: string;
   growth_pregen_touch_2_body?: string;
+  growth_pregen_touch_1_observation?: string;
+  growth_pregen_touch_2_fit?: string;
+  growth_pregen_touch_3_subject?: string;
   // Read-only context (used by the inbound router)
   notes_last_contacted?: string;
 };
@@ -506,6 +509,9 @@ export const CONTACT_CORE_PROPERTIES = [
   "growth_pregen_touch_1_body",
   "growth_pregen_touch_2_subject",
   "growth_pregen_touch_2_body",
+  "growth_pregen_touch_1_observation",
+  "growth_pregen_touch_2_fit",
+  "growth_pregen_touch_3_subject",
 ] as const satisfies readonly (keyof ContactProperties)[];
 
 type ContactCoreProperty = (typeof CONTACT_CORE_PROPERTIES)[number];

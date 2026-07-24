@@ -22,8 +22,11 @@ populated. Do not make enrollment part of copy approval.
 
 ### Shared template rules
 
-- HubSpot owns the paragraphs and blank paragraphs. Never inject a complete
-  multiline email through one contact-property token.
+- The model owns the substantive email. HubSpot owns only the greeting,
+  paragraph boundaries, preview-link slot, and default signature.
+- Touch 1 uses a model-written opening, the reviewed preview URL on its own
+  paragraph, and a model-written closing. Touch 2 uses a model-written opening
+  and closing.
 - Use HubSpot's built-in first-name token with `there` as its fallback.
 - Include WanderOS as the direct-booking platform for property managers from
   the team behind Wander.com.
@@ -35,86 +38,54 @@ populated. Do not make enrollment part of copy approval.
   WanderOS explanation visible as context and avoids manufacturing four
   separate inbox threads.
 
-### Re-engagement copy
+The live touch 1 token layout is:
 
-Touch 1 acknowledges the history without inventing a prior conversation:
+```text
+Hi {{ contact.firstname }},
 
-> Hi `first_name`,
->
-> I know Wander has been in touch before, so I’ll skip the generic
-> introduction. WanderOS is the direct-booking platform for property managers
-> from the team behind Wander.com.
->
-> Rather than ask you to reconsider WanderOS in the abstract, our team put
-> together a private working concept using your actual inventory:
->
-> `growth_pregen_preview_url`
->
-> The search and property pages work, but nothing can be booked.
->
-> Worth a fresh look?
+{{ contact.growth_pregen_touch_1_body }}
 
-Touch 2 gives the product explanation and one reviewed fit observation:
+{{ contact.growth_pregen_preview_url }}
 
-> Hi `first_name`,
->
-> The reason I’m coming back is that there’s now something concrete to react
-> to.
->
-> What you saw is not just a visual redesign. WanderOS connects to the existing
-> PMS, brings over listings, photos, pricing, and availability, then publishes
-> on the property manager’s own domain with payments and analytics built in.
->
-> `growth_pregen_touch_2_fit`
->
-> Would a 15-minute walkthrough be useful?
+{{ contact.growth_pregen_touch_1_observation }}
+```
 
-Touch 3 distributes proof instead of overloading touch 1:
+Touch 2 uses `growth_pregen_touch_2_body` and
+`growth_pregen_touch_2_fit` in the same two-paragraph pattern. This split is
+only a rendering contract; it does not reduce the model to filling a generic
+sentence fragment.
 
-> Hi `first_name`,
->
-> A quick bit of context on the team behind the preview: across Wander.com,
-> we’ve seen $75M+ in bookings and 70,000+ nights booked.
->
-> WanderOS applies what we’ve learned building that guest and booking
-> experience to property managers’ own brands and domains.
->
-> Open to a quick look next week?
+### Personalization evidence
 
-Touch 4 closes the loop:
+Generation combines the current lead record, current public website, and the
+company's associated HubSpot email activities. The company-history input keeps
+the names, company facts, subjects, direction, and message copy that make a
+reply specific. Raw headers and direct contact details are omitted.
 
-> Hi `first_name`,
->
-> We’ve reached out before, so I don’t want to keep circling.
->
-> Should I leave the preview with you, or is there someone else who owns the
-> direct-booking experience?
->
-> Happy to send it their way.
+For re-engagement, an inbound reply takes priority over unanswered outbound
+messages. Prior outbound copy is conversation context, not proof that a product
+claim is true. Generation and enrollment remain separate actions.
 
-### Fresh-outreach copy
+### Four-touch generation brief
 
-Touch 1 introduces both brands:
+- **Touch 1:** introduce the private working preview using one concrete,
+  company-specific reason for the message. In re-engagement, use a real prior
+  question when one exists. Never say the sender built the site personally.
+- **Touch 2:** explain the WanderOS fit for the prospect's current PMS, inventory,
+  brand, or direct-booking setup without inventing a weakness in the current
+  website.
+- **Touch 3:** use one supported Wander or WanderOS proof point instead of
+  cramming every number into touch 1.
+- **Touch 4:** close the loop with a low-friction routing question.
 
-> Hi `first_name`,
->
-> I’m with WanderOS, the direct-booking platform for property managers from the
-> team behind Wander.com, the luxury vacation-home platform.
->
-> Our team put together a private working concept using your actual inventory.
-> The search and property pages work, but nothing can be booked.
->
-> Preview:
->
-> `growth_pregen_preview_url`
->
-> Would it be worth 15 minutes to compare notes?
+Fresh outreach must introduce WanderOS and Wander.com because there is no prior
+relationship to rely on. Re-engagement should feel like the logical next
+message in the actual correspondence, not a generic recycled-lead template.
 
-Touch 2 explains the product, with the reviewed
-`growth_pregen_touch_2_fit` paragraph. Touch 3 uses the same Wander.com proof
-paragraphs as the re-engagement sequence. Touch 4 changes the opener to:
-
-> I’ll close the loop here.
+Touches 3 and 4 are still static in the pilot sequences. The generator already
+produces reviewed drafts for all four touches; moving the final two templates to
+model-owned properties is the next contract extension after the first two
+touches are proven.
 
 The older [personalized two-touch pilot](https://app.hubspot.com/sequences/22480390/sequence/308080004/edit)
 remains intact for the original test enrollment. It is not the default for
