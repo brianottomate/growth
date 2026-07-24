@@ -14,9 +14,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authClient } from "@/server/better-auth/client";
 import { getAuthPageHref, getCallbackURL } from "@/lib/auth-utils";
 import { InAppBrowserAlert } from "../components/InAppBrowserAlert";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 import { ForgotPasswordDialog } from "./ForgotPasswordDialog";
 
-export function SignInForm() {
+export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -92,6 +93,22 @@ export function SignInForm() {
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
+              )}
+
+              {googleEnabled && (
+                <>
+                  <GoogleSignInButton
+                    email={email}
+                    disabled={isEmailLoading}
+                  />
+                  <div className="flex items-center gap-3">
+                    <span className="bg-border h-px flex-1" />
+                    <span className="text-muted-foreground text-xs">
+                      or continue with email
+                    </span>
+                    <span className="bg-border h-px flex-1" />
+                  </div>
+                </>
               )}
 
               <form onSubmit={handleSignIn} className="space-y-4">

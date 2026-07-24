@@ -12,8 +12,9 @@ import { ErrorAlert } from "@/components/ui/alert";
 import { authClient } from "@/server/better-auth/client";
 import { getAuthPageHref, getCallbackURL } from "@/lib/auth-utils";
 import { InAppBrowserAlert } from "../components/InAppBrowserAlert";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
-export function SignUpForm() {
+export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -83,6 +84,22 @@ export function SignUpForm() {
       {error && <ErrorAlert>{error}</ErrorAlert>}
 
       <div className="grid gap-6">
+        {googleEnabled && (
+          <>
+            <GoogleSignInButton
+              isNewSignup
+              email={email}
+              disabled={isEmailLoading}
+            />
+            <div className="flex items-center gap-3">
+              <span className="bg-border h-px flex-1" />
+              <span className="text-muted-foreground text-xs">
+                or sign up with email
+              </span>
+              <span className="bg-border h-px flex-1" />
+            </div>
+          </>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>

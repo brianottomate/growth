@@ -2,12 +2,17 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 
+import { env } from "@/env";
 import { SignInForm } from "./SignInForm";
 
 export const metadata: Metadata = {
   title: "Sign In",
   description: "Sign in to your account to continue.",
 };
+
+// Only offer Google SSO when its OAuth credentials are configured (matches the
+// conditional provider registration in better-auth/config.ts).
+const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
 export default function SignInPage() {
   return (
@@ -19,7 +24,7 @@ export default function SignInPage() {
           </Link>
         </div>
         <Suspense fallback={<div className="min-h-[400px]" />}>
-          <SignInForm />
+          <SignInForm googleEnabled={googleEnabled} />
         </Suspense>
       </div>
     </div>
