@@ -73,6 +73,9 @@ reports/
 runs/
 future-plans/
 
+# Private, locally generated HubSpot email corpora live under reports/private/.
+# Never commit CRM email bodies, even after deterministic redaction.
+
 # Amplitude taxonomy scripts — contain project API/secret keys, keep local
 scripts/amplitude-taxonomy/
 

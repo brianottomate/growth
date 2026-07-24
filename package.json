@@ -14,6 +14,7 @@
     "db:apply:hubspot-sync": "bun --conditions=react-server scripts/apply-hubspot-company-sync-schema.ts",
     "hubspot:import:companies": "bun --conditions=react-server scripts/import-hubspot-company-export.ts",
     "hubspot:process:webhooks": "bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts",
+    "hubspot:build:sales-email-corpus": "bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts",
     "db:seed": "bun run scripts/seed.ts",
     "db:seed:product-storefronts": "bun --conditions=react-server scripts/seed-product-storefronts.ts",
     "db:unseed": "bun run scripts/unseed.ts",
