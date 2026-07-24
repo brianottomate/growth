@@ -24,15 +24,40 @@ bun --conditions=react-server scripts/import-hubspot-pregen-lists.ts
 The import is idempotent. It only reconciles the four explicit list IDs above;
 it does not modify the HubSpot list definitions or any other Growth cohort.
 
-## Two-touch personalization contract
+## Sequence routing
 
-The dormant HubSpot pilot sequence uses five contact properties:
+Keep cohort selection explicit. List membership does not enroll anybody.
+
+| Growth cohort                                  | HubSpot sequence                                                 | Posture                                                                                            |
+| ---------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Recycled companies/contacts (`3808` / `3809`)  | `PILOT - Pre-Gen Sites - Re-engagement 4-Touch - DO NOT ENROLL`  | Acknowledge prior Wander outreach and give the rep a concrete preview to re-open the conversation. |
+| Untouched companies/contacts (`3811` / `3812`) | `PILOT - Pre-Gen Sites - Fresh Outreach 4-Touch - DO NOT ENROLL` | Introduce WanderOS and its relationship to Wander.com from scratch.                                |
+| Future net-new Mexico and Europe prospects     | Fresh-outreach sequence                                          | Treat as fresh unless HubSpot history proves otherwise.                                            |
+
+Both four-touch sequences are private, dormant drafts. The older personalized
+two-touch pilot remains intact for the original test enrollment and must not be
+used as the default cohort sequence.
+
+## Personalization contract
+
+The current HubSpot contact-property surface is:
 
 - `growth_pregen_preview_url`
 - `growth_pregen_touch_1_subject`
 - `growth_pregen_touch_1_body`
 - `growth_pregen_touch_2_subject`
 - `growth_pregen_touch_2_body`
+- `growth_pregen_touch_1_observation`
+- `growth_pregen_touch_2_fit`
+- `growth_pregen_touch_3_subject`
+
+The four-touch drafts actively use the reviewed touch 1 subject, preview URL,
+and touch 2 fit paragraph. Touches 2 through 4 reply in the original thread, so
+HubSpot carries forward the touch 1 subject. The touch 3 subject is reserved if
+testing later shows that a new-thread reset performs better. The two full-body
+properties remain for the legacy two-touch pilot; new templates own their
+static copy and blank-paragraph spacing instead of injecting an entire email
+through one multiline token.
 
 Create or verify them idempotently with:
 

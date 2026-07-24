@@ -1,6 +1,6 @@
 /**
  * Idempotently creates the minimal HubSpot contact-property contract used by
- * the two-touch pre-generated-sites pilot sequence.
+ * the pre-generated-sites fresh and re-engagement sequences.
  *
  * No contacts are updated and nobody is enrolled. Sequence authoring remains
  * in HubSpot's UI; these properties are only its reviewed-copy token surface.
@@ -48,6 +48,26 @@ const PROPERTIES = [
     label: "Growth pregen touch 2 body",
     fieldType: "textarea",
     description: "Human-reviewed body for pregen sequence touch 2.",
+  },
+  {
+    name: "growth_pregen_touch_1_observation",
+    label: "Growth pregen touch 1 observation",
+    fieldType: "textarea",
+    description:
+      "One reviewed company-specific paragraph for touch 1. The HubSpot template owns the blank lines around it.",
+  },
+  {
+    name: "growth_pregen_touch_2_fit",
+    label: "Growth pregen touch 2 fit",
+    fieldType: "textarea",
+    description:
+      "One reviewed company-specific fit paragraph for touch 2. The HubSpot template owns the blank lines around it.",
+  },
+  {
+    name: "growth_pregen_touch_3_subject",
+    label: "Growth pregen touch 3 subject",
+    fieldType: "text",
+    description: "Human-reviewed subject for pregen sequence touch 3.",
   },
 ] as const;
 
@@ -121,4 +141,4 @@ for (const property of PROPERTIES) {
   await ensureProperty(property);
 }
 
-console.log(`Ready: ${PROPERTIES.length} two-touch pregen properties.`);
+console.log(`Ready: ${PROPERTIES.length} pregen sequence properties.`);
