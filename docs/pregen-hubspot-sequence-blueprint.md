@@ -104,9 +104,11 @@ Touch 1 introduces both brands:
 > Our team put together a private working concept using your actual inventory.
 > The search and property pages work, but nothing can be booked.
 >
+> Preview:
+>
 > `growth_pregen_preview_url`
 >
-> Worth a 15-minute look?
+> Would it be worth 15 minutes to compare notes?
 
 Touch 2 explains the product, with the reviewed
 `growth_pregen_touch_2_fit` paragraph. Touch 3 uses the same Wander.com proof
