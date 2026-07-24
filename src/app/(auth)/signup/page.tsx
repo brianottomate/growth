@@ -34,9 +34,10 @@ export default function SignUpPage() {
       </div>
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/placeholder.svg"
-          alt="Sign up illustration"
-          className="absolute inset-0 h-full w-full object-cover object-left dark:brightness-[0.2] dark:grayscale"
+          src="/auth-hero.jpg"
+          alt="A Wander home at golden hour"
+          sizes="(min-width: 1024px) 50vw, 0px"
+          className="absolute inset-0 h-full w-full object-cover"
           fill
         />
       </div>

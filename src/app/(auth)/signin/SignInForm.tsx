@@ -176,10 +176,12 @@ export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean 
           </div>
           <div className="bg-muted relative hidden md:block">
             <Image
-              src="/placeholder.svg"
-              alt="Sign in illustration"
+              src="/auth-hero.jpg"
+              alt="A Wander home at golden hour"
               fill
-              className="absolute inset-0 h-full w-full object-cover object-left dark:brightness-[0.2] dark:grayscale"
+              priority
+              sizes="(min-width: 768px) 50vw, 0px"
+              className="absolute inset-0 h-full w-full object-cover"
             />
           </div>
         </CardContent>
