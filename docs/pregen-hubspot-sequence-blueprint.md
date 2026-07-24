@@ -30,12 +30,21 @@ populated. Do not make enrollment part of copy approval.
   paragraph, and a model-written closing. Touch 2 uses a model-written opening
   and closing.
 - Use HubSpot's built-in first-name token with `there` as its fallback.
-- Include WanderOS as the direct-booking platform for property managers from
-  the team behind Wander.com.
+- Identify WanderOS with a supported number, not with lineage. "From the team
+  behind Wander.com" is meaningless to a property manager who has never heard
+  of Wander.com, so touch 1 must carry one of: $75M+ in bookings, 70,000+
+  nights, 10,000+ properties, 1,000+ property managers, 11+ PMS integrations.
+  Touch 3 spends a different one. The policy gate enforces this.
 - Use the sender's HubSpot default signature; do not hard-code a signature in
   the template.
 - Keep every custom fallback visibly unsendable:
   `[... NOT REVIEWED — DO NOT SEND]`.
+- Register: one competent person writing to another they have not met. Short
+  sentences, contractions, plain words. The policy gate blocks "I wanted to",
+  "I'm reaching out", "happy to", "feel free to", "don't hesitate", "circle
+  back", "touch base", "let me know if", "would you be open to", "would it be
+  worth", and any named meeting length in touch 1. If a sentence could appear
+  unchanged in a deck, it is wrong for this email.
 - Touches 2 through 4 reply in-thread. This keeps the preview and the short
   WanderOS explanation visible as context and avoids manufacturing four
   separate inbox threads.
@@ -77,13 +86,32 @@ A PMS in the lead record is product-fit context, not proof of how the preview
 was populated. Do not say the preview pulls live from a named PMS unless
 authoritative operator context explicitly confirms that connection.
 
+### The tension the copy runs on
+
+Every prospect on these lists already operates a direct-booking site. That is
+the whole opening. They have already decided they would rather not hand every
+reservation, fee, and guest relationship to Airbnb and Vrbo, which means the
+email is not arguing with a skeptic; it is talking to someone who already
+agrees and is living with how hard direct booking is to win.
+
+Use that by **labeling the decision they already made** and letting the cost of
+OTAs sit underneath the sentence, unstated. "Looks like you'd rather guests
+book with you than through a listing on someone else's site" is the move.
+"Are you tired of paying OTA commissions?" is a cold-call script and is
+blocked. Never quote a commission percentage, and never tell a prospect their
+current site is underperforming — that is a diagnosis we cannot support.
+
+The close is a question the recipient can safely answer "no" to. A question
+that pressures toward "yes" gets ignored; one that leaves them in control gets
+replies. Shapes vary per company by design.
+
 ### Four-touch generation brief
 
-- **Fresh touch 1:** begin with a natural first-person observation grounded in
-  one verifiable detail from the current site or lead record. Introduce the
-  sender as being with WanderOS, from the team behind Wander.com, by sentence
-  two or three. Then connect that observation to why the team prepared the
-  private preview.
+- **Fresh touch 1:** four beats in roughly four sentences, never announced as
+  structure — (1) a specific observation only someone who actually looked would
+  write, (2) the direct-booking decision labeled back to them, (3) WanderOS
+  identified with one supported number, (4) why that led the team to build this
+  preview.
 - **Re-engagement touch 1:** begin with the actual prior relationship, question,
   reply, or discussion when one exists. Briefly re-introduce WanderOS so the
   recipient does not need to remember the previous thread. If the history has
@@ -92,13 +120,14 @@ authoritative operator context explicitly confirms that connection.
 - **Touch 2:** explain the WanderOS fit for the prospect's current PMS, inventory,
   brand, or direct-booking setup without inventing a weakness in the current
   website.
-- **Touch 3:** use one supported Wander or WanderOS proof point instead of
-  cramming every number into touch 1.
+- **Touch 3:** use one supported proof point that touch 1 did not already
+  spend, instead of cramming every number into touch 1.
 - **Touch 4:** close the loop with a low-friction routing question.
 
-Fresh outreach must introduce WanderOS and Wander.com because there is no prior
-relationship to rely on. Re-engagement should feel like the logical next
-message in the actual correspondence, not a generic recycled-lead template.
+Fresh outreach must introduce WanderOS because there is no prior relationship
+to rely on. Re-engagement should feel like the logical next message in the
+actual correspondence, not a generic recycled-lead template — compress the
+introduction hard, but keep the number.
 Neither motion should open with a compressed consultant-style verdict such as
 "you already have unusually concrete reasons." The opening should sound like a
 person explaining why they wrote.

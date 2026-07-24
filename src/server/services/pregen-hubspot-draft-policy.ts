@@ -5,6 +5,58 @@ type DraftForPolicy = {
   }>;
 };
 
+/**
+ * "From the team behind Wander.com" means nothing to a property manager who has
+ * never heard of Wander.com. Touch 1 has to carry a number that stands on its
+ * own. These are the only scale claims the product actually supports.
+ */
+export const SUPPORTED_PROOF_ANCHORS = [
+  "$75M+ in bookings on Wander.com",
+  "70,000+ nights booked on Wander.com",
+  "10,000+ properties running on WanderOS",
+  "1,000+ property managers running on WanderOS",
+  "11+ PMS integrations",
+] as const;
+
+const PROOF_ANCHOR_PATTERN =
+  /\$\s?75\s?m(?:illion)?\b|\b70[,.]?000\+?\s+nights\b|\b70k\+?\s+nights\b|\b10[,.]?000\+?\s+(?:properties|homes|listings)\b|\b1[,.]?000\+?\s+(?:property managers|managers|operators)\b|\b11\+?\s+pms\b/i;
+
+/**
+ * Register bans. Each of these is a phrase the corpus shows reps never use and
+ * that makes a one-to-one email read like a template. Banning shapes keeps the
+ * copy varied; requiring one exact shape would not.
+ */
+const LIMP_PHRASES: Array<{ pattern: RegExp; label: string }> = [
+  {
+    pattern: /\bwould it be (?:worth|useful|helpful)\b/i,
+    label: '"would it be worth/useful/helpful"',
+  },
+  {
+    pattern: /\b\d{1,3}\s*(?:-\s*)?minutes?\b/i,
+    label: "a specific meeting length in touch 1",
+  },
+  {
+    pattern: /\bwould you be open to\b|\bopen to (?:a |an )?(?:quick )?(?:chat|call|look|conversation)\b/i,
+    label: '"would you be open to"',
+  },
+  {
+    pattern: /\bhappy to\b|\bfeel free to\b|\bdon'?t hesitate\b|\bat your convenience\b/i,
+    label: 'service-desk filler ("happy to", "feel free to", "don\'t hesitate")',
+  },
+  {
+    pattern: /\b(?:circle back|touch base|reach out|follow up with you|hope this (?:email )?finds you)\b/i,
+    label: "sales-cliche connective tissue",
+  },
+  {
+    pattern: /\blet me know if\b/i,
+    label: '"let me know if"',
+  },
+  {
+    pattern: /\bI wanted to\b|\bI'?m reaching out\b|\bjust wanted to\b/i,
+    label: '"I wanted to" / "I\'m reaching out"',
+  },
+];
+
 export function findPregenHubspotDraftViolations(
   draft: DraftForPolicy,
   options: {
@@ -22,22 +74,27 @@ export function findPregenHubspotDraftViolations(
   if (!opening.toLowerCase().includes("wanderos")) {
     violations.push("Touch 1 must introduce or re-introduce WanderOS.");
   }
-  if (
-    options.motion === "fresh" &&
-    !opening.toLowerCase().includes("wander.com")
-  ) {
+  if (!PROOF_ANCHOR_PATTERN.test(touch1Text)) {
     violations.push(
-      "Fresh touch 1 must identify WanderOS as coming from the team behind Wander.com.",
+      `Touch 1 must establish WanderOS with one concrete number rather than lineage alone, because the recipient has never heard of Wander.com. Use one of: ${SUPPORTED_PROOF_ANCHORS.join("; ")}.`,
     );
+  }
+  for (const { pattern, label } of LIMP_PHRASES) {
+    if (pattern.test(touch1Text)) {
+      violations.push(`Touch 1 uses ${label}; rewrite it in plainer language.`);
+    }
   }
   if (/\battach(?:ed|ment|ments)?\b/i.test(touch1Text)) {
     violations.push(
       "The preview is linked in the email, not attached; do not describe an attachment.",
     );
   }
-  if (/\bbelow\b/i.test(touch1.closing)) {
+  // The URL renders on its own line immediately above the closing, so the
+  // recipient can already see it. Narrating its position in either direction is
+  // mechanical filler occupying the strongest line in the email.
+  if (/\b(?:above|below)\b/i.test(touch1.closing)) {
     violations.push(
-      "The preview URL renders before the touch 1 closing; do not call it the link below from the closing.",
+      "The preview URL renders before the touch 1 closing; do not describe where the link sits from the closing, in either direction.",
     );
   }
   if (/\bcheckout\b/i.test(touch1Text)) {
@@ -84,6 +141,26 @@ export function findPregenHubspotDraftViolations(
     violations.push(
       "Touch 1 must end with one low-friction question that gives the recipient a clear next step.",
     );
+  }
+
+  // The two proof sets belong to different products. $75M and 70,000 nights are
+  // Wander.com marketplace numbers; properties, managers, and PMS integrations
+  // are WanderOS platform numbers. Merging them into one sentence invents a
+  // claim neither product supports.
+  const WANDEROS_SCALE =
+    /\b10[,.]?000\+?\s+(?:properties|homes|listings)\b|\b1[,.]?000\+?\s+(?:property managers|managers|operators)\b|\b11\+?\s+pms\b/i;
+  for (const [index, touch] of draft.touches.entries()) {
+    const sentences = `${touch.opening} ${touch.closing}`.split(/(?<=[.!?])\s+/);
+    if (
+      sentences.some(
+        (sentence) =>
+          /\bwander\.com\b/i.test(sentence) && WANDEROS_SCALE.test(sentence),
+      )
+    ) {
+      violations.push(
+        `Touch ${index + 1} credits Wander.com with a WanderOS platform number. $75M+ in bookings and 70,000+ nights belong to Wander.com; properties, property managers, and PMS integrations belong to WanderOS. Keep them in separate claims.`,
+      );
+    }
   }
 
   const pms = options.pms?.trim();
