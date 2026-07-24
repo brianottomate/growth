@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -22,7 +23,9 @@ let _client: S3Client | null = null;
 function getClient(): S3Client {
   if (_client) return _client;
   if (!env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY) {
-    throw new Error("R2 credentials (R2_ACCESS_KEY_ID/SECRET) are not configured");
+    throw new Error(
+      "R2 credentials (R2_ACCESS_KEY_ID/SECRET) are not configured",
+    );
   }
   _client = new S3Client({
     region: "auto",
@@ -50,7 +53,9 @@ export function r2IsPublicUrl(url: string): boolean {
 /** Public URL for an object key (bucket root is mapped to R2_PUBLIC_BASE_URL). */
 export function r2PublicUrl(key: string): string {
   if (!env.R2_PUBLIC_BASE_URL) {
-    throw new Error("R2_PUBLIC_BASE_URL is not configured (enable public access on the bucket)");
+    throw new Error(
+      "R2_PUBLIC_BASE_URL is not configured (enable public access on the bucket)",
+    );
   }
   return `${env.R2_PUBLIC_BASE_URL.replace(/\/$/, "")}/${key}`;
 }
@@ -60,7 +65,11 @@ export function r2PublicUrl(key: string): string {
  * it only when sharing a bucket with other data (e.g. "growth/"); for a
  * dedicated bucket leave it empty and keys are just `{brandId}/{mediaId}/{file}`.
  */
-export function r2BuildKey(brandId: string, mediaId: string, filename: string): string {
+export function r2BuildKey(
+  brandId: string,
+  mediaId: string,
+  filename: string,
+): string {
   const safe = filename
     .toLowerCase()
     .replace(/[^a-z0-9.-]/g, "-")
@@ -92,6 +101,19 @@ export async function r2Delete(key: string): Promise<void> {
   );
 }
 
+/** Verify a direct upload exists before a caller finalizes its media row. */
+export async function r2Head(
+  key: string,
+): Promise<{ size: number | null; contentType: string | null }> {
+  const result = await getClient().send(
+    new HeadObjectCommand({ Bucket: env.R2_BUCKET, Key: key }),
+  );
+  return {
+    size: result.ContentLength ?? null,
+    contentType: result.ContentType ?? null,
+  };
+}
+
 // ---- POSTER RE-HOSTING --------------------------------------------
 // Some platforms hand us media URLs we can't serve long-term: TikTok posters
 // are signed and expire within ~a day; Facebook's fbcdn blocks hotlinking
@@ -110,7 +132,11 @@ export function needsRehost(url: string): boolean {
 }
 
 /** Object key for a re-hosted poster, under `{R2_PREFIX}posters/{brandId}/`. */
-export function r2BuildPosterKey(brandId: string, id: string, ext = "jpg"): string {
+export function r2BuildPosterKey(
+  brandId: string,
+  id: string,
+  ext = "jpg",
+): string {
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
   return [env.R2_PREFIX, "posters", brandId, `${safeId}.${ext}`]
     .filter(Boolean)
@@ -190,9 +216,13 @@ export async function r2PutBuffer(
 }
 
 /** Server-side: fetch bytes from a URL and PUT them to R2; returns public URL. */
-export async function r2PutFromUrl(key: string, sourceUrl: string): Promise<string> {
+export async function r2PutFromUrl(
+  key: string,
+  sourceUrl: string,
+): Promise<string> {
   const res = await fetch(sourceUrl);
-  if (!res.ok) throw new Error(`r2PutFromUrl: fetch ${sourceUrl} → ${res.status}`);
+  if (!res.ok)
+    throw new Error(`r2PutFromUrl: fetch ${sourceUrl} → ${res.status}`);
   const body = Buffer.from(await res.arrayBuffer());
   await getClient().send(
     new PutObjectCommand({
@@ -215,6 +245,7 @@ export const R2 = {
   buildUserPhotoKey: r2BuildUserPhotoKey,
   buildUploadKey: r2BuildUploadKey,
   presignPut: r2PresignPut,
+  head: r2Head,
   putBuffer: r2PutBuffer,
   putFromUrl: r2PutFromUrl,
   needsRehost,

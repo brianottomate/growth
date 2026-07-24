@@ -21,12 +21,17 @@ import {
   contentPipelineSummary,
   createIdea,
   createPlatformPost,
+  finishContentMediaUploads,
   getContentWorkItem,
+  importRemoteImagesToContent,
+  makeCarouselFromPool,
+  prepareContentMediaUploads,
   productionQueue,
   promotePlatformPost,
   publishBlogDraft,
   recoverArchiveMediaToContent,
   suggestMediaForContent,
+  searchContentWorkItems,
   upcomingContent,
   updateContentWorkItem,
 } from "./content";
@@ -146,6 +151,7 @@ export const contentRead = growthDomainTool({
     upcoming: upcomingContent,
     productionQueue,
     getWorkItem: getContentWorkItem,
+    search: searchContentWorkItems,
     suggestMedia: suggestMediaForContent,
   },
 });
@@ -163,11 +169,16 @@ export const contentWrite = growthDomainTool({
 });
 
 export const contentMediaWrite = growthDomainTool({
-  description: "Attach or recover media for canonical content work.",
+  description:
+    "Attach, recover, or turn ordered pool images into platform media.",
   actions: {
     attachChatImage: attachChatImageToContent,
     attachLibraryMedia: attachLibraryMediaToContent,
     recoverArchiveMedia: recoverArchiveMediaToContent,
+    makeCarousel: makeCarouselFromPool,
+    prepareUpload: prepareContentMediaUploads,
+    finishUpload: finishContentMediaUploads,
+    importRemoteImages: importRemoteImagesToContent,
   },
 });
 

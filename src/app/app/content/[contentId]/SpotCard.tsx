@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
 import {
+  ChevronLeft,
+  ChevronRight,
   Images,
   Loader2,
   MessageSquare,
@@ -18,6 +20,7 @@ import { SimpleSelect } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dropzone } from "@/components/ui/dropzone";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { MediaThumbnail } from "@/components/media-thumbnail";
 import { cn } from "@/components/ui/lib/utils";
 import type { Member } from "@/components/assignment/assignee";
 import type { MediaItem, PostStats } from "@/server/db/schema";
@@ -148,6 +151,11 @@ export function SpotCard({
   const [addingLink, setAddingLink] = useState(false);
   const [linkValue, setLinkValue] = useState("");
   const { uploadImages, uploading } = useMediaUpload(brandId);
+  const platformFormat = spot.format
+    ? getPlatformFormat(spot.format)
+    : undefined;
+  const isCarousel =
+    spot.archetype === "carousel" || platformFormat?.archetype === "carousel";
 
   // Caption = the concrete per-platform copy (platform_post.text), plus the AI
   // generate steer (pills + free-text nudge) that drafts it from the brief.
@@ -219,6 +227,13 @@ export function SpotCard({
   const handleUpload = async (files: File[]) => {
     const items = await uploadImages(files);
     if (items.length) persistMedia([...media, ...items]);
+  };
+  const moveMedia = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= media.length) return;
+    const next = [...media];
+    [next[index], next[target]] = [next[target]!, next[index]!];
+    persistMedia(next);
   };
 
   return (
@@ -527,25 +542,51 @@ export function SpotCard({
               {media.map((m, i) => (
                 <span
                   key={i}
-                  className="bg-muted group relative size-14 overflow-hidden rounded-lg border"
+                  className="bg-muted group relative size-16 overflow-hidden rounded-lg border"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <MediaThumbnail
                     src={m.thumbnail ?? m.url}
-                    alt=""
                     className="size-full object-cover"
-                    loading="lazy"
                   />
                   {owned && (
-                    <button
-                      onClick={() =>
-                        persistMedia(media.filter((_, j) => j !== i))
-                      }
-                      className="absolute top-0.5 right-0.5 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                      aria-label="Remove asset"
-                    >
-                      <X className="size-3" />
-                    </button>
+                    <>
+                      {isCarousel && (
+                        <span className="absolute top-0.5 left-0.5 rounded bg-black/65 px-1 text-[9px] font-semibold text-white">
+                          {i + 1}
+                        </span>
+                      )}
+                      <button
+                        onClick={() =>
+                          persistMedia(media.filter((_, j) => j !== i))
+                        }
+                        className="absolute top-0.5 right-0.5 rounded bg-black/65 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                        aria-label="Remove asset"
+                      >
+                        <X className="size-3" />
+                      </button>
+                      {isCarousel && (
+                        <span className="absolute inset-x-0.5 bottom-0.5 flex justify-between">
+                          <button
+                            type="button"
+                            disabled={i === 0}
+                            onClick={() => moveMedia(i, -1)}
+                            aria-label={`Move slide ${i + 1} left`}
+                            className="rounded bg-black/65 p-0.5 text-white disabled:opacity-30"
+                          >
+                            <ChevronLeft className="size-3" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={i === media.length - 1}
+                            onClick={() => moveMedia(i, 1)}
+                            aria-label={`Move slide ${i + 1} right`}
+                            className="rounded bg-black/65 p-0.5 text-white disabled:opacity-30"
+                          >
+                            <ChevronRight className="size-3" />
+                          </button>
+                        </span>
+                      )}
+                    </>
                   )}
                 </span>
               ))}

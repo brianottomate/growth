@@ -28,8 +28,8 @@ endpoint verifies token issuer, audience, expiry, and scope and then re-checks
 the user's live organization membership on every request. There is no parallel
 connector table and no fallback to the browser session's active or first org.
 
-The MCP tools and the in-app Growth assistant are projections of the same 31-tool
-native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 30
+The MCP tools and the in-app Growth assistant are projections of the same 33-tool
+native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 32
 connector-safe capabilities and omits only open-world `researchRead`. Read-only,
 destructive, and idempotency annotations are derived from the same action policy
 used by chat receipts and approvals. Growth runs
@@ -60,6 +60,10 @@ Notable portable workflows:
 - sync owned history, website structure, and blog articles;
 - analyze media with human-managed vocabulary and optional steering;
 - propose grouping and series structure for human review;
+- search content ideas and platform drafts before creating duplicate work;
+- import public cloud-design images or prepare/finalize direct uploads from
+  local Claude Code artifacts, then turn the ordered pool into platform-native
+  carousels;
 - draft a non-persistent moment blueprint, then commit an approved plan;
 - propose cadence and mix changes from own performance and peer behavior.
 

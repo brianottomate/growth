@@ -354,6 +354,29 @@ async function setSpotMedia(input: {
   return { id: input.platformPostId };
 }
 
+async function setSpotCarousel(input: {
+  platformPostId: string;
+  format: string;
+  media: MediaItem[];
+}): Promise<{ id: string }> {
+  const seen = new Set<string>();
+  const deduped = input.media.filter((item) => {
+    const key = item.assetId ?? item.url;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  await db
+    .update(platformPostTable)
+    .set({
+      format: input.format,
+      archetype: "carousel",
+      media: deduped.length ? deduped : null,
+    })
+    .where(eq(platformPostTable.id, input.platformPostId));
+  return { id: input.platformPostId };
+}
+
 async function updatePlatformDraft(input: {
   platformPostId: string;
   text?: string | null;
@@ -408,6 +431,7 @@ export const ContentService = {
   setSpotText,
   setPoolMedia,
   setSpotMedia,
+  setSpotCarousel,
   updatePlatformDraft,
   setContentStatus,
 } as const;

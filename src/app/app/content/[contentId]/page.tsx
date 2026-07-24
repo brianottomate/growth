@@ -160,7 +160,12 @@ export default async function ContentDetailPage({
             platformPostLinkTable.toPlatformPostId,
             posts.map((p) => p.id),
           ),
-          inArray(platformPostLinkTable.kind, ["repost", "quote", "reposts", "quotes"]),
+          inArray(platformPostLinkTable.kind, [
+            "repost",
+            "quote",
+            "reposts",
+            "quotes",
+          ]),
         ),
         with: { from: { with: { brand: { columns: { name: true } } } } },
       })
@@ -175,7 +180,10 @@ export default async function ContentDetailPage({
             kind: "article",
             card: (await resolveLinkCard(target.externalUrl)) ?? {
               url: target.externalUrl,
-              domain: new URL(target.externalUrl).hostname.replace(/^www\./, ""),
+              domain: new URL(target.externalUrl).hostname.replace(
+                /^www\./,
+                "",
+              ),
               title: content.title,
               description: content.hook,
               image: target.media?.[0]?.url ?? content.media?.[0]?.url ?? null,
@@ -372,49 +380,49 @@ export default async function ContentDetailPage({
       </h2>
       <div className="flex flex-col gap-2.5">
         {posts.map((p) => (
-          <div key={p.id}>
-          <SpotCard
-            brandId={content.brandId}
-            members={members}
-            currentUserId={session.user.id}
-            contentPostId={content.id}
-            contentTitle={content.title ?? "Untitled"}
-            brandName={content.brand?.name ?? "Brand"}
-            spot={{
-              id: p.id,
-              platform: p.platform,
-              format: p.format,
-              archetype: p.archetype,
-              template: p.template,
-              status: p.status,
-              source: p.source,
-              username: p.username,
-              text: p.text,
-              externalUrl: p.externalUrl,
-              editorUrl: editorUrlOf(p.metadata),
-              previewPath:
-                p.platform === "blog" && p.externalId
-                  ? `/app/dato-preview/${p.externalId}`
+          <div key={p.id} id={`post-${p.id}`} className="scroll-mt-4">
+            <SpotCard
+              brandId={content.brandId}
+              members={members}
+              currentUserId={session.user.id}
+              contentPostId={content.id}
+              contentTitle={content.title ?? "Untitled"}
+              brandName={content.brand?.name ?? "Brand"}
+              spot={{
+                id: p.id,
+                platform: p.platform,
+                format: p.format,
+                archetype: p.archetype,
+                template: p.template,
+                status: p.status,
+                source: p.source,
+                username: p.username,
+                text: p.text,
+                externalUrl: p.externalUrl,
+                editorUrl: editorUrlOf(p.metadata),
+                previewPath:
+                  p.platform === "blog" && p.externalId
+                    ? `/app/dato-preview/${p.externalId}`
+                    : null,
+                provider: p.provider,
+                scheduledAtISO: p.scheduledAt
+                  ? p.scheduledAt.toISOString()
                   : null,
-              provider: p.provider,
-              scheduledAtISO: p.scheduledAt
-                ? p.scheduledAt.toISOString()
-                : null,
-              publishedAtISO: p.publishedAt
-                ? p.publishedAt.toISOString()
-                : null,
-              deliveryExternalId: p.deliveryExternalId,
-              deliveryStatus: p.deliveryStatus,
-              deliveryError: p.deliveryError,
-              publishingConnected: connectedPlatforms.has(p.platform),
-              assetLinks: p.assetLinks,
-              media: p.media,
-              stats: p.stats,
-              owner: toMember(p.owner),
-            }}
-          />
-          <LinkCardStrip card={linkCardBySpot.get(p.id) ?? null} />
-          <RepostSimulation sims={simsBySpot.get(p.id) ?? []} />
+                publishedAtISO: p.publishedAt
+                  ? p.publishedAt.toISOString()
+                  : null,
+                deliveryExternalId: p.deliveryExternalId,
+                deliveryStatus: p.deliveryStatus,
+                deliveryError: p.deliveryError,
+                publishingConnected: connectedPlatforms.has(p.platform),
+                assetLinks: p.assetLinks,
+                media: p.media,
+                stats: p.stats,
+                owner: toMember(p.owner),
+              }}
+            />
+            <LinkCardStrip card={linkCardBySpot.get(p.id) ?? null} />
+            <RepostSimulation sims={simsBySpot.get(p.id) ?? []} />
           </div>
         ))}
       </div>

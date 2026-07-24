@@ -38,6 +38,7 @@ import {
   Rocket,
   Rss,
   Rows3,
+  Search,
   Settings,
   Sparkles,
   Sun,
@@ -248,6 +249,27 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  type="button"
+                  tooltip="Search content (⌘K)"
+                  onClick={() =>
+                    window.dispatchEvent(new Event("growth-command-menu:open"))
+                  }
+                >
+                  <Search />
+                  <span>Search</span>
+                  <kbd className="text-muted-foreground bg-muted ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium group-data-[collapsible=icon]:hidden">
+                    ⌘K
+                  </kbd>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         {NAV_GROUPS.map((group, i) => (
           <SidebarGroup key={group.label ?? `group-${i}`}>
             {group.label && (
