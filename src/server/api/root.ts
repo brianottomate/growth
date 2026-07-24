@@ -3,6 +3,7 @@ import { adsRouter } from "@/server/api/routers/ads.router";
 import { affiliateRouter } from "@/server/api/routers/affiliate.router";
 import { amplifierRouter } from "@/server/api/routers/amplifier.router";
 import { audienceRouter } from "@/server/api/routers/audience.router";
+import { googleDriveRouter } from "@/server/api/routers/googleDrive.router";
 import { brandRouter } from "@/server/api/routers/brand.router";
 import { blogRouter } from "@/server/api/routers/blog.router";
 import { cadenceRouter } from "@/server/api/routers/cadence.router";
@@ -54,6 +55,7 @@ export const appRouter = createTRPCRouter({
   channel: channelRouter,
   channelSuggestion: channelSuggestionRouter,
   content: contentRouter,
+  googleDrive: googleDriveRouter,
   contentSuggestion: contentSuggestionRouter,
   contentAnalysis: contentAnalysisRouter,
   creativeWork: creativeWorkRouter,

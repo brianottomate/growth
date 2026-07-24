@@ -30,6 +30,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "updateActivation",
   ],
   researchRead: ["search", "readPage"],
+  driveRead: ["status", "browse"],
   contentRead: [
     "pipeline",
     "upcoming",
@@ -54,6 +55,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "prepareUpload",
     "finishUpload",
     "importRemoteImages",
+    "importFromDrive",
   ],
   emailRead: ["get"],
   emailWrite: [
@@ -123,6 +125,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   audienceRead: "Reading audiences",
   audienceWrite: "Updating audiences",
   researchRead: "Researching",
+  driveRead: "Reading Google Drive",
   contentRead: "Reading content",
   contentWrite: "Updating content",
   contentMediaWrite: "Updating content media",

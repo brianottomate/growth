@@ -23,6 +23,7 @@ import {
   createPlatformPost,
   finishContentMediaUploads,
   getContentWorkItem,
+  importDriveFilesToContent,
   importRemoteImagesToContent,
   makeCarouselFromPool,
   prepareContentMediaUploads,
@@ -35,6 +36,7 @@ import {
   upcomingContent,
   updateContentWorkItem,
 } from "./content";
+import { browseDrive, driveConnectionStatus } from "./drive";
 import { EMAIL_TOOLS } from "./email";
 import { leadsSummary } from "./leads";
 import { recentMentions } from "./listening";
@@ -143,6 +145,12 @@ export const researchRead = growthDomainTool({
   actions: { search: webSearch, readPage: readWebPage },
 });
 
+export const driveRead = growthDomainTool({
+  description:
+    "Check Google Drive connection status and browse the operator's Drive for importable images.",
+  actions: { status: driveConnectionStatus, browse: browseDrive },
+});
+
 export const contentRead = growthDomainTool({
   description:
     "Read pipeline, upcoming, production, work-item, or media state.",
@@ -179,6 +187,7 @@ export const contentMediaWrite = growthDomainTool({
     prepareUpload: prepareContentMediaUploads,
     finishUpload: finishContentMediaUploads,
     importRemoteImages: importRemoteImagesToContent,
+    importFromDrive: importDriveFilesToContent,
   },
 });
 
@@ -317,6 +326,7 @@ export const listeningRead = growthDomainTool({
 });
 
 export const DOMAIN_CAPABILITY_TOOLS = {
+  driveRead,
   brandRead,
   productAtlasRead,
   productAtlasWrite,

@@ -32,6 +32,14 @@ function safeFilename(filename: string, fallback = "file"): string {
 const MAX_IMPORTED_IMAGE_BYTES = 25 * 1024 * 1024;
 /** Format the browser encodes downscaled tiles as. */
 const THUMBNAIL_MIME = "image/webp";
+/** Image types accepted from any import path (upload, remote URL, Drive). */
+const DRIVE_SAFE_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+  "image/gif",
+] as const;
 
 async function fetchPublicImage(rawUrl: string): Promise<{
   body: Buffer;
@@ -218,6 +226,82 @@ export async function verifyR2Upload(mediaId: string) {
   if (object.contentType && !object.contentType.startsWith("image/")) {
     throw new Error("Uploaded object is not an image.");
   }
+  return asset;
+}
+
+/**
+ * Store already-downloaded image bytes as a library asset.
+ *
+ * Split out of `importRemoteImage` so authenticated sources (Google Drive)
+ * can reuse the exact same R2 key layout, row shape and provenance handling —
+ * they just can't reach the file over a plain public fetch.
+ */
+export async function importImageBuffer(input: {
+  brandId: string;
+  uploadedBy: string;
+  body: Buffer;
+  contentType: string;
+  filename: string;
+  title?: string;
+  width?: number;
+  height?: number;
+  /** Optional pre-made tile; stored beside the original like browser uploads. */
+  thumbnail?: { body: Buffer; contentType: string };
+  externalUrl?: string;
+  sourceProvider?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  if (
+    !(DRIVE_SAFE_IMAGE_TYPES as readonly string[]).includes(input.contentType)
+  ) {
+    throw new Error(`Unsupported image type (${input.contentType}).`);
+  }
+  if (input.body.byteLength > MAX_IMPORTED_IMAGE_BYTES) {
+    throw new Error("Imported image exceeds 25 MB.");
+  }
+
+  const id = createId("media");
+  const filename = safeFilename(
+    input.filename,
+    `image.${extensionForImageMime(input.contentType)}`,
+  );
+  const key = R2.buildKey(input.brandId, id, filename);
+  const url = await R2.putBuffer(key, input.body, input.contentType);
+
+  let thumbnailUrl: string | null = null;
+  if (input.thumbnail) {
+    const thumbnailKey = R2.buildThumbnailKey(key);
+    thumbnailUrl = await R2.putBuffer(
+      thumbnailKey,
+      input.thumbnail.body,
+      input.thumbnail.contentType,
+    );
+  }
+
+  const [asset] = await db
+    .insert(mediaAssetTable)
+    .values({
+      id,
+      brandId: input.brandId,
+      uploadedBy: input.uploadedBy,
+      provider: "r2",
+      kind: input.contentType === "image/gif" ? "gif" : "image",
+      status: "ready",
+      title: input.title?.trim() || null,
+      filename,
+      mimeType: input.contentType,
+      size: input.body.byteLength,
+      width: input.width ?? null,
+      height: input.height ?? null,
+      r2Key: key,
+      url,
+      thumbnailUrl,
+      externalUrl: input.externalUrl ?? null,
+      sourceProvider: input.sourceProvider ?? null,
+      metadata: input.metadata ?? null,
+    })
+    .returning();
+  if (!asset) throw new Error("Could not save imported image.");
   return asset;
 }
 
@@ -882,6 +966,7 @@ export async function promoteChatImage(input: {
 export const MediaService = {
   createR2Upload,
   finalizeR2Upload,
+  importImageBuffer,
   verifyR2Upload,
   importRemoteImage,
   markVideoReady,

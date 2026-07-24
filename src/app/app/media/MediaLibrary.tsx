@@ -10,6 +10,7 @@ import {
   Film,
   FileText,
   FolderOpen,
+  HardDrive,
   ImageIcon,
   Link2,
   Loader2,
@@ -41,6 +42,7 @@ import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 import { EditLinkDialog } from "./EditLinkDialog";
+import { GoogleDriveImportDialog } from "./GoogleDriveImportDialog";
 import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
 import { MediaTaxonomyDialog } from "./MediaTaxonomyDialog";
 import { OrganizeMediaDialog } from "./OrganizeMediaDialog";
@@ -140,6 +142,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
   const [organizingAsset, setOrganizingAsset] = useState<LibraryAsset | null>(
     null,
   );
@@ -344,6 +347,14 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setDriveOpen(true)}
+          >
+            <HardDrive className="size-4" />
+            Drive
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setTaxonomyOpen(true)}
           >
             <Settings2 className="size-4" />
@@ -526,6 +537,13 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           ))}
         </div>
       )}
+
+      <GoogleDriveImportDialog
+        brandId={brandId}
+        open={driveOpen}
+        onOpenChange={setDriveOpen}
+        onImported={() => invalidate()}
+      />
 
       <EditLinkDialog
         asset={editingAsset}

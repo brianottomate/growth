@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Images, Sparkles, X } from "lucide-react";
+import { HardDrive, Images, Sparkles, X } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -12,6 +12,7 @@ import { cn } from "@/components/ui/lib/utils";
 import type { MediaItem } from "@/server/db/schema";
 import { MediaPickerDialog } from "./MediaPickerDialog";
 import { ImageBatchImporter } from "./ImageBatchImporter";
+import { GoogleDriveImportDialog } from "@/app/app/media/GoogleDriveImportDialog";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 
 type Spot = { id: string; platform: string; media: MediaItem[] };
@@ -52,6 +53,7 @@ export function ContentPool({
   );
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [driveOpen, setDriveOpen] = useState(false);
   // Pool VIEW = idea-level media ∪ everything on a spot, deduped.
   const poolMap = new Map<string, MediaItem>();
   for (const m of directMedia) poolMap.set(keyOf(m), m);
@@ -146,6 +148,13 @@ export function ContentPool({
           onImported={addToPool}
         />
         <button
+          onClick={() => setDriveOpen(true)}
+          className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
+        >
+          <HardDrive className="size-5" />
+          Drive
+        </button>
+        <button
           onClick={() => setPickerOpen(true)}
           className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
         >
@@ -174,6 +183,24 @@ export function ContentPool({
         add or remove it on that spot, or ask chat to turn an ordered batch into
         a carousel. New uploads are saved to your media library.
       </p>
+
+      <GoogleDriveImportDialog
+        brandId={brandId}
+        open={driveOpen}
+        onOpenChange={setDriveOpen}
+        onImported={(assets) =>
+          addToPool(
+            assets.map((asset) => ({
+              url: asset.url!,
+              type: "image" as const,
+              assetId: asset.id,
+              ...(asset.width ? { width: asset.width } : {}),
+              ...(asset.height ? { height: asset.height } : {}),
+              ...(asset.thumbnailUrl ? { thumbnail: asset.thumbnailUrl } : {}),
+            })),
+          )
+        }
+      />
 
       <MediaPickerDialog
         brandId={brandId}

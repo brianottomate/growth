@@ -98,6 +98,10 @@ export const growthActionPolicies = {
     search: read("provider-read", PRODUCT),
     readPage: read("provider-read", PRODUCT),
   },
+  driveRead: {
+    status: read(),
+    browse: read("provider-read"),
+  },
   contentRead: {
     pipeline: read(),
     upcoming: read(),
@@ -123,6 +127,7 @@ export const growthActionPolicies = {
     prepareUpload: write(),
     finishUpload: write({ idempotent: true }),
     importRemoteImages: write({ consequence: "provider-write" }),
+    importFromDrive: write({ consequence: "provider-write" }),
   },
   emailRead: { get: read() },
   emailWrite: {
