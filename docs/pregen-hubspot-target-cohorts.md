@@ -45,15 +45,16 @@ must remain a separate, explicit provider action after human copy review.
 
 ## HubSpot webhook backlog
 
-The safe backlog processor projects the latest subscribed company properties,
-marks target-contact associations reconciled, preserves engagement associations
-as classified raw events, and applies positive deal guard signals:
+The safe backlog processor materializes post-export company creations, projects
+the latest subscribed company properties, reconciles deal additions and
+removals against current HubSpot state, and preserves unmodeled associations as
+classified raw events:
 
 ```bash
 bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts
 bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts --apply
 ```
 
-It deliberately leaves unlinked companies, non-target contact/company
-associations, merge events, and association removals pending for current-state
-hydration. It never deletes webhook rows.
+It never deletes webhook rows. `processed_at` means either projected or
+explicitly classified with a `process_note`; the raw payload remains available
+for later contact-mirror or hierarchy work.

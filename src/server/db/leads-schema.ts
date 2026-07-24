@@ -140,6 +140,11 @@ export const leadDomainTable = leadsSchema.table(
     hubspotRecordId: t.text(),
     hubspotLeadStatus: t.text(),
     hubspotOwner: t.text(),
+    // Snapshot/webhook freshness. The export importer writes both; webhook
+    // projection advances them so an older export can never overwrite a newer
+    // CRM change on a rerun.
+    hubspotSyncedAt: t.timestamp(),
+    hubspotLastModifiedAt: t.timestamp(),
     outreachLink: t.text(),
     hasHubspotDeal: t.boolean().default(false).notNull(),
     isExistingCustomer: t.boolean().default(false).notNull(),

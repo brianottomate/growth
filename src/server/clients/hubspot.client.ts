@@ -554,6 +554,42 @@ export type HubspotCompany = {
   values: Record<CompanyCoreProperty, string | null>;
 };
 
+/** Fetch one company by its immutable HubSpot record ID. */
+export async function getCompanyById(
+  companyId: string,
+): Promise<HubspotCompany | null> {
+  try {
+    const found = await client().crm.companies.basicApi.getById(companyId, [
+      ...COMPANY_CORE_PROPERTIES,
+    ]);
+    const values = {} as Record<CompanyCoreProperty, string | null>;
+    for (const prop of COMPANY_CORE_PROPERTIES) {
+      values[prop] = found.properties?.[prop] ?? null;
+    }
+    return { id: found.id, values };
+  } catch (error) {
+    const status =
+      typeof error === "object" && error !== null && "statusCode" in error
+        ? Number((error as { statusCode?: unknown }).statusCode)
+        : null;
+    if (status === 404) return null;
+    console.error(`❌ [HUBSPOT] getCompanyById(${companyId})`, error);
+    throw error;
+  }
+}
+
+/** Current-state guard for deal-association removals. */
+export async function companyHasDeals(companyId: string): Promise<boolean> {
+  const page = await client().crm.associations.v4.basicApi.getPage(
+    "companies",
+    companyId,
+    "deals",
+    undefined,
+    1,
+  );
+  return (page.results?.length ?? 0) > 0;
+}
+
 /**
  * Find a company by exact domain. Always returns the core property set;
  * pass `additionalProperties` to fetch more, which the return type narrows

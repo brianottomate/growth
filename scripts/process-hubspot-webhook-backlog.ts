@@ -13,9 +13,43 @@
  */
 import { sql } from "drizzle-orm";
 
+import {
+  companyHasDeals,
+  HS_OWNER_NAMES,
+} from "@/server/clients/hubspot.client";
 import { db } from "@/server/db";
+import { leadDomainTable } from "@/server/db/leads-schema";
 
 const apply = process.argv.includes("--apply");
+const ownerNamesJson = JSON.stringify(HS_OWNER_NAMES);
+
+function clean(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeDomain(value: unknown): string | null {
+  const raw = clean(value);
+  if (!raw) return null;
+  let domain = raw.toLowerCase();
+  if (domain.includes("://")) domain = domain.split("://")[1]!;
+  if (domain.includes("@")) domain = domain.split("@").pop()!;
+  for (const separator of ["/", "?", "#"]) {
+    if (domain.includes(separator)) domain = domain.split(separator)[0]!;
+  }
+  if (domain.includes(":")) domain = domain.split(":")[0]!;
+  while (domain.startsWith("www.")) domain = domain.slice(4);
+  domain = domain.replace(/^\.+|\.+$/g, "").trim();
+  return domain || null;
+}
+
+function toInteger(value: unknown): number | null {
+  const raw = clean(value);
+  if (!raw) return null;
+  const number = Number(raw.replace(/,/g, "").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(number) ? Math.round(number) : null;
+}
 
 async function pendingCount(): Promise<number> {
   const result = await db.execute(sql`
@@ -30,6 +64,88 @@ const before = await pendingCount();
 console.log(JSON.stringify({ apply, pendingBefore: before }, null, 2));
 if (!apply) process.exit(0);
 
+// The export predates the webhook receiver. Creation events since that export
+// have a complete set of property-change events in the durable log, including
+// domain. Materialize those companies first so the normal projection below can
+// attach every property without an API crawl.
+const missingCompanySnapshots = await db.execute<{
+  object_id: string;
+  props: Record<string, unknown>;
+  latest_occurred_at: Date | string | null;
+}>(sql`
+  with latest as (
+    select distinct on (event.object_id, event.property_name)
+      event.object_id,
+      event.property_name,
+      event.property_value,
+      event.occurred_at
+    from leads.hubspot_webhook_event as event
+    where event.processed_at is null
+      and event.subscription_type = 'object.propertyChange'
+      and event.object_type_id = '0-2'
+      and event.property_name is not null
+      and not exists (
+        select 1
+        from leads.domain as domain
+        where domain.hubspot_record_id = event.object_id
+      )
+    order by
+      event.object_id,
+      event.property_name,
+      event.occurred_at desc nulls last,
+      event.id desc
+  )
+  select
+    object_id,
+    jsonb_object_agg(property_name, property_value) as props,
+    max(occurred_at) as latest_occurred_at
+  from latest
+  group by object_id
+  having nullif(jsonb_object_agg(property_name, property_value) ->> 'domain', '') is not null
+`);
+
+const missingValues = missingCompanySnapshots.rows.flatMap((snapshot) => {
+  const domain = normalizeDomain(snapshot.props.domain);
+  if (!domain) return [];
+  const occurredAt = snapshot.latest_occurred_at
+    ? new Date(snapshot.latest_occurred_at)
+    : new Date();
+  const ownerId = clean(snapshot.props.hubspot_owner_id);
+  const pms = clean(snapshot.props.pms_ai_identified);
+  return [
+    {
+      domain,
+      companyName: clean(snapshot.props.name),
+      city: clean(snapshot.props.city),
+      state: clean(snapshot.props.state),
+      country: clean(snapshot.props.country),
+      pms: pms && !/^your pms$/i.test(pms) ? pms : null,
+      unitCount: toInteger(snapshot.props.portfolio_size),
+      hubspotRecordId: snapshot.object_id,
+      hubspotLeadStatus: clean(snapshot.props.hs_lead_status),
+      hubspotOwner: ownerId ? (HS_OWNER_NAMES[ownerId] ?? ownerId) : null,
+      hubspotSyncedAt: new Date(),
+      hubspotLastModifiedAt: occurredAt,
+      inHubspot: true,
+      enrichment: { hubspot: { webhookSnapshot: snapshot.props } },
+      updatedAt: new Date(),
+    },
+  ];
+});
+
+for (let index = 0; index < missingValues.length; index += 500) {
+  await db
+    .insert(leadDomainTable)
+    .values(missingValues.slice(index, index + 500))
+    .onConflictDoNothing({ target: leadDomainTable.domain });
+}
+
+console.log(
+  JSON.stringify({
+    materializedCompaniesFromWebhook: missingValues.length,
+  }),
+);
+
 // Collapse every subscribed company property to its latest event value, then
 // project the fields Growth already models. Preserve the full property snapshot
 // under enrichment.hubspotWebhook so currently-unmodeled fields are not lost.
@@ -38,7 +154,8 @@ await db.execute(sql`
     select distinct on (object_id, property_name)
       object_id,
       property_name,
-      property_value
+      property_value,
+      occurred_at
     from leads.hubspot_webhook_event
     where processed_at is null
       and subscription_type = 'object.propertyChange'
@@ -47,7 +164,10 @@ await db.execute(sql`
     order by object_id, property_name, occurred_at desc nulls last, id desc
   ),
   pivoted as (
-    select object_id, jsonb_object_agg(property_name, property_value) as props
+    select
+      object_id,
+      jsonb_object_agg(property_name, property_value) as props,
+      max(occurred_at) as latest_occurred_at
     from latest
     group by object_id
   )
@@ -87,8 +207,14 @@ await db.execute(sql`
       domain.hubspot_lead_status
     ),
     hubspot_owner = coalesce(
+      ${ownerNamesJson}::jsonb ->> (pivoted.props ->> 'hubspot_owner_id'),
       nullif(pivoted.props ->> 'hubspot_owner_id', ''),
       domain.hubspot_owner
+    ),
+    hubspot_synced_at = now(),
+    hubspot_last_modified_at = greatest(
+      coalesce(domain.hubspot_last_modified_at, pivoted.latest_occurred_at),
+      pivoted.latest_occurred_at
     ),
     enrichment = coalesce(domain.enrichment, '{}'::jsonb)
       || jsonb_build_object('hubspotWebhook', pivoted.props),
@@ -189,6 +315,75 @@ await db.execute(sql`
     end
 `);
 
+// A removal event cannot safely clear the flag by itself because another deal
+// may still be associated. Hydrate current association state for the small set
+// of affected companies, then mark both direction events together.
+const dealRemovalCompanies = await db.execute<{ company_id: string }>(sql`
+  select distinct
+    case
+      when payload ->> 'fromObjectTypeId' = '0-2'
+        then payload ->> 'fromObjectId'
+      else payload ->> 'toObjectId'
+    end as company_id
+  from leads.hubspot_webhook_event
+  where processed_at is null
+    and subscription_type = 'object.associationChange'
+    and payload ->> 'associationType' in (
+      'COMPANY_TO_DEAL',
+      'DEAL_TO_COMPANY'
+    )
+    and payload ->> 'associationRemoved' = 'true'
+`);
+
+for (const row of dealRemovalCompanies.rows) {
+  const hasDeals = await companyHasDeals(row.company_id);
+  await db
+    .update(leadDomainTable)
+    .set({
+      hasHubspotDeal: hasDeals,
+      hubspotSyncedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(sql`${leadDomainTable.hubspotRecordId} = ${row.company_id}`);
+
+  await db.execute(sql`
+    update leads.hubspot_webhook_event
+    set
+      processed_at = now(),
+      process_note = ${`reconciled: current deal associations (${hasDeals ? "has deals" : "no deals"})`}
+    where processed_at is null
+      and subscription_type = 'object.associationChange'
+      and payload ->> 'associationType' in (
+        'COMPANY_TO_DEAL',
+        'DEAL_TO_COMPANY'
+      )
+      and payload ->> 'associationRemoved' = 'true'
+      and case
+        when payload ->> 'fromObjectTypeId' = '0-2'
+          then payload ->> 'fromObjectId'
+        else payload ->> 'toObjectId'
+      end = ${row.company_id}
+  `);
+}
+
+// Contact and parent/child company associations do not have a first-class
+// projection until the full contact mirror lands. They are still retained
+// losslessly in the raw event log; classify them instead of presenting them as
+// a failed company-sync backlog.
+await db.execute(sql`
+  update leads.hubspot_webhook_event
+  set
+    processed_at = now(),
+    process_note = 'classified: association retained raw; no first-class projection'
+  where processed_at is null
+    and subscription_type = 'object.associationChange'
+    and payload ->> 'associationType' in (
+      'CONTACT_TO_COMPANY',
+      'COMPANY_TO_CONTACT',
+      'COMPANY_TO_COMPANY'
+    )
+`);
+
 // Engagement association events have no row-level projection in Growth today.
 // Classify them explicitly while retaining the full raw payload for analytics.
 await db.execute(sql`
@@ -211,6 +406,73 @@ await db.execute(sql`
       'NOTE_TO_COMPANY',
       'COMPANY_TO_COMMUNICATION',
       'COMMUNICATION_TO_COMPANY'
+    )
+`);
+
+// A domain-keyed projection cannot represent two HubSpot company records that
+// share a domain, or a company with no domain. Keep the payloads, classify the
+// exception, and make the queue mean "actionable" rather than "known model
+// limitation." The import audit reports these counts separately.
+await db.execute(sql`
+  update leads.hubspot_webhook_event as event
+  set
+    processed_at = now(),
+    process_note = 'classified: company creation has duplicate or missing domain'
+  where event.processed_at is null
+    and event.subscription_type = 'object.creation'
+    and event.object_type_id = '0-2'
+`);
+
+await db.execute(sql`
+  update leads.hubspot_webhook_event as event
+  set
+    processed_at = now(),
+    process_note = 'classified: company property belongs to duplicate or missing domain'
+  where event.processed_at is null
+    and event.subscription_type = 'object.propertyChange'
+    and event.object_type_id = '0-2'
+    and exists (
+      select 1
+      from leads.hubspot_webhook_event as creation
+      where creation.object_id = event.object_id
+        and creation.subscription_type = 'object.creation'
+        and creation.object_type_id = '0-2'
+        and creation.process_note =
+          'classified: company creation has duplicate or missing domain'
+    )
+`);
+
+await db.execute(sql`
+  update leads.hubspot_webhook_event
+  set
+    processed_at = now(),
+    process_note =
+      'classified: company merge retained raw; current properties projected separately'
+  where processed_at is null
+    and subscription_type = 'object.merge'
+    and object_type_id = '0-2'
+`);
+
+await db.execute(sql`
+  update leads.hubspot_webhook_event
+  set
+    processed_at = now(),
+    process_note = 'classified: company property has no domain projection'
+  where processed_at is null
+    and subscription_type = 'object.propertyChange'
+    and object_type_id = '0-2'
+`);
+
+await db.execute(sql`
+  update leads.hubspot_webhook_event
+  set
+    processed_at = now(),
+    process_note = 'classified: deal association has no domain projection'
+  where processed_at is null
+    and subscription_type = 'object.associationChange'
+    and payload ->> 'associationType' in (
+      'COMPANY_TO_DEAL',
+      'DEAL_TO_COMPANY'
     )
 `);
 
