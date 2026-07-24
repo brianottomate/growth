@@ -409,7 +409,10 @@ async function applyInline(rows: HubspotWebhookEventInsert[]) {
             coalesce(${leadDomainTable.enrichment}, '{}'::jsonb),
             '{hubspotWebhook}',
             coalesce(${leadDomainTable.enrichment} -> 'hubspotWebhook', '{}'::jsonb)
-              || jsonb_build_object(${row.propertyName}, ${value}),
+              || jsonb_build_object(
+                ${row.propertyName}::text,
+                to_jsonb(${value}::text)
+              ),
             true
           )`,
           updatedAt: new Date(),
