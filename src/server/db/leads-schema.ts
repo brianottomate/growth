@@ -279,6 +279,7 @@ export const leadContactTable = leadsSchema.table(
     verification: t.jsonb().$type<LeadContactVerification>(),
 
     // Instantly linkage (this is the projection — source of truth stays here).
+    hubspotContactId: t.text(),
     instantlyLeadId: t.text(),
     instantlyCampaignId: t.text(),
     pushedToInstantlyAt: t.timestamp(),
@@ -309,12 +310,66 @@ export const leadContactTable = leadsSchema.table(
     uniqueIndex("lead_contact_domain_email_idx").on(table.domain, table.email),
     index("lead_contact_domain_id_idx").on(table.domainId),
     index("lead_contact_email_idx").on(table.email),
+    index("lead_contact_hubspot_idx").on(table.hubspotContactId),
     index("lead_contact_instantly_idx").on(table.instantlyLeadId),
   ],
 );
 
 export type LeadContact = typeof leadContactTable.$inferSelect;
 export type LeadContactInsert = typeof leadContactTable.$inferInsert;
+
+// ---- HUBSPOT TARGET-LIST MEMBERSHIP -------------------------------
+//
+// HubSpot remains the source of truth for list definitions. This table is the
+// durable, queryable membership projection that makes those cohorts available
+// to Growth jobs and the /leads operator UI without flattening them into flags.
+
+export const hubspotListMembershipTable = leadsSchema.table(
+  "hubspot_list_membership",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("hlm")),
+    listId: t.text().notNull(),
+    listName: t.text().notNull(),
+    objectType: t.text().notNull(), // company | contact
+    objectId: t.text().notNull(),
+    cohort: t.text().notNull(), // recycled | untouched
+    domainId: t
+      .text()
+      .references(() => leadDomainTable.id, { onDelete: "set null" }),
+    contactId: t
+      .text()
+      .references(() => leadContactTable.id, { onDelete: "set null" }),
+    importedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("hubspot_list_membership_list_object_idx").on(
+      table.listId,
+      table.objectId,
+    ),
+    index("hubspot_list_membership_domain_idx").on(table.domainId),
+    index("hubspot_list_membership_contact_idx").on(table.contactId),
+    index("hubspot_list_membership_cohort_type_idx").on(
+      table.cohort,
+      table.objectType,
+    ),
+  ],
+);
+
+export type HubspotListMembership =
+  typeof hubspotListMembershipTable.$inferSelect;
+export type HubspotListMembershipInsert =
+  typeof hubspotListMembershipTable.$inferInsert;
 
 // ---- LEAD IMPORT (provenance / audit) ------------------------------
 

@@ -18,6 +18,7 @@ import {
   leadChannelTable,
   leadContactTable,
   leadDomainTable,
+  hubspotListMembershipTable,
   leadImportTable,
   leadOutreachTable,
 } from "@/server/db/leads-schema";
@@ -156,6 +157,19 @@ export const leadsRouter = createTRPCRouter({
       .select({ count: sql<number>`count(*)::int` })
       .from(leadContactTable);
 
+    const targetMemberships = await ctx.db
+      .select({
+        cohort: hubspotListMembershipTable.cohort,
+        objectType: hubspotListMembershipTable.objectType,
+        count: sql<number>`count(*)::int`,
+        linked: sql<number>`count(*) filter (where ${hubspotListMembershipTable.domainId} is not null)::int`,
+      })
+      .from(hubspotListMembershipTable)
+      .groupBy(
+        hubspotListMembershipTable.cohort,
+        hubspotListMembershipTable.objectType,
+      );
+
     const topPms = await ctx.db
       .select({
         pms: leadDomainTable.pms,
@@ -177,6 +191,7 @@ export const leadsRouter = createTRPCRouter({
       ...totals,
       netNew: netNewRow?.count ?? 0,
       contacts: contacts?.count ?? 0,
+      targetMemberships,
       topPms,
       imports,
     };
@@ -193,6 +208,7 @@ export const leadsRouter = createTRPCRouter({
         pms: z.string().optional(),
         hasPregenSite: z.boolean().optional(),
         integratedPmsOnly: z.boolean().optional(),
+        pregenCohort: z.enum(["recycled", "untouched"]).optional(),
         // net-new sendable target: not in CRM, LIVE_RENTAL, has a credible contact.
         netNew: z.boolean().optional(),
         // the first cold-outbound test cohort (SEND_BATCH_1).
@@ -222,6 +238,22 @@ export const leadsRouter = createTRPCRouter({
         conds.push(sql`${leadDomainTable.pregenSiteUrl} is not null`);
       if (input.integratedPmsOnly)
         conds.push(eq(leadDomainTable.isIntegratedPms, true));
+      if (input.pregenCohort) {
+        conds.push(
+          exists(
+            ctx.db
+              .select({ one: sql`1` })
+              .from(hubspotListMembershipTable)
+              .where(
+                and(
+                  eq(hubspotListMembershipTable.domainId, leadDomainTable.id),
+                  eq(hubspotListMembershipTable.objectType, "company"),
+                  eq(hubspotListMembershipTable.cohort, input.pregenCohort),
+                ),
+              ),
+          ),
+        );
+      }
       if (input.netNew) {
         // The "first send" cut: never entered the CRM, their current site is a
         // live rental site (ICP), and we have at least one credible contact.
@@ -312,10 +344,33 @@ export const leadsRouter = createTRPCRouter({
         : [];
       const countMap = new Map(counts.map((c) => [c.domainId, c.n]));
 
+      const cohortRows = ids.length
+        ? await ctx.db
+            .select({
+              domainId: hubspotListMembershipTable.domainId,
+              cohort: hubspotListMembershipTable.cohort,
+            })
+            .from(hubspotListMembershipTable)
+            .where(
+              and(
+                inArray(hubspotListMembershipTable.domainId, ids),
+                eq(hubspotListMembershipTable.objectType, "company"),
+              ),
+            )
+        : [];
+      const cohortsByDomain = new Map<string, Set<string>>();
+      for (const row of cohortRows) {
+        if (!row.domainId) continue;
+        const cohorts = cohortsByDomain.get(row.domainId) ?? new Set<string>();
+        cohorts.add(row.cohort);
+        cohortsByDomain.set(row.domainId, cohorts);
+      }
+
       return {
         items: items.map((i) => ({
           ...i,
           contactCount: countMap.get(i.id) ?? 0,
+          pregenCohorts: [...(cohortsByDomain.get(i.id) ?? [])].sort(),
         })),
         total,
         hasMore: input.offset + items.length < total,

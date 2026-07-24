@@ -111,6 +111,11 @@ const contactWriteProps = z.strictObject({
   portfolio_size_ai_guess_1_range: z.string().optional(),
   portfolio_size_ai_guess_2_exact: z.string().optional(),
   portfolio_size_ai_guess_2_range: z.string().optional(),
+  growth_pregen_preview_url: z.string().url().optional(),
+  growth_pregen_touch_1_subject: z.string().optional(),
+  growth_pregen_touch_1_body: z.string().optional(),
+  growth_pregen_touch_2_subject: z.string().optional(),
+  growth_pregen_touch_2_body: z.string().optional(),
 }) satisfies z.ZodType<ContactProperties>;
 
 export const upsertContactBody = z.strictObject({

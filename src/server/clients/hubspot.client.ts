@@ -428,6 +428,12 @@ export type ContactProperties = {
   portfolio_size_ai_guess_1_range?: string;
   portfolio_size_ai_guess_2_exact?: string;
   portfolio_size_ai_guess_2_range?: string;
+  // Human-reviewed two-touch pregen sequence token contract.
+  growth_pregen_preview_url?: string;
+  growth_pregen_touch_1_subject?: string;
+  growth_pregen_touch_1_body?: string;
+  growth_pregen_touch_2_subject?: string;
+  growth_pregen_touch_2_body?: string;
   // Read-only context (used by the inbound router)
   notes_last_contacted?: string;
 };
@@ -495,6 +501,11 @@ export const CONTACT_CORE_PROPERTIES = [
   "pms_inbound_form",
   "meeting_booked_inbound_form",
   "intent_inbound_form",
+  "growth_pregen_preview_url",
+  "growth_pregen_touch_1_subject",
+  "growth_pregen_touch_1_body",
+  "growth_pregen_touch_2_subject",
+  "growth_pregen_touch_2_body",
 ] as const satisfies readonly (keyof ContactProperties)[];
 
 type ContactCoreProperty = (typeof CONTACT_CORE_PROPERTIES)[number];
@@ -828,9 +839,7 @@ export async function findCompaniesByPhone(
 }
 
 /** High-precision — contacts whose phone contains the permit phone digits. */
-export async function findContactsByPhone(
-  phone: string,
-): Promise<
+export async function findContactsByPhone(phone: string): Promise<
   Array<{
     id: string;
     email: string | null;
