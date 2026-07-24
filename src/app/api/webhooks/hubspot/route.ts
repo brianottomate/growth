@@ -271,20 +271,15 @@ async function applyInline(rows: HubspotWebhookEventInsert[]) {
           continue;
         }
 
-        if (
-          associationType?.includes("CONTACT") ||
-          associationType === "COMPANY_TO_COMPANY"
-        ) {
-          await db
-            .update(hubspotWebhookEventTable)
-            .set({
-              processedAt: new Date(),
-              processNote:
-                "classified: association retained raw; no first-class projection",
-            })
-            .where(eq(hubspotWebhookEventTable.eventId, row.eventId));
-          continue;
-        }
+        await db
+          .update(hubspotWebhookEventTable)
+          .set({
+            processedAt: new Date(),
+            processNote:
+              "classified: association retained raw; no first-class projection",
+          })
+          .where(eq(hubspotWebhookEventTable.eventId, row.eventId));
+        continue;
       }
 
       if (
