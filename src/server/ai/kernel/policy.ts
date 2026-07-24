@@ -103,6 +103,7 @@ export const growthActionPolicies = {
     upcoming: read(),
     productionQueue: read(),
     getWorkItem: read(),
+    search: read(),
     suggestMedia: read("model-read"),
   },
   contentWrite: {
@@ -118,6 +119,10 @@ export const growthActionPolicies = {
     attachChatImage: write({ idempotent: true }),
     attachLibraryMedia: write({ idempotent: true }),
     recoverArchiveMedia: write({ consequence: "provider-write" }),
+    makeCarousel: write({ idempotent: true }),
+    prepareUpload: write(),
+    finishUpload: write({ idempotent: true }),
+    importRemoteImages: write({ consequence: "provider-write" }),
   },
   emailRead: { get: read() },
   emailWrite: {

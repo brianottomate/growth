@@ -28,7 +28,9 @@ export const inboxRouter = {
    * lives in the client until the next run.
    */
   triageNow: protectedProcedure.mutation(async () => {
-    const { conversations } = await listAllDmConversations({ perPlatformLimit: 50 });
+    const { conversations } = await listAllDmConversations({
+      perPlatformLimit: 50,
+    });
     const inputs: ConversationInput[] = conversations
       .filter((c) => typeof c.id === "string")
       .map((c) => ({

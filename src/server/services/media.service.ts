@@ -11,6 +11,7 @@ import { createId } from "../db/utils";
 import { R2 } from "../clients/r2.client";
 import { Stream } from "../clients/stream.client";
 import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
+import { classifyFetchUrl } from "@/server/ai/url-safety";
 
 export const MEDIA_MIME = {
   image: ["image/jpeg", "image/png", "image/webp", "image/avif"],
@@ -26,6 +27,69 @@ function safeFilename(filename: string, fallback = "file"): string {
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "") || fallback
   );
+}
+
+const MAX_IMPORTED_IMAGE_BYTES = 25 * 1024 * 1024;
+/** Format the browser encodes downscaled tiles as. */
+const THUMBNAIL_MIME = "image/webp";
+
+async function fetchPublicImage(rawUrl: string): Promise<{
+  body: Buffer;
+  contentType: string;
+  finalUrl: string;
+}> {
+  let current = rawUrl;
+  for (let redirects = 0; redirects <= 4; redirects++) {
+    const classified = classifyFetchUrl(current);
+    if (!classified.ok || !classified.url) {
+      throw new Error(classified.reason ?? "Image URL is not safe to fetch.");
+    }
+    const response = await fetch(classified.url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(20_000),
+      headers: { "User-Agent": "wander-growth-media-import/1.0" },
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location || redirects === 4) {
+        throw new Error("Image URL redirected too many times.");
+      }
+      current = new URL(location, classified.url).toString();
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(`Image download failed (${response.status}).`);
+    }
+    const contentType =
+      response.headers.get("content-type")?.split(";")[0]?.toLowerCase() ?? "";
+    if (
+      ![
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/avif",
+        "image/gif",
+      ].includes(contentType)
+    ) {
+      throw new Error(`Remote file is not a supported image (${contentType}).`);
+    }
+    const declaredSize = Number(response.headers.get("content-length") ?? 0);
+    if (declaredSize > MAX_IMPORTED_IMAGE_BYTES) {
+      throw new Error("Remote image exceeds 25 MB.");
+    }
+    const body = Buffer.from(await response.arrayBuffer());
+    if (body.byteLength > MAX_IMPORTED_IMAGE_BYTES) {
+      throw new Error("Remote image exceeds 25 MB.");
+    }
+    return { body, contentType, finalUrl: classified.url };
+  }
+  throw new Error("Image URL could not be fetched.");
+}
+
+function extensionForImageMime(mimeType: string) {
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/svg+xml") return "svg";
+  return mimeType.split("/")[1] ?? "png";
 }
 
 export function kindForMime(mimeType: string): MediaKind {
@@ -73,7 +137,32 @@ export async function createR2Upload(input: {
     .where(eq(mediaAssetTable.id, asset.id));
 
   const uploadUrl = await R2.presignPut(key, input.mimeType);
-  return { mediaId: asset.id, uploadUrl, publicUrl, pathname: key };
+
+  // Images also get a presigned slot for a browser-downscaled tile. The grid
+  // renders that instead of a multi-megabyte original; callers that skip it
+  // just leave `thumbnailUrl` null and fall back to the full image.
+  const thumbnail =
+    kind === "image"
+      ? await (async () => {
+          const thumbnailKey = R2.buildThumbnailKey(key);
+          return {
+            thumbnailUploadUrl: await R2.presignPut(
+              thumbnailKey,
+              THUMBNAIL_MIME,
+            ),
+            thumbnailPathname: thumbnailKey,
+            thumbnailPublicUrl: R2.publicUrl(thumbnailKey),
+          };
+        })()
+      : null;
+
+  return {
+    mediaId: asset.id,
+    uploadUrl,
+    publicUrl,
+    pathname: key,
+    ...(thumbnail ?? {}),
+  };
 }
 
 /** Mark an R2 upload complete (called by the browser after the PUT succeeds). */
@@ -83,6 +172,8 @@ export async function finalizeR2Upload(input: {
   pathname: string;
   width?: number;
   height?: number;
+  /** The browser PUT a downscaled tile to the presigned thumbnail slot. */
+  hasThumbnail?: boolean;
 }) {
   const asset = await getMedia(input.mediaId);
   if (asset?.provider !== "r2") return null;
@@ -90,16 +181,92 @@ export async function finalizeR2Upload(input: {
     throw new Error("Upload does not match the media asset");
   }
 
+  // Derived, never client-supplied — the only key the presign could have been
+  // issued for.
+  const thumbnailUrl = input.hasThumbnail
+    ? R2.publicUrl(R2.buildThumbnailKey(asset.r2Key))
+    : null;
+
   const [updated] = await db
     .update(mediaAssetTable)
     .set({
       status: "ready",
       width: input.width ?? null,
       height: input.height ?? null,
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
     })
     .where(eq(mediaAssetTable.id, input.mediaId))
     .returning();
   return updated ?? null;
+}
+
+export async function verifyR2Upload(mediaId: string) {
+  const asset = await getMedia(mediaId);
+  if (
+    asset?.provider !== "r2" ||
+    !asset.r2Key ||
+    !asset.url ||
+    (asset.status !== "uploading" && asset.status !== "ready")
+  ) {
+    throw new Error("Media upload is not available to finalize.");
+  }
+  const object = await R2.head(asset.r2Key);
+  if (object.size === 0) throw new Error("Uploaded image is empty.");
+  if (object.size && object.size > MAX_IMPORTED_IMAGE_BYTES) {
+    throw new Error("Uploaded image exceeds 25 MB.");
+  }
+  if (object.contentType && !object.contentType.startsWith("image/")) {
+    throw new Error("Uploaded object is not an image.");
+  }
+  return asset;
+}
+
+export async function importRemoteImage(input: {
+  brandId: string;
+  uploadedBy: string;
+  url: string;
+  filename?: string;
+  title?: string;
+  width?: number;
+  height?: number;
+}) {
+  const downloaded = await fetchPublicImage(input.url);
+  const id = createId("media");
+  const fallbackName = `image.${extensionForImageMime(downloaded.contentType)}`;
+  const filename = safeFilename(
+    input.filename ??
+      new URL(downloaded.finalUrl).pathname.split("/").pop() ??
+      fallbackName,
+    fallbackName,
+  );
+  const key = R2.buildKey(input.brandId, id, filename);
+  const url = await R2.putBuffer(key, downloaded.body, downloaded.contentType);
+  const [asset] = await db
+    .insert(mediaAssetTable)
+    .values({
+      id,
+      brandId: input.brandId,
+      uploadedBy: input.uploadedBy,
+      provider: "r2",
+      kind: downloaded.contentType === "image/gif" ? "gif" : "image",
+      status: "ready",
+      title: input.title?.trim() || null,
+      filename,
+      mimeType: downloaded.contentType,
+      size: downloaded.body.byteLength,
+      width: input.width ?? null,
+      height: input.height ?? null,
+      r2Key: key,
+      url,
+      thumbnailUrl: url,
+      metadata: {
+        source: "remote_import",
+        sourceUrl: input.url,
+      },
+    })
+    .returning();
+  if (!asset) throw new Error("Could not save imported image.");
+  return asset;
 }
 
 /**
@@ -620,6 +787,14 @@ export async function deleteMedia(id: string) {
     R2.delete(asset.r2Key).catch((error) =>
       console.error(`R2 delete failed for ${asset.id}:`, error),
     );
+    // Derived tiles are separate objects — without this they outlive the asset
+    // forever. Only ours: an externally-set thumbnail isn't at this key.
+    const derivedThumbnailKey = R2.buildThumbnailKey(asset.r2Key);
+    if (asset.thumbnailUrl === R2.publicUrl(derivedThumbnailKey)) {
+      R2.delete(derivedThumbnailKey).catch((error) =>
+        console.error(`R2 thumbnail delete failed for ${asset.id}:`, error),
+      );
+    }
   } else if (asset.provider === "stream" && asset.streamUid) {
     Stream.deleteVideo(asset.streamUid).catch((error) =>
       console.error(`Stream delete failed for ${asset.streamUid}:`, error),
@@ -707,6 +882,8 @@ export async function promoteChatImage(input: {
 export const MediaService = {
   createR2Upload,
   finalizeR2Upload,
+  verifyR2Upload,
+  importRemoteImage,
   markVideoReady,
   createExternal,
   capturePostMedia,

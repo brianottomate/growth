@@ -136,14 +136,10 @@ async function renderEmailTemplate<T extends EmailTemplateName>(
       );
     }
     case "password_reset": {
-      // Re-use email verification template for password reset for now
-      // TODO: Create a dedicated password reset template
-      const { default: EmailVerificationInline } =
-        await import("../../../emails/EmailVerificationInline");
+      const { default: PasswordResetInline } =
+        await import("../../../emails/PasswordResetInline");
       return render(
-        EmailVerificationInline({
-          verificationUrl: (variables as PasswordResetVariables).resetUrl,
-        }),
+        PasswordResetInline(variables as PasswordResetVariables),
       );
     }
     default:

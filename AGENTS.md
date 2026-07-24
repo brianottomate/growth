@@ -44,6 +44,11 @@ bun run build           # velite build + next build
 `bun run check`, `bun test`, and `bun run ai:contracts` are the normal gates.
 Use the full `ai:gauntlet` only with a current non-production Neon branch.
 
+Tests must protect a business rule, operator outcome, security boundary, or
+integration contract. Do not add tests solely to increase coverage, exercise
+mock wiring, or freeze a private implementation detail. See
+`docs/testing-principles.md` for the repository standard and review checklist.
+
 One-off scripts live in `scripts/` (run via `bun run scripts/<file>.ts`) and
 `src/scripts/` (operational tooling, e.g. CIO sync/repair — see `cio:diagnose`/`cio:repair`).
 

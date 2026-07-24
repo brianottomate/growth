@@ -12,7 +12,7 @@ import type { DiscoveryResult } from "./lead-discovery.service";
  * Callable from tRPC and scripts.
  */
 
-const EXTRACTION_MODEL = "claude-sonnet-4-5";
+const EXTRACTION_MODEL = "claude-sonnet-5";
 
 // Per-result char budget when flattening provider data into the prompt.
 const MAX_CHARS_PER_PROVIDER = 8000;

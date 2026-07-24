@@ -3,7 +3,6 @@ import {
   index,
   pgEnum,
   pgTable,
-  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -91,17 +90,6 @@ export const cadenceTargetTable = pgTable(
     index("cadence_target_brand_idx").on(table.brandId),
     index("cadence_target_channel_idx").on(table.channelId),
     index("cadence_target_series_idx").on(table.seriesId),
-    // One target per channel × archetype × template × period × series, so a
-    // series rhythm can coexist with the channel baseline on the same axes.
-    unique("cadence_target_unique_idx")
-      .on(
-        table.channelId,
-        table.archetype,
-        table.template,
-        table.period,
-        table.seriesId,
-      )
-      .nullsNotDistinct(),
   ],
 );
 

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { CommandMenu } from "@/components/command-menu";
 import { AUTH_RETURN_TO_HEADER, getSafeInternalPath } from "@/lib/auth-utils";
 import {
   SidebarInset,
@@ -75,6 +76,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           brands={brands}
         />
       </div>
+      <CommandMenu />
     </SidebarProvider>
   );
 }

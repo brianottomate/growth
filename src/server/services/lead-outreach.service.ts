@@ -21,7 +21,7 @@ import { leadDomainTable, leadContactTable } from "@/server/db/leads-schema";
  * House rule: generateText + Output.object (never generateObject).
  */
 
-const MODEL = "claude-sonnet-4-5";
+const MODEL = "claude-sonnet-5";
 
 export const OutreachDraftSchema = z.object({
   angle: z

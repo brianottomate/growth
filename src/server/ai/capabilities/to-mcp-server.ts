@@ -124,7 +124,7 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
           organizationId: identity.orgId,
           userId: identity.userId,
           surface: "invoke-growth",
-          model: "claude-sonnet-4-6",
+          model: "claude-sonnet-5",
           contextManifest: context.manifest,
         });
         const runtime = buildGrowthToolRuntime({
@@ -134,7 +134,7 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
           surface: "invoke-growth",
         });
         const result = await generateText({
-          model: anthropic("claude-sonnet-4-6"),
+          model: anthropic("claude-sonnet-5"),
           messages: [
             ...context.messages,
             { role: "user", content: input.request },

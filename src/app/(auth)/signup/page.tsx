@@ -3,12 +3,17 @@ import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+import { env } from "@/env";
 import { SignUpForm } from "./SignUpForm";
 
 export const metadata: Metadata = {
   title: "Sign Up",
   description: "Create your account and start organizing today.",
 };
+
+// Only offer Google SSO when its OAuth credentials are configured (matches the
+// conditional provider registration in better-auth/config.ts).
+const googleEnabled = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
 export default function SignUpPage() {
   return (
@@ -22,16 +27,17 @@ export default function SignUpPage() {
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-xs">
             <Suspense fallback={<div className="min-h-[500px]" />}>
-              <SignUpForm />
+              <SignUpForm googleEnabled={googleEnabled} />
             </Suspense>
           </div>
         </div>
       </div>
       <div className="bg-muted relative hidden lg:block">
         <Image
-          src="/placeholder.svg"
-          alt="Sign up illustration"
-          className="absolute inset-0 h-full w-full object-cover object-left dark:brightness-[0.2] dark:grayscale"
+          src="/auth-hero.jpg"
+          alt="A Wander home at golden hour"
+          sizes="(min-width: 1024px) 50vw, 0px"
+          className="absolute inset-0 h-full w-full object-cover"
           fill
         />
       </div>

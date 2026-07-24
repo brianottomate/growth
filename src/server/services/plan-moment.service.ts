@@ -34,7 +34,7 @@ import { scrapeBasicContent } from "@/server/clients/firecrawl.client";
  *      initiative + (series for an arc) + slots + amplifier targets.
  */
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 
 export const momentSlotSchema = z.object({
   title: z.string(),

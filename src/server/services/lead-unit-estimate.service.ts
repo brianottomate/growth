@@ -16,7 +16,7 @@ import { discoverDomain, type DiscoveryResult } from "./lead-discovery.service";
  * the strongest trust signal, divergence is itself actionable.
  */
 
-const UNIT_MODEL = "claude-sonnet-4-5";
+const UNIT_MODEL = "claude-sonnet-5";
 const MAX_CHARS_PER_PROVIDER = 12000; // listing pages are dense — give it room
 
 export const UnitBasis = ["managed_units", "listings", "mixed", "unknown"] as const;

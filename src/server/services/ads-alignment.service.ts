@@ -73,7 +73,7 @@ export type InitiativeAlignment = {
   suggestions: CampaignSuggestion[];
 };
 
-// ---- pure core (unit-tested; no db) ---------------------------------------
+// ---- pure business rules (unit-tested through alignment outcomes; no db) ---
 
 function campaignSpend(c: Campaign): number | undefined {
   return c.stats?.spend ?? c.spend ?? undefined;
@@ -93,7 +93,7 @@ function toAligned(c: Campaign): AlignedCampaign {
 }
 
 /** Tokens worth matching on: lowercase, alphanumeric, length > 3. */
-export function nameTokens(...parts: Array<string | null | undefined>): string[] {
+function nameTokens(...parts: Array<string | null | undefined>): string[] {
   const tokens = new Set<string>();
   for (const part of parts) {
     for (const raw of (part ?? "").toLowerCase().split(/[^a-z0-9]+/)) {
@@ -104,7 +104,7 @@ export function nameTokens(...parts: Array<string | null | undefined>): string[]
 }
 
 /** Date-window overlap; open-ended sides are treated as always overlapping. */
-export function windowsOverlap(
+function windowsOverlap(
   aStart: Date | null,
   aEnd: Date | null,
   bStart: Date | null,
@@ -184,7 +184,9 @@ export function diffInitiative(
 
   const suggestions = unlinkedCandidates
     .map((c) => ({ campaign: c, score: scoreSuggestion(initiative, c) }))
-    .filter((s): s is { campaign: Campaign; score: number } => s.score !== undefined)
+    .filter(
+      (s): s is { campaign: Campaign; score: number } => s.score !== undefined,
+    )
     .sort(
       (a, b) =>
         b.score - a.score ||

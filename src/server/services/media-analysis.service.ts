@@ -5,7 +5,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 
 export const MEDIA_ANALYSIS_VERSION = 1;
-export const MEDIA_ANALYSIS_MODEL = "claude-sonnet-4-6";
+export const MEDIA_ANALYSIS_MODEL = "claude-sonnet-5";
 
 /** Best-effort image media type from a URL's extension, for AI SDK file
  * parts (the "image" content part is deprecated). Unknown → image/jpeg. */

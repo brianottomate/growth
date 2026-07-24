@@ -1,3 +1,4 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -13,7 +14,7 @@ import {
 import { generateMonthSlots } from "@/server/services/slot-generate.service";
 import { suggestTargets } from "@/server/services/cadence-suggest.service";
 
-type Ctx = { db: typeof import("@/server/db").db; session: { user: { id: string } } };
+type Ctx = { db: Database; session: { user: { id: string } } };
 
 /** Ensure the user can manage strategy for this owned brand. Returns the brand. */
 async function assertBrandAccess(ctx: Ctx, brandId: string) {
@@ -36,7 +37,10 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this brand" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No access to this brand",
+    });
   }
   return brand;
 }
@@ -125,7 +129,9 @@ export const cadenceRouter = createTRPCRouter({
       });
       if (!target) throw new TRPCError({ code: "NOT_FOUND" });
       await assertBrandAccess(ctx, target.brandId);
-      await ctx.db.delete(mixTargetTable).where(eq(mixTargetTable.id, input.id));
+      await ctx.db
+        .delete(mixTargetTable)
+        .where(eq(mixTargetTable.id, input.id));
       return { ok: true };
     }),
 

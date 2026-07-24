@@ -30,7 +30,7 @@ import {
  *   template  = editorial structure (OPEN — starters seed the prompt)
  */
 
-const CLASSIFY_MODEL = "claude-sonnet-4-6";
+const CLASSIFY_MODEL = "claude-sonnet-5";
 const REVIEW_THRESHOLD = 0.6;
 const MAX_FIELDS_CHARS = 4000;
 

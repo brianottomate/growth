@@ -4,6 +4,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { env } from "@/env";
+import {
+  DEFAULT_CREATIVE_IMAGE_MODEL_ID,
+  type CreativeImageModelId,
+} from "@/lib/creative-image-models";
+import { buildCreativeImagePrompt } from "@/lib/creative-image-prompt";
 import type { MediaItem } from "@/server/db/content-schema";
 import { db, withTransaction } from "@/server/db";
 import {
@@ -22,8 +27,15 @@ import {
   getFalImageStatus,
   isFalConfigured,
   submitFalImage,
+  type FalAspectRatio,
   type FalImageSize,
 } from "@/server/clients/fal.client";
+import { isTrustedFalAssetUrl } from "@/server/clients/fal-request";
+import {
+  GEMINI_IMAGE_MODEL,
+  generateGeminiImage,
+  isGeminiImageConfigured,
+} from "@/server/clients/gemini-image.client";
 
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -42,6 +54,18 @@ function falImageSize(aspectRatio?: string | null): FalImageSize {
       return "portrait_16_9";
     default:
       return "square_hd";
+  }
+}
+
+function falAspectRatio(aspectRatio?: string | null): FalAspectRatio {
+  switch (aspectRatio) {
+    case "4:3":
+    case "3:4":
+    case "16:9":
+    case "9:16":
+      return aspectRatio;
+    default:
+      return "1:1";
   }
 }
 
@@ -192,13 +216,17 @@ export async function createProductionPacket(input: {
   return { ...packet, copyText: formatProductionPacket(packet) };
 }
 
-export async function submitPacketToFal(input: {
+export async function submitPacketForImageGeneration(input: {
   packetId: string;
   organizationId: string;
   userId: string;
+  modelProfile?: CreativeImageModelId;
 }) {
-  if (!isFalConfigured)
+  const modelProfile = input.modelProfile ?? DEFAULT_CREATIVE_IMAGE_MODEL_ID;
+  if (modelProfile === "flux" && !isFalConfigured)
     throw new Error("Fal image generation is not configured.");
+  if (modelProfile === "google" && !isGeminiImageConfigured)
+    throw new Error("Direct Google Gemini image generation is not configured.");
   const packet = await db.query.productionPacketTable.findFirst({
     where: and(
       eq(productionPacketTable.id, input.packetId),
@@ -210,6 +238,7 @@ export async function submitPacketToFal(input: {
   const token = randomBytes(32).toString("hex");
   const runId = createId("crun");
   const imageSize = falImageSize(packet.aspectRatio);
+  const aspectRatio = falAspectRatio(packet.aspectRatio);
   const format = outputFormat(packet.outputFormat);
 
   // Reference assets on the packet steer generation: their public R2 URLs go
@@ -230,10 +259,84 @@ export async function submitPacketToFal(input: {
   const referenceImageUrls = referenceAssets
     .filter((asset) => asset.kind === "image" && asset.url)
     .map((asset) => asset.url!);
+  const generationPrompt = buildCreativeImagePrompt({
+    prompt: packet.prompt,
+    purpose: packet.purpose,
+    instructions: packet.instructions,
+    negativePrompt: packet.negativePrompt,
+    hasReferenceImages: referenceImageUrls.length > 0,
+  });
+
+  if (modelProfile === "google") {
+    const ownedReferenceImageUrls = referenceImageUrls
+      .filter((url) => R2.isPublicUrl(url))
+      .slice(0, 4);
+    const providerInput = {
+      prompt: generationPrompt,
+      aspectRatio,
+      imageSize: "1K",
+      referenceImageUrls: ownedReferenceImageUrls,
+    };
+
+    await db.insert(creativeRunTable).values({
+      id: runId,
+      organizationId: input.organizationId,
+      brandId: packet.brandId,
+      contentPostId: packet.contentPostId,
+      threadId: packet.threadId,
+      packetId: packet.id,
+      provider: "google",
+      kind: "image",
+      model: GEMINI_IMAGE_MODEL,
+      prompt: generationPrompt,
+      input: providerInput,
+      status: "processing",
+      createdBy: input.userId,
+    });
+
+    try {
+      const generated = await generateGeminiImage({
+        prompt: generationPrompt,
+        aspectRatio,
+        referenceImageUrls: ownedReferenceImageUrls,
+      });
+      const extension = generated.contentType === "image/jpeg" ? "jpg" : "png";
+      const key = R2.buildKey(packet.brandId, runId, `candidate.${extension}`);
+      const url = await R2.putBuffer(
+        key,
+        generated.bytes,
+        generated.contentType,
+      );
+      const [run] = await db
+        .update(creativeRunTable)
+        .set({
+          status: "ready",
+          candidates: [{ url, contentType: generated.contentType }],
+          providerOutput: generated.providerOutput,
+          completedAt: new Date(),
+        })
+        .where(eq(creativeRunTable.id, runId))
+        .returning();
+      if (!run) throw new Error("Could not persist the Google Gemini result.");
+      return run;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Google Gemini generation failed";
+      await db
+        .update(creativeRunTable)
+        .set({ status: "error", error: message, completedAt: new Date() })
+        .where(eq(creativeRunTable.id, runId));
+      throw error;
+    }
+  }
 
   const { model, providerInput } = buildFalImageRequest({
-    prompt: packet.prompt,
+    profile: "flux",
+    prompt: generationPrompt,
     imageSize,
+    aspectRatio,
     outputFormat: format,
     referenceImageUrls,
   });
@@ -248,7 +351,7 @@ export async function submitPacketToFal(input: {
     provider: "fal",
     kind: "image",
     model,
-    prompt: packet.prompt,
+    prompt: generationPrompt,
     input: providerInput,
     webhookTokenHash: sha256(token),
     status: "queued",
@@ -364,16 +467,12 @@ export async function applyFalWebhook(input: {
   return updated ?? run;
 }
 
-function assertFalCandidateUrl(value: string) {
-  const url = new URL(value);
-  const allowed =
-    url.protocol === "https:" &&
-    (url.hostname === "fal.media" ||
-      url.hostname.endsWith(".fal.media") ||
-      url.hostname.endsWith(".fal.ai"));
-  if (!allowed)
-    throw new Error("The generated image URL is not a trusted Fal asset.");
-  return url;
+function assertCreativeCandidateUrl(provider: string, value: string) {
+  const trusted =
+    (provider === "fal" && isTrustedFalAssetUrl(value)) ||
+    (provider === "google" && R2.isPublicUrl(value));
+  if (!trusted)
+    throw new Error("The generated image URL is not a trusted provider asset.");
 }
 
 export async function acceptCreativeCandidate(input: {
@@ -394,7 +493,7 @@ export async function acceptCreativeCandidate(input: {
     return { run, mediaAssetId: run.acceptedMediaAssetId };
   const candidate = run.candidates[input.candidateIndex];
   if (!candidate) throw new Error("Generated image candidate not found.");
-  assertFalCandidateUrl(candidate.url);
+  assertCreativeCandidateUrl(run.provider, candidate.url);
 
   const extension = candidate.contentType === "image/png" ? "png" : "jpg";
   const filename = `${run.packet?.title ?? "generated-image"}.${extension}`
@@ -471,7 +570,7 @@ export async function acceptCreativeCandidate(input: {
 
 export const CreativeWorkService = {
   createProductionPacket,
-  submitPacketToFal,
+  submitPacketForImageGeneration,
   refreshCreativeRun,
   applyFalWebhook,
   acceptCreativeCandidate,

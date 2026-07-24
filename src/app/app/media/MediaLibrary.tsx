@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useRef, useState } from "react";
 import Image from "next/image";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Accept } from "react-dropzone";
 import {
   ExternalLink,
   Download,
@@ -32,11 +33,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Dropzone } from "@/components/ui/dropzone";
+import { createImageThumbnail, THUMBNAIL_MIME } from "@/lib/image-thumbnail";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { cn } from "@/components/ui/lib/utils";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 import { EditLinkDialog } from "./EditLinkDialog";
 import { PhotoPickerField, usePhotoPicker } from "../people/PhotoPicker";
@@ -97,7 +99,16 @@ const IMAGE_TYPES = [
   "image/gif",
 ];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
-const ACCEPT = [...IMAGE_TYPES, ...VIDEO_TYPES].join(",");
+const ACCEPT: Accept = {
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/png": [".png"],
+  "image/webp": [".webp"],
+  "image/avif": [".avif"],
+  "image/gif": [".gif"],
+  "video/mp4": [".mp4"],
+  "video/webm": [".webm"],
+  "video/quicktime": [".mov"],
+};
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 type Brand = { id: string; name: string; logo: string | null };
@@ -109,17 +120,6 @@ const KIND_FILTERS: { value: string; label: string }[] = [
   { value: "video", label: "Video" },
   { value: "gif", label: "GIFs" },
 ];
-
-function readImageDimensions(
-  file: File,
-): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    img.onload = () => resolve({ width: img.width, height: img.height });
-    img.onerror = () => resolve({ width: 0, height: 0 });
-    img.src = URL.createObjectURL(file);
-  });
-}
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "";
@@ -144,9 +144,9 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
     null,
   );
   const [previewAsset, setPreviewAsset] = useState<LibraryAsset | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Assigned by the Dropzone so the header "Upload" button opens the same picker.
+  const openPicker = useRef<(() => void) | null>(null);
 
   // "Add link" (external asset) dialog state.
   const [linkOpen, setLinkOpen] = useState(false);
@@ -255,8 +255,9 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
 
       setUploadingCount((c) => c + 1);
       try {
-        const dims = isImage ? await readImageDimensions(file) : undefined;
-        const { mediaId, uploadUrl, publicUrl, pathname } =
+        // Images decode once for both dimensions and a downscaled grid tile.
+        const decoded = isImage ? await createImageThumbnail(file) : null;
+        const { mediaId, uploadUrl, publicUrl, pathname, thumbnailUploadUrl } =
           await createUploadUrl.mutateAsync({
             brandId,
             filename: file.name,
@@ -269,12 +270,25 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           body: file,
         });
         if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+
+        // Best-effort — a missing tile only means the grid uses the original.
+        let hasThumbnail = false;
+        if (decoded?.thumbnail && thumbnailUploadUrl) {
+          const putThumbnail = await fetch(thumbnailUploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": THUMBNAIL_MIME },
+            body: decoded.thumbnail,
+          }).catch(() => null);
+          hasThumbnail = Boolean(putThumbnail?.ok);
+        }
+
         await finalizeUpload.mutateAsync({
           mediaId,
           url: publicUrl,
           pathname,
-          width: dims?.width || undefined,
-          height: dims?.height || undefined,
+          width: decoded?.sourceWidth || undefined,
+          height: decoded?.sourceHeight || undefined,
+          hasThumbnail,
         });
         toast.success(`Uploaded ${file.name}`);
       } catch (err) {
@@ -288,7 +302,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   );
 
   const handleFiles = useCallback(
-    async (files: FileList | null) => {
+    async (files: File[] | FileList | null) => {
       if (!files?.length) return;
       await Promise.all(Array.from(files).map((f) => uploadFile(f)));
     },
@@ -337,7 +351,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           </Button>
           <Button
             size="sm"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => openPicker.current?.()}
             disabled={uploadingCount > 0}
           >
             {uploadingCount > 0 ? (
@@ -467,44 +481,15 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         </DialogContent>
       </Dialog>
 
-      {/* Dropzone */}
-      <div
-        onClick={() => fileInputRef.current?.click()}
-        onDragEnter={(e) => {
-          e.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={(e) => {
-          e.preventDefault();
-          setDragActive(false);
-        }}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragActive(false);
-          void handleFiles(e.dataTransfer.files);
-        }}
-        className={cn(
-          "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed py-10 text-center transition-colors",
-          dragActive ? "border-primary bg-primary/5" : "border-border",
-        )}
-      >
-        <UploadCloud className="text-muted-foreground size-6" />
-        <p className="text-sm font-medium">
-          Drop images or video, or click to browse
-        </p>
-        <p className="text-muted-foreground text-xs">
-          JPEG · PNG · WebP · GIF (≤25MB) · MP4 · WebM · MOV
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={ACCEPT}
-          className="hidden"
-          onChange={(e) => void handleFiles(e.target.files)}
-        />
-      </div>
+      {/* Dropzone — accepts loose files, a whole folder, or a drag of either. */}
+      <Dropzone
+        accept={ACCEPT}
+        uploading={uploadingCount}
+        openRef={openPicker}
+        onFiles={(files) => void handleFiles(files)}
+        title="Drop images or video here"
+        hint="JPEG · PNG · WebP · GIF (≤25MB) · MP4 · WebM · MOV"
+      />
 
       {/* Grid */}
       {isLoading ? (

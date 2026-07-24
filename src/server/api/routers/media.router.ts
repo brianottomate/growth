@@ -420,6 +420,7 @@ export const mediaRouter = createTRPCRouter({
         pathname: z.string().min(1),
         width: z.number().int().positive().optional(),
         height: z.number().int().positive().optional(),
+        hasThumbnail: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

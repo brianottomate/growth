@@ -1,3 +1,4 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -30,7 +31,7 @@ import {
 import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 
 type Ctx = {
-  db: typeof import("@/server/db").db;
+  db: Database;
   session: { user: { id: string } };
 };
 
@@ -86,6 +87,93 @@ const toMember = (
 const statusEnum = z.enum(contentStatusEnum.enumValues);
 
 export const contentRouter = createTRPCRouter({
+  /**
+   * Lightweight, org-scoped index for the global command palette. This stays
+   * deliberately smaller than `board`: no comments, analytics, media, or
+   * assignee joins. cmdk filters these rows client-side after the palette opens.
+   */
+  searchIndex: protectedProcedure.query(async ({ ctx }) => {
+    const { org, brands } = await orgContext(ctx);
+    if (!org) return { ideas: [], posts: [] };
+    const brandIds = brands.map((brand) => brand.id);
+    if (!brandIds.length) return { ideas: [], posts: [] };
+    const brandName = new Map(brands.map((brand) => [brand.id, brand.name]));
+
+    const [ideas, posts] = await Promise.all([
+      ctx.db.query.contentPostTable.findMany({
+        where: and(
+          inArray(contentPostTable.brandId, brandIds),
+          isNull(contentPostTable.deletedAt),
+        ),
+        columns: {
+          id: true,
+          brandId: true,
+          title: true,
+          hook: true,
+          pillar: true,
+          status: true,
+          updatedAt: true,
+        },
+        with: {
+          series: { columns: { name: true } },
+        },
+        orderBy: [desc(contentPostTable.updatedAt)],
+      }),
+      ctx.db.query.platformPostTable.findMany({
+        where: and(
+          inArray(platformPostTable.brandId, brandIds),
+          eq(platformPostTable.source, "owned"),
+        ),
+        columns: {
+          id: true,
+          brandId: true,
+          contentPostId: true,
+          platform: true,
+          format: true,
+          status: true,
+          text: true,
+          updatedAt: true,
+        },
+        with: {
+          contentPost: {
+            columns: { id: true, title: true, deletedAt: true },
+          },
+        },
+        orderBy: [desc(platformPostTable.updatedAt)],
+      }),
+    ]);
+
+    return {
+      ideas: ideas.map((idea) => ({
+        id: idea.id,
+        title: idea.title ?? "Untitled idea",
+        hook: idea.hook,
+        pillar: idea.pillar,
+        seriesName: idea.series?.name ?? null,
+        status: idea.status,
+        brandName: brandName.get(idea.brandId) ?? "—",
+        href: `/app/content/${idea.id}`,
+      })),
+      posts: posts
+        .filter(
+          (post) =>
+            post.contentPostId &&
+            post.contentPost &&
+            !post.contentPost.deletedAt,
+        )
+        .map((post) => ({
+          id: post.id,
+          title: post.contentPost?.title ?? "Untitled idea",
+          text: post.text,
+          platform: post.platform,
+          format: post.format,
+          status: post.status,
+          brandName: brandName.get(post.brandId) ?? "—",
+          href: `/app/content/${post.contentPostId}#post-${post.id}`,
+        })),
+    };
+  }),
+
   /**
    * The editorial pipeline: every content idea across the org's brands, shaped
    * as board cards. The board groups by `status` client-side; this returns a
@@ -666,7 +754,7 @@ export const contentRouter = createTRPCRouter({
               derivedFrom: z.string().optional(),
             }),
           )
-          .max(20),
+          .max(300),
       }),
     )
     .mutation(async ({ ctx, input }) => {

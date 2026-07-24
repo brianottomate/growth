@@ -1158,10 +1158,12 @@ function ApprovalCard({
                           ? "Save these content mix changes?"
                           : toolName === "contentMediaWrite.attachLibraryMedia"
                             ? "Attach this library asset?"
-                            : toolName ===
-                                "contentMediaWrite.recoverArchiveMedia"
-                              ? "Recover and attach this archive media?"
-                              : "Confirm this action?";
+                            : toolName === "contentMediaWrite.makeCarousel"
+                              ? "Turn these images into platform carousels?"
+                              : toolName ===
+                                  "contentMediaWrite.recoverArchiveMedia"
+                                ? "Recover and attach this archive media?"
+                                : "Confirm this action?";
   const primaryLabel =
     toolName === "contentStrategyWrite.savePillar"
       ? "Save pillar"
@@ -1189,10 +1191,12 @@ function ApprovalCard({
                           ? "Save content mix"
                           : toolName === "contentMediaWrite.attachLibraryMedia"
                             ? "Attach asset"
-                            : toolName ===
-                                "contentMediaWrite.recoverArchiveMedia"
-                              ? "Recover & attach"
-                              : "Confirm";
+                            : toolName === "contentMediaWrite.makeCarousel"
+                              ? "Make carousels"
+                              : toolName ===
+                                  "contentMediaWrite.recoverArchiveMedia"
+                                ? "Recover & attach"
+                                : "Confirm";
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">

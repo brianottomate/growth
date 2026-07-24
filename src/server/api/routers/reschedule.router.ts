@@ -1,3 +1,4 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -10,12 +11,15 @@ import {
   memberTable,
   platformPostTable,
 } from "@/server/db/schema";
-import { archetypeForFormat, platformFormatsFor } from "@/server/content/formats";
+import {
+  archetypeForFormat,
+  platformFormatsFor,
+} from "@/server/content/formats";
 import { generateReschedule } from "@/server/services/reschedule.service";
 import type { ChannelPlatform } from "@/server/db/channel-schema";
 
 type Ctx = {
-  db: typeof import("@/server/db").db;
+  db: Database;
   session: { user: { id: string } };
 };
 
@@ -46,7 +50,10 @@ export const rescheduleRouter = createTRPCRouter({
     .input(z.object({ brandId: z.string(), year: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
-      const { plan, spots } = await generateReschedule(input.brandId, input.year);
+      const { plan, spots } = await generateReschedule(
+        input.brandId,
+        input.year,
+      );
       const byId = new Map(spots.map((s) => [s.id, s]));
       const moves = plan.moves
         .map((m) => {
@@ -112,7 +119,8 @@ export const rescheduleRouter = createTRPCRouter({
       let created = 0;
       for (const slot of input.slots) {
         if (!VALID_PLATFORMS.has(slot.platform)) continue;
-        const format = platformFormatsFor(slot.platform as ChannelPlatform)[0]?.id;
+        const format = platformFormatsFor(slot.platform as ChannelPlatform)[0]
+          ?.id;
         const [idea] = await ctx.db
           .insert(contentPostTable)
           .values({
@@ -124,7 +132,13 @@ export const rescheduleRouter = createTRPCRouter({
             origin: "ai",
             plannedAt: noon(slot.date),
             targetSpots: format
-              ? [{ platform: slot.platform, format, archetype: archetypeForFormat(format) ?? "" }]
+              ? [
+                  {
+                    platform: slot.platform,
+                    format,
+                    archetype: archetypeForFormat(format) ?? "",
+                  },
+                ]
               : undefined,
           })
           .returning({ id: contentPostTable.id });

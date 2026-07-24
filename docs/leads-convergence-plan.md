@@ -90,19 +90,21 @@ against HubSpot and repairs drift. Options, in preference order:
 Start without any sweep; add the cheapest one if drift is ever observed. Do not
 build a reconciliation system for a problem we have not yet measured.
 
-### The one-time backfill (the ~200k seed)
+### The one-time backfill (the ~200k seed) — completed 2026-07-24
 
-Before webhooks matter, Neon gets seeded with the full HubSpot company universe
-(same rebuildable contract as `import-cio.ts`: delete, re-import). Options, both
-ensconced per this doc's brief — pick whichever is least friction when we get to it:
+Neon was seeded from the July 9 full HubSpot CSV export with the streaming,
+idempotent `scripts/import-hubspot-company-export.ts` importer:
 
-- **HubSpot full CSV export** (portal-native, no rate limits, no new
-  infrastructure). Likely the pragmatic pick.
-- **One-time BigQuery pull** via the existing `bigquery.client.ts`, if the sync's
-  coverage is confirmed first. Equally fine; avoids a manual export step; BQ is
-  otherwise deliberately kept out of the architecture (nobody on growth wants to
-  operate against it day-to-day).
-- Not the API: 10k search window + 5 req/s makes a 215k crawl the worst option.
+- 215,844 source companies
+- 215,037 distinct normalized domains
+- 647 blank-domain records retained in the audit count but not inventively keyed
+- 160 duplicate records across 76 shared domains, resolved newest-modified-first
+- all stored webhook events replayed on top of the snapshot
+
+The importer fingerprints the source archive, streams quoted multiline CSV
+without loading the 512 MB file into memory, preserves Growth-owned enrichment,
+and refuses to let an older snapshot overwrite a row advanced by a newer
+snapshot or webhook.
 
 ### What BigQuery remains for
 
@@ -179,8 +181,8 @@ work inside that frame:
 | # | Work | Depends on |
 |---|---|---|
 | 1 | ICP definition file + threshold decision | Torger + Danny (open fact #5) |
-| 2 | Neon seed: full company backfill (CSV or BQ) + `hubspot_synced_at` column | Open facts #1/#6 |
-| 3 | Webhook receiver route + idempotent Neon upserts; gateway write-through | 2 |
+| 2 | ✅ Neon seed: full company backfill + freshness columns | Completed 2026-07-24 |
+| 3 | ✅ Webhook receiver + idempotent company projection | Completed 2026-07-24 |
 | 4 | Ground-truth import + validation harness; v2 unit-counter port | — (parallel) |
 | 5 | 429 cross-reference → send-review | 2, 4 |
 | 6 | Census salvage export → gateway import | Nathan (open fact #4), 2 |

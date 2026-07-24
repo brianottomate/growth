@@ -248,7 +248,7 @@ export async function discoverSocialHandles(input: {
 
   // Stage 3: Claude reads the evidence and returns one official handle per platform.
   const { output } = await generateText({
-    model: anthropic("claude-sonnet-4-6"),
+    model: anthropic("claude-sonnet-5"),
     output: Output.object({ schema: SCHEMA }),
     prompt:
       `Brand: "${name}"${website ? ` — ${website}` : ""}\n\n` +

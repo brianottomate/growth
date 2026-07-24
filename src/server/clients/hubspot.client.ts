@@ -428,6 +428,15 @@ export type ContactProperties = {
   portfolio_size_ai_guess_1_range?: string;
   portfolio_size_ai_guess_2_exact?: string;
   portfolio_size_ai_guess_2_range?: string;
+  // Human-reviewed two-touch pregen sequence token contract.
+  growth_pregen_preview_url?: string;
+  growth_pregen_touch_1_subject?: string;
+  growth_pregen_touch_1_body?: string;
+  growth_pregen_touch_2_subject?: string;
+  growth_pregen_touch_2_body?: string;
+  growth_pregen_touch_1_observation?: string;
+  growth_pregen_touch_2_fit?: string;
+  growth_pregen_touch_3_subject?: string;
   // Read-only context (used by the inbound router)
   notes_last_contacted?: string;
 };
@@ -495,6 +504,14 @@ export const CONTACT_CORE_PROPERTIES = [
   "pms_inbound_form",
   "meeting_booked_inbound_form",
   "intent_inbound_form",
+  "growth_pregen_preview_url",
+  "growth_pregen_touch_1_subject",
+  "growth_pregen_touch_1_body",
+  "growth_pregen_touch_2_subject",
+  "growth_pregen_touch_2_body",
+  "growth_pregen_touch_1_observation",
+  "growth_pregen_touch_2_fit",
+  "growth_pregen_touch_3_subject",
 ] as const satisfies readonly (keyof ContactProperties)[];
 
 type ContactCoreProperty = (typeof CONTACT_CORE_PROPERTIES)[number];
@@ -542,6 +559,42 @@ export type HubspotCompany = {
   id: string;
   values: Record<CompanyCoreProperty, string | null>;
 };
+
+/** Fetch one company by its immutable HubSpot record ID. */
+export async function getCompanyById(
+  companyId: string,
+): Promise<HubspotCompany | null> {
+  try {
+    const found = await client().crm.companies.basicApi.getById(companyId, [
+      ...COMPANY_CORE_PROPERTIES,
+    ]);
+    const values = {} as Record<CompanyCoreProperty, string | null>;
+    for (const prop of COMPANY_CORE_PROPERTIES) {
+      values[prop] = found.properties?.[prop] ?? null;
+    }
+    return { id: found.id, values };
+  } catch (error) {
+    const status =
+      typeof error === "object" && error !== null && "statusCode" in error
+        ? Number((error as { statusCode?: unknown }).statusCode)
+        : null;
+    if (status === 404) return null;
+    console.error(`❌ [HUBSPOT] getCompanyById(${companyId})`, error);
+    throw error;
+  }
+}
+
+/** Current-state guard for deal-association removals. */
+export async function companyHasDeals(companyId: string): Promise<boolean> {
+  const page = await client().crm.associations.v4.basicApi.getPage(
+    "companies",
+    companyId,
+    "deals",
+    undefined,
+    1,
+  );
+  return (page.results?.length ?? 0) > 0;
+}
 
 /**
  * Find a company by exact domain. Always returns the core property set;
@@ -828,9 +881,7 @@ export async function findCompaniesByPhone(
 }
 
 /** High-precision — contacts whose phone contains the permit phone digits. */
-export async function findContactsByPhone(
-  phone: string,
-): Promise<
+export async function findContactsByPhone(phone: string): Promise<
   Array<{
     id: string;
     email: string | null;

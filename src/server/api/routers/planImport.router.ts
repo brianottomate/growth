@@ -1,3 +1,4 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -22,7 +23,7 @@ import {
 import { applyImport } from "@/server/services/plan-import-apply.service";
 
 type Ctx = {
-  db: typeof import("@/server/db").db;
+  db: Database;
   session: { user: { id: string } };
 };
 
@@ -41,7 +42,10 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this brand" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No access to this brand",
+    });
   }
   return brand;
 }
@@ -179,7 +183,8 @@ export const planImportRouter = createTRPCRouter({
       const consumedBy = new Map<string, string>();
       for (const item of items) {
         for (const m of item.matchedSlots ?? []) {
-          if (!consumedBy.has(m.contentPostId)) consumedBy.set(m.contentPostId, item.id);
+          if (!consumedBy.has(m.contentPostId))
+            consumedBy.set(m.contentPostId, item.id);
         }
       }
       return {
@@ -218,7 +223,12 @@ export const planImportRouter = createTRPCRouter({
             continue;
           }
         }
-        const tally = { pending: 0, accepted: 0, accepted_refine: 0, rejected: 0 };
+        const tally = {
+          pending: 0,
+          accepted: 0,
+          accepted_refine: 0,
+          rejected: 0,
+        };
         for (const it of imp.items) tally[it.status]++;
         const { items: _items, rawText: _raw, ...rest } = imp;
         out.push({ ...rest, tally, itemCount: imp.items.length });
@@ -263,7 +273,10 @@ export const planImportRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const imp = await getImportOrThrow(ctx, input.importId);
       if (imp.status === "failed") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Import failed to parse" });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Import failed to parse",
+        });
       }
       const result = await applyImport({
         importId: imp.id,

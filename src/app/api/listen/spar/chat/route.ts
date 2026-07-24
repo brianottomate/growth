@@ -22,7 +22,7 @@ import { getSession } from "@/server/better-auth/server";
  */
 export const maxDuration = 60;
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 
 export async function POST(req: Request): Promise<Response> {
   const session = await getSession();

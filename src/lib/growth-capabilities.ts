@@ -35,6 +35,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "upcoming",
     "productionQueue",
     "getWorkItem",
+    "search",
     "suggestMedia",
   ],
   contentWrite: [
@@ -49,6 +50,10 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "attachChatImage",
     "attachLibraryMedia",
     "recoverArchiveMedia",
+    "makeCarousel",
+    "prepareUpload",
+    "finishUpload",
+    "importRemoteImages",
   ],
   emailRead: ["get"],
   emailWrite: [

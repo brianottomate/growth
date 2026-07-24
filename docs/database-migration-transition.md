@@ -2,12 +2,15 @@
 
 ## Current decision
 
-Wander Growth remains `db:push`-managed for now. The Vercel build runs the
-application build first and `drizzle-kit push` last. Do not add `--force` or make
-destructive schema changes through that unattended build step.
+Wander Growth remains manually `db:push`-managed for now. Vercel builds only the
+application; they never mutate the shared database. Apply schema changes
+deliberately from a current `main` checkout with `--strict --verbose`, or prefer
+an exact idempotent additive-DDL script for operational backfills. Never add
+`--force`.
 
-This document records how to move to checked-in migrations when the team chooses
-to make that cutover; it does not change today's deployment behavior.
+Development and production currently share the same database, so a local push
+is a production migration. This document records how to move to checked-in
+migrations when the team chooses that cutover.
 
 ## Current state to reconcile
 
@@ -58,7 +61,8 @@ to make that cutover; it does not change today's deployment behavior.
 
 ### 3. Change deployment
 
-- Replace the final `drizzle-kit push` in `build` with `drizzle-kit migrate`.
+- Add `drizzle-kit migrate` as an explicit release step; do not put schema
+  mutation back into the application compilation command.
 - Baseline every persistent existing environment before deploying that change.
 - Keep the migration after the successful application build so a compilation
   failure cannot advance the database.

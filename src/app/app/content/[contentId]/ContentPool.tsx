@@ -7,11 +7,11 @@ import { Images, Sparkles, X } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { MediaThumbnail } from "@/components/media-thumbnail";
 import { cn } from "@/components/ui/lib/utils";
-import { Dropzone } from "@/components/ui/dropzone";
 import type { MediaItem } from "@/server/db/schema";
-import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { MediaPickerDialog } from "./MediaPickerDialog";
+import { ImageBatchImporter } from "./ImageBatchImporter";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 
 type Spot = { id: string; platform: string; media: MediaItem[] };
@@ -52,8 +52,6 @@ export function ContentPool({
   );
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const { uploadImages, uploading } = useMediaUpload(brandId);
-
   // Pool VIEW = idea-level media ∪ everything on a spot, deduped.
   const poolMap = new Map<string, MediaItem>();
   for (const m of directMedia) poolMap.set(keyOf(m), m);
@@ -68,17 +66,13 @@ export function ContentPool({
     const next = [...directMedia];
     for (const it of items)
       if (!next.some((m) => keyOf(m) === keyOf(it))) next.push(it);
-    setPoolMedia.mutate({ contentPostId, media: next });
+    await setPoolMedia.mutateAsync({ contentPostId, media: next });
   };
   const removeFromPool = (m: MediaItem) =>
     setPoolMedia.mutate({
       contentPostId,
       media: directMedia.filter((x) => keyOf(x) !== keyOf(m)),
     });
-  const onFiles = async (files: File[]) => {
-    const items = await uploadImages(files);
-    await addToPool(items);
-  };
   const toggleOnSpot = (spot: Spot, m: MediaItem, on: boolean) => {
     const next = on
       ? spot.media.filter((x) => keyOf(x) !== keyOf(m))
@@ -100,12 +94,10 @@ export function ContentPool({
               className="bg-card w-28 rounded-lg border p-1.5"
             >
               <div className="bg-muted relative aspect-square overflow-hidden rounded-md">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={m.thumbnail ?? m.url}
-                  alt=""
+                <MediaThumbnail
+                  src={m.url}
+                  thumbnail={m.thumbnail}
                   className="size-full object-cover"
-                  loading="lazy"
                 />
                 {onPool && (
                   <button
@@ -148,12 +140,10 @@ export function ContentPool({
         })}
       </div>
       <div className="mt-3 flex items-stretch gap-2">
-        <Dropzone
-          compact
-          multiple
-          onFiles={(files) => void onFiles(files)}
-          uploading={uploading}
-          className="flex-1"
+        <ImageBatchImporter
+          brandId={brandId}
+          existingCount={directMedia.length}
+          onImported={addToPool}
         />
         <button
           onClick={() => setPickerOpen(true)}
@@ -181,8 +171,8 @@ export function ContentPool({
       </div>
       <p className="text-muted-foreground mt-1.5 text-[10px]">
         Anything attached to a spot also shows here. Toggle a platform icon to
-        add or remove it on that spot. New uploads are saved to your media
-        library.
+        add or remove it on that spot, or ask chat to turn an ordered batch into
+        a carousel. New uploads are saved to your media library.
       </p>
 
       <MediaPickerDialog

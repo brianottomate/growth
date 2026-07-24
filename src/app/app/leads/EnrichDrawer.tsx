@@ -57,7 +57,8 @@ function contactScore(c: {
   let s = 0;
   const t = c.jobTitle ?? "";
   if (/owner|founder|ceo|president|principal|partner/i.test(t)) s += 30;
-  else if (/director|vp|vice|general manager|\bgm\b|coo|cmo|head/i.test(t)) s += 20;
+  else if (/director|vp|vice|general manager|\bgm\b|coo|cmo|head/i.test(t))
+    s += 20;
   else if (t) s += 10;
   if (c.firstName ?? c.lastName) s += 5;
   if (!FREEMAIL.test(c.email)) s += 15;
@@ -80,14 +81,14 @@ export function HsMarker({
   return inHubspot ? (
     <span
       title={`We think this is already in HubSpot${leadStatus ? ` (${leadStatus})` : ""} — from the CSV snapshot, may be stale. Verify with "Pull from HubSpot".`}
-      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-medium text-orange-300"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-orange-300"
     >
       ● in HubSpot?
     </span>
   ) : (
     <span
       title="Not in our CRM snapshot — likely net-new. Verify with 'Pull from HubSpot'."
-      className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-emerald-300"
     >
       ○ net-new?
     </span>
@@ -118,8 +119,16 @@ export function EnrichDrawer({
   const merge = useMutation(trpc.leads.proposeMerge.mutationOptions());
   const apply = useMutation(trpc.leads.applyMerge.mutationOptions());
   const outreach = useMutation(trpc.leads.generateOutreach.mutationOptions());
+  const pregenOutreach = useMutation(
+    trpc.leads.generatePregenOutreach.mutationOptions(),
+  );
+  const publishPregen = useMutation(
+    trpc.leads.publishPregenOutreach.mutationOptions(),
+  );
   const queue = useMutation(trpc.leads.queueOutreach.mutationOptions());
-  const launch = useMutation(trpc.leads.launchOutreachCampaign.mutationOptions());
+  const launch = useMutation(
+    trpc.leads.launchOutreachCampaign.mutationOptions(),
+  );
 
   // Our own contacts for this domain (the people we'd actually email), ranked.
   const detail = useQuery(
@@ -131,11 +140,23 @@ export function EnrichDrawer({
   const rankedContacts = [...(detail.data?.contacts ?? [])].sort(
     (a, b) => contactScore(b) - contactScore(a),
   );
+  const hubspotContacts = rankedContacts.filter(
+    (contact) => contact.hubspotContactId,
+  );
+  const isPregenHubspotMotion = Boolean(lead?.pregenSiteUrl && lead?.inHubspot);
+  const pregenMotion =
+    lead?.pregenCohorts.includes("recycled") ||
+    (lead?.inHubspot && !lead.pregenCohorts.includes("untouched"))
+      ? "reengagement"
+      : "fresh";
 
   // The personalized sequence — freshly generated this session, or a stored
   // draft from a previous run (enrichment.outreachDraft).
-  const outreachDraft: OutreachDraftView | undefined =
-    outreach.data ?? detail.data?.outreach ?? undefined;
+  const outreachDraft: OutreachDraftView | undefined = isPregenHubspotMotion
+    ? (pregenOutreach.data ?? undefined)
+    : (outreach.data ?? detail.data?.outreach ?? undefined);
+  const outreachPending = outreach.isPending || pregenOutreach.isPending;
+  const outreachError = outreach.error ?? pregenOutreach.error;
   const recipientEmail = (
     detail.data?.domain.enrichment as unknown as
       | { contactChannel?: { bestEmail?: string } }
@@ -196,6 +217,7 @@ export function EnrichDrawer({
   const [copied, setCopied] = useState(false);
   const [steer, setSteer] = useState("");
   const [recipientOverride, setRecipientOverride] = useState("");
+  const [hubspotContactId, setHubspotContactId] = useState("");
   const hasContext = !!(hubspot.data ?? enrich.data ?? merge.data);
 
   // No HubSpot company for this domain — confirmed by a live pull, or implied by
@@ -217,12 +239,15 @@ export function EnrichDrawer({
     merge.reset();
     apply.reset();
     outreach.reset();
+    pregenOutreach.reset();
+    publishPregen.reset();
     queue.reset();
     launch.reset();
     setChecked({});
     setCopied(false);
     setSteer("");
     setRecipientOverride("");
+    setHubspotContactId("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain]);
 
@@ -239,7 +264,8 @@ export function EnrichDrawer({
 
     if (hubspot.data) {
       out.push("## HubSpot comparison");
-      if (hubspot.data.configured === false) out.push("_HubSpot not configured._");
+      if (hubspot.data.configured === false)
+        out.push("_HubSpot not configured._");
       else if (!hubspot.data.hubspot)
         out.push("_No HubSpot company for this domain — net-new._");
       else out.push(`Record: ${hubspot.data.hubspot.url}`);
@@ -326,8 +352,7 @@ export function EnrichDrawer({
               </div>
               <div className="text-muted-foreground mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
                 <span>
-                  PMS:{" "}
-                  <b className="text-foreground">{lead.pms ?? "—"}</b>
+                  PMS: <b className="text-foreground">{lead.pms ?? "—"}</b>
                   {lead.isIntegratedPms ? " · integrated" : ""}
                 </span>
                 <span>
@@ -342,8 +367,7 @@ export function EnrichDrawer({
                 </span>
                 {lead.pregenStatus && (
                   <span>
-                    Site:{" "}
-                    <b className="text-foreground">{lead.pregenStatus}</b>
+                    Site: <b className="text-foreground">{lead.pregenStatus}</b>
                   </span>
                 )}
               </div>
@@ -371,10 +395,14 @@ export function EnrichDrawer({
                           "(no name)"}
                       </span>
                       {c.jobTitle && (
-                        <span className="text-muted-foreground">· {c.jobTitle}</span>
+                        <span className="text-muted-foreground">
+                          · {c.jobTitle}
+                        </span>
                       )}
                     </div>
-                    <div className="text-muted-foreground truncate">{c.email}</div>
+                    <div className="text-muted-foreground truncate">
+                      {c.email}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -398,10 +426,7 @@ export function EnrichDrawer({
                     label: c.kind,
                   };
                   return (
-                    <div
-                      key={c.id}
-                      className="flex items-center gap-2 text-xs"
-                    >
+                    <div key={c.id} className="flex items-center gap-2 text-xs">
                       <meta.Icon className="text-muted-foreground size-3.5 shrink-0" />
                       <span className="text-muted-foreground shrink-0">
                         {meta.label}
@@ -427,19 +452,29 @@ export function EnrichDrawer({
           {/* ✦ Personalized outreach — bespoke sequence from the enrichment. */}
           <div className="mt-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">✦ Personalized outreach</span>
+              <span className="text-sm font-medium">
+                ✦ Personalized outreach
+              </span>
               <button
-                onClick={() =>
-                  lead &&
+                onClick={() => {
+                  if (!lead) return;
+                  if (isPregenHubspotMotion) {
+                    pregenOutreach.mutate({
+                      domainId: lead.id,
+                      motion: pregenMotion,
+                      steer: steer.trim() || undefined,
+                    });
+                    return;
+                  }
                   outreach.mutate({
                     domainId: lead.id,
                     steer: steer.trim() || undefined,
-                  })
-                }
-                disabled={outreach.isPending || !lead}
+                  });
+                }}
+                disabled={outreachPending || !lead}
                 className="border-border inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               >
-                {outreach.isPending ? (
+                {outreachPending ? (
                   <>
                     <Loader2 className="size-3.5 animate-spin" /> Generating…
                   </>
@@ -459,16 +494,17 @@ export function EnrichDrawer({
               className="border-border bg-background focus:ring-ring mt-2 w-full rounded-md border px-2 py-1.5 text-[11px] focus:ring-1 focus:outline-none"
             />
 
-            {outreach.error && (
+            {outreachError && (
               <div className="mt-2 rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">
-                {outreach.error.message}
+                {outreachError.message}
               </div>
             )}
 
-            {!outreachDraft && !outreach.isPending && (
+            {!outreachDraft && !outreachPending && (
               <p className="text-muted-foreground mt-1 text-[11px]">
-                Writes a bespoke 4-touch sequence for this company from its
-                enrichment. Draft only — review before sending.
+                {isPregenHubspotMotion
+                  ? `Writes a ${pregenMotion} HubSpot draft from the current website, lead record, and company email history. Draft only — review before publishing.`
+                  : "Writes a bespoke 4-touch sequence for this company from its enrichment. Draft only — review before sending."}
               </p>
             )}
 
@@ -503,61 +539,119 @@ export function EnrichDrawer({
                   </div>
                 ))}
 
-                <div className="space-y-2 border-t pt-2">
-                  <input
-                    type="email"
-                    value={recipientOverride}
-                    onChange={(e) => setRecipientOverride(e.target.value)}
-                    placeholder={
-                      recipientEmail
-                        ? `${recipientEmail} — default; edit to send to yourself / Kyle`
-                        : "recipient email (no corporate one found)"
-                    }
-                    className="border-border bg-background focus:ring-ring w-full rounded-md border px-2 py-1 text-[11px] focus:ring-1 focus:outline-none"
-                  />
-                  <div className="flex items-center gap-2">
+                {isPregenHubspotMotion ? (
+                  <div className="space-y-2 border-t pt-2">
+                    <select
+                      value={hubspotContactId}
+                      onChange={(event) =>
+                        setHubspotContactId(event.target.value)
+                      }
+                      className="border-border bg-background focus:ring-ring w-full rounded-md border px-2 py-1 text-[11px] focus:ring-1 focus:outline-none"
+                    >
+                      <option value="">
+                        Choose a HubSpot contact to publish
+                      </option>
+                      {hubspotContacts.map((contact) => (
+                        <option key={contact.id} value={contact.id}>
+                          {[contact.firstName, contact.lastName]
+                            .filter(Boolean)
+                            .join(" ") || contact.email}{" "}
+                          · {contact.email}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       onClick={() =>
                         lead &&
-                        queue.mutate({
+                        hubspotContactId &&
+                        publishPregen.mutate({
                           domainId: lead.id,
-                          recipientEmail: recipientOverride.trim() || undefined,
+                          contactId: hubspotContactId,
                         })
                       }
-                      disabled={queue.isPending || !lead}
-                      className="rounded-md bg-violet-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+                      disabled={
+                        publishPregen.isPending || !lead || !hubspotContactId
+                      }
+                      className="rounded-md bg-orange-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-600 disabled:opacity-50"
                     >
-                      {queue.isPending ? "Queuing…" : "Queue to Instantly"}
+                      {publishPregen.isPending
+                        ? "Publishing…"
+                        : "Publish reviewed copy to HubSpot"}
                     </button>
-                    <button
-                      onClick={() => launch.mutate()}
-                      disabled={launch.isPending}
-                      className="rounded-md border border-violet-500/40 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/10 disabled:opacity-50"
-                    >
-                      {launch.isPending ? "Launching…" : "Launch campaign"}
-                    </button>
+                    <p className="text-muted-foreground text-[10px]">
+                      Copies the reviewed subject, model-written paragraphs, and
+                      preview URL to this contact. It does not enroll or send.
+                    </p>
+                    {publishPregen.error && (
+                      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300">
+                        {publishPregen.error.message}
+                      </div>
+                    )}
+                    {publishPregen.data && (
+                      <div className="text-[11px] text-emerald-400">
+                        Published {publishPregen.data.propertyNames.length}{" "}
+                        reviewed properties to HubSpot. No enrollment created.
+                      </div>
+                    )}
                   </div>
-                  <p className="text-muted-foreground text-[10px]">
-                    Queue adds this lead to the shared “WanderOS Personalized”
-                    draft campaign at the address above. Launch activates that
-                    campaign → everyone currently queued starts sending.
-                  </p>
-                  {(queue.error ?? launch.error) && (
-                    <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300">
-                      {queue.error?.message ?? launch.error?.message}
+                ) : (
+                  <div className="space-y-2 border-t pt-2">
+                    <input
+                      type="email"
+                      value={recipientOverride}
+                      onChange={(e) => setRecipientOverride(e.target.value)}
+                      placeholder={
+                        recipientEmail
+                          ? `${recipientEmail} — default; edit to send to yourself / Kyle`
+                          : "recipient email (no corporate one found)"
+                      }
+                      className="border-border bg-background focus:ring-ring w-full rounded-md border px-2 py-1 text-[11px] focus:ring-1 focus:outline-none"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          lead &&
+                          queue.mutate({
+                            domainId: lead.id,
+                            recipientEmail:
+                              recipientOverride.trim() || undefined,
+                          })
+                        }
+                        disabled={queue.isPending || !lead}
+                        className="rounded-md bg-violet-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+                      >
+                        {queue.isPending ? "Queuing…" : "Queue to Instantly"}
+                      </button>
+                      <button
+                        onClick={() => launch.mutate()}
+                        disabled={launch.isPending}
+                        className="rounded-md border border-violet-500/40 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/10 disabled:opacity-50"
+                      >
+                        {launch.isPending ? "Launching…" : "Launch campaign"}
+                      </button>
                     </div>
-                  )}
-                  {queue.data && (
-                    <div className="text-[11px] text-emerald-400">
-                      Queued → {queue.data.recipient}
-                    </div>
-                  )}
-                  {launch.data && (
-                    <div className="text-[11px] text-emerald-400">
-                      Campaign launched — queued leads send shortly.
-                    </div>
-                  )}
-                </div>
+                    <p className="text-muted-foreground text-[10px]">
+                      Queue adds this lead to the shared “WanderOS Personalized”
+                      draft campaign at the address above. Launch activates that
+                      campaign → everyone currently queued starts sending.
+                    </p>
+                    {(queue.error ?? launch.error) && (
+                      <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300">
+                        {queue.error?.message ?? launch.error?.message}
+                      </div>
+                    )}
+                    {queue.data && (
+                      <div className="text-[11px] text-emerald-400">
+                        Queued → {queue.data.recipient}
+                      </div>
+                    )}
+                    {launch.data && (
+                      <div className="text-[11px] text-emerald-400">
+                        Campaign launched — queued leads send shortly.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -672,7 +766,9 @@ export function EnrichDrawer({
                 {hubspot.data.hubspot.contacts.length > 0 && (
                   <div className="text-muted-foreground mt-3 text-[11px]">
                     {hubspot.data.hubspot.contacts.length} HubSpot contact
-                    {hubspot.data.hubspot.contacts.length === 1 ? "" : "s"}:{" "}
+                    {hubspot.data.hubspot.contacts.length === 1
+                      ? ""
+                      : "s"}:{" "}
                     {hubspot.data.hubspot.contacts
                       .map((c) => c.values.email ?? c.values.firstname ?? "?")
                       .slice(0, 5)
@@ -712,7 +808,8 @@ export function EnrichDrawer({
               <TabsList>
                 <TabsTrigger value="extraction">Extraction</TabsTrigger>
                 <TabsTrigger value="discovery">
-                  Discovery ({enrich.data.discovery.providers.filter((p) => p.ok).length}/
+                  Discovery (
+                  {enrich.data.discovery.providers.filter((p) => p.ok).length}/
                   {enrich.data.discovery.providers.length})
                 </TabsTrigger>
               </TabsList>
@@ -738,7 +835,8 @@ export function EnrichDrawer({
                     </b>
                   </span>
                   <span>
-                    fed by: {enrich.data.extraction.providersUsed.join(", ") || "—"}
+                    fed by:{" "}
+                    {enrich.data.extraction.providersUsed.join(", ") || "—"}
                   </span>
                 </div>
                 <Json value={enrich.data.extraction.structured} />
@@ -814,7 +912,10 @@ export function EnrichDrawer({
                 {merge.data.conflicts.length > 0 && (
                   <ul className="mt-2 space-y-1">
                     {merge.data.conflicts.map((c, i) => (
-                      <li key={i} className="flex gap-1.5 text-[11px] text-amber-300">
+                      <li
+                        key={i}
+                        className="flex gap-1.5 text-[11px] text-amber-300"
+                      >
                         <Minus className="mt-0.5 size-3 shrink-0" />
                         {c}
                       </li>
@@ -832,14 +933,21 @@ export function EnrichDrawer({
                         type="checkbox"
                         checked={checked[f.key] ?? false}
                         onChange={(e) =>
-                          setChecked((c) => ({ ...c, [f.key]: e.target.checked }))
+                          setChecked((c) => ({
+                            ...c,
+                            [f.key]: e.target.checked,
+                          }))
                         }
                         className="mt-0.5"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">{f.label}:</span>
-                          <span className="font-medium">{f.proposed ?? "—"}</span>
+                          <span className="text-muted-foreground">
+                            {f.label}:
+                          </span>
+                          <span className="font-medium">
+                            {f.proposed ?? "—"}
+                          </span>
                           <span className="text-muted-foreground text-[10px]">
                             {f.source} · {f.confidence}
                           </span>
@@ -857,9 +965,9 @@ export function EnrichDrawer({
 
                 {hsCompanyMissing && (
                   <p className="mt-3 rounded-md border border-orange-500/20 bg-orange-500/5 p-2 text-[11px] text-orange-300/90">
-                    No HubSpot company for this domain — “Create in HubSpot” adds
-                    a new record. Only do this for a lead you mean to hand to
-                    sales.
+                    No HubSpot company for this domain — “Create in HubSpot”
+                    adds a new record. Only do this for a lead you mean to hand
+                    to sales.
                   </p>
                 )}
 
@@ -876,7 +984,9 @@ export function EnrichDrawer({
                     disabled={apply.isPending}
                     className="rounded-md bg-orange-500/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-500 disabled:opacity-50"
                   >
-                    {hsCompanyMissing ? "Create in HubSpot" : "Write to HubSpot"}
+                    {hsCompanyMissing
+                      ? "Create in HubSpot"
+                      : "Write to HubSpot"}
                   </button>
                   {apply.isPending && (
                     <Loader2 className="size-4 animate-spin" />

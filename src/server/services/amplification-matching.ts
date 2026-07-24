@@ -1,6 +1,6 @@
 import type { AmplifierHandle } from "@/server/db/schema";
 
-export function normalizedSocialHandle(value: string | null | undefined) {
+function normalizedSocialHandle(value: string | null | undefined) {
   return value?.trim().replace(/^@/, "").toLowerCase() ?? "";
 }
 

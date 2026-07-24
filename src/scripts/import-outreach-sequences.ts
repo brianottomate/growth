@@ -13,7 +13,7 @@
  *
  * Run: bun run src/scripts/import-outreach-sequences.ts
  */
-import { and, eq, ilike, inArray, isNull } from "drizzle-orm";
+import { and, eq, ilike, inArray } from "drizzle-orm";
 
 import {
   getAllSequenceSteps,

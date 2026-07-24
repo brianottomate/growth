@@ -14,8 +14,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authClient } from "@/server/better-auth/client";
 import { getAuthPageHref, getCallbackURL } from "@/lib/auth-utils";
 import { InAppBrowserAlert } from "../components/InAppBrowserAlert";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
+import { ForgotPasswordDialog } from "./ForgotPasswordDialog";
 
-export function SignInForm() {
+export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -23,6 +25,7 @@ export function SignInForm() {
   const [password, setPassword] = useState("");
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const isOAuthRequest =
     searchParams.has("client_id") && searchParams.has("redirect_uri");
   const signUpHref = isOAuthRequest
@@ -60,6 +63,11 @@ export function SignInForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      <ForgotPasswordDialog
+        open={forgotPasswordOpen}
+        onOpenChange={setForgotPasswordOpen}
+        defaultEmail={email}
+      />
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
           <div className="p-6 md:p-8">
@@ -87,6 +95,22 @@ export function SignInForm() {
                 </Alert>
               )}
 
+              {googleEnabled && (
+                <>
+                  <GoogleSignInButton
+                    email={email}
+                    disabled={isEmailLoading}
+                  />
+                  <div className="flex items-center gap-3">
+                    <span className="bg-border h-px flex-1" />
+                    <span className="text-muted-foreground text-xs">
+                      or continue with email
+                    </span>
+                    <span className="bg-border h-px flex-1" />
+                  </div>
+                </>
+              )}
+
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -102,7 +126,16 @@ export function SignInForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => setForgotPasswordOpen(true)}
+                      className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-4"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
                   <Input
                     id="password"
                     type="password"
@@ -143,10 +176,12 @@ export function SignInForm() {
           </div>
           <div className="bg-muted relative hidden md:block">
             <Image
-              src="/placeholder.svg"
-              alt="Sign in illustration"
+              src="/auth-hero.jpg"
+              alt="A Wander home at golden hour"
               fill
-              className="absolute inset-0 h-full w-full object-cover object-left dark:brightness-[0.2] dark:grayscale"
+              priority
+              sizes="(min-width: 768px) 50vw, 0px"
+              className="absolute inset-0 h-full w-full object-cover"
             />
           </div>
         </CardContent>

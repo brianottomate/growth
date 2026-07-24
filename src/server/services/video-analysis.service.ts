@@ -20,7 +20,7 @@ import { refreshInstagramPostMedia } from "./peer-scrape.service";
 import { MediaService } from "./media.service";
 
 export const VIDEO_ANALYSIS_RENDERER_VERSION = 1;
-export const VIDEO_ANALYSIS_MODEL = "claude-sonnet-4-6";
+export const VIDEO_ANALYSIS_MODEL = "claude-sonnet-5";
 
 const videoAnalysisSchema = z.object({
   summary: z

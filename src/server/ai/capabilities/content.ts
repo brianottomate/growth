@@ -1,7 +1,18 @@
 import "server-only";
 
 import { z } from "zod";
-import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -20,6 +31,7 @@ import { ContentService } from "@/server/services/content.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import { getContentReadiness } from "@/lib/content-readiness";
+import { platformFormatsFor } from "@/server/content/formats";
 import { growthAction } from "./types";
 import type { CapabilityContext } from "./types";
 import { orgBrandIds } from "./brands";
@@ -96,6 +108,104 @@ export const getContentWorkItem = growthAction({
       })),
       readiness,
       url: `/app/content/${content.id}`,
+    };
+  },
+});
+
+export const searchContentWorkItems = growthAction({
+  description:
+    "Search the current organization's canonical content ideas and their owned platform drafts by title, hook, copy, brand, platform, or format. Use this before creating an idea when the operator refers to existing work by name or intent.",
+  inputSchema: z.object({
+    query: z.string().trim().min(1).max(200),
+    limit: z.number().int().min(1).max(50).default(20),
+  }),
+  execute: async ({ query, limit }, ctx) => {
+    const brandIds = await orgBrandIds(ctx.orgId);
+    if (!brandIds.length) return { ideas: [], platformPosts: [] };
+    const pattern = `%${query}%`;
+    const brands = await db.query.brandTable.findMany({
+      where: inArray(brandTable.id, brandIds),
+      columns: { id: true, name: true },
+    });
+    const brandName = new Map(brands.map((brand) => [brand.id, brand.name]));
+    const [ideas, platformPosts] = await Promise.all([
+      db.query.contentPostTable.findMany({
+        where: and(
+          inArray(contentPostTable.brandId, brandIds),
+          isNull(contentPostTable.deletedAt),
+          or(
+            ilike(contentPostTable.title, pattern),
+            ilike(contentPostTable.hook, pattern),
+            ilike(contentPostTable.body, pattern),
+            ilike(contentPostTable.captionDirection, pattern),
+            ilike(contentPostTable.pillar, pattern),
+          ),
+        ),
+        columns: {
+          id: true,
+          brandId: true,
+          title: true,
+          hook: true,
+          pillar: true,
+          status: true,
+          updatedAt: true,
+        },
+        orderBy: [desc(contentPostTable.updatedAt)],
+        limit,
+      }),
+      db.query.platformPostTable.findMany({
+        where: and(
+          inArray(platformPostTable.brandId, brandIds),
+          eq(platformPostTable.source, "owned"),
+          or(
+            ilike(platformPostTable.text, pattern),
+            ilike(platformPostTable.platform, pattern),
+            ilike(platformPostTable.format, pattern),
+          ),
+        ),
+        columns: {
+          id: true,
+          brandId: true,
+          contentPostId: true,
+          platform: true,
+          format: true,
+          status: true,
+          text: true,
+          updatedAt: true,
+        },
+        with: {
+          contentPost: {
+            columns: { id: true, title: true, deletedAt: true },
+          },
+        },
+        orderBy: [desc(platformPostTable.updatedAt)],
+        limit,
+      }),
+    ]);
+    return {
+      ideas: ideas.map((idea) => ({
+        ...idea,
+        brandName: brandName.get(idea.brandId) ?? "—",
+        url: `/app/content/${idea.id}`,
+      })),
+      platformPosts: platformPosts
+        .filter(
+          (post) =>
+            post.contentPostId &&
+            post.contentPost &&
+            !post.contentPost.deletedAt,
+        )
+        .map((post) => ({
+          id: post.id,
+          contentPostId: post.contentPostId,
+          contentTitle: post.contentPost?.title ?? "Untitled idea",
+          brandName: brandName.get(post.brandId) ?? "—",
+          platform: post.platform,
+          format: post.format,
+          status: post.status,
+          text: post.text,
+          url: `/app/content/${post.contentPostId}#post-${post.id}`,
+        })),
     };
   },
 });
@@ -293,6 +403,289 @@ export const attachChatImageToContent = growthAction({
       analysis,
       analysisError,
       url: `/app/content/${content.id}`,
+    };
+  },
+});
+
+export const makeCarouselFromPool = growthAction({
+  description:
+    "Turn ordered images already in a content work item's media pool into one or more owned platform carousels. Call getWorkItem first, preserve the operator's requested image order (or the pool order when they say all/these images), and provide the asset IDs separately for each target platform post so platform limits can differ.",
+  inputSchema: z.object({
+    contentPostId: z.string(),
+    targets: z
+      .array(
+        z.object({
+          platformPostId: z.string(),
+          mediaAssetIds: z
+            .array(z.string())
+            .min(1)
+            .max(300)
+            .describe("Ordered media asset IDs from the content media pool."),
+        }),
+      )
+      .min(1)
+      .max(12),
+  }),
+  execute: async ({ contentPostId, targets }, ctx) => {
+    const content = await requireContentWorkItem(contentPostId, ctx);
+    const poolByAssetId = new Map(
+      (content.media ?? [])
+        .filter((item) => item.assetId)
+        .map((item) => [item.assetId!, item]),
+    );
+    const ownedById = new Map(
+      content.platformPosts
+        .filter((post) => post.source === "owned")
+        .map((post) => [post.id, post]),
+    );
+    const seenTargets = new Set<string>();
+    const prepared = targets.map((target) => {
+      if (seenTargets.has(target.platformPostId)) {
+        throw new Error("Each target platform post may only appear once.");
+      }
+      seenTargets.add(target.platformPostId);
+      const post = ownedById.get(target.platformPostId);
+      if (!post) {
+        throw new Error(
+          "A selected platform post is not an owned draft on this work item.",
+        );
+      }
+      const format = platformFormatsFor(post.platform).find(
+        (candidate) => candidate.archetype === "carousel",
+      );
+      if (!format) {
+        throw new Error(`${post.platform} has no supported carousel format.`);
+      }
+      const media = target.mediaAssetIds.map((assetId) => {
+        const item = poolByAssetId.get(assetId);
+        if (!item) {
+          throw new Error(
+            `Media asset ${assetId} is not in this content item's media pool.`,
+          );
+        }
+        if (item.type !== "image") {
+          throw new Error(`Media asset ${assetId} is not an image.`);
+        }
+        return item;
+      });
+      if (new Set(target.mediaAssetIds).size !== target.mediaAssetIds.length) {
+        throw new Error(
+          "A carousel cannot contain the same media asset twice.",
+        );
+      }
+      const minimum = format.media.min ?? 1;
+      const maximum = format.media.max ?? 300;
+      if (media.length < minimum || media.length > maximum) {
+        throw new Error(
+          `${format.label} needs ${minimum}-${maximum} images; received ${media.length}.`,
+        );
+      }
+      return { post, format, media };
+    });
+
+    for (const target of prepared) {
+      await ContentService.setSpotCarousel({
+        platformPostId: target.post.id,
+        format: target.format.id,
+        media: target.media,
+      });
+    }
+    return {
+      ok: true as const,
+      contentPostId: content.id,
+      updated: prepared.map(({ post, format, media }) => ({
+        platformPostId: post.id,
+        platform: post.platform,
+        format: format.id,
+        mediaCount: media.length,
+      })),
+      url: `/app/content/${content.id}`,
+    };
+  },
+});
+
+const uploadImageMimeType = z.enum([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+  "image/gif",
+]);
+
+export const prepareContentMediaUploads = growthAction({
+  description:
+    "Prepare direct uploads for local image files produced in Claude Code, Claude Design, or another creative tool. Returns short-lived presigned PUT URLs; the MCP host should PUT each local file with the exact Content-Type, then call finishUpload with the returned media IDs in carousel order.",
+  inputSchema: z.object({
+    contentPostId: z.string(),
+    files: z
+      .array(
+        z.object({
+          filename: z.string().trim().min(1).max(300),
+          mimeType: uploadImageMimeType,
+          size: z
+            .number()
+            .int()
+            .positive()
+            .max(25 * 1024 * 1024),
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  execute: async ({ contentPostId, files }, ctx) => {
+    const content = await requireContentWorkItem(contentPostId, ctx);
+    if ((content.media?.length ?? 0) + files.length > 50) {
+      throw new Error(
+        "This upload would exceed the 50-item content media pool.",
+      );
+    }
+    const uploads = [];
+    for (const file of files) {
+      const prepared = await MediaService.createR2Upload({
+        brandId: content.brandId,
+        uploadedBy: ctx.userId,
+        ...file,
+      });
+      uploads.push({
+        mediaId: prepared.mediaId,
+        uploadUrl: prepared.uploadUrl,
+        publicUrl: prepared.publicUrl,
+        pathname: prepared.pathname,
+        filename: file.filename,
+        mimeType: file.mimeType,
+      });
+    }
+    return {
+      contentPostId: content.id,
+      uploads,
+      next: "PUT each local file to its uploadUrl with the exact mimeType as Content-Type, then call contentMediaWrite.finishUpload with mediaIds in the intended slide order.",
+    };
+  },
+});
+
+export const finishContentMediaUploads = growthAction({
+  description:
+    "Verify and finalize direct image uploads prepared by prepareUpload, then attach them to the content media pool in the provided order. Safe to retry: already-ready media is reused and pool attachment dedupes by asset ID.",
+  inputSchema: z.object({
+    contentPostId: z.string(),
+    uploads: z
+      .array(
+        z.object({
+          mediaId: z.string(),
+          width: z.number().int().positive().max(20_000).optional(),
+          height: z.number().int().positive().max(20_000).optional(),
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  execute: async ({ contentPostId, uploads }, ctx) => {
+    const content = await requireContentWorkItem(contentPostId, ctx);
+    if (
+      (content.media?.length ?? 0) +
+        new Set(uploads.map((upload) => upload.mediaId)).size >
+      50
+    ) {
+      throw new Error(
+        "This upload would exceed the 50-item content media pool.",
+      );
+    }
+    const items = [];
+    for (const upload of uploads) {
+      const asset = await MediaService.verifyR2Upload(upload.mediaId);
+      if (
+        asset.brandId !== content.brandId ||
+        asset.uploadedBy !== ctx.userId
+      ) {
+        throw new Error(
+          "That upload does not belong to this operator and brand.",
+        );
+      }
+      const finalized = await MediaService.finalizeR2Upload({
+        mediaId: asset.id,
+        url: asset.url!,
+        pathname: asset.r2Key!,
+        width: upload.width ?? asset.width ?? undefined,
+        height: upload.height ?? asset.height ?? undefined,
+      });
+      if (!finalized?.url) throw new Error("Could not finalize media upload.");
+      items.push({
+        url: finalized.url,
+        type: "image" as const,
+        assetId: finalized.id,
+        thumbnail: finalized.thumbnailUrl ?? finalized.url,
+        width: finalized.width ?? upload.width,
+        height: finalized.height ?? upload.height,
+      });
+    }
+    await ContentService.setPoolMedia({
+      contentPostId: content.id,
+      media: [...(content.media ?? []), ...items],
+    });
+    return {
+      ok: true as const,
+      contentPostId: content.id,
+      mediaAssetIds: items.map((item) => item.assetId),
+      mediaCount: items.length,
+      url: `/app/content/${content.id}`,
+      next: "Call contentMediaWrite.makeCarousel with these mediaAssetIds in the intended order for each target platform post.",
+    };
+  },
+});
+
+export const importRemoteImagesToContent = growthAction({
+  description:
+    "Import public image URLs from a cloud design or artifact workflow into Growth's durable media library and the selected content pool. Growth downloads and rehosts each image so expiring source URLs do not break later. The input order becomes the pool/carousel order.",
+  inputSchema: z.object({
+    contentPostId: z.string(),
+    images: z
+      .array(
+        z.object({
+          url: z.string().url().max(2_000),
+          filename: z.string().trim().min(1).max(300).optional(),
+          title: z.string().trim().min(1).max(300).optional(),
+          width: z.number().int().positive().max(20_000).optional(),
+          height: z.number().int().positive().max(20_000).optional(),
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  execute: async ({ contentPostId, images }, ctx) => {
+    const content = await requireContentWorkItem(contentPostId, ctx);
+    if ((content.media?.length ?? 0) + images.length > 50) {
+      throw new Error(
+        "This import would exceed the 50-item content media pool.",
+      );
+    }
+    const items = [];
+    for (const image of images) {
+      const asset = await MediaService.importRemoteImage({
+        brandId: content.brandId,
+        uploadedBy: ctx.userId,
+        ...image,
+      });
+      if (!asset.url) throw new Error("Imported image has no durable URL.");
+      items.push({
+        url: asset.url,
+        type: "image" as const,
+        assetId: asset.id,
+        thumbnail: asset.thumbnailUrl ?? asset.url,
+        width: asset.width ?? image.width,
+        height: asset.height ?? image.height,
+      });
+    }
+    await ContentService.setPoolMedia({
+      contentPostId: content.id,
+      media: [...(content.media ?? []), ...items],
+    });
+    return {
+      ok: true as const,
+      contentPostId: content.id,
+      mediaAssetIds: items.map((item) => item.assetId),
+      mediaCount: items.length,
+      url: `/app/content/${content.id}`,
+      next: "Call contentMediaWrite.makeCarousel with these mediaAssetIds in the intended order for each target platform post.",
     };
   },
 });
@@ -766,7 +1159,7 @@ export const productionQueue = growthAction({
 
 export const createIdea = growthAction({
   description:
-    "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Optionally seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt) and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This writes to the workspace: gather the essentials (which brand, a title, ideally a hook and channels), reflect the idea back in one line, and call it once the operator agrees. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you — turn that into the fields.",
+    "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Search contentRead first when the operator may be referring to existing work, so this does not create a duplicate. Optionally seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt) and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This writes to the workspace: gather the essentials (which brand, a title, ideally a hook and channels), reflect the idea back in one line, and call it once the operator agrees. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you — turn that into the fields.",
   inputSchema: z.object({
     brandId: z
       .string()

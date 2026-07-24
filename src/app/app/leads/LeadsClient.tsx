@@ -5,6 +5,11 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
 import { ExternalLink } from "lucide-react";
 
+import {
+  HUBSPOT_PREGEN_LISTS,
+  hubspotListUrl,
+  type HubspotPregenCohort,
+} from "@/lib/hubspot-pregen-lists";
 import { useTRPC } from "@/trpc/react";
 import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
 
@@ -37,7 +42,9 @@ function StatCard({
     >
       <div className="text-muted-foreground text-xs font-medium">{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="text-muted-foreground mt-0.5 text-[11px]">{hint}</div>}
+      {hint && (
+        <div className="text-muted-foreground mt-0.5 text-[11px]">{hint}</div>
+      )}
     </div>
   );
 }
@@ -73,9 +80,14 @@ export function LeadsClient() {
   const [pms, setPms] = useState<string | undefined>(undefined);
   const [integratedOnly, setIntegratedOnly] = useState(false);
   const [hasPregen, setHasPregen] = useState(false);
+  const [pregenCohort, setPregenCohort] = useState<
+    HubspotPregenCohort | undefined
+  >(undefined);
   const [netNew, setNetNew] = useState(false);
   const [sendBatch, setSendBatch] = useState(false);
-  const [sort, setSort] = useState<"units" | "composite" | "domain" | "updated">("units");
+  const [sort, setSort] = useState<
+    "units" | "composite" | "domain" | "updated"
+  >("units");
   const [page, setPage] = useState(0);
   const [enrichLead, setEnrichLead] = useState<LeadRow | null>(null);
   // Deep-link: ?lead=<domain> opens that lead's drawer (shareable / bookmarkable).
@@ -94,6 +106,7 @@ export function LeadsClient() {
         pms,
         integratedPmsOnly: integratedOnly || undefined,
         hasPregenSite: hasPregen || undefined,
+        pregenCohort,
         netNew: netNew || undefined,
         sendBatch: sendBatch || undefined,
         sort,
@@ -124,6 +137,13 @@ export function LeadsClient() {
 
   const resetPage = () => setPage(0);
   const s = stats.data;
+  const membershipCount = (
+    cohort: HubspotPregenCohort,
+    objectType: "company" | "contact",
+  ) =>
+    s?.targetMemberships.find(
+      (row) => row.cohort === cohort && row.objectType === objectType,
+    );
 
   return (
     <div>
@@ -135,15 +155,27 @@ export function LeadsClient() {
 
       {/* summary cards */}
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Domains" value={fmt(s?.domains)} hint="unique, deduped" />
-        <StatCard label="Contacts" value={fmt(s?.contacts)} hint="across domains" />
+        <StatCard
+          label="Domains"
+          value={fmt(s?.domains)}
+          hint="unique, deduped"
+        />
+        <StatCard
+          label="Contacts"
+          value={fmt(s?.contacts)}
+          hint="across domains"
+        />
         <StatCard
           label="Untouched"
           value={fmt(s?.untouched)}
           hint="BuiltWith, no CRM/pregen"
           accent
         />
-        <StatCard label="Pregen sites" value={fmt(s?.withPregenSite)} hint="already built" />
+        <StatCard
+          label="Pregen sites"
+          value={fmt(s?.withPregenSite)}
+          hint="already built"
+        />
         <StatCard
           label="Pregen ∩ CRM"
           value={fmt(s?.pregenInCrm)}
@@ -154,6 +186,81 @@ export function LeadsClient() {
           value={fmt(s?.integratedPms)}
           hint="API-connected"
         />
+      </div>
+
+      <div className="bg-card mt-4 rounded-xl border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-sm font-medium">Pre-Gen target cohorts</div>
+            <div className="text-muted-foreground mt-0.5 text-xs">
+              Live HubSpot list memberships mirrored into Growth. No enrichment
+              or enrollment is triggered here.
+            </div>
+          </div>
+          <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium text-amber-300">
+            Targeting only
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {(
+            Object.entries(HUBSPOT_PREGEN_LISTS) as Array<
+              [
+                HubspotPregenCohort,
+                (typeof HUBSPOT_PREGEN_LISTS)[HubspotPregenCohort],
+              ]
+            >
+          ).map(([cohort, config]) => {
+            const companies = membershipCount(cohort, "company");
+            const contacts = membershipCount(cohort, "contact");
+            return (
+              <div
+                key={cohort}
+                className="border-border flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+              >
+                <button
+                  onClick={() => {
+                    setPregenCohort(
+                      pregenCohort === cohort ? undefined : cohort,
+                    );
+                    resetPage();
+                  }}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    pregenCohort === cohort
+                      ? "bg-foreground text-background"
+                      : "bg-muted hover:bg-accent"
+                  }`}
+                >
+                  {config.label}
+                </button>
+                <span className="text-muted-foreground text-xs">
+                  {fmt(companies?.count)} companies
+                  {companies && companies.linked !== companies.count
+                    ? ` · ${fmt(companies.linked)} linked`
+                    : ""}
+                  {" · "}
+                  {fmt(contacts?.count)} contacts
+                </span>
+                <span className="flex-1" />
+                <a
+                  href={hubspotListUrl(config.company.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
+                >
+                  Companies <ExternalLink className="size-3" />
+                </a>
+                <a
+                  href={hubspotListUrl(config.contact.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
+                >
+                  Contacts <ExternalLink className="size-3" />
+                </a>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* filter bar */}
@@ -168,23 +275,37 @@ export function LeadsClient() {
           className="border-border bg-background focus:ring-ring w-64 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
         />
         <span className="bg-border mx-1 h-4 w-px" />
-        <Pill active={!source} onClick={() => { setSource(undefined); resetPage(); }}>
+        <Pill
+          active={!source}
+          onClick={() => {
+            setSource(undefined);
+            resetPage();
+          }}
+        >
           All sources
         </Pill>
-        {(["builtwith", "hubspot", "pregen", "instantly"] as SourceKey[]).map((sk) => (
-          <Pill
-            key={sk}
-            active={source === sk}
-            onClick={() => { setSource(source === sk ? undefined : sk); resetPage(); }}
-          >
-            {sk}
-            {s ? ` · ${fmt(s[sk])}` : ""}
-          </Pill>
-        ))}
+        {(["builtwith", "hubspot", "pregen", "instantly"] as SourceKey[]).map(
+          (sk) => (
+            <Pill
+              key={sk}
+              active={source === sk}
+              onClick={() => {
+                setSource(source === sk ? undefined : sk);
+                resetPage();
+              }}
+            >
+              {sk}
+              {s ? ` · ${fmt(s[sk])}` : ""}
+            </Pill>
+          ),
+        )}
         <span className="bg-border mx-1 h-4 w-px" />
         <select
           value={pms ?? ""}
-          onChange={(e) => { setPms(e.target.value || undefined); resetPage(); }}
+          onChange={(e) => {
+            setPms(e.target.value || undefined);
+            resetPage();
+          }}
           className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
         >
           <option value="">All PMS</option>
@@ -194,23 +315,50 @@ export function LeadsClient() {
             </option>
           ))}
         </select>
-        <Pill active={integratedOnly} onClick={() => { setIntegratedOnly((v) => !v); resetPage(); }}>
+        <Pill
+          active={integratedOnly}
+          onClick={() => {
+            setIntegratedOnly((v) => !v);
+            resetPage();
+          }}
+        >
           Integrated PMS
         </Pill>
-        <Pill active={hasPregen} onClick={() => { setHasPregen((v) => !v); resetPage(); }}>
+        <Pill
+          active={hasPregen}
+          onClick={() => {
+            setHasPregen((v) => !v);
+            resetPage();
+          }}
+        >
           Has pregen site
         </Pill>
         <span className="bg-border mx-1 h-4 w-px" />
-        <Pill active={netNew} onClick={() => { setNetNew((v) => !v); resetPage(); }}>
+        <Pill
+          active={netNew}
+          onClick={() => {
+            setNetNew((v) => !v);
+            resetPage();
+          }}
+        >
           🎯 Net-new target{s ? ` · ${fmt(s.netNew)}` : ""}
         </Pill>
-        <Pill active={sendBatch} onClick={() => { setSendBatch((v) => !v); resetPage(); }}>
+        <Pill
+          active={sendBatch}
+          onClick={() => {
+            setSendBatch((v) => !v);
+            resetPage();
+          }}
+        >
           🚀 Send-20
         </Pill>
         <span className="flex-1" />
         <select
           value={sort}
-          onChange={(e) => { setSort(e.target.value as typeof sort); resetPage(); }}
+          onChange={(e) => {
+            setSort(e.target.value as typeof sort);
+            resetPage();
+          }}
           className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
         >
           <option value="units">Sort: units</option>
@@ -235,10 +383,15 @@ export function LeadsClient() {
               <th className="border-b py-2 pr-3 font-medium">Domain</th>
               <th className="border-b px-3 py-2 font-medium">Company</th>
               <th className="border-b px-3 py-2 font-medium">PMS</th>
-              <th className="border-b px-3 py-2 text-right font-medium">Units</th>
-              <th className="border-b px-3 py-2 text-right font-medium">Contacts</th>
+              <th className="border-b px-3 py-2 text-right font-medium">
+                Units
+              </th>
+              <th className="border-b px-3 py-2 text-right font-medium">
+                Contacts
+              </th>
               <th className="border-b px-3 py-2 font-medium">Tier</th>
               <th className="border-b px-3 py-2 font-medium">CRM</th>
+              <th className="border-b px-3 py-2 font-medium">Pre-Gen cohort</th>
               <th className="border-b px-3 py-2 font-medium">Sources</th>
             </tr>
           </thead>
@@ -274,7 +427,10 @@ export function LeadsClient() {
                     <span className="inline-flex items-center gap-1">
                       {d.pms}
                       {d.isIntegratedPms && (
-                        <span className="size-1.5 rounded-full bg-emerald-400" title="Integrated PMS" />
+                        <span
+                          className="size-1.5 rounded-full bg-emerald-400"
+                          title="Integrated PMS"
+                        />
                       )}
                     </span>
                   ) : (
@@ -285,7 +441,11 @@ export function LeadsClient() {
                   {fmt(d.unitCount)}
                 </td>
                 <td className="border-b px-3 py-2 text-right tabular-nums">
-                  <span className={d.contactCount > 0 ? "" : "text-muted-foreground"}>
+                  <span
+                    className={
+                      d.contactCount > 0 ? "" : "text-muted-foreground"
+                    }
+                  >
                     {d.contactCount}
                   </span>
                 </td>
@@ -300,7 +460,33 @@ export function LeadsClient() {
                 </td>
                 <td className="border-b px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    {(["builtwith", "hubspot", "pregen", "instantly"] as SourceKey[])
+                    {d.pregenCohorts.map((cohort) => (
+                      <span
+                        key={cohort}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          cohort === "recycled"
+                            ? "bg-amber-500/15 text-amber-300"
+                            : "bg-sky-500/15 text-sky-300"
+                        }`}
+                      >
+                        {cohort}
+                      </span>
+                    ))}
+                    {d.pregenCohorts.length === 0 && (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </div>
+                </td>
+                <td className="border-b px-3 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {(
+                      [
+                        "builtwith",
+                        "hubspot",
+                        "pregen",
+                        "instantly",
+                      ] as SourceKey[]
+                    )
                       .filter((sk) =>
                         sk === "builtwith"
                           ? d.inBuiltwith
@@ -336,8 +522,8 @@ export function LeadsClient() {
       {list.data && list.data.total > limit && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-muted-foreground text-xs">
-            {page * limit + 1}–{Math.min((page + 1) * limit, list.data.total)} of{" "}
-            {fmt(list.data.total)}
+            {page * limit + 1}–{Math.min((page + 1) * limit, list.data.total)}{" "}
+            of {fmt(list.data.total)}
           </span>
           <div className="flex gap-2">
             <button

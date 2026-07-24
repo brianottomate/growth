@@ -1,14 +1,31 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import { useDropzone, type Accept } from "react-dropzone";
-import { Loader2, UploadCloud } from "lucide-react";
+import { FolderOpen, Loader2, UploadCloud } from "lucide-react";
 
 import { cn } from "./lib/utils";
 
 const IMAGE_ACCEPT: Accept = {
   "image/*": [".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"],
 };
+
+/**
+ * Folder picks bypass react-dropzone's own filtering, so we re-apply the
+ * `accept` map by hand — otherwise `.DS_Store`, sidecar text files and other
+ * folder debris ride along into the upload.
+ */
+function acceptsFile(file: File, accept?: Accept) {
+  const name = file.name.toLowerCase();
+  if (name.startsWith(".")) return false;
+  if (!accept) return true;
+  return Object.entries(accept).some(([mime, extensions]) => {
+    if (extensions.some((extension) => name.endsWith(extension.toLowerCase())))
+      return true;
+    if (mime.endsWith("/*")) return file.type.startsWith(mime.slice(0, -1));
+    return file.type === mime;
+  });
+}
 
 /**
  * A friendly drag-and-drop upload zone (react-dropzone, already a dep). Big
@@ -21,22 +38,33 @@ export function Dropzone({
   uploading = 0,
   accept = IMAGE_ACCEPT,
   multiple = true,
+  folders = multiple,
   disabled,
   className,
   compact = false,
   title,
   hint = "or click to browse · saved to your library",
+  openRef,
 }: {
   onFiles: (files: File[]) => void;
   /** Count of uploads in flight — shows the spinner + disables the zone. */
   uploading?: number;
   accept?: Accept;
   multiple?: boolean;
+  /**
+   * Offer a "choose a folder" affordance alongside click-to-browse. Dropping a
+   * folder already works for free (react-dropzone walks directory entries);
+   * this is the click path, which browsers only expose via `webkitdirectory`.
+   * Defaults on wherever multiple files are allowed.
+   */
+  folders?: boolean;
   disabled?: boolean;
   className?: string;
   compact?: boolean;
   title?: string;
   hint?: string;
+  /** Receives an `open()` you can call to trigger the file picker elsewhere. */
+  openRef?: MutableRefObject<(() => void) | null>;
 }) {
   const onDrop = useCallback(
     (accepted: File[]) => {
@@ -45,12 +73,20 @@ export function Dropzone({
     [onFiles],
   );
   const busy = uploading > 0;
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const folderInput = useRef<HTMLInputElement | null>(null);
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept,
     multiple,
     disabled: disabled || busy,
   });
+  useEffect(() => {
+    if (!openRef) return;
+    openRef.current = open;
+    return () => {
+      openRef.current = null;
+    };
+  }, [openRef, open]);
 
   return (
     <div
@@ -64,6 +100,26 @@ export function Dropzone({
       )}
     >
       <input {...getInputProps()} />
+      {folders && (
+        <input
+          // `webkitdirectory` is how every browser exposes folder picking, but
+          // it is missing from React's input typings — hence the ref callback.
+          ref={(node) => {
+            folderInput.current = node;
+            node?.setAttribute("webkitdirectory", "");
+          }}
+          type="file"
+          multiple
+          hidden
+          onChange={(event) => {
+            const picked = Array.from(event.currentTarget.files ?? []).filter(
+              (file) => acceptsFile(file, accept),
+            );
+            event.currentTarget.value = "";
+            if (picked.length) onFiles(picked);
+          }}
+        />
+      )}
       <div
         className={cn(
           "rounded-xl p-2.5 transition-colors",
@@ -72,7 +128,10 @@ export function Dropzone({
       >
         {busy ? (
           <Loader2
-            className={cn("text-muted-foreground animate-spin", compact ? "size-5" : "size-7")}
+            className={cn(
+              "text-muted-foreground animate-spin",
+              compact ? "size-5" : "size-7",
+            )}
           />
         ) : (
           <UploadCloud
@@ -97,6 +156,22 @@ export function Dropzone({
             {title ?? "Drop images here"}
           </p>
           <p className="text-muted-foreground text-xs">{hint}</p>
+          {folders && (
+            <button
+              type="button"
+              disabled={disabled || busy}
+              onClick={(event) => {
+                // The zone itself opens the file picker on click — keep the
+                // folder button from triggering both dialogs.
+                event.stopPropagation();
+                folderInput.current?.click();
+              }}
+              className="text-muted-foreground hover:text-foreground mx-auto mt-1 flex items-center gap-1 text-xs underline underline-offset-2 disabled:opacity-50"
+            >
+              <FolderOpen className="size-3" />
+              Choose a folder
+            </button>
+          )}
         </div>
       )}
     </div>
