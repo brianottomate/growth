@@ -26,8 +26,14 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import {
+  CREATIVE_IMAGE_MODELS,
+  DEFAULT_CREATIVE_IMAGE_MODEL_ID,
+  type CreativeImageModelId,
+} from "@/lib/creative-image-models";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
+import { SimpleSelect } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
 import type { WorkContentIntent } from "@/lib/assistant-events";
 import { type RouterInputs, type RouterOutputs, useTRPC } from "@/trpc/react";
@@ -242,7 +248,7 @@ export interface ProductionPacketOutput {
   brandId: string;
 }
 
-/** External handoff is the primary action; Fal is an optional sibling path. */
+/** External handoff is the primary action; direct generation is an optional sibling path. */
 export function ProductionPacketCard({
   output,
 }: {
@@ -252,14 +258,24 @@ export function ProductionPacketCard({
   const configuration = useQuery(
     trpc.creativeWork.configuration.queryOptions(),
   );
+  const latestRun = useQuery(
+    trpc.creativeWork.latestRunForPacket.queryOptions({
+      packetId: output.packetId,
+    }),
+  );
+  const [modelProfile, setModelProfile] = useState<CreativeImageModelId>(
+    DEFAULT_CREATIVE_IMAGE_MODEL_ID,
+  );
   const [run, setRun] = useState<
-    RouterOutputs["creativeWork"]["submitFal"] | null
+    RouterOutputs["creativeWork"]["submitImage"] | null
   >(null);
-  const submitFal = useMutation(
-    trpc.creativeWork.submitFal.mutationOptions({
+  const submitImage = useMutation(
+    trpc.creativeWork.submitImage.mutationOptions({
       onSuccess: setRun,
       onError: (error) =>
-        toast.error("Fal could not start", { description: error.message }),
+        toast.error("Image generation could not start", {
+          description: error.message,
+        }),
     }),
   );
   const refreshRun = useMutation(
@@ -282,16 +298,25 @@ export function ProductionPacketCard({
     }),
   );
 
+  const activeRun = run ?? latestRun.data ?? null;
+  const canStartNewRun =
+    !activeRun || ["error", "cancelled"].includes(activeRun.status);
+  const selectedModelConfigured =
+    modelProfile === "google"
+      ? configuration.data?.googleConfigured
+      : configuration.data?.falConfigured;
+
   useEffect(() => {
-    if (!run || !["queued", "processing"].includes(run.status)) return;
+    if (!activeRun || !["queued", "processing"].includes(activeRun.status))
+      return;
     const timer = window.setTimeout(
-      () => refreshRun.mutate({ runId: run.id }),
+      () => refreshRun.mutate({ runId: activeRun.id }),
       3000,
     );
     return () => window.clearTimeout(timer);
-  }, [refreshRun, run]);
+  }, [activeRun, refreshRun]);
 
-  const candidate = run?.candidates[0];
+  const candidate = activeRun?.candidates[0];
   return (
     <ToolCard
       icon={FileText}
@@ -312,37 +337,65 @@ export function ProductionPacketCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CopyButton text={output.copyText} label="Copy production packet" />
+          <SimpleSelect
+            aria-label="Image model"
+            size="sm"
+            value={modelProfile}
+            disabled={!canStartNewRun || submitImage.isPending}
+            options={CREATIVE_IMAGE_MODELS.map((model) => ({
+              value: model.id,
+              label: model.label,
+            }))}
+            onValueChange={(value) =>
+              setModelProfile(value as CreativeImageModelId)
+            }
+          />
           <Button
             size="sm"
             variant="outline"
             disabled={
-              !configuration.data?.falConfigured || submitFal.isPending || !!run
+              !selectedModelConfigured ||
+              submitImage.isPending ||
+              !canStartNewRun
             }
-            onClick={() => submitFal.mutate({ packetId: output.packetId })}
+            onClick={() =>
+              submitImage.mutate({
+                packetId: output.packetId,
+                modelProfile,
+              })
+            }
           >
-            {submitFal.isPending ? (
+            {submitImage.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
               <Play className="size-3.5" />
             )}
-            Try with Fal
+            Generate image
           </Button>
         </div>
-        {!configuration.isLoading && !configuration.data?.falConfigured && (
+        {canStartNewRun && (
           <p className="text-muted-foreground text-[10px]">
-            Fal is optional and is not configured here. The packet is ready for
+            {
+              CREATIVE_IMAGE_MODELS.find((model) => model.id === modelProfile)
+                ?.description
+            }
+          </p>
+        )}
+        {!configuration.isLoading && !selectedModelConfigured && (
+          <p className="text-muted-foreground text-[10px]">
+            This model is not configured here. The packet is still ready for
             Claude, ChatGPT, or another production tool.
           </p>
         )}
-        {run && ["queued", "processing"].includes(run.status) && (
+        {activeRun && ["queued", "processing"].includes(activeRun.status) && (
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <Loader2 className="size-3.5 animate-spin" />
-            Fal is producing one candidate. You can leave this session; the run
-            is durable.
+            The selected provider is producing one candidate. You can leave this
+            session; the run is durable.
           </p>
         )}
-        {run?.status === "error" && (
-          <p className="text-destructive text-xs">{run.error}</p>
+        {activeRun?.status === "error" && (
+          <p className="text-destructive text-xs">{activeRun.error}</p>
         )}
         {candidate && (
           <div className="overflow-hidden rounded-lg border">
@@ -359,16 +412,19 @@ export function ProductionPacketCard({
               <Button
                 size="sm"
                 disabled={
-                  acceptCandidate.isPending || !!run.acceptedMediaAssetId
+                  acceptCandidate.isPending || !!activeRun.acceptedMediaAssetId
                 }
                 onClick={() =>
-                  acceptCandidate.mutate({ runId: run.id, candidateIndex: 0 })
+                  acceptCandidate.mutate({
+                    runId: activeRun.id,
+                    candidateIndex: 0,
+                  })
                 }
               >
                 {acceptCandidate.isPending && (
                   <Loader2 className="size-3.5 animate-spin" />
                 )}
-                {run.acceptedMediaAssetId
+                {activeRun.acceptedMediaAssetId
                   ? "Saved to library"
                   : "Accept to library"}
               </Button>

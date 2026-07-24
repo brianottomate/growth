@@ -24,6 +24,7 @@ export const env = createEnv({
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
     FAL_AI_API_KEY: z.string().optional(), // fal.ai image/video generation
+    GEMINI_API_KEY: z.string().optional(), // Direct Google Gemini image generation
     DATOCMS_CMA_TOKEN: z.string().optional(), // wander.com blog publishing (Content Management API)
     FIRECRAWL_API_KEY: z.string().min(1), // For web scraping
     OUTREACH_S2S_GUID: z.string().optional(), // For Outreach S2S auth
@@ -33,9 +34,7 @@ export const env = createEnv({
     OUTREACH_OAUTH_CLIENT_SECRET: z.string().optional(), // For Outreach OAuth
     OUTREACH_WEBHOOK_SECRET: z.string().optional(), // For Outreach webhook verification
     PREGEN_WEBHOOK_SECRET: z.string().optional(), // Shared secret for monolith pregen lifecycle webhooks
-    OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK: z.coerce
-      .boolean()
-      .default(false), // Dev-only escape hatch for webhook debugging
+    OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK: z.coerce.boolean().default(false), // Dev-only escape hatch for webhook debugging
     // Customer.io
     CUSTOMER_IO_APP_KEY: z.string().min(1), // App API key (Bearer) for reading customer data
     CUSTOMER_IO_SITE_ID: z.string().min(1), // Site ID for Track API (Basic auth)
@@ -155,6 +154,7 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     FAL_AI_API_KEY: process.env.FAL_AI_API_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     DATOCMS_CMA_TOKEN: process.env.DATOCMS_CMA_TOKEN,
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
     OUTREACH_S2S_GUID: process.env.OUTREACH_S2S_GUID,
@@ -227,7 +227,8 @@ export const env = createEnv({
     R2_PREFIX: process.env.R2_PREFIX,
     R2_PUBLIC_BASE_URL: process.env.R2_PUBLIC_BASE_URL,
     CLOUDFLARE_STREAM_TOKEN: process.env.CLOUDFLARE_STREAM_TOKEN,
-    CLOUDFLARE_STREAM_WEBHOOK_SECRET: process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
+    CLOUDFLARE_STREAM_WEBHOOK_SECRET:
+      process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
     RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
     SLACK_API_TOKEN: process.env.SLACK_API_TOKEN,
     IMPACT_ACCOUNT_SID: process.env.IMPACT_ACCOUNT_SID,

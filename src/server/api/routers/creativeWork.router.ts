@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
+import { CREATIVE_IMAGE_MODEL_IDS } from "@/lib/creative-image-models";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { type db } from "@/server/db";
 import {
@@ -14,11 +15,12 @@ import {
   productionPacketTable,
 } from "@/server/db/schema";
 import { isFalConfigured } from "@/server/clients/fal.client";
+import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
 import {
   acceptCreativeCandidate,
   createProductionPacket,
   refreshCreativeRun,
-  submitPacketToFal,
+  submitPacketForImageGeneration,
 } from "@/server/services/creative-work.service";
 
 type Database = typeof db;
@@ -58,6 +60,7 @@ async function accessibleThread(
 export const creativeWorkRouter = createTRPCRouter({
   configuration: protectedProcedure.query(() => ({
     falConfigured: isFalConfigured,
+    googleConfigured: isGeminiImageConfigured,
   })),
 
   listThreads: protectedProcedure.query(async ({ ctx }) => {
@@ -315,15 +318,35 @@ export const creativeWorkRouter = createTRPCRouter({
       });
     }),
 
-  submitFal: protectedProcedure
-    .input(z.object({ packetId: z.string() }))
+  submitImage: protectedProcedure
+    .input(
+      z.object({
+        packetId: z.string(),
+        modelProfile: z.enum(CREATIVE_IMAGE_MODEL_IDS),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const membership = await membershipForUser(ctx.db, ctx.session.user.id);
-      return submitPacketToFal({
-        packetId: input.packetId,
+      return submitPacketForImageGeneration({
+        ...input,
         organizationId: membership.organizationId,
         userId: ctx.session.user.id,
       });
+    }),
+
+  latestRunForPacket: protectedProcedure
+    .input(z.object({ packetId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const membership = await membershipForUser(ctx.db, ctx.session.user.id);
+      return (
+        (await ctx.db.query.creativeRunTable.findFirst({
+          where: and(
+            eq(creativeRunTable.packetId, input.packetId),
+            eq(creativeRunTable.organizationId, membership.organizationId),
+          ),
+          orderBy: [desc(creativeRunTable.createdAt)],
+        })) ?? null
+      );
     }),
 
   getRun: protectedProcedure

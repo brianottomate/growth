@@ -31,10 +31,11 @@ reviewed provider-neutral production packet
 - `production_packet` is a provider-neutral handoff with purpose, prompt,
   constraints, format, references, and operator notes. It can belong to a
   content item and retains its originating thread.
-- `creative_run` contains adapter-specific execution state. Fal is the first
-  provider, but the table is intentionally not Fal-specific.
+- `creative_run` contains adapter-specific execution state. Fal and direct
+  Google Gemini generation are the first providers, but the table is
+  intentionally not provider-specific.
 - A generated candidate is temporary. Only explicit acceptance copies it into
-  Vercel Blob and creates a normal `media_asset` with generation provenance.
+  Cloudflare R2 and creates a normal `media_asset` with generation provenance.
   When linked to a content item it is also attached to that item's media pool.
 
 Removing the Fal client, route, and UI action later leaves sessions, packets,
@@ -50,14 +51,24 @@ path remains available as recovery.
 
 Fal credentials remain server-only. Submission opts out of provider input/output
 retention where supported and requests one-day temporary object lifetime. The
-candidate URL is accepted only from Fal-controlled HTTPS hosts, then copied
-immediately into Wander Growth's own Blob storage when the operator chooses it.
+candidate URL is accepted only from Fal-controlled HTTPS hosts or Fal's exact
+Google Storage bucket path, then copied immediately into Wander Growth's own R2
+storage when the operator chooses it.
+
+The operator can currently choose between the existing Flux profile through Fal
+and Google Nano Banana 2 directly through the Gemini API. Fal's hosted model
+schema does not accept a caller-supplied Google credential, so the direct Google
+adapter is what preserves Wander's Google authentication and billing. The
+selected provider and model are recorded on `creative_run`. The reviewed packet,
+negative prompt, handoff notes, and grounding rules are compiled into the actual
+generation prompt so critical constraints are not silently dropped by models
+without a separate negative-prompt field.
 
 ## Deliberate limits of the first slice
 
-- Fal generates a single Flux image candidate from the packet. Video and
-  multi-candidate exploration can be added as new adapters without changing the
-  packet contract.
+- The selected provider generates a single image candidate from the packet.
+  Video, carousel assembly, and multi-candidate exploration can be added without
+  changing the packet contract.
 - Production packets are copyable Markdown rather than proprietary export
   files. This keeps the external workflow universal while real usage reveals
   which structured exports are worth adding.
