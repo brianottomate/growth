@@ -4,6 +4,7 @@ import {
   CONSENT_MARKERS,
   INLINE_SIGNATURES,
   matchTracker,
+  matchTrackerUrl,
 } from "../lib/trackers.js";
 
 /**
@@ -40,31 +41,46 @@ export default defineTool({
 
     // Script/iframe/link URLs referenced by the document.
     const refs = new Set<string>();
+    // Absolute (https://…), protocol-relative (//…) AND root-relative (/amp/…).
+    // The last form is the one that carries first-party-proxied trackers; a
+    // pattern that only matched absolute URLs could never see them.
     const attrRe =
-      /<(?:script|iframe|img|link)\b[^>]*?(?:src|href)\s*=\s*["']((?:https?:)?\/\/[^"']+)["'][^>]*>/gi;
+      /<(?:script|iframe|img|link)\b[^>]*?(?:src|href)\s*=\s*["']((?:https?:)?\/\/[^"']+|\/[^"'/][^"']*)["'][^>]*>/gi;
     for (const m of html.matchAll(attrRe)) {
-      refs.add(m[1].startsWith("//") ? "https:" + m[1] : m[1]);
+      refs.add(m[1]);
     }
 
     const pageHost = new URL(res.url).hostname;
-    const external: { url: string; host: string }[] = [];
+
+    // Resolve every reference against the final URL. Relative refs matter: on
+    // Wander surfaces the trackers are fronted by SAME-ORIGIN rewrites (/amp/,
+    // /rdt/, /li/ …), so filtering to third-party hosts first — as this did —
+    // discarded exactly the requests we most need to see.
+    const resolved: { url: string; host: string; sameOrigin: boolean }[] = [];
     for (const r of refs) {
       try {
-        const h = new URL(r).hostname;
-        if (h !== pageHost) external.push({ url: r.slice(0, 200), host: h });
+        const u = new URL(r, res.url);
+        resolved.push({
+          url: u.toString().slice(0, 200),
+          host: u.hostname,
+          sameOrigin: u.hostname === pageHost,
+        });
       } catch {
         /* ignore unparsable */
       }
     }
 
-    const trackers = external
-      .map((e) => ({ ...e, match: matchTracker(e.host) }))
+    const external = resolved.filter((e) => !e.sameOrigin);
+
+    const trackers = resolved
+      .map((e) => ({ ...e, match: matchTrackerUrl(e.url) }))
       .filter((e) => e.match)
       .map((e) => ({
         host: e.host,
         url: e.url,
         vendor: e.match!.vendor,
         category: e.match!.category,
+        via: e.sameOrigin ? ("first-party proxy" as const) : ("third-party host" as const),
       }));
 
     const inlineHits = INLINE_SIGNATURES.filter((s) => s.pattern.test(html)).map((s) => ({

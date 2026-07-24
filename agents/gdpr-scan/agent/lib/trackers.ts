@@ -19,9 +19,10 @@ export const KNOWN_TRACKERS: TrackerSignature[] = [
   { host: "googlesyndication.com", vendor: "Google Ads", category: "advertising" },
   { host: "googleadservices.com", vendor: "Google Ads", category: "advertising" },
   { host: "doubleclick.net", vendor: "Google DoubleClick", category: "advertising" },
-  // — Meta
+  // — Meta. Note `facebook.com` is deliberately NOT a signature: it suffix-matches
+  // www./web./m.facebook.com, so any share widget or social icon read as a pixel.
+  // The tracking endpoint is matched by path in `matchTrackerUrl` instead.
   { host: "connect.facebook.net", vendor: "Meta Pixel", category: "advertising" },
-  { host: "facebook.com", vendor: "Meta (fb tr endpoint)", category: "advertising" },
   // — Wander's stack
   { host: "cdn.segment.com", vendor: "Segment", category: "analytics" },
   { host: "segment.io", vendor: "Segment", category: "analytics" },
@@ -50,13 +51,23 @@ export const KNOWN_TRACKERS: TrackerSignature[] = [
   { host: "cmp.osano.com", vendor: "Osano", category: "cmp" },
 ];
 
-/** Inline-JS fingerprints worth flagging even without a script src. */
+/**
+ * Inline-JS fingerprints worth flagging even without a script src.
+ *
+ * Patterns must match *code*, not prose — a bare /osano/i also matched our own
+ * CMP-evaluation copy, which turned every blog post about consent vendors into
+ * a finding. Anchor on syntax (a call, an assignment, a container id).
+ */
 export const INLINE_SIGNATURES: { pattern: RegExp; vendor: string; note: string }[] = [
   { pattern: /\bgtag\s*\(/, vendor: "Google gtag", note: "gtag() call in inline script" },
   { pattern: /\bfbq\s*\(/, vendor: "Meta Pixel", note: "fbq() call in inline script" },
   { pattern: /GTM-[A-Z0-9]{4,}/, vendor: "Google Tag Manager", note: "GTM container id in markup" },
   { pattern: /\bOptanonWrapper\b/, vendor: "OneTrust", note: "OneTrust callback present" },
-  { pattern: /\bosano\b/i, vendor: "Osano", note: "Osano reference present" },
+  {
+    pattern: /\bOsano\s*[.(]|cmp\.osano\.com/i,
+    vendor: "Osano",
+    note: "Osano CMP script or Osano.cm API call",
+  },
 ];
 
 /** Markers that the Wander consent architecture is present on the page. */
@@ -67,10 +78,54 @@ export const CONSENT_MARKERS: { pattern: RegExp; meaning: string }[] = [
   { pattern: /__bootOnInteraction/, meaning: "interaction-gated tracker boot" },
 ];
 
+/**
+ * First-party reverse-proxy paths that front a third-party tracker.
+ *
+ * Host matching alone is blind on our own estate: wander.com routes most vendors
+ * through same-origin rewrites (ad-blocker evasion), so the request never carries
+ * the vendor's hostname. These mirror the matchers in wander.com's
+ * `tests/e2e/consent-preconsent-leak.spec.ts` — keep the two lists in step.
+ */
+export const PROXY_PATH_SIGNATURES: { pattern: RegExp; vendor: string; category: TrackerCategory }[] =
+  [
+    { pattern: /\/amp\//, vendor: "Amplitude", category: "analytics" },
+    { pattern: /\/rdt\//, vendor: "Reddit Ads", category: "advertising" },
+    { pattern: /\/li\//, vendor: "LinkedIn Ads", category: "advertising" },
+    { pattern: /\/bp\//, vendor: "bidr", category: "advertising" },
+    { pattern: /\/pp\//, vendor: "PebblePost", category: "advertising" },
+    { pattern: /\/tvs\//, vendor: "TVSquared/Innovid", category: "advertising" },
+    { pattern: /\/oai\/|oaiq/, vendor: "OpenAI Ads", category: "advertising" },
+    { pattern: /\/gtag\/js|[?&]gtag=/, vendor: "Google (gtag/GTM)", category: "advertising" },
+    { pattern: /facebook\.com\/tr|fbevents/, vendor: "Meta Pixel", category: "advertising" },
+  ];
+
 export function matchTracker(host: string): TrackerSignature | null {
   const h = host.toLowerCase();
   for (const sig of KNOWN_TRACKERS) {
     if (h === sig.host || h.endsWith("." + sig.host)) return sig;
+  }
+  return null;
+}
+
+/**
+ * Match a full URL: third-party host first, then first-party proxy path. Use this
+ * rather than `matchTracker` wherever the whole URL is available — on Wander
+ * surfaces the proxy path is usually the only signal there is.
+ */
+export function matchTrackerUrl(url: string): TrackerSignature | null {
+  try {
+    const parsed = new URL(url);
+    const byHost = matchTracker(parsed.hostname);
+    if (byHost) return byHost;
+
+    const target = parsed.pathname + parsed.search;
+    for (const sig of PROXY_PATH_SIGNATURES) {
+      if (sig.pattern.test(target)) {
+        return { host: parsed.hostname, vendor: sig.vendor, category: sig.category };
+      }
+    }
+  } catch {
+    /* unparsable URL — no match */
   }
   return null;
 }

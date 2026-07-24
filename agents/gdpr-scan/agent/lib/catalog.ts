@@ -38,7 +38,27 @@ export const CATALOGS: Record<string, SiteCatalog> = {
   },
 };
 
+/**
+ * Resolve the catalog for a hostname.
+ *
+ * Deliberately not an exact-match lookup: wander.com 301s to www.wander.com, so
+ * the host we actually scan is never the bare apex. Without the walk below every
+ * declared wander.com vendor (Segment, Google Ads, Reddit, LinkedIn) came back as
+ * an undeclared 🟠 on the primary site — a false positive on the one site whose
+ * catalog we know for certain.
+ *
+ * Strategy: strip a leading `www.`, then walk parent domains, so `www.wander.com`
+ * and `app.wander.com` both land on the `wander.com` catalog. Unknown hosts fall
+ * through to the WanderOS merchant default.
+ */
 export function catalogFor(hostname: string): { key: string; catalog: SiteCatalog } {
-  const key = hostname in CATALOGS ? hostname : "*.wanderos-default";
-  return { key, catalog: CATALOGS[key] };
+  const host = hostname.toLowerCase().replace(/^www\./, "");
+
+  const labels = host.split(".");
+  for (let i = 0; i < labels.length - 1; i++) {
+    const candidate = labels.slice(i).join(".");
+    if (candidate in CATALOGS) return { key: candidate, catalog: CATALOGS[candidate] };
+  }
+
+  return { key: "*.wanderos-default", catalog: CATALOGS["*.wanderos-default"] };
 }

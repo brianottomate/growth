@@ -17,6 +17,11 @@ export default defineConfig(
       "node_modules/**",
       ".velite/**",
       "scripts/amplitude-taxonomy/**",
+      // `agents/**` are standalone sub-projects with their own package.json,
+      // dependencies and tsconfig (see agents/gdpr-scan). They are not part of
+      // the Next.js app and their imports (e.g. `eve`) don't resolve from the
+      // root install, so linting them here only produces phantom errors.
+      "agents/**",
     ],
   },
   // Base config for all JS/TS files
