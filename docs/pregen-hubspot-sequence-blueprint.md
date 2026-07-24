@@ -24,6 +24,8 @@ populated. Do not make enrollment part of copy approval.
 
 - The model owns the substantive email. HubSpot owns only the greeting,
   paragraph boundaries, preview-link slot, and default signature.
+- Be direct without being abrupt. Establish why this person is receiving this
+  message before offering an analysis or pitching the preview.
 - Touch 1 uses a model-written opening, the reviewed preview URL on its own
   paragraph, and a model-written closing. Touch 2 uses a model-written opening
   and closing.
@@ -62,15 +64,31 @@ company's associated HubSpot email activities. The company-history input keeps
 the names, company facts, subjects, direction, and message copy that make a
 reply specific. Raw headers and direct contact details are omitted.
 
+Generation is company-level and happens before the operator selects the
+enrolled contact. The prose may say that a named person asked a question, but it
+must not address that person or assume the eventual recipient wrote the
+message. The HubSpot greeting owns recipient-level naming.
+
 For re-engagement, an inbound reply takes priority over unanswered outbound
 messages. Prior outbound copy is conversation context, not proof that a product
 claim is true. Generation and enrollment remain separate actions.
 
+A PMS in the lead record is product-fit context, not proof of how the preview
+was populated. Do not say the preview pulls live from a named PMS unless
+authoritative operator context explicitly confirms that connection.
+
 ### Four-touch generation brief
 
-- **Touch 1:** introduce the private working preview using one concrete,
-  company-specific reason for the message. In re-engagement, use a real prior
-  question when one exists. Never say the sender built the site personally.
+- **Fresh touch 1:** begin with a natural first-person observation grounded in
+  one verifiable detail from the current site or lead record. Introduce the
+  sender as being with WanderOS, from the team behind Wander.com, by sentence
+  two or three. Then connect that observation to why the team prepared the
+  private preview.
+- **Re-engagement touch 1:** begin with the actual prior relationship, question,
+  reply, or discussion when one exists. Briefly re-introduce WanderOS so the
+  recipient does not need to remember the previous thread. If the history has
+  no meaningful exchange, use a current observation while acknowledging the
+  prior contact without saying only "following up."
 - **Touch 2:** explain the WanderOS fit for the prospect's current PMS, inventory,
   brand, or direct-booking setup without inventing a weakness in the current
   website.
@@ -81,6 +99,9 @@ claim is true. Generation and enrollment remain separate actions.
 Fresh outreach must introduce WanderOS and Wander.com because there is no prior
 relationship to rely on. Re-engagement should feel like the logical next
 message in the actual correspondence, not a generic recycled-lead template.
+Neither motion should open with a compressed consultant-style verdict such as
+"you already have unusually concrete reasons." The opening should sound like a
+person explaining why they wrote.
 
 Touches 3 and 4 are still static in the pilot sequences. The generator already
 produces reviewed drafts for all four touches; moving the final two templates to

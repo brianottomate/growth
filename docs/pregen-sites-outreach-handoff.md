@@ -146,6 +146,15 @@ Verified on July 24:
 - Subject: `A concrete answer to Ryan's WanderOS question`.
 - The first two touches are grounded in Cascadia's actual HubSpot correspondence,
   current website, Guesty lead record, and working Native+ preview.
+- The current generation brief distinguishes the two motions at the opening:
+  fresh outreach starts with a natural, verifiable prospect observation and
+  introduces WanderOS by sentence two or three; re-engagement starts with the
+  real prior relationship or question and briefly re-introduces WanderOS.
+- Both motions are direct without opening on an abrupt analytical verdict.
+- Generation is company-level: HubSpot owns the recipient greeting, while the
+  model may reference a prior correspondent only in the third person.
+- A lead's PMS can shape product-fit copy, but it cannot be presented as the
+  preview's live data source without explicit operator confirmation.
 - HubSpot default signature rendered correctly.
 - The original test automatically finished when the recipient replied.
 - The stale Fresh Outreach test enrollment was explicitly ended before creating
