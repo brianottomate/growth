@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "velite build && next build && drizzle-kit push",
+    "build": "velite build && next build",
     "check": "eslint . --cache && tsc --noEmit",
     "clean": "rm -rf node_modules .next .turbo .cache .velite .eslintcache bun.lock",
     "reinstall": "bun run clean && bun install",
