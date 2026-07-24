@@ -19,6 +19,7 @@ const item = (
   status: null,
   ownerId: null,
   body: `${subject} body`,
+  operatorTest: false,
 });
 
 describe("selectCompanyHistoryForGeneration", () => {
@@ -77,6 +78,34 @@ describe("selectCompanyHistoryForGeneration", () => {
           "outbound",
           "2026-07-20T10:00:00Z",
         ),
+      ],
+    };
+
+    const selected = selectCompanyHistoryForGeneration(history);
+    expect(selected.items.map((candidate) => candidate.engagementId)).toEqual([
+      "real",
+    ]);
+  });
+
+  test("removes operator self-test correspondence", () => {
+    const operatorTest = {
+      ...item(
+        "operator-test",
+        "A concrete answer to Ryan's WanderOS question",
+        "outbound" as const,
+        "2026-07-24T19:14:00Z",
+      ),
+      operatorTest: true,
+    };
+    const history: CompanyEmailHistory = {
+      companyId: "company-1",
+      available: 2,
+      retained: 2,
+      inbound: 0,
+      outbound: 2,
+      items: [
+        operatorTest,
+        item("real", "Ryan + WanderOS", "outbound", "2026-06-20T10:00:00Z"),
       ],
     };
 

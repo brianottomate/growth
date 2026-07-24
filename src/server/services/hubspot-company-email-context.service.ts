@@ -19,6 +19,7 @@ type HubSpotEmail = {
     hs_email_subject?: string | null;
     hs_email_text?: string | null;
     hs_email_html?: string | null;
+    hs_email_headers?: string | null;
   };
 };
 
@@ -30,6 +31,7 @@ export type CompanyEmailHistoryItem = {
   ownerId: string | null;
   subject: string;
   body: string;
+  operatorTest: boolean;
 };
 
 export type CompanyEmailHistory = {
@@ -49,7 +51,39 @@ const EMAIL_PROPERTIES = [
   "hs_email_subject",
   "hs_email_text",
   "hs_email_html",
+  "hs_email_headers",
 ] as const;
+
+type EmailAddress = {
+  email?: string;
+};
+
+type EmailHeaders = {
+  from?: EmailAddress;
+  to?: EmailAddress[];
+  cc?: EmailAddress[];
+  bcc?: EmailAddress[];
+};
+
+const OPERATOR_TEST_EMAILS = new Set(["kristian.e.boe@gmail.com"]);
+
+function isOperatorTestEmail(rawHeaders: string | null | undefined): boolean {
+  if (!rawHeaders) return false;
+  try {
+    const headers = JSON.parse(rawHeaders) as EmailHeaders;
+    const participants = [
+      headers.from,
+      ...(headers.to ?? []),
+      ...(headers.cc ?? []),
+      ...(headers.bcc ?? []),
+    ];
+    return participants.some((address) =>
+      OPERATOR_TEST_EMAILS.has(address?.email?.trim().toLowerCase() ?? ""),
+    );
+  } catch {
+    return false;
+  }
+}
 
 function token(): string {
   if (!env.HUBSPOT_ACCESS_TOKEN_OPERATED) {
@@ -157,6 +191,7 @@ export async function readHubspotCompanyEmailHistory(
         ownerId: properties.hubspot_owner_id ?? null,
         subject: properties.hs_email_subject?.trim() ?? "",
         body,
+        operatorTest: isOperatorTestEmail(properties.hs_email_headers),
       };
     })
     .filter((item): item is CompanyEmailHistoryItem => Boolean(item))

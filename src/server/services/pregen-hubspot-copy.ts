@@ -15,6 +15,7 @@ export function selectCompanyHistoryForGeneration(
 ): CompanyEmailHistory {
   const eligible = history.items.filter(
     (item) =>
+      !item.operatorTest &&
       !PILOT_SUBJECTS.some((pattern) => pattern.test(item.subject.trim())),
   );
   const selected = new Map<string, CompanyEmailHistoryItem>();

@@ -76,6 +76,10 @@ writes a private JSON file under
 It omits raw headers, direct email addresses, phone numbers, and URLs. The
 unmodified activity remains in HubSpot.
 
+Operator self-test traffic remains visible in the private company corpus but is
+flagged and excluded from model generation. This prevents the pilot emails and
+Kristian's planted test contact from being mistaken for real prospect history.
+
 ## Intended use
 
 Use the corpus to measure and distill how Wander reps actually write:
