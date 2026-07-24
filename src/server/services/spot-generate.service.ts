@@ -9,7 +9,7 @@ import { db } from "@/server/db";
 import { platformPostTable } from "@/server/db/schema";
 import { SPOT_PILL_INSTRUCTION, type SpotPill } from "@/lib/spot-pills";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 
 const CaptionSchema = z.object({
   caption: z

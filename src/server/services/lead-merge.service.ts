@@ -13,7 +13,7 @@ import type { LeadEnrichmentExtraction } from "./lead-extraction.service";
  * write and where (DB and/or HubSpot) — see leads.applyMerge.
  */
 
-const MERGE_MODEL = "claude-sonnet-4-5";
+const MERGE_MODEL = "claude-sonnet-5";
 
 // The fields we can write to BOTH our DB and HubSpot. Keep this list and the
 // applyMerge write-mapping in sync.

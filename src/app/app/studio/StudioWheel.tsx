@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
@@ -22,7 +22,20 @@ type Brand = { id: string; name: string; slug: string | null };
 
 const LABEL_W = 150; // sticky pillar-name gutter
 const TRACK_MIN = 1000; // min timeline width before horizontal scroll
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 const STATUS_OPACITY: Record<string, string> = {
   active: "opacity-100",
@@ -38,11 +51,17 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
   const router = useRouter();
   const [brandId, setBrandId] = useState(brands[0]!.id);
   const [year, setYear] = useState(2026);
-  const [draft, setDraft] = useState<{ pillarSlug: string; date: string } | null>(null);
+  const [draft, setDraft] = useState<{
+    pillarSlug: string;
+    date: string;
+  } | null>(null);
 
   // Deep-link into the Calendar, filtered to this brand (+ pillar) and focused
   // on the relevant month — the tactical, day-level counterpart to the wheel.
-  const goCalendar = (opts: { pillar?: string | null; at?: Date | string | null }) => {
+  const goCalendar = (opts: {
+    pillar?: string | null;
+    at?: Date | string | null;
+  }) => {
     const params = new URLSearchParams({ brand: brandId, y: String(year) });
     if (opts.pillar) params.set("pillar", opts.pillar);
     if (opts.at) params.set("m", String(new Date(opts.at).getMonth()));
@@ -93,11 +112,13 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
     (seriesByPillar.get("_unassigned")?.length ?? 0) > 0 ||
     (piecesByPillar.get("_unassigned")?.length ?? 0) > 0;
 
-  const trackRef = useRef<HTMLDivElement>(null);
   const { ref: bleedRef, style: bleedStyle } = useFullBleed();
 
   // Click a lane → resolve x to a date, open the produce drawer for that slot.
-  const onLaneClick = (e: React.MouseEvent<HTMLDivElement>, pillarSlug: string) => {
+  const onLaneClick = (
+    e: React.MouseEvent<HTMLDivElement>,
+    pillarSlug: string,
+  ) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const f = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     const date = new Date(yearStart + f * yearMs);
@@ -125,11 +146,23 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
             />
           )}
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="size-8" onClick={() => setYear((y) => y - 1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8"
+              onClick={() => setYear((y) => y - 1)}
+            >
               <ChevronLeft className="size-4" />
             </Button>
-            <span className="w-12 text-center text-sm font-semibold tabular-nums">{year}</span>
-            <Button variant="outline" size="icon" className="size-8" onClick={() => setYear((y) => y + 1)}>
+            <span className="w-12 text-center text-sm font-semibold tabular-nums">
+              {year}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8"
+              onClick={() => setYear((y) => y + 1)}
+            >
               <ChevronRight className="size-4" />
             </Button>
           </div>
@@ -149,7 +182,11 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
       </div>
 
       {/* Timeline */}
-      <div ref={bleedRef} style={bleedStyle} className="overflow-x-auto rounded-xl border">
+      <div
+        ref={bleedRef}
+        style={bleedStyle}
+        className="overflow-x-auto rounded-xl border"
+      >
         <div style={{ minWidth: LABEL_W + TRACK_MIN }}>
           {/* Month axis */}
           <div className="bg-muted/30 flex border-b text-[11px]">
@@ -177,7 +214,9 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
 
           {/* Pillar lanes */}
           {isLoading ? (
-            <div className="text-muted-foreground p-6 text-sm">Loading the year…</div>
+            <div className="text-muted-foreground p-6 text-sm">
+              Loading the year…
+            </div>
           ) : (
             <>
               {pillars.map((pillar) => (
@@ -200,7 +239,9 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
                         label={s.name}
                         status={s.status}
                         meta={`${s.postCount} piece${s.postCount === 1 ? "" : "s"}`}
-                        onOpen={() => goCalendar({ pillar: pillar.slug, at: s.startAt })}
+                        onOpen={() =>
+                          goCalendar({ pillar: pillar.slug, at: s.startAt })
+                        }
                       />
                     );
                   })}
@@ -222,13 +263,26 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
               ))}
 
               {hasUnassigned && (
-                <Lane label="Unassigned" color="#64748b" onClick={(e) => onLaneClick(e, pillars[0]?.slug ?? "")}>
+                <Lane
+                  label="Unassigned"
+                  color="#64748b"
+                  onClick={(e) => onLaneClick(e, pillars[0]?.slug ?? "")}
+                >
                   {(seriesByPillar.get("_unassigned") ?? []).map((s) => {
                     const a = frac(s.startAt);
                     const b = frac(s.endAt);
                     if (a == null || b == null) return null;
                     return (
-                      <SeriesBar key={s.id} left={a} width={Math.max(b - a, 0.02)} color={s.color ?? "#64748b"} label={s.name} status={s.status} meta={`${s.postCount} pieces`} onOpen={() => goCalendar({ at: s.startAt })} />
+                      <SeriesBar
+                        key={s.id}
+                        left={a}
+                        width={Math.max(b - a, 0.02)}
+                        color={s.color ?? "#64748b"}
+                        label={s.name}
+                        status={s.status}
+                        meta={`${s.postCount} pieces`}
+                        onOpen={() => goCalendar({ at: s.startAt })}
+                      />
                     );
                   })}
                 </Lane>
@@ -237,7 +291,7 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
               {/* Paid lane */}
               <Lane label="Campaigns" color="#f59e0b" muted>
                 {(data?.initiatives ?? []).length === 0 ? (
-                  <span className="text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 text-[11px]">
+                  <span className="text-muted-foreground absolute top-1/2 left-2 -translate-y-1/2 text-[11px]">
                     No campaigns this year
                   </span>
                 ) : (
@@ -246,7 +300,17 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
                     const b = frac(i.endAt);
                     if (a == null || b == null) return null;
                     return (
-                      <SeriesBar key={i.id} left={a} width={Math.max(b - a, 0.02)} color={i.color ?? "#f59e0b"} label={i.name} status={i.status} meta={i.goal ?? "paid"} dashed onOpen={() => goCalendar({ at: i.startAt })} />
+                      <SeriesBar
+                        key={i.id}
+                        left={a}
+                        width={Math.max(b - a, 0.02)}
+                        color={i.color ?? "#f59e0b"}
+                        label={i.name}
+                        status={i.status}
+                        meta={i.goal ?? "paid"}
+                        dashed
+                        onOpen={() => goCalendar({ at: i.startAt })}
+                      />
                     );
                   })
                 )}
@@ -257,7 +321,8 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
       </div>
 
       <p className="text-muted-foreground text-xs">
-        Tip: click anywhere in a pillar lane to draft content for that pillar + date.
+        Tip: click anywhere in a pillar lane to draft content for that pillar +
+        date.
       </p>
 
       {draft && (
@@ -293,13 +358,21 @@ function Lane({
         className="bg-background sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r px-3 py-2"
         style={{ width: LABEL_W }}
       >
-        <span className="size-2 shrink-0 rounded-full" style={{ background: color }} />
-        <span className={cn("truncate text-xs font-medium", muted && "text-muted-foreground")}>
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: color }}
+        />
+        <span
+          className={cn(
+            "truncate text-xs font-medium",
+            muted && "text-muted-foreground",
+          )}
+        >
           {label}
         </span>
       </div>
       <div
-        className="relative h-14 flex-1 cursor-pointer transition-colors hover:bg-accent/20"
+        className="hover:bg-accent/20 relative h-14 flex-1 cursor-pointer transition-colors"
         onClick={onClick}
       >
         {/* faint month gridlines */}
@@ -390,7 +463,10 @@ function PieceDot({
       <TooltipTrigger asChild>
         <div
           role={onOpen ? "button" : undefined}
-          className={cn("absolute bottom-1 -translate-x-1/2", onOpen && "cursor-pointer")}
+          className={cn(
+            "absolute bottom-1 -translate-x-1/2",
+            onOpen && "cursor-pointer",
+          )}
           style={{ left: `${left * 100}%` }}
           onClick={(e) => {
             e.stopPropagation();
@@ -398,14 +474,16 @@ function PieceDot({
           }}
         >
           <span
-            className="block size-2.5 rounded-full ring-2 ring-background"
+            className="ring-background block size-2.5 rounded-full ring-2"
             style={{ background: color }}
           />
         </div>
       </TooltipTrigger>
       <TooltipContent>
         <span className="font-medium">{label}</span>
-        {ai && <span className="text-muted-foreground block text-xs">AI draft</span>}
+        {ai && (
+          <span className="text-muted-foreground block text-xs">AI draft</span>
+        )}
       </TooltipContent>
     </Tooltip>
   );

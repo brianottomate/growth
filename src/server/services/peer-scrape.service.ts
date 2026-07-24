@@ -184,7 +184,6 @@ export function mapInstagramRecord(rec: Raw, brandId: string): Mapped | null {
   if (rec.error || !str(rec.id)) return null;
 
   const imageUrl = str(rec.image_url) ?? str(rec.displayUrl);
-  const videoUrl = str(rec.video_url) ?? str(rec.videoUrl);
   const media: MediaItem[] = [];
   const childPosts = arr(rec.childPosts) as Raw[];
   const mediaRecords = childPosts.length ? childPosts : [rec];

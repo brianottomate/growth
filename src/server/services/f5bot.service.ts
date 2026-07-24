@@ -26,7 +26,7 @@ import {
 // (not a regex) so we can watch what real emails look like in the logs first
 // and harden toward deterministic parsing later if we want.
 
-const EXTRACTION_MODEL = anthropic("claude-sonnet-4-6");
+const EXTRACTION_MODEL = anthropic("claude-sonnet-5");
 
 // ---- Extraction --------------------------------------------------------------
 

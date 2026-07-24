@@ -1,3 +1,4 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
 import { eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -13,7 +14,7 @@ import {
 } from "@/server/db/schema";
 
 type Ctx = {
-  db: typeof import("@/server/db").db;
+  db: Database;
   session: { user: { id: string } };
 };
 

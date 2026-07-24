@@ -26,7 +26,7 @@ import {
  * analog of capient's per-company brand profile.
  */
 
-const EVAL_MODEL = anthropic("claude-sonnet-4-6");
+const EVAL_MODEL = anthropic("claude-sonnet-5");
 
 const USER_AGENT =
   "web:wandercom-growth-reddit-monitor:0.1.0 (by /u/homi-scout-bot)";
@@ -179,6 +179,6 @@ export async function evaluateSubreddit(
     signalNotes: evaluated.signalNotes,
     subscribers: about?.subscribers,
     evaluatedAt: new Date().toISOString(),
-    evaluatedModel: "claude-sonnet-4-6",
+    evaluatedModel: "claude-sonnet-5",
   };
 }

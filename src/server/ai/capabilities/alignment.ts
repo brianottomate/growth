@@ -9,7 +9,7 @@ import { computeAudienceAlignment } from "@/server/services/audience-alignment.s
 import { orgBrandIds } from "./brands";
 import { growthAction } from "./types";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 
 // The model reasons over grounding we compute deterministically (DB intent +
 // Zernio-synced reality) rather than pulling the platforms itself — grounding

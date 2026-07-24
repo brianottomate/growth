@@ -545,7 +545,8 @@ export function SpotCard({
                   className="bg-muted group relative size-16 overflow-hidden rounded-lg border"
                 >
                   <MediaThumbnail
-                    src={m.thumbnail ?? m.url}
+                    src={m.url}
+                    thumbnail={m.thumbnail}
                     className="size-full object-cover"
                   />
                   {owned && (

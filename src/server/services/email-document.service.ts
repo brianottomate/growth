@@ -31,7 +31,7 @@ import {
 } from "@/server/db/schema";
 import { renderDesignSystemNewsletter } from "@/server/email/design-system-newsletter-renderer";
 
-export const EMAIL_GENERATION_MODEL = "claude-sonnet-4-6";
+export const EMAIL_GENERATION_MODEL = "claude-sonnet-5";
 
 const generatedDraftSchema = z.object({
   subject: z.string().trim().min(1).max(200),

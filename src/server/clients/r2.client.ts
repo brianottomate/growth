@@ -80,6 +80,15 @@ export function r2BuildKey(
     .join("/");
 }
 
+/**
+ * Key for the downscaled tile that accompanies an uploaded image. Derived from
+ * the original's key so the server never has to trust a client-supplied
+ * thumbnail URL — it can always recompute the one legal value.
+ */
+export function r2BuildThumbnailKey(originalKey: string): string {
+  return `${originalKey}.thumb.webp`;
+}
+
 /** Presign a PUT for direct browser upload. URL expires in `expiresIn` seconds. */
 export async function r2PresignPut(
   key: string,
@@ -239,6 +248,7 @@ export const R2 = {
   publicUrl: r2PublicUrl,
   isPublicUrl: r2IsPublicUrl,
   buildKey: r2BuildKey,
+  buildThumbnailKey: r2BuildThumbnailKey,
   analysisKeyPrefix: r2AnalysisKeyPrefix,
   buildAnalysisKey: r2BuildAnalysisKey,
   buildPosterKey: r2BuildPosterKey,

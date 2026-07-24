@@ -16,7 +16,7 @@ import {
 import { selectCompanyHistoryForGeneration } from "@/server/services/pregen-hubspot-copy";
 import { findPregenHubspotDraftViolations } from "@/server/services/pregen-hubspot-draft-policy";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 
 export const PregenMotionSchema = z.enum(["fresh", "reengagement"]);
 export type PregenMotion = z.infer<typeof PregenMotionSchema>;

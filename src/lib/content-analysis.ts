@@ -1,5 +1,5 @@
 export const CONTENT_ANALYSIS_VERSION = 1;
-export const CONTENT_ANALYSIS_MODEL = "claude-sonnet-4-6";
+export const CONTENT_ANALYSIS_MODEL = "claude-sonnet-5";
 
 export const CONTENT_ARTIFACT_KINDS = [
   "website",

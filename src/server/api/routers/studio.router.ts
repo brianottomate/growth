@@ -1,5 +1,15 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
-import { and, desc, eq, gte, inArray, isNotNull, isNull, lte } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+} from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -10,19 +20,20 @@ import {
   channelTable,
   contentPostTable,
   initiativeTable,
-  type MediaItem,
   memberTable,
   platformPostTable,
   seriesTable,
 } from "@/server/db/schema";
-import type { BrandFingerprint } from "@/server/db/brand-schema";
 import { createId } from "@/server/db/utils";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { keyDatesForYear } from "@/lib/key-dates";
-import { completeText, isClaudeConfigured } from "@/server/clients/claude.client";
+import {
+  completeText,
+  isClaudeConfigured,
+} from "@/server/clients/claude.client";
 
 type Ctx = {
-  db: typeof import("@/server/db").db;
+  db: Database;
   session: { user: { id: string } };
 };
 
@@ -31,7 +42,8 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
   const brand = await ctx.db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
-  if (!brand) throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
+  if (!brand)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Brand not found" });
   if (!brand.organizationId) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -45,7 +57,10 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
     ),
   });
   if (!membership) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this brand" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No access to this brand",
+    });
   }
   return brand;
 }
@@ -60,7 +75,8 @@ function parseJsonLoose<T>(text: string): T {
     .replace(/\s*```$/i, "");
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
-  const slice = start >= 0 && end >= 0 ? cleaned.slice(start, end + 1) : cleaned;
+  const slice =
+    start >= 0 && end >= 0 ? cleaned.slice(start, end + 1) : cleaned;
   return JSON.parse(slice) as T;
 }
 
@@ -71,7 +87,12 @@ export const studioRouter = createTRPCRouter({
    * client-side; this returns only the time-positioned items.
    */
   wheel: protectedProcedure
-    .input(z.object({ brandId: z.string(), year: z.number().int().min(2020).max(2100) }))
+    .input(
+      z.object({
+        brandId: z.string(),
+        year: z.number().int().min(2020).max(2100),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
       const yearStart = new Date(input.year, 0, 1);
@@ -202,7 +223,10 @@ export const studioRouter = createTRPCRouter({
         links.map((l) => [l.inspirationBrandId, l.purpose]),
       );
       const nameByBrand = new Map(
-        links.map((l) => [l.inspirationBrandId, l.inspirationBrand?.name ?? "Tracked"]),
+        links.map((l) => [
+          l.inspirationBrandId,
+          l.inspirationBrand?.name ?? "Tracked",
+        ]),
       );
 
       const refs = refBrandIds.length
@@ -214,7 +238,7 @@ export const studioRouter = createTRPCRouter({
         : [];
 
       const shape = (
-        p: typeof own[number],
+        p: (typeof own)[number],
         kind: "own" | "competitor" | "inspiration",
         brandName: string,
       ) => ({
@@ -233,7 +257,9 @@ export const studioRouter = createTRPCRouter({
         tracked: refs.map((p) =>
           shape(
             p,
-            purposeByBrand.get(p.brandId) === "competitor" ? "competitor" : "inspiration",
+            purposeByBrand.get(p.brandId) === "competitor"
+              ? "competitor"
+              : "inspiration",
             nameByBrand.get(p.brandId) ?? "Tracked",
           ),
         ),
@@ -297,12 +323,17 @@ export const studioRouter = createTRPCRouter({
       const prompt = [
         `Content pillar: ${pillar?.name ?? input.pillarSlug} — ${pillar?.description ?? ""}`,
         `Target date: ${when.toDateString()}${
-          nearby ? ` (near ${nearby.name} ${nearby.emoji} — ${nearby.note ?? ""})` : ""
+          nearby
+            ? ` (near ${nearby.name} ${nearby.emoji} — ${nearby.note ?? ""})`
+            : ""
         }`,
         input.steer ? `Extra direction: ${input.steer}` : "",
         refs.length
           ? `Reference posts for inspiration:\n${refs
-              .map((r, i) => `${i + 1}. [${r.platform}] ${r.text?.slice(0, 200) ?? ""}`)
+              .map(
+                (r, i) =>
+                  `${i + 1}. [${r.platform}] ${r.text?.slice(0, 200) ?? ""}`,
+              )
               .join("\n")}`
           : "",
         `Produce ONE main content idea and platform-specific hooks for: ${input.platforms.join(", ")}.`,
@@ -317,7 +348,12 @@ export const studioRouter = createTRPCRouter({
         .filter(Boolean)
         .join("\n\n");
 
-      const { text } = await completeText({ system, prompt, max_tokens: 1500, temperature: 0.8 });
+      const { text } = await completeText({
+        system,
+        prompt,
+        max_tokens: 1500,
+        temperature: 0.8,
+      });
 
       try {
         const draft = parseJsonLoose<{
@@ -407,7 +443,10 @@ export const studioRouter = createTRPCRouter({
         })
         .returning();
       if (!content) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create content" });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create content",
+        });
       }
 
       await ctx.db.insert(platformPostTable).values(
@@ -422,7 +461,7 @@ export const studioRouter = createTRPCRouter({
           origin: input.origin,
           ownerId: ctx.session.user.id,
           text: p.text ?? null,
-          media: (p.media) ?? null,
+          media: p.media ?? null,
         })),
       );
 

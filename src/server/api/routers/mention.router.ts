@@ -43,7 +43,10 @@ export const mentionRouter = {
       const mentions = input?.includeSkipped
         ? rows
         : rows.filter((m) => m.status !== "skipped");
-      return { mentions, skippedCount: rows.filter((m) => m.status === "skipped").length };
+      return {
+        mentions,
+        skippedCount: rows.filter((m) => m.status === "skipped").length,
+      };
     }),
 
   setStatus: protectedProcedure
@@ -79,7 +82,8 @@ export const mentionRouter = {
       } else {
         // Only overwrite when the caller provided a value (undefined = leave
         // as-is, so a plain "Mark engaged" never clobbers an existing link).
-        if (input.replyUrl !== undefined) patch.replyUrl = input.replyUrl || null;
+        if (input.replyUrl !== undefined)
+          patch.replyUrl = input.replyUrl || null;
         if (input.replyNote !== undefined)
           patch.replyNote = input.replyNote || null;
         if (input.decisionNote !== undefined)
@@ -114,7 +118,8 @@ export const mentionRouter = {
         .from(mentionTable)
         .where(eq(mentionTable.id, input.id))
         .limit(1);
-      if (!mention) return { success: false as const, error: "Mention not found" };
+      if (!mention)
+        return { success: false as const, error: "Mention not found" };
 
       const result = await postMentionToRadio(mention);
       return result.success

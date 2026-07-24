@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Dropzone } from "@/components/ui/dropzone";
+import { createImageThumbnail, THUMBNAIL_MIME } from "@/lib/image-thumbnail";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
@@ -119,17 +120,6 @@ const KIND_FILTERS: { value: string; label: string }[] = [
   { value: "video", label: "Video" },
   { value: "gif", label: "GIFs" },
 ];
-
-function readImageDimensions(
-  file: File,
-): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    img.onload = () => resolve({ width: img.width, height: img.height });
-    img.onerror = () => resolve({ width: 0, height: 0 });
-    img.src = URL.createObjectURL(file);
-  });
-}
 
 function formatBytes(bytes: number | null): string {
   if (!bytes) return "";
@@ -265,8 +255,9 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
 
       setUploadingCount((c) => c + 1);
       try {
-        const dims = isImage ? await readImageDimensions(file) : undefined;
-        const { mediaId, uploadUrl, publicUrl, pathname } =
+        // Images decode once for both dimensions and a downscaled grid tile.
+        const decoded = isImage ? await createImageThumbnail(file) : null;
+        const { mediaId, uploadUrl, publicUrl, pathname, thumbnailUploadUrl } =
           await createUploadUrl.mutateAsync({
             brandId,
             filename: file.name,
@@ -279,12 +270,25 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           body: file,
         });
         if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+
+        // Best-effort — a missing tile only means the grid uses the original.
+        let hasThumbnail = false;
+        if (decoded?.thumbnail && thumbnailUploadUrl) {
+          const putThumbnail = await fetch(thumbnailUploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": THUMBNAIL_MIME },
+            body: decoded.thumbnail,
+          }).catch(() => null);
+          hasThumbnail = Boolean(putThumbnail?.ok);
+        }
+
         await finalizeUpload.mutateAsync({
           mediaId,
           url: publicUrl,
           pathname,
-          width: dims?.width || undefined,
-          height: dims?.height || undefined,
+          width: decoded?.sourceWidth || undefined,
+          height: decoded?.sourceHeight || undefined,
+          hasThumbnail,
         });
         toast.success(`Uploaded ${file.name}`);
       } catch (err) {

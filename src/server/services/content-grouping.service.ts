@@ -31,7 +31,7 @@ import {
  * one model call each. Cross-batch series won't merge — acceptable for v1.
  */
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 const BATCH = 100;
 
 const GroupingsSchema = z.object({

@@ -45,7 +45,7 @@ import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
  */
 export const maxDuration = 60;
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 const NEXT_ACTIVE_TOOLS = [
   "workspaceOverview",
   "navigateWorkspace",

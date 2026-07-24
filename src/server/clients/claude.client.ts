@@ -44,31 +44,30 @@ export const anthropic = isClaudeConfigured
 // =====================================================
 
 /**
- * Claude model identifiers
+ * Claude model identifiers.
  *
- * Use these constants instead of hardcoded strings for type safety.
- * Updated as of January 2025.
+ * Prefer these constants over hardcoded strings — when a generation ships, this
+ * is the one place that should need editing.
  */
 export const CLAUDE_MODELS = {
-  // Sonnet models - Best balance of intelligence and speed
-  SONNET_4_5: "claude-sonnet-4-5-20250929", // Current: Fast, intelligent, best for most tasks
-  SONNET_4: "claude-sonnet-4-20250514", // Previous Sonnet 4
-  SONNET_3_7: "claude-sonnet-3-7-20250219", // Economy tier, 3x cheaper
-  SONNET_3_5: "claude-3-5-sonnet-20241022", // Legacy
+  // Current generation
+  SONNET_5: "claude-sonnet-5", // Default: best balance of intelligence and speed
+  OPUS_5: "claude-opus-5", // Most capable, expensive
+  HAIKU_4_5: "claude-haiku-4-5-20251001", // Fastest, most affordable
 
-  // Opus models - Maximum intelligence
-  OPUS_4_5: "claude-opus-4-5-20251101", // Most capable, expensive
-  OPUS_4: "claude-opus-4-20250514", // Previous Opus 4
-
-  // Haiku models - Fastest, most affordable
-  HAIKU_3_5: "claude-3-5-haiku-20241022", // Fast, affordable
+  // Superseded — kept so historical rows stay readable. Don't pick these for
+  // new work.
+  SONNET_4_5: "claude-sonnet-4-5-20250929",
+  SONNET_4: "claude-sonnet-4-20250514",
+  SONNET_3_7: "claude-sonnet-3-7-20250219",
+  SONNET_3_5: "claude-3-5-sonnet-20241022",
+  OPUS_4_5: "claude-opus-4-5-20251101",
+  OPUS_4: "claude-opus-4-20250514",
+  HAIKU_3_5: "claude-3-5-haiku-20241022",
 } as const;
 
-/**
- * Default model to use when not specified
- * Sonnet 4.5 is the best balance for most use cases
- */
-export const DEFAULT_MODEL = CLAUDE_MODELS.SONNET_4_5;
+/** Default model when a caller doesn't specify one. */
+export const DEFAULT_MODEL = CLAUDE_MODELS.SONNET_5;
 
 // =====================================================
 // BASIC MESSAGE CREATION
@@ -105,7 +104,10 @@ export async function createMessage(
     max_tokens?: number;
   },
 ): Promise<Message> {
-  console.log("🤖 [Claude] Creating message with model:", params.model ?? DEFAULT_MODEL);
+  console.log(
+    "🤖 [Claude] Creating message with model:",
+    params.model ?? DEFAULT_MODEL,
+  );
 
   const response = await anthropic.messages.create({
     model: params.model ?? DEFAULT_MODEL,
@@ -220,7 +222,10 @@ export async function streamMessage(
     max_tokens?: number;
   },
 ): Promise<AsyncIterable<MessageStreamEvent>> {
-  console.log("🌊 [Claude] Creating streaming message with model:", params.model ?? DEFAULT_MODEL);
+  console.log(
+    "🌊 [Claude] Creating streaming message with model:",
+    params.model ?? DEFAULT_MODEL,
+  );
 
   const stream = anthropic.messages.stream({
     model: params.model ?? DEFAULT_MODEL,
@@ -262,7 +267,10 @@ export async function collectStreamedResponse(
   const usage = { input_tokens: 0, output_tokens: 0 };
 
   for await (const event of stream) {
-    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+    if (
+      event.type === "content_block_delta" &&
+      event.delta.type === "text_delta"
+    ) {
       text += event.delta.text;
     } else if (event.type === "message_start") {
       usage.input_tokens = event.message.usage.input_tokens;
@@ -332,7 +340,10 @@ export async function continueConversation(params: {
   message: Message;
   updatedHistory: ConversationMessage[];
 }> {
-  const messages = [...params.history, { role: "user" as const, content: params.newMessage }];
+  const messages = [
+    ...params.history,
+    { role: "user" as const, content: params.newMessage },
+  ];
 
   const message = await createMessage({
     system: params.system,

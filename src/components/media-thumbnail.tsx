@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { ImageOff, Loader2 } from "lucide-react";
 
 import { cn } from "@/components/ui/lib/utils";
 
-function retryableSource(src: string, attempt: number) {
-  if (!attempt) return src;
+function cacheBusted(src: string) {
   try {
     const url = new URL(src);
     if (!url.hostname.endsWith(".r2.dev")) return src;
-    url.searchParams.set("_growth_retry", String(attempt));
+    url.searchParams.set("_growth_retry", "1");
     return url.toString();
   } catch {
     return src;
@@ -18,76 +18,77 @@ function retryableSource(src: string, attempt: number) {
 }
 
 /**
- * Content media can be several megabytes. Keep the tile intentional while the
- * full original loads and retry one transient R2 miss instead of leaving a
- * browser broken-image glyph behind.
+ * Grid tile for content media.
+ *
+ * Two layers of downscaling, because originals are routinely multi-megabyte
+ * 2000px+ PNGs: prefer the WebP tile written at upload time, and run whatever
+ * we show through next/image so the bytes on the wire match the rendered size.
+ *
+ * Sources are tried in order — tile, then original, then one cache-busted retry
+ * of the original — so an asset uploaded before tiles existed, or one whose
+ * tile PUT failed, still renders instead of showing a broken-image glyph.
  */
 export function MediaThumbnail({
   src,
+  thumbnail,
   alt = "",
   className,
+  sizes = "(max-width: 640px) 33vw, 200px",
 }: {
   src: string;
+  /** Downscaled tile, when the asset has one. */
+  thumbnail?: string | null;
   alt?: string;
   className?: string;
+  sizes?: string;
 }) {
-  const [attempt, setAttempt] = useState(0);
+  const candidates = useMemo(() => {
+    const ordered = [thumbnail, src, cacheBusted(src)].filter(
+      (candidate): candidate is string => Boolean(candidate),
+    );
+    return [...new Set(ordered)];
+  }, [src, thumbnail]);
+
+  const [index, setIndex] = useState(0);
   const [state, setState] = useState<"loading" | "loaded" | "failed">(
     "loading",
   );
-  const resolvedSrc = useMemo(
-    () => retryableSource(src, attempt),
-    [attempt, src],
-  );
 
   useEffect(() => {
+    setIndex(0);
     setState("loading");
-    const image = new window.Image();
-    image.onload = () => setState("loaded");
-    image.onerror = () => setState("failed");
-    image.src = resolvedSrc;
-    return () => {
-      image.onload = null;
-      image.onerror = null;
-    };
-  }, [resolvedSrc]);
+  }, [candidates]);
 
-  useEffect(() => setAttempt(0), [src]);
-
-  useEffect(() => {
-    if (state !== "failed" || attempt > 0) return;
-    const retry = window.setTimeout(() => {
-      setAttempt(1);
-      setState("loading");
-    }, 1_000);
-    return () => window.clearTimeout(retry);
-  }, [attempt, state]);
+  const current = candidates[Math.min(index, candidates.length - 1)] ?? src;
+  const exhausted = index >= candidates.length - 1;
 
   return (
     <>
       {state !== "loaded" && (
         <span className="bg-muted absolute inset-0 flex items-center justify-center">
-          {state === "failed" && attempt > 0 ? (
+          {state === "failed" ? (
             <ImageOff className="text-muted-foreground size-4" />
           ) : (
             <Loader2 className="text-muted-foreground size-4 animate-spin" />
           )}
         </span>
       )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        key={resolvedSrc}
-        src={resolvedSrc}
+      <Image
+        key={current}
+        src={current}
         alt={alt}
+        fill
+        sizes={sizes}
         className={cn(
           "transition-opacity",
           state === "loaded" ? "opacity-100" : "opacity-0",
           className,
         )}
-        loading="lazy"
-        decoding="async"
         onLoad={() => setState("loaded")}
-        onError={() => setState("failed")}
+        onError={() => {
+          if (exhausted) setState("failed");
+          else setIndex((current) => current + 1);
+        }}
       />
     </>
   );

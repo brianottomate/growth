@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
 import { toast } from "@/components/ui/toast";
+import { createImageThumbnail, THUMBNAIL_MIME } from "@/lib/image-thumbnail";
 import type { MediaItem } from "@/server/db/schema";
 
 // Mirrors the media library's accepted types (src/app/app/media/MediaLibrary.tsx).
@@ -16,24 +17,6 @@ const IMAGE_TYPES = [
   "image/gif",
 ];
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
-
-function readImageDimensions(
-  file: File,
-): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve({ width: img.width, height: img.height });
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve({ width: 0, height: 0 });
-    };
-    img.src = objectUrl;
-  });
-}
 
 /**
  * Reusable image-upload hook backed by the media library's presigned direct
@@ -73,33 +56,56 @@ export function useMediaUpload(brandId: string) {
           }
           setUploading((c) => c + 1);
           try {
-            const dims = await readImageDimensions(file);
-            const { mediaId, uploadUrl, publicUrl, pathname } =
-              await createUploadUrl.mutateAsync({
-                brandId,
-                filename: file.name,
-                mimeType: file.type,
-                size: file.size,
-              });
+            // One decode yields both the true dimensions and the tile.
+            const { sourceWidth, sourceHeight, thumbnail } =
+              await createImageThumbnail(file);
+            const {
+              mediaId,
+              uploadUrl,
+              publicUrl,
+              pathname,
+              thumbnailUploadUrl,
+              thumbnailPublicUrl,
+            } = await createUploadUrl.mutateAsync({
+              brandId,
+              filename: file.name,
+              mimeType: file.type,
+              size: file.size,
+            });
             const put = await fetch(uploadUrl, {
               method: "PUT",
               headers: { "Content-Type": file.type },
               body: file,
             });
             if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+
+            // Best-effort: a missing tile just means the grid falls back to the
+            // original, so never fail the upload over it.
+            let thumbnailUrl: string | undefined;
+            if (thumbnail && thumbnailUploadUrl && thumbnailPublicUrl) {
+              const putThumbnail = await fetch(thumbnailUploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": THUMBNAIL_MIME },
+                body: thumbnail,
+              }).catch(() => null);
+              if (putThumbnail?.ok) thumbnailUrl = thumbnailPublicUrl;
+            }
+
             await finalizeUpload.mutateAsync({
               mediaId,
               url: publicUrl,
               pathname,
-              width: dims.width || undefined,
-              height: dims.height || undefined,
+              width: sourceWidth || undefined,
+              height: sourceHeight || undefined,
+              hasThumbnail: Boolean(thumbnailUrl),
             });
             out[index] = {
               url: publicUrl,
               type: "image",
               assetId: mediaId,
-              width: dims.width || undefined,
-              height: dims.height || undefined,
+              width: sourceWidth || undefined,
+              height: sourceHeight || undefined,
+              ...(thumbnailUrl ? { thumbnail: thumbnailUrl } : {}),
             };
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Upload failed");

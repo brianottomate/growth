@@ -56,6 +56,13 @@ export const db = drizzle({
   casing: "snake_case",
 });
 
+/**
+ * The shared client's type. Routers and services that take a `db` in their own
+ * context object should annotate with this rather than re-deriving it via
+ * `typeof import(...)`, which the lint config forbids.
+ */
+export type Database = typeof db;
+
 // Transaction-capable client that creates WebSocket connections on demand
 const createTransactionClient = () => {
   const pool = new Pool({

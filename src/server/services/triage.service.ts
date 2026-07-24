@@ -21,8 +21,8 @@ import type { SubredditProfile } from "@/server/db/listening-schema";
  */
 
 // Centralized model knobs — bump in one place.
-export const TRIAGE_SCORING_MODEL = anthropic("claude-sonnet-4-6");
-export const TRIAGE_DRAFT_MODEL = anthropic("claude-opus-4-7");
+export const TRIAGE_SCORING_MODEL = anthropic("claude-sonnet-5");
+export const TRIAGE_DRAFT_MODEL = anthropic("claude-opus-5");
 
 export const SUGGESTED_ACTIONS = ["engage", "monitor", "skip"] as const;
 export type SuggestedAction = (typeof SUGGESTED_ACTIONS)[number];

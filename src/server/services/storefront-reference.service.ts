@@ -33,7 +33,7 @@ import {
   type ProductStorefrontActor,
 } from "./product-storefront.service";
 
-export const STOREFRONT_REFERENCE_MODEL = "claude-sonnet-4-6";
+export const STOREFRONT_REFERENCE_MODEL = "claude-sonnet-5";
 
 export const captureStorefrontReferenceSchema = z.object({
   storefrontId: z.string().min(1),

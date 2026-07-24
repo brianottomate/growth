@@ -95,7 +95,8 @@ export function ContentPool({
             >
               <div className="bg-muted relative aspect-square overflow-hidden rounded-md">
                 <MediaThumbnail
-                  src={m.thumbnail ?? m.url}
+                  src={m.url}
+                  thumbnail={m.thumbnail}
                   className="size-full object-cover"
                 />
                 {onPool && (

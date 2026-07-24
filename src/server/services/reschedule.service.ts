@@ -11,7 +11,7 @@ import { keyDatesForYear } from "@/lib/key-dates";
 
 // House rule: generateText + Output.object (never generateObject). Mirrors
 // content-grouping.service.ts / plan-moment.service.ts.
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 
 const RescheduleSchema = z.object({
   moves: z

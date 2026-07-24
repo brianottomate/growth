@@ -13,7 +13,7 @@
  *
  * Run: bun run src/scripts/import-transactional.ts
  */
-import { eq, ilike, sql } from "drizzle-orm";
+import { ilike } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
@@ -55,7 +55,11 @@ const ROWS: SeedRow[] = [
     provider: "customerio",
     providerRef: { envVar: "CIO_MAGIC_LINK_MESSAGE_ID" },
     codeRefs: [
-      { repo: REPO, path: "src/users/auth/module/src/utils/magic/email.ts", line: 72 },
+      {
+        repo: REPO,
+        path: "src/users/auth/module/src/utils/magic/email.ts",
+        line: 72,
+      },
     ],
     templateSource: "cio_ui",
     templateKey: "marketplace.transactional.guest.email-code",
@@ -166,7 +170,11 @@ const ROWS: SeedRow[] = [
       ["checkInTime", true],
       ["checkOutTime", true],
       ["totalNights", true],
-      ["receipt", false, "object: total, tax, nightlyPrice, nightTotal, items[], coupons[], pointsUsed, creditsUsed — omitted on reschedules"],
+      [
+        "receipt",
+        false,
+        "object: total, tax, nightlyPrice, nightTotal, items[], coupons[], pointsUsed, creditsUsed — omitted on reschedules",
+      ],
       ["beforeGap", false],
       ["afterGap", false],
     ]),
@@ -276,7 +284,8 @@ const ROWS: SeedRow[] = [
   {
     key: "booking.host_reminder",
     name: "Host intro reminder",
-    description: "Reminds the host ahead of an upcoming stay (intro-email shape).",
+    description:
+      "Reminds the host ahead of an upcoming stay (intro-email shape).",
     workspace: "os",
     domain: "booking",
     criticality: "operational",
@@ -322,7 +331,10 @@ const ROWS: SeedRow[] = [
     triggerKind: "event",
     triggerEvent: "New booking lands for an owner's unit (batched)",
     provider: "customerio",
-    providerRef: { envVar: "CIO_NEW_OWNER_BOOKING_MESSAGE_ID", defaultId: "47" },
+    providerRef: {
+      envVar: "CIO_NEW_OWNER_BOOKING_MESSAGE_ID",
+      defaultId: "47",
+    },
     codeRefs: [
       {
         repo: REPO,
@@ -593,7 +605,8 @@ const ROWS: SeedRow[] = [
       ["(passthrough)", true, "getMessageData(notification.data)"],
     ]),
     status: "live_legacy",
-    notes: "No w9-rejected template in design-system-emails yet — template gap.",
+    notes:
+      "No w9-rejected template in design-system-emails yet — template gap.",
   },
   {
     key: "os.owner_unread_chat",
@@ -624,7 +637,10 @@ const ROWS: SeedRow[] = [
     triggerKind: "event",
     triggerEvent: "Task assigned to a vendor",
     provider: "customerio",
-    providerRef: { envVar: "CIO_VENDOR_TASK_ASSIGNED_MESSAGE_ID", defaultId: "36" },
+    providerRef: {
+      envVar: "CIO_VENDOR_TASK_ASSIGNED_MESSAGE_ID",
+      defaultId: "36",
+    },
     codeRefs: [
       {
         repo: REPO,
@@ -662,7 +678,10 @@ const ROWS: SeedRow[] = [
     triggerAnchor: "task_due",
     triggerLabel: "cron sweep after due date",
     provider: "customerio",
-    providerRef: { envVar: "CIO_VENDOR_TASK_OVERDUE_MESSAGE_ID", defaultId: "72" },
+    providerRef: {
+      envVar: "CIO_VENDOR_TASK_OVERDUE_MESSAGE_ID",
+      defaultId: "72",
+    },
     codeRefs: [
       {
         repo: REPO,
@@ -674,7 +693,11 @@ const ROWS: SeedRow[] = [
     templateKey: "marketplace.transactional.services.overdue-task",
     dataContract: contract([
       ["taskCount", true],
-      ["tasks", true, "array: unitName, dueDate, daysOverdue, priority, taskUrl"],
+      [
+        "tasks",
+        true,
+        "array: unitName, dueDate, daysOverdue, priority, taskUrl",
+      ],
       ["vendorPortalUrl", true],
       ["vendorName", false],
     ]),
@@ -930,7 +953,11 @@ const ROWS: SeedRow[] = [
       ["accountName", true, "underscored duplicate account_name deprecated"],
       ["inviteName", true, "underscored duplicate inviter_name deprecated"],
       ["inviteUrl", true, "underscored duplicate invite_url deprecated"],
-      ["propertyNames", true, "underscored duplicate property_names deprecated"],
+      [
+        "propertyNames",
+        true,
+        "underscored duplicate property_names deprecated",
+      ],
     ]),
     previewProps: {
       orgName: "{{accountName}}",
@@ -989,7 +1016,10 @@ const ROWS: SeedRow[] = [
     triggerEvent: "Monthly owner statement published",
     triggerLabel: "monthly publishing process",
     provider: "customerio",
-    providerRef: { envVar: "CIO_STATEMENT_PUBLISH_MESSAGE_ID", defaultId: "49" },
+    providerRef: {
+      envVar: "CIO_STATEMENT_PUBLISH_MESSAGE_ID",
+      defaultId: "49",
+    },
     codeRefs: [
       {
         repo: REPO,

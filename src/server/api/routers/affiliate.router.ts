@@ -42,8 +42,13 @@ export const affiliateRouter = {
       const rows = await db
         .select()
         .from(affiliateItemTable)
-        .where(input?.kind ? eq(affiliateItemTable.kind, input.kind) : undefined)
-        .orderBy(desc(affiliateItemTable.receivedAt), desc(affiliateItemTable.createdAt))
+        .where(
+          input?.kind ? eq(affiliateItemTable.kind, input.kind) : undefined,
+        )
+        .orderBy(
+          desc(affiliateItemTable.receivedAt),
+          desc(affiliateItemTable.createdAt),
+        )
         .limit(input?.limit ?? 200);
       const items = input?.includeDismissed
         ? rows
@@ -78,7 +83,8 @@ export const affiliateRouter = {
         patch.replyNote = null;
         patch.decisionNote = null;
       } else {
-        if (input.replyNote !== undefined) patch.replyNote = input.replyNote || null;
+        if (input.replyNote !== undefined)
+          patch.replyNote = input.replyNote || null;
         if (input.decisionNote !== undefined)
           patch.decisionNote = input.decisionNote || null;
       }

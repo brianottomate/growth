@@ -28,7 +28,7 @@ import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
  */
 export const maxDuration = 60;
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 export async function POST(req: Request): Promise<Response> {
   const session = await getSession();
   if (!session?.user) return new Response("Unauthorized", { status: 401 });

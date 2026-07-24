@@ -25,7 +25,7 @@ import {
 // and at this program's volume (single-digit actions/week) an LLM can review
 // every single one rather than sampling. Output is a Slack post, not a PDF.
 
-const REPORT_MODEL = anthropic("claude-sonnet-4-6");
+const REPORT_MODEL = anthropic("claude-sonnet-5");
 
 const REPORT_SYSTEM = `You write the weekly report for Wander's affiliate program
 (vacation rentals; runs on Impact.com; recently taken in-house from an agency).

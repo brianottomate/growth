@@ -1,3 +1,4 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -30,7 +31,7 @@ import {
 import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 
 type Ctx = {
-  db: typeof import("@/server/db").db;
+  db: Database;
   session: { user: { id: string } };
 };
 

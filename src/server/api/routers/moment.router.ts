@@ -1,3 +1,4 @@
+import type { Database } from "@/server/db";
 import { z } from "zod";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -21,7 +22,7 @@ import {
 
 async function assertOwnedBrandAccess(
   ctx: {
-    db: typeof import("@/server/db").db;
+    db: Database;
     session: { user: { id: string } };
   },
   brandId: string,

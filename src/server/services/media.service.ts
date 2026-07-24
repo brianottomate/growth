@@ -30,6 +30,8 @@ function safeFilename(filename: string, fallback = "file"): string {
 }
 
 const MAX_IMPORTED_IMAGE_BYTES = 25 * 1024 * 1024;
+/** Format the browser encodes downscaled tiles as. */
+const THUMBNAIL_MIME = "image/webp";
 
 async function fetchPublicImage(rawUrl: string): Promise<{
   body: Buffer;
@@ -135,7 +137,32 @@ export async function createR2Upload(input: {
     .where(eq(mediaAssetTable.id, asset.id));
 
   const uploadUrl = await R2.presignPut(key, input.mimeType);
-  return { mediaId: asset.id, uploadUrl, publicUrl, pathname: key };
+
+  // Images also get a presigned slot for a browser-downscaled tile. The grid
+  // renders that instead of a multi-megabyte original; callers that skip it
+  // just leave `thumbnailUrl` null and fall back to the full image.
+  const thumbnail =
+    kind === "image"
+      ? await (async () => {
+          const thumbnailKey = R2.buildThumbnailKey(key);
+          return {
+            thumbnailUploadUrl: await R2.presignPut(
+              thumbnailKey,
+              THUMBNAIL_MIME,
+            ),
+            thumbnailPathname: thumbnailKey,
+            thumbnailPublicUrl: R2.publicUrl(thumbnailKey),
+          };
+        })()
+      : null;
+
+  return {
+    mediaId: asset.id,
+    uploadUrl,
+    publicUrl,
+    pathname: key,
+    ...(thumbnail ?? {}),
+  };
 }
 
 /** Mark an R2 upload complete (called by the browser after the PUT succeeds). */
@@ -145,6 +172,8 @@ export async function finalizeR2Upload(input: {
   pathname: string;
   width?: number;
   height?: number;
+  /** The browser PUT a downscaled tile to the presigned thumbnail slot. */
+  hasThumbnail?: boolean;
 }) {
   const asset = await getMedia(input.mediaId);
   if (asset?.provider !== "r2") return null;
@@ -152,12 +181,19 @@ export async function finalizeR2Upload(input: {
     throw new Error("Upload does not match the media asset");
   }
 
+  // Derived, never client-supplied — the only key the presign could have been
+  // issued for.
+  const thumbnailUrl = input.hasThumbnail
+    ? R2.publicUrl(R2.buildThumbnailKey(asset.r2Key))
+    : null;
+
   const [updated] = await db
     .update(mediaAssetTable)
     .set({
       status: "ready",
       width: input.width ?? null,
       height: input.height ?? null,
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
     })
     .where(eq(mediaAssetTable.id, input.mediaId))
     .returning();
@@ -751,6 +787,14 @@ export async function deleteMedia(id: string) {
     R2.delete(asset.r2Key).catch((error) =>
       console.error(`R2 delete failed for ${asset.id}:`, error),
     );
+    // Derived tiles are separate objects — without this they outlive the asset
+    // forever. Only ours: an externally-set thumbnail isn't at this key.
+    const derivedThumbnailKey = R2.buildThumbnailKey(asset.r2Key);
+    if (asset.thumbnailUrl === R2.publicUrl(derivedThumbnailKey)) {
+      R2.delete(derivedThumbnailKey).catch((error) =>
+        console.error(`R2 thumbnail delete failed for ${asset.id}:`, error),
+      );
+    }
   } else if (asset.provider === "stream" && asset.streamUid) {
     Stream.deleteVideo(asset.streamUid).catch((error) =>
       console.error(`Stream delete failed for ${asset.streamUid}:`, error),

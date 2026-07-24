@@ -32,7 +32,7 @@ import { PILLARS } from "@/lib/pillars";
  * weekly.
  */
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 const WINDOW_DAYS = 60;
 
 export type TargetSuggestion = {
