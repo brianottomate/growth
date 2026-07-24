@@ -1,11 +1,11 @@
 # HubSpot sequence blueprint: pregen personalized pilot
 
-## Account constraint
+## Seat access
 
-HubSpot sequence creation and editing is unavailable to Kristian's current
-view-only seat. A paid Sales Hub Enterprise user must create this in HubSpot's
-UI. HubSpot's public API can read and enroll sequences but cannot create or edit
-them.
+Kristian's Sales Hub Enterprise seat was activated and sequence creation access
+was verified in HubSpot on July 24, 2026. HubSpot's public API can read and
+enroll sequences but cannot create or edit them, so initial sequence setup still
+happens in HubSpot's UI.
 
 ## Sequence
 
