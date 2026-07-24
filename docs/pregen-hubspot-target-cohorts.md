@@ -58,3 +58,8 @@ bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts --apply
 It never deletes webhook rows. `processed_at` means either projected or
 explicitly classified with a `process_note`; the raw payload remains available
 for later contact-mirror or hierarchy work.
+
+Production also runs `/api/cron/hubspot` every ten minutes. The receiver normally
+projects events immediately after acknowledging them; the cron replays any
+remaining raw payloads through the same signed receiver so a transient
+projection failure heals automatically.
