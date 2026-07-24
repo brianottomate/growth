@@ -1,12 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { Campaign, Initiative } from "@/server/db/schema";
-import {
-  diffInitiative,
-  nameTokens,
-  scoreSuggestion,
-  windowsOverlap,
-} from "./ads-alignment.service";
+import { diffInitiative, scoreSuggestion } from "./ads-alignment.service";
 
 // Minimal fixture builders — only fields the diff reads, cast to full rows.
 function initiative(overrides: Partial<Initiative> = {}): Initiative {
@@ -56,52 +51,14 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
   };
 }
 
-describe("nameTokens", () => {
-  it("lowercases, splits on non-alphanumerics, drops short tokens, dedupes", () => {
-    expect(nameTokens("Supply Push Q3", "supply-push-q3")).toEqual([
-      "supply",
-      "push",
-    ]);
-  });
-
-  it("handles null/undefined parts", () => {
-    expect(nameTokens(null, undefined, "")).toEqual([]);
-  });
-});
-
-describe("windowsOverlap", () => {
-  const d = (s: string) => new Date(s);
-
-  it("overlapping windows", () => {
-    expect(
-      windowsOverlap(d("2026-07-01"), d("2026-09-30"), d("2026-08-01"), null),
-    ).toBe(true);
-  });
-
-  it("disjoint windows", () => {
-    expect(
-      windowsOverlap(
-        d("2026-07-01"),
-        d("2026-09-30"),
-        d("2026-10-01"),
-        d("2026-12-01"),
-      ),
-    ).toBe(false);
-  });
-
-  it("fully open sides always overlap", () => {
-    expect(windowsOverlap(null, null, null, null)).toBe(true);
-  });
-});
-
 describe("scoreSuggestion", () => {
-  it("rejects platforms outside targetChannels", () => {
+  it("does not suggest a campaign on a channel outside the initiative", () => {
     expect(
       scoreSuggestion(initiative(), campaign({ platform: "x_ads" })),
     ).toBeUndefined();
   });
 
-  it("rejects non-overlapping date windows", () => {
+  it("does not suggest a campaign that ran outside the initiative window", () => {
     expect(
       scoreSuggestion(
         initiative(),
@@ -113,7 +70,7 @@ describe("scoreSuggestion", () => {
     ).toBeUndefined();
   });
 
-  it("scores by token overlap", () => {
+  it("ranks eligible campaigns by meaningful initiative-name overlap", () => {
     expect(scoreSuggestion(initiative(), campaign())).toBe(1); // "supply"
     expect(
       scoreSuggestion(
@@ -124,6 +81,19 @@ describe("scoreSuggestion", () => {
     expect(
       scoreSuggestion(initiative(), campaign({ name: "Brand awareness" })),
     ).toBe(0);
+  });
+
+  it("keeps open-ended campaigns eligible when their active dates overlap", () => {
+    expect(
+      scoreSuggestion(
+        initiative(),
+        campaign({
+          name: "Supply expansion",
+          startAt: new Date("2026-08-01"),
+          endAt: null,
+        }),
+      ),
+    ).toBe(1);
   });
 });
 
