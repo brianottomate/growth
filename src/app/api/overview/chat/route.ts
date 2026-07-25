@@ -54,6 +54,10 @@ const NEXT_ACTIVE_TOOLS = [
   "contentRead",
   "contentWrite",
   "contentMediaWrite",
+  // Resolves Drive folder/file names to ids so the chat can compose
+  // browse -> importFromDrive -> makeCarousel. MCP hosts bring their own
+  // Drive connector instead (see policy.ts).
+  "driveRead",
   "contentStrategyRead",
   "contentStrategyWrite",
   "researchRead",

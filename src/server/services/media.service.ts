@@ -32,14 +32,14 @@ function safeFilename(filename: string, fallback = "file"): string {
 const MAX_IMPORTED_IMAGE_BYTES = 25 * 1024 * 1024;
 /** Format the browser encodes downscaled tiles as. */
 const THUMBNAIL_MIME = "image/webp";
-/** Image types accepted from any import path (upload, remote URL, Drive). */
-const DRIVE_SAFE_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-  "image/gif",
-] as const;
+/**
+ * Image types any import path will store — direct upload, remote URL, or a
+ * connector. Derived from MEDIA_MIME so there is one list, not three.
+ */
+const IMPORTABLE_IMAGE_TYPES: readonly string[] = [
+  ...MEDIA_MIME.image,
+  ...MEDIA_MIME.gif,
+];
 
 async function fetchPublicImage(rawUrl: string): Promise<{
   body: Buffer;
@@ -70,15 +70,7 @@ async function fetchPublicImage(rawUrl: string): Promise<{
     }
     const contentType =
       response.headers.get("content-type")?.split(";")[0]?.toLowerCase() ?? "";
-    if (
-      ![
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-        "image/avif",
-        "image/gif",
-      ].includes(contentType)
-    ) {
+    if (!IMPORTABLE_IMAGE_TYPES.includes(contentType)) {
       throw new Error(`Remote file is not a supported image (${contentType}).`);
     }
     const declaredSize = Number(response.headers.get("content-length") ?? 0);
@@ -232,9 +224,9 @@ export async function verifyR2Upload(mediaId: string) {
 /**
  * Store already-downloaded image bytes as a library asset.
  *
- * Split out of `importRemoteImage` so authenticated sources (Google Drive)
- * can reuse the exact same R2 key layout, row shape and provenance handling —
- * they just can't reach the file over a plain public fetch.
+ * Split out of `importRemoteImage` so sources that need their own auth to
+ * fetch (a connector, say) reuse the exact same R2 key layout, row shape and
+ * provenance handling instead of growing a parallel path.
  */
 export async function importImageBuffer(input: {
   brandId: string;
@@ -251,9 +243,7 @@ export async function importImageBuffer(input: {
   sourceProvider?: string;
   metadata?: Record<string, unknown>;
 }) {
-  if (
-    !(DRIVE_SAFE_IMAGE_TYPES as readonly string[]).includes(input.contentType)
-  ) {
+  if (!IMPORTABLE_IMAGE_TYPES.includes(input.contentType)) {
     throw new Error(`Unsupported image type (${input.contentType}).`);
   }
   if (input.body.byteLength > MAX_IMPORTED_IMAGE_BYTES) {
@@ -270,8 +260,8 @@ export async function importImageBuffer(input: {
 
   let thumbnailUrl: string | null = null;
   if (input.thumbnail) {
-    // Drive hands back JPEG tiles, the browser encodes WebP — name the object
-    // after what's actually in it.
+    // Callers differ on encoding (browser uploads are WebP, some connectors
+    // hand back JPEG) — name the object after what's actually in it.
     const thumbnailKey = R2.buildThumbnailKey(
       key,
       extensionForImageMime(input.thumbnail.contentType),

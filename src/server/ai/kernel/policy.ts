@@ -98,9 +98,15 @@ export const growthActionPolicies = {
     search: read("provider-read", PRODUCT),
     readPage: read("provider-read", PRODUCT),
   },
+  // PRODUCT, not ALL — same call as researchRead. An MCP host almost always
+  // has its own Drive connector, and it is a better file search than this one;
+  // duplicating it just widens Growth's surface. External callers resolve
+  // their own file ids and hand them to contentMediaWrite.importFromDrive,
+  // which still fetches the bytes server-side so they never cross the model.
+  // The in-app chat has no such connector, so it keeps both actions.
   driveRead: {
-    status: read(),
-    browse: read("provider-read"),
+    status: read("local-read", PRODUCT),
+    browse: read("provider-read", PRODUCT),
   },
   contentRead: {
     pipeline: read(),

@@ -2,9 +2,41 @@ import "server-only";
 
 import { z } from "zod";
 
+import { and, eq, isNull } from "drizzle-orm";
+
+import { db } from "@/server/db";
+import { contentPostTable } from "@/server/db/content-schema";
+import { ContentService } from "@/server/services/content.service";
 import { GoogleDriveService } from "@/server/services/google-drive.service";
 import { isDriveFolder } from "@/lib/google-drive";
 import { growthAction } from "./types";
+import type { CapabilityContext } from "./types";
+
+/**
+ * Local copy of the content-work-item guard.
+ *
+ * Deliberately not imported from ./content: the dependency runs connector ->
+ * core, never the reverse, so the central content capability file stays free
+ * of connector imports and Drive can be deleted without touching it.
+ */
+async function requireContentWorkItem(
+  contentPostId: string,
+  ctx: CapabilityContext,
+) {
+  const content = await db.query.contentPostTable.findFirst({
+    where: and(
+      eq(contentPostTable.id, contentPostId),
+      isNull(contentPostTable.deletedAt),
+    ),
+    with: { brand: true },
+  });
+  if (!content || content.brand?.organizationId !== ctx.orgId) {
+    throw new Error(
+      "That content work item is not available in this organization.",
+    );
+  }
+  return content;
+}
 
 /**
  * Read-only Drive discovery.
@@ -69,6 +101,65 @@ export const driveConnectionStatus = growthAction({
         : connection.configured
           ? "Ask the operator to open /app/media and click Drive → Connect Google Drive."
           : "Google Drive is not configured in this environment.",
+    };
+  },
+});
+
+/**
+ * Drive is the team's working store, so this is often the shortest path from
+ * "the designer finished" to "it's in the pool" — no download/re-upload round
+ * trip through the operator's machine.
+ */
+export const importDriveFilesToContent = growthAction({
+  description:
+    "Import images from the operator's Google Drive into a content work item's media pool. Use driveRead.browse first to resolve names to file IDs, and pass fileIds in the intended slide order — that order becomes the pool/carousel order. Requires the operator to have connected Drive in Growth; if not connected this fails and they must click Connect Google Drive on /app/media.",
+  inputSchema: z.object({
+    contentPostId: z.string(),
+    fileIds: z.array(z.string().trim().min(1).max(200)).min(1).max(20),
+  }),
+  execute: async ({ contentPostId, fileIds }, ctx) => {
+    const content = await requireContentWorkItem(contentPostId, ctx);
+    if ((content.media?.length ?? 0) + fileIds.length > 50) {
+      throw new Error(
+        "This import would exceed the 50-item content media pool.",
+      );
+    }
+
+    const { imported, failures } = await GoogleDriveService.importFiles({
+      userId: ctx.userId,
+      brandId: content.brandId,
+      fileIds,
+    });
+
+    const items = imported.flatMap((asset) =>
+      asset.url
+        ? [
+            {
+              url: asset.url,
+              type: "image" as const,
+              assetId: asset.id,
+              thumbnail: asset.thumbnailUrl ?? asset.url,
+              ...(asset.width ? { width: asset.width } : {}),
+              ...(asset.height ? { height: asset.height } : {}),
+            },
+          ]
+        : [],
+    );
+    if (items.length) {
+      await ContentService.setPoolMedia({
+        contentPostId: content.id,
+        media: [...(content.media ?? []), ...items],
+      });
+    }
+
+    return {
+      ok: items.length > 0,
+      contentPostId: content.id,
+      mediaAssetIds: items.map((item) => item.assetId),
+      mediaCount: items.length,
+      failures,
+      url: `/app/content/${content.id}`,
+      next: "Call contentMediaWrite.makeCarousel with these mediaAssetIds in the intended order for each target platform post.",
     };
   },
 });
