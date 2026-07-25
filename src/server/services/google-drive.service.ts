@@ -7,6 +7,7 @@ import { accountTable } from "../db/schema";
 import { auth } from "../better-auth";
 import { env } from "@/env";
 import {
+  DRIVE_PROVIDER_ID,
   DRIVE_READONLY_SCOPE,
   isDriveFolder,
   resizeDriveThumbnail,
@@ -19,21 +20,22 @@ import { MediaService } from "./media.service";
 const THUMBNAIL_EDGE = 640;
 
 /**
- * Google Drive rides on the existing better-auth Google account rather than a
- * bespoke connection table: the user already signs in with their Wander
- * account, so "connect Drive" is an incremental-consent re-link that adds the
- * Drive scope to that same account row. better-auth owns the token exchange,
- * encryption-at-rest policy and refresh, which is why there is no OAuth
- * callback route in this file.
+ * Drive is its own linked account (`google-drive`), registered through
+ * better-auth's generic-OAuth plugin with credentials separate from Google
+ * sign-in — see DRIVE_PROVIDER_ID for why that separation is load-bearing.
+ *
+ * better-auth still owns the authorize redirect, PKCE, callback, token storage
+ * and refresh, so there is no OAuth route in this file. Connecting or revoking
+ * Drive touches only this account row and never the user's session.
  */
 export function isDriveConfigured(): boolean {
-  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  return Boolean(env.GOOGLE_DRIVE_CLIENT_ID && env.GOOGLE_DRIVE_CLIENT_SECRET);
 }
 
 export type DriveConnection = {
   configured: boolean;
   connected: boolean;
-  /** Signed in with Google but hasn't granted the Drive scope yet. */
+  /** Linked the Drive account but the read scope is missing — reconnect. */
   needsConsent: boolean;
   accountId: string | null;
 };
@@ -54,7 +56,7 @@ export async function driveConnection(
   const account = await db.query.accountTable.findFirst({
     where: and(
       eq(accountTable.userId, userId),
-      eq(accountTable.providerId, "google"),
+      eq(accountTable.providerId, DRIVE_PROVIDER_ID),
     ),
     columns: { id: true, scope: true },
   });
@@ -89,7 +91,7 @@ async function driveAccessToken(userId: string): Promise<string> {
   }
 
   const token = await auth.api
-    .getAccessToken({ body: { providerId: "google", userId } })
+    .getAccessToken({ body: { providerId: DRIVE_PROVIDER_ID, userId } })
     .catch((error: unknown) => {
       throw new GoogleDriveError(
         error instanceof Error

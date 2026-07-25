@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import { authClient } from "@/server/better-auth/client";
-import { DRIVE_READONLY_SCOPE, isDriveFolder } from "@/lib/google-drive";
+import { DRIVE_PROVIDER_ID, isDriveFolder } from "@/lib/google-drive";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,11 +31,10 @@ type Crumb = { id: string; name: string };
 /**
  * Pull creative straight out of Drive.
  *
- * "Connect" is an incremental-consent re-link of the Google account the user
- * already signed in with, so there's no separate account to manage — Growth
- * just asks for one more scope. Selected files are rehosted into R2 (Drive
- * URLs need the viewer's own credentials, so linking them would break for
- * everyone else).
+ * "Connect" links a dedicated `google-drive` account, kept separate from
+ * however the user signs in. Selected files are rehosted into R2 — a Drive URL
+ * needs the viewer's own credentials, so linking one would break for everyone
+ * else.
  */
 export function GoogleDriveImportDialog({
   brandId,
@@ -91,11 +90,15 @@ export function GoogleDriveImportDialog({
     }),
   );
 
-  // Full-page redirect — an OAuth consent screen can't run inside fetch().
+  /**
+   * Links a *separate* `google-drive` account to the signed-in user — not extra
+   * scopes on their Google login, so connecting or later revoking Drive never
+   * touches how they sign in. Full-page redirect, since an OAuth consent screen
+   * can't run inside fetch().
+   */
   const connect = () =>
-    authClient.linkSocial({
-      provider: "google",
-      scopes: [DRIVE_READONLY_SCOPE],
+    authClient.oauth2.link({
+      providerId: DRIVE_PROVIDER_ID,
       callbackURL: window.location.pathname,
     });
 

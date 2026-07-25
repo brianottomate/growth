@@ -270,7 +270,12 @@ export async function importImageBuffer(input: {
 
   let thumbnailUrl: string | null = null;
   if (input.thumbnail) {
-    const thumbnailKey = R2.buildThumbnailKey(key);
+    // Drive hands back JPEG tiles, the browser encodes WebP — name the object
+    // after what's actually in it.
+    const thumbnailKey = R2.buildThumbnailKey(
+      key,
+      extensionForImageMime(input.thumbnail.contentType),
+    );
     thumbnailUrl = await R2.putBuffer(
       thumbnailKey,
       input.thumbnail.body,

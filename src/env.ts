@@ -20,6 +20,10 @@ export const env = createEnv({
     RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
+    // Separate OAuth client from sign-in: connecting Drive must never alter
+    // how someone logs in, and revoking Drive must not revoke their session.
+    GOOGLE_DRIVE_CLIENT_ID: z.string().optional(),
+    GOOGLE_DRIVE_CLIENT_SECRET: z.string().optional(),
     ADMIN_TOKEN: z.string().min(32), // Require strong token (32+ chars)
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
@@ -150,6 +154,8 @@ export const env = createEnv({
     RESEND_REPLY_TO_EMAIL: process.env.RESEND_REPLY_TO_EMAIL,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    GOOGLE_DRIVE_CLIENT_ID: process.env.GOOGLE_DRIVE_CLIENT_ID,
+    GOOGLE_DRIVE_CLIENT_SECRET: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
     ADMIN_TOKEN: process.env.ADMIN_TOKEN,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,

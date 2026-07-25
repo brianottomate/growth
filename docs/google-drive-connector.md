@@ -4,16 +4,21 @@ Pulls creative out of Drive and rehosts it in Growth's own media library. Read-o
 
 ## How it works
 
-Drive rides on the **existing better-auth Google account**, not a bespoke connection table. The user already signs in with their Wander Google account, so "Connect Drive" is an incremental-consent re-link (`authClient.linkSocial` with one extra scope) against that same `account` row.
+Drive is its own linked account — provider id `google-drive`, registered through better-auth's **generic-OAuth plugin** with its own OAuth client, separate from Google sign-in.
 
-That is the main design decision, and it deletes most of the usual OAuth work: better-auth already owns the authorize redirect, PKCE, the callback route, refresh-token storage, and rotation. `auth.api.getAccessToken({ providerId: "google", userId })` returns a valid access token and refreshes when needed, so no code here ever touches a refresh token.
+That separation is the main design decision, and it is load-bearing for two concrete reasons:
 
-(For contrast, Capient's Outlook integration hand-rolls all of that — `external_account_connection`, AES-256-GCM envelopes, an HMAC-signed state cookie, a callback route. That shape is right when the provider isn't already your sign-in provider. Here it is, so we don't pay for it.)
+1. **Google revokes per app grant, not per scope.** Sharing the sign-in client would mean someone revoking Drive access at `myaccount.google.com/permissions` also kills the refresh token that logs them into Growth.
+2. **Account linking is on** (`trustedProviders: ["google"]`). Asking the sign-in provider for Drive scopes would give an email/password user a Google login they never opted into. Connecting a file source must not change how anyone authenticates.
+
+Separation costs no token plumbing, because the plugin registers its providers into better-auth's internal `socialProviders` map. So `auth.api.getAccessToken({ providerId: "google-drive", userId })` still returns a valid token and refreshes when needed — no OAuth route, no encryption envelope, no state cookie, and no code here ever touches a refresh token.
+
+(For contrast, Capient's Outlook integration hand-rolls all of that — `external_account_connection`, AES-256-GCM envelopes, an HMAC-signed state cookie, a callback route. Correct there, because Microsoft isn't its sign-in provider and it has no equivalent plugin.)
 
 ```
 UI (GoogleDriveImportDialog)
   └─ tRPC googleDrive.{status,browse,importFiles,importFolder}
-       └─ google-drive.service   ← better-auth getAccessToken (refresh)
+       └─ google-drive.service   ← getAccessToken("google-drive") (refresh)
             └─ google-drive.client (thin, origin-checked fetch on Drive v3)
                  └─ MediaService.importImageBuffer → R2 + media_asset row
 ```
@@ -26,33 +31,25 @@ Order is preserved end to end: input order → pool order → carousel slide ord
 
 ## Setup (one-time, ~5 minutes)
 
-Everything below happens in Google Cloud project **`wander-growth-ads-mcp`** as **kristian@wander.com**. Until it's done, the feature degrades gracefully: `status.configured` is `false` and the dialog says so instead of erroring.
+**This is already done** in Google Cloud project `wander-growth-ads-mcp` — recorded here so it can be reproduced or audited.
 
-1. **OAuth consent screen** → set **User type: Internal**.
-   This is the important one. `drive.readonly` is a Google _restricted_ scope; an **External** app using it needs a third-party CASA security assessment (slow, paid). An **Internal** app — Workspace users only — skips verification entirely. Since only Wander staff use Growth, Internal is both cheaper and more correct.
+1. **OAuth consent screen: User type = Internal.** `drive.readonly` is a Google _restricted_ scope; an **External** app using it needs a third-party CASA security assessment (slow, paid). An **Internal** app — Workspace users only — skips verification entirely.
 
-2. **Enable the Google Drive API**
-   `https://console.cloud.google.com/apis/library/drive.googleapis.com?project=wander-growth-ads-mcp`
+2. **Google Drive API enabled.**
 
-3. **Create an OAuth client** → _APIs & Services → Credentials → Create credentials → OAuth client ID → Web application_. Authorized redirect URIs:
+3. **OAuth client "Growth Drive Connector"** (Web application), separate from the existing "Growth Tracker (Better Auth)" sign-in client. Authorized redirect URIs — note the generic-OAuth callback path, which differs from the social-provider one:
 
    ```
-   http://localhost:3000/api/auth/callback/google
-   https://kristianeboe-65.beta.localcan.dev/api/auth/callback/google
-   https://growth-red.vercel.app/api/auth/callback/google
+   http://localhost:3000/api/auth/oauth2/callback/google-drive
+   https://kristianeboe-65.beta.localcan.dev/api/auth/oauth2/callback/google-drive
+   https://growth-red.vercel.app/api/auth/oauth2/callback/google-drive
    ```
 
-   (`/api/auth/callback/:provider` is better-auth's own path — it's already mounted at `src/app/api/auth/[...all]/route.ts`.)
+4. **Credentials stored** as `GOOGLE_DRIVE_CLIENT_ID` / `GOOGLE_DRIVE_CLIENT_SECRET` in Doppler `wander-growth` dev/stg/prd and local `.env`. Distinct from `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, which remain reserved for Google sign-in and are still unset.
 
-4. **Store the credentials.** They're read by `src/env.ts` as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — the same pair the dormant Google SSO code has been waiting on, so this lights that up too.
+   > Two client secrets currently exist on the Drive client: the original (never captured anywhere) and the one in use. Delete the unused one in the console — Google flags having two as a risk.
 
-   ```bash
-   doppler secrets set GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET --project wander-growth --config dev
-   ```
-
-   Repeat for `stg` and `prd`, and add both to local `.env`.
-
-5. **Restart the dev server**, open `/app/media`, click **Drive** → **Connect Google Drive**, and approve the Drive scope.
+5. Open `/app/media` → **Drive** → **Connect Google Drive**, and approve.
 
 ## Using it
 
@@ -61,9 +58,15 @@ Everything below happens in Google Cloud project **`wander-growth-ads-mcp`** as 
 
 ## Notes and limits
 
-- Scope requested: `https://www.googleapis.com/auth/drive.readonly`.
+- Scopes requested: `openid`, `email`, `profile`, `https://www.googleapis.com/auth/drive.readonly`. `profile` is not optional — the plugin resolves the account against Google's userinfo and rejects a response with no name (`name_is_missing`).
+- `accessType: "offline"` + `prompt: "consent"` — Google only issues a refresh token with both.
 - Only image types the library already accepts (jpeg, png, webp, avif, gif); 25 MB per file, matching direct upload.
 - Shared drives are included (`supportsAllDrives`, `corpora=allDrives`) — brand creative usually lives in one.
 - Google Docs/Sheets/Slides are **not** exported; only real image files are listed and imported.
 - Per-file failures are collected and returned rather than aborting the batch, so one bad file doesn't lose the rest.
 - The connection is per-user, not per-org: each person grants their own Drive access, and imports run as whoever clicked.
+- Thumbnails are stored as `<key>.thumb.<ext>` matching the tile's real content type (Drive returns JPEG; browser uploads encode WebP).
+
+## Verified
+
+Against real credentials and a real Drive on 2026-07-25: consent round trip completed (`connected: true`), `browse` returned live Wander Drive folders and images, and `importFiles` copied two 1280x720 JPEGs into R2 with byte sizes matching Drive exactly, thumbnails generated, `sourceProvider = "google_drive"`, and all objects serving 200. Test assets were deleted afterwards.

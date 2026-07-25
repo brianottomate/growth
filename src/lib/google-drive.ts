@@ -16,6 +16,19 @@
 export const DRIVE_READONLY_SCOPE =
   "https://www.googleapis.com/auth/drive.readonly";
 
+/**
+ * Drive is a *separate* linked account from Google sign-in, registered through
+ * better-auth's generic-OAuth plugin with its own client credentials.
+ *
+ * Keeping them apart matters for two concrete reasons. Google revocation is
+ * per-app-grant, not per-scope — sharing a client means revoking Drive access
+ * also kills the refresh token that signs you in. And with account linking
+ * enabled, adding Drive to the sign-in provider would give email/password
+ * users a Google login they never asked for. Connecting a file source must not
+ * change how anyone authenticates.
+ */
+export const DRIVE_PROVIDER_ID = "google-drive";
+
 /** Image types Growth can rehost. Mirrors the media library's own list. */
 export const DRIVE_IMAGE_MIME_TYPES = [
   "image/jpeg",

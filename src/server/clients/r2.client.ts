@@ -85,8 +85,11 @@ export function r2BuildKey(
  * the original's key so the server never has to trust a client-supplied
  * thumbnail URL — it can always recompute the one legal value.
  */
-export function r2BuildThumbnailKey(originalKey: string): string {
-  return `${originalKey}.thumb.webp`;
+export function r2BuildThumbnailKey(
+  originalKey: string,
+  extension = "webp",
+): string {
+  return `${originalKey}.thumb.${extension}`;
 }
 
 /** Presign a PUT for direct browser upload. URL expires in `expiresIn` seconds. */

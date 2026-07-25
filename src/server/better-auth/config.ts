@@ -5,6 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
   admin,
   bearer,
+  genericOAuth,
   jwt,
   username,
   organization,
@@ -344,6 +345,47 @@ export const auth = betterAuth({
     // Preserve bearer-session support for the app's server API while MCP
     // clients use OAuth access tokens below.
     bearer(),
+    /**
+     * Google Drive as its own linked account — deliberately NOT extra scopes on
+     * the Google sign-in provider above.
+     *
+     * Google revokes per app grant rather than per scope, so a shared client
+     * would mean "revoke Drive" also logs the person out of Growth. And with
+     * account linking enabled, asking the sign-in provider for Drive would hand
+     * email/password users a Google login they never opted into.
+     *
+     * The plugin registers this into `socialProviders` internally, so
+     * `auth.api.getAccessToken({ providerId: "google-drive" })` still handles
+     * refresh — separation costs us no token plumbing.
+     */
+    genericOAuth({
+      config:
+        env.GOOGLE_DRIVE_CLIENT_ID && env.GOOGLE_DRIVE_CLIENT_SECRET
+          ? [
+              {
+                providerId: "google-drive",
+                clientId: env.GOOGLE_DRIVE_CLIENT_ID,
+                clientSecret: env.GOOGLE_DRIVE_CLIENT_SECRET,
+                discoveryUrl:
+                  "https://accounts.google.com/.well-known/openid-configuration",
+                // `profile` is not optional here: the plugin resolves the
+                // account against Google's userinfo and rejects a response with
+                // no name (`name_is_missing`).
+                scopes: [
+                  "openid",
+                  "email",
+                  "profile",
+                  "https://www.googleapis.com/auth/drive.readonly",
+                ],
+                // Google only returns a refresh token when both are set, and
+                // only re-issues one on an explicit consent prompt.
+                accessType: "offline",
+                prompt: "consent",
+                pkce: true,
+              },
+            ]
+          : [],
+    }),
     username(),
     admin({
       adminUserIds: [], // Add admin user IDs here when needed
