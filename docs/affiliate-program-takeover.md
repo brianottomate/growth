@@ -140,6 +140,8 @@ crons: /api/cron/affiliate?job=daily|weekly|monthly ──► affiliate-monitor.
 services ──► scoreItems/draftReply (triage.service.ts, unchanged)
          ──► affiliate_item / affiliate_partner / affiliate_metric_daily (affiliate-schema.ts)
          ──► postOnSlack → #radio-affiliate (+ owner ping, slackTs persisted)
+             (partner-email items are NOT posted — owners already get the mail;
+              set AFFILIATE_RADIO_EMAIL_ALERTS=true to re-enable)
 UI: /app/affiliate — tabs: inbox | applications | partners | reports | playbook
     (Listen.tsx tab pattern; setup-task amber panel for dashboard-only Impact actions)
 ```
