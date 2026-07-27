@@ -75,7 +75,7 @@ Key insight: webprobe's authenticated pass repurposes as a **post-consent pass**
 - **Merchant GTM policy**: `Trackers.astro` boots merchant GTM containers whose contents are invisible to our gate. Preferred: no-GTM policy + curated integration catalog + AI-triage for custom scripts (SRI-pinned, category-declared, CSP-bounded). CMP auto-blocking only earns its keep if GTM stays permitted.
 - **Jurisdiction candidates**: BR (LGPD), CA (Québec Law 25 — needs region-level signal, country flip would catch all of Canada). One-line change in `OPT_IN_COUNTRIES` + vendored contract + conformance vectors.
 - **Merchant opt-in-everywhere toggle**: per-merchant "consent-required globally" config option (EU-heavy merchants will want it; don't make it the default — US signal loss).
-- **Osano decision** after the UC technical session: buy records/DSAR console or build internal view.
+- **Osano integration (option-dependent, §3)**: if Option A (UC) → a UC Core API client that `POST`s consent records (`POST /v2/consents`, `/v2/consents/gpc`) and optionally `GET`s for server reads. If Option B (standard CMP) → the client adapter, already built in [tracking#69](https://github.com/wandercom/tracking/pull/69). Either way gated on trial creds + confirmed `OPT-OUT`/`STORAGE` semantics; our own engine (and, under A, our own banner) stay.
 
 ## 6b. Remaining launch-blockers — ownership (debrief view)
 
@@ -86,7 +86,7 @@ Key insight: webprobe's authenticated pass repurposes as a **post-consent pass**
 | Pre-consent-leak CI test | wander.com e2e (+ per-PR CI) | in progress | Kristian → Platform | Yes (the one control worth keeping; scanning half is the `gdpr-scan` agent, §4) |
 | WanderOS sanitizer + CSP | wander-sites-website | NOT started; being reframed as a "limit merchant GTM containers" handoff-talk topic | CPA / Camille + a handoff-talk decision | Yes for PM-site coverage |
 | /cookies → DB mirror | wander.com/app client | endpoint exists (#20620); client mirror-on-login NOT wired | Kristian | Needed for logged-in server enforcement |
-| Vendor CMP adapter (banner + consume signals) | tracking-web | NOT started; pending vendor pick | Kristian | Once vendor signed |
+| Osano adapter (consume vendor signal) | tracking-web/core | BUILT — [tracking#69](https://github.com/wandercom/tracking/pull/69): `mapOsanoConsent` + `subscribeToOsanoConsent`. Additive/inert until a consumer calls it. Consumers must still suppress their own banner when Osano is the source | Kristian | No (unblocks Option B) |
 | DSAR deletion propagation | monolith + tracking-server | NOT started (`bypassConsent` hook exists) | Compliance + Camille | Before EU launch |
 | Login reconciliation (stricter-wins) | monolith + tracking-web | designed not built (§6) | Kristian + Camille | No (phase-2) |
 
