@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/spend",
-      "schedule": "30 5 * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/growth?job=daily_comprehensive_sync&hoursBack=24&concurrency=6&limit=1000",
@@ -10,11 +10,31 @@
     },
     {
       "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
-      "schedule": "*/20 * * * *"
+      "schedule": "*/5 13-21 * * 1-5"
+    },
+    {
+      "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
+      "schedule": "0 0-12,22,23 * * 1-5"
+    },
+    {
+      "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
+      "schedule": "0 * * * 0,6"
     },
     {
       "path": "/api/cron/growth?job=funnel_email_backfill",
-      "schedule": "30 */6 * * *"
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/hubspot",
+      "schedule": "*/5 13-21 * * 1-5"
+    },
+    {
+      "path": "/api/cron/hubspot",
+      "schedule": "0 0-12,22,23 * * 1-5"
+    },
+    {
+      "path": "/api/cron/hubspot",
+      "schedule": "0 * * * 0,6"
     },
     {
       "path": "/api/cron/instagram",
@@ -35,10 +55,6 @@
     {
       "path": "/api/cron/channels?limit=100&concurrency=4&staleDays=30",
       "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/hubspot",
-      "schedule": "*/10 * * * *"
     }
   ]
 }

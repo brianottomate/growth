@@ -155,14 +155,33 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 
 ### Cron jobs (`vercel.json` → `src/app/api/cron/`)
 
-- `/api/cron/spend` — daily 05:30 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
+- `/api/cron/spend` — daily 05:00 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
 - `/api/cron/growth?job=daily_comprehensive_sync&...` — daily 03:00 (comprehensive CIO/lead sync)
-- `/api/cron/growth?job=funnel_abandonment_sweep&...` — every 20 min (abandonment sweep)
-- `/api/cron/growth?job=funnel_email_backfill` — every 6h at :30 (funnel email backfill)
+- `/api/cron/growth?job=funnel_abandonment_sweep&...` — peak/off-peak (abandonment sweep)
+- `/api/cron/growth?job=funnel_email_backfill` — every 6h on the hour (funnel email backfill)
+- `/api/cron/hubspot` — peak/off-peak (pending HubSpot webhook retry)
 - `/api/cron/instagram` — daily 19:00 UTC (Instagram account watch)
 - `/api/cron/x` — every 6h (X listening scan)
 - `/api/cron/affiliate` — daily 09:00 + weekly report Mon 14:00 (Impact.com monitor)
 - `/api/cron/channels` — daily 04:00 (channel stats refresh)
+
+### Cron cadence is a Neon compute budget
+
+What costs money is not the number of jobs but the number of distinct **wake windows**:
+Neon scale-to-zero idles after ~3 min, so each wake costs ~3.5 min of compute whether the
+job takes 200ms or 30s. Two crons on `*/10` + `*/20` kept the compute awake ~16 h/day and
+burned the 100 CPU-hr quota by the 27th, taking prod down (2026-07-27).
+
+The two hot jobs (`funnel_abandonment_sweep`, `hubspot`) are therefore split by time of day:
+
+- **Peak** `*/5 13-21 * * 1-5` — every 5 min, 09:00–18:00 ET (US East is the sales day)
+- **Off-peak** `0 0-12,22,23 * * 1-5` and `0 * * * 0,6` — hourly overnight and weekends
+
+Everything else sits on an hour mark so it shares a wake window. That's ~42 CPU-hrs/month
+against a 60-hr target. **Put new crons on an existing mark**, and if you need sub-hourly
+frequency, confine it to the peak range — an off-peak `*/5` roughly doubles the bill.
+Note ET is UTC−4/−5, so the peak window drifts an hour at DST; harmless, but that's why
+it's 13-21 rather than a tight 13-22.
 
 Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
 `api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
