@@ -3,7 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 
 import { env } from "@/env";
-import { postOnSlack } from "@/server/clients/slack.client";
+import { postOnSlack, type SlackBlock } from "@/server/clients/slack.client";
 import { db } from "@/server/db";
 import { mentionTable, type Mention } from "@/server/db/listening-schema";
 import { buildTrackedLink } from "@/lib/tracked-link";
@@ -69,63 +69,119 @@ function trackedLinkFor(m: Mention): string {
   return buildTrackedLink({ id: m.id, source: m.source, subreddit: m.subreddit });
 }
 
+// Layout follows Hashim Warren's 2026-07-27 read on the channel: the old
+// single-blob message repeated "New r/x mention" and the poster's handle on
+// every row, and its two links unfurled into the same pair of preview cards
+// every time. Now: the title *is* the link (so the sub is one hover away, not
+// restated), metadata sits in a two-column field grid rather than a `·`-joined
+// run-on, each element gets its own block so Slack spaces them, and the
+// broadcaster suppresses unfurls. The tracked link moved to the thread, next to
+// the suggested reply — that's where you're composing, and it keeps the feed
+// scannable.
 function buildBlocks(m: Mention) {
-  const where = sourceLabel(m);
-  const lines: string[] = [];
+  const blocks: SlackBlock[] = [];
+  const title = m.title?.trim() || "(untitled)";
 
-  const ownerSlackId = SOURCE_OWNER_SLACK_ID[m.source];
-  if (ownerSlackId) lines.push(`<@${ownerSlackId}> — you're on this one`);
+  blocks.push({
+    type: "section",
+    text: { type: "mrkdwn", text: `*<${m.url}|${escapeSlackText(title)}>*` },
+  });
 
-  lines.push(`:eyes: New ${where} mention — ${m.title ? `*${m.title}*` : "_(no title)_"}`);
+  // Two-column grid — the closest Block Kit gets to a table, and it stays
+  // readable on mobile where a long `·`-joined line wraps into mush.
+  const fields: { type: "mrkdwn"; text: string }[] = [];
+  const field = (label: string, value: string) =>
+    fields.push({ type: "mrkdwn", text: `*${label}*\n${value}` });
 
-  const meta: string[] = [];
-  if (m.keyword) meta.push(`keyword: \`${m.keyword}\``);
-  if (m.author) meta.push(`by ${m.author}`);
-  if (typeof m.relevance === "number") meta.push(`relevance ${m.relevance}/10`);
-  if (m.intentTag) meta.push(`intent: ${m.intentTag}`);
+  field("Where", sourceLabel(m));
+  if (m.keyword) field("Keyword", `\`${m.keyword}\``);
+  if (typeof m.relevance === "number") field("Relevance", `${m.relevance}/10`);
+  if (m.intentTag) field("Intent", m.intentTag);
   // Surface non-trivial removal risk so the team knows to check the thread is
   // still alive before investing in a reply.
   if (typeof m.banRisk === "number" && m.banRisk >= 0.25)
-    meta.push(`ban-risk ${Math.round(m.banRisk * 100)}%`);
-  if (meta.length) lines.push(meta.join(" · "));
+    field("Ban risk", `${Math.round(m.banRisk * 100)}%`);
+  blocks.push({ type: "section", fields });
 
   if (m.snippet) {
     const snippet =
       m.snippet.length > 500 ? `${m.snippet.slice(0, 500)}…` : m.snippet;
-    lines.push(`> ${snippet.replace(/\n/g, "\n> ")}`);
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `> ${escapeSlackText(snippet).replace(/\n/g, "\n> ")}`,
+      },
+    });
   }
-  if (m.rationale) lines.push(`_${m.rationale}_`);
 
-  lines.push(
-    `<${m.url}|View on ${where}> · <${env.NEXT_PUBLIC_BASE_URL}/app/listen?tab=${listenTab(m.source)}|Open in Listen>`,
-  );
-  // Copy-pasteable (code span, not a hyperlink) — the point is to drop it into
-  // the reply, not click it. utm_content = mention id → attributed in Amplitude.
-  lines.push(`:link: Tracked link: \`${trackedLinkFor(m)}\``);
+  if (m.rationale) {
+    blocks.push({
+      type: "context",
+      elements: [
+        { type: "mrkdwn", text: `_${escapeSlackText(m.rationale)}_` },
+      ],
+    });
+  }
 
-  return [
-    {
-      type: "section" as const,
-      text: { type: "mrkdwn" as const, text: lines.join("\n") },
+  // Owner ping stays in a `section`, not a `context` — context styling is
+  // quieter but we don't want to risk the RACI owner's notification.
+  const ownerSlackId = SOURCE_OWNER_SLACK_ID[m.source];
+  const listenLink = `<${env.NEXT_PUBLIC_BASE_URL}/app/listen?tab=${listenTab(m.source)}|Open in Listen>`;
+  blocks.push({
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: ownerSlackId
+        ? `<@${ownerSlackId}> — you're on this one · ${listenLink}`
+        : listenLink,
     },
-  ];
+  });
+
+  // Separates consecutive alerts so the channel reads as distinct cards.
+  blocks.push({ type: "divider" });
+
+  return blocks;
+}
+
+// Slack mrkdwn treats these three as control characters; a mention title or
+// snippet quoting "<3" or "R&D" would otherwise render mangled.
+function escapeSlackText(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // The action kit, hung off the alert in a thread so the channel stays scannable:
 // the AI-drafted reply to make our own. Only posted when a draft exists.
 function buildThreadBlocks(m: Mention) {
-  const lines = [
-    ":speech_balloon: *Suggested reply* — make it yours, keep it human, and disclose you're with Wander:",
-  ];
-  if (m.suggestedReply) {
-    lines.push(`> ${m.suggestedReply.replace(/\n/g, "\n> ")}`);
-  }
-  return [
+  const blocks: SlackBlock[] = [
     {
-      type: "section" as const,
-      text: { type: "mrkdwn" as const, text: lines.join("\n") },
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: ":speech_balloon: *Suggested reply* — make it yours, keep it human, and disclose you're with Wander:",
+      },
     },
   ];
+  if (m.suggestedReply) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `> ${escapeSlackText(m.suggestedReply).replace(/\n/g, "\n> ")}`,
+      },
+    });
+  }
+  // Lives here rather than in the channel message: this is where the reply gets
+  // composed, so the link is at hand without adding a line to every feed row.
+  // Copy-pasteable (code span, not a hyperlink) — the point is to drop it into
+  // the reply, not click it. utm_content = mention id → attributed in Amplitude.
+  blocks.push({
+    type: "context",
+    elements: [
+      { type: "mrkdwn", text: `:link: Tracked link: \`${trackedLinkFor(m)}\`` },
+    ],
+  });
+  return blocks;
 }
 
 /**
@@ -137,9 +193,13 @@ function buildThreadBlocks(m: Mention) {
  */
 export async function postMentionToRadio(m: Mention) {
   const result = await postOnSlack({
-    text: `New ${sourceLabel(m)} mention${m.keyword ? ` for "${m.keyword}"` : ""}`,
+    // Notification/sidebar preview only (blocks win in-channel) — lead with the
+    // title, which is what tells you whether to open it.
+    text: m.title?.trim() || `New ${sourceLabel(m)} mention`,
     channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
     blocks: buildBlocks(m),
+    unfurl_links: false,
+    unfurl_media: false,
   });
 
   if (result.success && result.ts) {
@@ -164,6 +224,8 @@ export async function postMentionToRadio(m: Mention) {
         channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
         thread_ts: result.ts,
         blocks: buildThreadBlocks(m),
+        unfurl_links: false,
+        unfurl_media: false,
       });
     }
   }

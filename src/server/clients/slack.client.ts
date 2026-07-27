@@ -26,7 +26,7 @@ interface SlackMessage {
   blocks?: SlackBlock[];
 }
 
-interface SlackBlock {
+export interface SlackBlock {
   type: "section" | "divider" | "context";
   text?: {
     type: "mrkdwn" | "plain_text";
@@ -301,6 +301,14 @@ interface PostOnSlackMessage {
   channel: string;
   blocks?: SlackBlock[];
   thread_ts?: string;
+  /**
+   * Slack unfurls any wander.com / growth link into a preview card. In a feed
+   * channel where every message carries the same two links that's a wall of
+   * identical cards, so alert broadcasters pass `false` (Hashim Warren,
+   * 2026-07-27). Omitted = Slack's default behaviour.
+   */
+  unfurl_links?: boolean;
+  unfurl_media?: boolean;
 }
 
 /**
@@ -335,6 +343,8 @@ export async function postOnSlack(
         text: message.text,
         blocks: message.blocks,
         thread_ts: message.thread_ts,
+        unfurl_links: message.unfurl_links,
+        unfurl_media: message.unfurl_media,
         channel,
       }),
     });
