@@ -167,21 +167,30 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 
 ### Cron cadence is a Neon compute budget
 
-What costs money is not the number of jobs but the number of distinct **wake windows**:
-Neon scale-to-zero idles after ~3 min, so each wake costs ~3.5 min of compute whether the
-job takes 200ms or 30s. Two crons on `*/10` + `*/20` kept the compute awake ~16 h/day and
-burned the 100 CPU-hr quota by the 27th, taking prod down (2026-07-27).
+Growth is on Neon's free plan: **100 CPU-hrs/month**, reset on the 1st. What spends it is
+not the number of jobs but the number of distinct **wake windows** — scale-to-zero idles
+after ~5 min, so every wake costs ~5.5 min of compute whether the job takes 200ms or 30s.
+Two crons on `*/10` + `*/20` kept the compute awake ~16 h/day and burned the quota by the
+27th, taking prod down (2026-07-27).
 
-The two hot jobs (`funnel_abandonment_sweep`, `hubspot`) are therefore split by time of day:
+**Match cadence to the job's own latency floor — polling faster than that buys nothing.**
+Work out the soonest the job could possibly do something useful, and use that:
 
-- **Peak** `*/5 13-21 * * 1-5` — every 5 min, 09:00–18:00 ET (US East is the sales day)
-- **Off-peak** `0 0-12,22,23 * * 1-5` and `0 * * * 0,6` — hourly overnight and weekends
+- `funnel_abandonment_sweep` is a window query, and no stage is eligible sooner than 30 min
+  after the event (payment; the rest are 1 h) with windows 48 h–7 days wide. Polling every
+  5 min just re-runs the same query to find the same people. Peak is `*/15`, and even that
+  is generous.
+- `/api/cron/hubspot` is a **retry rail**, not the delivery path — the webhook receiver
+  stores and projects in `after()`, so enrichment latency is webhook-bound and totally
+  independent of this cron. It only matters when a projection fails, so it runs on marks
+  the sweep already wakes for (`0,30` at peak) and therefore costs nothing extra.
 
-Everything else sits on an hour mark so it shares a wake window. That's ~42 CPU-hrs/month
-against a 60-hr target. **Put new crons on an existing mark**, and if you need sub-hourly
-frequency, confine it to the peak range — an off-peak `*/5` roughly doubles the bill.
-Note ET is UTC−4/−5, so the peak window drifts an hour at DST; harmless, but that's why
-it's 13-21 rather than a tight 13-22.
+That's ~30 CPU-hrs/month, comfortably inside the free tier. Rules of thumb: **put new
+crons on a mark an existing cron already wakes for** (marginal cost ≈ zero), keep
+sub-hourly work inside the peak range, and before reaching for a tighter interval check
+whether the thing you want faster is actually gated by a cron at all. ET is UTC−4/−5, so
+the peak window drifts an hour at DST — harmless, hence `13-21` rather than a tight
+`13-22`.
 
 Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
 `api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
