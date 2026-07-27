@@ -1,6 +1,6 @@
 # Consent workstream — handoff
 
-_Last updated: 2026-07-23. Owner: Kristian (kristian@wander.com). Companion docs: [cmp-vendor-evaluation.md](./cmp-vendor-evaluation.md), [compliance-scan-qualification.md](./compliance-scan-qualification.md). Interactive architecture walkthrough: [consent-journey.html](./consent-journey.html) (open in any browser — toggle visitor/site/consent state)._
+_Last updated: 2026-07-27. Owner: Kristian (kristian@wander.com). Companion docs: [cmp-vendor-evaluation.md](./cmp-vendor-evaluation.md), [osano-trial-handoff.md](./osano-trial-handoff.md) (live trial + banner styling), [compliance-scan-qualification.md](./compliance-scan-qualification.md). Interactive architecture walkthrough: [consent-journey.html](./consent-journey.html) (open in any browser — toggle visitor/site/consent state)._
 
 This doc is the single entry point for anyone picking up the GDPR/consent work: what shipped, what's verified, what's one command from done, and what's deliberately deferred.
 
@@ -31,10 +31,15 @@ gh pr create --base feat/consent-regime-engine --head feat/consent-geo-middlewar
   --body-file ~/Developer/wander/pr-body-consent-geo-middleware.md
 ```
 
-## 3. Vendor evaluation — decided
+## 3. Vendor evaluation — two live Osano options (exploring both, not decided)
 
-- **OneTrust: out.** Their CMP is a GTM/script-tag blocker (irrelevant to our bundled architecture) with a mandatory vendor banner; consent-records product floors at $50k/yr × 3-year commit × 1M data subjects (we're ~650k). Their geo = the same Cloudflare country header we already read. Their scanner (per their own docs): Chrome VM crawler, 6–24h+, can't perform user actions (can't click Accept), no SPA support.
-- **Osano: one live thread**, scoped narrowly to Unified Consent (records/DSAR console, BYO banner) at ~$2k over base. Technical UC session booked. Walk-away is cheap: a legal-facing records view over `User.analyticsConsent` + cookie records is a modest internal build.
+Two Osano products are being evaluated in parallel, both costed so finance can weigh the tradeoff. **The through-line: Wander owns enforcement either way** — our trackers are bundled ES modules gated in our own code, so the vendor buys us records, banner UI, rule-currency and a defensible "we use a recognized CMP" story, not enforcement. Live trial detail in [osano-trial-handoff.md](./osano-trial-handoff.md).
+
+- **Option A — Unified Consent: probably the better fit.** A consent record / preference hub (system-of-record + audit console + cross-channel + REST Core API), **not** a script blocker. We render our own banner (already built), `POST` consent to UC, our engine enforces; Osano is the downstream certified record. Pros: fills the one gap we won't build cheaply, no useless blocker, we keep our banner. Cons: more build, likely higher cost, and the vendor's read is that a bring-your-own banner **would not** carry the no-fines guarantee.
+- **Option B — standard Cookie Consent: the fallback, and maybe where we land.** Their rendered banner + geo/jurisdiction engine + auto-updated legal templates, guarantee attaching cleanly. Run **Permissive** — its script blocker is a no-op against our bundled trackers, so we still enforce everything. Pros: cheaper, simpler, the recognizable product finance knows. Cons: banner only themeable, blocker adds nothing.
+- **No-fines guarantee = diligence signal, not a shield.** We are not banking on the $500k payout (terms void easily, and we do not plan to get fined). The value is pointing to a recognized CMP as good-faith effort. Not a decision driver.
+- **OneTrust: out.** Script-tag blocker (irrelevant to bundled architecture), mandatory vendor banner, records product floors at $50k/yr × 3yr × 1M data subjects (we're ~650k), scanner is a slow Chrome-VM crawler with no SPA support.
+- **Next:** trial banner live on real surfaces (done, see trial doc); confirm `STORAGE` semantics + whether a consent-change webhook exists; settle the ~800-domain topology; get the A-vs-B cost delta.
 - Full detail in [cmp-vendor-evaluation.md](./cmp-vendor-evaluation.md).
 
 ## 4. GDPR-scan agent (this repo) — deployed-ready spike
