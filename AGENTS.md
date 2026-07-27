@@ -156,7 +156,8 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 ### Cron jobs (`vercel.json` → `src/app/api/cron/`)
 
 - `/api/cron/spend` — daily 05:00 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
-- `/api/cron/growth?job=daily_comprehensive_sync&...` — daily 03:00 (comprehensive CIO/lead sync)
+- `/api/cron/growth?job=daily_comprehensive_sync&...` — **hourly** on the hour with a 3 h
+  window, plus a 24 h backstop pass at 03:00 (CIO/Outreach lead sync)
 - `/api/cron/growth?job=funnel_abandonment_sweep&...` — peak/off-peak (abandonment sweep)
 - `/api/cron/growth?job=funnel_email_backfill` — every 6h on the hour (funnel email backfill)
 - `/api/cron/hubspot` — peak/off-peak (pending HubSpot webhook retry)
@@ -184,6 +185,16 @@ Work out the soonest the job could possibly do something useful, and use that:
   stores and projects in `after()`, so enrichment latency is webhook-bound and totally
   independent of this cron. It only matters when a projection fails, so it runs on marks
   the sweep already wakes for (`0,30` at peak) and therefore costs nothing extra.
+
+The job that *does* deserve frequency is `daily_comprehensive_sync` — it's the path demand
+sales actually depends on. It pulls `checkout_started` / `payment_info_entered` from
+BigQuery and runs `processLead` to enrich into Customer.io and Outreach, so at its old
+daily 03:00 cadence a prospect could wait ~23 h to reach a BDR's queue. It now runs hourly
+with a 3 h window (overlap absorbs BigQuery ingestion lag) on the `:00` mark the sweep
+already wakes for — **zero extra Neon cost** — with the 24 h pass kept at 03:00 as a
+backstop for late-arriving rows. Safe to overlap because `processLead` creates-or-updates
+the Outreach prospect and never enrols anyone in a sequence. The cost to watch here is
+BigQuery bytes scanned, not Neon.
 
 That's ~30 CPU-hrs/month, comfortably inside the free tier. Rules of thumb: **put new
 crons on a mark an existing cron already wakes for** (marginal cost ≈ zero), keep

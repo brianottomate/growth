@@ -9,6 +9,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/growth?job=daily_comprehensive_sync&hoursBack=3&concurrency=6&limit=500",
+      "schedule": "0 0-2,4-23 * * *"
+    },
+    {
       "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
       "schedule": "*/15 13-21 * * 1-5"
     },
