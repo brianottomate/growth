@@ -115,16 +115,6 @@ export const env = createEnv({
     // Impact dashboard under Settings → API Access. Missing → the client no-ops.
     IMPACT_ACCOUNT_SID: z.string().optional(),
     IMPACT_AUTH_TOKEN: z.string().optional(),
-    // #radio-affiliate partner-email alerts. OFF by default: partnerships@
-    // already delivers every partner email to the owners' inboxes, so the Slack
-    // copy was duplicate noise (Micaela Koremblit, 2026-07-26). Items still land
-    // in the Affiliate desk. Set to "true" to turn the Slack feed back on.
-    // Explicit enum rather than z.coerce.boolean() — coercion treats the string
-    // "false" as true, which is the wrong failure mode for a re-enable switch.
-    AFFILIATE_RADIO_EMAIL_ALERTS: z
-      .enum(["true", "false"])
-      .default("false")
-      .transform((v) => v === "true"),
   },
 
   /**

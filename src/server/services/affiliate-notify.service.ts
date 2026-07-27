@@ -36,16 +36,16 @@ const KIND_LABEL: Record<AffiliateItem["kind"], string> = {
   finding: "Finding",
 };
 
-// Partner emails are suppressed from Slack: partnerships@wander.com already
-// delivers every one of them to the owners' inboxes, so the radio post was a
-// duplicate that also tagged them a second time (Micaela Koremblit + Kristian
-// Boe in #radio-affiliate, 2026-07-26). Ingest, scoring and reply drafting are
-// untouched — suppressed items still land in the Affiliate desk with their
-// drafted reply, and the conversion feed / weekly report are unaffected.
-// Flip AFFILIATE_RADIO_EMAIL_ALERTS=true to bring the Slack posts back.
-const SUPPRESSED_KINDS: ReadonlySet<AffiliateItem["kind"]> = new Set(
-  env.AFFILIATE_RADIO_EMAIL_ALERTS ? [] : (["email"] as const),
-);
+// Kinds that never reach Slack. Partner emails are suppressed because
+// partnerships@wander.com already delivers every one of them to the owners'
+// inboxes, so the radio post was a duplicate that also tagged them a second
+// time (Micaela Koremblit + Kristian Boe in #radio-affiliate, 2026-07-26).
+// Ingest, scoring and reply drafting are untouched — suppressed items still
+// land in the Affiliate desk with their drafted reply, and the conversion feed
+// and weekly report are unaffected. To bring partner-email posts back, drop
+// "email" from this set (a code change, deliberately — this is an editorial
+// call about the feed, not per-environment configuration).
+const SUPPRESSED_KINDS = new Set<AffiliateItem["kind"]>(["email"]);
 
 function isWorthBroadcasting(item: AffiliateItem): boolean {
   if (SUPPRESSED_KINDS.has(item.kind)) {
