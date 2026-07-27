@@ -889,7 +889,11 @@ export async function getUsers(options?: {
 // ---- Sequences (read-only mirror source for /app/lifecycle) ----------
 
 export interface OutreachSequence {
-  id: string;
+  // Outreach's JSON:API returns numeric ids, not strings. Anything comparing
+  // these against our text `externalId` columns must String() them first —
+  // typing this as `string` silently broke the mirror upsert (every refresh
+  // re-inserted all 125 sequences and soft-deleted the previous generation).
+  id: number;
   attributes: {
     name: string;
     description: string | null;
@@ -918,7 +922,7 @@ export interface OutreachSequence {
 }
 
 export interface OutreachSequenceStep {
-  id: string;
+  id: number; // numeric, as above
   attributes: {
     order: number;
     interval: number; // minutes after the previous step

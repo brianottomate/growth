@@ -90,9 +90,22 @@ async function main() {
       eq(lifecycleCampaignTable.provider, "outreach"),
     ),
   });
-  const existingByExternalId = new Map(
-    existing.map((c) => [c.externalId ?? "", c]),
-  );
+  // One row per externalId wins the refresh: prefer a live row over a
+  // soft-deleted one, then the oldest. Any further copies are redundant and
+  // get soft-deleted below — self-healing if a bad run ever double-inserts.
+  const ranked = [...existing].sort((a, b) => {
+    const deleted = Number(Boolean(a.deletedAt)) - Number(Boolean(b.deletedAt));
+    if (deleted !== 0) return deleted;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+  const existingByExternalId = new Map<string, (typeof ranked)[number]>();
+  const redundantIds: string[] = [];
+  for (const row of ranked) {
+    const key = row.externalId ?? "";
+    if (!key) continue;
+    if (!existingByExternalId.has(key)) existingByExternalId.set(key, row);
+    else if (!row.deletedAt) redundantIds.push(row.id);
+  }
 
   let inserted = 0;
   let refreshed = 0;
@@ -100,7 +113,10 @@ async function main() {
 
   for (const seq of sequences) {
     const a = seq.attributes;
-    seenIds.add(seq.id);
+    // Outreach ids are numbers; `externalId` is text. Compare as text or the
+    // upsert misses every row and duplicates the whole mirror.
+    const seqId = String(seq.id);
+    seenIds.add(seqId);
     const ownerId = seq.relationships?.owner?.data?.id;
     const values = {
       name: a.name,
@@ -109,8 +125,8 @@ async function main() {
       runState: a.enabled ? ("running" as const) : ("paused" as const),
       externalKind: "sequence",
       provider: "outreach" as const,
-      externalId: seq.id,
-      externalUrl: `https://web.outreach.io/sequences/${seq.id}/overview`,
+      externalId: seqId,
+      externalUrl: `https://web.outreach.io/sequences/${seqId}/overview`,
       metrics: {
         matched: a.numContactedProspects,
         delivered: a.deliverCount,
@@ -134,7 +150,7 @@ async function main() {
       updatedAt: new Date(),
     };
 
-    const prior = existingByExternalId.get(seq.id);
+    const prior = existingByExternalId.get(seqId);
     let campaignId: string;
     if (prior) {
       // Refresh mirror fields; keep programId + cleanupStatus (operator-owned).
@@ -157,7 +173,7 @@ async function main() {
     // Touchpoints are structural: wipe + reinsert — but only when the steps
     // endpoint is readable, so a scope regression never erases the mirror.
     if (!stepsAvailable) continue;
-    const steps = (stepsBySequence.get(seq.id) ?? []).sort(
+    const steps = (stepsBySequence.get(seqId) ?? []).sort(
       (x, y) => x.attributes.order - y.attributes.order,
     );
     await db
@@ -176,15 +192,28 @@ async function main() {
             step.attributes.interval,
             step.attributes.order,
           ),
-          externalId: step.id,
+          externalId: String(step.id),
         })),
       );
     }
   }
 
+  // Redundant duplicates of a kept row → soft-delete (reversible; a later run
+  // never resurrects them because the kept row always wins the map).
+  if (redundantIds.length) {
+    await db
+      .update(lifecycleCampaignTable)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(inArray(lifecycleCampaignTable.id, redundantIds));
+  }
+
   // Sequences that vanished from Outreach → soft-delete their mirror rows.
   const vanished = existing.filter(
-    (c) => c.externalId && !seenIds.has(c.externalId) && !c.deletedAt,
+    (c) =>
+      c.externalId &&
+      !seenIds.has(c.externalId) &&
+      !c.deletedAt &&
+      !redundantIds.includes(c.id),
   );
   if (vanished.length) {
     await db
@@ -199,7 +228,7 @@ async function main() {
   }
 
   console.log(
-    `lifecycle_campaign (outreach): ${inserted} inserted, ${refreshed} refreshed, ${vanished.length} soft-deleted.`,
+    `lifecycle_campaign (outreach): ${inserted} inserted, ${refreshed} refreshed, ${vanished.length} soft-deleted, ${redundantIds.length} duplicates collapsed.`,
   );
 }
 
