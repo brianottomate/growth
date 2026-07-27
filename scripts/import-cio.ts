@@ -195,6 +195,45 @@ async function main() {
   console.log(`✓ inserted ${ppRows.length} newsletter platform_posts`);
 
   // ---- 2 & 3. Campaigns + transactional → lifecycle_campaign ----------
+  //
+  // This mirror is wipe-and-reinsert, but `cleanupStatus` and `programId` are
+  // operator-owned, not mirrored facts — an archive/keep call a human (or the
+  // sequence-triage agent) made must outlive the next refresh. Snapshot them
+  // by externalId first, then restore on re-insert. Derived cleanup heuristics
+  // only apply to rows we haven't seen before.
+  // Key by kind + id: CIO campaigns and transactional messages have separate
+  // id spaces that collide (id 42 is both a campaign and a transactional), so
+  // an externalId-only key hands one row the other's decision.
+  const priorState = new Map(
+    (
+      await db
+        .select({
+          externalKind: lifecycleCampaignTable.externalKind,
+          externalId: lifecycleCampaignTable.externalId,
+          cleanupStatus: lifecycleCampaignTable.cleanupStatus,
+          programId: lifecycleCampaignTable.programId,
+        })
+        .from(lifecycleCampaignTable)
+        .where(
+          and(
+            eq(lifecycleCampaignTable.brandId, wander.id),
+            eq(lifecycleCampaignTable.provider, "customerio"),
+          ),
+        )
+    ).map((r) => [`${r.externalKind ?? ""}:${r.externalId ?? ""}`, r]),
+  );
+  const carried = (
+    externalKind: "campaign" | "transactional",
+    externalId: string,
+    derived: CleanupStatus,
+  ) => {
+    const prior = priorState.get(`${externalKind}:${externalId}`);
+    return {
+      cleanupStatus: prior?.cleanupStatus ?? derived,
+      programId: prior?.programId ?? null,
+    };
+  };
+
   await db
     .delete(lifecycleCampaignTable)
     .where(and(eq(lifecycleCampaignTable.brandId, wander.id), eq(lifecycleCampaignTable.provider, "customerio")));
@@ -221,7 +260,7 @@ async function main() {
       provider: "customerio",
       externalId: String(c.id),
       externalUrl: `${UI}/campaigns/${c.id}`,
-      cleanupStatus: draftish ? "candidate" : "keep",
+      ...carried("campaign", String(c.id), draftish ? "candidate" : "keep"),
       startedAt: c.first_started ? new Date(num(c.first_started) * 1000) : undefined,
       metadata: { type, active: c.active },
     });
@@ -262,7 +301,7 @@ async function main() {
       provider: "customerio",
       externalId: String(m.id),
       externalUrl: `${UI}/transactional/${m.id}`,
-      cleanupStatus: draftish ? "candidate" : "keep",
+      ...carried("transactional", String(m.id), draftish ? "candidate" : "keep"),
     });
   }
   console.log(`✓ inserted ${tx.length} transactional as lifecycle_campaign`);

@@ -107,7 +107,9 @@ function stepName(s: HsSequenceStep): string {
 const seqUrl = (id: string) =>
   `https://app.hubspot.com/sequences/${HUB_ID}/sequence/${id}`;
 
-// The six live WanderOS flows (May/June 2026 generation) → strategic programs.
+// The live WanderOS flows sales actually runs → strategic programs.
+// Confirmed against sales' own list 2026-07-27; the May generation is still
+// enrolled but several sequences have been superseded by July clones.
 const PROGRAM_SEEDS: Array<{
   sequenceId: string;
   name: string;
@@ -116,12 +118,29 @@ const PROGRAM_SEEDS: Array<{
   description: string;
 }> = [
   {
-    sequenceId: "306457011",
+    // Superseded 306457011 (same name, May clone still carrying enrollments).
+    sequenceId: "307995758",
     name: "WanderOS Cold Outbound — Main",
     kind: "outbound",
     priority: "must_have",
     description:
-      "Primary multi-channel cold motion: interleaved calls + emails over ~17 days. The workhorse sequence.",
+      "Primary multi-channel cold motion: interleaved calls + emails over ~18 days. The workhorse sequence.",
+  },
+  {
+    sequenceId: "307884887",
+    name: "WanderOS Cold Outbound — Casago Franchisees",
+    kind: "outbound",
+    priority: "should_have",
+    description:
+      "Casago-franchisee cut of the main cold motion (Justin + Matt M, July 2026) — same shape, franchisee-specific copy.",
+  },
+  {
+    sequenceId: "307398281",
+    name: "WanderOS Self-Serve Re-engagement",
+    kind: "reactivation",
+    priority: "should_have",
+    description:
+      "Re-engages self-serve deals that went quiet after signup — calls plus email, distinct from the cold Re-engage motion.",
   },
   {
     sequenceId: "306457150",
@@ -236,6 +255,28 @@ async function main() {
   );
 
   // ---- 3. Mirror: sequences → lifecycle_campaign ----------------------
+  //
+  // `cleanupStatus` is an operator/agent decision, not a mirrored fact — carry
+  // it across the wipe so an archive/keep call survives the next refresh. The
+  // enrollment-derived default only applies to sequences we haven't seen.
+  // (`programId` is re-linked from PROGRAM_SEEDS below, so it isn't carried.)
+  const priorCleanup = new Map(
+    (
+      await db
+        .select({
+          externalId: lifecycleCampaignTable.externalId,
+          cleanupStatus: lifecycleCampaignTable.cleanupStatus,
+        })
+        .from(lifecycleCampaignTable)
+        .where(
+          and(
+            eq(lifecycleCampaignTable.brandId, wander.id),
+            eq(lifecycleCampaignTable.provider, "hubspot"),
+          ),
+        )
+    ).map((r) => [r.externalId ?? "", r.cleanupStatus]),
+  );
+
   await db
     .delete(lifecycleCampaignTable)
     .where(
@@ -253,7 +294,8 @@ async function main() {
     const lcId = createId("lc");
     campaignIdBySequence.set(sid, lcId);
     const cleanup: CleanupStatus =
-      live > 0 ? "keep" : STALE_RX.test(seq.name) ? "candidate" : "review";
+      priorCleanup.get(sid) ??
+      (live > 0 ? "keep" : STALE_RX.test(seq.name) ? "candidate" : "review");
     await db.insert(lifecycleCampaignTable).values({
       id: lcId,
       brandId: wander.id,
