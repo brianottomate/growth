@@ -158,8 +158,9 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 - `/api/cron/spend` — daily 05:00 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
 - `/api/cron/growth?job=daily_comprehensive_sync&...` — **hourly** on the hour with a 3 h
   window, plus a 24 h backstop pass at 03:00 (CIO/Outreach lead sync)
-- `/api/cron/growth?job=funnel_abandonment_sweep&...` — every 20 min (abandonment sweep →
-  Customer.io / Outreach; the cadence the whole compute budget is spent on)
+- `/api/cron/growth?job=funnel_abandonment_sweep&...` — every 20 min during ET business
+  hours, hourly overnight, every 6 h at weekends (abandonment sweep → Customer.io /
+  Outreach; the cadence the whole compute budget is spent on)
 - `/api/cron/growth?job=funnel_email_backfill` — every 6h on the hour (funnel email backfill)
 - `/api/cron/hubspot` — hourly (pending HubSpot webhook retry rail)
 - `/api/cron/instagram` — daily 19:00 UTC (Instagram account watch)
@@ -188,8 +189,19 @@ else on a mark that path already wakes for.**
   dark — records state, sends nothing); the sweep is what turns that into a Customer.io /
   Outreach sync via `processLead`. Its stage windows are deliberate delays (payment 30 min,
   search/wishlist/cart 1 h), so end-to-end latency is `window + up to one sweep interval`.
-  `*/20`, uniform across the day — **not** workday-weighted: this is a consumer signal that
-  peaks in evenings and at weekends, unlike anything sales-facing.
+
+  **Cadence follows the BDRs, not the browsers.** Sweep output is Outreach work for a human
+  to action (Phase 3 email isn't live), so a 20-minute sweep at 03:00 just means a lead
+  waits in a queue until morning anyway. Hence `*/20` only across `13-22` UTC Mon–Fri
+  (≈09:00–18:00 ET), hourly overnight to keep the backlog trimmed against `limit=50`
+  per stage per run, and every 6 h at weekends.
+
+  Sweeping rarely loses nothing: eligibility windows stay open 7 days and `funnel_send_log`'s
+  unique `(user, stage, windowKey)` is the idempotency ledger, so a Saturday abandoner is
+  still eligible on Monday. **The exception is the payment stage, whose window is only 48 h**
+  — a Friday-evening payment abandonment expires Sunday evening, so weekends can't go
+  uncovered entirely. That's why it's every 6 h rather than a single Sunday pass, and
+  weekend runs carry `limit=200` to drain a two-day backlog in one go.
 - `/api/cron/hubspot` is a **retry rail**, not a delivery path — the webhook receiver stores
   and projects in `after()`, so enrichment latency is webhook-bound and independent of the
   cron. It only matters when a projection fails. Hourly on `:00`, a mark `*/20` already
@@ -202,10 +214,12 @@ else on a mark that path already wakes for.**
   creates-or-updates the Outreach prospect and never enrols anyone in a sequence. The cost
   to watch here is BigQuery bytes scanned, not Neon.
 
-Every remaining cron sits on `:00`, so the whole schedule costs what `*/20` costs on its
-own: **~50 CPU-hrs/month** against the free tier's 100. Rule of thumb: **put new crons on a
-mark an existing cron already wakes for** — marginal cost is zero — and before reaching for
-a tighter interval, check whether the thing you want faster is gated by a cron at all.
+Every remaining cron sits on `:00`, so the only marks beyond hourly are the sweep's `:20`
+and `:40` during business hours: **44 wake marks per weekday, 24 per weekend day ≈ 27
+CPU-hrs/month** against the free tier's 100. Rules of thumb: **put new crons on a mark an
+existing cron already wakes for** (marginal cost zero); before reaching for a tighter
+interval, check whether the thing you want faster is gated by a cron at all; and if a human
+consumes the output, match the cadence to *their* hours rather than the event's.
 
 Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
 `api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
