@@ -328,6 +328,55 @@ Keep a specialized top-level tool when grouping would create an optional-field
 bag, combine unrelated consequences, or hide an important product interaction.
 Do not create another registry to preserve old tool names.
 
+## Sub-agents
+
+A few jobs are loops rather than actions. Editing a CMS record means: discover
+the schema, read the record, write, look at the result, correct. The operator
+asks for one outcome, but reaching it takes an unknown number of dependent
+steps whose shape depends on what the previous step returned.
+
+Neither existing option fits. A domain read/write pair would push every step
+into the global catalog, so the assistant carries eight more tools for a job it
+does occasionally. A single do-everything action would hide which writes ran,
+which is the `commitMomentPlan` mistake.
+
+A sub-agent is the third shape. One tool in `OVERVIEW_TOOLS` delegates a task
+to an agent that owns bespoke tools for the length of that call. The tools are
+exposed on demand instead of permanently.
+
+`blogAgent` is the reference implementation:
+
+- `src/server/ai/capabilities/blog.ts` — the single catalog entry. Ordinary
+  `growthTool`, registered in `growth-capabilities.ts` and `policy.ts` like
+  anything else.
+- `src/server/ai/blog-agent/tools.ts` — the bespoke tools (`describeModel`,
+  `listModels`, `getArticle`, `createDraft`, `updateFields`, `insertBlock`,
+  `previewUrl`, `publishArticle`). Built by `buildBlogTools(ctx)` per call.
+- `src/server/ai/blog-agent/persona.ts` — how it works and what it may not do.
+- `src/server/ai/blog-agent/run.ts` — the loop.
+
+Rules that keep a sub-agent from becoming a macro:
+
+1. **Return the trail.** Every tool call appends to `ctx.trail`, which comes
+   back in the tool result. Delegation must not make writes invisible; a
+   reviewer can still see that the agent read before it wrote.
+2. **Each inner tool stays one discrete product action.** No inner tool bundles
+   a judgment with a write. The loop supplies the sequencing.
+3. **Discover, do not hardcode.** The agent reads the live schema rather than
+   assuming fields, so a CMS change does not silently corrupt writes.
+4. **Bound the loop.** `stopWhen: stepCountIs(20)` — high enough to finish a
+   real task, low enough that a confused agent stops.
+5. **Gate the dangerous verb explicitly.** `publishArticle` exists with a full
+   schema and refuses in its body, so the agent knows publishing exists and
+   that it is not its call. Enabling it means adding an approval gate, not
+   editing the prompt.
+6. **Say what it did not do.** The persona requires naming gaps. An agent that
+   quietly drops half a task is worse than one that reports the half it left.
+
+Reach for a sub-agent only when the work is genuinely iterative and the tools
+would otherwise be dead weight in the catalog. A one-shot action is still an
+action.
+
 ## File map
 
 | Concern                                     | Source                                                                        |

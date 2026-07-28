@@ -65,9 +65,11 @@ export async function runBlogAgent(input: {
       system: BLOG_AGENT_PERSONA,
       prompt,
       tools,
-      // Enough room to discover, act, and verify; short enough that a confused
-      // loop stops instead of grinding against the production CMS.
-      stopWhen: stepCountIs(12),
+      // Room to discover, act, and verify without running dry mid-task —
+      // an agent that stops halfway through a CMS edit is worse than one that
+      // takes a few more steps. Still bounded so a confused loop gives up
+      // instead of grinding against the production CMS.
+      stopWhen: stepCountIs(20),
     });
 
     return {
