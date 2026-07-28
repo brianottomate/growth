@@ -14,6 +14,8 @@ import {
   platformPostTable,
   webPageTable,
 } from "@/server/db/schema";
+import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
+import { datoStructuredTextToPlainText } from "@/lib/dato-structured-text";
 import {
   analyzeContentArtifact,
   analyzeWebsitePortfolio,
@@ -235,6 +237,20 @@ ${source}`;
         if (content?.body) {
           source = normalizeContentSource(content.body);
           title = content.subject ?? title;
+        }
+      }
+      if (!source && input.kind === "blog" && post.externalId) {
+        const article = await getBlogArticleDraft(post.externalId).catch(
+          () => null,
+        );
+        const draftBody = article?.body
+          ? datoStructuredTextToPlainText(article.body.value)
+          : "";
+        if (article) {
+          title = article.title ?? title;
+          source = normalizeContentSource(
+            [article.description, draftBody].filter(Boolean).join("\n\n"),
+          );
         }
       }
       if (!source && post.externalUrl) {

@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
+import { StructuredText } from "react-datocms/structured-text";
 
 import { db } from "@/server/db";
 import { memberTable, platformPostTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
+import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
 import { ContentAnalysisPanel } from "@/components/content-analysis-panel";
 import { readContentAnalysis } from "@/lib/content-analysis";
+import { PreviewBlock } from "../preview/[itemId]/PreviewBlocks";
 
 type BlogMeta = {
   description?: string | null;
@@ -42,7 +45,22 @@ export default async function BlogArticlePage({
 
   const meta = (post.metadata ?? {}) as BlogMeta;
   const analysis = readContentAnalysis(post.metadata);
-  const cover = post.media?.[0]?.url ?? null;
+  const datoArticle = post.externalId
+    ? await getBlogArticleDraft(post.externalId).catch(() => null)
+    : null;
+  const isDraft = datoArticle
+    ? datoArticle._status !== "published"
+    : post.status !== "published" || !post.publishedAt;
+  const title = datoArticle?.title ?? post.text ?? "Untitled";
+  const description =
+    datoArticle?.description ??
+    meta.metaDescription ??
+    meta.description ??
+    null;
+  const cover = datoArticle?.image?.url ?? post.media?.[0]?.url ?? null;
+  const draftPreviewHref =
+    isDraft && post.externalId ? `/app/blog/preview/${post.externalId}` : null;
+  const sourceUrl = draftPreviewHref ?? post.externalUrl;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -59,8 +77,35 @@ export default async function BlogArticlePage({
           Blog
         </Link>
         <span>/</span>
-        <span className="text-foreground font-medium">{post.text}</span>
+        <span className="text-foreground font-medium">{title}</span>
       </div>
+
+      {isDraft && (
+        <section className="mt-4 rounded-xl border border-amber-400/40 bg-amber-500/10 p-4 text-amber-100">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold tracking-wider text-black uppercase">
+                  Draft
+                </span>
+                <h2 className="text-sm font-semibold">Not published</h2>
+              </div>
+              <p className="mt-2 max-w-2xl text-xs leading-relaxed text-amber-100/75">
+                This is the current DatoCMS draft. The reserved wander.com URL
+                will not show the article until a human publishes it.
+              </p>
+            </div>
+            {draftPreviewHref && (
+              <Link
+                href={draftPreviewHref}
+                className="rounded-full border border-amber-300/40 px-3 py-1.5 text-xs font-medium hover:bg-amber-300/10"
+              >
+                Open standalone preview
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
 
       {cover && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -71,12 +116,10 @@ export default async function BlogArticlePage({
         />
       )}
 
-      <h1 className="mt-5 text-2xl font-semibold tracking-tight">
-        {post.text}
-      </h1>
+      <h1 className="mt-5 text-2xl font-semibold tracking-tight">{title}</h1>
 
       <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-sm">
-        {post.publishedAt && (
+        {!isDraft && post.publishedAt && (
           <span>
             {post.publishedAt.toLocaleDateString([], {
               month: "long",
@@ -84,6 +127,9 @@ export default async function BlogArticlePage({
               year: "numeric",
             })}
           </span>
+        )}
+        {isDraft && (
+          <span className="font-medium text-amber-300">DatoCMS draft</span>
         )}
         {(meta.tags ?? []).map((tag) => (
           <span
@@ -95,14 +141,14 @@ export default async function BlogArticlePage({
         ))}
       </div>
 
-      {(meta.metaDescription ?? meta.description) && (
+      {description && (
         <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
-          {meta.metaDescription ?? meta.description}
+          {description}
         </p>
       )}
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {post.externalUrl && (
+        {!isDraft && post.externalUrl && (
           <a
             href={post.externalUrl}
             target="_blank"
@@ -112,18 +158,46 @@ export default async function BlogArticlePage({
             Read original ↗
           </a>
         )}
+        {draftPreviewHref && (
+          <Link
+            href={draftPreviewHref}
+            className="bg-foreground text-background rounded-full px-3.5 py-1.5 text-xs font-medium"
+          >
+            Read full draft
+          </Link>
+        )}
       </div>
 
-      <p className="text-muted-foreground mt-6 text-xs">
-        Full-body rendering and per-post analytics can be added as the source
-        adapters expose richer content and performance data.
-      </p>
+      {datoArticle?.body ? (
+        <section className="mt-10 border-t pt-8">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">
+              {isDraft ? "Draft body" : "Article body"}
+            </h2>
+            {isDraft && (
+              <span className="text-xs font-medium text-amber-300">
+                Current DatoCMS version
+              </span>
+            )}
+          </div>
+          <div className="prose prose-invert prose-neutral max-w-none">
+            <StructuredText
+              data={datoArticle.body}
+              renderBlock={({ record }) => <PreviewBlock block={record} />}
+            />
+          </div>
+        </section>
+      ) : (
+        <p className="text-muted-foreground mt-6 text-xs">
+          This imported record currently exposes summary metadata only.
+        </p>
+      )}
 
       <ContentAnalysisPanel
         id={post.id}
         kind="blog"
         initialAnalysis={analysis}
-        sourceUrl={post.externalUrl}
+        sourceUrl={sourceUrl}
       />
     </div>
   );
