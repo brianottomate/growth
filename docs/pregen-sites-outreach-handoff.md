@@ -1,7 +1,7 @@
 # Pre-Gen Sites outreach handoff
 
 **Status:** working internal pilot, not ready for broad prospect enrollment  
-**Last verified:** July 24, 2026  
+**Last verified:** July 28, 2026  
 **Owners:** Growth Engineering + Sales
 
 ## Executive summary
@@ -22,6 +22,137 @@ cadence.
 
 Do not bulk-enroll prospects yet. The current previews are served from the local
 development environment, and the claim CTA still routes to `localhost:7775`.
+
+## Measured state, July 28, 2026
+
+Every number in this section was measured against the live HubSpot portal
+(`22480390`) and the production Growth database, not estimated. Re-measure
+rather than trusting these figures after any large import.
+
+### Sync coverage
+
+| Object                                | HubSpot     | Growth   |
+| ------------------------------------- | ----------- | -------- |
+| Companies                             | 217,097     | 216,235  |
+| Contacts                              | 307,334     | 33,032   |
+| Contacts with an email                | 307,304     | —        |
+| Contacts with an email **and** a company association | **266,961** | 1,885 carry a `hubspot_contact_id` |
+
+Company sync is effectively complete (99.6%). **Contact sync is not**: Growth
+holds roughly 11% of the portal's contacts and can only address 1,885 of them
+in HubSpot. A 200-contact sample averages 1.13 contacts per associated company,
+so contact coverage in HubSpot is close to universal across the company
+universe — the gap is entirely on the Growth side, not missing data in HubSpot.
+
+Sizing for the full backfill: `leads.contact` is 14 MB for 33,032 rows (~440
+bytes/row), so mirroring all ~307k contacts costs roughly **130–190 MB**. The
+whole database is 394 MB today. Storage is not a constraint; API pagination
+time and webhook volume are the real costs.
+
+### Contact updates are a snapshot, not a sync
+
+The mirrored cohort contacts were imported on July 24, 2026 and nothing updates
+them. Of 142,176 stored HubSpot webhook events, **zero** are contact events —
+every row is `object.propertyChange` / `object.creation` / `object.merge` with
+`objectTypeId` `0-2` (company), or an untyped `object.associationChange`. The
+receiver could not project a contact event anyway: every branch of `applyInline`
+in `src/app/api/webhooks/hubspot/route.ts` is gated on
+`COMPANY_OBJECT_TYPE_ID = "0-2"`.
+
+Closing this needs both halves, and neither exists yet:
+
+1. a contact (`0-1`) subscription on the **Operated** HubSpot app, and
+2. contact branches in the receiver plus the backlog processor.
+
+Subscribe to a **narrow property allow-list**, not all contact properties. The
+company subscription alone produced 142k events; contacts outnumber companies
+1.4:1 and change more often, so a broad subscription is a Vercel invocation and
+storage problem, not just noise.
+
+### Cohort enrollability
+
+Both pregen lists are mirrored and linked. "Enrollable" means the company has at
+least one associated, non-deleted contact carrying both an email and a
+`hubspot_contact_id` — the minimum for an API enrollment.
+
+| Cohort    | Companies mirrored | Contacts mirrored | Companies enrollable today |
+| --------- | ------------------ | ----------------- | -------------------------- |
+| Recycled  | 404                | 1,436             | **390 (96.5%)**            |
+| Untouched | 499                | 452               | **367 (73.5%)**            |
+
+757 of 903 companies are enrollable. The untouched shortfall is real — 132 of
+those companies have no addressable contact — and it is the reason a 25/25 pilot
+split is comfortable while a full-universe send is not yet.
+
+### Enrollment via the API is confirmed working
+
+`POST /automation/sequences/2026-03/enrollments`, body `sequenceId` +
+`contactId` + `senderEmail`. `HUBSPOT_ACCESS_TOKEN_OPERATED` already carries
+both required scopes (`automation.sequences.read`,
+`automation.sequences.enrollments.write`) out of its 47 — **no new HubSpot
+access is needed**, and no browser automation is needed to enroll.
+
+Constraints that shape the design:
+
+- `senderEmail` must be an inbox connected to HubSpot, so sequence mail sends
+  **as a person**. Pregen outbound goes out under the owning BDR.
+- **1,000 enrollments per portal inbox per day.**
+- Sequences are **user-scoped on read**: `userId` is a required query parameter,
+  and omitting it returns a confusing `validation error`.
+
+Sequence read endpoints confirmed against the live portal:
+
+| Path                                          | Notes                                                        |
+| --------------------------------------------- | ------------------------------------------------------------ |
+| `GET /automation/sequences/2026-03?userId=`   | List. Appending `/sequences` parses as a sequence **id** and 400s. |
+| `GET /automation/sequences/2026-03/{id}?userId=` | Single sequence.                                          |
+
+There is still no create/update endpoint and no sequence-definition write scope,
+which is why templates are built in the HubSpot UI and personalized through
+contact properties. Independently re-verified July 28, 2026.
+
+### HubSpot user IDs for sequence calls
+
+| Person         | HubSpot user / owner id | Notes                                                     |
+| -------------- | ----------------------- | --------------------------------------------------------- |
+| Kristian Boe   | **87642320**            | Owns the three PILOT pregen sequences. Use this for reads. |
+| Kris Salguero  | 91455876                | `HS_USER_IDS.KRIS` in `hubspot.client.ts`. A different person. |
+
+`HS_USER_IDS.KRIS` is correct for Kris Salguero — do not "fix" it to Kristian
+Boe. Querying sequences as `91455876` returns a valid but different 12-sequence
+list and makes the PILOT sequences look permission-denied.
+
+All three pilot sequences are readable as `87642320`:
+
+| Sequence id | Name                                                       | Steps |
+| ----------- | ---------------------------------------------------------- | ----- |
+| 308080466   | PILOT - Pre-Gen Sites - Re-engagement 4-Touch - DO NOT ENROLL | 5  |
+| 308081169   | PILOT - Pre-Gen Sites - Fresh Outreach 4-Touch - DO NOT ENROLL | 5  |
+| 308080004   | PILOT - Pre-Gen Sites - Personalized 2-Touch - DO NOT ENROLL   | 5  |
+
+### Target ranking is two-sided
+
+Rank by the **gap between our generated site and their current one**, not by
+either alone: a manager with a good site and a weak generated preview should
+rank below a manager with a poor site and a strong preview.
+
+- *Their* side comes from the Growth-side site auditor.
+- *Our* side must also become a Growth-side evaluation. The monolith's eval gate
+  writes a score to `SaasWebsiteProspect.evaluation`, but that gate is
+  considered one of the weaker parts of the monolith and is a candidate for
+  removal — do not build the ranking on it as a dependency.
+
+Practical consequence: build previews for the whole ~900-company universe, score
+both sides in Growth, and rank on the delta. A hand-picked short list from
+RevOps then becomes an optional override rather than a prerequisite.
+
+### Cost of generating one site
+
+Ballpark **$2–5 per site** at Sonnet 5 / Opus 4.8 rates ($3/$15 and $5/$25 per
+MTok respectively), dominated by the full page-set generation and per-unit
+inference, plus roughly $0.02–0.05 of Firecrawl per site. The whole ~900-site
+universe therefore lands in the low thousands of dollars, which has been
+accepted. Measure a single real build before treating this as a budget.
 
 ## HubSpot target cohorts
 
@@ -231,6 +362,13 @@ Resolve these before sending to real prospects:
    action.
 6. **Rep rollout.** Start with a small reviewed subset. Recycled leads are
    rep-owned and should not be bulk-enrolled without owner approval.
+7. **Contact freshness.** Mirrored contacts are a July 24 snapshot with no
+   update path, so an email corrected or a contact merged in HubSpot will not
+   reach Growth. A pilot can tolerate this by re-running
+   `import-hubspot-pregen-lists.ts` as a pre-flight step; a full send cannot.
+   Fixing it properly means the `0-1` subscription and receiver branches above.
+8. **Contact coverage.** 132 untouched-cohort companies have no addressable
+   contact. Either accept the reduced universe or source contacts for them.
 
 ## Recommended next milestone
 

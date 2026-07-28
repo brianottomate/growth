@@ -5,7 +5,15 @@
 Kristian's Sales Hub Enterprise seat was activated and sequence creation access
 was verified in HubSpot on July 24, 2026. HubSpot's public API can read and
 enroll sequences but cannot create or edit them, so initial sequence setup still
-happens in HubSpot's UI.
+happens in HubSpot's UI. Re-verified July 28, 2026: the public reference exposes
+only two sequence GETs plus enrollment read/write, and
+`HUBSPOT_ACCESS_TOKEN_OPERATED` carries no sequence-definition write scope.
+
+**Sequence reads and enrollments are user-scoped.** Pass Kristian Boe's HubSpot
+user id **`87642320`** as the `userId` query parameter. Omitting it returns a
+misleading `validation error`, and passing `HS_USER_IDS.KRIS` (`91455876`, Kris
+Salguero — a different person) makes the PILOT sequences look permission-denied
+while returning someone else's 12-sequence list.
 
 ## Current four-touch drafts
 

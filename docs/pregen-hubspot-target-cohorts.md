@@ -4,10 +4,22 @@ HubSpot owns the dynamic list definitions. Growth mirrors their current
 memberships so the same target universe is available to jobs, SQL, and the
 `/app/leads` operator UI.
 
-| Cohort    | Companies | Contacts |
-| --------- | --------- | -------- |
-| Recycled  | `3808`    | `3809`   |
-| Untouched | `3811`    | `3812`   |
+| Cohort    | Companies | Contacts | Mirrored companies | Mirrored contacts | Enrollable companies |
+| --------- | --------- | -------- | ------------------ | ----------------- | -------------------- |
+| Recycled  | `3808`    | `3809`   | 404                | 1,436             | 390 (96.5%)          |
+| Untouched | `3811`    | `3812`   | 499                | 452               | 367 (73.5%)          |
+
+Membership counts measured July 28, 2026 against the live lists and the
+production database. HubSpot's own list sizes were 410/1,400 (recycled) and
+506/454 (untouched); the small deltas are companies whose HubSpot record carries
+no resolvable domain. "Enrollable" means the company has at least one
+associated, non-deleted contact with both an email and a `hubspot_contact_id`.
+
+⚠️ **Mirrored contacts are a snapshot, not a sync.** No contact webhook exists —
+all 142,176 stored HubSpot events are company (`0-2`) or association events.
+Re-run the import before any send batch. Full detail and the fix in
+[pregen-sites-outreach-handoff.md](./pregen-sites-outreach-handoff.md) →
+*Measured state, July 28, 2026*.
 
 The contact lists contain valid-email contacts associated with companies in the
 corresponding company list. Growth preserves company and contact memberships

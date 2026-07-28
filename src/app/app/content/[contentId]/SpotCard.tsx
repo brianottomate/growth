@@ -89,7 +89,7 @@ export type SpotCardData = {
   externalUrl: string | null;
   /** CMS editor deep link (Dato) — the preview surface while the item is a draft. */
   editorUrl: string | null;
-  /** In-app rendered preview (/app/dato-preview/…) for CMS-linked drafts. */
+  /** In-app rendered preview (/app/dato-preview-react/…) for CMS-linked drafts. */
   previewPath: string | null;
   provider: string | null;
   scheduledAtISO: string | null;

@@ -11,16 +11,20 @@ import {
 } from "@/server/clients/datocms-cda.client";
 import { PreviewBlock } from "./PreviewBlocks";
 
-// Draft preview, official-tooling version. Reads the CURRENT (draft) record
-// from the DatoCMS Content Delivery API with X-Include-Drafts — the same API
-// wander.com renders from — and renders it with react-datocms'
-// <StructuredText>, the same component wander.com uses.
+// Draft preview for the growth team. Reads the CURRENT (draft) record from the
+// DatoCMS Content Delivery API with X-Include-Drafts — the same API wander.com
+// renders from — and renders it with react-datocms' <StructuredText>, the same
+// component wander.com uses, so the preview and the site stay in step.
 //
-// Contrast with /app/dato-preview/[itemId], which reads the CMA and renders
-// to an HTML string. That path needs to hand-translate the CMA's raw DAST
-// into the shape the renderer expects, and injects the result with
-// dangerouslySetInnerHTML. Here the CDA returns { value, blocks } directly
-// and blocks render as real React components.
+// This deliberately lives in growth rather than wander.com: the audience is the
+// growth team, who are already here. A wander.com draft-mode route would only
+// buy pixel-exact fidelity, and would cost a preview secret, a Dato plugin, and
+// a production surface. Revisit if people outside growth need previews.
+//
+// An earlier version read the CMA and rendered to an HTML string, which meant
+// hand-translating raw DAST into the renderer's shape and injecting it with
+// dangerouslySetInnerHTML. The CDA returns { value, blocks } directly, so that
+// translation layer is gone.
 
 export const dynamic = "force-dynamic";
 
@@ -89,12 +93,6 @@ export default async function DatoPreviewReactPage({
       <div className="text-muted-foreground mt-10 flex gap-4 border-t pt-4 text-xs">
         <Link href="/app/content" className="hover:text-foreground underline">
           ← Back to content
-        </Link>
-        <Link
-          href={`/app/dato-preview/${article.id}`}
-          className="hover:text-foreground underline"
-        >
-          Compare with the original preview →
         </Link>
       </div>
     </div>
