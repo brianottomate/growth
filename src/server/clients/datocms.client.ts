@@ -139,8 +139,17 @@ export async function getItem(itemId: string): Promise<{
       attributes: Record<string, unknown>;
       meta: { status: string };
     }>
-  >(`/items/${itemId}?version=current`);
+  >(`/items/${itemId}?version=current&nested=true`);
   return data;
+}
+
+/** Map of item_type id → api_key, so a preview can render blocks by model
+ * name (`video_embed`, `blog_image`, …) instead of opaque ids. */
+export async function getItemTypeMap(): Promise<Record<string, string>> {
+  const { data } = await request<
+    JsonApi<Array<{ id: string; attributes: { api_key: string } }>>
+  >("/item-types");
+  return Object.fromEntries(data.map((t) => [t.id, t.attributes.api_key]));
 }
 
 /** Resolve an upload's public CDN URL. */
