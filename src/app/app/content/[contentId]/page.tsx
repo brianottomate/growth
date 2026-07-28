@@ -402,7 +402,7 @@ export default async function ContentDetailPage({
                 editorUrl: editorUrlOf(p.metadata),
                 previewPath:
                   p.platform === "blog" && p.externalId
-                    ? `/app/dato-preview-react/${p.externalId}`
+                    ? `/app/blog/preview/${p.externalId}`
                     : null,
                 provider: p.provider,
                 scheduledAtISO: p.scheduledAt

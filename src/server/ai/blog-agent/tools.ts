@@ -3,6 +3,10 @@ import "server-only";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
+import { and, eq } from "drizzle-orm";
+
+import { db } from "@/server/db";
+import { brandTable, platformPostTable } from "@/server/db/schema";
 import {
   buildBlockNode,
   createDraftItem,
@@ -41,6 +45,8 @@ export interface BlogToolTrailEntry {
 export interface BlogToolContext {
   /** Appended to as the agent works, so the caller gets a receipt. */
   trail: BlogToolTrailEntry[];
+  /** Org the invoking operator belongs to, for scoping brand lookups. */
+  organizationId: string;
 }
 
 const note = (ctx: BlogToolContext, toolName: string, summary: string) => {
@@ -229,6 +235,91 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
       },
     }),
 
+    linkToGrowth: tool({
+      description:
+        "Give a Dato article a home row in Growth: creates (or updates) the blog platform_post that /app/blog and /app/content read, linked by externalId. Call this after createDraft so the article is visible in the app instead of living only in Dato. Idempotent.",
+      inputSchema: z.object({
+        itemId: z.string(),
+        brandName: z
+          .string()
+          .trim()
+          .default("Wander")
+          .describe("Which brand owns this article."),
+      }),
+      execute: async ({ itemId, brandName }) => {
+        try {
+          const article = await getBlogArticleDraft(itemId);
+          if (!article) return { error: `No blog article with id ${itemId}.` };
+
+          const brands = await db.query.brandTable.findMany({
+            where: eq(brandTable.organizationId, ctx.organizationId),
+            columns: { id: true, name: true },
+          });
+          const needle = brandName.trim().toLowerCase();
+          const brand =
+            brands.find((b) => b.name.toLowerCase() === needle) ??
+            brands.find((b) => b.name.toLowerCase().includes(needle));
+          if (!brand) {
+            return {
+              error: `No brand matching "${brandName}". Known: ${brands.map((b) => b.name).join(", ")}`,
+            };
+          }
+
+          const existing = await db.query.platformPostTable.findFirst({
+            where: and(
+              eq(platformPostTable.externalId, itemId),
+              eq(platformPostTable.externalKind, "blog_article"),
+            ),
+          });
+
+          const fields = {
+            brandId: brand.id,
+            platform: "blog" as const,
+            username: "wander.com/blog",
+            source: "owned" as const,
+            // Mirrors Dato: an unpublished article is a draft here too, which
+            // is why /app/blog no longer filters to published-only.
+            status:
+              article._status === "published"
+                ? ("published" as const)
+                : ("draft" as const),
+            provider: "native" as const,
+            text: article.title,
+            externalId: itemId,
+            externalKind: "blog_article",
+            externalUrl: article.url
+              ? `${PUBLIC_BASE}/${article.url}`
+              : null,
+            media: article.image?.url
+              ? [{ url: article.image.url, type: "image" as const }]
+              : undefined,
+            metadata: {
+              description: article.description,
+              slug: article.url,
+              linkedBy: "blog-agent",
+            },
+          };
+
+          if (existing) {
+            await db
+              .update(platformPostTable)
+              .set(fields)
+              .where(eq(platformPostTable.id, existing.id));
+            note(ctx, "linkToGrowth", `updated spot ${existing.id}`);
+            return { ok: true, platformPostId: existing.id, created: false };
+          }
+          const [created] = await db
+            .insert(platformPostTable)
+            .values(fields)
+            .returning({ id: platformPostTable.id });
+          note(ctx, "linkToGrowth", `created spot ${created!.id} for ${itemId}`);
+          return { ok: true, platformPostId: created!.id, created: true };
+        } catch (error) {
+          return { error: (error as Error).message };
+        }
+      },
+    }),
+
     previewUrl: tool({
       description:
         "Get the links for an article: the in-app rendered draft preview, the Dato editor, and the planned public URL. Call after writing so your report points somewhere real.",
@@ -242,7 +333,7 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
           ]);
           note(ctx, "previewUrl", `links for ${itemId}`);
           return {
-            preview: `/app/dato-preview-react/${itemId}`,
+            preview: `/app/blog/preview/${itemId}`,
             editorUrl: adminDomain
               ? `https://${adminDomain}/editor/item_types/${itemTypeId}/items/${itemId}/edit`
               : null,

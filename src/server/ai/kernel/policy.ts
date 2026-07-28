@@ -72,6 +72,10 @@ export const growthActionPolicies = {
   blogAgent: {
     run: write({ consequence: "provider-write", reversible: false }),
   },
+  // Writes newsletter drafts through the product services. local-write
+  // because the effect lands in our own tables, and revisions are kept, so
+  // an edit can be restored rather than lost.
+  newsletterAgent: { run: write({ consequence: "local-write" }) },
   brandRead: {
     list: read("local-read", PLAN_READ),
     getMap: read("local-read", PLAN_READ),

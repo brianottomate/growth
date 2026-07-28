@@ -377,6 +377,59 @@ Reach for a sub-agent only when the work is genuinely iterative and the tools
 would otherwise be dead weight in the catalog. A one-shot action is still an
 action.
 
+`newsletterAgent` is the second instance, over `email-document.service`. Note
+what it does NOT do: it wraps the same product services the newsletter UI
+calls, rather than reaching into tables directly. A sub-agent is another caller
+of the product, not a private path into the database.
+
+## Published mirrors and the platform_post spine
+
+Blog and newsletter both drifted the same way, and it is worth naming so the
+next provider integration does not repeat it.
+
+Each product had a *published mirror* — `/app/blog` and `/app/newsletters` read
+`platform_post` filtered by `externalKind` (`blog_article`, `broadcast`) and, until
+recently, `publishedAt IS NOT NULL`. Drafting lived somewhere else entirely
+(Dato records; `email_document` rows). So an artifact being worked on had no
+home in the app until it shipped and was synced back.
+
+The rule now: **`platform_post` is the spine for drafts too.** Anything that
+creates content in a provider also creates or links its `platform_post` row, with
+the provider id in `externalId`. The blog agent's `linkToGrowth` does this, and
+`/app/blog` no longer filters to published-only. A record that exists only in a
+provider is invisible to the team, which is how content goes missing.
+
+### Ingest
+
+Two ingest paths exist for the blog and they overlap:
+
+- `blog-sync.service` reads the public RSS feed. It can only ever see published
+  posts, and only what the feed exposes.
+- The DatoCMS Content Delivery API (`datocms-cda.client`) is the same API
+  wander.com renders from. With `X-Include-Drafts` it sees drafts too, and
+  returns structured content rather than feed summaries.
+
+Prefer the CDA. The feed path should become a fallback for sources that have no
+API, not the primary route for our own CMS.
+
+DatoCMS does support webhooks (three are already configured for cache
+revalidation), so push ingest is possible. It is not worth it yet: an
+on-demand "fetch new articles" reconcile is simpler to reason about, needs no
+public endpoint or shared secret, and content volume is low. Revisit if latency
+between publishing and appearing in Growth ever matters.
+
+### Newsletter delivery is deliberately not wired
+
+Customer.io is reachable from services and `/api/lab/*` routes, but is NOT
+exposed to the AI layer, and `newsletterAgent.sendIssue` refuses. Sending is
+irreversible in a way drafting is not.
+
+When we do wire it, the shape should be: a product service that owns delivery,
+an approval gate in front of it, and only then an action that calls it — the
+same order the rest of the catalog follows. Same reconcile question as the blog:
+prefer an on-demand "fetch recent broadcasts" over a Customer.io webhook until
+volume justifies the endpoint.
+
 ## File map
 
 | Concern                                     | Source                                                                        |

@@ -34,6 +34,8 @@ export async function runBlogAgent(input: {
   task: string;
   /** Optional record the task is about, so the agent doesn't have to search. */
   itemId?: string;
+  /** Scopes brand lookups when the agent links an article into Growth. */
+  organizationId: string;
 }): Promise<BlogAgentResult> {
   if (!isClaudeConfigured) {
     return {
@@ -53,7 +55,10 @@ export async function runBlogAgent(input: {
   }
 
   const trail: BlogToolTrailEntry[] = [];
-  const tools = buildBlogTools({ trail });
+  const tools = buildBlogTools({
+    trail,
+    organizationId: input.organizationId,
+  });
 
   const prompt = input.itemId
     ? `${input.task}\n\nThe article this concerns: ${input.itemId}`

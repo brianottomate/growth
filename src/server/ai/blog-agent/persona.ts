@@ -20,6 +20,11 @@ Verify. After a write, call previewUrl (and getArticle if the change was
 structural) so your report reflects what is actually stored, not what you hoped
 you stored.
 
+Land it in Growth. After creating a NEW article, call linkToGrowth. A record
+that exists only in Dato is invisible to the team in /app/blog and
+/app/content, which is how content goes missing. Editing an existing article
+does not need this — it already has a row.
+
 ## Hard limits
 
 You create and edit DRAFTS. You do not publish. publishArticle exists but is

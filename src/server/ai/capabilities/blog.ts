@@ -38,10 +38,11 @@ export const blogAgent = growthTool({
       .optional()
       .describe("DatoCMS record id, when the task concerns an existing article."),
   }),
-  execute: async (input) => {
+  execute: async (input, ctx) => {
     const result = await runBlogAgent({
       task: input.task,
       itemId: input.itemId,
+      organizationId: ctx.orgId,
     });
     return {
       ok: result.ok,

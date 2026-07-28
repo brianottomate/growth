@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable, memberTable, platformPostTable } from "@/server/db/schema";
@@ -62,14 +62,20 @@ export default async function BlogPage({
     ? [selectedBrand.id]
     : brands.map((brand) => brand.id);
 
+  // Drafts included on purpose. This page used to be published-only, which
+  // meant an article being written was invisible here until it shipped and was
+  // synced — so work in progress had no home. Unpublished rows sort first by
+  // creation time, since they have no publishedAt.
   const posts = brandIds.length
     ? await db.query.platformPostTable.findMany({
         where: and(
           inArray(platformPostTable.brandId, brandIds),
           eq(platformPostTable.externalKind, "blog_article"),
-          isNotNull(platformPostTable.publishedAt),
         ),
-        orderBy: [desc(platformPostTable.publishedAt)],
+        orderBy: [
+          desc(platformPostTable.publishedAt),
+          desc(platformPostTable.createdAt),
+        ],
       })
     : [];
 
@@ -103,25 +109,33 @@ export default async function BlogPage({
     return query ? `/app/blog?${query}` : "/app/blog";
   };
 
+  // Drafts have no publishedAt, so every date read falls back to createdAt.
+  const dateOf = (p: (typeof visible)[number]["post"]) =>
+    p.publishedAt ?? p.createdAt;
+
   // Build cover items (image-backed — cheap, no live iframes).
   const items: CoverItem[] = visible.map((t) => ({
     id: t.post.id,
     href: `/app/blog/${t.post.id}`,
     title: t.post.text ?? "Untitled",
     subtitle: t.description,
-    date: t.post.publishedAt!.toLocaleDateString([], {
+    date: dateOf(t.post).toLocaleDateString([], {
       month: "short",
       day: "numeric",
       year: "numeric",
     }),
-    badge: t.tags[0] ? { label: t.tags[0], color: "#38bdf8" } : undefined,
+    badge: !t.post.publishedAt
+      ? { label: "Draft", color: "#fbbf24" }
+      : t.tags[0]
+        ? { label: t.tags[0], color: "#38bdf8" }
+        : undefined,
     coverImage: t.post.media?.[0]?.url ?? null,
   }));
 
   // Group for list view.
   const months: { key: string; items: typeof visible }[] = [];
   for (const t of visible) {
-    const k = monthKey(t.post.publishedAt!);
+    const k = monthKey(dateOf(t.post));
     let m = months.find((x) => x.key === k);
     if (!m) {
       m = { key: k, items: [] };
@@ -221,11 +235,16 @@ export default async function BlogPage({
                   className="hover:bg-accent/40 -mx-2 flex items-center gap-3 rounded-lg border-b px-2 py-3 text-sm transition-colors last:border-0"
                 >
                   <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
-                    {t.post.publishedAt!.toLocaleDateString([], {
+                    {dateOf(t.post).toLocaleDateString([], {
                       month: "short",
                       day: "numeric",
                     })}
                   </span>
+                  {!t.post.publishedAt && (
+                    <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                      Draft
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1 truncate">{t.post.text}</span>
                   <span className="text-muted-foreground hidden shrink-0 gap-1 text-[11px] sm:flex">
                     {t.tags.slice(0, 2).map((tag) => (

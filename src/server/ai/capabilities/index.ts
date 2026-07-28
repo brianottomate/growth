@@ -6,6 +6,7 @@ import { blogAgent } from "./blog";
 import { DOMAIN_CAPABILITY_TOOLS } from "./domains";
 import { LIFECYCLE_TOOLS } from "./lifecycle";
 import { navigateWorkspace } from "./navigation";
+import { newsletterAgent } from "./newsletter";
 import { workspaceOverview } from "./overview";
 import { prepareProductionPacket } from "./production";
 import { capabilityAllowsSurface } from "../kernel/policy";
@@ -23,6 +24,7 @@ export const OVERVIEW_TOOLS = {
   navigateWorkspace,
   prepareProductionPacket,
   blogAgent,
+  newsletterAgent,
   ...DOMAIN_CAPABILITY_TOOLS,
   ...LIFECYCLE_TOOLS,
 } as const satisfies ToolSet;
