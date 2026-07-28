@@ -3,10 +3,6 @@ import "server-only";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
-import { and, eq } from "drizzle-orm";
-
-import { db } from "@/server/db";
-import { brandTable, platformPostTable } from "@/server/db/schema";
 import {
   buildBlockNode,
   createDraftItem,
@@ -19,6 +15,7 @@ import {
   updateItemFields,
 } from "@/server/clients/datocms.client";
 import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
+import { linkDatoBlogArticle } from "@/server/services/dato-blog-link.service";
 
 /**
  * The blog agent's bespoke tools.
@@ -47,6 +44,8 @@ export interface BlogToolContext {
   trail: BlogToolTrailEntry[];
   /** Org the invoking operator belongs to, for scoping brand lookups. */
   organizationId: string;
+  /** Dato records written during this run, reconciled before handoff. */
+  touchedItemIds: Set<string>;
 }
 
 const note = (ctx: BlogToolContext, toolName: string, summary: string) => {
@@ -145,6 +144,7 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
             itemTypeId,
             attributes: { title, url: slug, description, author: authorId },
           });
+          ctx.touchedItemIds.add(created.id);
           note(ctx, "createDraft", `created draft ${created.id} "${title}"`);
           return {
             ok: true,
@@ -173,6 +173,7 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
           const keys = Object.keys(fields);
           if (keys.length === 0) return { error: "No fields supplied." };
           await updateItemFields(itemId, fields);
+          ctx.touchedItemIds.add(itemId);
           note(ctx, "updateFields", `patched ${keys.join(", ")} on ${itemId}`);
           return { ok: true, itemId, updated: keys };
         } catch (error) {
@@ -191,7 +192,9 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
           .describe("Block model api_key, e.g. video_embed."),
         attributes: z
           .record(z.string(), z.unknown())
-          .describe("Field api_key -> value for the block, e.g. { url: '...' }."),
+          .describe(
+            "Field api_key -> value for the block, e.g. { url: '...' }.",
+          ),
       }),
       execute: async ({ itemId, blockModel, attributes }) => {
         try {
@@ -217,6 +220,7 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
             },
           };
           await updateItemFields(itemId, { body: nextBody });
+          ctx.touchedItemIds.add(itemId);
           note(
             ctx,
             "insertBlock",
@@ -248,72 +252,18 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
       }),
       execute: async ({ itemId, brandName }) => {
         try {
-          const article = await getBlogArticleDraft(itemId);
-          if (!article) return { error: `No blog article with id ${itemId}.` };
-
-          const brands = await db.query.brandTable.findMany({
-            where: eq(brandTable.organizationId, ctx.organizationId),
-            columns: { id: true, name: true },
+          const linked = await linkDatoBlogArticle({
+            itemId,
+            organizationId: ctx.organizationId,
+            brandName,
           });
-          const needle = brandName.trim().toLowerCase();
-          const brand =
-            brands.find((b) => b.name.toLowerCase() === needle) ??
-            brands.find((b) => b.name.toLowerCase().includes(needle));
-          if (!brand) {
-            return {
-              error: `No brand matching "${brandName}". Known: ${brands.map((b) => b.name).join(", ")}`,
-            };
-          }
-
-          const existing = await db.query.platformPostTable.findFirst({
-            where: and(
-              eq(platformPostTable.externalId, itemId),
-              eq(platformPostTable.externalKind, "blog_article"),
-            ),
-          });
-
-          const fields = {
-            brandId: brand.id,
-            platform: "blog" as const,
-            username: "wander.com/blog",
-            source: "owned" as const,
-            // Mirrors Dato: an unpublished article is a draft here too, which
-            // is why /app/blog no longer filters to published-only.
-            status:
-              article._status === "published"
-                ? ("published" as const)
-                : ("draft" as const),
-            provider: "native" as const,
-            text: article.title,
-            externalId: itemId,
-            externalKind: "blog_article",
-            externalUrl: article.url
-              ? `${PUBLIC_BASE}/${article.url}`
-              : null,
-            media: article.image?.url
-              ? [{ url: article.image.url, type: "image" as const }]
-              : undefined,
-            metadata: {
-              description: article.description,
-              slug: article.url,
-              linkedBy: "blog-agent",
-            },
-          };
-
-          if (existing) {
-            await db
-              .update(platformPostTable)
-              .set(fields)
-              .where(eq(platformPostTable.id, existing.id));
-            note(ctx, "linkToGrowth", `updated spot ${existing.id}`);
-            return { ok: true, platformPostId: existing.id, created: false };
-          }
-          const [created] = await db
-            .insert(platformPostTable)
-            .values(fields)
-            .returning({ id: platformPostTable.id });
-          note(ctx, "linkToGrowth", `created spot ${created!.id} for ${itemId}`);
-          return { ok: true, platformPostId: created!.id, created: true };
+          ctx.touchedItemIds.delete(itemId);
+          note(
+            ctx,
+            "linkToGrowth",
+            `${linked.created ? "created" : "updated"} spot ${linked.platformPostId} for ${itemId}`,
+          );
+          return { ok: true, ...linked };
         } catch (error) {
           return { error: (error as Error).message };
         }

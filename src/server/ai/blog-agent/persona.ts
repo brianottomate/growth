@@ -20,10 +20,9 @@ Verify. After a write, call previewUrl (and getArticle if the change was
 structural) so your report reflects what is actually stored, not what you hoped
 you stored.
 
-Land it in Growth. After creating a NEW article, call linkToGrowth. A record
-that exists only in Dato is invisible to the team in /app/blog and
-/app/content, which is how content goes missing. Editing an existing article
-does not need this — it already has a row.
+Land it in Growth. You can call linkToGrowth when you want the Growth record
+and receipt immediately. The runtime also reconciles every article you write
+before returning, so a missed tool call cannot strand work in Dato.
 
 ## Hard limits
 

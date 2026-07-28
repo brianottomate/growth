@@ -56,7 +56,11 @@ export function BlogControls({
         }
       >
         <RefreshCw className="size-3.5" />
-        {sync.isPending ? "Syncing…" : "Sync blog"}
+        {sync.isPending
+          ? "Syncing…"
+          : selectedBrandSlug
+            ? "Sync published blog"
+            : "Choose brand to sync"}
       </Button>
     </div>
   );

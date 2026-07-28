@@ -8,6 +8,7 @@ import {
   isClaudeConfigured,
 } from "@/server/clients/claude.client";
 import { isDatoCmsConfigured } from "@/server/clients/datocms.client";
+import { linkDatoBlogArticle } from "@/server/services/dato-blog-link.service";
 import { BLOG_AGENT_PERSONA } from "./persona";
 import { buildBlogTools, type BlogToolTrailEntry } from "./tools";
 
@@ -55,9 +56,11 @@ export async function runBlogAgent(input: {
   }
 
   const trail: BlogToolTrailEntry[] = [];
+  const touchedItemIds = new Set<string>();
   const tools = buildBlogTools({
     trail,
     organizationId: input.organizationId,
+    touchedItemIds,
   });
 
   const prompt = input.itemId
@@ -76,6 +79,18 @@ export async function runBlogAgent(input: {
       // instead of grinding against the production CMS.
       stopWhen: stepCountIs(20),
     });
+
+    for (const itemId of touchedItemIds) {
+      const linked = await linkDatoBlogArticle({
+        itemId,
+        organizationId: input.organizationId,
+        linkedBy: "blog-agent-reconciliation",
+      });
+      trail.push({
+        tool: "reconcileGrowth",
+        summary: `${linked.created ? "created" : "updated"} spot ${linked.platformPostId} for ${itemId}`,
+      });
+    }
 
     return {
       ok: true,
