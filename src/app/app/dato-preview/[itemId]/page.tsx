@@ -247,9 +247,15 @@ export default async function DatoPreviewPage({
         )}
       </article>
 
-      <div className="text-muted-foreground mt-10 border-t pt-4 text-xs">
+      <div className="text-muted-foreground mt-10 flex gap-4 border-t pt-4 text-xs">
         <Link href="/app/content" className="hover:text-foreground underline">
           ← Back to content
+        </Link>
+        <Link
+          href={`/app/dato-preview-react/${itemId}`}
+          className="hover:text-foreground underline"
+        >
+          Compare with the react-datocms preview →
         </Link>
       </div>
     </div>
