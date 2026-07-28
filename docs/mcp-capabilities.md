@@ -1,5 +1,9 @@
 # Growth MCP tool surface
 
+For the product and architecture handoff, including the chat editing model,
+domain design, provider boundaries, and current gaps, read
+[`ai-mcp-handoff.md`](ai-mcp-handoff.md).
+
 Growth exposes its canonical AI capability registry over Streamable HTTP at:
 
 ```text

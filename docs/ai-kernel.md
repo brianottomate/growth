@@ -1,5 +1,9 @@
 # Growth AI kernel
 
+For a shareable overview of the product approach, domain catalog, MCP boundary,
+provider ownership, and lessons from the implementation, read
+[`ai-mcp-handoff.md`](ai-mcp-handoff.md).
+
 Growth's executable contract is an ordinary AI SDK 7 `ToolSet`. It has no
 parallel atomic registry and no post-hoc grouping layer.
 

@@ -71,6 +71,9 @@ organization.
 Read `docs/mcp-capabilities.md` before changing OAuth, organization selection,
 the capability registry, or connector exposure. Vercel is the application and
 MCP deployment pipeline. Do not create a duplicate MCP deployment elsewhere.
+`docs/ai-mcp-handoff.md` is the shareable overview of the product direction,
+domain contract, provider boundaries, implementation history, and extension
+checklist.
 
 ## Architecture
 
