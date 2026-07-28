@@ -5,6 +5,14 @@ import {
   type GrowthWorkflowName,
 } from "@/server/services/growth-workflows.service";
 
+// Explicit rather than inherited: these jobs fan out over up to `limit`
+// candidates per stage, each doing BigQuery + Customer.io + Minerva + Outreach
+// round-trips, so the ceiling needs to be a decision rather than whatever the
+// platform default happens to be. Overrunning is not data loss — unprocessed
+// episodes stay `pending` in funnel_send_log and the next run picks them up
+// oldest-first — but it is wasted work.
+export const maxDuration = 300;
+
 const WORKFLOW_NAMES: GrowthWorkflowName[] = [
   "daily_comprehensive_sync",
   "outreach_auto_healing",

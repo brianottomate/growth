@@ -21,8 +21,8 @@
       "schedule": "0 0-12,23 * * 1-5"
     },
     {
-      "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=200&concurrency=4",
-      "schedule": "0 */6 * * 0,6"
+      "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=100&concurrency=4",
+      "schedule": "0 */4 * * 0,6"
     },
     {
       "path": "/api/cron/growth?job=funnel_email_backfill",

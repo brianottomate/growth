@@ -200,8 +200,17 @@ else on a mark that path already wakes for.**
   unique `(user, stage, windowKey)` is the idempotency ledger, so a Saturday abandoner is
   still eligible on Monday. **The exception is the payment stage, whose window is only 48 h**
   — a Friday-evening payment abandonment expires Sunday evening, so weekends can't go
-  uncovered entirely. That's why it's every 6 h rather than a single Sunday pass, and
-  weekend runs carry `limit=200` to drain a two-day backlog in one go.
+  uncovered entirely. Hence every 4 h at weekends rather than a single Sunday pass.
+
+  **`limit` cannot lose anyone.** The detection query is unbounded — every eligible candidate
+  is ledgered `pending` on the first sweep that sees it — and `limitPerStage` caps only the
+  *processing* of that queue, `ORDER BY sent_at ASC`, so a backlog drains oldest-first with
+  no starvation and the ledger row outlives the eligibility window. `limit` is therefore a
+  batch-size/timeout dial, not a correctness one: keep it small enough that a run finishes
+  inside `maxDuration` (300 s, set explicitly on the route). Sizing reference, 21 days to
+  2026-07-28: `abandoned_search` averages 190/day and peaked at 310, cart 65/100, wishlist
+  59/114, payment 7/18 — so weekend capacity of 6 runs × 100 = 600/stage/day carries ~2×
+  the busiest observed day.
 - `/api/cron/hubspot` is a **retry rail**, not a delivery path — the webhook receiver stores
   and projects in `after()`, so enrichment latency is webhook-bound and independent of the
   cron. It only matters when a projection fails. Hourly on `:00`, a mark `*/20` already
