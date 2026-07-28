@@ -19,15 +19,23 @@ parallel atomic registry and no post-hoc grouping layer.
 - Outputs use `{ ok: true, action, data }` or
   `{ ok: false, action?, error: { code, message, retryable, suggestedAction } }`.
 
-`OVERVIEW_TOOLS` contains the 31 canonical in-app capabilities. `MCP_TOOLS` is
-the same catalog projected by action policy; it contains 30 capabilities because
-open-world `researchRead` stays with the host. The optional `invoke_growth`
+`OVERVIEW_TOOLS` contains the 34 canonical in-app capabilities. `MCP_TOOLS` is
+the same catalog projected by action policy; it contains 32 capabilities because
+open-world `researchRead` and in-app `driveRead` stay with the host. The optional `invoke_growth`
 facade receives only that MCP-safe projection, cannot invoke itself, and stops
 after eight steps.
 
 The older `/plan` product surface does not own another registry. `PLAN_TOOLS`
-is a deterministic three-capability projection (`brandRead`, `researchRead`,
-and `planningRead`) of the same definitions and uses the same runtime.
+is a deterministic three-capability, read-only projection (`brandRead`,
+`researchRead`, and `planningRead`) of the same definitions and uses the same
+runtime. It exists only for the focused Form|Chat moment planner. It does not
+limit the global assistant or the MCP surface.
+
+The global assistant receives current-page context but keeps the full canonical
+catalog available. Location guides which state to inspect first; it is not an
+authorization or capability boundary. `navigateWorkspace` returns canonical
+named destinations and also accepts a validated internal `/app` path for a new
+route that has not yet been named.
 
 ## Runtime guarantees
 
@@ -42,7 +50,7 @@ idempotency hints. Local reversible changes may run after a clear conversational
 instruction. Any future external send/publish, destructive deletion, or
 irreversible provider mutation must declare that consequence and approval.
 
-## Contract gauntlet
+## Contract checks
 
 `bun run ai:contracts` verifies registry/catalog/policy parity, root-object model
 and MCP schemas, strict action coverage, connector projection, and consequence

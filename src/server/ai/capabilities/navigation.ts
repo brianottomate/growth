@@ -5,63 +5,14 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { brandTable } from "@/server/db/schema";
+import {
+  getSafeWorkspacePath,
+  WORKSPACE_ROUTES,
+  WORKSPACE_SURFACES,
+} from "@/lib/workspace-navigation";
 import { growthTool } from "./types";
 
-const surfaceSchema = z.enum([
-  "overview",
-  "next",
-  "review",
-  "brands",
-  "brand_map",
-  "channels",
-  "website",
-  "audiences",
-  "plan",
-  "create",
-  "studio",
-  "content",
-  "calendar",
-  "campaigns",
-  "timeline",
-  "feed",
-  "blog",
-  "newsletters",
-  "ads",
-  "inbox",
-  "listen",
-  "media",
-  "pillars",
-  "people",
-]);
-
-const ROUTES: Record<
-  Exclude<z.infer<typeof surfaceSchema>, "brand_map">,
-  string
-> = {
-  overview: "/app/next",
-  next: "/app/next",
-  review: "/app/review",
-  brands: "/app/brands",
-  channels: "/app/channels",
-  website: "/app/website",
-  audiences: "/app/audiences",
-  plan: "/app/next?intent=plan",
-  create: "/app/next?intent=create",
-  studio: "/app/next?intent=create",
-  content: "/app/content",
-  calendar: "/app/calendar",
-  campaigns: "/app/campaigns",
-  timeline: "/app/feed-v5",
-  feed: "/app/feed",
-  blog: "/app/blog",
-  newsletters: "/app/newsletters",
-  ads: "/app/ads",
-  inbox: "/app/inbox",
-  listen: "/app/listen",
-  media: "/app/media",
-  pillars: "/app/pillars",
-  people: "/app/people",
-};
+const surfaceSchema = z.enum(WORKSPACE_SURFACES);
 
 /**
  * A portable navigation request. In-app chat executes it with router.push;
@@ -69,10 +20,16 @@ const ROUTES: Record<
  */
 export const navigateWorkspace = growthTool({
   description:
-    "Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. /app/next is the single conversational home; the other surfaces are for inspection and editing. For a specific brand map or brand-aware Next conversation, pass a brandId from brandRead.list. The in-app client follows the returned route; MCP clients receive the same canonical URL.",
+    'Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. The current page is context, not a capability boundary: complete the requested workspace operation first when possible, then navigate to the best inspection or editing surface. Prefer a named surface. Use surface "path" with a safe /app path only for a real route not yet represented by a named surface. For a specific brand map or brand-aware Next conversation, pass a brandId from brandRead.list. The in-app client follows the returned route; MCP clients receive the same canonical URL.',
   inputSchema: z.object({
     action: z.literal("navigate"),
     surface: surfaceSchema,
+    path: z
+      .string()
+      .optional()
+      .describe(
+        'Required only for surface "path". Must be an internal /app path, optionally including a query or hash.',
+      ),
     brandId: z
       .string()
       .optional()
@@ -81,6 +38,28 @@ export const navigateWorkspace = growthTool({
       ),
   }),
   execute: async (input, ctx) => {
+    if (input.surface === "path") {
+      const href = getSafeWorkspacePath(input.path);
+      if (!href) {
+        return {
+          ok: false as const,
+          action: input.action,
+          error: {
+            code: "invalid_input",
+            message: "A workspace path must start with /app.",
+            retryable: false,
+            suggestedAction:
+              "Use a named surface or pass a real internal /app path.",
+          },
+        };
+      }
+      return {
+        ok: true as const,
+        action: input.action,
+        data: { surface: input.surface, href },
+      };
+    }
+
     if (input.surface === "next" && input.brandId) {
       const brand = await db.query.brandTable.findFirst({
         where: and(
@@ -120,7 +99,7 @@ export const navigateWorkspace = growthTool({
         action: input.action,
         data: {
           surface: input.surface,
-          href: ROUTES[input.surface],
+          href: WORKSPACE_ROUTES[input.surface],
         },
       };
     }

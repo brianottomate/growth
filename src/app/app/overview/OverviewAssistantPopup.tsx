@@ -315,7 +315,7 @@ export function OverviewAssistantPopup({
               userName={userName}
               variant={nextMode ? "page" : "popup"}
               active={visible}
-              mode="next"
+              mode={nextMode ? "next" : "overview"}
               brandId={activeBrand?.id}
               brandName={activeBrand?.name}
               intent={searchParams.get("intent") ?? undefined}

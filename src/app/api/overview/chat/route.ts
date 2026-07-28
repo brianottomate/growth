@@ -46,30 +46,6 @@ import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
 export const maxDuration = 60;
 
 const MODEL = "claude-sonnet-5";
-const NEXT_ACTIVE_TOOLS = [
-  "workspaceOverview",
-  "navigateWorkspace",
-  "prepareProductionPacket",
-  "brandRead",
-  "contentRead",
-  "contentWrite",
-  "contentMediaWrite",
-  // Resolves Drive folder/file names to ids so the chat can compose
-  // browse -> importFromDrive -> makeCarousel. MCP hosts bring their own
-  // Drive connector instead (see policy.ts).
-  "driveRead",
-  "contentStrategyRead",
-  "contentStrategyWrite",
-  "researchRead",
-  "publishingRead",
-  "mediaAnalysisRead",
-  "mediaAnalysisWrite",
-  "strategyRead",
-  "strategyWrite",
-  "planningRead",
-  "planningWrite",
-] as const satisfies readonly (keyof typeof OVERVIEW_TOOLS)[];
-
 function sanitizeForModel(history: UIMessage[]) {
   return history
     .map((message, index) => {
@@ -326,10 +302,6 @@ export async function POST(req: Request): Promise<Response> {
         messages: [...context.messages, ...modelMessages],
         allowSystemInMessages: true,
         tools: runtime.tools,
-        activeTools:
-          surface === "create" || surface === "next"
-            ? [...NEXT_ACTIVE_TOOLS]
-            : undefined,
         toolsContext: runtime.toolsContext,
         toolApproval: runtime.toolApproval,
         stopWhen: stepCountIs(8),
