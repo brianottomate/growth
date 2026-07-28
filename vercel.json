@@ -14,15 +14,7 @@
     },
     {
       "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
-      "schedule": "*/15 13-21 * * 1-5"
-    },
-    {
-      "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
-      "schedule": "0 0-12,22,23 * * 1-5"
-    },
-    {
-      "path": "/api/cron/growth?job=funnel_abandonment_sweep&limit=50&concurrency=4",
-      "schedule": "0 * * * 0,6"
+      "schedule": "*/20 * * * *"
     },
     {
       "path": "/api/cron/growth?job=funnel_email_backfill",
@@ -30,15 +22,7 @@
     },
     {
       "path": "/api/cron/hubspot",
-      "schedule": "0,30 13-21 * * 1-5"
-    },
-    {
-      "path": "/api/cron/hubspot",
-      "schedule": "0 0-12,22,23 * * 1-5"
-    },
-    {
-      "path": "/api/cron/hubspot",
-      "schedule": "0 * * * 0,6"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/instagram",

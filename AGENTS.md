@@ -158,9 +158,10 @@ projections. Ingest via `scripts/ingest-leads.ts`; UI under `/app/leads`.
 - `/api/cron/spend` — daily 05:00 (spend-tracker cache warm; see `src/server/services/spend-tracker/`)
 - `/api/cron/growth?job=daily_comprehensive_sync&...` — **hourly** on the hour with a 3 h
   window, plus a 24 h backstop pass at 03:00 (CIO/Outreach lead sync)
-- `/api/cron/growth?job=funnel_abandonment_sweep&...` — peak/off-peak (abandonment sweep)
+- `/api/cron/growth?job=funnel_abandonment_sweep&...` — every 20 min (abandonment sweep →
+  Customer.io / Outreach; the cadence the whole compute budget is spent on)
 - `/api/cron/growth?job=funnel_email_backfill` — every 6h on the hour (funnel email backfill)
-- `/api/cron/hubspot` — peak/off-peak (pending HubSpot webhook retry)
+- `/api/cron/hubspot` — hourly (pending HubSpot webhook retry rail)
 - `/api/cron/instagram` — daily 19:00 UTC (Instagram account watch)
 - `/api/cron/x` — every 6h (X listening scan)
 - `/api/cron/affiliate` — daily 09:00 + weekly report Mon 14:00 (Impact.com monitor)
@@ -174,34 +175,37 @@ after ~5 min, so every wake costs ~5.5 min of compute whether the job takes 200m
 Two crons on `*/10` + `*/20` kept the compute awake ~16 h/day and burned the quota by the
 27th, taking prod down (2026-07-27).
 
-**Match cadence to the job's own latency floor — polling faster than that buys nothing.**
-Work out the soonest the job could possibly do something useful, and use that:
+Crucially the cost is the **union** of all cron marks, not any single schedule. That's what
+made the outage counterintuitive: `funnel_abandonment_sweep` on `*/20` costs ~50 CPU-hrs on
+its own, but adding `/api/cron/hubspot` on `*/10` collapsed the union to every 10 minutes
+and took it to ~99 — and the expensive job was the *retry rail*, not the one doing work.
 
-- `funnel_abandonment_sweep` is a window query, and no stage is eligible sooner than 30 min
-  after the event (payment; the rest are 1 h) with windows 48 h–7 days wide. Polling every
-  5 min just re-runs the same query to find the same people. Peak is `*/15`, and even that
-  is generous.
-- `/api/cron/hubspot` is a **retry rail**, not the delivery path — the webhook receiver
-  stores and projects in `after()`, so enrichment latency is webhook-bound and totally
-  independent of this cron. It only matters when a projection fails, so it runs on marks
-  the sweep already wakes for (`0,30` at peak) and therefore costs nothing extra.
+So: **spend the budget on the path that carries user-visible latency, and put everything
+else on a mark that path already wakes for.**
 
-The job that *does* deserve frequency is `daily_comprehensive_sync` — it's the path demand
-sales actually depends on. It pulls `checkout_started` / `payment_info_entered` from
-BigQuery and runs `processLead` to enrich into Customer.io and Outreach, so at its old
-daily 03:00 cadence a prospect could wait ~23 h to reach a BDR's queue. It now runs hourly
-with a 3 h window (overlap absorbs BigQuery ingestion lag) on the `:00` mark the sweep
-already wakes for — **zero extra Neon cost** — with the 24 h pass kept at 03:00 as a
-backstop for late-arriving rows. Safe to overlap because `processLead` creates-or-updates
-the Outreach prospect and never enrols anyone in a sequence. The cost to watch here is
-BigQuery bytes scanned, not Neon.
+- `funnel_abandonment_sweep` is the one that earns frequency. Amplitude posts abandonment
+  events to a webhook which upserts `funnel_state` in real time (`funnel-ingest.service.ts`,
+  dark — records state, sends nothing); the sweep is what turns that into a Customer.io /
+  Outreach sync via `processLead`. Its stage windows are deliberate delays (payment 30 min,
+  search/wishlist/cart 1 h), so end-to-end latency is `window + up to one sweep interval`.
+  `*/20`, uniform across the day — **not** workday-weighted: this is a consumer signal that
+  peaks in evenings and at weekends, unlike anything sales-facing.
+- `/api/cron/hubspot` is a **retry rail**, not a delivery path — the webhook receiver stores
+  and projects in `after()`, so enrichment latency is webhook-bound and independent of the
+  cron. It only matters when a projection fails. Hourly on `:00`, a mark `*/20` already
+  hits, so it costs nothing.
+- `daily_comprehensive_sync` pulls `checkout_started` / `payment_info_entered` from BigQuery
+  and enriches into Customer.io and Outreach — the path demand sales depends on. At its old
+  daily 03:00 cadence a prospect could wait ~23 h to reach a BDR's queue; now hourly with a
+  3 h window (overlap absorbs BigQuery ingestion lag) plus the 24 h pass at 03:00 as a
+  backstop. Also free — `:00` again. Safe to overlap because `processLead`
+  creates-or-updates the Outreach prospect and never enrols anyone in a sequence. The cost
+  to watch here is BigQuery bytes scanned, not Neon.
 
-That's ~30 CPU-hrs/month, comfortably inside the free tier. Rules of thumb: **put new
-crons on a mark an existing cron already wakes for** (marginal cost ≈ zero), keep
-sub-hourly work inside the peak range, and before reaching for a tighter interval check
-whether the thing you want faster is actually gated by a cron at all. ET is UTC−4/−5, so
-the peak window drifts an hour at DST — harmless, hence `13-21` rather than a tight
-`13-22`.
+Every remaining cron sits on `:00`, so the whole schedule costs what `*/20` costs on its
+own: **~50 CPU-hrs/month** against the free tier's 100. Rule of thumb: **put new crons on a
+mark an existing cron already wakes for** — marginal cost is zero — and before reaching for
+a tighter interval, check whether the thing you want faster is gated by a cron at all.
 
 Other API routes: `api/trpc`, `api/auth/[...all]`, `api/upload`, `api/media`, `api/webhooks`,
 `api/instantly` (incl. the reply webhook that mirrors replies/interest onto `lead_contact`),
