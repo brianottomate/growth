@@ -276,6 +276,15 @@ operation that imports a resolved Drive file into its own media system.
 The global assistant is broad, but several areas are deliberately incomplete:
 
 - Spend is reserved for a dedicated agent.
+- The blog is delegated, not a domain pair. `blogAgent` hands one task to a
+  sub-agent in `src/server/ai/blog-agent/`, which owns bespoke DatoCMS tools
+  (describeModel, listModels, getArticle, createDraft, updateFields,
+  insertBlock, previewUrl) for the length of that call. Editing a CMS record is
+  a discover-write-verify loop, so seven more top-level tools would widen the
+  catalog for an occasional job, and one do-everything action would hide which
+  writes ran. The sub-agent returns the trail of tools it called, so individual
+  writes stay visible. It works in drafts only: `publishArticle` exists but
+  refuses, because publishing is a human decision.
 - The initiative and campaign API needs another product pass before it becomes
   a general `campaignRead` and `campaignWrite` contract.
 - The inbox does not expose provider reply actions to the global assistant.

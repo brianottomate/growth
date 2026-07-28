@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ToolSet } from "ai";
 
+import { blogAgent } from "./blog";
 import { DOMAIN_CAPABILITY_TOOLS } from "./domains";
 import { LIFECYCLE_TOOLS } from "./lifecycle";
 import { navigateWorkspace } from "./navigation";
@@ -21,6 +22,7 @@ export const OVERVIEW_TOOLS = {
   workspaceOverview,
   navigateWorkspace,
   prepareProductionPacket,
+  blogAgent,
   ...DOMAIN_CAPABILITY_TOOLS,
   ...LIFECYCLE_TOOLS,
 } as const satisfies ToolSet;

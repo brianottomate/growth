@@ -66,6 +66,12 @@ export const growthActionPolicies = {
   workspaceOverview: { overview: read() },
   navigateWorkspace: { navigate: read() },
   prepareProductionPacket: { prepare: write() },
+  // Delegates to the blog sub-agent, which writes DRAFTS in the production
+  // CMS. provider-write because the effect lands in DatoCMS, not our DB;
+  // not reversible from here because undo means editing in Dato.
+  blogAgent: {
+    run: write({ consequence: "provider-write", reversible: false }),
+  },
   brandRead: {
     list: read("local-read", PLAN_READ),
     getMap: read("local-read", PLAN_READ),

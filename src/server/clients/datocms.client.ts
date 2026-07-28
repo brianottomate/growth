@@ -196,3 +196,96 @@ export async function createDraftItem(input: {
   });
   return { id: data.id };
 }
+
+/** One field of a Dato model, as the agent needs to see it. */
+export type DatoFieldSpec = {
+  apiKey: string;
+  label: string;
+  fieldType: string;
+  required: boolean;
+  hint: string | null;
+  /** For link/block fields: the api_keys of the models they accept. */
+  accepts?: string[];
+};
+
+/**
+ * Describe a model's fields so an agent can write valid attributes without
+ * hardcoding the schema. Block/link validators are resolved from item_type ids
+ * to api_keys, because ids mean nothing to a model reading this.
+ */
+export async function describeModelFields(
+  apiKey: string,
+): Promise<{ apiKey: string; itemTypeId: string; fields: DatoFieldSpec[] }> {
+  const itemTypeId = await resolveItemTypeId(apiKey);
+  const [{ data }, typeMap] = await Promise.all([
+    request<
+      JsonApi<
+        Array<{
+          attributes: {
+            api_key: string;
+            label: string;
+            field_type: string;
+            hint: string | null;
+            validators: Record<string, unknown>;
+          };
+        }>
+      >
+    >(`/item-types/${itemTypeId}/fields`),
+    getItemTypeMap(),
+  ]);
+
+  const fields = data.map((field) => {
+    const v = field.attributes.validators;
+    const ids = [
+      ...((v.rich_text_blocks as { item_types?: string[] })?.item_types ?? []),
+      ...((v.structured_text_blocks as { item_types?: string[] })?.item_types ??
+        []),
+      ...((v.item_item_type as { item_types?: string[] })?.item_types ?? []),
+    ];
+    const accepts = ids.map((id) => typeMap[id] ?? id);
+    return {
+      apiKey: field.attributes.api_key,
+      label: field.attributes.label,
+      fieldType: field.attributes.field_type,
+      required: Boolean(v.required),
+      hint: field.attributes.hint,
+      ...(accepts.length ? { accepts } : {}),
+    };
+  });
+  return { apiKey, itemTypeId, fields };
+}
+
+/**
+ * Patch specific fields on an item. Dato merges what you send, so this only
+ * touches the named attributes — the agent never has to resend a whole body to
+ * change a title.
+ */
+export async function updateItemFields(
+  itemId: string,
+  attributes: Record<string, unknown>,
+): Promise<{ id: string }> {
+  const { data } = await request<JsonApi<{ id: string }>>(`/items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      data: { id: itemId, type: "item", attributes },
+    }),
+  });
+  return { id: data.id };
+}
+
+/** A structured-text block node, ready to append to a body's children. */
+export function buildBlockNode(
+  itemTypeId: string,
+  attributes: Record<string, unknown>,
+) {
+  return {
+    type: "block" as const,
+    item: {
+      type: "item" as const,
+      attributes,
+      relationships: {
+        item_type: { data: { type: "item_type" as const, id: itemTypeId } },
+      },
+    },
+  };
+}
