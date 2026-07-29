@@ -358,6 +358,16 @@ export async function generatePregenHubspotDraft(
   });
   if (!row) throw new Error(`lead domain not found: ${domain}`);
 
+  // The choke point for the exclusion rule, deliberately here rather than at
+  // each caller. The tRPC procedure, the script harness and the chat action all
+  // reach prospecting copy through this function, and guarding them one at a
+  // time already missed the chat door once.
+  if (row.excludeFromOutreach) {
+    throw new Error(
+      `${row.domain} is excluded from outreach (${row.excludeReason ?? "no reason recorded"}) — refusing to generate prospecting copy`,
+    );
+  }
+
   const company =
     row.hubspotRecordId != null
       ? {
