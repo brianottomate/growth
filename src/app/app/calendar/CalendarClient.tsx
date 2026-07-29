@@ -39,6 +39,9 @@ export type CalEntry = {
   tracked?: boolean; // a competitor/inspiration brand we scrape, not our own
   platform: string;
   format: string | null;
+  archetype: string | null;
+  sequence: number | null;
+  parentPlatformPostId: string | null;
   contentPostId: string | null;
   title: string | null;
   pillar: string | null;
@@ -188,6 +191,16 @@ function groupDay(entries: CalEntry[]): DayGroup[] {
       });
   }
   return [...byKey.values()];
+}
+
+const isStoryEntry = (entry: CalEntry) =>
+  entry.archetype === "story" || entry.format?.endsWith(".story");
+
+function storyDensityClass(count: number) {
+  if (count === 0) return "text-muted-foreground/60";
+  if (count <= 3) return "text-emerald-400";
+  if (count <= 6) return "text-amber-400";
+  return "text-red-400";
 }
 
 /** Most common pillar among a day's entries (drives mini-month tint). */
@@ -379,6 +392,24 @@ export function CalendarClient({
   );
   const windowEnd = windowMonths[11]!;
   const windowLabel = `${MONTHS_SHORT[month]} ${year} – ${MONTHS_SHORT[windowEnd.month]} ${windowEnd.year}`;
+  const storyTotal = useMemo(() => {
+    const windowStart = new Date(year, month, 1).getTime();
+    const windowFinish = new Date(
+      windowEnd.year,
+      windowEnd.month + 1,
+      1,
+    ).getTime();
+    return filtered.filter((entry) => {
+      if (!isStoryEntry(entry)) return false;
+      const date = new Date(entry.at);
+      if (zoom === "month") {
+        return date.getFullYear() === year && date.getMonth() === month;
+      }
+      if (yearMode === "heatmap") return date.getFullYear() === year;
+      const time = date.getTime();
+      return time >= windowStart && time < windowFinish;
+    }).length;
+  }, [filtered, month, windowEnd.month, windowEnd.year, year, yearMode, zoom]);
 
   const openMonth = (y: number, mo: number) => {
     setYear(y);
@@ -394,8 +425,8 @@ export function CalendarClient({
           <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {zoom === "month"
-              ? `${MONTHS[month]} ${year}`
-              : `${yearMode === "heatmap" ? year : windowLabel} · ${filtered.length} posts`}
+              ? `${MONTHS[month]} ${year} · ${filtered.length} platform items · ${storyTotal} Stories`
+              : `${yearMode === "heatmap" ? year : windowLabel} · ${filtered.length} platform items · ${storyTotal} Stories`}
           </p>
         </div>
 
@@ -702,6 +733,7 @@ function MonthGrid({
           const inMonth = date.getMonth() === month;
           const isToday = k === todayKey;
           const groups = groupDay(byDay.get(k) ?? []);
+          const storyCount = (byDay.get(k) ?? []).filter(isStoryEntry).length;
           const shown = groups.slice(0, 3);
           const extra = groups.length - shown.length;
           return (
@@ -724,6 +756,17 @@ function MonthGrid({
                 >
                   {date.getDate()}
                 </span>
+                {inMonth && (
+                  <span
+                    className={cn(
+                      "ml-auto text-[9px] font-medium tabular-nums",
+                      storyDensityClass(storyCount),
+                    )}
+                    title={`${storyCount} ${storyCount === 1 ? "Story" : "Stories"} on this day`}
+                  >
+                    {storyCount} {storyCount === 1 ? "Story" : "Stories"}
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 {shown.map((g) => (
@@ -751,6 +794,7 @@ function ContentChip({ g }: { g: DayGroup }) {
     g.entries[0]?.format === "newsletter.blast" ? "blast" : platform;
   const media = g.entries.find((e) => e.mediaUrl)?.mediaUrl ?? null;
   const label = g.title ?? g.entries[0]?.text ?? platformLabel(platform);
+  const storyCount = g.entries.filter(isStoryEntry).length;
   return (
     <span
       className="bg-card flex items-center gap-1.5 overflow-hidden rounded-md border p-1 text-xs"
@@ -782,6 +826,11 @@ function ContentChip({ g }: { g: DayGroup }) {
           {g.entries.length > 1 && (
             <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
               ×{g.entries.length}
+            </span>
+          )}
+          {storyCount > 0 && (
+            <span className="shrink-0 text-[10px] font-medium text-violet-400 tabular-nums">
+              {storyCount} {storyCount === 1 ? "Story" : "Stories"}
             </span>
           )}
         </span>
@@ -1279,6 +1328,11 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
             <span className="text-muted-foreground shrink-0 capitalize">
               {e.status}
             </span>
+            {isStoryEntry(e) && (
+              <span className="shrink-0 text-violet-400">
+                Story {e.sequence != null ? e.sequence + 1 : 1}
+              </span>
+            )}
             {e.text && (
               <span className="min-w-0 flex-1 truncate">· {e.text}</span>
             )}

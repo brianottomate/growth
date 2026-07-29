@@ -134,8 +134,11 @@ export const PLATFORM_FORMATS: PlatformFormat[] = [
     label: "Story",
     surface: "stories",
     ephemeral: true,
+    sequence: true,
     media: {
       kinds: ["image", "video"],
+      min: 1,
+      max: 1,
       aspectRatios: ["9:16"],
       maxDurationSec: 60,
     },
@@ -266,8 +269,16 @@ export const PLATFORM_FORMATS: PlatformFormat[] = [
     platform: "facebook",
     archetype: "story",
     label: "Story",
+    surface: "stories",
     ephemeral: true,
-    media: { kinds: ["image", "video"], aspectRatios: ["9:16"] },
+    sequence: true,
+    media: {
+      kinds: ["image", "video"],
+      min: 1,
+      max: 1,
+      aspectRatios: ["9:16"],
+      maxDurationSec: 120,
+    },
   },
 
   // YouTube

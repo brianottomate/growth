@@ -18,7 +18,9 @@ import { STATUS_OPTIONS } from "./IdeaControls";
 import { MarkScheduledButton } from "../MarkScheduledButton";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { SocialDeliveryControl } from "./SocialDeliveryControl";
+import { StoryDeliveryControl } from "./StoryDeliveryControl";
 import { getPlatformFormat } from "@/server/content/formats";
+import { isStoryFormat, sequenceNoun } from "@/lib/platform-sequence";
 import {
   CompactPlatformPreview,
   type CompactPreviewLinkCard,
@@ -142,12 +144,16 @@ export function SpotCard({
   const trpc = useTRPC();
   const router = useRouter();
   const owned = spot.source === "owned";
+  const story = isStoryFormat(spot.format);
   const providerPublishingPlatform =
     spot.platform === "instagram" ||
     spot.platform === "linkedin" ||
     spot.platform === "x"
       ? spot.platform
       : null;
+  const providerPublishing =
+    providerPublishingPlatform !== null ||
+    (spot.platform === "facebook" && story);
   const isEmail =
     spot.platform === "newsletter" &&
     (spot.format === "newsletter.broadcast" ||
@@ -189,6 +195,10 @@ export function SpotCard({
           },
         ];
   const isThread = threadItems.length > 1;
+  const isSequence = story || isThread;
+  const deliveredCount = threadItems.filter(
+    (item) => item.deliveryExternalId,
+  ).length;
   const media = threadItems.flatMap((item) => item.media ?? []);
   const assetLinks = [
     ...new Set(threadItems.flatMap((item) => item.assetLinks ?? [])),
@@ -235,9 +245,10 @@ export function SpotCard({
                 {label}
               </span>
             )}
-            {isThread && (
+            {isSequence && (
               <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                {threadItems.length} posts
+                {threadItems.length}{" "}
+                {sequenceNoun(spot.format, threadItems.length)}
               </span>
             )}
             {owned ? (
@@ -272,7 +283,7 @@ export function SpotCard({
           <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             {owned ? (
               <>
-                {providerPublishingPlatform ? (
+                {providerPublishing ? (
                   <input
                     type="datetime-local"
                     value={toLocalDateTimeInput(spot.scheduledAtISO)}
@@ -285,7 +296,7 @@ export function SpotCard({
                           : null,
                       })
                     }
-                    disabled={Boolean(spot.deliveryExternalId)}
+                    disabled={deliveredCount > 0}
                     aria-label="Scheduled date and time"
                     className="border-border bg-background text-muted-foreground rounded-md border px-1.5 py-0.5 text-[11px] disabled:opacity-50"
                   />
@@ -307,7 +318,7 @@ export function SpotCard({
                     aria-label="Scheduled date"
                   />
                 )}
-                {spot.status !== "published" && !providerPublishingPlatform && (
+                {spot.status !== "published" && !providerPublishing && (
                   <MarkScheduledButton
                     spotId={spot.id}
                     at={spot.scheduledAtISO}
@@ -315,7 +326,7 @@ export function SpotCard({
                     onChanged={() => router.refresh()}
                   />
                 )}
-                {providerPublishingPlatform && (
+                {providerPublishingPlatform && !story && (
                   <SocialDeliveryControl
                     spotId={spot.id}
                     platform={providerPublishingPlatform}
@@ -325,6 +336,16 @@ export function SpotCard({
                     deliveryExternalId={spot.deliveryExternalId}
                     deliveryStatus={spot.deliveryStatus}
                     deliveryError={spot.deliveryError}
+                  />
+                )}
+                {story && (
+                  <StoryDeliveryControl
+                    spotId={spot.id}
+                    platform={spot.platform}
+                    status={spot.status}
+                    scheduledAt={spot.scheduledAtISO}
+                    connected={spot.publishingConnected}
+                    items={threadItems}
                   />
                 )}
               </>

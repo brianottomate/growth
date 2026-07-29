@@ -16,11 +16,15 @@ export type ContentReadinessInput = {
 
 const needsProductionAsset = (archetype: string | null) =>
   !!archetype &&
-  ["image", "carousel", "video_short", "video_long"].includes(archetype);
+  ["image", "carousel", "video_short", "video_long", "story"].includes(
+    archetype,
+  );
 
 export function getContentReadiness(input: ContentReadinessInput) {
   const owned = input.spots.filter((spot) => spot.source === "owned");
-  const missingCopy = owned.filter((spot) => !spot.text?.trim());
+  const missingCopy = owned.filter(
+    (spot) => spot.archetype !== "story" && !spot.text?.trim(),
+  );
   const missingDates = owned.filter((spot) => !spot.scheduledAt);
   const missingAssets = owned.filter(
     (spot) =>

@@ -17,17 +17,24 @@ import {
   type MediaItem,
   platformPostTable,
 } from "@/server/db/schema";
+import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
 
 export type SocialDeliveryMode = "schedule" | "publish_now";
-export type SocialPublishingPlatform = "instagram" | "linkedin" | "x";
+export type SocialPublishingPlatform =
+  | "facebook"
+  | "instagram"
+  | "linkedin"
+  | "x";
 
 const SUPPORTED_PLATFORMS = new Set<SocialPublishingPlatform>([
+  "facebook",
   "instagram",
   "linkedin",
   "x",
 ]);
 
 const ZERNIO_PLATFORM: Record<SocialPublishingPlatform, string> = {
+  facebook: "facebook",
   instagram: "instagram",
   linkedin: "linkedin",
   x: "twitter",
@@ -38,6 +45,9 @@ type DeliveryItem = {
   text: string | null;
   media: MediaItem[] | null;
   sequence: number | null;
+  deliveryExternalId: string | null;
+  deliveryStatus: string | null;
+  deliveryError: string | null;
 };
 
 type DeliveryPayload = {
@@ -129,6 +139,16 @@ function validateInstagram(item: DeliveryItem, format: string | null) {
   return { text, media, isStory };
 }
 
+function validateStoryFrame(item: DeliveryItem, frameNumber: number) {
+  const media = publicMedia(item.media);
+  if (media.length !== 1) {
+    throw new Error(
+      `Story frame ${frameNumber} needs exactly one image or video`,
+    );
+  }
+  return media;
+}
+
 function validateX(item: DeliveryItem) {
   const text = item.text?.trim() ?? "";
   const media = publicMedia(item.media);
@@ -176,6 +196,10 @@ function deliveryPayload(input: {
     };
   }
 
+  if (input.platform !== "x") {
+    throw new Error("This platform format is not available for publishing");
+  }
+
   const items = input.items.map(validateX);
   if (items.length === 1) return items[0]!;
 
@@ -208,6 +232,9 @@ async function loadSocialSpot(platformPostId: string) {
           text: true,
           media: true,
           sequence: true,
+          deliveryExternalId: true,
+          deliveryStatus: true,
+          deliveryError: true,
         },
       },
     },
@@ -218,9 +245,15 @@ async function loadSocialSpot(platformPostId: string) {
   }
   if (spot.source !== "owned") throw new Error("Only owned posts can publish");
   if (!SUPPORTED_PLATFORMS.has(spot.platform as SocialPublishingPlatform)) {
-    throw new Error("Zernio publishing supports Instagram, LinkedIn, and X");
+    throw new Error(
+      "Zernio publishing supports Facebook, Instagram, LinkedIn, and X",
+    );
   }
   const platform = spot.platform as SocialPublishingPlatform;
+  const story = isStoryFormat(spot.format);
+  if (platform === "facebook" && !story) {
+    throw new Error("Facebook publishing is currently available for Stories");
+  }
   if (!isZernioConfigured) throw new Error("Zernio is not configured");
   if (!spot.brand?.zernioProfileId) {
     throw new Error("Connect this brand to a Zernio profile first");
@@ -258,6 +291,9 @@ async function loadSocialSpot(platformPostId: string) {
       text: spot.text,
       media: spot.media,
       sequence: spot.sequence,
+      deliveryExternalId: spot.deliveryExternalId,
+      deliveryStatus: spot.deliveryStatus,
+      deliveryError: spot.deliveryError,
     },
     ...spot.children,
   ].sort(
@@ -265,11 +301,16 @@ async function loadSocialSpot(platformPostId: string) {
       (a.sequence ?? Number.MAX_SAFE_INTEGER) -
       (b.sequence ?? Number.MAX_SAFE_INTEGER),
   );
-  const payload = deliveryPayload({
-    platform,
-    format: spot.format,
-    items,
-  });
+  const payload = story
+    ? null
+    : deliveryPayload({
+        platform,
+        format: spot.format,
+        items,
+      });
+  if (story) {
+    items.forEach((item, index) => validateStoryFrame(item, index + 1));
+  }
 
   return {
     spot,
@@ -278,6 +319,7 @@ async function loadSocialSpot(platformPostId: string) {
     connectedAccountId: channel.externalId,
     items,
     payload,
+    story,
   };
 }
 
@@ -288,6 +330,7 @@ async function persistDelivery(
   account: string,
   platform: SocialPublishingPlatform,
   fallbackStatus: string,
+  externalTargetId = spot.id,
 ) {
   const target = platformResult(zernioPost, account, platform);
   const deliveryStatus =
@@ -330,7 +373,7 @@ async function persistDelivery(
       externalId: target?.platformPostId,
       externalUrl: target?.platformPostUrl,
     })
-    .where(eq(platformPostTable.id, spot.id));
+    .where(eq(platformPostTable.id, externalTargetId));
 
   return {
     zernioPostId: zernioPost._id ?? null,
@@ -343,14 +386,16 @@ export async function deliverSocialPost(input: {
   platformPostId: string;
   mode: SocialDeliveryMode;
 }) {
-  const { spot, channel, platform, connectedAccountId, items, payload } =
-    await loadSocialSpot(input.platformPostId);
-  if (spot.status !== "approved") {
+  const loaded = await loadSocialSpot(input.platformPostId);
+  const { spot, channel, platform, connectedAccountId, items, payload, story } =
+    loaded;
+  const handedOffCount = items.filter((item) => item.deliveryExternalId).length;
+  if (spot.status !== "approved" && !(story && handedOffCount > 0)) {
     throw new Error(
-      `Approve this ${platform === "x" ? "X" : platform} post before sending it to Zernio`,
+      `Approve this ${story ? "Story sequence" : platform === "x" ? "X post" : `${platform} post`} before sending it to Zernio`,
     );
   }
-  if (spot.deliveryExternalId) {
+  if (!story && spot.deliveryExternalId) {
     throw new Error("This post has already been handed to Zernio");
   }
   if (input.mode === "schedule") {
@@ -362,6 +407,98 @@ export async function deliverSocialPost(input: {
     }
   }
 
+  if (story) {
+    const results = [];
+    for (const [index, item] of items.entries()) {
+      if (item.deliveryExternalId) continue;
+      const scheduledFor =
+        input.mode === "schedule"
+          ? sequenceScheduledAt(spot.scheduledAt!, index).toISOString()
+          : undefined;
+      try {
+        const zernioPost = await createZernioPost(
+          {
+            mediaItems: validateStoryFrame(item, index + 1),
+            platforms: [
+              {
+                platform: ZERNIO_PLATFORM[platform],
+                accountId: connectedAccountId,
+                platformSpecificData: { contentType: "story" },
+              },
+            ],
+            scheduledFor,
+            publishNow: input.mode === "publish_now" ? true : undefined,
+            timezone: "UTC",
+            metadata: {
+              growthPlatformPostId: item.id,
+              growthStoryRootPlatformPostId: spot.id,
+              growthStoryFrame: index + 1,
+              growthBrandId: spot.brandId,
+            },
+          },
+          {
+            requestId: `growth-story:${item.id}:${input.mode}:${scheduledFor ?? "now"}`,
+          },
+        );
+        results.push(
+          await persistDelivery(
+            spot,
+            [item.id],
+            zernioPost,
+            connectedAccountId,
+            platform,
+            input.mode === "schedule" ? "scheduled" : "publishing",
+            item.id,
+          ),
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Story publishing failed";
+        await db
+          .update(platformPostTable)
+          .set({
+            provider: "zernio",
+            deliveryStatus: "failed",
+            deliveryError: message,
+            deliveryUpdatedAt: new Date(),
+          })
+          .where(eq(platformPostTable.id, item.id));
+        throw new Error(
+          `Story frame ${index + 1} could not be handed to Zernio. Earlier frames remain saved. ${message}`,
+        );
+      }
+    }
+
+    if (spot.channelId !== channel.id) {
+      await db
+        .update(platformPostTable)
+        .set({
+          channelId: channel.id,
+          username: spot.username ?? channel.handle,
+        })
+        .where(
+          inArray(
+            platformPostTable.id,
+            items.map((item) => item.id),
+          ),
+        );
+    }
+    const totalHandedOff = handedOffCount + results.length;
+    return {
+      deliveryStatus:
+        totalHandedOff === items.length
+          ? input.mode === "schedule"
+            ? "scheduled"
+            : "publishing"
+          : "partial",
+      handedOffCount: results.length,
+      frameCount: items.length,
+    };
+  }
+
+  if (!payload) {
+    throw new Error("Could not build the publishing payload");
+  }
   const scheduledFor =
     input.mode === "schedule" ? spot.scheduledAt?.toISOString() : undefined;
   const zernioPost = await createZernioPost(
@@ -412,8 +549,47 @@ export async function deliverSocialPost(input: {
 }
 
 export async function refreshSocialDelivery(platformPostId: string) {
-  const { spot, connectedAccountId, items, platform } =
+  const { spot, connectedAccountId, items, platform, story } =
     await loadSocialSpot(platformPostId);
+  if (story) {
+    const refreshable = items.filter((item) => item.deliveryExternalId);
+    if (!refreshable.length) {
+      throw new Error("This Story sequence is not in Zernio yet");
+    }
+    const results = [];
+    for (const item of refreshable) {
+      const zernioPost = await getZernioPost(item.deliveryExternalId!);
+      if (!zernioPost) {
+        throw new Error(
+          `Zernio no longer has Story frame ${(item.sequence ?? 0) + 1}`,
+        );
+      }
+      results.push(
+        await persistDelivery(
+          spot,
+          [item.id],
+          zernioPost,
+          connectedAccountId,
+          platform,
+          "unknown",
+          item.id,
+        ),
+      );
+    }
+    return {
+      deliveryStatus: results.some(
+        (result) =>
+          result.deliveryStatus === "failed" ||
+          result.deliveryStatus === "partial",
+      )
+        ? "partial"
+        : results.every((result) => result.deliveryStatus === "published")
+          ? "published"
+          : "scheduled",
+      handedOffCount: refreshable.length,
+      frameCount: items.length,
+    };
+  }
   if (!spot.deliveryExternalId) {
     throw new Error("This post is not in Zernio yet");
   }
@@ -430,8 +606,39 @@ export async function refreshSocialDelivery(platformPostId: string) {
 }
 
 export async function retrySocialDelivery(platformPostId: string) {
-  const { spot, connectedAccountId, items, platform } =
+  const { spot, connectedAccountId, items, platform, story } =
     await loadSocialSpot(platformPostId);
+  if (story) {
+    const retryable = items.filter(
+      (item) =>
+        item.deliveryExternalId &&
+        (item.deliveryStatus === "failed" || item.deliveryStatus === "partial"),
+    );
+    if (!retryable.length) {
+      throw new Error("No failed Story frames are available to retry");
+    }
+    const results = [];
+    for (const item of retryable) {
+      const zernioPost = await retryZernioPost(item.deliveryExternalId!);
+      results.push(
+        await persistDelivery(
+          spot,
+          [item.id],
+          zernioPost,
+          connectedAccountId,
+          platform,
+          "publishing",
+          item.id,
+        ),
+      );
+    }
+    return {
+      deliveryStatus: "publishing",
+      handedOffCount: items.filter((item) => item.deliveryExternalId).length,
+      frameCount: items.length,
+      retriedCount: results.length,
+    };
+  }
   if (!spot.deliveryExternalId) {
     throw new Error("This post is not in Zernio yet");
   }

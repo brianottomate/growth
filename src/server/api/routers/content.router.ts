@@ -19,6 +19,7 @@ import {
 import {
   archetypeForFormat,
   platformFormatsFor,
+  validateSpot,
 } from "@/server/content/formats";
 import { ContentService } from "@/server/services/content.service";
 import { generateSpotCaption } from "@/server/services/spot-generate.service";
@@ -635,8 +636,8 @@ export const contentRouter = createTRPCRouter({
           message: "Can't edit a scraped post",
         });
       }
-      await ContentService.updatePlatformDraft({
-        platformPostId: input.platformPostId,
+      await ContentService.setPublishingUnitStatus({
+        rootPlatformPostId: input.platformPostId,
         status: input.status,
       });
       return { id: input.platformPostId, status: input.status };
@@ -670,8 +671,8 @@ export const contentRouter = createTRPCRouter({
           message: "Can't edit a scraped post",
         });
       }
-      await ContentService.updatePlatformDraft({
-        platformPostId: input.platformPostId,
+      await ContentService.setPublishingUnitSchedule({
+        rootPlatformPostId: input.platformPostId,
         scheduledAt: input.scheduledAt,
         markScheduled: input.markScheduled,
       });
@@ -834,7 +835,7 @@ export const contentRouter = createTRPCRouter({
       return saved;
     }),
 
-  /** Save one platform publishing unit, including ordered X/Threads replies. */
+  /** Save one platform publishing unit, including ordered threads or Stories. */
   saveSpotThread: protectedProcedure
     .input(
       z.object({
@@ -1145,6 +1146,18 @@ export const contentRouter = createTRPCRouter({
       await assertOrgMember(ctx, content.brand?.organizationId);
 
       const format = input.format ?? platformFormatsFor(input.platform)[0]?.id;
+      if (format) {
+        const validation = validateSpot({
+          platform: input.platform,
+          format,
+        });
+        if (!validation.ok) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: validation.errors.join("; "),
+          });
+        }
+      }
       const [row] = await ctx.db
         .insert(platformPostTable)
         .values({

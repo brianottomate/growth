@@ -1,11 +1,16 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 
 import { db, withTransaction } from "../db";
-import { archetypeForFormat, platformFormatsFor } from "../content/formats";
+import {
+  archetypeForFormat,
+  getPlatformFormat,
+  platformFormatsFor,
+} from "../content/formats";
 import {
   platformTextLength,
   threadFormatForPlatform,
 } from "@/lib/platform-thread";
+import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
 import {
   type channelPlatformEnum,
   channelTable,
@@ -418,12 +423,28 @@ async function saveSpotThread(
     if (!root || root.parentPlatformPostId) {
       throw new Error("Thread editing must start from the root platform post.");
     }
+    const formatDefinition = root.format
+      ? getPlatformFormat(root.format)
+      : undefined;
+    const isStory = formatDefinition?.archetype === "story";
+    const supportsSequence =
+      formatDefinition?.sequence === true ||
+      root.platform === "x" ||
+      root.platform === "threads";
+    if (input.items.length > 1 && !supportsSequence) {
+      throw new Error(
+        "This platform format does not support an ordered sequence.",
+      );
+    }
     if (
-      input.items.length > 1 &&
-      root.platform !== "x" &&
-      root.platform !== "threads"
+      isStory &&
+      input.items.some(
+        (item) =>
+          item.media.length !== 1 ||
+          !["image", "video"].includes(item.media[0]?.type ?? ""),
+      )
     ) {
-      throw new Error("Only X and Threads support ordered post threads.");
+      throw new Error("Every Story frame needs exactly one image or video.");
     }
 
     const characterLimit =
@@ -457,10 +478,9 @@ async function saveSpotThread(
 
     const now = new Date();
     const rootItem = cleanThreadItem(input.items[0]!);
-    const threadFormat = threadFormatForPlatform(
-      root.platform,
-      input.items.length,
-    );
+    const threadFormat = isStory
+      ? { format: root.format ?? undefined, archetype: "story" }
+      : threadFormatForPlatform(root.platform, input.items.length);
     const [savedRoot] = await tx
       .update(platformPostTable)
       .set({
@@ -496,7 +516,7 @@ async function saveSpotThread(
           .set({
             ...item,
             format: threadFormat.format,
-            archetype: "thread",
+            archetype: threadFormat.archetype,
             sequence: index + 1,
             updatedAt: now,
           })
@@ -515,7 +535,7 @@ async function saveSpotThread(
           platform: root.platform,
           username: root.username,
           format: threadFormat.format,
-          archetype: "thread",
+          archetype: threadFormat.archetype,
           template: root.template,
           pillar: root.pillar,
           parentPlatformPostId: root.id,
@@ -528,12 +548,13 @@ async function saveSpotThread(
           text: item.text,
           media: item.media,
           assetLinks: item.assetLinks.length ? item.assetLinks : null,
+          scheduledAt: root.scheduledAt,
           isSeed: root.isSeed,
           metadata: {
             ...(typeof root.metadata === "object" && root.metadata
               ? root.metadata
               : {}),
-            threadRootPlatformPostId: root.id,
+            sequenceRootPlatformPostId: root.id,
           },
         })
         .returning({ id: platformPostTable.id });
@@ -555,6 +576,73 @@ async function saveSpotThread(
       itemIds: [savedRoot.id, ...keptChildIds],
     };
   });
+}
+
+/**
+ * Schedule one platform publishing unit. Child posts are real provider jobs,
+ * so they receive deterministic one-minute offsets while staying on the same
+ * calendar day as the root in normal use.
+ */
+async function setPublishingUnitSchedule(input: {
+  rootPlatformPostId: string;
+  scheduledAt: string | null;
+  markScheduled?: boolean;
+}): Promise<{ id: string }> {
+  return withTransaction(async (tx) => {
+    const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+    const rows = await tx
+      .select({
+        id: platformPostTable.id,
+        sequence: platformPostTable.sequence,
+        format: platformPostTable.format,
+      })
+      .from(platformPostTable)
+      .where(
+        or(
+          eq(platformPostTable.id, input.rootPlatformPostId),
+          eq(platformPostTable.parentPlatformPostId, input.rootPlatformPostId),
+        ),
+      );
+    for (const row of rows) {
+      const sequence = row.sequence ?? 0;
+      const itemSchedule = scheduledAt
+        ? isStoryFormat(row.format)
+          ? sequenceScheduledAt(scheduledAt, sequence)
+          : scheduledAt
+        : null;
+      await tx
+        .update(platformPostTable)
+        .set({
+          scheduledAt: itemSchedule,
+          ...(input.markScheduled && itemSchedule
+            ? { status: "scheduled" as const }
+            : {}),
+        })
+        .where(eq(platformPostTable.id, row.id));
+    }
+    return { id: input.rootPlatformPostId };
+  });
+}
+
+/** Move the root and every ordered child through review as one publishing unit. */
+async function setPublishingUnitStatus(input: {
+  rootPlatformPostId: string;
+  status: (typeof contentPostTable.$inferSelect)["status"];
+}): Promise<{ id: string }> {
+  const now = new Date();
+  await db
+    .update(platformPostTable)
+    .set({
+      status: input.status,
+      ...(input.status === "published" ? { publishedAt: now } : {}),
+    })
+    .where(
+      or(
+        eq(platformPostTable.id, input.rootPlatformPostId),
+        eq(platformPostTable.parentPlatformPostId, input.rootPlatformPostId),
+      ),
+    );
+  return { id: input.rootPlatformPostId };
 }
 
 /** Set the content-level media pool (`content_post.media`). Deduped by assetId
@@ -672,6 +760,8 @@ export const ContentService = {
   setSpotText,
   saveSpotEditor,
   saveSpotThread,
+  setPublishingUnitSchedule,
+  setPublishingUnitStatus,
   setPoolMedia,
   setSpotMedia,
   setSpotCarousel,

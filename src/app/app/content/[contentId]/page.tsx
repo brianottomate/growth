@@ -465,6 +465,10 @@ export default async function ContentDetailPage({
                   media: item.media,
                   assetLinks: item.assetLinks,
                   sequence: item.sequence,
+                  scheduledAtISO: item.scheduledAt?.toISOString() ?? null,
+                  deliveryExternalId: item.deliveryExternalId,
+                  deliveryStatus: item.deliveryStatus,
+                  deliveryError: item.deliveryError,
                 })),
               }}
             />
@@ -475,7 +479,9 @@ export default async function ContentDetailPage({
 
       <AddSpotControl
         contentPostId={content.id}
-        existingPlatforms={postGroups.map((group) => group.root.platform)}
+        existingTargets={postGroups.map(
+          (group) => `${group.root.platform}|${group.root.format ?? ""}`,
+        )}
       />
 
       {/* series siblings */}

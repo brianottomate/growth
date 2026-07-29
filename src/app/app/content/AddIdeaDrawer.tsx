@@ -41,9 +41,21 @@ type Seed = (typeof SEEDS)[number]["id"];
 // format). Listening-only + ads platforms are intentionally excluded here.
 const SPOT_TARGETS = [
   { id: "instagram", platform: "instagram", label: "Instagram" },
+  {
+    id: "instagram.story",
+    platform: "instagram",
+    format: "instagram.story",
+    label: "Instagram Story",
+  },
   { id: "tiktok", platform: "tiktok", label: "TikTok" },
   { id: "x", platform: "x", label: "X" },
   { id: "facebook", platform: "facebook", label: "Facebook" },
+  {
+    id: "facebook.story",
+    platform: "facebook",
+    format: "facebook.story",
+    label: "Facebook Story",
+  },
   { id: "youtube", platform: "youtube", label: "YouTube" },
   { id: "threads", platform: "threads", label: "Threads" },
   { id: "pinterest", platform: "pinterest", label: "Pinterest" },

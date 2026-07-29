@@ -24,6 +24,8 @@ import { platformLabel } from "@/components/channel-logos";
 import { toast } from "@/components/ui/toast";
 import type { MediaItem } from "@/server/db/schema";
 import { platformTextLength } from "@/lib/platform-thread";
+import { isStoryFormat, sequenceNoun } from "@/lib/platform-sequence";
+import { getPlatformFormat } from "@/server/content/formats";
 import {
   CompactPlatformPreview,
   type CompactPreviewLinkCard,
@@ -37,6 +39,10 @@ export type PlatformThreadItemData = {
   media: MediaItem[] | null;
   assetLinks: string[] | null;
   sequence: number | null;
+  scheduledAtISO?: string | null;
+  deliveryExternalId?: string | null;
+  deliveryStatus?: string | null;
+  deliveryError?: string | null;
 };
 
 type EditorItem = {
@@ -113,8 +119,9 @@ export function PlatformPostEditDialog({
   const save = useMutation(
     trpc.content.saveSpotThread.mutationOptions({
       onSuccess: (result) => {
-        const label =
-          result.itemIds.length > 1
+        const label = isStoryFormat(format)
+          ? `${platformLabel(platform)} Story`
+          : result.itemIds.length > 1
             ? `${platformLabel(platform)} thread`
             : `${platformLabel(platform)} post`;
         toast.success(`${label} saved`);
@@ -125,14 +132,24 @@ export function PlatformPostEditDialog({
     }),
   );
 
-  const threadCapable = platform === "x" || platform === "threads";
+  const story = isStoryFormat(format);
+  const sequenceCapable =
+    getPlatformFormat(format ?? "")?.sequence === true ||
+    platform === "x" ||
+    platform === "threads";
   const characterLimit =
     platform === "x" ? 280 : platform === "threads" ? 500 : null;
   const dirty = persistedSnapshot(items) !== baseSnapshot;
   const stale = open && openedVersion !== updatedAtISO;
   const invalid =
     items.length === 0 ||
-    (items.length > 1 && items.some((item) => !item.text.trim())) ||
+    (!story && items.length > 1 && items.some((item) => !item.text.trim())) ||
+    (story &&
+      items.some(
+        (item) =>
+          item.media.length !== 1 ||
+          !["image", "video"].includes(item.media[0]?.type ?? ""),
+      )) ||
     (characterLimit !== null &&
       items.some(
         (item) => platformTextLength(item.text, platform) > characterLimit,
@@ -263,7 +280,7 @@ export function PlatformPostEditDialog({
           })
         }
       >
-        Save {items.length > 1 ? "thread" : "post"}
+        Save {story ? "Story" : items.length > 1 ? "thread" : "post"}
       </Button>
     </div>
   );
@@ -282,11 +299,15 @@ export function PlatformPostEditDialog({
       <SimpleDialog
         open={open}
         onOpenChange={handleOpenChange}
-        title={`Edit ${platformLabel(platform)} ${items.length > 1 ? "thread" : "post"}`}
+        title={`Edit ${platformLabel(platform)} ${
+          story ? "Story" : items.length > 1 ? "thread" : "post"
+        }`}
         description={
-          threadCapable
-            ? "Each block is one native post. Together they publish as one ordered thread."
-            : "Manual changes save together. The page preview always reflects the latest server version."
+          story
+            ? "Each frame is one native 24-hour Story post with exactly one image or video. Frame notes stay internal and are not sent to the platform."
+            : sequenceCapable
+              ? "Each block is one native post. Together they publish as one ordered thread."
+              : "Manual changes save together. The page preview always reflects the latest server version."
         }
         size="xl"
         scrollable
@@ -315,11 +336,13 @@ export function PlatformPostEditDialog({
                     {index + 1}
                   </span>
                   <h3 className="min-w-0 flex-1 text-sm font-medium">
-                    {items.length > 1
-                      ? index === 0
-                        ? "Thread opener"
-                        : `Reply ${index}`
-                      : "Platform copy"}
+                    {story
+                      ? `Story frame ${index + 1}`
+                      : items.length > 1
+                        ? index === 0
+                          ? "Thread opener"
+                          : `Reply ${index}`
+                        : "Platform copy"}
                   </h3>
                   {characterLimit && (
                     <span
@@ -380,13 +403,15 @@ export function PlatformPostEditDialog({
                     }))
                   }
                   placeholder={
-                    items.length > 1
-                      ? index === 0
-                        ? "Write the thread opener"
-                        : "Write the next reply"
-                      : "Write the platform-ready copy"
+                    story
+                      ? "Optional internal note. Story captions are not displayed."
+                      : items.length > 1
+                        ? index === 0
+                          ? "Write the thread opener"
+                          : "Write the next reply"
+                        : "Write the platform-ready copy"
                   }
-                  rows={items.length > 1 ? 5 : 8}
+                  rows={story ? 3 : items.length > 1 ? 5 : 8}
                   className="focus:ring-ring/40 mt-3 w-full resize-y rounded-lg border px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2"
                 />
 
@@ -426,11 +451,14 @@ export function PlatformPostEditDialog({
                 <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <Dropzone
                     compact
-                    multiple
+                    multiple={!story}
                     onFiles={async (files) => {
                       const uploaded = await uploadImages(files);
                       if (uploaded.length) {
-                        setItemMedia(index, [...item.media, ...uploaded]);
+                        setItemMedia(
+                          index,
+                          story ? [uploaded[0]!] : [...item.media, ...uploaded],
+                        );
                       }
                     }}
                     uploading={uploading}
@@ -523,7 +551,7 @@ export function PlatformPostEditDialog({
               </section>
             ))}
 
-            {threadCapable && items.length < 25 && (
+            {sequenceCapable && items.length < 25 && (
               <button
                 type="button"
                 onClick={() =>
@@ -541,7 +569,7 @@ export function PlatformPostEditDialog({
                 className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed py-3 text-sm font-medium transition-colors"
               >
                 <Plus className="size-4" />
-                Add another post
+                Add another {sequenceNoun(format, 1)}
               </button>
             )}
 
@@ -582,7 +610,7 @@ export function PlatformPostEditDialog({
           .filter((id): id is string => Boolean(id))}
         onPick={(item) =>
           setItemMedia(pickerItemIndex, [
-            ...(items[pickerItemIndex]?.media ?? []),
+            ...(story ? [] : (items[pickerItemIndex]?.media ?? [])),
             item,
           ])
         }

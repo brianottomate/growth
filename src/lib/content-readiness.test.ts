@@ -35,6 +35,22 @@ describe("getContentReadiness", () => {
     expect(result.next?.id).toBe("production");
   });
 
+  test("treats Story copy as internal notes while still requiring media", () => {
+    const withoutMedia = getContentReadiness({
+      hook: "A useful hook",
+      status: "draft",
+      spots: [{ ...baseSpot, archetype: "story", text: null }],
+    });
+    const withMedia = getContentReadiness({
+      hook: "A useful hook",
+      status: "draft",
+      spots: [{ ...baseSpot, archetype: "story", text: null, mediaCount: 1 }],
+    });
+
+    expect(withoutMedia.next?.id).toBe("production");
+    expect(withMedia.readyForReview).toBe(true);
+  });
+
   test("recognizes an item already in review", () => {
     const result = getContentReadiness({
       hook: "A useful hook",

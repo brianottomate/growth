@@ -6,6 +6,7 @@ import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { MediaThumbnail } from "@/components/media-thumbnail";
 import { cn } from "@/components/ui/lib/utils";
 import type { MediaItem } from "@/server/db/schema";
+import { isStoryFormat, sequenceNoun } from "@/lib/platform-sequence";
 
 export type CompactPreviewLinkCard = {
   url: string;
@@ -151,9 +152,10 @@ export function CompactPlatformPreview({
       ? threadItems
       : [{ id: "root", text, media }];
   const isThread = items.length > 1;
+  const story = isStoryFormat(format);
   const hasVisual =
     items.some((item) => item.media.length > 0) || !!linkCard?.image;
-  const hasCopy = items.every((item) => item.text.trim());
+  const hasCopy = story || items.every((item) => item.text.trim());
 
   return (
     <aside
@@ -168,10 +170,13 @@ export function CompactPlatformPreview({
           className="size-3.5"
         />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
-          {platformLabel(platform)} {isThread ? "thread" : "preview"}
+          {platformLabel(platform)}{" "}
+          {story ? "Story" : isThread ? "thread" : "preview"}
         </span>
         <span className="text-muted-foreground text-[9px]">
-          {isThread ? `${items.length} posts` : "Representative"}
+          {story || isThread
+            ? `${items.length} ${sequenceNoun(format, items.length)}`
+            : "Representative"}
         </span>
       </div>
 
@@ -208,7 +213,7 @@ export function CompactPlatformPreview({
               <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
                 {identity}
               </span>
-              {isThread && (
+              {(story || isThread) && (
                 <span className="text-muted-foreground text-[9px]">
                   {index + 1}/{items.length}
                 </span>
@@ -226,7 +231,13 @@ export function CompactPlatformPreview({
             />
 
             <div className="px-2.5 py-2">
-              {item.text.trim() ? (
+              {story ? (
+                item.text.trim() ? (
+                  <p className="text-muted-foreground line-clamp-2 text-[9px] leading-relaxed whitespace-pre-wrap italic">
+                    Internal note: {item.text}
+                  </p>
+                ) : null
+              ) : item.text.trim() ? (
                 <p className="line-clamp-4 text-[10px] leading-relaxed whitespace-pre-wrap">
                   {item.text}
                 </p>
@@ -255,7 +266,7 @@ export function CompactPlatformPreview({
 
       <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
         <ReadyDot ready={hasVisual} label="Visual" />
-        <ReadyDot ready={hasCopy} label="Copy" />
+        {!story && <ReadyDot ready={hasCopy} label="Copy" />}
         <ReadyDot ready={scheduled} label="Schedule" />
       </div>
     </aside>
