@@ -15,6 +15,13 @@ import {
   leadDomainTable,
   type HubspotWebhookEventInsert,
 } from "@/server/db/leads-schema";
+import {
+  applyContactPropertyChange,
+  isMirroredContactProperty,
+  mirrorContactById,
+  normalizeDomain,
+  softDeleteMirroredContact,
+} from "@/server/services/hubspot-contact-mirror";
 
 // HubSpot webhook receiver (private app "Operated", account 22480390).
 //
@@ -29,6 +36,7 @@ import {
 const MAX_TIMESTAMP_SKEW_MS = 5 * 60 * 1000; // HubSpot rejects replays > 5 min
 
 const COMPANY_OBJECT_TYPE_ID = "0-2"; // HubSpot's canonical company objectTypeId
+const CONTACT_OBJECT_TYPE_ID = "0-1"; // ...and contact
 
 /**
  * True for a company property-change event under either subscription model:
@@ -43,6 +51,30 @@ function isCompanyPropertyChange(row: {
   return (
     row.subscriptionType === "object.propertyChange" &&
     row.objectTypeId === COMPANY_OBJECT_TYPE_ID
+  );
+}
+
+/** Contact equivalent of {@link isCompanyPropertyChange}. */
+function isContactPropertyChange(row: {
+  subscriptionType: string;
+  objectTypeId?: string | null;
+}): boolean {
+  if (row.subscriptionType === "contact.propertyChange") return true;
+  return (
+    row.subscriptionType === "object.propertyChange" &&
+    row.objectTypeId === CONTACT_OBJECT_TYPE_ID
+  );
+}
+
+/** True for any subscription that names the contact object explicitly. */
+function isContactEvent(
+  row: { subscriptionType: string; objectTypeId?: string | null },
+  action: "creation" | "deletion" | "merge",
+): boolean {
+  if (row.subscriptionType === `contact.${action}`) return true;
+  return (
+    row.subscriptionType === `object.${action}` &&
+    row.objectTypeId === CONTACT_OBJECT_TYPE_ID
   );
 }
 
@@ -61,21 +93,6 @@ function asString(value: unknown): string | null {
 function clean(value: string | null | undefined): string | null {
   const normalized = value?.trim();
   return normalized ? normalized : null;
-}
-
-function normalizeDomain(value: string | null | undefined): string | null {
-  if (!value) return null;
-  let domain = value.trim().toLowerCase();
-  if (!domain) return null;
-  if (domain.includes("://")) domain = domain.split("://")[1]!;
-  if (domain.includes("@")) domain = domain.split("@").pop()!;
-  for (const separator of ["/", "?", "#"]) {
-    if (domain.includes(separator)) domain = domain.split(separator)[0]!;
-  }
-  if (domain.includes(":")) domain = domain.split(":")[0]!;
-  while (domain.startsWith("www.")) domain = domain.slice(4);
-  domain = domain.replace(/^\.+|\.+$/g, "").trim();
-  return domain || null;
 }
 
 function toInteger(value: string | null | undefined): number | null {
@@ -212,11 +229,20 @@ function parseEvents(rawBody: string): HubspotWebhookEventInsert[] {
   return rows;
 }
 
+/** Close out a raw event row. `processedAt` means projected *or* classified. */
+async function markProcessed(eventId: string, processNote: string) {
+  await db
+    .update(hubspotWebhookEventTable)
+    .set({ processedAt: new Date(), processNote })
+    .where(eq(hubspotWebhookEventTable.eventId, eventId));
+}
+
 /**
  * Apply every subscribed company property to the compact HubSpot snapshot and
  * update the first-class fields Growth actually reads. This keeps the raw
  * event log lossless without allowing the pending queue to grow for already
- * linked companies.
+ * linked companies. Contact events mirror onto `leads.contact` through
+ * `hubspot-contact-mirror`, which the backfill script shares.
  */
 async function applyInline(rows: HubspotWebhookEventInsert[]) {
   for (const row of rows) {
@@ -271,14 +297,36 @@ async function applyInline(rows: HubspotWebhookEventInsert[]) {
           continue;
         }
 
-        await db
-          .update(hubspotWebhookEventTable)
-          .set({
-            processedAt: new Date(),
-            processNote:
-              "classified: association retained raw; no first-class projection",
-          })
-          .where(eq(hubspotWebhookEventTable.eventId, row.eventId));
+        // A contact gaining or losing its company changes which lead_domain it
+        // belongs to, so re-hydrate rather than patch. On removal HubSpot has
+        // already dropped the association, so the mirror falls back to the
+        // email host — which is usually the same company anyway.
+        const contactId =
+          fromType === CONTACT_OBJECT_TYPE_ID
+            ? asString(row.payload.fromObjectId)
+            : toType === CONTACT_OBJECT_TYPE_ID
+              ? asString(row.payload.toObjectId)
+              : null;
+
+        if (
+          contactId &&
+          (associationType === "CONTACT_TO_COMPANY" ||
+            associationType === "COMPANY_TO_CONTACT")
+        ) {
+          const { stats, found } = await mirrorContactById(contactId);
+          await markProcessed(
+            row.eventId,
+            found
+              ? `inline: re-linked contact after ${removed ? "removed" : "added"} company association (mirrored ${stats.mirrored}, unresolved ${stats.unresolvedDomain})`
+              : "classified: contact association target no longer readable",
+          );
+          continue;
+        }
+
+        await markProcessed(
+          row.eventId,
+          "classified: association retained raw; no first-class projection",
+        );
         continue;
       }
 
@@ -348,6 +396,93 @@ async function applyInline(rows: HubspotWebhookEventInsert[]) {
             processNote: "inline: hydrated newly created company",
           })
           .where(eq(hubspotWebhookEventTable.eventId, row.eventId));
+        continue;
+      }
+
+      if (isContactEvent(row, "creation")) {
+        const { stats, found } = await mirrorContactById(row.objectId);
+        await markProcessed(
+          row.eventId,
+          found
+            ? stats.mirrored > 0
+              ? "inline: mirrored newly created contact"
+              : stats.noEmail > 0
+                ? "classified: contact creation has no email"
+                : "classified: contact creation has no resolvable lead_domain"
+            : "classified: contact creation no longer readable",
+        );
+        continue;
+      }
+
+      if (isContactEvent(row, "deletion")) {
+        const removed = await softDeleteMirroredContact(row.objectId);
+        await markProcessed(
+          row.eventId,
+          removed > 0
+            ? `inline: soft-deleted ${removed} mirrored contact row(s)`
+            : "classified: contact deletion has no mirrored row",
+        );
+        continue;
+      }
+
+      if (isContactEvent(row, "merge")) {
+        // The surviving record keeps the primary id; losers stop existing in
+        // HubSpot. Soft-delete the losers so their Instantly linkage and
+        // engagement history survive, then re-hydrate the survivor.
+        const mergedIds = Array.isArray(row.payload.mergedObjectIds)
+          ? row.payload.mergedObjectIds
+              .map((id) => asString(id))
+              .filter((id): id is string => Boolean(id) && id !== row.objectId)
+          : [];
+        let removed = 0;
+        for (const loserId of mergedIds) {
+          removed += await softDeleteMirroredContact(loserId);
+        }
+        const { found } = await mirrorContactById(row.objectId);
+        await markProcessed(
+          row.eventId,
+          `inline: contact merge — soft-deleted ${removed} loser row(s), survivor ${found ? "re-hydrated" : "unreadable"}`,
+        );
+        continue;
+      }
+
+      if (isContactPropertyChange(row) && row.propertyName) {
+        // `email` is the mirror's unique key and `associatedcompanyid` is its
+        // domain link — changing either changes the row's identity, so a patch
+        // in place would strand the old row. Re-hydrate instead.
+        if (
+          row.propertyName === "email" ||
+          row.propertyName === "associatedcompanyid"
+        ) {
+          const { stats, found } = await mirrorContactById(row.objectId);
+          await markProcessed(
+            row.eventId,
+            found
+              ? `inline: re-hydrated contact after ${row.propertyName} change (mirrored ${stats.mirrored})`
+              : "classified: contact no longer readable",
+          );
+          continue;
+        }
+
+        if (isMirroredContactProperty(row.propertyName)) {
+          const updated = await applyContactPropertyChange({
+            contactId: row.objectId,
+            propertyName: row.propertyName,
+            value: clean(row.propertyValue),
+          });
+          await markProcessed(
+            row.eventId,
+            updated > 0
+              ? `inline: contact property ${row.propertyName} on ${updated} lead_contact row(s)`
+              : "classified: contact property has no mirrored row",
+          );
+          continue;
+        }
+
+        await markProcessed(
+          row.eventId,
+          `classified: contact property ${row.propertyName} retained raw; not mirrored`,
+        );
         continue;
       }
 

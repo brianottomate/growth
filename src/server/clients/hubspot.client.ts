@@ -957,6 +957,83 @@ export async function getCompanyContacts(
   });
 }
 
+// ---- CONTACT MIRROR (read side) -----------------------------------
+//
+// The narrow property allow-list Growth mirrors onto `leads.contact`. This is
+// deliberately not CONTACT_CORE_PROPERTIES: it is the set that maps to a
+// first-class column plus the two fields needed to link and suppress. The same
+// list is what the Operated app's contact webhook subscribes to — keep them in
+// step, because a subscription wider than this produces events with nothing to
+// project, and the company subscription alone already generated 142k rows.
+export const CONTACT_MIRROR_PROPERTIES = [
+  "email",
+  "firstname",
+  "lastname",
+  "jobtitle",
+  "phone",
+  "state",
+  "associatedcompanyid",
+  "hs_email_optout",
+] as const;
+
+export type ContactMirrorProperty = (typeof CONTACT_MIRROR_PROPERTIES)[number];
+
+export type HubspotContact = {
+  id: string;
+  values: Record<ContactMirrorProperty, string | null>;
+};
+
+function contactFrom(found: {
+  id: string;
+  properties?: Record<string, string | null | undefined> | null;
+}): HubspotContact {
+  const values = {} as Record<ContactMirrorProperty, string | null>;
+  for (const prop of CONTACT_MIRROR_PROPERTIES) {
+    values[prop] = found.properties?.[prop] ?? null;
+  }
+  return { id: found.id, values };
+}
+
+/** Single contact for webhook hydration. `null` when deleted or unreadable. */
+export async function getContactById(
+  contactId: string,
+): Promise<HubspotContact | null> {
+  try {
+    const found = await client().crm.contacts.basicApi.getById(contactId, [
+      ...CONTACT_MIRROR_PROPERTIES,
+    ]);
+    return contactFrom(found);
+  } catch (error) {
+    const status =
+      typeof error === "object" && error !== null && "statusCode" in error
+        ? Number((error as { statusCode?: unknown }).statusCode)
+        : null;
+    if (status === 404) return null;
+    console.error(`❌ [HUBSPOT] getContactById(${contactId})`, error);
+    throw error;
+  }
+}
+
+/**
+ * One page of the full contact universe, for the mirror backfill. Cursor-paged
+ * rather than search-paged: CRM search caps out at 10k results per query, which
+ * cannot walk 300k+ contacts.
+ */
+export async function listContactsPage(params: {
+  after?: string;
+  limit?: number;
+}): Promise<{ contacts: HubspotContact[]; after: string | null }> {
+  const page = await client().crm.contacts.basicApi.getPage(
+    params.limit ?? 100,
+    params.after,
+    [...CONTACT_MIRROR_PROPERTIES],
+  );
+  return {
+    contacts: (page.results ?? []).map(contactFrom),
+    after: page.paging?.next?.after ?? null,
+  };
+}
+
 export async function createCompany(
   props: CompanyProperties,
 ): Promise<{ id: string }> {
