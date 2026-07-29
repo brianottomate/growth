@@ -461,8 +461,10 @@ export function SendReviewClient() {
       onSuccess: invalidate,
     }),
   );
+  // The pregen motion is the only generator now; the Instantly-era
+  // generateOutreach is gone. Motion is derived from cohort server-side.
   const generate = useMutation(
-    trpc.leads.generateOutreach.mutationOptions({
+    trpc.leads.generatePregenOutreach.mutationOptions({
       onSuccess: invalidate,
     }),
   );

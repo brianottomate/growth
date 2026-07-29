@@ -41,7 +41,7 @@ const CHANNEL_META: Record<string, { Icon: LucideIcon; label: string }> = {
 };
 
 /** The AI-generated personalized sequence draft. */
-type OutreachDraftView = RouterOutputs["leads"]["generateOutreach"];
+type OutreachDraftView = RouterOutputs["leads"]["generatePregenOutreach"];
 
 // Decision-maker pick heuristic — mirrors the send-list builder's titleScore so
 // the drawer's "would send" stars match who'd actually get emailed.
@@ -118,7 +118,6 @@ export function EnrichDrawer({
   const hubspot = useMutation(trpc.leads.pullFromHubspot.mutationOptions());
   const merge = useMutation(trpc.leads.proposeMerge.mutationOptions());
   const apply = useMutation(trpc.leads.applyMerge.mutationOptions());
-  const outreach = useMutation(trpc.leads.generateOutreach.mutationOptions());
   const pregenOutreach = useMutation(
     trpc.leads.generatePregenOutreach.mutationOptions(),
   );
@@ -151,12 +150,11 @@ export function EnrichDrawer({
       : "fresh";
 
   // The personalized sequence — freshly generated this session, or a stored
-  // draft from a previous run (enrichment.outreachDraft).
-  const outreachDraft: OutreachDraftView | undefined = isPregenHubspotMotion
-    ? (pregenOutreach.data ?? undefined)
-    : (outreach.data ?? detail.data?.outreach ?? undefined);
-  const outreachPending = outreach.isPending || pregenOutreach.isPending;
-  const outreachError = outreach.error ?? pregenOutreach.error;
+  // draft from a previous run.
+  const outreachDraft: OutreachDraftView | undefined =
+    pregenOutreach.data ?? detail.data?.outreach ?? undefined;
+  const outreachPending = pregenOutreach.isPending;
+  const outreachError = pregenOutreach.error;
   const recipientEmail = (
     detail.data?.domain.enrichment as unknown as
       | { contactChannel?: { bestEmail?: string } }
@@ -238,7 +236,6 @@ export function EnrichDrawer({
     hubspot.reset();
     merge.reset();
     apply.reset();
-    outreach.reset();
     pregenOutreach.reset();
     publishPregen.reset();
     queue.reset();
@@ -458,15 +455,7 @@ export function EnrichDrawer({
               <button
                 onClick={() => {
                   if (!lead) return;
-                  if (isPregenHubspotMotion) {
-                    pregenOutreach.mutate({
-                      domainId: lead.id,
-                      motion: pregenMotion,
-                      steer: steer.trim() || undefined,
-                    });
-                    return;
-                  }
-                  outreach.mutate({
+                  pregenOutreach.mutate({
                     domainId: lead.id,
                     steer: steer.trim() || undefined,
                   });
@@ -502,9 +491,7 @@ export function EnrichDrawer({
 
             {!outreachDraft && !outreachPending && (
               <p className="text-muted-foreground mt-1 text-[11px]">
-                {isPregenHubspotMotion
-                  ? `Writes a ${pregenMotion} HubSpot draft from the current website, lead record, and company email history. Draft only — review before publishing.`
-                  : "Writes a bespoke 4-touch sequence for this company from its enrichment. Draft only — review before sending."}
+                {`Writes a ${pregenMotion} HubSpot draft from the current website, the generated preview, the lead record, and the team's logged emails, calls and notes. Draft only — review before publishing.`}
               </p>
             )}
 

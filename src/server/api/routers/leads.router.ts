@@ -28,7 +28,6 @@ import {
   extractFromDiscovery,
   LeadEnrichmentSchema,
 } from "@/server/services/lead-extraction.service";
-import { generateOutreachDraft } from "@/server/services/lead-outreach.service";
 import {
   generatePregenHubspotDraft,
   PregenMotionSchema,
@@ -495,49 +494,6 @@ export const leadsRouter = createTRPCRouter({
   // Generate a bespoke, personalized cold sequence for ONE lead from its
   // enrichment + the WanderOS hook strategy. Stored as a DRAFT on
   // enrichment.outreachDraft for human review before it's ever sent.
-  generateOutreach: protectedProcedure
-    .input(
-      z.object({
-        domainId: z.string(),
-        // Optional operator steer: free-text context injected into the prompt
-        // (e.g. "pretend this is a 200-unit luxury PM" for a demo).
-        steer: z.string().trim().max(2000).optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.leadDomainTable.findFirst({
-        where: eq(leadDomainTable.id, input.domainId),
-      });
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
-      }
-      const { draft, model } = await generateOutreachDraft(row.domain, {
-        steer: input.steer,
-      });
-      // Replace any prior *unsent* draft for this domain; keep sent/approved history.
-      await ctx.db
-        .delete(leadOutreachTable)
-        .where(
-          and(
-            eq(leadOutreachTable.domainId, input.domainId),
-            eq(leadOutreachTable.status, "draft"),
-          ),
-        );
-      const [created] = await ctx.db
-        .insert(leadOutreachTable)
-        .values({
-          domainId: row.id,
-          domain: row.domain,
-          status: "draft",
-          angle: draft.angle,
-          personalizedOn: draft.personalizedOn,
-          steps: draft.steps,
-          model,
-        })
-        .returning();
-      return created!;
-    }),
-
   // Generate the HubSpot pregen motion from live company correspondence,
   // current website evidence, and the assigned preview. The prose is split
   // into reliable HubSpot paragraph slots, but the stored review shows the
@@ -546,7 +502,9 @@ export const leadsRouter = createTRPCRouter({
     .input(
       z.object({
         domainId: z.string(),
-        motion: PregenMotionSchema,
+        // Optional: the cohort already knows which motion applies, so callers
+        // only pass this to override.
+        motion: PregenMotionSchema.optional(),
         previewUrl: z.url().optional(),
         steer: z.string().trim().max(2000).optional(),
       }),
@@ -558,6 +516,25 @@ export const leadsRouter = createTRPCRouter({
       if (!row) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
       }
+
+      // Cohort membership is the source of truth for motion: a recycled company
+      // has prior Wander outreach to acknowledge, an untouched one does not.
+      // Deriving it here keeps every review surface from having to pick, and
+      // stops the two from ever disagreeing.
+      let motion = input.motion;
+      if (!motion) {
+        const [membership] = await ctx.db
+          .select({ cohort: hubspotListMembershipTable.cohort })
+          .from(hubspotListMembershipTable)
+          .where(
+            and(
+              eq(hubspotListMembershipTable.domainId, input.domainId),
+              eq(hubspotListMembershipTable.objectType, "company"),
+            ),
+          )
+          .limit(1);
+        motion = membership?.cohort === "recycled" ? "reengagement" : "fresh";
+      }
       const previewUrl = input.previewUrl ?? row.pregenSiteUrl;
       if (!previewUrl) {
         throw new TRPCError({
@@ -568,7 +545,7 @@ export const leadsRouter = createTRPCRouter({
       }
 
       const result = await generatePregenHubspotDraft(row.domain, {
-        motion: input.motion,
+        motion,
         previewUrl,
         steer: input.steer,
       });
