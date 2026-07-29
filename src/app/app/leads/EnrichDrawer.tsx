@@ -362,11 +362,6 @@ export function EnrichDrawer({
                     {lead.sourceTier ?? lead.computedTier ?? "—"}
                   </b>
                 </span>
-                {lead.pregenStatus && (
-                  <span>
-                    Site: <b className="text-foreground">{lead.pregenStatus}</b>
-                  </span>
-                )}
               </div>
             </div>
           )}

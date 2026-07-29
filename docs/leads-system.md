@@ -15,6 +15,7 @@ enrichment that decides whether they're worth contacting and how, and the
 pipeline that turns a raw company into a sent, personalized cold sequence.
 
 > This is the generalized overview. Companion docs go deeper on specific pieces:
+>
 > - `cold-outbound-playbook.md` — the strategy + hard-won findings (why appended contacts are junk, Minerva-as-geo-validator, site-scrape channel resolution).
 > - `outbound-channel-strategy.md` — channel selection notes.
 > - `permit-list-processing.md` — the government-permit list + the agentic domain-discovery/fit/HubSpot work (2026-07).
@@ -24,8 +25,8 @@ pipeline that turns a raw company into a sent, personalized cold sequence.
 ## The core idea
 
 **The internal Neon DB is the system of record. Instantly and HubSpot are
-projections.** Contacts flow *out* to Instantly to be emailed; HubSpot is pulled
-*in* as a dedup/suppression signal and written *back* to. Neither is the source
+projections.** Contacts flow _out_ to Instantly to be emailed; HubSpot is pulled
+_in_ as a dedup/suppression signal and written _back_ to. Neither is the source
 of truth — the `leads.*` Postgres schema is. This is deliberate: if the outbound
 experiment dead-ends, `DROP SCHEMA leads CASCADE` removes it and nothing else is
 touched.
@@ -49,13 +50,13 @@ re-importing.
 Isolated in its **own Postgres schema** (`leads.*`, not `public`) so it stays
 decoupled and droppable. `drizzle.config.ts` keeps `schemaFilter: ["public", "leads"]`.
 
-| Table | Grain | Purpose |
-|---|---|---|
-| `lead_domain` | one per domain | the spine — geo, PMS/tech, unit estimate, scores, HubSpot guard flags, pregen state, `enrichment` JSONB |
-| `lead_contact` | many per domain | people to email — email/name/title/phone, deliverability, Instantly linkage + synced engagement, `verification` JSONB (trust layer) |
-| `lead_channel` | many per domain | reachability channels discovered on the company's own site (email/phone/form/chat), dedup on (domain, kind, value) |
-| `lead_outreach` | per domain (+contact) | the per-lead "meal" — an AI-generated cold sequence (steps, angle, status draft→queued→sent→replied) |
-| `lead_import` | one per CSV run | provenance/audit — how data got in and when |
+| Table           | Grain                 | Purpose                                                                                                                             |
+| --------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `lead_domain`   | one per domain        | the spine — geo, PMS/tech, unit estimate, scores, HubSpot guard flags, optional preview artifacts, `enrichment` JSONB               |
+| `lead_contact`  | many per domain       | people to email — email/name/title/phone, deliverability, Instantly linkage + synced engagement, `verification` JSONB (trust layer) |
+| `lead_channel`  | many per domain       | reachability channels discovered on the company's own site (email/phone/form/chat), dedup on (domain, kind, value)                  |
+| `lead_outreach` | per domain (+contact) | the per-lead "meal" — an AI-generated cold sequence (steps, angle, status draft→queued→sent→replied)                                |
+| `lead_import`   | one per CSV run       | provenance/audit — how data got in and when                                                                                         |
 
 Enums: `lead_source` (builtwith · hubspot · pregen · instantly_upload · minerva · manual · other), `lead_tier`, `lead_channel_kind`, `lead_channel_state`, `lead_outreach_status`.
 
@@ -63,12 +64,14 @@ Rough live size: ~58.9K domains, ~31K contacts, ~17.9K flagged `in_hubspot`.
 
 ## Sources
 
-Every source is a CSV ingest that upserts on normalized domain and flips a
-presence flag (`inBuiltwith`/`inHubspot`/`inPregen`/`inInstantly`):
+Every source is a CSV ingest that upserts on normalized domain. Active source
+presence is tracked for BuiltWith, HubSpot, and Instantly:
 
 - **BuiltWith** — the tech-stack / PMS-detection universe (the bulk, ~45K).
 - **HubSpot export** — dedup + exclusion signals (`hasHubspotDeal`, `isExistingCustomer`, owner). ~17.9K.
-- **Pregen** — the pre-built Wander Sites catalog.
+- **Historical "Pregen" export** — a prospect catalog only. Its company, tier,
+  and unit facts may be imported; its site status and placeholder URL fields
+  are intentionally ignored.
 - **Instantly upload** — the contact-level CSVs that seeded the send list.
 - **Government permits** (2026-07, in progress) — STR permit filings; real operator identity but usually no domain. See `permit-list-processing.md`.
 
@@ -78,19 +81,19 @@ The pipeline that turns a bare row into a scored, contactable target. Per the
 house rule, judgment/extraction is done with **AI (`generateText` + `Output.object`,
 `claude-sonnet-*`)**, not regex.
 
-| Service | Does |
-|---|---|
-| `lead-discovery` | source ingest / candidate discovery |
-| `lead-extraction` | AI: scraped site → structured `{company, portfolio, pms, brand, pregenFit}` (the `LeadEnrichmentSchema`) |
-| `lead-unit-estimate` | AI: triangulated unit/portfolio-size estimate + confidence (stored `unit_count` is noisy; this is the real size signal) |
-| `lead-merge` | AI: dedup / merge two records |
-| `lead-channel` | site-scrape contact-channel resolver + heuristic channel scoring → send/review/form/skip verdict |
-| `channel-discovery` (#19) | Firecrawl `map` + structured `scrape` → persist every reachability channel as `lead_channel` |
-| `domain-discovery` (2026-07) | **agentic** name→domain: claude-sonnet-5 + Firecrawl search/read tools verify the operator's site AND score target fit |
-| `lead-verify` | trust layer: Minerva geo-validation + Bright Data LinkedIn on freemail contacts (is this the right person?) |
-| `lead-outreach` | AI: generate the personalized cold sequence for a domain |
-| `outreach-send` | headless push to Instantly |
-| `cio-to-outreach` / `outreach-to-cio` workflows | bridge outbound ↔ CustomerIO lifecycle |
+| Service                                         | Does                                                                                                                    |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `lead-discovery`                                | source ingest / candidate discovery                                                                                     |
+| `lead-extraction`                               | AI: scraped site → structured `{company, portfolio, pms, brand, pregenFit}` (the `LeadEnrichmentSchema`)                |
+| `lead-unit-estimate`                            | AI: triangulated unit/portfolio-size estimate + confidence (stored `unit_count` is noisy; this is the real size signal) |
+| `lead-merge`                                    | AI: dedup / merge two records                                                                                           |
+| `lead-channel`                                  | site-scrape contact-channel resolver + heuristic channel scoring → send/review/form/skip verdict                        |
+| `channel-discovery` (#19)                       | Firecrawl `map` + structured `scrape` → persist every reachability channel as `lead_channel`                            |
+| `domain-discovery` (2026-07)                    | **agentic** name→domain: claude-sonnet-5 + Firecrawl search/read tools verify the operator's site AND score target fit  |
+| `lead-verify`                                   | trust layer: Minerva geo-validation + Bright Data LinkedIn on freemail contacts (is this the right person?)             |
+| `lead-outreach`                                 | AI: generate the personalized cold sequence for a domain                                                                |
+| `outreach-send`                                 | headless push to Instantly                                                                                              |
+| `cio-to-outreach` / `outreach-to-cio` workflows | bridge outbound ↔ CustomerIO lifecycle                                                                                  |
 
 ## The send pipeline
 
@@ -99,7 +102,7 @@ ingest → enrich/score → SEND-REVIEW queue → generate sequence → Instantl
 ```
 
 - **`/app/leads`** — domain-centric table with stats cards, source pills, PMS/net-new filters, and an enrichment drawer. Deep-linkable via `?lead=`.
-- **`/app/leads/send-review`** — the operator queue: enriched net-new domains with a **verdict** (send / review / form / skip), the selected channel + evidence, the candidate contacts, and the drafted **Sequence**. Actions: *Resolve channel*, *Generate/Regenerate sequence*, *Verify people*. (Redesigned 2026-06 to verdict-as-hero cards with a colored rail.)
+- **`/app/leads/send-review`** — the operator queue: enriched net-new domains with a **verdict** (send / review / form / skip), the selected channel + evidence, the candidate contacts, and the drafted **Sequence**. Actions: _Resolve channel_, _Generate/Regenerate sequence_, _Verify people_. (Redesigned 2026-06 to verdict-as-hero cards with a colored rail.)
 - **Instantly** — the cold-email projection; a contact is pushed as a lead into a campaign. The reply webhook mirrors replies/interest back onto `lead_contact`.
 
 ## Guards (before anything is sent)
@@ -113,15 +116,15 @@ ingest → enrich/score → SEND-REVIEW queue → generate sequence → Instantl
 From `cold-outbound-playbook.md` and this session:
 
 1. **Don't trust appended contact lists.** Purchased contacts are mostly
-   mis-associated freemail junk. Derive the channel from the company's *own site*.
+   mis-associated freemail junk. Derive the channel from the company's _own site_.
 2. **Minerva is a geo-validator, not a source.** It matches freemails but often
-   in the wrong city — use it to *downgrade* mismatches, not to supply contacts.
+   in the wrong city — use it to _downgrade_ mismatches, not to supply contacts.
 3. **`unit_count` is noise; `pregenFit` / the AI unit-estimate is the signal.**
 4. **AI extraction beats regex for any judgment.** String-matching produced
    confident-but-wrong results (a domain "matching" because it shared a word).
    Hand the page to an analyst (the model) and ask "does this make sense."
 5. **Verified ≠ viable.** A real, correctly-identified company can still be a bad
-   target (enterprise, timeshare, aggregator) — score *fit* separately.
+   target (enterprise, timeshare, aggregator) — score _fit_ separately.
 
 ## Evolution (from git history)
 

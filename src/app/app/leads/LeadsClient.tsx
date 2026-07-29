@@ -16,14 +16,13 @@ import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
 const SOURCE_BADGE: Record<string, string> = {
   builtwith: "bg-slate-500/15 text-slate-300",
   hubspot: "bg-orange-500/15 text-orange-300",
-  pregen: "bg-emerald-500/15 text-emerald-300",
   instantly: "bg-violet-500/15 text-violet-300",
 };
 
 const fmt = (n: number | null | undefined) =>
   n == null ? "—" : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`;
 
-type SourceKey = "builtwith" | "hubspot" | "pregen" | "instantly";
+type SourceKey = "builtwith" | "hubspot" | "instantly";
 
 function StatCard({
   label,
@@ -160,8 +159,8 @@ export function LeadsClient() {
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
       <p className="text-muted-foreground mt-1 text-sm">
-        Domain-centric prospecting universe · BuiltWith + HubSpot + pregen +
-        Instantly, deduped on domain
+        Domain-centric prospecting universe · BuiltWith + HubSpot + Instantly,
+        deduped on domain
       </p>
 
       {/* Pre-Gen cohorts lead the page: this is the active outbound motion, and
@@ -301,19 +300,15 @@ export function LeadsClient() {
         <StatCard
           label="Untouched"
           value={fmt(s?.untouched)}
-          hint="BuiltWith, no CRM/pregen"
+          hint="BuiltWith, no CRM"
           accent
         />
         <StatCard
-          label="Pregen sites"
+          label="Preview URLs"
           value={fmt(s?.withPregenSite)}
-          hint="already built"
+          hint="draft artifacts"
         />
-        <StatCard
-          label="Pregen ∩ CRM"
-          value={fmt(s?.pregenInCrm)}
-          hint="pre-send guard"
-        />
+        <StatCard label="Ranked" value={fmt(s?.ranked)} hint="own model" />
         <StatCard
           label="Integrated PMS"
           value={fmt(s?.integratedPms)}
@@ -342,21 +337,19 @@ export function LeadsClient() {
         >
           All sources
         </Pill>
-        {(["builtwith", "hubspot", "pregen", "instantly"] as SourceKey[]).map(
-          (sk) => (
-            <Pill
-              key={sk}
-              active={source === sk}
-              onClick={() => {
-                setSource(source === sk ? undefined : sk);
-                resetPage();
-              }}
-            >
-              {sk}
-              {s ? ` · ${fmt(s[sk])}` : ""}
-            </Pill>
-          ),
-        )}
+        {(["builtwith", "hubspot", "instantly"] as SourceKey[]).map((sk) => (
+          <Pill
+            key={sk}
+            active={source === sk}
+            onClick={() => {
+              setSource(source === sk ? undefined : sk);
+              resetPage();
+            }}
+          >
+            {sk}
+            {s ? ` · ${fmt(s[sk])}` : ""}
+          </Pill>
+        ))}
         <span className="bg-border mx-1 h-4 w-px" />
         <select
           value={owner ?? ""}
@@ -404,7 +397,7 @@ export function LeadsClient() {
             resetPage();
           }}
         >
-          Has pregen site
+          Has preview URL
         </Pill>
         <span className="bg-border mx-1 h-4 w-px" />
         <Pill
@@ -552,22 +545,13 @@ export function LeadsClient() {
                 </td>
                 <td className="border-b px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    {(
-                      [
-                        "builtwith",
-                        "hubspot",
-                        "pregen",
-                        "instantly",
-                      ] as SourceKey[]
-                    )
+                    {(["builtwith", "hubspot", "instantly"] as SourceKey[])
                       .filter((sk) =>
                         sk === "builtwith"
                           ? d.inBuiltwith
                           : sk === "hubspot"
                             ? d.inHubspot
-                            : sk === "pregen"
-                              ? d.inPregen
-                              : d.inInstantly,
+                            : d.inInstantly,
                       )
                       .map((sk) => (
                         <span

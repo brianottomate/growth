@@ -1,5 +1,5 @@
 /**
- * scrub-netnew-hubspot.ts — refresh the LIVE HubSpot status of the net-new
+ * scrub-netnew-hubspot.ts — refresh the live HubSpot status of the net-new
  * outbound candidates and WRITE IT BACK to leads.domain.
  *
  * Fixes the stale `in_hubspot` flag the audit exposed (~30% of "net-new" leads
@@ -11,8 +11,8 @@
  * Uses a BATCHED domain search (IN operator) — ~7 API calls, not 543 — so it
  * doesn't trip HubSpot's per-second search rate limit.
  *
- * Scope: the ~543 net-new candidates (not flagged in CRM, LIVE_RENTAL, credible
- * contact) — i.e. exactly the leads we'd otherwise cold-email.
+ * Scope: ranked net-new candidates with a credible contact — exactly the leads
+ * we'd otherwise cold-email.
  *
  *   bun --conditions react-server scripts/scrub-netnew-hubspot.ts --dry-run  # preview, no writes
  *   bun --conditions react-server scripts/scrub-netnew-hubspot.ts            # write back to our DB
@@ -45,7 +45,7 @@ const candRes = await db.execute(sql`
   FROM leads.domain d
   WHERE not d.in_hubspot and not d.has_hubspot_deal
     and not d.is_existing_customer and not d.exclude_from_outreach
-    and d.pregen_status = 'LIVE_RENTAL'
+    and d.score_pregen_potential is not null
     and exists (
       select 1 from leads.contact c
       where c.domain_id = d.id and c.deleted_at is null
@@ -104,7 +104,9 @@ console.log(
 );
 
 console.log("\nFound-in-HubSpot by lead status:");
-for (const [status, n] of Object.entries(byStatus).sort((a, b) => b[1] - a[1])) {
+for (const [status, n] of Object.entries(byStatus).sort(
+  (a, b) => b[1] - a[1],
+)) {
   console.log(`  ${String(n).padStart(4)}  ${status}`);
 }
 console.log(`\nFirst 30 that ${DRY_RUN ? "would flip" : "flipped"}:`);

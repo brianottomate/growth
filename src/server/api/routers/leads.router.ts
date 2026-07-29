@@ -72,7 +72,6 @@ import { TRPCError } from "@trpc/server";
 const SOURCE_COLUMN = {
   builtwith: leadDomainTable.inBuiltwith,
   hubspot: leadDomainTable.inHubspot,
-  pregen: leadDomainTable.inPregen,
   instantly: leadDomainTable.inInstantly,
 } as const;
 
@@ -91,14 +90,13 @@ export const leadsRouter = createTRPCRouter({
         domains: sql<number>`count(*)::int`,
         builtwith: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith})::int`,
         hubspot: sql<number>`count(*) filter (where ${leadDomainTable.inHubspot})::int`,
-        pregen: sql<number>`count(*) filter (where ${leadDomainTable.inPregen})::int`,
         instantly: sql<number>`count(*) filter (where ${leadDomainTable.inInstantly})::int`,
         integratedPms: sql<number>`count(*) filter (where ${leadDomainTable.isIntegratedPms})::int`,
         withPregenSite: sql<number>`count(*) filter (where ${leadDomainTable.pregenSiteUrl} is not null)::int`,
-        // expansion pool: in builtwith, never in CRM or pregen
-        untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot} and not ${leadDomainTable.inPregen})::int`,
-        // pre-send guard: pregen domains already known to the CRM
-        pregenInCrm: sql<number>`count(*) filter (where ${leadDomainTable.inPregen} and ${leadDomainTable.inHubspot})::int`,
+        // Expansion pool: known through BuiltWith, never in the CRM.
+        untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot})::int`,
+        ranked: sql<number>`count(*) filter (where ${leadDomainTable.scorePregenPotential} is not null)::int`,
+        sendBatch: sql<number>`count(*) filter (where ${leadDomainTable.pregenBatch} is not null)::int`,
       })
       .from(leadDomainTable);
 
@@ -115,7 +113,7 @@ export const leadsRouter = createTRPCRouter({
           eq(leadDomainTable.hasHubspotDeal, false),
           eq(leadDomainTable.isExistingCustomer, false),
           eq(leadDomainTable.excludeFromOutreach, false),
-          eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
+          sql`${leadDomainTable.scorePregenPotential} is not null`,
           exists(
             ctx.db
               .select({ one: sql`1` })
@@ -215,14 +213,12 @@ export const leadsRouter = createTRPCRouter({
     .input(
       z.object({
         q: z.string().trim().optional(),
-        source: z
-          .enum(["builtwith", "hubspot", "pregen", "instantly"])
-          .optional(),
+        source: z.enum(["builtwith", "hubspot", "instantly"]).optional(),
         pms: z.string().optional(),
         hasPregenSite: z.boolean().optional(),
         integratedPmsOnly: z.boolean().optional(),
         pregenCohort: z.enum(["recycled", "untouched"]).optional(),
-        // net-new sendable target: not in CRM, LIVE_RENTAL, has a credible contact.
+        // Net-new sendable target: not in CRM, ranked, credible contact.
         netNew: z.boolean().optional(),
         // the first cold-outbound test cohort (SEND_BATCH_1).
         sendBatch: z.boolean().optional(),
@@ -272,14 +268,14 @@ export const leadsRouter = createTRPCRouter({
         );
       }
       if (input.netNew) {
-        // The "first send" cut: never entered the CRM, their current site is a
-        // live rental site (ICP), and we have at least one credible contact.
+        // The "first send" cut: never entered the CRM, ranked by our own
+        // qualification model, and has at least one credible contact.
         conds.push(
           eq(leadDomainTable.inHubspot, false),
           eq(leadDomainTable.hasHubspotDeal, false),
           eq(leadDomainTable.isExistingCustomer, false),
           eq(leadDomainTable.excludeFromOutreach, false),
-          eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
+          sql`${leadDomainTable.scorePregenPotential} is not null`,
           exists(
             ctx.db
               .select({ one: sql`1` })
@@ -888,7 +884,6 @@ export const leadsRouter = createTRPCRouter({
           eq(leadDomainTable.inHubspot, false),
           eq(leadDomainTable.hasHubspotDeal, false),
           eq(leadDomainTable.isExistingCustomer, false),
-          eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
           sql`${leadDomainTable.scorePregenPotential} is not null`,
         );
       }

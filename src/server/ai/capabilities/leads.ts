@@ -20,7 +20,7 @@ import { growthAction } from "./types";
  */
 export const leadsSummary = growthAction({
   description:
-    "Headline numbers for the lead prospecting database: total domains & contacts, how many are in HubSpot / Instantly / pregen, the untouched expansion pool, the net-new sendable cohort, and the top PMS platforms. Use for 'how big is the leads pool / how many leads are we ready to send / what PMS do prospects use' questions.",
+    "Headline numbers for the lead prospecting database: total domains and contacts, HubSpot and Instantly coverage, ranked prospects, send-batch membership, the untouched expansion pool, the net-new sendable cohort, and the top PMS platforms. Use for 'how big is the leads pool / how many leads are we ready to send / what PMS do prospects use' questions.",
   inputSchema: z.object({}),
   execute: async () => {
     const [totals] = await db
@@ -28,10 +28,10 @@ export const leadsSummary = growthAction({
         domains: sql<number>`count(*)::int`,
         inHubspot: sql<number>`count(*) filter (where ${leadDomainTable.inHubspot})::int`,
         inInstantly: sql<number>`count(*) filter (where ${leadDomainTable.inInstantly})::int`,
-        inPregen: sql<number>`count(*) filter (where ${leadDomainTable.inPregen})::int`,
-        withPregenSite: sql<number>`count(*) filter (where ${leadDomainTable.pregenSiteUrl} is not null)::int`,
-        // expansion pool: known to BuiltWith, never in CRM or pregen
-        untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot} and not ${leadDomainTable.inPregen})::int`,
+        ranked: sql<number>`count(*) filter (where ${leadDomainTable.scorePregenPotential} is not null)::int`,
+        sendBatch: sql<number>`count(*) filter (where ${leadDomainTable.pregenBatch} is not null)::int`,
+        withPreviewUrl: sql<number>`count(*) filter (where ${leadDomainTable.pregenSiteUrl} is not null)::int`,
+        untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot})::int`,
       })
       .from(leadDomainTable);
 
@@ -46,7 +46,7 @@ export const leadsSummary = growthAction({
           eq(leadDomainTable.hasHubspotDeal, false),
           eq(leadDomainTable.isExistingCustomer, false),
           eq(leadDomainTable.excludeFromOutreach, false),
-          eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
+          sql`${leadDomainTable.scorePregenPotential} is not null`,
           exists(
             db
               .select({ one: sql`1` })
@@ -83,7 +83,6 @@ export const leadsSummary = growthAction({
   },
 });
 
-
 /**
  * Read the current sequence draft for one company, so a reviewer can pull it up
  * in chat before steering it.
@@ -92,7 +91,11 @@ export const leadsSequence = growthAction({
   description:
     "Read the latest generated outreach sequence for one lead domain: the angle, what it personalized on, and every touch with its subject, body and send day. Use for 'show me the sequence for example.com' or before rewriting one.",
   inputSchema: z.object({
-    domain: z.string().trim().min(3).describe("The lead domain, e.g. example.com"),
+    domain: z
+      .string()
+      .trim()
+      .min(3)
+      .describe("The lead domain, e.g. example.com"),
   }),
   execute: async ({ domain }) => {
     const row = await db.query.leadDomainTable.findFirst({

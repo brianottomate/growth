@@ -131,9 +131,12 @@ export const leadDomainTable = leadsSchema.table(
     unitCount: t.integer(),
     websiteQuality: t.text(),
 
-    // Pregen site state.
+    // Generated-preview artifacts. These columns are deliberately not a
+    // qualification or build-lifecycle model. The old CSV catalog used them
+    // for LIVE_RENTAL/LIVE_OTHER and placeholder URLs; that state was retired.
+    // Introduce a separate lifecycle table when production generation is real.
     pregenSiteUrl: t.text(),
-    pregenStatus: t.text(), // LIVE_RENTAL / LIVE_OTHER / ... (raw, messy upstream)
+    pregenStatus: t.text(), // Retired compatibility column; keep null.
     pregenPageTitle: t.text(),
 
     // HubSpot signals — used for the pre-send guard, never to *drive* outreach.
@@ -156,7 +159,7 @@ export const leadDomainTable = leadsSchema.table(
     // Source presence — which lists this domain showed up in.
     inBuiltwith: t.boolean().default(false).notNull(),
     inHubspot: t.boolean().default(false).notNull(),
-    inPregen: t.boolean().default(false).notNull(),
+    inPregen: t.boolean().default(false).notNull(), // Retired compatibility flag.
     inInstantly: t.boolean().default(false).notNull(),
 
     // Reachability presence — projected from `lead_channel` by the channel

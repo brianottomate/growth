@@ -143,7 +143,8 @@ async function auditOne(c: Cand): Promise<Audit> {
       const hi = Math.max(base.ourUnits, base.webUnits);
       const lo = Math.min(base.ourUnits, base.webUnits);
       base.unitRatio = lo > 0 ? Math.round((hi / lo) * 10) / 10 : null;
-      base.unitDiscrepancy = base.unitRatio != null && base.unitRatio >= UNIT_DISCREPANCY_RATIO;
+      base.unitDiscrepancy =
+        base.unitRatio != null && base.unitRatio >= UNIT_DISCREPANCY_RATIO;
     }
   } catch (e) {
     base.error = e instanceof Error ? e.message : String(e);
@@ -166,7 +167,9 @@ async function auditOne(c: Cand): Promise<Audit> {
         }
       }
     } catch (e) {
-      base.error = (base.error ? base.error + " | " : "") + `hubspot: ${e instanceof Error ? e.message : String(e)}`;
+      base.error =
+        (base.error ? base.error + " | " : "") +
+        `hubspot: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 
@@ -182,7 +185,7 @@ const candRes = await db.execute(sql`
   FROM leads.domain d
   WHERE not d.in_hubspot and not d.has_hubspot_deal
     and not d.is_existing_customer and not d.exclude_from_outreach
-    and d.pregen_status = 'LIVE_RENTAL'
+    and d.score_pregen_potential is not null
     and exists (
       select 1 from leads.contact c
       where c.domain_id = d.id and c.deleted_at is null
@@ -196,7 +199,9 @@ const candidates = (candRes as unknown as { rows: Cand[] }).rows;
 
 console.log(
   `Auditing ${candidates.length} net-new leads (sample of the ~543), HubSpot ${
-    isHubspotConfigured ? "configured ✓" : "NOT configured ✗ (in_hubspot check skipped)"
+    isHubspotConfigured
+      ? "configured ✓"
+      : "NOT configured ✗ (in_hubspot check skipped)"
   }…\n`,
 );
 
@@ -222,7 +227,9 @@ const ok = results.filter((r) => !r.error);
 const alreadyInHs = results.filter((r) => r.liveInHubspot);
 const unitDisc = results.filter((r) => r.unitDiscrepancy);
 const sendable = results.filter((r) => r.verdict.startsWith("✅"));
-const review = results.filter((r) => r.verdict.startsWith("🟡") || r.verdict.startsWith("review"));
+const review = results.filter(
+  (r) => r.verdict.startsWith("🟡") || r.verdict.startsWith("review"),
+);
 const skip = results.filter((r) => r.verdict.startsWith("⏭️"));
 const pct = (n: number) => `${Math.round((n / results.length) * 100)}%`;
 const cell = (s: string | number | null | undefined) =>
@@ -256,15 +263,21 @@ md.push(`| metric | value |`);
 md.push(`|---|---|`);
 md.push(`| leads audited | ${results.length} |`);
 md.push(`| enrichment errors | ${results.length - ok.length} |`);
-md.push(`| **already in HubSpot** (stale net-new flag) | **${alreadyInHs.length}** (${pct(alreadyInHs.length)}) |`);
-md.push(`| unit-count discrepancies ≥${UNIT_DISCREPANCY_RATIO}× | ${unitDisc.length} (${pct(unitDisc.length)}) |`);
+md.push(
+  `| **already in HubSpot** (stale net-new flag) | **${alreadyInHs.length}** (${pct(alreadyInHs.length)}) |`,
+);
+md.push(
+  `| unit-count discrepancies ≥${UNIT_DISCREPANCY_RATIO}× | ${unitDisc.length} (${pct(unitDisc.length)}) |`,
+);
 md.push(`| ✅ send candidates | ${sendable.length} |`);
 md.push(`| 🟡 review | ${review.length} |`);
 md.push(`| ⏭️ / 🛑 skip or exclude | ${skip.length + alreadyInHs.length} |`);
 md.push("");
 md.push("## Per-lead");
 md.push("");
-md.push(`| domain | company | our units | web est | live in HS? | HS lead status | fit | verdict |`);
+md.push(
+  `| domain | company | our units | web est | live in HS? | HS lead status | fit | verdict |`,
+);
 md.push(`|---|---|--:|--:|:-:|---|--:|---|`);
 for (const r of results) {
   md.push(
@@ -284,10 +297,17 @@ for (const r of results) {
   md.push(
     `- **HubSpot (live):** ${r.liveInHubspot ? `**ALREADY PRESENT** — status "${r.hsLeadStatus ?? "?"}", owner ${r.hsOwner ?? "none"}, ${r.hsContacts} contact(s) · ${r.hsUrl}` : "not found (genuinely net-new)"}`,
   );
-  md.push(`- **Fit:** pregenFit \`${r.pregenFit ?? "?"}\` · tier ${r.tier ?? "?"}`);
-  if (r.redFlags.length) md.push(`- **Red flags:** ${r.redFlags.map((f) => f.replace(/\n/g, " ")).join("; ")}`);
+  md.push(
+    `- **Fit:** pregenFit \`${r.pregenFit ?? "?"}\` · tier ${r.tier ?? "?"}`,
+  );
+  if (r.redFlags.length)
+    md.push(
+      `- **Red flags:** ${r.redFlags.map((f) => f.replace(/\n/g, " ")).join("; ")}`,
+    );
   if (r.webContacts.length)
-    md.push(`- **Decision-makers found:** ${r.webContacts.map((p) => `${p.name ?? "?"}${p.role ? ` (${p.role})` : ""}`).join(", ")}`);
+    md.push(
+      `- **Decision-makers found:** ${r.webContacts.map((p) => `${p.name ?? "?"}${p.role ? ` (${p.role})` : ""}`).join(", ")}`,
+    );
   md.push(`- **Verdict:** ${r.verdict}`);
   md.push("");
 }
@@ -299,8 +319,12 @@ writeFileSync(mdPath, md.join("\n"));
 for (const r of results) appendFileSync(jsonlPath, JSON.stringify(r) + "\n");
 
 console.log(`\n${"─".repeat(60)}`);
-console.log(`Audited ${results.length} · already-in-HubSpot ${alreadyInHs.length} (${pct(alreadyInHs.length)}) · unit-discrepancies ${unitDisc.length} (${pct(unitDisc.length)})`);
-console.log(`send ${sendable.length} · review ${review.length} · skip/exclude ${skip.length + alreadyInHs.length}`);
+console.log(
+  `Audited ${results.length} · already-in-HubSpot ${alreadyInHs.length} (${pct(alreadyInHs.length)}) · unit-discrepancies ${unitDisc.length} (${pct(unitDisc.length)})`,
+);
+console.log(
+  `send ${sendable.length} · review ${review.length} · skip/exclude ${skip.length + alreadyInHs.length}`,
+);
 console.log(`\nReport (send to Danny): ${mdPath}`);
 console.log(`Raw records:            ${jsonlPath}`);
 process.exit(0);

@@ -153,7 +153,8 @@ function mapBuiltwith(r: Row): DomainPatch {
 }
 
 function mapHubspot(r: Row): DomainPatch {
-  const hasDeal = !!clean(r["Associated Deal"]) || !!clean(r["Associated Deal IDs"]);
+  const hasDeal =
+    !!clean(r["Associated Deal"]) || !!clean(r["Associated Deal IDs"]);
   return {
     companyName: clean(r["Company name"]),
     hubspotRecordId: clean(r["Record ID"]),
@@ -169,13 +170,13 @@ function mapHubspot(r: Row): DomainPatch {
 }
 
 function mapPregen(r: Row): DomainPatch {
+  // This CSV was a prospect catalog, not generated-site lifecycle data.
+  // Preserve useful targeting facts without recreating the retired
+  // LIVE_RENTAL/LIVE_OTHER status, placeholder URLs, or source-presence flag.
   return {
     companyName: clean(r.company),
     sourceTier: clean(r.tier),
     unitCount: toInt(r.property_count),
-    pregenStatus: clean(r.status),
-    pregenPageTitle: clean(r.page_title),
-    inPregen: true,
   };
 }
 
@@ -350,8 +351,10 @@ function mergePatch(
 // On conflict, COALESCE so a new source fills gaps without nuking existing
 // values; presence flags OR together.
 function buildDomainUpdateSet() {
-  const coalesce = (col: string) => sql.raw(`coalesce(excluded.${col}, leads.domain.${col})`);
-  const orFlag = (col: string) => sql.raw(`(leads.domain.${col} or excluded.${col})`);
+  const coalesce = (col: string) =>
+    sql.raw(`coalesce(excluded.${col}, leads.domain.${col})`);
+  const orFlag = (col: string) =>
+    sql.raw(`(leads.domain.${col} or excluded.${col})`);
   return {
     companyName: coalesce("company_name"),
     country: coalesce("country"),
@@ -364,8 +367,6 @@ function buildDomainUpdateSet() {
     unitCount: coalesce("unit_count"),
     websiteQuality: coalesce("website_quality"),
     pregenSiteUrl: coalesce("pregen_site_url"),
-    pregenStatus: coalesce("pregen_status"),
-    pregenPageTitle: coalesce("pregen_page_title"),
     hubspotRecordId: coalesce("hubspot_record_id"),
     hubspotLeadStatus: coalesce("hubspot_lead_status"),
     hubspotOwner: coalesce("hubspot_owner"),
@@ -374,7 +375,6 @@ function buildDomainUpdateSet() {
     hasHubspotDeal: orFlag("has_hubspot_deal"),
     inBuiltwith: orFlag("in_builtwith"),
     inHubspot: orFlag("in_hubspot"),
-    inPregen: orFlag("in_pregen"),
     inInstantly: orFlag("in_instantly"),
     updatedAt: new Date(),
   };
@@ -402,7 +402,9 @@ async function main() {
     const row = (Array.isArray(res) ? res : (res.rows ?? []))[0] as
       | { d: number; c: number }
       | undefined;
-    console.log(`\nTotals now → domains: ${row?.d ?? "?"}  contacts: ${row?.c ?? "?"}`);
+    console.log(
+      `\nTotals now → domains: ${row?.d ?? "?"}  contacts: ${row?.c ?? "?"}`,
+    );
   } else {
     console.log("\n(dry run — pass --commit to write)");
   }

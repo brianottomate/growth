@@ -9,43 +9,55 @@ Living doc for the first WanderOS cold-email campaign. Captures what we learned
 building the lead → enrich → contact → send pipeline so we don't re-derive it.
 
 ## The goal
+
 Stand up and **de-risk the cold-outbound machine** with a throwaway first batch —
 not a max-impact blast. First send tests copy / deliverability / reply-loop, so we
-use *mid-tier* prospects (don't burn the best) and Kristian as a proxy AE.
+use _mid-tier_ prospects (don't burn the best) and Kristian as a proxy AE.
 
 ## The leads funnel (reality)
+
 - `leads.domain` ≈ **58.9k** domains, but that's a contactless BuiltWith/CRM universe.
-- Sendable pool = **net-new** (not in CRM, `LIVE_RENTAL`, has a credible contact) →
-  **543** after a live-HubSpot scrub (see below). NOT 50k.
-- "Pregen sites 1.8K" was a **mislabel** — it's the curated shortlist that has
-  contacts; nothing was actually built (`pregen_site_url` = `PREGEN_URL_PATTERN/...`).
+- The historical sendable pool was **net-new** (not in CRM, ranked, has a
+  credible contact) → **543** after a live-HubSpot scrub. That count is context,
+  not a current queue contract.
+- "Pregen sites 1.8K" was a **mislabel** — it was a curated prospect catalog.
+  Nothing was built; `LIVE_RENTAL`/`LIVE_OTHER`, `in_pregen`, page titles, and
+  `PREGEN_URL_PATTERN/...` values were retired in July 2026. Current targeting
+  uses our ranker score and explicit send batches. A future generated-site
+  lifecycle must use separate state backed by real production artifacts.
 
 ## HubSpot scrub (done)
+
 - The ingested `in_hubspot` flag is a **June-1 CSV snapshot, ~stale**. A live
   per-domain scrub (`scripts/scrub-netnew-hubspot.ts`, batched `IN` search) flipped
   **93 of 543** to `in_hubspot=true` → net-new pool **543 → 450**.
 - Lesson: don't trust the stored flag; verify against live HubSpot before send.
 
 ## Enrichment SOP (what's valuable)
+
 Pipeline: `scripts/enrich-batch.ts` (discovery → extraction + triangulated unit
 estimate, writes back to `leads.domain`). Findings from 100 enriched net-new:
+
 - ✅ **`pregenFit`** — the targeting signal (0–78). The cut.
 - ✅ **`redFlags`** — disqualifier gate (aggregator / single-property / not-a-PM).
 - ✅ **`unit_estimate` + confidence** — the size axis; ~60% high-confidence, 40% null.
 - ❌ **stored `unit_count`** — NOISE. Wrong on ~19/20, 30–150× off (it's HubSpot's
   distrusted `portfolio_size` / a `property_count` CSV column; airvillage 1524→10).
-  Keep only as a *prior* the estimator ingests, never as the ranking truth.
+  Keep only as a _prior_ the estimator ingests, never as the ranking truth.
 - ⚠️ **`computed_tier`** — redundant with fit; derive, don't store.
 - Rich extraction (brand voice, etc.) = **personalization** later, not targeting.
 - **fit ≠ size** — orthogonal. Rank on fit gated by flags, then prefer real size.
   The prize is high-fit + high-size (rare); high-fit + tiny is abundant test fodder.
 
 ### Portfolio-size detection — a skill to evolve (NOT today)
+
 Today = web-search + scrape + LLM guess. Future, more structural: count unique
 listings in **sitemaps**, **Airbnb host-profile** unit counts, financial filings.
 
 ## Contacts — the big finding (2026-06-18)
+
 Our purchased/appended contact list is **mostly mis-associated freemail junk**:
+
 - **0 of the 20** test companies have a single corporate-email contact. ~all freemail.
 - **Minerva `enrichByEmail` DOES enrich freemail** (42% match) — but the matches sit
   in **random, wrong cities** (a Maui rental's "co-owner" in Chehalis WA). So Minerva's
@@ -60,6 +72,7 @@ Our purchased/appended contact list is **mostly mis-associated freemail junk**:
   contact data — derive the channel from the company's own site.**
 
 ### Contact strategy (the plan)
+
 1. **Don't send to the freemail list.** Use only where Minerva geo matches company geo.
 2. **Site-scrape "contact channel resolver"** per domain → corporate email
    (`info@`/`bookings@`/`owner@`), owner name, contact-form yes/no, phone/WhatsApp.
@@ -72,6 +85,7 @@ Our purchased/appended contact list is **mostly mis-associated freemail junk**:
 4. **Minerva** = geo-validator in the pipeline, not the source.
 
 ### Deferred / future
+
 - **Existing-user check (BigQuery)** — don't cold-pitch a current Wander user/host.
   Needs the warehouse users/hosts table discovered. `bigquery.client.executeQuery`.
 - **Agentic browser** for contact-form submission.
@@ -80,6 +94,7 @@ Our purchased/appended contact list is **mostly mis-associated freemail junk**:
   already has open/click/reply counters; reply webhook exists (`api/instantly`).
 
 ## Outbound test setup (A/B/C)
+
 - 3 lifecycle programs (`scripts/seed-outbound-sequences.ts`), all → `wander.com/os`:
   - **A** Reply-first (text only) · **B** Self-serve (text + /os link) · **C** Visual (+ image)
 - Built into Instantly DRAFT campaigns by `scripts/create-outbound-campaigns.ts`.
@@ -92,6 +107,7 @@ Our purchased/appended contact list is **mostly mis-associated freemail junk**:
   deliverability), alert Kristian via the reply webhook. NOT reply-to personal email.
 
 ## Email signature (Emily)
+
 Set as the **mailbox-level signature** on the Emily account in Instantly (auto-
 appends; bodies sign off with just "Emily" so we don't double-sign). Adapted from
 Kristian's template: name "Emily Collins", title "Account Executive", phone
@@ -101,6 +117,7 @@ fine for warm/personalized sends, but a lighter text sig often delivers better o
 pure-cold variants. HTML lives in this repo via the seed-script comment + here.
 
 ## State / next steps
+
 - ✅ Net-new pill (450), Send-20 pill, enrich-drawer (company info, contacts w/ ★ picks,
   Copy context, CRM marker), HubSpot scrub, 100 enriched, contact deep-dive.
 - ▶ Contact resolver over the 100 → choose a NEW 20 (best clean contact channel) → upload to Instantly.

@@ -616,8 +616,9 @@ export interface LeadsSummaryOutput {
   domains: number;
   inHubspot: number;
   inInstantly: number;
-  inPregen: number;
-  withPregenSite: number;
+  ranked: number;
+  sendBatch: number;
+  withPreviewUrl: number;
   untouched: number;
   contacts: number;
   netNew: number;
@@ -1575,7 +1576,8 @@ export function LeadsSummaryCard({ output }: { output: LeadsSummaryOutput }) {
     contacts,
     netNew,
     untouched,
-    inInstantly,
+    ranked,
+    sendBatch,
     inHubspot,
     topPms,
   } = output;
@@ -1592,7 +1594,8 @@ export function LeadsSummaryCard({ output }: { output: LeadsSummaryOutput }) {
           sub={netNew > 0 ? "ready to send" : undefined}
         />
         <Stat label="Untouched pool" value={fmtNum(untouched)} />
-        <Stat label="In Instantly" value={fmtNum(inInstantly)} />
+        <Stat label="Ranked" value={fmtNum(ranked)} />
+        <Stat label="Send batch" value={fmtNum(sendBatch)} />
         <Stat label="In HubSpot" value={fmtNum(inHubspot)} />
       </div>
       {topPms.length > 0 && (
