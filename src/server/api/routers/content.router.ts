@@ -85,6 +85,15 @@ const toMember = (
 ): Member | null => (u ? { id: u.id, name: u.name, image: u.image } : null);
 
 const statusEnum = z.enum(contentStatusEnum.enumValues);
+const mediaItemInput = z.object({
+  url: z.string().max(2000),
+  type: z.enum(["image", "video", "carousel"]),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+  thumbnail: z.string().max(2000).optional(),
+  assetId: z.string().optional(),
+  derivedFrom: z.string().optional(),
+});
 
 export const contentRouter = createTRPCRouter({
   /**
@@ -742,19 +751,7 @@ export const contentRouter = createTRPCRouter({
     .input(
       z.object({
         platformPostId: z.string(),
-        media: z
-          .array(
-            z.object({
-              url: z.string().max(2000),
-              type: z.enum(["image", "video", "carousel"]),
-              width: z.number().int().positive().optional(),
-              height: z.number().int().positive().optional(),
-              thumbnail: z.string().max(2000).optional(),
-              assetId: z.string().optional(),
-              derivedFrom: z.string().optional(),
-            }),
-          )
-          .max(300),
+        media: z.array(mediaItemInput).max(300),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -771,6 +768,42 @@ export const contentRouter = createTRPCRouter({
         });
       }
       return ContentService.setSpotMedia(input);
+    }),
+
+  /** Save the complete manual post editor against the version it opened from. */
+  saveSpotEditor: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        expectedUpdatedAt: z.string().datetime(),
+        text: z.string().max(5000).nullable(),
+        media: z.array(mediaItemInput).max(300),
+        assetLinks: z.array(z.string().trim().min(1).max(2000)).max(30),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      if (spot.source !== "owned") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't edit a scraped post",
+        });
+      }
+
+      const saved = await ContentService.saveSpotEditor(input);
+      if (!saved) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "This post changed while you were editing. Close and reopen the editor to review the latest version.",
+        });
+      }
+      return saved;
     }),
 
   /** Set a spot's concrete, platform-specific caption (`platform_post.text`) —

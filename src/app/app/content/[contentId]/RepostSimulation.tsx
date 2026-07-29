@@ -131,16 +131,3 @@ export function RepostSimulation({ sims }: { sims: RepostSim[] }) {
     </div>
   );
 }
-
-/** Standalone unfurl for a URL found in a spot's drafted copy. */
-export function LinkCardStrip({ card }: { card: LinkCard | null }) {
-  if (!card) return null;
-  return (
-    <div className="mt-1.5 ml-6 max-w-md">
-      <div className="text-muted-foreground mb-1 text-[10px]">
-        link unfurl{card.predicted ? " — predicted from draft, not live yet" : ""}
-      </div>
-      <ArticleCard card={card} />
-    </div>
-  );
-}

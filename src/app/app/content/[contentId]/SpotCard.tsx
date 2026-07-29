@@ -1,38 +1,29 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Images,
-  Loader2,
-  MessageSquare,
-  Plus,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { SimpleSelect } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Dropzone } from "@/components/ui/dropzone";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { MediaThumbnail } from "@/components/media-thumbnail";
 import { cn } from "@/components/ui/lib/utils";
 import type { Member } from "@/components/assignment/assignee";
 import type { MediaItem, PostStats } from "@/server/db/schema";
-import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { SpotOwnerControl } from "./OwnerControls";
 import { STATUS_OPTIONS } from "./IdeaControls";
-import { MediaPickerDialog } from "./MediaPickerDialog";
 import { MarkScheduledButton } from "../MarkScheduledButton";
-import { SPOT_PILLS, type SpotPill } from "@/lib/spot-pills";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { LinkedInDeliveryControl } from "./LinkedInDeliveryControl";
 import { getPlatformFormat } from "@/server/content/formats";
+import {
+  CompactPlatformPreview,
+  type CompactPreviewLinkCard,
+} from "./CompactPlatformPreview";
+import { PlatformPostEditDialog } from "./PlatformPostEditDialog";
 
 const STATUS_PILL: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -48,8 +39,10 @@ const VIA: Record<string, string> = {
   manual: "Manual",
 };
 
-const titleCase = (s: string) =>
-  s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const titleCase = (value: string) =>
+  value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 
 function formatLabel(
   format: string | null,
@@ -66,9 +59,12 @@ function formatLabel(
   return null;
 }
 
-const fmt = (n: number) =>
-  n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `${n}`;
-const fmtWhen = (iso: string) =>
+const formatMetric = (value: number) =>
+  value >= 1000
+    ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}K`
+    : `${value}`;
+
+const formatWhen = (iso: string) =>
   new Date(iso).toLocaleString([], {
     month: "short",
     day: "numeric",
@@ -78,6 +74,9 @@ const fmtWhen = (iso: string) =>
 
 export type SpotCardData = {
   id: string;
+  updatedAtISO: string;
+  channelId?: string | null;
+  channelName?: string | null;
   platform: string;
   format: string | null;
   archetype: string | null;
@@ -87,9 +86,9 @@ export type SpotCardData = {
   username: string | null;
   text: string | null;
   externalUrl: string | null;
-  /** CMS editor deep link (Dato) — the preview surface while the item is a draft. */
+  /** CMS editor deep link (Dato) for the source article. */
   editorUrl: string | null;
-  /** In-app rendered preview (/app/blog/preview/…) for CMS-linked drafts. */
+  /** In-app rendered preview for CMS-linked drafts. */
   previewPath: string | null;
   provider: string | null;
   scheduledAtISO: string | null;
@@ -102,10 +101,14 @@ export type SpotCardData = {
   media: MediaItem[] | null;
   stats: PostStats | null;
   owner: Member | null;
+  linkCard?: CompactPreviewLinkCard | null;
 };
 
-/** A rich, /brands-style platform-post card: the manual layer (status, ship
- *  date, mark-done), the asset links (Drive), inline image upload, and stats. */
+/**
+ * A server-truth platform preview with operational controls around it. Chat is
+ * the primary refinement path; manual copy, media, and link changes live in one
+ * explicit editor so local form state can never mask a refreshed server value.
+ */
 export function SpotCard({
   spot,
   brandId,
@@ -130,7 +133,6 @@ export function SpotCard({
     spot.platform === "newsletter" &&
     (spot.format === "newsletter.broadcast" ||
       spot.format === "newsletter.blast");
-
   const refresh = { onSettled: () => router.refresh() };
   const setStatus = useMutation(
     trpc.content.setSpotStatus.mutationOptions(refresh),
@@ -138,107 +140,30 @@ export function SpotCard({
   const setSchedule = useMutation(
     trpc.content.setSpotSchedule.mutationOptions(refresh),
   );
-  const setAssetLinks = useMutation(
-    trpc.content.setAssetLinks.mutationOptions(refresh),
-  );
-  const setMedia = useMutation(trpc.content.setMedia.mutationOptions(refresh));
   const removeSpot = useMutation(
     trpc.content.removeSpot.mutationOptions(refresh),
   );
 
-  const [links, setLinks] = useState<string[]>(spot.assetLinks ?? []);
-  const [media, setMediaState] = useState<MediaItem[]>(spot.media ?? []);
-  const [addingLink, setAddingLink] = useState(false);
-  const [linkValue, setLinkValue] = useState("");
-  const { uploadImages, uploading } = useMediaUpload(brandId);
-  const platformFormat = spot.format
-    ? getPlatformFormat(spot.format)
-    : undefined;
-  const isCarousel =
-    spot.archetype === "carousel" || platformFormat?.archetype === "carousel";
-
-  // Caption = the concrete per-platform copy (platform_post.text), plus the AI
-  // generate steer (pills + free-text nudge) that drafts it from the brief.
-  const [caption, setCaption] = useState(spot.text ?? "");
-  const [genOpen, setGenOpen] = useState(false);
-  const [pills, setPills] = useState<Set<SpotPill>>(new Set());
-  const [steer, setSteer] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  const setText = useMutation(
-    trpc.content.setSpotText.mutationOptions(refresh),
-  );
-  const generate = useMutation(
-    trpc.content.generateSpotCaption.mutationOptions({
-      onSuccess: (res) => {
-        // Drop the draft into the editor and persist it; still fully editable.
-        setCaption(res.caption);
-        setText.mutate({ platformPostId: spot.id, text: res.caption });
-        setGenOpen(false);
-      },
-    }),
-  );
-  const togglePill = (id: SpotPill) =>
-    setPills((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  const runGenerate = () =>
-    generate.mutate({
-      platformPostId: spot.id,
-      pills: [...pills],
-      steer: steer.trim() || undefined,
-    });
-  const saveCaption = () => {
-    const next = caption.trim() ? caption : "";
-    if (next !== (spot.text ?? "")) {
-      setText.mutate({ platformPostId: spot.id, text: next || null });
-    }
-  };
-
-  const fmtLabel = formatLabel(spot.format, spot.archetype, spot.template);
+  const label = formatLabel(spot.format, spot.archetype, spot.template);
   const via = spot.provider ? (VIA[spot.provider] ?? spot.provider) : null;
-  const s = spot.stats ?? {};
+  const stats = spot.stats ?? {};
   const metrics = [
-    s.views != null ? `${fmt(s.views)} views` : null,
-    s.likes != null ? `${fmt(s.likes)} likes` : null,
-    s.comments != null ? `${fmt(s.comments)} comments` : null,
-  ].filter((m): m is string => m !== null);
-
-  const persistLinks = (next: string[]) => {
-    setLinks(next);
-    setAssetLinks.mutate({ platformPostId: spot.id, assetLinks: next });
-  };
-  const persistMedia = (next: MediaItem[]) => {
-    // Dedupe by assetId so dropping or picking the same library asset twice
-    // doesn't double-attach. Items without an assetId (scraped/legacy) are kept.
-    const seen = new Set<string>();
-    const deduped = next.filter((m) => {
-      if (!m.assetId) return true;
-      if (seen.has(m.assetId)) return false;
-      seen.add(m.assetId);
-      return true;
-    });
-    setMediaState(deduped);
-    setMedia.mutate({ platformPostId: spot.id, media: deduped });
-  };
-  const handleUpload = async (files: File[]) => {
-    const items = await uploadImages(files);
-    if (items.length) persistMedia([...media, ...items]);
-  };
-  const moveMedia = (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= media.length) return;
-    const next = [...media];
-    [next[index], next[target]] = [next[target]!, next[index]!];
-    persistMedia(next);
-  };
+    stats.views != null ? `${formatMetric(stats.views)} views` : null,
+    stats.likes != null ? `${formatMetric(stats.likes)} likes` : null,
+    stats.comments != null ? `${formatMetric(stats.comments)} comments` : null,
+  ].filter((metric): metric is string => metric !== null);
+  const media = spot.media ?? [];
+  const assetLinks = spot.assetLinks ?? [];
+  const scheduled =
+    Boolean(spot.scheduledAtISO) ||
+    spot.status === "scheduled" ||
+    spot.status === "published";
 
   return (
-    <div className="bg-card rounded-2xl border p-4 shadow-sm">
-      {/* header */}
+    <div
+      id={`platform-post-${spot.id}`}
+      className="bg-card scroll-mt-6 rounded-2xl border p-4 shadow-sm"
+    >
       <div className="flex items-start gap-3">
         <span className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-xl">
           <ChannelLogo
@@ -248,6 +173,7 @@ export function SpotCard({
             className="size-6"
           />
         </span>
+
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold">
@@ -255,27 +181,32 @@ export function SpotCard({
                 ? "Email"
                 : platformLabel(spot.platform)}
             </span>
+            {spot.channelName && (
+              <span className="text-muted-foreground text-xs">
+                {spot.channelName}
+              </span>
+            )}
             {spot.username && (
               <span className="text-muted-foreground text-xs">
                 {spot.username}
               </span>
             )}
-            {fmtLabel && (
+            {label && (
               <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                {fmtLabel}
+                {label}
               </span>
             )}
             {owned ? (
               <SimpleSelect
                 value={
-                  STATUS_OPTIONS.some((o) => o.value === spot.status)
+                  STATUS_OPTIONS.some((option) => option.value === spot.status)
                     ? spot.status
                     : "draft"
                 }
-                onValueChange={(v) =>
+                onValueChange={(status) =>
                   setStatus.mutate({
                     platformPostId: spot.id,
-                    status: v as never,
+                    status: status as never,
                   })
                 }
                 options={STATUS_OPTIONS}
@@ -294,7 +225,6 @@ export function SpotCard({
             )}
           </div>
 
-          {/* meta: ship date + posted + via + open */}
           <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             {owned ? (
               <>
@@ -304,10 +234,10 @@ export function SpotCard({
                       ? new Date(spot.scheduledAtISO)
                       : undefined
                   }
-                  onChange={(d) =>
+                  onChange={(date) =>
                     setSchedule.mutate({
                       platformPostId: spot.id,
-                      scheduledAt: d ? d.toISOString() : null,
+                      scheduledAt: date ? date.toISOString() : null,
                     })
                   }
                   placeholder="Schedule"
@@ -336,10 +266,12 @@ export function SpotCard({
                 )}
               </>
             ) : (
-              spot.scheduledAtISO && <span>{fmtWhen(spot.scheduledAtISO)}</span>
+              spot.scheduledAtISO && (
+                <span>{formatWhen(spot.scheduledAtISO)}</span>
+              )
             )}
             {spot.publishedAtISO && (
-              <span>· posted {fmtWhen(spot.publishedAtISO)}</span>
+              <span>· posted {formatWhen(spot.publishedAtISO)}</span>
             )}
             {via && <span>· via {via}</span>}
             {spot.previewPath && (
@@ -370,7 +302,7 @@ export function SpotCard({
                 className="hover:text-foreground underline"
                 title={
                   spot.editorUrl && spot.status !== "published"
-                    ? "Public URL — live after the draft is published in Dato"
+                    ? "Public URL. Live after the draft is published in Dato."
                     : undefined
                 }
               >
@@ -380,25 +312,45 @@ export function SpotCard({
           </div>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          {owned && (
-            <button
-              onClick={() =>
-                sendAssistantIntent({
-                  type: "work_content_post",
-                  brandId,
-                  brandName,
-                  contentPostId,
-                  contentTitle,
-                  platformPostId: spot.id,
-                  platform: spot.platform,
-                  visibleText: `Help me refine the ${platformLabel(spot.platform)} version of “${contentTitle}”`,
-                })
-              }
-              className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
-            >
-              <MessageSquare className="size-3.5" /> Refine in chat
-            </button>
+        <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {owned && !isEmail && (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  sendAssistantIntent({
+                    type: "work_content_post",
+                    brandId,
+                    brandName,
+                    contentPostId,
+                    contentTitle,
+                    platformPostId: spot.id,
+                    platform: spot.platform,
+                    visibleText: `Help me refine the ${platformLabel(spot.platform)} version of “${contentTitle}”`,
+                  })
+                }
+                className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+              >
+                <MessageSquare className="size-3.5" />
+                Refine in chat
+              </button>
+              <PlatformPostEditDialog
+                platformPostId={spot.id}
+                updatedAtISO={spot.updatedAtISO}
+                brandId={brandId}
+                platform={spot.platform}
+                format={spot.format}
+                channelName={spot.channelName ?? null}
+                username={spot.username}
+                brandName={brandName}
+                contentTitle={contentTitle}
+                text={spot.text}
+                media={media}
+                assetLinks={assetLinks}
+                linkCard={spot.linkCard}
+                scheduled={scheduled}
+              />
+            </>
           )}
           <SpotOwnerControl
             platformPostId={spot.id}
@@ -408,6 +360,7 @@ export function SpotCard({
           />
           {owned && (
             <button
+              type="button"
               onClick={() => removeSpot.mutate({ platformPostId: spot.id })}
               disabled={removeSpot.isPending}
               aria-label="Remove channel"
@@ -419,17 +372,14 @@ export function SpotCard({
         </div>
       </div>
 
-      {/* Caption — the concrete platform copy. Editable for owned spots, with an
-          AI generate/regenerate that remixes the idea brief in the brand+channel
-          voice. Scraped posts show their captured text read-only. */}
       {owned && isEmail ? (
-        <div className="bg-muted/25 mt-3 rounded-lg border p-3">
+        <div className="bg-muted/25 mt-4 rounded-lg border p-3">
           <p className="text-sm font-medium">
             This email has a subject, Markdown body, CTA, preview, and revision
             history in its issue workspace.
           </p>
           <p className="text-muted-foreground mt-1 text-xs">
-            The content card holds the premise and calendar placement; the
+            The content card holds the premise and calendar placement. The
             newsletter workspace holds the actual email artifact.
           </p>
           <Link
@@ -439,266 +389,106 @@ export function SpotCard({
             Open email workspace
           </Link>
         </div>
-      ) : owned ? (
-        <div className="mt-3">
-          <div className="bg-background min-h-16 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-            {caption.trim() || (
-              <span className="text-muted-foreground">
-                No channel copy yet. Refine it with the assistant.
-              </span>
-            )}
-          </div>
-          <details className="mt-2">
-            <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
-              Manual edit
-            </summary>
-            <div className="mt-2">
-              <textarea
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                onBlur={saveCaption}
-                placeholder="Platform caption…"
-                className="bg-background focus:ring-ring/40 min-h-24 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-              />
-              <div className="mt-2 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setGenOpen((open) => !open)}
-                  className="border-border text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
-                >
-                  {generate.isPending ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="size-3.5" />
-                  )}
-                  {caption.trim() ? "Regenerate" : "Generate"}
-                </button>
-                {setText.isPending && (
-                  <span className="text-muted-foreground text-[11px]">
-                    Saving…
-                  </span>
-                )}
-              </div>
-            </div>
-          </details>
-          {genOpen && (
-            <div className="bg-muted/30 mt-2 rounded-lg border p-2.5">
-              <div className="flex flex-wrap gap-1.5">
-                {SPOT_PILLS.map((p) => {
-                  const on = pills.has(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => togglePill(p.id)}
-                      className={cn(
-                        "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
-                        on
-                          ? "bg-foreground text-background border-foreground"
-                          : "border-border text-muted-foreground hover:bg-accent",
-                      )}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  value={steer}
-                  onChange={(e) => setSteer(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") runGenerate();
-                  }}
-                  placeholder="Optional nudge — e.g. lead with the pool"
-                  className="bg-background flex-1 rounded-md border px-2 py-1 text-xs outline-none"
-                />
-                <button
-                  onClick={runGenerate}
-                  disabled={generate.isPending}
-                  className="bg-foreground text-background rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50"
-                >
-                  {generate.isPending ? "Generating…" : "Generate"}
-                </button>
-              </div>
-              {generate.isError && (
-                <p className="text-destructive mt-1.5 text-[11px]">
-                  {generate.error.message}
+      ) : (
+        <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="min-w-0 space-y-3">
+            <section className="bg-background rounded-xl border p-4">
+              <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                Copy
+              </h3>
+              {spot.text?.trim() ? (
+                <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">
+                  {spot.text}
+                </p>
+              ) : (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  No channel copy yet. Refine it in chat or open the manual
+                  editor.
                 </p>
               )}
-            </div>
-          )}
-        </div>
-      ) : (
-        spot.text && (
-          <p className="text-muted-foreground mt-3 text-sm">{spot.text}</p>
-        )
-      )}
+            </section>
 
-      {/* media — thumbnails + a proper drop zone (saved to the library) */}
-      {(media.length > 0 || owned) && (
-        <div className="mt-3 space-y-2">
-          {media.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {media.map((m, i) => (
-                <span
-                  key={i}
-                  className="bg-muted group relative size-16 overflow-hidden rounded-lg border"
-                >
-                  <MediaThumbnail
-                    src={m.url}
-                    thumbnail={m.thumbnail}
-                    className="size-full object-cover"
-                  />
-                  {owned && (
-                    <>
-                      {isCarousel && (
-                        <span className="absolute top-0.5 left-0.5 rounded bg-black/65 px-1 text-[9px] font-semibold text-white">
-                          {i + 1}
+            {media.length > 0 && (
+              <section className="bg-background rounded-xl border p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                    Media
+                  </h3>
+                  <span className="text-muted-foreground text-[10px]">
+                    {media.length === 1
+                      ? "1 asset"
+                      : `${media.length} carousel slides`}
+                  </span>
+                </div>
+                <ol className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                  {media.map((item, index) => (
+                    <li
+                      key={`${item.assetId ?? item.url}-${index}`}
+                      className="min-w-0"
+                    >
+                      <div className="bg-muted relative aspect-square overflow-hidden rounded-lg border">
+                        <MediaThumbnail
+                          src={item.url}
+                          thumbnail={item.thumbnail}
+                          alt={`${platformLabel(spot.platform)} media ${index + 1}`}
+                          className="object-contain"
+                          sizes="180px"
+                        />
+                        <span className="absolute top-1.5 left-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white">
+                          {index + 1}
                         </span>
-                      )}
-                      <button
-                        onClick={() =>
-                          persistMedia(media.filter((_, j) => j !== i))
-                        }
-                        className="absolute top-0.5 right-0.5 rounded bg-black/65 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                        aria-label="Remove asset"
-                      >
-                        <X className="size-3" />
-                      </button>
-                      {isCarousel && (
-                        <span className="absolute inset-x-0.5 bottom-0.5 flex justify-between">
-                          <button
-                            type="button"
-                            disabled={i === 0}
-                            onClick={() => moveMedia(i, -1)}
-                            aria-label={`Move slide ${i + 1} left`}
-                            className="rounded bg-black/65 p-0.5 text-white disabled:opacity-30"
-                          >
-                            <ChevronLeft className="size-3" />
-                          </button>
-                          <button
-                            type="button"
-                            disabled={i === media.length - 1}
-                            onClick={() => moveMedia(i, 1)}
-                            aria-label={`Move slide ${i + 1} right`}
-                            className="rounded bg-black/65 p-0.5 text-white disabled:opacity-30"
-                          >
-                            <ChevronRight className="size-3" />
-                          </button>
-                        </span>
-                      )}
-                    </>
-                  )}
-                </span>
-              ))}
-            </div>
-          )}
-          {owned && (
-            <details>
-              <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">
-                Channel media
-              </summary>
-              <div className="mt-2 flex items-stretch gap-2">
-                <Dropzone
-                  compact
-                  multiple
-                  onFiles={handleUpload}
-                  uploading={uploading}
-                  className="flex-1"
-                />
-                <button
-                  onClick={() => setPickerOpen(true)}
-                  className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-xs transition-colors"
-                >
-                  <Images className="size-5" />
-                  Library
-                </button>
-              </div>
-            </details>
-          )}
-        </div>
-      )}
-
-      {/* Drive / external asset links */}
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {links.map((url, i) => (
-          <span
-            key={i}
-            className="border-border text-muted-foreground flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px]"
-          >
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground max-w-[180px] truncate"
-            >
-              ↗ {url.replace(/^https?:\/\/(www\.)?/, "")}
-            </a>
-            {owned && (
-              <button
-                onClick={() => persistLinks(links.filter((_, j) => j !== i))}
-                aria-label="Remove link"
-                className="hover:text-foreground"
-              >
-                <X className="size-3" />
-              </button>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
             )}
-          </span>
-        ))}
-        {owned &&
-          (addingLink ? (
-            <input
-              autoFocus
-              value={linkValue}
-              onChange={(e) => setLinkValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  const v = linkValue.trim();
-                  if (v) persistLinks([...links, v]);
-                  setLinkValue("");
-                  setAddingLink(false);
-                }
-                if (e.key === "Escape") {
-                  setLinkValue("");
-                  setAddingLink(false);
-                }
-              }}
-              onBlur={() => {
-                const v = linkValue.trim();
-                if (v) persistLinks([...links, v]);
-                setLinkValue("");
-                setAddingLink(false);
-              }}
-              placeholder="Paste a Drive link…"
-              className="bg-background w-56 rounded-md border px-1.5 py-0.5 text-[11px] outline-none"
-            />
-          ) : (
-            <button
-              onClick={() => setAddingLink(true)}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-md border border-dashed px-1.5 py-0.5 text-[11px]"
-            >
-              <Plus className="size-3" /> Link
-            </button>
-          ))}
-      </div>
+
+            {assetLinks.length > 0 && (
+              <section className="bg-background rounded-xl border p-4">
+                <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                  Production links
+                </h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {assetLinks.map((url) => (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="border-border text-muted-foreground hover:text-foreground max-w-full truncate rounded-md border px-2 py-1 text-xs underline underline-offset-2"
+                    >
+                      {url.replace(/^https?:\/\/(www\.)?/, "")}
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+
+          <CompactPlatformPreview
+            className="mx-0 max-w-72"
+            platform={spot.platform}
+            format={spot.format}
+            channelName={spot.channelName ?? null}
+            username={spot.username}
+            brandName={brandName}
+            contentTitle={contentTitle}
+            text={spot.text ?? ""}
+            media={media}
+            linkCard={spot.linkCard}
+            scheduled={scheduled}
+          />
+        </div>
+      )}
 
       {metrics.length > 0 && (
         <div className="text-muted-foreground mt-3 flex flex-wrap gap-3 text-[11px] tabular-nums">
-          {metrics.map((m, i) => (
-            <span key={i}>{m}</span>
+          {metrics.map((metric) => (
+            <span key={metric}>{metric}</span>
           ))}
         </div>
       )}
-
-      <MediaPickerDialog
-        brandId={brandId}
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        existingAssetIds={media
-          .map((m) => m.assetId)
-          .filter((id): id is string => !!id)}
-        onPick={(item) => persistMedia([...media, item])}
-      />
     </div>
   );
 }

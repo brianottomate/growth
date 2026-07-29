@@ -14,11 +14,7 @@ import {
   resolveLinkCard,
   type LinkCard,
 } from "@/server/services/unfurl.service";
-import {
-  LinkCardStrip,
-  RepostSimulation,
-  type RepostSim,
-} from "./RepostSimulation";
+import { RepostSimulation, type RepostSim } from "./RepostSimulation";
 import { getSession } from "@/server/better-auth/server";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { getContentReadiness } from "@/lib/content-readiness";
@@ -93,7 +89,19 @@ export default async function ContentDetailPage({
     with: {
       brand: true,
       series: true,
-      platformPosts: { with: { owner: { columns: memberCols } } },
+      platformPosts: {
+        with: {
+          owner: { columns: memberCols },
+          channel: {
+            columns: {
+              id: true,
+              displayName: true,
+              handle: true,
+              platform: true,
+            },
+          },
+        },
+      },
       owner: { columns: memberCols },
     },
   });
@@ -392,6 +400,10 @@ export default async function ContentDetailPage({
               brandName={content.brand?.name ?? "Brand"}
               spot={{
                 id: p.id,
+                updatedAtISO: p.updatedAt.toISOString(),
+                channelId: p.channel?.id ?? p.channelId,
+                channelName:
+                  p.channel?.displayName ?? p.channel?.handle ?? null,
                 platform: p.platform,
                 format: p.format,
                 archetype: p.archetype,
@@ -421,9 +433,9 @@ export default async function ContentDetailPage({
                 media: p.media,
                 stats: p.stats,
                 owner: toMember(p.owner),
+                linkCard: linkCardBySpot.get(p.id) ?? null,
               }}
             />
-            <LinkCardStrip card={linkCardBySpot.get(p.id) ?? null} />
             <RepostSimulation sims={simsBySpot.get(p.id) ?? []} />
           </div>
         ))}

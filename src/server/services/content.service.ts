@@ -316,6 +316,53 @@ async function setSpotText(input: {
   return { id: input.platformPostId };
 }
 
+export type SaveSpotEditorInput = {
+  platformPostId: string;
+  expectedUpdatedAt: string;
+  text: string | null;
+  media: MediaItem[];
+  assetLinks: string[];
+};
+
+/**
+ * Save every manual platform-post field atomically. This is deliberately
+ * separate from the small chat-facing mutations: the dialog is an explicit
+ * editing session and must not partially land or overwrite a newer chat edit.
+ */
+async function saveSpotEditor(
+  input: SaveSpotEditorInput,
+): Promise<{ id: string; updatedAt: Date } | null> {
+  const seenMedia = new Set<string>();
+  const media = input.media.filter((item) => {
+    const key = item.assetId ?? item.url;
+    if (seenMedia.has(key)) return false;
+    seenMedia.add(key);
+    return true;
+  });
+  const assetLinks = [
+    ...new Set(input.assetLinks.map((link) => link.trim()).filter(Boolean)),
+  ];
+  const [row] = await db
+    .update(platformPostTable)
+    .set({
+      text: input.text?.trim() || null,
+      media: media.length ? media : null,
+      assetLinks: assetLinks.length ? assetLinks : null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(platformPostTable.id, input.platformPostId),
+        eq(platformPostTable.updatedAt, new Date(input.expectedUpdatedAt)),
+      ),
+    )
+    .returning({
+      id: platformPostTable.id,
+      updatedAt: platformPostTable.updatedAt,
+    });
+  return row ?? null;
+}
+
 /** Set the content-level media pool (`content_post.media`). Deduped by assetId
  *  — the same dedupe the spot attach-list uses. */
 async function setPoolMedia(input: {
@@ -429,6 +476,7 @@ export const ContentService = {
   addSpots,
   addSpotTargets,
   setSpotText,
+  saveSpotEditor,
   setPoolMedia,
   setSpotMedia,
   setSpotCarousel,
