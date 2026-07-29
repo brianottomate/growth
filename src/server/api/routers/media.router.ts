@@ -145,21 +145,25 @@ const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25MB
 
 export const mediaRouter = createTRPCRouter({
   /**
-   * Upload a transient chat attachment (a pasted/dropped image) → public R2
-   * URL. Not a media_asset — used by the /overview chat composer to attach the
-   * image to a message as an AI SDK file part. Any org member can call it.
+   * Presign a transient chat attachment for direct browser → R2 upload. Not a
+   * media_asset — used by the /overview chat composer to attach the image to a
+   * message as an AI SDK file part. Any org member can call it.
    */
-  uploadChatImage: protectedProcedure
+  createChatUploadUrl: protectedProcedure
     .input(
       z.object({
-        dataUrl: z.string().min(1),
-        fileName: z.string().optional(),
+        fileName: z.string().max(300).optional(),
+        mediaType: z.string().min(1).max(120),
+        size: z
+          .number()
+          .int()
+          .positive()
+          .max(10 * 1024 * 1024),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return MediaService.uploadChatImage({
-        dataUrl: input.dataUrl,
-        fileName: input.fileName,
+      return MediaService.createChatR2Upload({
+        ...input,
         userId: ctx.session.user.id,
       });
     }),

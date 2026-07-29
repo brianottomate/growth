@@ -1,8 +1,9 @@
 /**
  * True when a chat-attachment URL is one WE host (public R2 bucket) AND lives
  * under the calling operator's own chat-upload prefix. Chat images are written
- * by `MediaService.uploadChatImage` to `R2.buildUploadKey("chat", userId, …)`,
- * i.e. `…/uploads/chat/{userId}/…` under `R2_PUBLIC_BASE_URL`.
+ * by `MediaService.createChatR2Upload` to
+ * `R2.buildUploadKey("chat", userId, …)`, i.e.
+ * `…/uploads/chat/{userId}/…` under `R2_PUBLIC_BASE_URL`.
  *
  * Reads `process.env` directly (not `@/env`) so this stays a dependency-free
  * pure helper that unit tests can exercise. Fails closed when the public base

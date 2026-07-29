@@ -883,30 +883,31 @@ export async function deleteMedia(id: string) {
 }
 
 /**
- * Upload a transient chat attachment (a pasted/dropped image) to R2 and return
- * its public URL. Deliberately NOT a media_asset row — it's an ephemeral file
- * the chat composer attaches to a message as an AI SDK file part.
+ * Prepare a direct browser → R2 upload for a transient chat attachment.
+ * Deliberately NOT a media_asset row — it's an ephemeral file the chat composer
+ * attaches to a message as an AI SDK file part. The image bytes never pass
+ * through a Vercel function.
  */
-export async function uploadChatImage(input: {
-  dataUrl: string;
+export async function createChatR2Upload(input: {
   userId: string;
+  mediaType: string;
+  size: number;
   fileName?: string;
-}): Promise<{ url: string; mediaType: string }> {
-  const match = /^data:([^;]+);base64,(.+)$/s.exec(input.dataUrl);
-  if (!match) throw new Error("Expected a base64-encoded image data URL");
-  const mediaType = match[1]!;
-  if (!mediaType.startsWith("image/"))
+}): Promise<{ uploadUrl: string; url: string; mediaType: string }> {
+  if (!input.mediaType.startsWith("image/"))
     throw new Error("Only images can be attached");
-  const buffer = Buffer.from(match[2]!, "base64");
-  if (buffer.byteLength > 10 * 1024 * 1024)
+  if (input.size > 10 * 1024 * 1024)
     throw new Error("Image is too large (max 10MB)");
 
-  const ext = mediaType.split("/")[1]?.split("+")[0] ?? "png";
+  const ext = input.mediaType.split("/")[1]?.split("+")[0] ?? "png";
   // Unique key per upload so same-named pastes never collide; scoped per user.
   const filename = `${createId("att")}-${safeFilename(input.fileName ?? `paste.${ext}`)}`;
   const key = R2.buildUploadKey("chat", input.userId, filename);
-  const url = await R2.putBuffer(key, buffer, mediaType);
-  return { url, mediaType };
+  return {
+    uploadUrl: await R2.presignPut(key, input.mediaType),
+    url: R2.publicUrl(key),
+    mediaType: input.mediaType,
+  };
 }
 
 /** Promote a transient chat image into the durable media library without
@@ -977,6 +978,6 @@ export const MediaService = {
   updateMeta: updateMediaMeta,
   delete: deleteMedia,
   kindForMime,
-  uploadChatImage,
+  createChatR2Upload,
   promoteChatImage,
 } as const;

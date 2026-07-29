@@ -332,38 +332,65 @@ export function OverviewChat({
     }
   }, [messages, queryClient, router]);
 
-  // ---- image attachment (transient Blob URL → AI SDK file part) ----
+  // ---- image attachment (direct browser → R2 → AI SDK file part) ----
   const trpc = useTRPC();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingAttachment, setPendingAttachment] = useState<{
     previewUrl: string;
-    blobUrl?: string;
+    hostedUrl?: string;
     mediaType: string;
     uploading: boolean;
   } | null>(null);
-  const uploadChatImage = useMutation(
-    trpc.media.uploadChatImage.mutationOptions(),
+  const createChatUploadUrl = useMutation(
+    trpc.media.createChatUploadUrl.mutationOptions(),
   );
 
   const attachImage = useCallback(
-    (dataUrl: string, fileName?: string) => {
-      const mediaType = /^data:([^;]+);/.exec(dataUrl)?.[1] ?? "image/png";
+    async (dataUrl: string, file: File) => {
+      const mediaType = file.type || "image/png";
+      if (!mediaType.startsWith("image/")) {
+        toast.error("Couldn't attach image", {
+          description: "Only images can be attached",
+        });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Couldn't attach image", {
+          description: "Image is too large (max 10MB)",
+        });
+        return;
+      }
       setPendingAttachment({ previewUrl: dataUrl, mediaType, uploading: true });
-      uploadChatImage.mutate(
-        { dataUrl, fileName },
-        {
-          onSuccess: (res) =>
-            setPendingAttachment((prev) =>
-              prev ? { ...prev, blobUrl: res.url, uploading: false } : prev,
-            ),
-          onError: (err) => {
-            toast.error("Couldn't attach image", { description: err.message });
-            setPendingAttachment(null);
-          },
-        },
-      );
+      try {
+        const prepared = await createChatUploadUrl.mutateAsync({
+          fileName: file.name,
+          mediaType,
+          size: file.size,
+        });
+        const uploaded = await fetch(prepared.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": mediaType },
+          body: file,
+        });
+        if (!uploaded.ok) {
+          throw new Error(`R2 upload failed (${uploaded.status})`);
+        }
+        setPendingAttachment((prev) =>
+          prev?.previewUrl === dataUrl
+            ? { ...prev, hostedUrl: prepared.url, uploading: false }
+            : prev,
+        );
+      } catch (error) {
+        toast.error("Couldn't attach image", {
+          description:
+            error instanceof Error ? error.message : "R2 upload failed",
+        });
+        setPendingAttachment((prev) =>
+          prev?.previewUrl === dataUrl ? null : prev,
+        );
+      }
     },
-    [uploadChatImage],
+    [createChatUploadUrl],
   );
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -373,12 +400,12 @@ export function OverviewChat({
     const file = item?.getAsFile();
     if (!file) return;
     e.preventDefault();
-    readImageFile(file, (dataUrl) => attachImage(dataUrl, file.name));
+    readImageFile(file, (dataUrl) => void attachImage(dataUrl, file));
   };
 
   const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) readImageFile(file, (dataUrl) => attachImage(dataUrl, file.name));
+    if (file) readImageFile(file, (dataUrl) => void attachImage(dataUrl, file));
     e.target.value = "";
   };
 
@@ -436,7 +463,7 @@ export function OverviewChat({
   };
 
   const attachmentReady =
-    !!pendingAttachment?.blobUrl && !pendingAttachment.uploading;
+    !!pendingAttachment?.hostedUrl && !pendingAttachment.uploading;
   const canSend =
     !busy &&
     !pendingAttachment?.uploading &&
@@ -454,7 +481,7 @@ export function OverviewChat({
                 {
                   type: "file" as const,
                   mediaType: pendingAttachment.mediaType,
-                  url: pendingAttachment.blobUrl!,
+                  url: pendingAttachment.hostedUrl!,
                 },
               ],
             }
@@ -464,7 +491,7 @@ export function OverviewChat({
         ? {
             body: {
               chatAttachment: {
-                url: pendingAttachment.blobUrl!,
+                url: pendingAttachment.hostedUrl!,
                 mediaType: pendingAttachment.mediaType,
               },
             },
