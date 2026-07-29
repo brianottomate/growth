@@ -102,6 +102,7 @@ export async function POST(req: Request): Promise<Response> {
     assistantIntent,
     workContext,
     chatAttachment,
+    chatAttachments,
     threadId,
     pagePath,
   } = (await req.json()) as {
@@ -112,6 +113,7 @@ export async function POST(req: Request): Promise<Response> {
     assistantIntent?: AssistantIntent;
     workContext?: ContentWorkContext;
     chatAttachment?: { url?: string; mediaType?: string };
+    chatAttachments?: { url?: string; mediaType?: string }[];
     threadId?: string;
     pagePath?: string;
   };
@@ -200,15 +202,38 @@ export async function POST(req: Request): Promise<Response> {
     activeWorkContext && brand
       ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call contentRead action getWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists, and apply authorized writes directly.`
       : "";
-  const safeAttachment =
-    chatAttachment?.url &&
-    chatAttachment.mediaType?.startsWith("image/") &&
-    isOwnedChatImageUrl(chatAttachment.url, session.user.id)
-      ? chatAttachment
-      : null;
-  const attachmentPrompt = safeAttachment
-    ? `\n\n# Current pasted image\nThe operator attached an image stored at ${safeAttachment.url} (${safeAttachment.mediaType}). You can analyze it visually now.${activeWorkContext ? " If the operator asks to use, save, or attach it to the active content work item, call contentMediaWrite action attachChatImage with this exact URL." : ""} If the operator asks to use it on a DatoCMS blog article, pass this exact URL as blogAgent attachmentUrl. Do not save or upload it merely because it was pasted.`
-    : "";
+  const attachmentCandidates = Array.isArray(chatAttachments)
+    ? chatAttachments
+    : chatAttachment
+      ? [chatAttachment]
+      : [];
+  const seenAttachmentUrls = new Set<string>();
+  const safeAttachments = attachmentCandidates
+    .filter((attachment): attachment is { url: string; mediaType: string } => {
+      if (
+        !attachment.url ||
+        !attachment.mediaType?.startsWith("image/") ||
+        !isOwnedChatImageUrl(attachment.url, session.user.id) ||
+        seenAttachmentUrls.has(attachment.url)
+      ) {
+        return false;
+      }
+      seenAttachmentUrls.add(attachment.url);
+      return true;
+    })
+    .slice(0, 10);
+  const attachmentList = safeAttachments
+    .map(
+      (attachment, index) =>
+        `${index + 1}. ${attachment.url} (${attachment.mediaType})`,
+    )
+    .join("\n");
+  const attachmentPrompt =
+    safeAttachments.length > 0
+      ? `\n\n# Current pasted images\nThe operator attached ${safeAttachments.length} image${safeAttachments.length === 1 ? "" : "s"}. You can analyze every image visually now. Their durable URLs are:\n${attachmentList}${activeWorkContext ? "\nIf the operator asks to use, save, or attach them to the active content work item, call contentMediaWrite action attachChatImage with the complete images array and preserve this order." : ""}\nFor a DatoCMS blog task, pass only the specific image the operator selects as blogAgent attachmentUrl; ask which image if their choice is ambiguous. Do not save or upload images merely because they were pasted.`
+      : activeWorkContext
+        ? `\n\n# Persisted image continuity\nIf the operator refers to images pasted earlier in this conversation, call contentMediaWrite action attachChatImage without inventing URLs or MIME types. The action resolves the complete image set from the newest user message with owned attachments in the durable thread.`
+        : "";
   const pageContextPrompt = await composePageContextSection({
     pagePath,
     organizationId: membership.organizationId,

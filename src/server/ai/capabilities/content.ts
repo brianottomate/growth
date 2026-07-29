@@ -21,6 +21,7 @@ import {
   seriesTable,
 } from "@/server/db/content-schema";
 import {
+  assistantMessageTable,
   brandTable,
   channelPlatformEnum,
   contentStatusEnum,
@@ -30,6 +31,10 @@ import { publishBlogDraft as publishBlogDraftToDato } from "@/server/services/bl
 import { ContentService } from "@/server/services/content.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
+import {
+  findLatestOwnedChatImages,
+  type ChatImageReference,
+} from "@/lib/chat-attachment";
 import { getContentReadiness } from "@/lib/content-readiness";
 import { platformFormatsFor } from "@/server/content/formats";
 import { growthAction } from "./types";
@@ -333,35 +338,89 @@ export const addContentCrossPost = growthAction({
 
 export const attachChatImageToContent = growthAction({
   description:
-    "Save the operator's current pasted chat image into the active brand's durable media library and attach it to the active content pool, selected platform drafts, or every owned draft. Use only when the operator explicitly asks to use, save, or attach the pasted image.",
+    "Save one or more pasted chat images into the active brand's durable media library and attach them to the active content pool, selected platform drafts, or every owned draft. Use only when the operator explicitly asks to use, save, or attach images. Pass the complete images array for the current turn. When they refer to images from an earlier turn, omit images, imageUrl, and mimeType; the server resolves the complete image set from the newest user message with owned attachments.",
   inputSchema: z.object({
     contentPostId: z.string(),
-    imageUrl: z.string().url(),
-    mimeType: z.string().startsWith("image/"),
+    images: z
+      .array(
+        z.object({
+          imageUrl: z.string().url(),
+          mimeType: z.string().startsWith("image/"),
+          title: z.string().optional(),
+        }),
+      )
+      .min(1)
+      .max(10)
+      .optional(),
+    // Retained for one-image callers while the canonical path is `images`.
+    imageUrl: z.string().url().optional(),
+    mimeType: z.string().startsWith("image/").optional(),
     title: z.string().optional(),
     attachTo: z.enum(["pool", "all_spots", "platform_posts"]).default("pool"),
     platformPostIds: z.array(z.string()).max(12).optional(),
   }),
   execute: async (input, ctx) => {
     const content = await requireContentWorkItem(input.contentPostId, ctx);
-    const asset = await MediaService.promoteChatImage({
-      brandId: content.brandId,
-      userId: ctx.userId,
-      url: input.imageUrl,
-      mimeType: input.mimeType,
-      title: input.title ?? content.title ?? undefined,
+    let images: Array<ChatImageReference & { title?: string }> =
+      input.images?.map((image) => ({
+        url: image.imageUrl,
+        mediaType: image.mimeType,
+        title: image.title,
+      })) ??
+      (input.imageUrl && input.mimeType
+        ? [
+            {
+              url: input.imageUrl,
+              mediaType: input.mimeType,
+              title: input.title,
+            },
+          ]
+        : []);
+    if (images.length === 0 && ctx.threadId) {
+      const rows = await db.query.assistantMessageTable.findMany({
+        where: eq(assistantMessageTable.threadId, ctx.threadId),
+        columns: { message: true },
+        orderBy: [desc(assistantMessageTable.createdAt)],
+        limit: 30,
+      });
+      images = findLatestOwnedChatImages(
+        rows.map((row) => row.message).reverse(),
+        ctx.userId,
+      );
+    }
+    const seen = new Set<string>();
+    images = images.filter((image) => {
+      if (seen.has(image.url)) return false;
+      seen.add(image.url);
+      return true;
     });
-    const item = {
+    if (images.length === 0) {
+      throw new Error(
+        "No user-owned image attachments are available in this conversation.",
+      );
+    }
+    const assets = await Promise.all(
+      images.map((image) =>
+        MediaService.promoteChatImage({
+          brandId: content.brandId,
+          userId: ctx.userId,
+          url: image.url,
+          mimeType: image.mediaType,
+          title: image.title ?? input.title ?? content.title ?? undefined,
+        }),
+      ),
+    );
+    const items = assets.map((asset) => ({
       url: asset.url!,
       type: "image" as const,
       assetId: asset.id,
       thumbnail: asset.thumbnailUrl ?? asset.url ?? undefined,
       width: asset.width ?? undefined,
       height: asset.height ?? undefined,
-    };
+    }));
     await ContentService.setPoolMedia({
       contentPostId: content.id,
-      media: [...(content.media ?? []), item],
+      media: [...(content.media ?? []), ...items],
     });
 
     const owned = content.platformPosts.filter(
@@ -376,32 +435,43 @@ export const attachChatImageToContent = growthAction({
     for (const post of selected) {
       await ContentService.setSpotMedia({
         platformPostId: post.id,
-        media: [...(post.media ?? []), item],
+        media: [...(post.media ?? []), ...items],
       });
     }
-    let analysis: Awaited<ReturnType<typeof analyzeStoredMediaAsset>> | null =
-      null;
-    let analysisError: string | null = null;
-    try {
-      analysis = await analyzeStoredMediaAsset({
-        mediaId: asset.id,
-        brandName: content.brand?.name ?? "Brand",
-        steer: `Analyze this pasted asset for ${content.title ?? "the active content item"}.`,
-      });
-    } catch (error) {
-      // The durable save and attachment already succeeded. Keep that useful
-      // result even if the optional enrichment provider is temporarily down.
-      analysisError =
-        error instanceof Error ? error.message : "Analysis failed";
-    }
+    const analyses = await Promise.all(
+      assets.map(async (asset) => {
+        try {
+          return {
+            mediaAssetId: asset.id,
+            analysis: await analyzeStoredMediaAsset({
+              mediaId: asset.id,
+              brandName: content.brand?.name ?? "Brand",
+              steer: `Analyze this pasted asset for ${content.title ?? "the active content item"}.`,
+            }),
+            error: null,
+          };
+        } catch (error) {
+          // The durable save and attachment already succeeded. Keep that useful
+          // result even if optional enrichment is temporarily unavailable.
+          return {
+            mediaAssetId: asset.id,
+            analysis: null,
+            error: error instanceof Error ? error.message : "Analysis failed",
+          };
+        }
+      }),
+    );
     return {
       ok: true as const,
-      mediaAssetId: asset.id,
+      mediaAssetId: assets[0]!.id,
+      mediaAssetIds: assets.map((asset) => asset.id),
       contentPostId: content.id,
       attachedPlatformPostIds: selected.map((post) => post.id),
-      analyzed: Boolean(analysis),
-      analysis,
-      analysisError,
+      analyzed: Boolean(analyses[0]?.analysis),
+      analysis: analyses[0]?.analysis ?? null,
+      analysisError: analyses[0]?.error ?? null,
+      analyzedCount: analyses.filter((result) => result.analysis).length,
+      analyses,
       url: `/app/content/${content.id}`,
     };
   },

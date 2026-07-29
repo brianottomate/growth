@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
+  FileText,
   LayoutDashboard,
   Loader2,
   type LucideIcon,
@@ -159,6 +160,18 @@ const NEXT_STARTERS: { icon: LucideIcon; text: string }[] = [
   { icon: Paperclip, text: "Help me use something I already have" },
   { icon: LayoutDashboard, text: "Turn one channel post into a reusable idea" },
 ];
+
+const MAX_CHAT_IMAGES = 10;
+const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
+const LONG_TEXT_ATTACHMENT_THRESHOLD = 2_000;
+
+type PendingAttachment = {
+  id: string;
+  previewUrl: string;
+  hostedUrl?: string;
+  mediaType: string;
+  uploading: boolean;
+};
 
 export function OverviewChat({
   threadId,
@@ -333,77 +346,149 @@ export function OverviewChat({
   // ---- image attachment (direct browser → R2 → AI SDK file part) ----
   const trpc = useTRPC();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingAttachment, setPendingAttachment] = useState<{
-    previewUrl: string;
-    hostedUrl?: string;
-    mediaType: string;
-    uploading: boolean;
-  } | null>(null);
+  const attachmentCountRef = useRef(0);
+  const previewUrlsRef = useRef(new Set<string>());
+  const [pendingAttachments, setPendingAttachments] = useState<
+    PendingAttachment[]
+  >([]);
   const createChatUploadUrl = useMutation(
     trpc.media.createChatUploadUrl.mutationOptions(),
   );
 
-  const attachImage = useCallback(
-    async (dataUrl: string, file: File) => {
-      const mediaType = file.type || "image/png";
-      if (!mediaType.startsWith("image/")) {
-        toast.error("Couldn't attach image", {
-          description: "Only images can be attached",
-        });
+  const updatePendingAttachments = useCallback(
+    (update: (current: PendingAttachment[]) => PendingAttachment[]) => {
+      setPendingAttachments((current) => {
+        const next = update(current);
+        attachmentCountRef.current = next.length;
+        return next;
+      });
+    },
+    [],
+  );
+
+  const releasePreview = useCallback((previewUrl: string) => {
+    URL.revokeObjectURL(previewUrl);
+    previewUrlsRef.current.delete(previewUrl);
+  }, []);
+
+  useEffect(
+    () => () => {
+      for (const previewUrl of previewUrlsRef.current) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      previewUrlsRef.current.clear();
+    },
+    [],
+  );
+
+  const attachFiles = useCallback(
+    (files: File[]) => {
+      const available = MAX_CHAT_IMAGES - attachmentCountRef.current;
+      if (available <= 0) {
+        toast.info(`You can attach up to ${MAX_CHAT_IMAGES} images`);
         return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("Couldn't attach image", {
-          description: "Image is too large (max 10MB)",
-        });
-        return;
-      }
-      setPendingAttachment({ previewUrl: dataUrl, mediaType, uploading: true });
-      try {
-        const prepared = await createChatUploadUrl.mutateAsync({
-          fileName: file.name,
-          mediaType,
-          size: file.size,
-        });
-        const uploaded = await fetch(prepared.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": mediaType },
-          body: file,
-        });
-        if (!uploaded.ok) {
-          throw new Error(`R2 upload failed (${uploaded.status})`);
+
+      const valid: File[] = [];
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) {
+          toast.error(`Couldn't attach ${file.name}`, {
+            description: "Only images can be attached",
+          });
+          continue;
         }
-        setPendingAttachment((prev) =>
-          prev?.previewUrl === dataUrl
-            ? { ...prev, hostedUrl: prepared.url, uploading: false }
-            : prev,
+        if (file.size > MAX_CHAT_IMAGE_BYTES) {
+          toast.error(`Couldn't attach ${file.name}`, {
+            description: "Image is too large (max 10MB)",
+          });
+          continue;
+        }
+        if (valid.length < available) valid.push(file);
+      }
+      if (valid.length === 0) return;
+      if (valid.length < files.length) {
+        toast.info(
+          `Added ${valid.length} image${valid.length === 1 ? "" : "s"}. A message can contain up to ${MAX_CHAT_IMAGES}.`,
         );
-      } catch (error) {
-        toast.error("Couldn't attach image", {
-          description:
-            error instanceof Error ? error.message : "R2 upload failed",
-        });
-        setPendingAttachment((prev) =>
-          prev?.previewUrl === dataUrl ? null : prev,
-        );
+      }
+
+      const prepared = valid.map((file) => {
+        const previewUrl = URL.createObjectURL(file);
+        previewUrlsRef.current.add(previewUrl);
+        return {
+          id: crypto.randomUUID(),
+          previewUrl,
+          mediaType: file.type || "image/png",
+          file,
+        };
+      });
+      attachmentCountRef.current += prepared.length;
+      updatePendingAttachments((current) => [
+        ...current,
+        ...prepared.map(({ id, previewUrl, mediaType }) => ({
+          id,
+          previewUrl,
+          mediaType,
+          uploading: true,
+        })),
+      ]);
+
+      for (const attachment of prepared) {
+        void (async () => {
+          try {
+            const uploadTarget = await createChatUploadUrl.mutateAsync({
+              fileName: attachment.file.name,
+              mediaType: attachment.mediaType,
+              size: attachment.file.size,
+            });
+            const uploaded = await fetch(uploadTarget.uploadUrl, {
+              method: "PUT",
+              headers: { "Content-Type": attachment.mediaType },
+              body: attachment.file,
+            });
+            if (!uploaded.ok) {
+              throw new Error(`R2 upload failed (${uploaded.status})`);
+            }
+            updatePendingAttachments((current) =>
+              current.map((pending) =>
+                pending.id === attachment.id
+                  ? {
+                      ...pending,
+                      hostedUrl: uploadTarget.url,
+                      uploading: false,
+                    }
+                  : pending,
+              ),
+            );
+          } catch (error) {
+            toast.error(`Couldn't attach ${attachment.file.name}`, {
+              description:
+                error instanceof Error ? error.message : "R2 upload failed",
+            });
+            releasePreview(attachment.previewUrl);
+            updatePendingAttachments((current) =>
+              current.filter((pending) => pending.id !== attachment.id),
+            );
+          }
+        })();
       }
     },
-    [createChatUploadUrl],
+    [createChatUploadUrl, releasePreview, updatePendingAttachments],
   );
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const item = Array.from(e.clipboardData.items).find((it) =>
-      it.type.startsWith("image/"),
-    );
-    const file = item?.getAsFile();
-    if (!file) return;
+    const files = Array.from(e.clipboardData.items)
+      .filter((item) => item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+    if (files.length === 0) return;
     e.preventDefault();
-    readImageFile(file, (dataUrl) => void attachImage(dataUrl, file));
+    attachFiles(files);
   };
 
   const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) readImageFile(file, (dataUrl) => void attachImage(dataUrl, file));
+    const files = Array.from(e.target.files ?? []);
+    if (files.length > 0) attachFiles(files);
     e.target.value = "";
   };
 
@@ -460,44 +545,46 @@ export function OverviewChat({
     setInput("");
   };
 
-  const attachmentReady =
-    !!pendingAttachment?.hostedUrl && !pendingAttachment.uploading;
+  const readyAttachments = pendingAttachments.filter(
+    (attachment): attachment is PendingAttachment & { hostedUrl: string } =>
+      Boolean(attachment.hostedUrl) && !attachment.uploading,
+  );
+  const attachmentsUploading = pendingAttachments.some(
+    (attachment) => attachment.uploading,
+  );
   const canSend =
     !busy &&
-    !pendingAttachment?.uploading &&
-    (input.trim().length > 0 || attachmentReady);
+    !attachmentsUploading &&
+    (input.trim().length > 0 || readyAttachments.length > 0);
 
-  // The composer send — text and/or a ready image attachment (file part).
+  // The composer sends text and every ready image as one durable user turn.
   const submitComposer = () => {
     if (!canSend) return;
+    const chatAttachments = readyAttachments.map((attachment) => ({
+      url: attachment.hostedUrl,
+      mediaType: attachment.mediaType,
+    }));
     void sendMessage(
       {
         text: input.trim(),
-        ...(attachmentReady
+        ...(chatAttachments.length > 0
           ? {
-              files: [
-                {
-                  type: "file" as const,
-                  mediaType: pendingAttachment.mediaType,
-                  url: pendingAttachment.hostedUrl!,
-                },
-              ],
+              files: chatAttachments.map((attachment) => ({
+                type: "file" as const,
+                mediaType: attachment.mediaType,
+                url: attachment.url,
+              })),
             }
           : {}),
       },
-      attachmentReady
-        ? {
-            body: {
-              chatAttachment: {
-                url: pendingAttachment.hostedUrl!,
-                mediaType: pendingAttachment.mediaType,
-              },
-            },
-          }
-        : undefined,
+      chatAttachments.length > 0 ? { body: { chatAttachments } } : undefined,
     );
     setInput("");
-    setPendingAttachment(null);
+    for (const attachment of pendingAttachments) {
+      releasePreview(attachment.previewUrl);
+    }
+    attachmentCountRef.current = 0;
+    setPendingAttachments([]);
   };
 
   const submit = (e: React.FormEvent) => {
@@ -750,27 +837,47 @@ export function OverviewChat({
       >
         <form className="mt-3" onSubmit={submit}>
           <div className="border-border focus-within:border-primary/50 bg-card rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:shadow-md">
-            {pendingAttachment && (
-              <div className="relative mb-2 inline-block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pendingAttachment.previewUrl}
-                  alt="Attachment"
-                  className="h-16 w-16 rounded-md border object-cover"
-                />
-                {pendingAttachment.uploading && (
-                  <div className="bg-background/60 absolute inset-0 flex items-center justify-center rounded-md">
-                    <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+            {pendingAttachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {pendingAttachments.map((attachment, index) => (
+                  <div key={attachment.id} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={attachment.previewUrl}
+                      alt={`Attachment ${index + 1}`}
+                      className="h-16 w-16 rounded-md border object-cover"
+                    />
+                    {attachment.uploading && (
+                      <div className="bg-background/60 absolute inset-0 flex items-center justify-center rounded-md">
+                        <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        releasePreview(attachment.previewUrl);
+                        updatePendingAttachments((current) =>
+                          current.filter(
+                            (pending) => pending.id !== attachment.id,
+                          ),
+                        );
+                      }}
+                      aria-label={`Remove attachment ${index + 1}`}
+                      className="bg-background hover:bg-muted absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setPendingAttachment(null)}
-                  aria-label="Remove attachment"
-                  className="bg-background hover:bg-muted absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border shadow-sm transition-colors"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+                ))}
+              </div>
+            )}
+            {input.length >= LONG_TEXT_ATTACHMENT_THRESHOLD && (
+              <div className="text-muted-foreground mb-2 flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs">
+                <FileText className="size-4 shrink-0" />
+                <span className="font-medium">Pasted text</span>
+                <span className="ml-auto tabular-nums">
+                  {input.length.toLocaleString()} characters
+                </span>
               </div>
             )}
             <Textarea
@@ -798,6 +905,7 @@ export function OverviewChat({
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
                 onChange={onFilePicked}
               />
@@ -807,8 +915,8 @@ export function OverviewChat({
                 variant="ghost"
                 className="text-muted-foreground"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={!!pendingAttachment}
-                aria-label="Attach image"
+                disabled={pendingAttachments.length >= MAX_CHAT_IMAGES}
+                aria-label="Attach images"
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
@@ -845,16 +953,7 @@ export function OverviewChat({
   );
 }
 
-/** Read a File as a base64 data URL (for paste / file-picker attach). */
-function readImageFile(file: File, onData: (dataUrl: string) => void) {
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    if (typeof ev.target?.result === "string") onData(ev.target.result);
-  };
-  reader.readAsDataURL(file);
-}
-
-/** A user message bubble — image attachments stacked above the text. */
+/** A user message bubble with its complete image set and compact long text. */
 function UserMessage({ message }: { message: UIMessage }) {
   const images = message.parts.filter(
     (p) =>
@@ -865,21 +964,49 @@ function UserMessage({ message }: { message: UIMessage }) {
     .filter((p) => p.type === "text")
     .map((p) => (p as { text: string }).text)
     .join("");
+  const longText = text.length >= LONG_TEXT_ATTACHMENT_THRESHOLD;
   return (
     <div className="flex max-w-[85%] flex-col items-end gap-1.5">
-      {images.map((p, i) => {
-        const url = (p as { url?: string }).url;
-        return url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={`${message.id}-img-${i}`}
-            src={url}
-            alt="Attachment"
-            className="max-h-56 rounded-xl border object-cover"
-          />
-        ) : null;
-      })}
-      {text && (
+      {images.length > 0 && (
+        <div
+          className={cn(
+            "grid max-w-md gap-1.5",
+            images.length === 1 ? "grid-cols-1" : "grid-cols-2",
+          )}
+        >
+          {images.map((part, index) => {
+            const url = (part as { url?: string }).url;
+            return url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={`${message.id}-img-${index}`}
+                src={url}
+                alt={`Attachment ${index + 1}`}
+                className={cn(
+                  "w-full rounded-xl border object-cover",
+                  images.length === 1 ? "max-h-56" : "aspect-square",
+                )}
+              />
+            ) : null;
+          })}
+        </div>
+      )}
+      {text && longText && (
+        <details className="border-primary/30 bg-primary text-primary-foreground group w-full max-w-md overflow-hidden rounded-2xl rounded-br-sm border">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm">
+            <FileText className="size-4 shrink-0" />
+            <span className="font-medium">Pasted text</span>
+            <span className="ml-auto text-xs opacity-70">
+              {text.length.toLocaleString()} characters
+            </span>
+            <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90" />
+          </summary>
+          <div className="max-h-64 overflow-y-auto border-t border-white/15 px-4 py-3 text-sm break-words whitespace-pre-wrap">
+            {text}
+          </div>
+        </details>
+      )}
+      {text && !longText && (
         <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2 text-sm break-words whitespace-pre-wrap">
           {text}
         </div>
