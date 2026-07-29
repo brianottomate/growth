@@ -1,7 +1,7 @@
 # Pre-Gen Sites outreach handoff
 
 **Status:** working internal pilot, not ready for broad prospect enrollment  
-**Last verified:** July 28, 2026  
+**Last verified:** July 29, 2026  
 **Owners:** Growth Engineering + Sales
 
 ## Executive summary
@@ -49,25 +49,109 @@ bytes/row), so mirroring all ~307k contacts costs roughly **130–190 MB**. The
 whole database is 394 MB today. Storage is not a constraint; API pagination
 time and webhook volume are the real costs.
 
-### Contact updates are a snapshot, not a sync
+### Contact mirror — code shipped July 29, 2026; subscription still pending
 
-The mirrored cohort contacts were imported on July 24, 2026 and nothing updates
-them. Of 142,176 stored HubSpot webhook events, **zero** are contact events —
-every row is `object.propertyChange` / `object.creation` / `object.merge` with
-`objectTypeId` `0-2` (company), or an untyped `object.associationChange`. The
-receiver could not project a contact event anyway: every branch of `applyInline`
-in `src/app/api/webhooks/hubspot/route.ts` is gated on
-`COMPANY_OBJECT_TYPE_ID = "0-2"`.
+As diagnosed on July 28: of 142,176 stored HubSpot webhook events, **zero** were
+contact events, and the receiver could not have projected one anyway because
+every branch of `applyInline` was gated on `COMPANY_OBJECT_TYPE_ID = "0-2"`.
 
-Closing this needs both halves, and neither exists yet:
+Closing this needed two halves. **The code half is done and on `main`:**
 
-1. a contact (`0-1`) subscription on the **Operated** HubSpot app, and
-2. contact branches in the receiver plus the backlog processor.
+- `src/server/services/hubspot-contact-mirror.ts` — the single upsert shape,
+  idempotent on `(domain, email)`. HubSpot wins per field but through
+  `coalesce(excluded, existing)`, so a property HubSpot leaves blank cannot
+  erase what Instantly or Minerva discovered.
+- Receiver branches for contact creation, deletion, merge, property change, and
+  contact↔company association change.
+- `scripts/process-hubspot-webhook-backlog.ts` reconciles contacts too.
+- `scripts/backfill-hubspot-contacts.ts` walks the full universe.
+
+**The remaining half is the contact (`0-1`) subscription on the Operated app**,
+which has no API — it must be added in the HubSpot UI. Deliberately sequenced
+last so the firehose never pointed at untested handlers. **It is now blocked —
+see the next section.**
+
+### ⚠️ The receiver silently loses events (found July 29, 2026)
+
+**Do not enable the contact subscription until this is fixed.** The contact
+mirror would inherit the loss, which defeats the point of subscribing at all.
+
+Measured in the Operated app's Webhooks tab (app `1855067`, portal `22480390`)
+against `leads.hubspot_webhook_event`. Rows stored over 30 days equal HubSpot's
+delivered total **minus its error count, exactly**:
+
+| Property            | HubSpot total | Errors | total − errors | Stored |
+| ------------------- | ------------- | ------ | -------------- | ------ |
+| `domain`            | 1,991         | 713    | 1,278          | 1,278  |
+| `name`              | 2,064         | 707    | 1,357          | 1,357  |
+| `lifecyclestage`    | 2,009         | 648    | 1,361          | 1,361  |
+| `website`           | 5,879         | 718    | 5,161          | 5,161  |
+| `pms_ai_identified` | 1,290         | 233    | 1,057          | 1,057  |
+
+Errored deliveries were therefore **never stored, and no retry ever succeeded** —
+roughly 3,000 lost company updates in 30 days, still ongoing (app Overview shows
+`4XX — 254 errors, last occurred an hour ago`).
+
+Two consequences worth internalising:
+
+- **The backlog processor cannot heal this.** It reprocesses stored rows; these
+  were never stored. Store-raw-first only protects events that actually arrive,
+  so "durable" was doing less work than the design assumed.
+- **`hubspot_last_modified_at` is not trustworthy** as a freshness signal for
+  company records, because the update that would have advanced it may be one of
+  the lost ones.
+
+The error pattern points at **bulk** changes rather than overload: it clusters on
+properties that move during imports, enrichment, and workflows (the five above)
+and is near-zero on incrementally-changing high-volume ones (`hs_lead_status`
+32/13,123, `phone` 13/10,212, `email` 0/7,315). Event throttling on the app is
+10 requests.
+
+Leading hypothesis, **not yet confirmed** — the errors are 4XX, meaning the
+receiver *rejects* them. The v3 signature check enforces a five-minute timestamp
+skew, so if a bulk batch fails once and HubSpot retries outside that window,
+every retry is rejected and a transient failure becomes permanent loss.
+
+Diagnose from Vercel runtime logs for `/api/webhooks/hubspot` — note the project
+lives under team **`wanderdev`**, so the CLI needs `--scope wanderdev` (its
+default here is `boe-ventures`). Then add a reconciliation pass so loss is
+detectable rather than silent.
 
 Subscribe to a **narrow property allow-list**, not all contact properties. The
 company subscription alone produced 142k events; contacts outnumber companies
 1.4:1 and change more often, so a broad subscription is a Vercel invocation and
-storage problem, not just noise.
+storage problem, not just noise. The authoritative list is
+`CONTACT_MIRROR_PROPERTIES` in `src/server/clients/hubspot.client.ts` — keep the
+subscription and that constant in step, because a subscription wider than the
+allow-list produces events with nothing to project.
+
+#### Contacts hydrate, companies replay
+
+The two paths in the backlog processor deliberately disagree, and it matters if
+you extend either. Companies replay their stored property log; contacts re-read
+current HubSpot state. The reason is that two mirrored contact fields — `email`
+and `associatedcompanyid` — *are* the row's identity, so replaying them out of a
+log can point a contact at a company it has since left. The pre-existing
+fast-path did exactly that: it marked association events reconciled whenever the
+contact and company were both known, without checking that the contact's domain
+link agreed. It was removed. Re-reading costs one batch call per 100 contacts
+(`getContactsByIds`) and cannot go stale.
+
+`processed_at` notes stay honest: a contact only reads as hydrated if it has a
+live mirror row, so no-email and unresolved-domain contacts are classified as
+the model limitation they are rather than a claimed projection.
+
+#### Opt-out is now mirrored (and was silently dropped before)
+
+`hs_email_optout` was in the allow-list but had nowhere to land, so it was
+fetched and discarded. `leads.contact.email_opt_out` now holds it, applied via
+`scripts/apply-contact-optout-schema.ts`.
+
+HubSpot enforces suppression at send time regardless, so this is not a
+compliance fix — it is a cost fix. Without it, an opted-out contact still counts
+as enrollable, so it consumes an operator review slot and a paid site build for
+someone we may not email. The column is **nullable on purpose**: null means
+HubSpot has not told us, which must never collapse into "cleared to email".
 
 ### Cohort enrollability
 
@@ -136,15 +220,31 @@ Rank by the **gap between our generated site and their current one**, not by
 either alone: a manager with a good site and a weak generated preview should
 rank below a manager with a poor site and a strong preview.
 
-- *Their* side comes from the Growth-side site auditor.
-- *Our* side must also become a Growth-side evaluation. The monolith's eval gate
-  writes a score to `SaasWebsiteProspect.evaluation`, but that gate is
-  considered one of the weaker parts of the monolith and is a candidate for
-  removal — do not build the ranking on it as a dependency.
-
 Practical consequence: build previews for the whole ~900-company universe, score
 both sides in Growth, and rank on the delta. A hand-picked short list from
 RevOps then becomes an optional override rather than a prerequisite.
+
+**Full design in [pregen-site-evaluation.md](./pregen-site-evaluation.md)** —
+verified July 29, 2026. The headline decisions:
+
+- Score **both sides with the same existing site grader**
+  (`POST /guest-api/growth/site-grader`, unauthenticated, URL-driven, live).
+  Two different scorers would produce two scales, and subtracting across them
+  makes the gap noise. This is the "our own existing site auditor" option, and
+  it does not re-introduce the objection to the monolith's build-time
+  revision-ratchet eval gate — growth calls a service, it does not depend on
+  monolith code in the generation pipeline.
+- `summary.overall` from two runs is **not directly subtractable**: `content`
+  and `mobile` drop to `null` and get renormalized out, so two runs can be
+  computed over different denominators. Recompute over the shared category set
+  before diffing.
+- Add a **growth-owned visual score** — the grader has no design dimension at
+  all, and growth needs the screenshot anyway for the Send Review card.
+- `metrics.cwv` is always null (dead code). No Core Web Vitals claim can reach
+  copy.
+- Scores are **internal ranking only**. The sequence policy already forbids
+  telling a prospect their site underperforms; keep the score out of every
+  `growth_pregen_*` property so it cannot leak into a token.
 
 ### Cost of generating one site
 
@@ -321,10 +421,26 @@ bun --conditions=react-server scripts/apply-reviewed-hubspot-pregen-draft.ts \
 The import is idempotent and only reconciles the four explicit list IDs above.
 It does not edit the HubSpot list definitions or enroll contacts.
 
+```bash
+# Apply the mirrored opt-out column (idempotent, additive)
+bun --conditions=react-server scripts/apply-contact-optout-schema.ts
+
+# Walk the full HubSpot contact universe into leads.contact
+bun --conditions=react-server scripts/backfill-hubspot-contacts.ts --dry
+bun --conditions=react-server scripts/backfill-hubspot-contacts.ts
+bun --conditions=react-server scripts/backfill-hubspot-contacts.ts --after=<cursor>
+```
+
+The backfill prints its cursor every 25 pages and `--after` resumes from one;
+that is safe because the upsert is idempotent on `(domain, email)`. A full run is
+roughly **45 minutes at ~115 contacts/sec**. Contacts whose company resolves to
+no `leads.domain` row are counted and skipped, never invented.
+
 Supporting documentation:
 
 - [Target cohort and webhook operations](./pregen-hubspot-target-cohorts.md)
 - [Sequence copy and token blueprint](./pregen-hubspot-sequence-blueprint.md)
+- [Two-sided site evaluation design](./pregen-site-evaluation.md)
 
 ## Operator runbook
 
@@ -362,13 +478,19 @@ Resolve these before sending to real prospects:
    action.
 6. **Rep rollout.** Start with a small reviewed subset. Recycled leads are
    rep-owned and should not be bulk-enrolled without owner approval.
-7. **Contact freshness.** Mirrored contacts are a July 24 snapshot with no
-   update path, so an email corrected or a contact merged in HubSpot will not
-   reach Growth. A pilot can tolerate this by re-running
-   `import-hubspot-pregen-lists.ts` as a pre-flight step; a full send cannot.
-   Fixing it properly means the `0-1` subscription and receiver branches above.
-8. **Contact coverage.** 132 untouched-cohort companies have no addressable
-   contact. Either accept the reduced universe or source contacts for them.
+7. **Contact freshness.** *Partly resolved July 29.* The mirror code and a full
+   backfill exist, so contacts are no longer a July 24 snapshot. But the `0-1`
+   subscription is not enabled yet, so there is still **no live update path** —
+   re-run `backfill-hubspot-contacts.ts` as a pre-flight step before any send
+   batch until blocker 9 is cleared.
+8. **Contact coverage.** *Largely resolved July 29* by the full backfill —
+   untouched-cohort enrollability went from 367 to ~377 of 499 and recycled to
+   ~394 of 404. The residual gap is companies with genuinely no addressable
+   contact in HubSpot; either accept the reduced universe or source contacts.
+9. **⚠️ Silent webhook event loss.** ~3,000 company updates lost in 30 days, still
+   ongoing, and it cannot be healed after the fact. This **blocks enabling the
+   contact subscription** — see the dedicated section above. Highest-priority
+   item in this document.
 
 ## Recommended next milestone
 
