@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
@@ -75,6 +76,10 @@ export function LeadsClient() {
   const trpc = useTRPC();
 
   const [q, setQ] = useState("");
+  // Default to the pregen target list. The 217.8K universe is the exception you
+  // opt into, not the thing you land on: the ~900 cohort companies are the
+  // active motion, and everything else buries them.
+  const [cohortOnly, setCohortOnly] = useState(true);
   const [source, setSource] = useState<SourceKey | undefined>(undefined);
   const [pms, setPms] = useState<string | undefined>(undefined);
   const [integratedOnly, setIntegratedOnly] = useState(false);
@@ -113,6 +118,7 @@ export function LeadsClient() {
         integratedPmsOnly: integratedOnly || undefined,
         hasPregenSite: hasPregen || undefined,
         pregenCohort,
+        inAnyCohort: cohortOnly || undefined,
         netNew: netNew || undefined,
         sendBatch: sendBatch || undefined,
         enrollableOnly: enrollableOnly || undefined,
@@ -261,6 +267,15 @@ export function LeadsClient() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+          <Pill
+            active={cohortOnly}
+            onClick={() => {
+              setCohortOnly(!cohortOnly);
+              resetPage();
+            }}
+          >
+            {cohortOnly ? "Target list only" : "Whole universe"}
+          </Pill>
           <Pill
             active={enrollableOnly}
             onClick={() => {
@@ -472,16 +487,32 @@ export function LeadsClient() {
                 className="hover:bg-accent/30 cursor-pointer"
               >
                 <td className="border-b py-2 pr-3 font-medium">
-                  <a
-                    href={`https://${d.domain}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 hover:underline"
-                  >
-                    {d.domain}
-                    <ExternalLink className="size-3 opacity-40" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    {/* The prospect's current site, captured by the ranker.
+                        Only ranked domains have one. */}
+                    {d.siteScreenshotUrl && (
+                      <div className="border-border bg-muted relative h-8 w-12 shrink-0 overflow-hidden rounded border">
+                        <Image
+                          src={d.siteScreenshotUrl}
+                          alt=""
+                          fill
+                          sizes="48px"
+                          className="object-cover object-top"
+                          unoptimized
+                        />
+                      </div>
+                    )}
+                    <a
+                      href={`https://${d.domain}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      {d.domain}
+                      <ExternalLink className="size-3 opacity-40" />
+                    </a>
+                  </div>
                 </td>
                 <td className="text-muted-foreground border-b px-3 py-2">
                   <span className="line-clamp-1 max-w-[16rem]">

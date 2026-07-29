@@ -218,6 +218,9 @@ export const leadsRouter = createTRPCRouter({
         hasPregenSite: z.boolean().optional(),
         integratedPmsOnly: z.boolean().optional(),
         pregenCohort: z.enum(["recycled", "untouched"]).optional(),
+        // Members of EITHER pregen cohort — the active target list. Distinct
+        // from pregenCohort, which narrows to one of them.
+        inAnyCohort: z.boolean().optional(),
         // Net-new sendable target: not in CRM, ranked, credible contact.
         netNew: z.boolean().optional(),
         // the first cold-outbound test cohort (SEND_BATCH_1).
@@ -251,6 +254,21 @@ export const leadsRouter = createTRPCRouter({
         conds.push(sql`${leadDomainTable.pregenSiteUrl} is not null`);
       if (input.integratedPmsOnly)
         conds.push(eq(leadDomainTable.isIntegratedPms, true));
+      if (input.inAnyCohort) {
+        conds.push(
+          exists(
+            ctx.db
+              .select({ one: sql`1` })
+              .from(hubspotListMembershipTable)
+              .where(
+                and(
+                  eq(hubspotListMembershipTable.domainId, leadDomainTable.id),
+                  eq(hubspotListMembershipTable.objectType, "company"),
+                ),
+              ),
+          ),
+        );
+      }
       if (input.pregenCohort) {
         conds.push(
           exists(
@@ -334,6 +352,11 @@ export const leadsRouter = createTRPCRouter({
           computedTier: leadDomainTable.computedTier,
           scoreComposite: leadDomainTable.scoreComposite,
           pregenSiteUrl: leadDomainTable.pregenSiteUrl,
+          scorePregenPotential: leadDomainTable.scorePregenPotential,
+          // Only the screenshot, not the whole enrichment blob — the row needs
+          // one URL and enrichment carries every provider payload we hold.
+          siteScreenshotUrl:
+            sql<string | null>`${leadDomainTable.enrichment} -> 'leadRank' ->> 'screenshotUrl'`,
           pregenStatus: leadDomainTable.pregenStatus,
           hubspotLeadStatus: leadDomainTable.hubspotLeadStatus,
           inBuiltwith: leadDomainTable.inBuiltwith,

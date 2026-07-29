@@ -247,10 +247,12 @@ function SequencePreview({ row }: { row: ReviewRow }) {
           </a>
         )}
       </div>
-      {/* Full bodies, unclamped: the point of this surface is approving copy
-          that is about to go out as a person, so a truncated body is not a
+      {/* A vertical stack, not a grid: touches are read in order, and a 2-up
+          grid left every card as tall as its neighbour with dead space beside
+          the short ones. Full bodies stay unclamped — approving copy that goes
+          out as a named person is the whole job, so a truncated body is not a
           review. */}
-      <div className="grid gap-2 lg:grid-cols-2">
+      <div className="space-y-2">
         {outreach.steps.slice(0, 4).map((step, index) => (
           <div key={index} className="rounded-md border p-2">
             <div className="text-muted-foreground flex items-center justify-between gap-2 text-[10px] font-medium">
@@ -262,7 +264,10 @@ function SequencePreview({ row }: { row: ReviewRow }) {
                 {step.delayDays === 0 ? "day 0" : `day ${step.delayDays}`}
               </span>
             </div>
-            <pre className="mt-1 font-sans text-xs leading-relaxed whitespace-pre-wrap">
+            {/* A signed preview URL is one long unbroken token, which
+                whitespace-pre-wrap alone will happily run past the container —
+                anywhere lets it break mid-token. */}
+            <pre className="mt-1 font-sans text-xs leading-relaxed break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
               {step.body}
             </pre>
           </div>
