@@ -1015,6 +1015,43 @@ export async function getContactById(
 }
 
 /**
+ * Hydrate up to 100 contacts in one call. Used by the webhook backlog rail,
+ * where a burst of stored events resolves to a set of contact ids and hydrating
+ * them one at a time would mean thousands of sequential round-trips.
+ *
+ * Ids HubSpot cannot return — deleted, merged away, or never visible to this
+ * app — are simply absent from the result. Callers must treat "asked for, not
+ * returned" as gone rather than assuming index alignment.
+ */
+export async function getContactsByIds(
+  contactIds: string[],
+): Promise<HubspotContact[]> {
+  if (contactIds.length === 0) return [];
+  const found: HubspotContact[] = [];
+  for (let index = 0; index < contactIds.length; index += 100) {
+    const chunk = contactIds.slice(index, index + 100);
+    try {
+      // A partial batch comes back as 207 with an `errors` array alongside the
+      // results, which the SDK resolves rather than throws — so a single
+      // missing id does not cost us the whole chunk.
+      const response = await client().crm.contacts.batchApi.read({
+        properties: [...CONTACT_MIRROR_PROPERTIES],
+        propertiesWithHistory: [],
+        inputs: chunk.map((id) => ({ id })),
+      });
+      found.push(...(response.results ?? []).map(contactFrom));
+    } catch (error) {
+      console.error(
+        `❌ [HUBSPOT] getContactsByIds chunk ${index / 100} (${chunk.length} ids)`,
+        error,
+      );
+      throw error;
+    }
+  }
+  return found;
+}
+
+/**
  * One page of the full contact universe, for the mirror backfill. Cursor-paged
  * rather than search-paged: CRM search caps out at 10k results per query, which
  * cannot walk 300k+ contacts.

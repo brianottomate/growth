@@ -279,6 +279,13 @@ export const leadContactTable = leadsSchema.table(
     // Deliverability (Instantly / Minerva verification).
     verificationStatus: t.text(),
 
+    // HubSpot's own email opt-out flag, mirrored so Growth can suppress before
+    // spending on a contact rather than after. HubSpot enforces suppression at
+    // send time regardless; the point of holding it here is that enrollability
+    // counts and Send Review must not offer up a contact we may not email, and
+    // a pregen site build is not free. Null means HubSpot has not told us yet.
+    emailOptOut: t.boolean(),
+
     // Person-verification evidence (Minerva geo + Bright Data LinkedIn).
     // Re-runnable trust layer — see lead-verify.service.ts.
     verification: t.jsonb().$type<LeadContactVerification>(),

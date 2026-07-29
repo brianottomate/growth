@@ -4,6 +4,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 
 import {
   getContactById,
+  getContactsByIds,
   type HubspotContact,
 } from "@/server/clients/hubspot.client";
 import { db } from "@/server/db";
@@ -51,6 +52,19 @@ export function normalizeDomain(
 function clean(value: string | null | undefined): string | null {
   const normalized = value?.trim();
   return normalized ? normalized : null;
+}
+
+/**
+ * HubSpot sends booleans as strings. Anything it does not actually assert stays
+ * null rather than defaulting to false — for a suppression flag, "we have not
+ * been told" and "cleared to email" must not collapse into the same value.
+ */
+function toBoolean(value: string | null | undefined): boolean | null {
+  const raw = clean(value)?.toLowerCase();
+  if (!raw) return null;
+  if (raw === "true" || raw === "yes" || raw === "1") return true;
+  if (raw === "false" || raw === "no" || raw === "0") return false;
+  return null;
 }
 
 export type MirrorStats = {
@@ -140,6 +154,7 @@ function toInsert(
     jobTitle: clean(contact.values.jobtitle),
     phone: clean(contact.values.phone),
     state: clean(contact.values.state),
+    emailOptOut: toBoolean(contact.values.hs_email_optout),
     hubspotContactId: contact.id,
     source: "hubspot",
   };
@@ -194,6 +209,7 @@ export async function mirrorContacts(
         jobTitle: sql`coalesce(excluded.job_title, ${leadContactTable.jobTitle})`,
         phone: sql`coalesce(excluded.phone, ${leadContactTable.phone})`,
         state: sql`coalesce(excluded.state, ${leadContactTable.state})`,
+        emailOptOut: sql`coalesce(excluded.email_opt_out, ${leadContactTable.emailOptOut})`,
         // The linkage itself is never optional — without it we cannot enroll.
         hubspotContactId: sql`excluded.hubspot_contact_id`,
         domainId: sql`excluded.domain_id`,
@@ -214,13 +230,50 @@ export async function mirrorContactById(
   return { stats: await mirrorContacts([contact]), found: true };
 }
 
-/** Column a subscribed HubSpot contact property projects onto, if any. */
+/**
+ * Hydrate and mirror many contacts by id, for the webhook backlog rail.
+ *
+ * Chunked at 100 so both the HubSpot read and the resulting upsert statement
+ * stay bounded no matter how large the pending set is. `missingIds` are the ids
+ * HubSpot did not return — gone from the CRM, so the caller should soft-delete
+ * rather than retry them forever.
+ */
+export async function mirrorContactsByIds(contactIds: string[]): Promise<{
+  stats: MirrorStats;
+  missingIds: string[];
+}> {
+  const unique = [...new Set(contactIds)];
+  const stats = emptyMirrorStats();
+  const missingIds: string[] = [];
+
+  for (let index = 0; index < unique.length; index += 100) {
+    const chunk = unique.slice(index, index + 100);
+    const contacts = await getContactsByIds(chunk);
+    const returned = new Set(contacts.map((contact) => contact.id));
+    for (const id of chunk) {
+      if (!returned.has(id)) missingIds.push(id);
+    }
+    const chunkStats = await mirrorContacts(contacts);
+    stats.mirrored += chunkStats.mirrored;
+    stats.noEmail += chunkStats.noEmail;
+    stats.unresolvedDomain += chunkStats.unresolvedDomain;
+  }
+
+  return { stats, missingIds };
+}
+
+/**
+ * Column a subscribed HubSpot contact property projects onto, with the coercion
+ * that column needs. Keep in step with CONTACT_MIRROR_PROPERTIES minus the two
+ * identity fields, which re-hydrate instead of patching.
+ */
 const CONTACT_PROPERTY_COLUMNS = {
-  firstname: "firstName",
-  lastname: "lastName",
-  jobtitle: "jobTitle",
-  phone: "phone",
-  state: "state",
+  firstname: { column: "firstName", parse: clean },
+  lastname: { column: "lastName", parse: clean },
+  jobtitle: { column: "jobTitle", parse: clean },
+  phone: { column: "phone", parse: clean },
+  state: { column: "state", parse: clean },
+  hs_email_optout: { column: "emailOptOut", parse: toBoolean },
 } as const;
 
 export type MirroredContactProperty = keyof typeof CONTACT_PROPERTY_COLUMNS;
@@ -246,10 +299,10 @@ export async function applyContactPropertyChange(params: {
   propertyName: MirroredContactProperty;
   value: string | null;
 }): Promise<number> {
-  const column = CONTACT_PROPERTY_COLUMNS[params.propertyName];
+  const { column, parse } = CONTACT_PROPERTY_COLUMNS[params.propertyName];
   const updated = await db
     .update(leadContactTable)
-    .set({ [column]: clean(params.value), updatedAt: new Date() })
+    .set({ [column]: parse(params.value), updatedAt: new Date() })
     .where(eq(leadContactTable.hubspotContactId, params.contactId))
     .returning({ id: leadContactTable.id });
   return updated.length;
@@ -263,10 +316,23 @@ export async function applyContactPropertyChange(params: {
 export async function softDeleteMirroredContact(
   contactId: string,
 ): Promise<number> {
-  const updated = await db
-    .update(leadContactTable)
-    .set({ deletedAt: new Date(), updatedAt: new Date() })
-    .where(eq(leadContactTable.hubspotContactId, contactId))
-    .returning({ id: leadContactTable.id });
-  return updated.length;
+  return softDeleteMirroredContacts([contactId]);
+}
+
+/** Batch form of {@link softDeleteMirroredContact}, for the backlog rail. */
+export async function softDeleteMirroredContacts(
+  contactIds: string[],
+): Promise<number> {
+  const unique = [...new Set(contactIds)];
+  if (unique.length === 0) return 0;
+  let removed = 0;
+  for (let index = 0; index < unique.length; index += 500) {
+    const updated = await db
+      .update(leadContactTable)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(inArray(leadContactTable.hubspotContactId, unique.slice(index, index + 500)))
+      .returning({ id: leadContactTable.id });
+    removed += updated.length;
+  }
+  return removed;
 }

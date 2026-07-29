@@ -3,10 +3,12 @@
  * backlog. Raw events are retained; "processed" means projected or explicitly
  * classified, never deleted.
  *
- * This intentionally leaves three categories pending:
+ * This intentionally leaves two categories pending:
  * - companies not yet linked to a Growth domain
- * - contact/company associations outside the imported target cohorts
  * - merges and association removals that require a current-state hydration
+ *
+ * Contacts (0-1) are reconciled by hydrating current HubSpot state rather than
+ * replaying their property log — see the contact section below for why.
  *
  *   bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts
  *   bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts --apply
@@ -19,6 +21,10 @@ import {
 } from "@/server/clients/hubspot.client";
 import { db } from "@/server/db";
 import { leadDomainTable } from "@/server/db/leads-schema";
+import {
+  mirrorContactsByIds,
+  softDeleteMirroredContacts,
+} from "@/server/services/hubspot-contact-mirror";
 
 const apply = process.argv.includes("--apply");
 const ownerNamesJson = JSON.stringify(HS_OWNER_NAMES);
@@ -249,32 +255,6 @@ await db.execute(sql`
     and domain.hubspot_record_id = event.object_id
 `);
 
-// The target-list import hydrated these exact contacts and their company links.
-// Mark both directions of those association events as reconciled.
-await db.execute(sql`
-  update leads.hubspot_webhook_event as event
-  set
-    processed_at = now(),
-    process_note = 'reconciled: target contact/company association'
-  from leads.contact as contact, leads.domain as domain
-  where event.processed_at is null
-    and event.subscription_type = 'object.associationChange'
-    and event.payload ->> 'associationType' in (
-      'CONTACT_TO_COMPANY',
-      'COMPANY_TO_CONTACT'
-    )
-    and contact.hubspot_contact_id = case
-      when event.payload ->> 'fromObjectTypeId' = '0-1'
-        then event.payload ->> 'fromObjectId'
-      else event.payload ->> 'toObjectId'
-    end
-    and domain.hubspot_record_id = case
-      when event.payload ->> 'fromObjectTypeId' = '0-2'
-        then event.payload ->> 'fromObjectId'
-      else event.payload ->> 'toObjectId'
-    end
-`);
-
 // A current or historical deal is a positive guard signal. Additions can safely
 // set the flag true; removals need current-state hydration before clearing it.
 await db.execute(sql`
@@ -366,10 +346,200 @@ for (const row of dealRemovalCompanies.rows) {
   `);
 }
 
-// Contact and parent/child company associations do not have a first-class
-// projection until the full contact mirror lands. They are still retained
-// losslessly in the raw event log; classify them instead of presenting them as
-// a failed company-sync backlog.
+// ---- CONTACTS (0-1) ------------------------------------------------
+//
+// Companies above replay their property log, because company property events
+// arrive complete and a company's identity never moves. Contacts take the
+// opposite approach: hydrate current HubSpot state and let the mirror upsert
+// decide.
+//
+// The reason is that two of the mirrored contact fields — email and
+// associatedcompanyid — *are* the row's identity. Replaying them out of a log
+// can point a contact at a company it has since left, and the old fast-path
+// here did exactly that: it marked association events reconciled whenever the
+// contact and company were both known, without checking that the contact's
+// domain link actually agreed. Re-reading is one batch call per 100 contacts
+// and cannot go stale.
+//
+// Deletions are the exception: there is nothing left to read.
+
+const contactSurvivors = new Set<string>();
+const contactMergeLosers = new Set<string>();
+
+const contactMerges = await db.execute<{
+  object_id: string;
+  merged_ids: string[] | null;
+}>(sql`
+  select
+    object_id,
+    case
+      when jsonb_typeof(payload -> 'mergedObjectIds') = 'array'
+        then array(
+          select jsonb_array_elements_text(payload -> 'mergedObjectIds')
+        )
+    end as merged_ids
+  from leads.hubspot_webhook_event
+  where processed_at is null
+    and subscription_type = 'object.merge'
+    and object_type_id = '0-1'
+`);
+
+for (const row of contactMerges.rows) {
+  contactSurvivors.add(row.object_id);
+  for (const loserId of row.merged_ids ?? []) {
+    contactMergeLosers.add(loserId);
+  }
+}
+// HubSpot lists the survivor among mergedObjectIds; never soft-delete the row
+// that survived the merge.
+for (const survivor of contactSurvivors) contactMergeLosers.delete(survivor);
+
+const contactDeletions = await db.execute<{ object_id: string }>(sql`
+  select distinct object_id
+  from leads.hubspot_webhook_event
+  where processed_at is null
+    and subscription_type = 'object.deletion'
+    and object_type_id = '0-1'
+`);
+
+// Every pending event that names a contact, whether it named it directly or as
+// one side of a company association.
+const contactsToHydrate = await db.execute<{ contact_id: string | null }>(sql`
+  select distinct contact_id from (
+    select object_id as contact_id
+    from leads.hubspot_webhook_event
+    where processed_at is null
+      and object_type_id = '0-1'
+      and subscription_type in (
+        'object.creation',
+        'object.propertyChange',
+        'object.merge'
+      )
+    union
+    select case
+      when payload ->> 'fromObjectTypeId' = '0-1'
+        then payload ->> 'fromObjectId'
+      else payload ->> 'toObjectId'
+    end as contact_id
+    from leads.hubspot_webhook_event
+    where processed_at is null
+      and subscription_type = 'object.associationChange'
+      and payload ->> 'associationType' in (
+        'CONTACT_TO_COMPANY',
+        'COMPANY_TO_CONTACT'
+      )
+  ) as ids
+  where contact_id is not null
+`);
+
+const hydrateIds = contactsToHydrate.rows
+  .map((row) => row.contact_id)
+  .filter((id): id is string => Boolean(id))
+  .filter((id) => !contactMergeLosers.has(id));
+
+const contactMirror = await mirrorContactsByIds(hydrateIds);
+
+// Anything HubSpot would not return is gone, whichever way we learned it.
+const goneContactIds = [
+  ...contactDeletions.rows.map((row) => row.object_id),
+  ...contactMergeLosers,
+  ...contactMirror.missingIds,
+];
+const softDeletedContacts = await softDeleteMirroredContacts(goneContactIds);
+
+console.log(
+  JSON.stringify({
+    contactsHydrated: contactMirror.stats.mirrored,
+    contactsSkippedNoEmail: contactMirror.stats.noEmail,
+    contactsSkippedUnresolvedDomain: contactMirror.stats.unresolvedDomain,
+    contactsGoneFromHubspot: contactMirror.missingIds.length,
+    contactRowsSoftDeleted: softDeletedContacts,
+  }),
+);
+
+// Deletions and merges are unambiguous, so they are noted first and exactly.
+await db.execute(sql`
+  update leads.hubspot_webhook_event
+  set
+    processed_at = now(),
+    process_note = 'reconciled: contact deleted; mirror row soft-deleted'
+  where processed_at is null
+    and object_type_id = '0-1'
+    and subscription_type = 'object.deletion'
+`);
+
+await db.execute(sql`
+  update leads.hubspot_webhook_event
+  set
+    processed_at = now(),
+    process_note =
+      'reconciled: contact merge; survivor re-hydrated, losers soft-deleted'
+  where processed_at is null
+    and object_type_id = '0-1'
+    and subscription_type = 'object.merge'
+`);
+
+// For the rest, "processed" must not overstate what happened. A contact only
+// counts as hydrated if it actually has a live mirror row; a contact HubSpot
+// has no email for, or whose company resolves to no Growth domain, is a known
+// model limitation rather than a projection we can claim.
+await db.execute(sql`
+  update leads.hubspot_webhook_event as event
+  set
+    processed_at = now(),
+    process_note = 'reconciled: contact hydrated from current HubSpot state'
+  from leads.contact as contact
+  where event.processed_at is null
+    and contact.deleted_at is null
+    and contact.hubspot_contact_id = case
+      when event.object_type_id = '0-1' then event.object_id
+      when event.payload ->> 'fromObjectTypeId' = '0-1'
+        then event.payload ->> 'fromObjectId'
+      else event.payload ->> 'toObjectId'
+    end
+    and (
+      (
+        event.object_type_id = '0-1'
+        and event.subscription_type in (
+          'object.creation',
+          'object.propertyChange'
+        )
+      )
+      or (
+        event.subscription_type = 'object.associationChange'
+        and event.payload ->> 'associationType' in (
+          'CONTACT_TO_COMPANY',
+          'COMPANY_TO_CONTACT'
+        )
+      )
+    )
+`);
+
+await db.execute(sql`
+  update leads.hubspot_webhook_event
+  set
+    processed_at = now(),
+    process_note =
+      'classified: contact not mirrored (no email, no resolvable Growth domain, or gone from HubSpot)'
+  where processed_at is null
+    and (
+      (
+        object_type_id = '0-1'
+        and subscription_type in ('object.creation', 'object.propertyChange')
+      )
+      or (
+        subscription_type = 'object.associationChange'
+        and payload ->> 'associationType' in (
+          'CONTACT_TO_COMPANY',
+          'COMPANY_TO_CONTACT'
+        )
+      )
+    )
+`);
+
+// Parent/child company associations still have no first-class projection. They
+// are retained losslessly in the raw event log; classify them instead of
+// presenting them as a failed company-sync backlog.
 await db.execute(sql`
   update leads.hubspot_webhook_event
   set
@@ -377,11 +547,7 @@ await db.execute(sql`
     process_note = 'classified: association retained raw; no first-class projection'
   where processed_at is null
     and subscription_type = 'object.associationChange'
-    and payload ->> 'associationType' in (
-      'CONTACT_TO_COMPANY',
-      'COMPANY_TO_CONTACT',
-      'COMPANY_TO_COMPANY'
-    )
+    and payload ->> 'associationType' = 'COMPANY_TO_COMPANY'
 `);
 
 // Engagement association events have no row-level projection in Growth today.
