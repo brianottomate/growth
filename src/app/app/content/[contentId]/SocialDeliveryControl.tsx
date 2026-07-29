@@ -1,15 +1,29 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { Clock3, Loader2, RefreshCw, Send } from "lucide-react";
+import { Clock3, Loader2, RefreshCw, RotateCcw, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { cn } from "@/components/ui/lib/utils";
 import { useTRPC } from "@/trpc/react";
 
-export function LinkedInDeliveryControl({
+const LABELS: Record<string, string> = {
+  instagram: "Instagram",
+  linkedin: "LinkedIn",
+  x: "X",
+};
+
+function operationalState(status: string | null) {
+  if (status === "published") return "Done";
+  if (status === "failed" || status === "partial") return "Failed";
+  if (status === "publishing") return "Publishing";
+  return "Queued";
+}
+
+export function SocialDeliveryControl({
   spotId,
+  platform,
   status,
   scheduledAt,
   connected,
@@ -18,6 +32,7 @@ export function LinkedInDeliveryControl({
   deliveryError,
 }: {
   spotId: string;
+  platform: "instagram" | "linkedin" | "x";
   status: string;
   scheduledAt: string | null;
   connected: boolean;
@@ -27,6 +42,7 @@ export function LinkedInDeliveryControl({
 }) {
   const trpc = useTRPC();
   const router = useRouter();
+  const platformLabel = LABELS[platform] ?? platform;
   const settle = {
     onSuccess: () => router.refresh(),
     onError: (error: { message: string }) => {
@@ -34,12 +50,12 @@ export function LinkedInDeliveryControl({
     },
   };
   const deliver = useMutation(
-    trpc.content.deliverLinkedIn.mutationOptions({
+    trpc.content.deliverSocial.mutationOptions({
       ...settle,
       onSuccess: (result) => {
         toast.success(
           result.deliveryStatus === "published"
-            ? "Published to LinkedIn"
+            ? `Published to ${platformLabel}`
             : "Queued in Zernio",
         );
         router.refresh();
@@ -47,14 +63,28 @@ export function LinkedInDeliveryControl({
     }),
   );
   const refresh = useMutation(
-    trpc.content.refreshLinkedInDelivery.mutationOptions(settle),
+    trpc.content.refreshSocialDelivery.mutationOptions(settle),
   );
-  const busy = deliver.isPending || refresh.isPending;
+  const retry = useMutation(
+    trpc.content.retrySocialDelivery.mutationOptions({
+      ...settle,
+      onSuccess: () => {
+        toast.success("Retry sent to Zernio");
+        router.refresh();
+      },
+    }),
+  );
+  const busy = deliver.isPending || refresh.isPending || retry.isPending;
 
   if (!connected) {
     return (
-      <span className="text-muted-foreground text-[11px]">
-        Connect LinkedIn in Channels to publish
+      <span className="flex items-center gap-1.5 text-[11px]">
+        <span className="rounded-full border border-amber-500/40 px-2 py-0.5 font-medium text-amber-400">
+          Todo
+        </span>
+        <span className="text-muted-foreground">
+          Connect {platformLabel} in Channels
+        </span>
       </span>
     );
   }
@@ -66,18 +96,14 @@ export function LinkedInDeliveryControl({
           title={deliveryError ?? undefined}
           className={cn(
             "rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize",
-            deliveryStatus === "failed"
+            deliveryStatus === "failed" || deliveryStatus === "partial"
               ? "border-red-500/40 text-red-400"
               : deliveryStatus === "published"
                 ? "border-emerald-500/40 text-emerald-400"
                 : "border-sky-500/40 text-sky-400",
           )}
         >
-          {deliveryStatus === "published"
-            ? "Published via Zernio"
-            : deliveryStatus === "failed"
-              ? "Zernio failed"
-              : "Queued in Zernio"}
+          {operationalState(deliveryStatus)}
         </span>
         <button
           type="button"
@@ -93,14 +119,29 @@ export function LinkedInDeliveryControl({
             <RefreshCw className="size-3" />
           )}
         </button>
+        {(deliveryStatus === "failed" || deliveryStatus === "partial") && (
+          <button
+            type="button"
+            onClick={() => retry.mutate({ platformPostId: spotId })}
+            disabled={busy}
+            title="Retry failed Zernio delivery"
+            aria-label="Retry failed Zernio delivery"
+            className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-50"
+          >
+            <RotateCcw className="size-3" />
+          </button>
+        )}
       </span>
     );
   }
 
   if (status !== "approved") {
     return (
-      <span className="text-muted-foreground text-[11px]">
-        Approve to publish with Zernio
+      <span className="flex items-center gap-1.5 text-[11px]">
+        <span className="rounded-full border border-amber-500/40 px-2 py-0.5 font-medium text-amber-400">
+          Todo
+        </span>
+        <span className="text-muted-foreground">Approve for Zernio</span>
       </span>
     );
   }
@@ -108,6 +149,9 @@ export function LinkedInDeliveryControl({
   const future = scheduledAt && new Date(scheduledAt).getTime() > Date.now();
   return (
     <span className="flex items-center gap-1.5">
+      <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-[11px] font-medium text-amber-400">
+        Todo
+      </span>
       <button
         type="button"
         onClick={() =>
@@ -131,7 +175,7 @@ export function LinkedInDeliveryControl({
         onClick={() => {
           if (
             window.confirm(
-              "Publish this approved post to LinkedIn now? This is a live external action.",
+              `Publish this approved post to ${platformLabel} now? This is a live external action.`,
             )
           ) {
             deliver.mutate({ platformPostId: spotId, mode: "publish_now" });

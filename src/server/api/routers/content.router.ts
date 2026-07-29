@@ -26,8 +26,9 @@ import { SPOT_PILL_IDS } from "@/lib/spot-pills";
 import { displayPoster } from "@/lib/utils/media";
 import { groupPlatformThreads } from "@/lib/platform-thread";
 import {
-  deliverLinkedInPost,
-  refreshLinkedInDelivery,
+  deliverSocialPost,
+  refreshSocialDelivery,
+  retrySocialDelivery,
 } from "@/server/services/content-publishing.service";
 import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 
@@ -677,10 +678,9 @@ export const contentRouter = createTRPCRouter({
       return { id: input.platformPostId };
     }),
 
-  /** Approval-gated LinkedIn-first publishing spike. The same Zernio endpoint
-   * handles future scheduling and publish-now; delivery state is persisted on
-   * the platform post so a later refresh/webhook can close the loop. */
-  deliverLinkedIn: protectedProcedure
+  /** Approval-gated social publishing. Zernio owns the provider queue while
+   * the platform post mirrors its operational state for review and recovery. */
+  deliverSocial: protectedProcedure
     .input(
       z.object({
         platformPostId: z.string(),
@@ -695,7 +695,7 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       try {
-        return await deliverLinkedInPost(input);
+        return await deliverSocialPost(input);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -704,7 +704,7 @@ export const contentRouter = createTRPCRouter({
       }
     }),
 
-  refreshLinkedInDelivery: protectedProcedure
+  refreshSocialDelivery: protectedProcedure
     .input(z.object({ platformPostId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const spot = await ctx.db.query.platformPostTable.findFirst({
@@ -714,7 +714,7 @@ export const contentRouter = createTRPCRouter({
       if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
       await assertOrgMember(ctx, spot.brand?.organizationId);
       try {
-        return await refreshLinkedInDelivery(input.platformPostId);
+        return await refreshSocialDelivery(input.platformPostId);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -722,6 +722,25 @@ export const contentRouter = createTRPCRouter({
             error instanceof Error
               ? error.message
               : "Could not refresh delivery",
+        });
+      }
+    }),
+
+  retrySocialDelivery: protectedProcedure
+    .input(z.object({ platformPostId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      try {
+        return await retrySocialDelivery(input.platformPostId);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Could not retry",
         });
       }
     }),

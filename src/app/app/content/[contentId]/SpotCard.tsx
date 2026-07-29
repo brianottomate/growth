@@ -17,7 +17,7 @@ import { SpotOwnerControl } from "./OwnerControls";
 import { STATUS_OPTIONS } from "./IdeaControls";
 import { MarkScheduledButton } from "../MarkScheduledButton";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { LinkedInDeliveryControl } from "./LinkedInDeliveryControl";
+import { SocialDeliveryControl } from "./SocialDeliveryControl";
 import { getPlatformFormat } from "@/server/content/formats";
 import {
   CompactPlatformPreview,
@@ -74,6 +74,13 @@ const formatWhen = (iso: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+const toLocalDateTimeInput = (iso: string | null) => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 
 export type SpotCardData = {
   id: string;
@@ -135,6 +142,12 @@ export function SpotCard({
   const trpc = useTRPC();
   const router = useRouter();
   const owned = spot.source === "owned";
+  const providerPublishingPlatform =
+    spot.platform === "instagram" ||
+    spot.platform === "linkedin" ||
+    spot.platform === "x"
+      ? spot.platform
+      : null;
   const isEmail =
     spot.platform === "newsletter" &&
     (spot.format === "newsletter.broadcast" ||
@@ -259,34 +272,53 @@ export function SpotCard({
           <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
             {owned ? (
               <>
-                <DatePicker
-                  value={
-                    spot.scheduledAtISO
-                      ? new Date(spot.scheduledAtISO)
-                      : undefined
-                  }
-                  onChange={(date) =>
-                    setSchedule.mutate({
-                      platformPostId: spot.id,
-                      scheduledAt: date ? date.toISOString() : null,
-                    })
-                  }
-                  placeholder="Schedule"
-                  className="px-1.5 py-0.5 text-[11px]"
-                  aria-label="Scheduled date"
-                />
-                {spot.status !== "published" &&
-                  spot.platform !== "linkedin" && (
-                    <MarkScheduledButton
-                      spotId={spot.id}
-                      at={spot.scheduledAtISO}
-                      scheduled={spot.status === "scheduled"}
-                      onChanged={() => router.refresh()}
-                    />
-                  )}
-                {spot.platform === "linkedin" && (
-                  <LinkedInDeliveryControl
+                {providerPublishingPlatform ? (
+                  <input
+                    type="datetime-local"
+                    value={toLocalDateTimeInput(spot.scheduledAtISO)}
+                    min={toLocalDateTimeInput(new Date().toISOString())}
+                    onChange={(event) =>
+                      setSchedule.mutate({
+                        platformPostId: spot.id,
+                        scheduledAt: event.target.value
+                          ? new Date(event.target.value).toISOString()
+                          : null,
+                      })
+                    }
+                    disabled={Boolean(spot.deliveryExternalId)}
+                    aria-label="Scheduled date and time"
+                    className="border-border bg-background text-muted-foreground rounded-md border px-1.5 py-0.5 text-[11px] disabled:opacity-50"
+                  />
+                ) : (
+                  <DatePicker
+                    value={
+                      spot.scheduledAtISO
+                        ? new Date(spot.scheduledAtISO)
+                        : undefined
+                    }
+                    onChange={(date) =>
+                      setSchedule.mutate({
+                        platformPostId: spot.id,
+                        scheduledAt: date ? date.toISOString() : null,
+                      })
+                    }
+                    placeholder="Schedule"
+                    className="px-1.5 py-0.5 text-[11px]"
+                    aria-label="Scheduled date"
+                  />
+                )}
+                {spot.status !== "published" && !providerPublishingPlatform && (
+                  <MarkScheduledButton
                     spotId={spot.id}
+                    at={spot.scheduledAtISO}
+                    scheduled={spot.status === "scheduled"}
+                    onChanged={() => router.refresh()}
+                  />
+                )}
+                {providerPublishingPlatform && (
+                  <SocialDeliveryControl
+                    spotId={spot.id}
+                    platform={providerPublishingPlatform}
                     status={spot.status}
                     scheduledAt={spot.scheduledAtISO}
                     connected={spot.publishingConnected}

@@ -167,6 +167,8 @@ export type CreateZernioPostInput = {
   platforms: Array<{
     platform: string;
     accountId: string;
+    customContent?: string;
+    platformSpecificData?: Record<string, unknown>;
   }>;
   scheduledFor?: string;
   publishNow?: boolean;
@@ -277,6 +279,22 @@ export async function getZernioPost(
     if (obj._id) return obj;
   }
   return null;
+}
+
+/** Retry only the failed platform targets on an existing Zernio post. */
+export async function retryZernioPost(postId: string): Promise<ZernioPost> {
+  const data = await zernioFetch<unknown>(
+    `/posts/${encodeURIComponent(postId)}/retry`,
+    { method: "POST" },
+  );
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (obj.post && typeof obj.post === "object") {
+      return obj.post as ZernioPost;
+    }
+    if (obj._id) return obj;
+  }
+  throw new Error("Zernio retried the post but returned no post object");
 }
 
 // Real metrics shape verified against /analytics (IG + LinkedIn, 2026-06).
