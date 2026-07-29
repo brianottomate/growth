@@ -54,6 +54,13 @@ Console-first: native controls cover all colors plus the Box layout; CSS only fo
 - **Drawer**: set it to match the banner, otherwise the preference center falls back to Osano's light defaults and clashes.
 - Publishing takes up to ~15 min to hit the CDN and `osano.js` caches hard — hard-refresh and clear `osano_consentmanager*` before concluding a change did not land.
 
+## Vendor answers (Martin, 2026-07-28) — settles most opens
+- **Styling:** visual-only theming fine; substantive changes (removing buttons, altering choice architecture, changing default copy, Accept > Reject prominence) risk the guarantee. Do NOT remove the X without Osano review. Preferences/Save as secondary weight explicitly OK. **Hiding the cookie widget + footer link = explicitly acceptable** (their documented pattern). Loop in their privacy team before major changes.
+- **CMP records: no programmatic export, confirmed.** Console Consent Search (by UUID/external ID) + aggregate Reporting only. Person-level programmatic records = Unified Consent's role.
+- **CMP banner writing into UC as its records store: "not a confirmed pattern yet."** So banner+guarantee+UC-records as one chain does not exist today. Tiebreaker for A vs B: whether our own `Consent` table + CMP console search satisfies audit needs.
+- **STORAGE = IAB TCF 2.0 storage signal**, defaults DENY when TCF is off (ours is). Vendor endorses leaving it unmapped — the adapter's fail-closed choice is now vendor-confirmed (tracking#69's "unconfirmed" comment can be softened when next touching the file).
+- OPT_OUT: ACCEPT = visitor opted out (re-confirmed). CMP pricing tiers in their Sales Room.
+
 ## Open items
 1. Finish the accept/reject round-trip test (confirm Osano logs a certified record; check `getConsent()` flip + Reporting).
 2. Confirm `STORAGE` semantics and whether a **consent-change webhook** exists (would let the server receive decisions without ever reading Osano).
