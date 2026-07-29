@@ -80,6 +80,8 @@ export type SpotCardData = {
   updatedAtISO: string;
   channelId?: string | null;
   channelName?: string | null;
+  channelProfileImageUrl?: string | null;
+  channelBannerImageUrl?: string | null;
   platform: string;
   format: string | null;
   archetype: string | null;
@@ -370,6 +372,8 @@ export function SpotCard({
                 platform={spot.platform}
                 format={spot.format}
                 channelName={spot.channelName ?? null}
+                channelProfileImageUrl={spot.channelProfileImageUrl}
+                channelBannerImageUrl={spot.channelBannerImageUrl}
                 username={spot.username}
                 brandName={brandName}
                 contentTitle={contentTitle}
@@ -537,6 +541,8 @@ export function SpotCard({
             platform={spot.platform}
             format={spot.format}
             channelName={spot.channelName ?? null}
+            channelProfileImageUrl={spot.channelProfileImageUrl}
+            channelBannerImageUrl={spot.channelBannerImageUrl}
             username={spot.username}
             brandName={brandName}
             contentTitle={contentTitle}

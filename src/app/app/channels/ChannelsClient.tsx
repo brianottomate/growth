@@ -275,14 +275,22 @@ export function ChannelsClient({
                             href={publicUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="hover:text-primary focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm text-sm font-medium transition-colors outline-none focus-visible:ring-2"
+                            className="hover:text-primary focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-sm text-sm font-medium transition-colors outline-none focus-visible:ring-2"
                             title={`Open ${platformLabel(c.platform)} profile`}
                           >
+                            <ChannelLogo
+                              platform={c.platform}
+                              className="size-3.5 shrink-0"
+                            />
                             {platformLabel(c.platform)}
                             <ExternalLink className="size-3 opacity-60" />
                           </a>
                         ) : (
-                          <div className="text-sm font-medium">
+                          <div className="inline-flex items-center gap-1.5 text-sm font-medium">
+                            <ChannelLogo
+                              platform={c.platform}
+                              className="size-3.5 shrink-0"
+                            />
                             {platformLabel(c.platform)}
                           </div>
                         )}

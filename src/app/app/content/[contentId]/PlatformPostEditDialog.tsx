@@ -70,6 +70,8 @@ export function PlatformPostEditDialog({
   platform,
   format,
   channelName,
+  channelProfileImageUrl,
+  channelBannerImageUrl,
   username,
   brandName,
   contentTitle,
@@ -86,6 +88,8 @@ export function PlatformPostEditDialog({
   platform: string;
   format: string | null;
   channelName: string | null;
+  channelProfileImageUrl?: string | null;
+  channelBannerImageUrl?: string | null;
   username: string | null;
   brandName: string;
   contentTitle: string;
@@ -551,6 +555,8 @@ export function PlatformPostEditDialog({
             platform={platform}
             format={items.length > 1 ? `${platform}.thread` : format}
             channelName={channelName}
+            channelProfileImageUrl={channelProfileImageUrl}
+            channelBannerImageUrl={channelBannerImageUrl}
             username={username}
             brandName={brandName}
             contentTitle={contentTitle}

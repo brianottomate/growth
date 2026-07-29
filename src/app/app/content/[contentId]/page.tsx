@@ -99,6 +99,8 @@ export default async function ContentDetailPage({
               displayName: true,
               handle: true,
               platform: true,
+              profileImageUrl: true,
+              bannerImageUrl: true,
             },
           },
         },
@@ -424,6 +426,8 @@ export default async function ContentDetailPage({
                 channelId: p.channel?.id ?? p.channelId,
                 channelName:
                   p.channel?.displayName ?? p.channel?.handle ?? null,
+                channelProfileImageUrl: p.channel?.profileImageUrl ?? null,
+                channelBannerImageUrl: p.channel?.bannerImageUrl ?? null,
                 platform: p.platform,
                 format: p.format,
                 archetype: p.archetype,

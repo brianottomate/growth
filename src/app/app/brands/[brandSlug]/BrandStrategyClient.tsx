@@ -10,7 +10,7 @@ import type {
   CadenceStatus,
   ChannelCadence,
 } from "@/server/services/cadence.service";
-import { platformLabel } from "@/components/channel-logos";
+import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { useTRPC } from "@/trpc/react";
 import { cn } from "@/lib/utils";
@@ -25,12 +25,19 @@ import { cn } from "@/lib/utils";
 
 // ---- status palette --------------------------------------------------------
 type Status = CadenceStatus | "dormant";
-const STATUS: Record<Status, { label: string; color: string; muted?: boolean }> = {
+const STATUS: Record<
+  Status,
+  { label: string; color: string; muted?: boolean }
+> = {
   on: { label: "On pace", color: "#10b981", muted: true },
   under: { label: "Behind", color: "#f59e0b" },
   over: { label: "Over", color: "#0ea5e9" },
   dormant: { label: "Dormant", color: "var(--color-neutral-450)", muted: true },
-  untracked: { label: "No target", color: "var(--color-neutral-450)", muted: true },
+  untracked: {
+    label: "No target",
+    color: "var(--color-neutral-450)",
+    muted: true,
+  },
 };
 
 const ARCH_LABEL: Record<string, string> = {
@@ -67,7 +74,10 @@ const chMeta = (platform: string) =>
 const pillarMeta = (slug: string) =>
   slug === "__unsorted"
     ? { name: "Unsorted", color: "var(--color-neutral-450)" }
-    : (PILLAR_BY_SLUG[slug] ?? { name: slug, color: "var(--color-neutral-450)" });
+    : (PILLAR_BY_SLUG[slug] ?? {
+        name: slug,
+        color: "var(--color-neutral-450)",
+      });
 
 const archLabel = (a: string) => ARCH_LABEL[a] ?? a;
 const fmt1 = (n: number) => (n % 1 === 0 ? String(n) : n.toFixed(1));
@@ -105,8 +115,7 @@ function Gauge({
 }) {
   const max =
     Math.max(obs, target ?? 0, peer ?? 0, unit === "%" ? 1 : 0.6) * 1.28;
-  const pct = (v: number) =>
-    `${Math.min(100, Math.max(0, (v / max) * 100))}%`;
+  const pct = (v: number) => `${Math.min(100, Math.max(0, (v / max) * 100))}%`;
   const s = STATUS[status];
   return (
     <span
@@ -203,8 +212,14 @@ function PeerDelta({ obs, peer }: { obs: number; peer: number | null }) {
       className="rounded-full px-1.5 py-px text-[10px] font-medium whitespace-nowrap"
       style={
         behind
-          ? { color: "#f59e0b", background: "color-mix(in oklab, #f59e0b 12%, transparent)" }
-          : { color: "var(--color-secondary)", background: "var(--color-surface-tertiary)" }
+          ? {
+              color: "#f59e0b",
+              background: "color-mix(in oklab, #f59e0b 12%, transparent)",
+            }
+          : {
+              color: "var(--color-secondary)",
+              background: "var(--color-surface-tertiary)",
+            }
       }
     >
       {behind ? "−" : "+"}
@@ -215,11 +230,15 @@ function PeerDelta({ obs, peer }: { obs: number; peer: number | null }) {
 
 function StatusPill({ status, small }: { status: Status; small?: boolean }) {
   const s = STATUS[status];
-  const muted = status === "on" || status === "dormant" || status === "untracked";
+  const muted =
+    status === "on" || status === "dormant" || status === "untracked";
   return (
     <span className="flex shrink-0 items-center gap-1.5">
       <span
-        className={cn("shrink-0 rounded-full", small ? "size-[5px]" : "size-1.5")}
+        className={cn(
+          "shrink-0 rounded-full",
+          small ? "size-[5px]" : "size-1.5",
+        )}
         style={{ background: s.color }}
       />
       <span
@@ -246,7 +265,7 @@ function Nums({
   const u = unit ?? "";
   const show = (v: number) => (unit === "%" ? v : fmt1(v));
   return (
-    <span className="inline-flex items-baseline gap-1 tabular-nums whitespace-nowrap">
+    <span className="inline-flex items-baseline gap-1 whitespace-nowrap tabular-nums">
       <span className="text-foreground text-[12.5px] font-semibold">
         {show(obs)}
         {u}
@@ -300,11 +319,7 @@ function TargetSlider({
 }
 
 // ---- verdict strip ---------------------------------------------------------
-function Verdict({
-  strategy,
-}: {
-  strategy: BrandStrategy;
-}) {
+function Verdict({ strategy }: { strategy: BrandStrategy }) {
   const { channels } = strategy;
   const live = channels.filter((c) => !channelDormant(c));
   const on = live.filter((c) => c.status === "on").length;
@@ -331,7 +346,10 @@ function Verdict({
       if (a.status === "over" && a.target != null) {
         const delta = a.observedPerWeek - a.target;
         if (!overTop || delta > overTop.delta)
-          overTop = { label: `${chMeta(c.platform).short} · ${archLabel(a.archetype)}`, delta };
+          overTop = {
+            label: `${chMeta(c.platform).short} · ${archLabel(a.archetype)}`,
+            delta,
+          };
       }
 
   const headline =
@@ -370,8 +388,12 @@ function Verdict({
                 className="size-1.5 rounded-full"
                 style={{ background: p.color }}
               />
-              <span className="text-[11px] font-semibold tabular-nums">{p.n}</span>
-              <span className="text-muted-foreground text-[11px]">{p.label}</span>
+              <span className="text-[11px] font-semibold tabular-nums">
+                {p.n}
+              </span>
+              <span className="text-muted-foreground text-[11px]">
+                {p.label}
+              </span>
             </span>
           ))}
         </span>
@@ -381,10 +403,15 @@ function Verdict({
           {hasGap && (
             <div
               className="flex flex-1 basis-[280px] items-center gap-3 rounded-xl px-3 py-2.5"
-              style={{ background: "color-mix(in oklab, #f59e0b 9%, transparent)" }}
+              style={{
+                background: "color-mix(in oklab, #f59e0b 9%, transparent)",
+              }}
             >
               <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-[11px] font-semibold" style={{ color: "#f59e0b" }}>
+                <span
+                  className="text-[11px] font-semibold"
+                  style={{ color: "#f59e0b" }}
+                >
                   Biggest gap vs peers · Short-form video
                 </span>
                 <span className="text-muted-foreground text-[11px] leading-snug">
@@ -393,7 +420,7 @@ function Verdict({
                 </span>
               </span>
               <span
-                className="ml-auto text-[14px] font-semibold tabular-nums whitespace-nowrap"
+                className="ml-auto text-[14px] font-semibold whitespace-nowrap tabular-nums"
                 style={{ color: "#f59e0b" }}
               >
                 −{gap.toFixed(1)}/wk
@@ -417,7 +444,7 @@ function Verdict({
                 </span>
               </span>
               <span
-                className="ml-auto text-[14px] font-semibold tabular-nums whitespace-nowrap"
+                className="ml-auto text-[14px] font-semibold whitespace-nowrap tabular-nums"
                 style={{ color: "#0ea5e9" }}
               >
                 +{overTop.delta.toFixed(1)}/wk
@@ -467,18 +494,20 @@ function ChannelCard({
             color: meta.hue,
           }}
         >
-          {meta.code}
+          <ChannelLogo platform={c.platform} className="size-4" />
         </span>
         <span className="flex min-w-0 flex-col">
           <span className="text-[13.5px] font-semibold">{meta.short}</span>
           {c.handle && (
-            <span className="text-muted-foreground text-[10px]">{c.handle}</span>
+            <span className="text-muted-foreground text-[10px]">
+              {c.handle}
+            </span>
           )}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-3.5">
           {!dormant && <PeerDelta obs={c.observedPerWeek} peer={peer} />}
           {!dormant && (
-            <span className="text-muted-foreground text-[11px] tabular-nums whitespace-nowrap">
+            <span className="text-muted-foreground text-[11px] whitespace-nowrap tabular-nums">
               {rhythm(c.observedPerWeek)}
               {c.targetPerWeek != null && (
                 <span className="text-muted-foreground">
@@ -523,7 +552,11 @@ function ChannelCard({
                   target={a.target}
                   pending={pending}
                   onCommit={(n) =>
-                    onSetCadence({ channelId: c.channelId, archetype: a.archetype, count: n })
+                    onSetCadence({
+                      channelId: c.channelId,
+                      archetype: a.archetype,
+                      count: n,
+                    })
                   }
                 />
               ) : (
@@ -535,8 +568,14 @@ function ChannelCard({
                 />
               )}
               <span className="flex items-center justify-end gap-2.5">
-                {!editing && <PeerDelta obs={a.observedPerWeek} peer={a.peerPerWeek} />}
-                <Nums obs={a.observedPerWeek} target={a.target} peer={a.peerPerWeek} />
+                {!editing && (
+                  <PeerDelta obs={a.observedPerWeek} peer={a.peerPerWeek} />
+                )}
+                <Nums
+                  obs={a.observedPerWeek}
+                  target={a.target}
+                  peer={a.peerPerWeek}
+                />
               </span>
             </div>
           ))}
@@ -591,7 +630,12 @@ function MixCard({
     );
   }
 
-  const rank: Record<string, number> = { under: 0, over: 1, on: 2, untracked: 3 };
+  const rank: Record<string, number> = {
+    under: 0,
+    over: 1,
+    on: 2,
+    untracked: 3,
+  };
   const sorted = [...classified].sort(
     (a, b) =>
       (rank[a.status] ?? 9) - (rank[b.status] ?? 9) ||
@@ -622,7 +666,9 @@ function MixCard({
                   className="size-2.5 shrink-0 rounded-sm"
                   style={{ background: meta.color }}
                 />
-                <span className="truncate text-[12.5px] font-medium">{meta.name}</span>
+                <span className="truncate text-[12.5px] font-medium">
+                  {meta.name}
+                </span>
               </span>
               {editing ? (
                 <span className="flex items-center gap-2">
@@ -645,11 +691,22 @@ function MixCard({
                   <span className="text-muted-foreground text-[10px]">%</span>
                 </span>
               ) : (
-                <Gauge obs={m.pct} target={m.targetPct} peer={m.peerPct} status={m.status} unit="%" />
+                <Gauge
+                  obs={m.pct}
+                  target={m.targetPct}
+                  peer={m.peerPct}
+                  status={m.status}
+                  unit="%"
+                />
               )}
               <span className="flex items-center justify-end gap-2.5">
                 {!editing && <PeerDelta obs={m.pct} peer={m.peerPct} />}
-                <Nums obs={m.pct} target={m.targetPct} peer={m.peerPct} unit="%" />
+                <Nums
+                  obs={m.pct}
+                  target={m.targetPct}
+                  peer={m.peerPct}
+                  unit="%"
+                />
               </span>
             </div>
           );

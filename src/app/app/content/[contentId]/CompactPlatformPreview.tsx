@@ -119,6 +119,8 @@ export function CompactPlatformPreview({
   platform,
   format,
   channelName,
+  channelProfileImageUrl,
+  channelBannerImageUrl,
   username,
   brandName,
   contentTitle,
@@ -132,6 +134,8 @@ export function CompactPlatformPreview({
   platform: string;
   format: string | null;
   channelName: string | null;
+  channelProfileImageUrl?: string | null;
+  channelBannerImageUrl?: string | null;
   username: string | null;
   brandName: string;
   contentTitle: string;
@@ -172,15 +176,35 @@ export function CompactPlatformPreview({
       </div>
 
       <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
+        {channelBannerImageUrl && (
+          <div className="relative h-10 overflow-hidden border-b">
+            {/* eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts */}
+            <img
+              src={channelBannerImageUrl}
+              alt=""
+              className="size-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+          </div>
+        )}
         {items.map((item, index) => (
           <div
             key={item.id}
             className={cn(index > 0 && "border-border border-t")}
           >
             <div className="flex items-center gap-2 px-2.5 py-2">
-              <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[9px] font-semibold">
-                {identity.slice(0, 1).toUpperCase()}
-              </span>
+              {channelProfileImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts
+                <img
+                  src={channelProfileImageUrl}
+                  alt=""
+                  className="bg-muted size-6 rounded-full border object-cover"
+                />
+              ) : (
+                <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[9px] font-semibold">
+                  {identity.slice(0, 1).toUpperCase()}
+                </span>
+              )}
               <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
                 {identity}
               </span>
