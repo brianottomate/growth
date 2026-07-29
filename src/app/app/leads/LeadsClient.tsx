@@ -86,6 +86,7 @@ export function LeadsClient() {
   const [netNew, setNetNew] = useState(false);
   const [sendBatch, setSendBatch] = useState(false);
   const [enrollableOnly, setEnrollableOnly] = useState(false);
+  const [owner, setOwner] = useState<string | undefined>(undefined);
   const [sort, setSort] = useState<
     "units" | "composite" | "domain" | "updated"
   >("units");
@@ -98,6 +99,11 @@ export function LeadsClient() {
 
   const stats = useQuery(trpc.leads.stats.queryOptions());
   const pmsOptions = useQuery(trpc.leads.pmsOptions.queryOptions());
+  // Scoped to the pregen cohorts so the list reads as "reps with target
+  // companies", not "reps who happen to own enrichment records".
+  const ownerOptions = useQuery(
+    trpc.leads.ownerOptions.queryOptions({ pregenOnly: true }),
+  );
 
   const list = useQuery(
     trpc.leads.listDomains.queryOptions(
@@ -111,6 +117,7 @@ export function LeadsClient() {
         netNew: netNew || undefined,
         sendBatch: sendBatch || undefined,
         enrollableOnly: enrollableOnly || undefined,
+        owner,
         sort,
         dir: sort === "domain" ? "asc" : "desc",
         limit,
@@ -351,6 +358,21 @@ export function LeadsClient() {
           ),
         )}
         <span className="bg-border mx-1 h-4 w-px" />
+        <select
+          value={owner ?? ""}
+          onChange={(event) => {
+            setOwner(event.target.value || undefined);
+            resetPage();
+          }}
+          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+        >
+          <option value="">All BDRs</option>
+          {ownerOptions.data?.map((o) => (
+            <option key={o.owner} value={o.owner ?? ""}>
+              {o.owner} ({o.count})
+            </option>
+          ))}
+        </select>
         <select
           value={pms ?? ""}
           onChange={(e) => {

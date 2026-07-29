@@ -255,6 +255,8 @@ export const leadsRouter = createTRPCRouter({
         sendBatch: z.boolean().optional(),
         // only companies with a live, emailable, HubSpot-enrollable contact.
         enrollableOnly: z.boolean().optional(),
+        // owning BDR (resolved rep name as stored on the domain).
+        owner: z.string().trim().min(1).optional(),
         minUnits: z.number().int().nonnegative().optional(),
         sort: z
           .enum(["composite", "units", "domain", "updated"])
@@ -323,6 +325,8 @@ export const leadsRouter = createTRPCRouter({
         conds.push(inArray(leadDomainTable.domain, [...SEND_BATCH_1]));
       if (input.minUnits != null)
         conds.push(gte(leadDomainTable.unitCount, input.minUnits));
+      if (input.owner)
+        conds.push(eq(leadDomainTable.hubspotOwner, input.owner));
       // Same definition as the enrollable counts in `stats` — keep them in step,
       // or the card promises a number the filtered list cannot produce.
       if (input.enrollableOnly)
@@ -1172,6 +1176,53 @@ export const leadsRouter = createTRPCRouter({
     }),
 
   // Distinct PMS values for the filter dropdown.
+  /**
+   * Owning reps, for the BDR filter. Cohort-scoped by default because the
+   * pregen motion is the point: unscoped, Danny's 10k+ enrichment-owned domains
+   * bury the reps who actually own a target company.
+   */
+  ownerOptions: protectedProcedure
+    .input(
+      z
+        .object({ pregenOnly: z.boolean().default(true) })
+        .default({ pregenOnly: true }),
+    )
+    .query(async ({ ctx, input }) => {
+      const base = ctx.db
+        .select({
+          owner: leadDomainTable.hubspotOwner,
+          count: sql<number>`count(distinct ${leadDomainTable.id})::int`,
+        })
+        .from(leadDomainTable);
+
+      const rows = input.pregenOnly
+        ? await base
+            .innerJoin(
+              hubspotListMembershipTable,
+              and(
+                eq(hubspotListMembershipTable.domainId, leadDomainTable.id),
+                eq(hubspotListMembershipTable.objectType, "company"),
+              ),
+            )
+            .where(sql`${leadDomainTable.hubspotOwner} is not null`)
+            .groupBy(leadDomainTable.hubspotOwner)
+            .orderBy(desc(sql`count(distinct ${leadDomainTable.id})`))
+            .limit(40)
+        : await base
+            .where(sql`${leadDomainTable.hubspotOwner} is not null`)
+            .groupBy(leadDomainTable.hubspotOwner)
+            .orderBy(desc(sql`count(distinct ${leadDomainTable.id})`))
+            .limit(40);
+
+      // Deactivated HubSpot users still own records; keep them visible but last,
+      // since their book needs reassigning rather than reviewing.
+      return rows.sort((left, right) => {
+        const leftGone = /deactivated/i.test(left.owner ?? "") ? 1 : 0;
+        const rightGone = /deactivated/i.test(right.owner ?? "") ? 1 : 0;
+        return leftGone - rightGone || right.count - left.count;
+      });
+    }),
+
   pmsOptions: protectedProcedure.query(async ({ ctx }) => {
     const rows = await ctx.db
       .select({
