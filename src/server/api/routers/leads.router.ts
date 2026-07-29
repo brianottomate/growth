@@ -176,6 +176,36 @@ export const leadsRouter = createTRPCRouter({
         hubspotListMembershipTable.objectType,
       );
 
+    // The number that actually gates the pregen send motion: cohort companies
+    // we could enroll today. A company counts only if it has a live contact
+    // with an email, a HubSpot contact id to enroll against, and no mirrored
+    // opt-out. Reviewing or building a site for anything else burns operator
+    // attention and a paid site build on someone we cannot email.
+    const targetEnrollableRows = await ctx.db.execute<{
+      cohort: string;
+      linked: number;
+      enrollable: number;
+    }>(sql`
+      select
+        membership.cohort as cohort,
+        count(distinct membership.domain_id)::int as linked,
+        count(distinct membership.domain_id) filter (
+          where exists (
+            select 1
+            from leads.contact as contact
+            where contact.domain_id = membership.domain_id
+              and contact.deleted_at is null
+              and nullif(btrim(contact.email), '') is not null
+              and contact.hubspot_contact_id is not null
+              and coalesce(contact.email_opt_out, false) = false
+          )
+        )::int as enrollable
+      from leads.hubspot_list_membership as membership
+      where membership.object_type = 'company'
+        and membership.domain_id is not null
+      group by membership.cohort
+    `);
+
     const topPms = await ctx.db
       .select({
         pms: leadDomainTable.pms,
@@ -198,6 +228,11 @@ export const leadsRouter = createTRPCRouter({
       netNew: netNewRow?.count ?? 0,
       contacts: contacts?.count ?? 0,
       targetMemberships,
+      targetEnrollable: targetEnrollableRows.rows.map((row) => ({
+        cohort: row.cohort,
+        linked: Number(row.linked),
+        enrollable: Number(row.enrollable),
+      })),
       topPms,
       imports,
     };
@@ -219,6 +254,8 @@ export const leadsRouter = createTRPCRouter({
         netNew: z.boolean().optional(),
         // the first cold-outbound test cohort (SEND_BATCH_1).
         sendBatch: z.boolean().optional(),
+        // only companies with a live, emailable, HubSpot-enrollable contact.
+        enrollableOnly: z.boolean().optional(),
         minUnits: z.number().int().nonnegative().optional(),
         sort: z
           .enum(["composite", "units", "domain", "updated"])
@@ -287,6 +324,18 @@ export const leadsRouter = createTRPCRouter({
         conds.push(inArray(leadDomainTable.domain, [...SEND_BATCH_1]));
       if (input.minUnits != null)
         conds.push(gte(leadDomainTable.unitCount, input.minUnits));
+      // Same definition as the enrollable counts in `stats` — keep them in step,
+      // or the card promises a number the filtered list cannot produce.
+      if (input.enrollableOnly)
+        conds.push(sql`exists (
+          select 1
+          from leads.contact as enrollable_contact
+          where enrollable_contact.domain_id = ${leadDomainTable.id}
+            and enrollable_contact.deleted_at is null
+            and nullif(btrim(enrollable_contact.email), '') is not null
+            and enrollable_contact.hubspot_contact_id is not null
+            and coalesce(enrollable_contact.email_opt_out, false) = false
+        )`);
 
       const where = conds.length ? and(...conds) : undefined;
       const orderCol = SORTS[input.sort];

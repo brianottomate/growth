@@ -85,6 +85,7 @@ export function LeadsClient() {
   >(undefined);
   const [netNew, setNetNew] = useState(false);
   const [sendBatch, setSendBatch] = useState(false);
+  const [enrollableOnly, setEnrollableOnly] = useState(false);
   const [sort, setSort] = useState<
     "units" | "composite" | "domain" | "updated"
   >("units");
@@ -109,6 +110,7 @@ export function LeadsClient() {
         pregenCohort,
         netNew: netNew || undefined,
         sendBatch: sendBatch || undefined,
+        enrollableOnly: enrollableOnly || undefined,
         sort,
         dir: sort === "domain" ? "asc" : "desc",
         limit,
@@ -144,6 +146,8 @@ export function LeadsClient() {
     s?.targetMemberships.find(
       (row) => row.cohort === cohort && row.objectType === objectType,
     );
+  const enrollableCount = (cohort: HubspotPregenCohort) =>
+    s?.targetEnrollable.find((row) => row.cohort === cohort);
 
   return (
     <div>
@@ -153,8 +157,130 @@ export function LeadsClient() {
         Instantly, deduped on domain
       </p>
 
-      {/* summary cards */}
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {/* Pre-Gen cohorts lead the page: this is the active outbound motion, and
+          everything below is the wider universe it was selected from. */}
+      <div className="border-primary/25 bg-card mt-5 rounded-xl border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-sm font-medium">Pre-Gen target cohorts</div>
+            <div className="text-muted-foreground mt-0.5 text-xs">
+              Live HubSpot list memberships mirrored into Growth. No enrichment
+              or enrollment is triggered here.
+            </div>
+          </div>
+          <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium text-amber-300">
+            Targeting only
+          </span>
+        </div>
+
+        <div className="mt-3 grid gap-2 lg:grid-cols-2">
+          {(
+            Object.entries(HUBSPOT_PREGEN_LISTS) as Array<
+              [
+                HubspotPregenCohort,
+                (typeof HUBSPOT_PREGEN_LISTS)[HubspotPregenCohort],
+              ]
+            >
+          ).map(([cohort, config]) => {
+            const companies = membershipCount(cohort, "company");
+            const contacts = membershipCount(cohort, "contact");
+            const reach = enrollableCount(cohort);
+            const active = pregenCohort === cohort;
+            return (
+              <div
+                key={cohort}
+                className={`rounded-lg border px-3 py-2.5 transition-colors ${
+                  active ? "border-foreground/40 bg-accent/40" : "border-border"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setPregenCohort(active ? undefined : cohort);
+                      resetPage();
+                    }}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      active
+                        ? "bg-foreground text-background"
+                        : "bg-muted hover:bg-accent"
+                    }`}
+                  >
+                    {config.label}
+                  </button>
+                  <span className="flex-1" />
+                  <a
+                    href={hubspotListUrl(config.company.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
+                  >
+                    Companies <ExternalLink className="size-3" />
+                  </a>
+                  <a
+                    href={hubspotListUrl(config.contact.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
+                  >
+                    Contacts <ExternalLink className="size-3" />
+                  </a>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  <span className="text-lg font-semibold tabular-nums">
+                    {fmt(reach?.enrollable)}
+                  </span>
+                  <span className="text-muted-foreground text-[11px]">
+                    enrollable now
+                    {reach && reach.linked > 0
+                      ? ` · of ${fmt(reach.linked)} linked`
+                      : ""}
+                  </span>
+                  <span className="flex-1" />
+                  <span className="text-muted-foreground text-xs tabular-nums">
+                    {fmt(companies?.count)} companies · {fmt(contacts?.count)}{" "}
+                    contacts
+                  </span>
+                </div>
+
+                {reach && reach.linked > reach.enrollable && (
+                  <div className="text-muted-foreground mt-1 text-[11px]">
+                    {fmt(reach.linked - reach.enrollable)} not reachable — no
+                    emailable HubSpot contact, or opted out
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+          <Pill
+            active={enrollableOnly}
+            onClick={() => {
+              setEnrollableOnly(!enrollableOnly);
+              resetPage();
+            }}
+          >
+            Enrollable only
+          </Pill>
+          {(pregenCohort || enrollableOnly) && (
+            <button
+              onClick={() => {
+                setPregenCohort(undefined);
+                setEnrollableOnly(false);
+                resetPage();
+              }}
+              className="text-muted-foreground text-xs hover:underline"
+            >
+              Clear cohort filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* summary cards — the wider universe behind the cohorts */}
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
           label="Domains"
           value={fmt(s?.domains)}
@@ -186,81 +312,6 @@ export function LeadsClient() {
           value={fmt(s?.integratedPms)}
           hint="API-connected"
         />
-      </div>
-
-      <div className="bg-card mt-4 rounded-xl border p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <div className="text-sm font-medium">Pre-Gen target cohorts</div>
-            <div className="text-muted-foreground mt-0.5 text-xs">
-              Live HubSpot list memberships mirrored into Growth. No enrichment
-              or enrollment is triggered here.
-            </div>
-          </div>
-          <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium text-amber-300">
-            Targeting only
-          </span>
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {(
-            Object.entries(HUBSPOT_PREGEN_LISTS) as Array<
-              [
-                HubspotPregenCohort,
-                (typeof HUBSPOT_PREGEN_LISTS)[HubspotPregenCohort],
-              ]
-            >
-          ).map(([cohort, config]) => {
-            const companies = membershipCount(cohort, "company");
-            const contacts = membershipCount(cohort, "contact");
-            return (
-              <div
-                key={cohort}
-                className="border-border flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
-              >
-                <button
-                  onClick={() => {
-                    setPregenCohort(
-                      pregenCohort === cohort ? undefined : cohort,
-                    );
-                    resetPage();
-                  }}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                    pregenCohort === cohort
-                      ? "bg-foreground text-background"
-                      : "bg-muted hover:bg-accent"
-                  }`}
-                >
-                  {config.label}
-                </button>
-                <span className="text-muted-foreground text-xs">
-                  {fmt(companies?.count)} companies
-                  {companies && companies.linked !== companies.count
-                    ? ` · ${fmt(companies.linked)} linked`
-                    : ""}
-                  {" · "}
-                  {fmt(contacts?.count)} contacts
-                </span>
-                <span className="flex-1" />
-                <a
-                  href={hubspotListUrl(config.company.id)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
-                >
-                  Companies <ExternalLink className="size-3" />
-                </a>
-                <a
-                  href={hubspotListUrl(config.contact.id)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
-                >
-                  Contacts <ExternalLink className="size-3" />
-                </a>
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* filter bar */}
