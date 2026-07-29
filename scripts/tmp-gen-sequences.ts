@@ -4,6 +4,12 @@
  * generation engine supplies preview URLs.
  *
  *   bun --conditions=react-server scripts/tmp-gen-sequences.ts a.com b.com
+ *
+ * Generates against the domain's real stored pregenSiteUrl. The generator reads
+ * the preview's own content, so an unreachable URL yields copy that only looks
+ * personalized — it silently loses the preview half of its context. Most stored
+ * previews sit on retired per-company localcan tunnels and are dead, so the URL
+ * is probed first and the domain is skipped unless ALLOW_UNREACHABLE=1.
  */
 import { and, eq } from "drizzle-orm";
 
@@ -16,9 +22,19 @@ import {
 import { generatePregenHubspotDraft } from "@/server/services/pregen-hubspot-outreach.service";
 
 const DOMAINS = process.argv.slice(2).filter((a) => a.includes("."));
-// No previews exist yet; shape mirrors the real signed /p/<id>?t= path.
-const standin = (d: string) =>
-  `https://preview.wander.com/p/standin-${d.replace(/\W/g, "-")}?t=eval`;
+const ALLOW_UNREACHABLE = process.env.ALLOW_UNREACHABLE === "1";
+
+async function previewIsReachable(url: string): Promise<number | null> {
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(15_000),
+    });
+    return res.status;
+  } catch {
+    return null;
+  }
+}
 
 for (const domain of DOMAINS) {
   const row = await db.query.leadDomainTable.findFirst({
@@ -26,6 +42,12 @@ for (const domain of DOMAINS) {
   });
   if (!row) {
     console.log(`\n### ${domain}: not in leads.domain`);
+    continue;
+  }
+  if (row.excludeFromOutreach) {
+    console.log(
+      `\n### ${domain}: excluded from outreach (${row.excludeReason ?? "no reason recorded"}) — skipped`,
+    );
     continue;
   }
   const [m] = await db
@@ -40,10 +62,25 @@ for (const domain of DOMAINS) {
     .limit(1);
   const motion = m?.cohort === "recycled" ? "reengagement" : "fresh";
 
+  const previewUrl = row.pregenSiteUrl;
+  if (!previewUrl) {
+    console.log(`\n### ${domain}: no pregenSiteUrl — assign a preview first`);
+    continue;
+  }
+  const status = await previewIsReachable(previewUrl);
+  if (status !== 200 && !ALLOW_UNREACHABLE) {
+    console.log(
+      `\n### ${domain}: preview unreachable (${status ?? "no response"}) — ${previewUrl}` +
+        `\n    skipped; the generator would have no preview content to read.` +
+        `\n    re-run with ALLOW_UNREACHABLE=1 to generate anyway.`,
+    );
+    continue;
+  }
+
   try {
     const r = await generatePregenHubspotDraft(domain, {
       motion,
-      previewUrl: standin(domain),
+      previewUrl,
     });
 
     await db
@@ -69,6 +106,7 @@ for (const domain of DOMAINS) {
 
     console.log(`\n${"=".repeat(74)}`);
     console.log(`### ${domain} · ${motion} · rank ${row.scorePregenPotential}`);
+    console.log(`PREVIEW: ${previewUrl} (${status})`);
     console.log(`ANGLE: ${r.draft.angle}`);
     console.log(`PERSONALIZED ON: ${r.draft.personalizedOn.join(" | ")}`);
     if (r.draft.historyUsed.length)

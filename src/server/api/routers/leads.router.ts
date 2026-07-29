@@ -515,6 +515,18 @@ export const leadsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
       }
 
+      // The enrich/merge passes already mark existing customers and rep-owned
+      // live conversations. Prospecting copy is never right for those, and a
+      // draft sitting in Send Review reads as cleared to send, so refuse at
+      // generation rather than filtering it out downstream. 17 of the 33
+      // domains that currently carry a preview are excluded this way.
+      if (row.excludeFromOutreach) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `${row.domain} is excluded from outreach (${row.excludeReason ?? "no reason recorded"})`,
+        });
+      }
+
       // Cohort membership is the source of truth for motion: a recycled company
       // has prior Wander outreach to acknowledge, an untouched one does not.
       // Deriving it here keeps every review surface from having to pick, and
