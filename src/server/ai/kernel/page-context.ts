@@ -5,6 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   contentPostTable,
+  platformPostTable,
   productTable,
   seriesTable,
   storefrontTable,
@@ -108,6 +109,23 @@ export async function composePageContextSection(options: {
     });
     if (post?.brand?.organizationId !== options.organizationId) return header;
     return `${header}\nThis is the content idea “${post.title ?? "Untitled"}” (contentPostId: ${post.id}) for ${post.brand.name} (brandId: ${post.brand.id}). Call contentRead action getWorkItem before making claims about its readiness or copy.`;
+  }
+
+  const blogPostId = /^\/app\/blog\/([^/]+)$/.exec(pathname)?.[1];
+  if (blogPostId) {
+    const post = await db.query.platformPostTable.findFirst({
+      where: and(
+        eq(platformPostTable.id, blogPostId),
+        eq(platformPostTable.externalKind, "blog_article"),
+      ),
+      with: {
+        brand: { columns: { id: true, name: true, organizationId: true } },
+      },
+    });
+    if (post?.brand?.organizationId !== options.organizationId) return header;
+    const status =
+      post.publishedAt && post.status === "published" ? "published" : "draft";
+    return `${header}\nThis is the ${status} blog article “${post.text ?? "Untitled"}” (platformPostId: ${post.id}${post.externalId ? `, Dato itemId: ${post.externalId}` : ""}) for ${post.brand.name} (brandId: ${post.brand.id}). Use blogAgent to read, review, or edit this article. When the operator refers to “this blog” or “this article,” pass its Dato itemId to blogAgent; an attached replacement image should be passed as blogAgent attachmentUrl. The agent may edit the Dato draft but cannot publish it.`;
   }
 
   const productId = /^\/app\/product-atlas\/([^/]+)$/.exec(pathname)?.[1];

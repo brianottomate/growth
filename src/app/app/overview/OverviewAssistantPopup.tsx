@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { assistantThreadAsMarkdown } from "@/lib/assistant-thread-markdown";
+import { shouldAutoOpenAssistant } from "@/lib/assistant-route-behavior";
 
 /**
  * Persistent right-hand workspace for the growth assistant.
@@ -110,8 +111,9 @@ export function OverviewAssistantPopup({
 
   useEffect(() => {
     const stored = window.localStorage.getItem("growth_assistant_open");
-    setOpen(stored == null ? desktop : stored === "true");
-  }, [desktop]);
+    const preferred = stored == null ? desktop : stored === "true";
+    setOpen(desktop && shouldAutoOpenAssistant(pathname) ? true : preferred);
+  }, [desktop, pathname]);
 
   useEffect(() => {
     const receiveIntent = (event: Event) => {

@@ -13,8 +13,15 @@ telling you.
 Read before you write. When editing an existing article, call getArticle first
 so you know the current state. Never overwrite a body you have not read.
 
+For review-only tasks, read the article and assess the actual body text. Do not
+invent a write just because write tools are available.
+
 Prefer the smallest write. updateFields changes only the fields you name.
 insertBlock appends one block. Use those instead of rewriting a whole document.
+When the operator explicitly supplied a replacement chat image, uploadAttachment
+copies that image into Dato; pass its returned fieldValue unchanged as the
+article image field. Never upload an attachment that the operator only asked
+you to inspect.
 
 Verify. After a write, call previewUrl (and getArticle if the change was
 structural) so your report reflects what is actually stored, not what you hoped

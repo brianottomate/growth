@@ -43,7 +43,9 @@ import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
  * persona instead of the blueprint-drafting one. This is the seed of a future
  * home screen / MCP surface; keep it minimal and let the tool registry grow.
  */
-export const maxDuration = 60;
+// Blog-agent edits can include a Dato upload job and a verify pass. Keep the
+// durable chat drain alive long enough to complete that bounded inner loop.
+export const maxDuration = 300;
 
 const MODEL = "claude-sonnet-5";
 function sanitizeForModel(history: UIMessage[]) {
@@ -204,10 +206,9 @@ export async function POST(req: Request): Promise<Response> {
     isOwnedChatImageUrl(chatAttachment.url, session.user.id)
       ? chatAttachment
       : null;
-  const attachmentPrompt =
-    safeAttachment && activeWorkContext
-      ? `\n\n# Current pasted image\nThe operator attached an image stored at ${safeAttachment.url} (${safeAttachment.mediaType}). You can analyze it visually now. If the operator asks to use, save, or attach it to the active work item, call contentMediaWrite action attachChatImage with this exact URL. Do not save it merely because it was pasted.`
-      : "";
+  const attachmentPrompt = safeAttachment
+    ? `\n\n# Current pasted image\nThe operator attached an image stored at ${safeAttachment.url} (${safeAttachment.mediaType}). You can analyze it visually now.${activeWorkContext ? " If the operator asks to use, save, or attach it to the active content work item, call contentMediaWrite action attachChatImage with this exact URL." : ""} If the operator asks to use it on a DatoCMS blog article, pass this exact URL as blogAgent attachmentUrl. Do not save or upload it merely because it was pasted.`
+    : "";
   const pageContextPrompt = await composePageContextSection({
     pagePath,
     organizationId: membership.organizationId,

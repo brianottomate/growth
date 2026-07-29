@@ -351,7 +351,9 @@ exposed on demand instead of permanently.
   anything else.
 - `src/server/ai/blog-agent/tools.ts` — the bespoke tools (`describeModel`,
   `listModels`, `getArticle`, `createDraft`, `updateFields`, `insertBlock`,
-  `previewUrl`, `publishArticle`). Built by `buildBlogTools(ctx)` per call.
+  `uploadAttachment`, `previewUrl`, `publishArticle`). `uploadAttachment` is
+  only useful when the invoking operator supplied an owned chat image for that
+  run. Built by `buildBlogTools(ctx)` per call.
 - `src/server/ai/blog-agent/persona.ts` — how it works and what it may not do.
 - `src/server/ai/blog-agent/run.ts` — the loop.
 
@@ -387,7 +389,7 @@ of the product, not a private path into the database.
 Blog and newsletter both drifted the same way, and it is worth naming so the
 next provider integration does not repeat it.
 
-Each product had a *published mirror* — `/app/blog` and `/app/newsletters` read
+Each product had a _published mirror_ — `/app/blog` and `/app/newsletters` read
 `platform_post` filtered by `externalKind` (`blog_article`, `broadcast`) and, until
 recently, `publishedAt IS NOT NULL`. Drafting lived somewhere else entirely
 (Dato records; `email_document` rows). So an artifact being worked on had no

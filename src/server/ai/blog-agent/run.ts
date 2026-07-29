@@ -35,6 +35,8 @@ export async function runBlogAgent(input: {
   task: string;
   /** Optional record the task is about, so the agent doesn't have to search. */
   itemId?: string;
+  /** Current operator-owned chat image, available only for this invocation. */
+  attachmentUrl?: string;
   /** Scopes brand lookups when the agent links an article into Growth. */
   organizationId: string;
 }): Promise<BlogAgentResult> {
@@ -61,11 +63,18 @@ export async function runBlogAgent(input: {
     trail,
     organizationId: input.organizationId,
     touchedItemIds,
+    attachmentUrl: input.attachmentUrl,
   });
 
-  const prompt = input.itemId
-    ? `${input.task}\n\nThe article this concerns: ${input.itemId}`
-    : input.task;
+  const prompt = [
+    input.task,
+    input.itemId ? `The article this concerns: ${input.itemId}` : null,
+    input.attachmentUrl
+      ? "The operator explicitly supplied a current chat image for this task. Use uploadAttachment if the requested edit needs it."
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   try {
     const result = await generateText({

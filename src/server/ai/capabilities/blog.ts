@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
 import { runBlogAgent } from "@/server/ai/blog-agent/run";
 import { growthTool } from "./types";
 
@@ -21,7 +22,7 @@ import { growthTool } from "./types";
  */
 export const blogAgent = growthTool({
   description:
-    "Delegate a wander.com blog task to the DatoCMS blog agent. It can inspect the blog schema, read an article, create a draft, patch fields, and append body blocks such as a video embed, then report back with a preview link. Use for any 'create/edit/add to the blog' request. It works in DRAFTS only — it cannot publish. Give it a complete task description in one go, plus the article id when the task concerns an existing post.",
+    "Delegate a wander.com blog task to the DatoCMS blog agent. It can inspect the blog schema, read or review a full article, create a draft, patch fields, upload the operator's current chat image, and append body blocks, then report back with a preview link. Use for any 'review/create/edit/add to the blog' request. It works in DRAFTS only — it cannot publish. Give it a complete task description in one go, plus the article id when the task concerns an existing post.",
   inputSchema: z.object({
     action: z.literal("run"),
     task: z
@@ -36,12 +37,30 @@ export const blogAgent = growthTool({
       .string()
       .trim()
       .optional()
-      .describe("DatoCMS record id, when the task concerns an existing article."),
+      .describe(
+        "DatoCMS record id, when the task concerns an existing article.",
+      ),
+    attachmentUrl: z
+      .string()
+      .url()
+      .optional()
+      .describe(
+        "The exact owned chat-attachment URL when the operator explicitly asks to use the pasted image on the article.",
+      ),
   }),
   execute: async (input, ctx) => {
+    if (
+      input.attachmentUrl &&
+      !isOwnedChatImageUrl(input.attachmentUrl, ctx.userId)
+    ) {
+      throw new Error(
+        "That image is not an owned attachment from this operator's chat.",
+      );
+    }
     const result = await runBlogAgent({
       task: input.task,
       itemId: input.itemId,
+      attachmentUrl: input.attachmentUrl,
       organizationId: ctx.orgId,
     });
     return {

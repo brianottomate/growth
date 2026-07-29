@@ -7,8 +7,6 @@ import { db } from "@/server/db";
 import { memberTable, platformPostTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
-import { ContentAnalysisPanel } from "@/components/content-analysis-panel";
-import { readContentAnalysis } from "@/lib/content-analysis";
 import { PreviewBlock } from "../preview/[itemId]/PreviewBlocks";
 
 type BlogMeta = {
@@ -44,7 +42,6 @@ export default async function BlogArticlePage({
   if (!post || post.brand?.organizationId !== org.id) notFound();
 
   const meta = (post.metadata ?? {}) as BlogMeta;
-  const analysis = readContentAnalysis(post.metadata);
   const datoArticle = post.externalId
     ? await getBlogArticleDraft(post.externalId).catch(() => null)
     : null;
@@ -60,7 +57,6 @@ export default async function BlogArticlePage({
   const cover = datoArticle?.image?.url ?? post.media?.[0]?.url ?? null;
   const draftPreviewHref =
     isDraft && post.externalId ? `/app/blog/preview/${post.externalId}` : null;
-  const sourceUrl = draftPreviewHref ?? post.externalUrl;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -192,13 +188,6 @@ export default async function BlogArticlePage({
           This imported record currently exposes summary metadata only.
         </p>
       )}
-
-      <ContentAnalysisPanel
-        id={post.id}
-        kind="blog"
-        initialAnalysis={analysis}
-        sourceUrl={sourceUrl}
-      />
     </div>
   );
 }

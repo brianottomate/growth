@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   buildBlockNode,
+  createUploadFromUrl,
   createDraftItem,
   describeModelFields,
   findAuthorIdByName,
@@ -15,6 +16,7 @@ import {
   updateItemFields,
 } from "@/server/clients/datocms.client";
 import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
+import { datoStructuredTextToPlainText } from "@/lib/dato-structured-text";
 import { linkDatoBlogArticle } from "@/server/services/dato-blog-link.service";
 
 /**
@@ -22,7 +24,7 @@ import { linkDatoBlogArticle } from "@/server/services/dato-blog-link.service";
  *
  * These are deliberately NOT in the global capability catalog. The handoff doc
  * warns that too many atomic top-level tools make the assistant worse at
- * choosing, and these seven only make sense inside a Dato editing loop. They
+ * choosing, and these tools only make sense inside a Dato editing loop. They
  * are exposed on demand — the sub-agent is spawned for a task, uses them, and
  * they disappear again — rather than sitting in `OVERVIEW_TOOLS` forever.
  *
@@ -46,6 +48,8 @@ export interface BlogToolContext {
   organizationId: string;
   /** Dato records written during this run, reconciled before handoff. */
   touchedItemIds: Set<string>;
+  /** Operator-owned image attached to the invoking chat turn. */
+  attachmentUrl?: string;
 }
 
 const note = (ctx: BlogToolContext, toolName: string, summary: string) => {
@@ -105,7 +109,44 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
             slug: article.url,
             status: article._status,
             heroUrl: article.image?.url ?? null,
+            bodyText: article.body
+              ? datoStructuredTextToPlainText(article.body.value)
+              : "",
             blocks: article.body?.blocks ?? [],
+          };
+        } catch (error) {
+          return { error: (error as Error).message };
+        }
+      },
+    }),
+
+    uploadAttachment: tool({
+      description:
+        "Upload the operator's current chat image into DatoCMS and return the exact field value for Dato's image field. Use only when the task explicitly asks to use the attached image. Afterward, pass fieldValue unchanged to updateFields as the article's image value.",
+      inputSchema: z.object({
+        filename: z
+          .string()
+          .trim()
+          .max(200)
+          .optional()
+          .describe("A useful filename for the Dato media library."),
+      }),
+      execute: async ({ filename }) => {
+        if (!ctx.attachmentUrl) {
+          return {
+            error: "No current chat image was supplied to this blog-agent run.",
+          };
+        }
+        try {
+          const uploadId = await createUploadFromUrl(
+            ctx.attachmentUrl,
+            filename,
+          );
+          note(ctx, "uploadAttachment", `uploaded chat image as ${uploadId}`);
+          return {
+            ok: true,
+            uploadId,
+            fieldValue: { upload_id: uploadId },
           };
         } catch (error) {
           return { error: (error as Error).message };
