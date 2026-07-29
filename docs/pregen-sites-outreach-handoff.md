@@ -31,23 +31,30 @@ rather than trusting these figures after any large import.
 
 ### Sync coverage
 
-| Object                                | HubSpot     | Growth   |
-| ------------------------------------- | ----------- | -------- |
-| Companies                             | 217,097     | 216,235  |
-| Contacts                              | 307,334     | 33,032   |
-| Contacts with an email                | 307,304     | —        |
-| Contacts with an email **and** a company association | **266,961** | 1,885 carry a `hubspot_contact_id` |
+Updated after the full contact backfill ran on July 29, 2026.
 
-Company sync is effectively complete (99.6%). **Contact sync is not**: Growth
-holds roughly 11% of the portal's contacts and can only address 1,885 of them
-in HubSpot. A 200-contact sample averages 1.13 contacts per associated company,
-so contact coverage in HubSpot is close to universal across the company
-universe — the gap is entirely on the Growth side, not missing data in HubSpot.
+| Object                        | HubSpot | Growth  |
+| ----------------------------- | ------- | ------- |
+| Companies                     | 217,097 | 216,235 |
+| Contacts                      | 307,334 | 321,706 |
+| Contacts carrying a `hubspot_contact_id` | — | **291,113** |
 
-Sizing for the full backfill: `leads.contact` is 14 MB for 33,032 rows (~440
-bytes/row), so mirroring all ~307k contacts costs roughly **130–190 MB**. The
-whole database is 394 MB today. Storage is not a constraint; API pagination
-time and webhook volume are the real costs.
+Both sides are now effectively complete. The backfill walked the whole contact
+universe — 307,416 seen, **291,034 mirrored (94.7%)**, 30 skipped for no email,
+16,352 skipped because their HubSpot company resolves to no `leads.domain` row.
+Growth's total exceeds HubSpot's because `leads.contact` also holds
+BuiltWith/Instantly-sourced contacts that were never in the CRM.
+
+That skip rate is real rather than a resolution bug: 99.98% of `leads.domain`
+rows carry a `hubspot_record_id`, so those contacts belong to HubSpot companies
+genuinely outside Growth's 216k domain universe. Domains are never minted from
+contact email hosts — that is the company projection's business.
+
+The unlock is large: **companies with at least one enrollable contact went from
+18,180 to 214,103** of 216,252. Enrollability is no longer the constraint on the
+pregen universe.
+
+Runtime was ~45 minutes at ~114 contacts/sec. Storage was never the issue.
 
 ### Contact mirror — code shipped July 29, 2026; subscription still pending
 
@@ -66,56 +73,84 @@ Closing this needed two halves. **The code half is done and on `main`:**
 - `scripts/process-hubspot-webhook-backlog.ts` reconciles contacts too.
 - `scripts/backfill-hubspot-contacts.ts` walks the full universe.
 
-**The remaining half is the contact (`0-1`) subscription on the Operated app**,
-which has no API — it must be added in the HubSpot UI. Deliberately sequenced
-last so the firehose never pointed at untested handlers. **It is now blocked —
-see the next section.**
+**The contact (`0-1`) subscription is LIVE** as of July 29, 2026 — added in the
+HubSpot UI on the Operated app (there is no API for it), deliberately last so the
+firehose never pointed at untested handlers. The app now shows **Company 35/35,
+Contact 8/8**:
 
-### ⚠️ The receiver silently loses events (found July 29, 2026)
+| Contact subscription                                    | Type                    |
+| ------------------------------------------------------- | ----------------------- |
+| Created                                                 | `object.creation`       |
+| Deleted                                                 | `object.deletion`       |
+| Merged                                                  | `object.merge`          |
+| `email`, `firstname`, `lastname`, `jobtitle`, `phone`    | `object.propertyChange` |
 
-**Do not enable the contact subscription until this is fixed.** The contact
-mirror would inherit the loss, which defeats the point of subscribing at all.
+**Use expanded object support** is switched on, so contact events arrive as
+`object.*` carrying `objectTypeId: "0-1"`. That is not cosmetic — the backlog
+processor's SQL filters on exactly that shape, and classic `contact.*` events
+would silently fail to match it.
 
-Measured in the Operated app's Webhooks tab (app `1855067`, portal `22480390`)
-against `leads.hubspot_webhook_event`. Rows stored over 30 days equal HubSpot's
-delivered total **minus its error count, exactly**:
+Three allow-list entries are deliberately **not** subscribed, documented on
+`CONTACT_MIRROR_PROPERTIES` itself: `associatedcompanyid` (company links arrive
+as association events, which already trigger re-hydration), `state` (low churn),
+and `hs_email_optout` — HubSpot does not offer that one as a subscription at all.
 
-| Property            | HubSpot total | Errors | total − errors | Stored |
-| ------------------- | ------------- | ------ | -------------- | ------ |
-| `domain`            | 1,991         | 713    | 1,278          | 1,278  |
-| `name`              | 2,064         | 707    | 1,357          | 1,357  |
-| `lifecyclestage`    | 2,009         | 648    | 1,361          | 1,361  |
-| `website`           | 5,879         | 718    | 5,161          | 5,161  |
-| `pms_ai_identified` | 1,290         | 233    | 1,057          | 1,057  |
+⚠️ **Opt-out state does not self-refresh.** `hs_email_optout` reads fine over the
+API (the backfill captured 73 opted-out contacts) but is a calculated property
+HubSpot will not let you subscribe to. A fresh unsubscribe therefore will not
+reach Growth on its own — re-run the backfill before treating opt-out as current.
+HubSpot still enforces suppression at send time regardless; the local copy exists
+to stop us spending review slots and paid site builds on people we may not email.
 
-Errored deliveries were therefore **never stored, and no retry ever succeeded** —
-roughly 3,000 lost company updates in 30 days, still ongoing (app Overview shows
-`4XX — 254 errors, last occurred an hour ago`).
+### Receiver error rate: transient, not loss (investigated July 29, 2026)
 
-Two consequences worth internalising:
+The Operated app's Webhooks tab (app `1855067`, portal `22480390`) shows alarming
+error counts — `domain` 713 of 1,991, `name` 707 of 2,064, `website` 718 of
+5,879, `lifecyclestage` 648 of 2,009, `pms_ai_identified` 233 of 1,290 — and
+rows stored in `leads.hubspot_webhook_event` equal HubSpot's total *minus* its
+errors, **exactly**, for all five.
 
-- **The backlog processor cannot heal this.** It reprocesses stored rows; these
-  were never stored. Store-raw-first only protects events that actually arrive,
-  so "durable" was doing less work than the design assumed.
-- **`hubspot_last_modified_at` is not trustworthy** as a freshness signal for
-  company records, because the update that would have advanced it may be one of
-  the lost ones.
+That looks like proof of permanent loss. **It is not.** It was initially read
+that way and the reading was wrong; the arithmetic has a benign explanation.
+HubSpot's TOTAL COUNT is delivery *attempts* and ERRORS is *failed attempts*, so
+`total − errors` is just the number of successful attempts — which equals the
+number of unique events when every event eventually succeeds.
 
-The error pattern points at **bulk** changes rather than overload: it clusters on
-properties that move during imports, enrichment, and workflows (the five above)
-and is near-zero on incrementally-changing high-volume ones (`hs_lead_status`
-32/13,123, `phone` 13/10,212, `email` 0/7,315). Event throttling on the app is
-10 requests.
+The discriminator is `attempt_number`, which the receiver stores. Rows landing on
+a retry track the error count at a near-constant ratio:
 
-Leading hypothesis, **not yet confirmed** — the errors are 4XX, meaning the
-receiver *rejects* them. The v3 signature check enforces a five-minute timestamp
-skew, so if a bulk batch fails once and HubSpot retries outside that window,
-every retry is rejected and a transient failure becomes permanent loss.
+| Property            | Errors | Stored on retry (`attempt_number >= 1`) | Ratio |
+| ------------------- | ------ | --------------------------------------- | ----- |
+| `domain`            | 713    | 384                                     | 1.86  |
+| `name`              | 707    | 383                                     | 1.85  |
+| `website`           | 718    | 382                                     | 1.88  |
+| `lifecyclestage`    | 648    | 365                                     | 1.78  |
+| `pms_ai_identified` | 233    | 133                                     | 1.75  |
 
-Diagnose from Vercel runtime logs for `/api/webhooks/hubspot` — note the project
-lives under team **`wanderdev`**, so the CLI needs `--scope wanderdev` (its
-default here is `boe-ventures`). Then add a reconciliation pass so loss is
-detectable rather than silent.
+A permanently-lost event burns its whole retry budget (max observed
+`attempt_number` is 7), which would push that ratio far higher and make it
+erratic. A steady ~1.8 means affected events failed once or twice and then
+landed. Solving for lost events on `domain` — `7X + 1.8 × 384 = 713` — gives
+**X ≈ 3**. Essentially nothing is lost.
+
+So: the retry rail works, `store-raw-first` holds, and the backlog processor has
+nothing to heal.
+
+What *is* real, and worth hardening rather than panicking about: the receiver
+fails roughly 1.8 attempts per affected event under **bulk** bursts. The failures
+cluster on properties that move during imports, enrichment, and workflows (the
+five above) and are near-zero on incrementally-changing high-volume ones
+(`hs_lead_status` 32/13,123, `phone` 13/10,212, `email` **0**/7,315). Event
+throttling on the app is 10 requests. Normal traffic is clean — a sampled log
+window showed only `200`s.
+
+The risk is headroom, not current loss: retries already reach attempt 7, so a
+larger burst could exhaust the budget and *then* we would lose data silently.
+Worth adding a reconciliation pass so that stays detectable.
+
+To dig further, Vercel runtime logs for `/api/webhooks/hubspot` — note the
+project lives under team **`wanderdev`**, so the CLI needs `--scope wanderdev`
+(its default here is `boe-ventures`).
 
 Subscribe to a **narrow property allow-list**, not all contact properties. The
 company subscription alone produced 142k events; contacts outnumber companies
@@ -227,21 +262,17 @@ RevOps then becomes an optional override rather than a prerequisite.
 **Full design in [pregen-site-evaluation.md](./pregen-site-evaluation.md)** —
 verified July 29, 2026. The headline decisions:
 
-- Score **both sides with the same existing site grader**
-  (`POST /guest-api/growth/site-grader`, unauthenticated, URL-driven, live).
-  Two different scorers would produce two scales, and subtracting across them
-  makes the gap noise. This is the "our own existing site auditor" option, and
-  it does not re-introduce the objection to the monolith's build-time
-  revision-ratchet eval gate — growth calls a service, it does not depend on
-  monolith code in the generation pipeline.
-- `summary.overall` from two runs is **not directly subtractable**: `content`
-  and `mobile` drop to `null` and get renormalized out, so two runs can be
-  computed over different denominators. Recompute over the shared category set
-  before diffing.
-- Add a **growth-owned visual score** — the grader has no design dimension at
-  all, and growth needs the screenshot anyway for the Send Review card.
-- `metrics.cwv` is always null (dead code). No Core Web Vitals claim can reach
-  copy.
+- **The scorer lives in Growth**, not the monolith, and does not call out to it
+  either. Standing architectural preference, and it costs nothing here.
+- The constraint that actually matters is **one yardstick**: score both sides
+  with the *same* scorer, because the output is a difference and two scales make
+  that difference noise. A Growth-native scorer satisfies this completely —
+  "same scorer" never meant "the monolith's scorer".
+- Emit **every dimension, always.** The monolith grader's `content` and `mobile`
+  drop to `null` and get renormalized out, so two of its runs can be computed
+  over different denominators — exactly the trap a gap-based ranking must avoid.
+- Growth owns the axis nothing else scores: **visual design and media quality**,
+  judged from a screenshot it needs for the Send Review card anyway.
 - Scores are **internal ranking only**. The sequence policy already forbids
   telling a prospect their site underperforms; keep the score out of every
   `growth_pregen_*` property so it cannot leak into a token.
@@ -487,10 +518,10 @@ Resolve these before sending to real prospects:
    untouched-cohort enrollability went from 367 to ~377 of 499 and recycled to
    ~394 of 404. The residual gap is companies with genuinely no addressable
    contact in HubSpot; either accept the reduced universe or source contacts.
-9. **⚠️ Silent webhook event loss.** ~3,000 company updates lost in 30 days, still
-   ongoing, and it cannot be healed after the fact. This **blocks enabling the
-   contact subscription** — see the dedicated section above. Highest-priority
-   item in this document.
+9. **Receiver burst fragility.** Not a blocker and not current data loss — see
+   the receiver-error section above for why the scary-looking numbers are
+   transient. But retries already reach attempt 7 under bulk bursts, so add a
+   reconciliation pass before relying on webhooks as the only freshness path.
 
 ## Recommended next milestone
 

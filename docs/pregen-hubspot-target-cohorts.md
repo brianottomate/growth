@@ -15,13 +15,12 @@ production database. HubSpot's own list sizes were 410/1,400 (recycled) and
 no resolvable domain. "Enrollable" means the company has at least one
 associated, non-deleted contact with both an email and a `hubspot_contact_id`.
 
-⚠️ **Contacts still have no live update path.** The mirror code shipped July 29,
-2026 and a full backfill ran, so contacts are no longer a July 24 snapshot — but
-the contact (`0-1`) subscription is **not enabled**, and enabling it is blocked
-on a receiver bug that silently loses events. Re-run
-`scripts/backfill-hubspot-contacts.ts` before any send batch. Full detail in
+The mirror code shipped July 29, 2026 and a full backfill ran, so contacts are no
+longer a July 24 snapshot. Until the contact (`0-1`) subscription is confirmed
+active, re-run `scripts/backfill-hubspot-contacts.ts` before any send batch.
+Receiver health detail in
 [pregen-sites-outreach-handoff.md](./pregen-sites-outreach-handoff.md) →
-*The receiver silently loses events*.
+*Receiver error rate: transient, not loss*.
 
 The contact lists contain valid-email contacts associated with companies in the
 corresponding company list. Growth preserves company and contact memberships

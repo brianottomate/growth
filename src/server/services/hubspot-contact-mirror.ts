@@ -213,6 +213,13 @@ export async function mirrorContacts(
         // The linkage itself is never optional — without it we cannot enroll.
         hubspotContactId: sql`excluded.hubspot_contact_id`,
         domainId: sql`excluded.domain_id`,
+        // Resurrect on re-hydration. If HubSpot returned this contact then it
+        // exists there, which outranks any earlier soft delete. Without this a
+        // contact that was deleted and then restored — or re-created with the
+        // same email — would stay invisible and unenrollable forever, since
+        // nothing else ever clears deleted_at. This matters now that the app
+        // subscribes to contact deletions.
+        deletedAt: sql`null`,
         updatedAt: new Date(),
       },
     });

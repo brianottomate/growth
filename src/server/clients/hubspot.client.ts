@@ -961,10 +961,22 @@ export async function getCompanyContacts(
 //
 // The narrow property allow-list Growth mirrors onto `leads.contact`. This is
 // deliberately not CONTACT_CORE_PROPERTIES: it is the set that maps to a
-// first-class column plus the two fields needed to link and suppress. The same
-// list is what the Operated app's contact webhook subscribes to — keep them in
-// step, because a subscription wider than this produces events with nothing to
+// first-class column plus the two fields needed to link and suppress. Keep it
+// narrow — a subscription wider than this produces events with nothing to
 // project, and the company subscription alone already generated 142k rows.
+//
+// The Operated app subscribes to the readable subset of this list: `email`,
+// `firstname`, `lastname`, `jobtitle`, `phone` (plus contact creation, deletion
+// and merge). Three entries here are deliberately NOT subscribed:
+//
+// - `associatedcompanyid` — company links arrive as association events instead,
+//   which the receiver already turns into a re-hydration.
+// - `state` — low churn, and the backfill covers it.
+// - `hs_email_optout` — HubSpot does not offer it as a webhook subscription at
+//   all (it is a calculated property; the picker will only "create option" for
+//   it). It reads fine over the API, so the backfill captures it, but a fresh
+//   unsubscribe will NOT reach Growth on its own. Re-run the backfill, or
+//   re-hydrate, before treating opt-out state as current.
 export const CONTACT_MIRROR_PROPERTIES = [
   "email",
   "firstname",
