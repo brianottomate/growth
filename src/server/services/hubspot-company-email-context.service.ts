@@ -92,21 +92,37 @@ function token(): string {
   return env.HUBSPOT_ACCESS_TOKEN_OPERATED;
 }
 
+/**
+ * Retries on 429. Reading emails plus three activity types per company means one
+ * ranked lead can issue a dozen calls, which trips HubSpot's ten-second rolling
+ * limit as soon as anything runs concurrently. Without this the callers' own
+ * per-kind catches turn a rate limit into silently missing history — a ranked
+ * lead reporting "no prior contact" when it has ten logged calls is worse than
+ * an error, because nobody goes looking.
+ */
 async function hubspot<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`https://api.hubapi.com${path}`, {
-    ...init,
-    headers: {
-      authorization: `Bearer ${token()}`,
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `HubSpot ${path} -> ${response.status}: ${await response.text()}`,
-    );
+  const maxAttempts = 4;
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetch(`https://api.hubapi.com${path}`, {
+      ...init,
+      headers: {
+        authorization: `Bearer ${token()}`,
+        "content-type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    if (response.ok) return (await response.json()) as T;
+
+    const body = await response.text();
+    const retriable = response.status === 429 || response.status >= 500;
+    if (!retriable || attempt >= maxAttempts) {
+      throw new Error(`HubSpot ${path} -> ${response.status}: ${body}`);
+    }
+    // The rolling window is ten seconds wide, so anything shorter on a 429 just
+    // burns another attempt against the same window.
+    const waitMs = response.status === 429 ? 10_000 : 500 * attempt;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
-  return (await response.json()) as T;
 }
 
 function chunks<T>(items: T[], size: number): T[][] {
