@@ -7,9 +7,9 @@ import {
 } from "ai";
 
 import { renderPlaybookIndex } from "@/server/ai/playbooks";
-import { loadMentionSparContext } from "@/server/ai/spar-agent/context";
-import { SPAR_AGENT_PERSONA } from "@/server/ai/spar-agent/persona";
-import { buildSparTools } from "@/server/ai/spar-agent/tools";
+import { loadMentionSparContext } from "@/server/ai/listening-agent/context";
+import { SPAR_AGENT_PERSONA } from "@/server/ai/listening-agent/persona";
+import { buildSparTools } from "@/server/ai/listening-agent/tools";
 import { getSession } from "@/server/better-auth/server";
 
 /**
