@@ -872,23 +872,55 @@ export const leadsRouter = createTRPCRouter({
     .input(
       z.object({
         q: z.string().trim().optional(),
+        // Which population to review. "netnew" is the original cold-outbound
+        // list: not in the CRM at all. "pregen" is the opposite population —
+        // companies that ARE in HubSpot, as members of a pregen cohort — so the
+        // two cannot share a base filter.
+        mode: z.enum(["netnew", "pregen"]).default("pregen"),
         verdict: z.enum(["send", "review", "form", "skip"]).optional(),
         route: z.enum(["instantly", "form", "none"]).optional(),
         hasDraft: z.boolean().optional(),
+        owner: z.string().trim().min(1).optional(),
         limit: z.number().int().min(1).max(100).default(50),
         offset: z.number().int().nonnegative().default(0),
       }),
     )
     .query(async ({ ctx, input }) => {
+      // Suppression and deletion apply to both populations; everything else
+      // differs, because "never touched the CRM" and "is a CRM cohort member"
+      // are mutually exclusive.
       const conds = [
-        eq(leadDomainTable.inHubspot, false),
-        eq(leadDomainTable.hasHubspotDeal, false),
-        eq(leadDomainTable.isExistingCustomer, false),
         eq(leadDomainTable.excludeFromOutreach, false),
-        eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
         isNull(leadDomainTable.deletedAt),
-        sql`${leadDomainTable.scorePregenPotential} is not null`,
       ];
+
+      if (input.mode === "pregen") {
+        conds.push(
+          exists(
+            ctx.db
+              .select({ one: sql`1` })
+              .from(hubspotListMembershipTable)
+              .where(
+                and(
+                  eq(hubspotListMembershipTable.domainId, leadDomainTable.id),
+                  eq(hubspotListMembershipTable.objectType, "company"),
+                ),
+              ),
+          ),
+        );
+      } else {
+        conds.push(
+          eq(leadDomainTable.inHubspot, false),
+          eq(leadDomainTable.hasHubspotDeal, false),
+          eq(leadDomainTable.isExistingCustomer, false),
+          eq(leadDomainTable.pregenStatus, "LIVE_RENTAL"),
+          sql`${leadDomainTable.scorePregenPotential} is not null`,
+        );
+      }
+
+      if (input.owner) {
+        conds.push(eq(leadDomainTable.hubspotOwner, input.owner));
+      }
 
       if (input.q) {
         conds.push(
@@ -915,6 +947,8 @@ export const leadsRouter = createTRPCRouter({
           scoreLeadQuality: leadDomainTable.scoreLeadQuality,
           sourceTier: leadDomainTable.sourceTier,
           enrichment: leadDomainTable.enrichment,
+          hubspotOwner: leadDomainTable.hubspotOwner,
+          pregenSiteUrl: leadDomainTable.pregenSiteUrl,
         })
         .from(leadDomainTable)
         .where(where)

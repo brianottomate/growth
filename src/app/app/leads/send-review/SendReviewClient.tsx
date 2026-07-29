@@ -194,18 +194,38 @@ function SequencePreview({ row }: { row: ReviewRow }) {
 
   return (
     <div className="space-y-2">
-      <div className="text-xs">
-        <span className="text-muted-foreground">Angle:</span>{" "}
-        {outreach.angle ?? "-"}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span>
+          <span className="text-muted-foreground">Angle:</span>{" "}
+          {outreach.angle ?? "-"}
+        </span>
+        {row.pregenSiteUrl && (
+          <a
+            href={row.pregenSiteUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] underline"
+          >
+            Open the preview they will see ↗
+          </a>
+        )}
       </div>
+      {/* Full bodies, unclamped: the point of this surface is approving copy
+          that is about to go out as a person, so a truncated body is not a
+          review. */}
       <div className="grid gap-2 lg:grid-cols-2">
         {outreach.steps.slice(0, 4).map((step, index) => (
           <div key={index} className="rounded-md border p-2">
-            <div className="text-muted-foreground text-[10px] font-medium">
-              Step {index + 1}
-              {step.subject ? ` · ${step.subject}` : " · in-thread"}
+            <div className="text-muted-foreground flex items-center justify-between gap-2 text-[10px] font-medium">
+              <span>
+                Touch {index + 1}
+                {step.subject ? ` · ${step.subject}` : " · in-thread reply"}
+              </span>
+              <span className="tabular-nums">
+                {step.delayDays === 0 ? "day 0" : `day ${step.delayDays}`}
+              </span>
             </div>
-            <pre className="mt-1 line-clamp-5 font-sans text-xs leading-relaxed whitespace-pre-wrap">
+            <pre className="mt-1 font-sans text-xs leading-relaxed whitespace-pre-wrap">
               {step.body}
             </pre>
           </div>
@@ -440,11 +460,21 @@ export function SendReviewClient() {
   const [q, setQ] = useState("");
   const [verdict, setVerdict] = useState<Verdict | undefined>();
   const [route, setRoute] = useState<Route | undefined>();
+  // Defaults to the pregen cohorts — the active motion. "netnew" is the old
+  // cold-outbound population, which is a disjoint set (never in the CRM).
+  const [mode, setMode] = useState<"pregen" | "netnew">("pregen");
+  const [owner, setOwner] = useState<string | undefined>(undefined);
+
+  const ownerOptions = useQuery(
+    trpc.leads.ownerOptions.queryOptions({ pregenOnly: mode === "pregen" }),
+  );
 
   const queryInput = {
     q: q || undefined,
+    mode,
     verdict,
     route,
+    owner,
     limit: 50,
   };
   const reviewOptions = trpc.leads.sendReview.queryOptions(queryInput, {
@@ -507,6 +537,35 @@ export function SendReviewClient() {
             className="border-border bg-background focus:ring-ring w-72 rounded-md border py-1.5 pr-3 pl-8 text-sm focus:ring-1 focus:outline-none"
           />
         </div>
+        <span className="bg-border mx-1 h-4 w-px" />
+        <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+          Motion
+        </span>
+        {(["pregen", "netnew"] as const).map((value) => (
+          <Pill
+            key={`mode-${value}`}
+            active={mode === value}
+            onClick={() => {
+              setMode(value);
+              setOwner(undefined);
+            }}
+          >
+            {value === "pregen" ? "Pre-Gen cohorts" : "Net-new"}
+          </Pill>
+        ))}
+        <span className="bg-border mx-1 h-4 w-px" />
+        <select
+          value={owner ?? ""}
+          onChange={(event) => setOwner(event.target.value || undefined)}
+          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
+        >
+          <option value="">All BDRs</option>
+          {ownerOptions.data?.map((o) => (
+            <option key={o.owner} value={o.owner ?? ""}>
+              {o.owner} ({o.count})
+            </option>
+          ))}
+        </select>
         <span className="bg-border mx-1 h-4 w-px" />
         <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
           Verdict
