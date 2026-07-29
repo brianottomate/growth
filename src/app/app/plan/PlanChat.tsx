@@ -5,6 +5,8 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Streamdown } from "streamdown";
 
+import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
+
 import type { Blueprint } from "./BlueprintReview";
 
 /**
@@ -114,8 +116,8 @@ export function PlanChat({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-4">
+    <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">
+      <div className="min-w-0 space-y-4">
         {messages.length === 0 && (
           <p className="text-muted-foreground text-sm">
             Paste a link (a press release, a landing page) or just describe a
@@ -135,7 +137,7 @@ export function PlanChat({
           });
 
           return (
-            <div key={m.id} className="space-y-2">
+            <div key={m.id} className="min-w-0 space-y-2">
               <div className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
                 {m.role === "user" ? "You" : "Planner"}
               </div>
@@ -148,7 +150,7 @@ export function PlanChat({
                       key={i}
                       animated={{ animation: "blurIn", duration: 80 }}
                       isAnimating={streaming && i === lastTextIdx}
-                      className="text-sm leading-relaxed"
+                      className={`${CHAT_MARKDOWN_LAYOUT} text-sm leading-relaxed`}
                     >
                       {part.text}
                     </Streamdown>

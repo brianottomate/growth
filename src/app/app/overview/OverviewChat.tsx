@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
+import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
 import { cn } from "@/lib/utils";
 import {
   GROWTH_CAPABILITY_LABELS,
@@ -49,6 +50,7 @@ import {
   type AssistantIntent,
   type ContentWorkContext,
 } from "@/lib/assistant-events";
+import { capabilityWritesWorkspace } from "@/lib/assistant-write-effect";
 import {
   AdsRankedCard,
   AdsScopeCard,
@@ -256,10 +258,7 @@ export function OverviewChat({
         ) {
           navigatedCalls.current.add(key);
         }
-        if (
-          toolName.endsWith("Write") ||
-          toolName === "prepareProductionPacket"
-        ) {
+        if (capabilityWritesWorkspace(toolName, completed.data)) {
           reconciledCalls.current.add(key);
         }
       }
@@ -306,8 +305,7 @@ export function OverviewChat({
           loose.toolCallId ??
           `${message.id}:${toolName}:${completed.action ?? "output"}`;
         if (
-          (toolName.endsWith("Write") ||
-            toolName === "prepareProductionPacket") &&
+          capabilityWritesWorkspace(toolName, completed.data) &&
           !reconciledCalls.current.has(key)
         ) {
           reconciledCalls.current.add(key);
@@ -541,11 +539,11 @@ export function OverviewChat({
           onScroll={handleScroll}
           role="log"
           aria-label="Overview assistant conversation"
-          className="h-full scrollbar-thin overflow-y-auto"
+          className="h-full scrollbar-thin overflow-x-hidden overflow-y-auto"
         >
           <div
             className={cn(
-              "mx-auto w-full space-y-4 pb-4",
+              "mx-auto w-full min-w-0 space-y-4 pb-4",
               variant === "page" ? "max-w-3xl px-1" : "px-4",
             )}
           >
@@ -601,14 +599,14 @@ export function OverviewChat({
                 <div
                   key={message.id}
                   className={cn(
-                    "group space-y-2",
+                    "group min-w-0 space-y-2",
                     message.role === "user" && "flex justify-end",
                   )}
                 >
                   {message.role === "user" ? (
                     <UserMessage message={message} />
                   ) : (
-                    <div className="max-w-[95%] space-y-2">
+                    <div className="max-w-[95%] min-w-0 space-y-2">
                       {message.parts.map((part, i) => {
                         const key = `${message.id}-${i}`;
                         if (part.type === "reasoning") {
@@ -630,7 +628,7 @@ export function OverviewChat({
                                 <ChevronRight className="h-3 w-3 transition-transform group-open/r:rotate-90" />
                                 Thought process
                               </summary>
-                              <p className="border-border mt-1 border-l-2 pl-3 whitespace-pre-wrap">
+                              <p className="border-border mt-1 border-l-2 pl-3 break-words whitespace-pre-wrap">
                                 {part.text}
                               </p>
                             </details>
@@ -647,7 +645,7 @@ export function OverviewChat({
                               key={key}
                               animated={{ animation: "blurIn", duration: 80 }}
                               isAnimating={shouldAnimate}
-                              className="text-sm leading-relaxed"
+                              className={`${CHAT_MARKDOWN_LAYOUT} text-sm leading-relaxed`}
                             >
                               {part.text}
                             </Streamdown>
@@ -882,7 +880,7 @@ function UserMessage({ message }: { message: UIMessage }) {
         ) : null;
       })}
       {text && (
-        <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2 text-sm whitespace-pre-wrap">
+        <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2 text-sm break-words whitespace-pre-wrap">
           {text}
         </div>
       )}

@@ -19,6 +19,21 @@ type BlogMeta = {
 const monthKey = (d: Date) =>
   d.toLocaleDateString([], { month: "long", year: "numeric" });
 
+const blogThumbnailUrl = (url: string) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.endsWith("datocms-assets.com")) {
+      parsed.searchParams.set("w", "160");
+      parsed.searchParams.set("h", "100");
+      parsed.searchParams.set("fit", "crop");
+      parsed.searchParams.set("auto", "format");
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+};
+
 export default async function BlogPage({
   searchParams,
 }: {
@@ -240,6 +255,22 @@ export default async function BlogPage({
                       day: "numeric",
                     })}
                   </span>
+                  {t.post.media?.[0]?.url ? (
+                    // Dato serves a small Imgix derivative here; non-Dato
+                    // sources retain their original URL and are still lazy.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={blogThumbnailUrl(t.post.media[0].url)}
+                      alt=""
+                      loading="lazy"
+                      className="bg-muted h-9 w-14 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="bg-muted/40 h-9 w-14 shrink-0 rounded border"
+                    />
+                  )}
                   {!t.post.publishedAt && (
                     <span className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
                       Draft

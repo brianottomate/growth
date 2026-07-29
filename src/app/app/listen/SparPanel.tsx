@@ -7,6 +7,7 @@ import { BookOpen, Check, PenLine, ShieldQuestion, X } from "lucide-react";
 import { Streamdown } from "streamdown";
 
 import { Button } from "@/components/ui/button";
+import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
 import {
   Sheet,
   SheetContent,
@@ -107,7 +108,7 @@ export function SparPanel({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+        className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
       >
         <SheetHeader className="border-b">
           <SheetTitle className="text-sm">Spar — should we engage?</SheetTitle>
@@ -116,7 +117,7 @@ export function SparPanel({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4">
           {messages.length === 0 ? (
             <div className="space-y-3 pt-2">
               <p className="text-muted-foreground text-sm">
@@ -147,21 +148,24 @@ export function SparPanel({
               });
 
               return (
-                <div key={m.id} className="space-y-2">
+                <div key={m.id} className="min-w-0 space-y-2">
                   <div className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
                     {m.role === "user" ? "You" : "Spar"}
                   </div>
                   {m.parts.map((part, i) => {
                     if (part.type === "text") {
                       return m.role === "user" ? (
-                        <p key={i} className="text-sm whitespace-pre-wrap">
+                        <p
+                          key={i}
+                          className="text-sm break-words whitespace-pre-wrap"
+                        >
                           {part.text}
                         </p>
                       ) : (
                         <Streamdown
                           key={i}
                           isAnimating={streaming && i === lastTextIdx}
-                          className="text-sm leading-relaxed"
+                          className={`${CHAT_MARKDOWN_LAYOUT} text-sm leading-relaxed`}
                         >
                           {part.text}
                         </Streamdown>
@@ -244,10 +248,12 @@ function ToolCard({
           Record this decision?
         </div>
         <p className="mt-1.5 text-sm">
-          Mark as{" "}
-          <span className="font-semibold">{input?.status ?? "?"}</span>
+          Mark as <span className="font-semibold">{input?.status ?? "?"}</span>
           {input?.decisionNote ? (
-            <span className="text-muted-foreground italic"> — {input.decisionNote}</span>
+            <span className="text-muted-foreground italic">
+              {" "}
+              — {input.decisionNote}
+            </span>
           ) : null}
         </p>
         <div className="mt-2 flex gap-2">
@@ -305,7 +311,7 @@ function ToolCard({
             <PenLine className="size-3" />
             Draft reply
           </div>
-          <p className="text-sm whitespace-pre-wrap">{out.draft}</p>
+          <p className="text-sm break-words whitespace-pre-wrap">{out.draft}</p>
         </div>
       );
     }
