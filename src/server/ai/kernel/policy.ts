@@ -202,7 +202,10 @@ export const growthActionPolicies = {
   planningWrite: { generateSlots: write() },
   amplificationRead: { list: read() },
   amplificationWrite: { request: write({ idempotent: true }) },
-  leadsRead: { summary: read() },
+  leadsRead: { summary: read(), sequence: read() },
+  // Regenerating a draft is reversible (the prior draft is replaced, nothing
+  // leaves Growth) but it does spend model tokens, so it is a write.
+  leadsWrite: { rewriteSequence: write({ idempotent: false }) },
   lifecycleRead: {
     overview: read(),
     inspectProgram: read(),

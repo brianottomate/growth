@@ -99,7 +99,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   planningWrite: ["generateSlots"],
   amplificationRead: ["list"],
   amplificationWrite: ["request"],
-  leadsRead: ["summary"],
+  leadsRead: ["summary", "sequence"],
+  leadsWrite: ["rewriteSequence"],
   lifecycleRead: ["overview", "inspectProgram", "searchCampaigns", "findGaps"],
   lifecycleWrite: [
     "createProgram",
@@ -150,6 +151,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   amplificationRead: "Reading amplifiers",
   amplificationWrite: "Recruiting amplification",
   leadsRead: "Reading leads",
+  leadsWrite: "Rewriting a lead sequence",
   lifecycleRead: "Reading lifecycle",
   lifecycleWrite: "Updating lifecycle",
   listeningRead: "Reading mentions",

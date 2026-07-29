@@ -42,7 +42,11 @@ import {
   importDriveFilesToContent,
 } from "./drive";
 import { EMAIL_TOOLS } from "./email";
-import { leadsSummary } from "./leads";
+import {
+  leadsRewriteSequence,
+  leadsSequence,
+  leadsSummary,
+} from "./leads";
 import { recentMentions } from "./listening";
 import { nextForBrand } from "./next";
 import {
@@ -321,8 +325,15 @@ export const amplificationWrite = growthDomainTool({
 });
 
 export const leadsRead = growthDomainTool({
-  description: "Read lead totals and current pipeline summary.",
-  actions: { summary: leadsSummary },
+  description:
+    "Read lead totals, the current pipeline summary, and the generated outreach sequence for a specific domain.",
+  actions: { summary: leadsSummary, sequence: leadsSequence },
+});
+
+export const leadsWrite = growthDomainTool({
+  description:
+    "Rewrite a lead's outreach sequence from a plain-language instruction. Saves a draft; never publishes to HubSpot and never enrolls.",
+  actions: { rewriteSequence: leadsRewriteSequence },
 });
 
 export const listeningRead = growthDomainTool({
@@ -359,5 +370,6 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   amplificationRead,
   amplificationWrite,
   leadsRead,
+  leadsWrite,
   listeningRead,
 } as const;
