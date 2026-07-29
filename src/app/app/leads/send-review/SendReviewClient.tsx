@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -182,6 +183,42 @@ function EvidenceList({ row }: { row: ReviewRow }) {
   );
 }
 
+/**
+ * The prospect's current site, as captured by the lead ranker.
+ *
+ * Standing in for the finished pregen preview thumbnail we actually want here —
+ * proving the row layout and the image plumbing now, with the one screenshot we
+ * already have. Silent when a domain has not been ranked yet.
+ */
+function SiteThumbnail({ row }: { row: ReviewRow }) {
+  const rank = (
+    row.enrichment as unknown as {
+      leadRank?: { screenshotUrl?: string | null; overall?: number };
+    } | null
+  )?.leadRank;
+  const src = rank?.screenshotUrl;
+  if (!src) return null;
+  return (
+    <div className="shrink-0">
+      <div className="border-border relative h-20 w-32 overflow-hidden rounded-md border bg-muted">
+        <Image
+          src={src}
+          alt={`Current site for ${row.domain}`}
+          fill
+          sizes="128px"
+          className="object-cover object-top"
+          unoptimized
+        />
+      </div>
+      {typeof rank?.overall === "number" && (
+        <div className="text-muted-foreground mt-1 text-center text-[10px] tabular-nums">
+          rank {rank.overall}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SequencePreview({ row }: { row: ReviewRow }) {
   const outreach = row.outreach;
   if (!outreach?.steps?.length) {
@@ -266,6 +303,7 @@ function ReviewRowItem({
         {/* decision header — the verdict is the hero */}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex min-w-0 gap-3.5">
+            <SiteThumbnail row={row} />
             <div
               className={`grid size-11 shrink-0 place-items-center rounded-full border-2 ${theme.border}`}
             >

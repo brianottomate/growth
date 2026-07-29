@@ -24,6 +24,13 @@ const config: NextConfig = {
         pathname: "/**",
       },
       {
+        // Firecrawl hosts the site screenshots the lead ranker captures, which
+        // the Send Review row renders as a thumbnail.
+        protocol: "https",
+        hostname: "storage.googleapis.com",
+        pathname: "/firecrawl-scrape-media/**",
+      },
+      {
         protocol: "https",
         hostname: "**.public.blob.vercel-storage.com",
         pathname: "/**",

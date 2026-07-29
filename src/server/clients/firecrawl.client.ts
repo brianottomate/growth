@@ -29,10 +29,15 @@ export async function scrapeForEnrichment(url: string): Promise<{
   markdown?: string;
   metadata?: Record<string, unknown>;
   screenshot?: string;
+  images?: string[];
 }> {
   if (!isFirecrawlConfigured) return {};
   const result = await firecrawl.scrape(url, {
-    formats: ["markdown", "screenshot"],
+    // `images` is a first-class format in the SDK and returns the page's image
+    // URLs, which is what lets us judge whether an operator has real photography
+    // or placeholder stock. Not derived from the markdown: onlyMainContent
+    // strips the hero, which is usually their best asset.
+    formats: ["markdown", "screenshot", "images"],
     onlyMainContent: true,
   });
   return {
@@ -42,6 +47,7 @@ export async function scrapeForEnrichment(url: string): Promise<{
     screenshot:
       (result as { screenshot?: string }).screenshot ??
       (result as { screenshotUrl?: string }).screenshotUrl,
+    images: (result as { images?: string[] }).images,
   };
 }
 
