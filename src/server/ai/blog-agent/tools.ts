@@ -57,6 +57,73 @@ const note = (ctx: BlogToolContext, toolName: string, summary: string) => {
   ctx.trail.push({ tool: toolName, summary });
 };
 
+/**
+ * Body reads/writes for the positional tools.
+ *
+ * `getItem` asks Dato for `nested=true`, so a block node arrives as its full
+ * object and can be written straight back — which is why the positional tools
+ * move nodes VERBATIM and never rebuild them. Rebuilding a block is how you
+ * lose its identity and its fields; `buildBlockNode` is for blocks that do not
+ * exist yet, not for ones already in the document.
+ */
+async function readBody(itemId: string) {
+  const item = await getItem(itemId);
+  const body = item.attributes.body as
+    | { schema?: string; document?: { children?: unknown[] } }
+    | null
+    | undefined;
+  const children = body?.document?.children;
+  return { item, children: Array.isArray(children) ? children : null };
+}
+
+async function writeBodyChildren(itemId: string, children: unknown[]) {
+  await updateItemFields(itemId, {
+    body: { schema: "dast", document: { type: "root", children } },
+  });
+}
+
+const nodeType = (node: unknown): string => {
+  const type = (node as { type?: unknown } | null)?.type;
+  return typeof type === "string" ? type : "unknown";
+};
+
+const NODE_PREVIEW_CHARS = 140;
+
+/** One addressable top-level node, as the agent sees it in an outline. */
+function describeNode(
+  node: unknown,
+  index: number,
+  itemTypeMap: Record<string, string>,
+) {
+  const record = (node ?? {}) as Record<string, unknown>;
+  const type = nodeType(node);
+  if (type === "block") {
+    const item = record.item as
+      | { relationships?: { item_type?: { data?: { id?: string } } } }
+      | string
+      | undefined;
+    const typeId =
+      typeof item === "object"
+        ? item?.relationships?.item_type?.data?.id
+        : undefined;
+    return {
+      index,
+      type,
+      blockModel: (typeId && itemTypeMap[typeId]) || null,
+    };
+  }
+  return {
+    index,
+    type,
+    ...(typeof record.level === "number" ? { level: record.level } : {}),
+    preview: datoStructuredTextToPlainText(record).slice(0, NODE_PREVIEW_CHARS),
+  };
+}
+
+/** Editing a live published record is a human's call, as with replaceBody. */
+const PUBLISHED_REFUSAL =
+  "This article is published with no draft revision. Create a separate draft instead of editing its body.";
+
 export function buildBlogTools(ctx: BlogToolContext): ToolSet {
   return {
     describeModel: tool({
@@ -114,6 +181,37 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
               ? datoStructuredTextToPlainText(article.body.value)
               : "",
             blocks: article.body?.blocks ?? [],
+          };
+        } catch (error) {
+          return { error: (error as Error).message };
+        }
+      },
+    }),
+
+    outlineBody: tool({
+      description:
+        "List an article body's top-level nodes with their POSITIONS: index, type (paragraph / heading / block / list / …), the block model for block nodes, and a text preview. Indexes are how you address a place in the document — getArticle returns flattened text and gives you none. Call this before moveNode or a positioned insertBlock, and again afterwards to confirm the result.",
+      inputSchema: z.object({ itemId: z.string() }),
+      execute: async ({ itemId }) => {
+        try {
+          const [{ children }, itemTypeMap] = await Promise.all([
+            readBody(itemId),
+            getItemTypeMap(),
+          ]);
+          if (!children) {
+            return { error: `Article ${itemId} has no structured-text body.` };
+          }
+          note(
+            ctx,
+            "outlineBody",
+            `outlined ${children.length} nodes of ${itemId}`,
+          );
+          return {
+            itemId,
+            nodeCount: children.length,
+            nodes: children.map((node, index) =>
+              describeNode(node, index, itemTypeMap),
+            ),
           };
         } catch (error) {
           return { error: (error as Error).message };
@@ -292,18 +390,36 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
 
     replaceBody: tool({
       description:
-        "Replace the complete body of an existing Dato DRAFT from Markdown. Use only when the operator explicitly asks to replace or reconcile the full article body, and call getArticle first. Refuses an article whose current Dato status is published.",
+        "Replace the complete body of an existing Dato DRAFT from Markdown. Use only when the operator explicitly asks to replace or reconcile the full article body, and call getArticle first. Markdown cannot represent blocks, so this REFUSES a body that contains any (use moveNode / insertBlock to edit around them). Also refuses an article whose current Dato status is published.",
       inputSchema: z.object({
         itemId: z.string(),
         bodyMarkdown: z.string().trim().min(1).max(20_000),
+        discardBlocks: z
+          .boolean()
+          .default(false)
+          .describe(
+            "Set true ONLY when the operator has agreed that the body's existing blocks (e.g. a video embed) should be deleted.",
+          ),
       }),
-      execute: async ({ itemId, bodyMarkdown }) => {
+      execute: async ({ itemId, bodyMarkdown, discardBlocks }) => {
         try {
-          const item = await getItem(itemId);
+          const { item, children } = await readBody(itemId);
           if (item.meta.status === "published") {
             return {
               error:
                 "This article is published with no draft revision. Create a separate draft instead of replacing its body.",
+            };
+          }
+          // markdownToDatoStructuredText emits no block nodes, so a Markdown
+          // round-trip silently deletes every embed already in the body. That
+          // is a data-loss bug disguised as a formatting tool; make it loud.
+          const blockIndexes = (children ?? [])
+            .map((node, index) => (nodeType(node) === "block" ? index : -1))
+            .filter((index) => index >= 0);
+          if (blockIndexes.length > 0 && !discardBlocks) {
+            return {
+              error: `This body contains ${blockIndexes.length} block node(s) that Markdown cannot carry, so replacing it would DELETE them. Use moveNode to reposition a block, or insertBlock with atIndex to add one, and leave the surrounding Markdown alone. Only pass discardBlocks: true if the operator has agreed to lose them.`,
+              blockIndexes,
             };
           }
           const body = await markdownToDatoStructuredText(bodyMarkdown);
@@ -319,7 +435,7 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
 
     insertBlock: tool({
       description:
-        "Append one block to an article's body — for example a video_embed with a YouTube or Cloudflare Stream url. Reads the current body first and appends, so existing content is preserved. Call describeModel on the block model if unsure of its fields.",
+        "Insert one block into an article's body — for example a video_embed with a YouTube or Cloudflare Stream url. Appends at the end by default; pass atIndex to place it mid-document (get indexes from outlineBody). Reads the current body first, so existing content is preserved. Call describeModel on the block model if unsure of its fields.",
       inputSchema: z.object({
         itemId: z.string(),
         blockModel: z
@@ -330,43 +446,109 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
           .describe(
             "Field api_key -> value for the block, e.g. { url: '...' }.",
           ),
+        atIndex: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe(
+            "Position to insert at, pushing the node currently there down. Omit to append at the end.",
+          ),
       }),
-      execute: async ({ itemId, blockModel, attributes }) => {
+      execute: async ({ itemId, blockModel, attributes, atIndex }) => {
         try {
-          const [item, blockTypeId] = await Promise.all([
-            getItem(itemId),
+          const [{ children }, blockTypeId] = await Promise.all([
+            readBody(itemId),
             resolveItemTypeId(blockModel),
           ]);
-          const body = item.attributes.body as
-            | { schema?: string; document?: { children?: unknown[] } }
-            | null
-            | undefined;
-          const children = body?.document?.children;
-          if (!Array.isArray(children)) {
+          if (!children) {
             return {
-              error: `Article ${itemId} has no structured-text body to append to.`,
+              error: `Article ${itemId} has no structured-text body to insert into.`,
             };
           }
-          const nextBody = {
-            schema: "dast",
-            document: {
-              type: "root",
-              children: [...children, buildBlockNode(blockTypeId, attributes)],
-            },
-          };
-          await updateItemFields(itemId, { body: nextBody });
+          const at = Math.min(atIndex ?? children.length, children.length);
+          const next = [...children];
+          next.splice(at, 0, buildBlockNode(blockTypeId, attributes));
+          await writeBodyChildren(itemId, next);
           ctx.touchedItemIds.add(itemId);
           note(
             ctx,
             "insertBlock",
-            `appended ${blockModel} to ${itemId} (${children.length} -> ${children.length + 1} nodes)`,
+            `inserted ${blockModel} into ${itemId} at index ${at} (${children.length} -> ${next.length} nodes)`,
           );
           return {
             ok: true,
             itemId,
             blockModel,
+            atIndex: at,
             nodesBefore: children.length,
-            nodesAfter: children.length + 1,
+            nodesAfter: next.length,
+          };
+        } catch (error) {
+          return { error: (error as Error).message };
+        }
+      },
+    }),
+
+    moveNode: tool({
+      description:
+        "Move one top-level body node to a different position — the way to relocate a video embed or a paragraph without retyping the article. The node is moved VERBATIM, so a block keeps its identity and its fields; nothing is rebuilt and no text is regenerated. toIndex is the position in the list once the node has been lifted out, so moving 8 -> 3 puts it before whatever was at index 3. Call outlineBody first for the indexes and again afterwards to confirm.",
+      inputSchema: z.object({
+        itemId: z.string(),
+        fromIndex: z
+          .number()
+          .int()
+          .min(0)
+          .describe("Current index of the node, from outlineBody."),
+        toIndex: z
+          .number()
+          .int()
+          .min(0)
+          .describe("Destination index, counted with the node lifted out."),
+      }),
+      execute: async ({ itemId, fromIndex, toIndex }) => {
+        try {
+          const [{ item, children }, itemTypeMap] = await Promise.all([
+            readBody(itemId),
+            getItemTypeMap(),
+          ]);
+          if (!children) {
+            return { error: `Article ${itemId} has no structured-text body.` };
+          }
+          if (item.meta.status === "published") {
+            return { error: PUBLISHED_REFUSAL };
+          }
+          if (fromIndex >= children.length) {
+            return {
+              error: `fromIndex ${fromIndex} is out of range — the body has ${children.length} nodes (0-${children.length - 1}). Call outlineBody.`,
+            };
+          }
+          const next = [...children];
+          const [moved] = next.splice(fromIndex, 1);
+          const at = Math.min(toIndex, next.length);
+          if (at === fromIndex) {
+            return {
+              ok: true,
+              itemId,
+              unchanged: true as const,
+              message: `Node ${fromIndex} is already at index ${at}; nothing written.`,
+            };
+          }
+          next.splice(at, 0, moved);
+          await writeBodyChildren(itemId, next);
+          ctx.touchedItemIds.add(itemId);
+          note(
+            ctx,
+            "moveNode",
+            `moved ${nodeType(moved)} node ${fromIndex} -> ${at} in ${itemId}`,
+          );
+          return {
+            ok: true,
+            itemId,
+            fromIndex,
+            toIndex: at,
+            moved: describeNode(moved, at, itemTypeMap),
+            nodeCount: next.length,
           };
         } catch (error) {
           return { error: (error as Error).message };

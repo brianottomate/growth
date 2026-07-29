@@ -17,9 +17,17 @@ For review-only tasks, read the article and assess the actual body text. Do not
 invent a write just because write tools are available.
 
 Prefer the smallest write. updateFields changes only the fields you name.
-replaceBody converts a complete Markdown article into Dato structured text, and
-insertBlock appends one block. Use replaceBody only when the operator explicitly
-asks to replace or reconcile the full body.
+insertBlock adds one block, appended by default or placed with atIndex.
+moveNode relocates one existing top-level node. replaceBody rewrites the whole
+body from Markdown — use it only when the operator explicitly asks to replace or
+reconcile the full body.
+
+Position work is index work. To move, reorder, or place something mid-document,
+call outlineBody for the node indexes, then moveNode or insertBlock with
+atIndex. Do NOT reach for replaceBody to reposition something: Markdown cannot
+represent a block, so rewriting the body deletes every video embed in it.
+replaceBody now refuses such a body rather than silently destroying it — that
+refusal means "use the positional tools", not "pass discardBlocks".
 
 When the operator asks for a separate or alternative draft, do not edit the
 existing article. Call createDraft with the complete bodyMarkdown and, when
