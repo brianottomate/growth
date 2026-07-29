@@ -44,6 +44,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   contentWrite: [
     "createIdea",
     "updateWorkItem",
+    "setThread",
     "addCrossPost",
     "createPlatformPost",
     "promotePlatformPost",

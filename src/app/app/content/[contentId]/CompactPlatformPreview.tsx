@@ -16,6 +16,12 @@ export type CompactPreviewLinkCard = {
   predicted?: boolean;
 };
 
+export type CompactPreviewItem = {
+  id: string;
+  text: string;
+  media: MediaItem[];
+};
+
 function cropClass(format: string | null, platform: string) {
   if (
     format?.includes(".story") ||
@@ -55,6 +61,59 @@ function ReadyDot({ ready, label }: { ready: boolean; label: string }) {
   );
 }
 
+function PreviewMedia({
+  item,
+  platform,
+  format,
+  contentTitle,
+  fallbackImage,
+}: {
+  item: CompactPreviewItem;
+  platform: string;
+  format: string | null;
+  contentTitle: string;
+  fallbackImage?: string | null;
+}) {
+  const firstMedia = item.media[0];
+  if (!firstMedia && !fallbackImage) return null;
+  return (
+    <div
+      className={cn(
+        "bg-muted relative w-full overflow-hidden",
+        cropClass(format, platform),
+      )}
+    >
+      {firstMedia?.type === "video" && !firstMedia.thumbnail ? (
+        <div className="from-muted via-background to-muted flex size-full items-center justify-center bg-gradient-to-br">
+          <span className="bg-foreground/90 text-background flex size-9 items-center justify-center rounded-full">
+            <Play className="ml-0.5 size-4 fill-current" />
+          </span>
+        </div>
+      ) : firstMedia ? (
+        <MediaThumbnail
+          src={firstMedia.url}
+          thumbnail={firstMedia.thumbnail}
+          alt={`${platformLabel(platform)} preview for ${contentTitle}`}
+          className="object-cover"
+          sizes="256px"
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- arbitrary external OG hosts
+        <img
+          src={fallbackImage ?? ""}
+          alt=""
+          className="size-full object-cover"
+        />
+      )}
+      {item.media.length > 1 && (
+        <span className="absolute top-1.5 right-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] text-white">
+          1/{item.media.length}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function CompactPlatformPreview({
   className,
   platform,
@@ -65,6 +124,7 @@ export function CompactPlatformPreview({
   contentTitle,
   text,
   media,
+  threadItems,
   linkCard,
   scheduled,
 }: {
@@ -77,12 +137,19 @@ export function CompactPlatformPreview({
   contentTitle: string;
   text: string;
   media: MediaItem[];
+  threadItems?: CompactPreviewItem[];
   linkCard?: CompactPreviewLinkCard | null;
   scheduled: boolean;
 }) {
-  const firstMedia = media[0];
   const identity = channelName ?? username ?? brandName;
-  const hasVisual = Boolean(firstMedia || linkCard?.image);
+  const items =
+    threadItems?.length && threadItems.length > 0
+      ? threadItems
+      : [{ id: "root", text, media }];
+  const isThread = items.length > 1;
+  const hasVisual =
+    items.some((item) => item.media.length > 0) || !!linkCard?.image;
+  const hasCopy = items.every((item) => item.text.trim());
 
   return (
     <aside
@@ -97,75 +164,57 @@ export function CompactPlatformPreview({
           className="size-3.5"
         />
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
-          {platformLabel(platform)} preview
+          {platformLabel(platform)} {isThread ? "thread" : "preview"}
         </span>
-        <span className="text-muted-foreground text-[9px]">Representative</span>
+        <span className="text-muted-foreground text-[9px]">
+          {isThread ? `${items.length} posts` : "Representative"}
+        </span>
       </div>
 
       <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
-        <div className="flex items-center gap-2 px-2.5 py-2">
-          <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[9px] font-semibold">
-            {identity.slice(0, 1).toUpperCase()}
-          </span>
-          <span className="truncate text-[11px] font-medium">{identity}</span>
-        </div>
-
-        <div
-          className={cn(
-            "bg-muted relative w-full overflow-hidden",
-            cropClass(format, platform),
-          )}
-        >
-          {firstMedia?.type === "video" && !firstMedia.thumbnail ? (
-            <div className="from-muted via-background to-muted flex size-full items-center justify-center bg-gradient-to-br">
-              <span className="bg-foreground/90 text-background flex size-9 items-center justify-center rounded-full">
-                <Play className="ml-0.5 size-4 fill-current" />
+        {items.map((item, index) => (
+          <div
+            key={item.id}
+            className={cn(index > 0 && "border-border border-t")}
+          >
+            <div className="flex items-center gap-2 px-2.5 py-2">
+              <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[9px] font-semibold">
+                {identity.slice(0, 1).toUpperCase()}
               </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                {identity}
+              </span>
+              {isThread && (
+                <span className="text-muted-foreground text-[9px]">
+                  {index + 1}/{items.length}
+                </span>
+              )}
             </div>
-          ) : firstMedia ? (
-            <MediaThumbnail
-              src={firstMedia.url}
-              thumbnail={firstMedia.thumbnail}
-              alt={`${platformLabel(platform)} preview for ${contentTitle}`}
-              className="object-cover"
-              sizes="256px"
-            />
-          ) : linkCard?.image ? (
-            // eslint-disable-next-line @next/next/no-img-element -- arbitrary external OG hosts
-            <img
-              src={linkCard.image}
-              alt=""
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="from-muted via-background to-muted flex size-full min-h-32 flex-col items-center justify-center bg-gradient-to-br px-4 text-center">
-              <ImageIcon className="text-muted-foreground size-5" />
-              <p className="mt-2 line-clamp-2 text-[11px] font-medium">
-                {contentTitle}
-              </p>
-              <p className="text-muted-foreground mt-1 text-[9px]">
-                Visual not attached
-              </p>
-            </div>
-          )}
-          {media.length > 1 && (
-            <span className="absolute top-1.5 right-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] text-white">
-              1/{media.length}
-            </span>
-          )}
-        </div>
 
-        <div className="px-2.5 py-2">
-          {text.trim() ? (
-            <p className="line-clamp-4 text-[10px] leading-relaxed whitespace-pre-wrap">
-              {text}
-            </p>
-          ) : (
-            <p className="text-muted-foreground text-[10px] italic">
-              No channel copy yet.
-            </p>
-          )}
-        </div>
+            <PreviewMedia
+              item={item}
+              platform={platform}
+              format={format}
+              contentTitle={contentTitle}
+              fallbackImage={
+                index === 0 && item.media.length === 0 ? linkCard?.image : null
+              }
+            />
+
+            <div className="px-2.5 py-2">
+              {item.text.trim() ? (
+                <p className="line-clamp-4 text-[10px] leading-relaxed whitespace-pre-wrap">
+                  {item.text}
+                </p>
+              ) : (
+                <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] italic">
+                  <ImageIcon className="size-3" />
+                  No post copy yet.
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
 
         {linkCard && (
           <div className="border-t px-2.5 py-2">
@@ -182,7 +231,7 @@ export function CompactPlatformPreview({
 
       <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
         <ReadyDot ready={hasVisual} label="Visual" />
-        <ReadyDot ready={Boolean(text.trim())} label="Copy" />
+        <ReadyDot ready={hasCopy} label="Copy" />
         <ReadyDot ready={scheduled} label="Schedule" />
       </div>
     </aside>

@@ -9,7 +9,7 @@ Ground factual answers in live Growth capabilities. Choose the coherent domain f
 - Product Atlas is the durable product model; storefronts are target marketing state. Updating a storefront marks Growth state stale and never proves the external listing changed.
 
 # Content and strategy
-- contentRead covers pipeline, upcoming work, production readiness, searchable work items, and media suggestions. contentWrite changes canonical content; contentMediaWrite attaches, imports, uploads, and turns ordered pool media into platform carousels. prepareProductionPacket is the reviewed provider-neutral handoff.
+- contentRead covers pipeline, upcoming work, production readiness, searchable work items, and media suggestions. contentWrite changes canonical content; use setThread when one X or Threads rendering contains several linked native posts, never a content series. contentMediaWrite attaches, imports, uploads, and turns ordered pool media into platform carousels. prepareProductionPacket is the reviewed provider-neutral handoff.
 - contentStrategyRead/Write cover pillars, series, and canonical grouping decisions. A broad territory is a pillar; an editorial arc is a series; multiple channel renderings may be one idea.
 - strategyRead compares current targets with observed evidence. strategyWrite changes local cadence and brand-mix intent, not provider delivery settings.
 - planningRead previews; planningWrite materializes only an agreed plan. Missing setup is not zero cadence.

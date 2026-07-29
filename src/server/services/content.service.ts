@@ -1,7 +1,11 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
-import { db } from "../db";
+import { db, withTransaction } from "../db";
 import { archetypeForFormat, platformFormatsFor } from "../content/formats";
+import {
+  platformTextLength,
+  threadFormatForPlatform,
+} from "@/lib/platform-thread";
 import {
   type channelPlatformEnum,
   channelTable,
@@ -363,6 +367,196 @@ async function saveSpotEditor(
   return row ?? null;
 }
 
+export type SaveSpotThreadItemInput = {
+  id?: string;
+  text: string | null;
+  media: MediaItem[];
+  assetLinks: string[];
+};
+
+export type SaveSpotThreadInput = {
+  rootPlatformPostId: string;
+  expectedUpdatedAt: string;
+  items: SaveSpotThreadItemInput[];
+};
+
+const cleanThreadItem = (item: SaveSpotThreadItemInput) => {
+  const seenMedia = new Set<string>();
+  const media = item.media.filter((mediaItem) => {
+    const key = mediaItem.assetId ?? mediaItem.url;
+    if (seenMedia.has(key)) return false;
+    seenMedia.add(key);
+    return true;
+  });
+  return {
+    text: item.text?.trim() || null,
+    media: media.length ? media : null,
+    assetLinks: [
+      ...new Set(item.assetLinks.map((link) => link.trim()).filter(Boolean)),
+    ],
+  };
+};
+
+/**
+ * Save one platform publishing unit. X and Threads may contain ordered reply
+ * rows, but they remain one channel rendering under the canonical content item.
+ * Every reply points to the root; `sequence` carries the native publish order.
+ */
+async function saveSpotThread(
+  input: SaveSpotThreadInput,
+): Promise<{ id: string; updatedAt: Date; itemIds: string[] } | null> {
+  if (input.items.length === 0) {
+    throw new Error("A platform post needs at least one item.");
+  }
+
+  return withTransaction(async (tx) => {
+    const [root] = await tx
+      .select()
+      .from(platformPostTable)
+      .where(eq(platformPostTable.id, input.rootPlatformPostId))
+      .limit(1);
+    if (!root || root.parentPlatformPostId) {
+      throw new Error("Thread editing must start from the root platform post.");
+    }
+    if (
+      input.items.length > 1 &&
+      root.platform !== "x" &&
+      root.platform !== "threads"
+    ) {
+      throw new Error("Only X and Threads support ordered post threads.");
+    }
+
+    const characterLimit =
+      root.platform === "x" ? 280 : root.platform === "threads" ? 500 : null;
+    if (
+      characterLimit &&
+      input.items.some(
+        (item) =>
+          platformTextLength(item.text ?? "", root.platform) > characterLimit,
+      )
+    ) {
+      throw new Error(
+        `${root.platform === "x" ? "X" : "Threads"} posts must be ${characterLimit} characters or fewer.`,
+      );
+    }
+
+    const existingChildren = await tx
+      .select()
+      .from(platformPostTable)
+      .where(
+        eq(platformPostTable.parentPlatformPostId, input.rootPlatformPostId),
+      );
+    const existingById = new Map(
+      existingChildren.map((child) => [child.id, child]),
+    );
+    for (const item of input.items.slice(1)) {
+      if (item.id && !existingById.has(item.id)) {
+        throw new Error("A thread reply does not belong to this root post.");
+      }
+    }
+
+    const now = new Date();
+    const rootItem = cleanThreadItem(input.items[0]!);
+    const threadFormat = threadFormatForPlatform(
+      root.platform,
+      input.items.length,
+    );
+    const [savedRoot] = await tx
+      .update(platformPostTable)
+      .set({
+        text: rootItem.text,
+        media: rootItem.media,
+        assetLinks: rootItem.assetLinks.length ? rootItem.assetLinks : null,
+        ...threadFormat,
+        parentPlatformPostId: null,
+        sequence: 0,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(platformPostTable.id, input.rootPlatformPostId),
+          eq(platformPostTable.updatedAt, new Date(input.expectedUpdatedAt)),
+        ),
+      )
+      .returning({
+        id: platformPostTable.id,
+        updatedAt: platformPostTable.updatedAt,
+      });
+    if (!savedRoot) return null;
+
+    const keptChildIds: string[] = [];
+    for (const [index, inputItem] of input.items.slice(1).entries()) {
+      const item = cleanThreadItem(inputItem);
+      const existing = inputItem.id
+        ? existingById.get(inputItem.id)
+        : undefined;
+      if (existing) {
+        const [saved] = await tx
+          .update(platformPostTable)
+          .set({
+            ...item,
+            format: threadFormat.format,
+            archetype: "thread",
+            sequence: index + 1,
+            updatedAt: now,
+          })
+          .where(eq(platformPostTable.id, existing.id))
+          .returning({ id: platformPostTable.id });
+        if (saved) keptChildIds.push(saved.id);
+        continue;
+      }
+
+      const [created] = await tx
+        .insert(platformPostTable)
+        .values({
+          brandId: root.brandId,
+          contentPostId: root.contentPostId,
+          channelId: root.channelId,
+          platform: root.platform,
+          username: root.username,
+          format: threadFormat.format,
+          archetype: "thread",
+          template: root.template,
+          pillar: root.pillar,
+          parentPlatformPostId: root.id,
+          sequence: index + 1,
+          source: root.source,
+          status: root.status,
+          origin: root.origin,
+          ownerId: root.ownerId,
+          provider: root.provider,
+          text: item.text,
+          media: item.media,
+          assetLinks: item.assetLinks.length ? item.assetLinks : null,
+          isSeed: root.isSeed,
+          metadata: {
+            ...(typeof root.metadata === "object" && root.metadata
+              ? root.metadata
+              : {}),
+            threadRootPlatformPostId: root.id,
+          },
+        })
+        .returning({ id: platformPostTable.id });
+      if (created) keptChildIds.push(created.id);
+    }
+
+    const removedIds = existingChildren
+      .map((child) => child.id)
+      .filter((id) => !keptChildIds.includes(id));
+    if (removedIds.length) {
+      await tx
+        .delete(platformPostTable)
+        .where(inArray(platformPostTable.id, removedIds));
+    }
+
+    return {
+      id: savedRoot.id,
+      updatedAt: savedRoot.updatedAt,
+      itemIds: [savedRoot.id, ...keptChildIds],
+    };
+  });
+}
+
 /** Set the content-level media pool (`content_post.media`). Deduped by assetId
  *  — the same dedupe the spot attach-list uses. */
 async function setPoolMedia(input: {
@@ -477,6 +671,7 @@ export const ContentService = {
   addSpotTargets,
   setSpotText,
   saveSpotEditor,
+  saveSpotThread,
   setPoolMedia,
   setSpotMedia,
   setSpotCarousel,

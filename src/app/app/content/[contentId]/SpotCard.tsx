@@ -23,7 +23,10 @@ import {
   CompactPlatformPreview,
   type CompactPreviewLinkCard,
 } from "./CompactPlatformPreview";
-import { PlatformPostEditDialog } from "./PlatformPostEditDialog";
+import {
+  PlatformPostEditDialog,
+  type PlatformThreadItemData,
+} from "./PlatformPostEditDialog";
 
 const STATUS_PILL: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -102,6 +105,7 @@ export type SpotCardData = {
   stats: PostStats | null;
   owner: Member | null;
   linkCard?: CompactPreviewLinkCard | null;
+  threadItems?: PlatformThreadItemData[];
 };
 
 /**
@@ -152,8 +156,28 @@ export function SpotCard({
     stats.likes != null ? `${formatMetric(stats.likes)} likes` : null,
     stats.comments != null ? `${formatMetric(stats.comments)} comments` : null,
   ].filter((metric): metric is string => metric !== null);
-  const media = spot.media ?? [];
-  const assetLinks = spot.assetLinks ?? [];
+  const threadItems =
+    spot.threadItems?.length && spot.threadItems.length > 0
+      ? [...spot.threadItems].sort(
+          (a, b) =>
+            (a.sequence ?? Number.MAX_SAFE_INTEGER) -
+            (b.sequence ?? Number.MAX_SAFE_INTEGER),
+        )
+      : [
+          {
+            id: spot.id,
+            updatedAtISO: spot.updatedAtISO,
+            text: spot.text,
+            media: spot.media,
+            assetLinks: spot.assetLinks,
+            sequence: 0,
+          },
+        ];
+  const isThread = threadItems.length > 1;
+  const media = threadItems.flatMap((item) => item.media ?? []);
+  const assetLinks = [
+    ...new Set(threadItems.flatMap((item) => item.assetLinks ?? [])),
+  ];
   const scheduled =
     Boolean(spot.scheduledAtISO) ||
     spot.status === "scheduled" ||
@@ -194,6 +218,11 @@ export function SpotCard({
             {label && (
               <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium">
                 {label}
+              </span>
+            )}
+            {isThread && (
+              <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                {threadItems.length} posts
               </span>
             )}
             {owned ? (
@@ -345,8 +374,9 @@ export function SpotCard({
                 brandName={brandName}
                 contentTitle={contentTitle}
                 text={spot.text}
-                media={media}
-                assetLinks={assetLinks}
+                media={spot.media ?? []}
+                assetLinks={spot.assetLinks ?? []}
+                threadItems={threadItems}
                 linkCard={spot.linkCard}
                 scheduled={scheduled}
               />
@@ -396,10 +426,31 @@ export function SpotCard({
               <h3 className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Copy
               </h3>
-              {spot.text?.trim() ? (
-                <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">
-                  {spot.text}
-                </p>
+              {threadItems.some((item) => item.text?.trim()) ? (
+                <div className="mt-3 space-y-0">
+                  {threadItems.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="relative flex gap-3 pb-4 last:pb-0"
+                    >
+                      {isThread && index < threadItems.length - 1 && (
+                        <span className="bg-border absolute top-6 bottom-0 left-3 w-px" />
+                      )}
+                      {isThread && (
+                        <span className="bg-muted relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold">
+                          {index + 1}
+                        </span>
+                      )}
+                      <p className="min-w-0 flex-1 text-sm leading-6 whitespace-pre-wrap">
+                        {item.text?.trim() || (
+                          <span className="text-muted-foreground italic">
+                            No copy yet.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="text-muted-foreground mt-2 text-sm">
                   No channel copy yet. Refine it in chat or open the manual
@@ -420,27 +471,42 @@ export function SpotCard({
                       : `${media.length} carousel slides`}
                   </span>
                 </div>
-                <ol className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-                  {media.map((item, index) => (
-                    <li
-                      key={`${item.assetId ?? item.url}-${index}`}
-                      className="min-w-0"
-                    >
-                      <div className="bg-muted relative aspect-square overflow-hidden rounded-lg border">
-                        <MediaThumbnail
-                          src={item.url}
-                          thumbnail={item.thumbnail}
-                          alt={`${platformLabel(spot.platform)} media ${index + 1}`}
-                          className="object-contain"
-                          sizes="180px"
-                        />
-                        <span className="absolute top-1.5 left-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white">
-                          {index + 1}
-                        </span>
+                <div className="mt-3 space-y-3">
+                  {threadItems.map((threadItem, threadIndex) => {
+                    const itemMedia = threadItem.media ?? [];
+                    if (!itemMedia.length) return null;
+                    return (
+                      <div key={threadItem.id}>
+                        {isThread && (
+                          <div className="text-muted-foreground mb-1.5 text-[10px]">
+                            Post {threadIndex + 1}
+                          </div>
+                        )}
+                        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                          {itemMedia.map((item, mediaIndex) => (
+                            <li
+                              key={`${item.assetId ?? item.url}-${mediaIndex}`}
+                              className="min-w-0"
+                            >
+                              <div className="bg-muted relative aspect-square overflow-hidden rounded-lg border">
+                                <MediaThumbnail
+                                  src={item.url}
+                                  thumbnail={item.thumbnail}
+                                  alt={`${platformLabel(spot.platform)} post ${threadIndex + 1} media ${mediaIndex + 1}`}
+                                  className="object-contain"
+                                  sizes="180px"
+                                />
+                                <span className="absolute top-1.5 left-1.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] font-medium text-white">
+                                  {mediaIndex + 1}
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
                       </div>
-                    </li>
-                  ))}
-                </ol>
+                    );
+                  })}
+                </div>
               </section>
             )}
 
@@ -475,7 +541,12 @@ export function SpotCard({
             brandName={brandName}
             contentTitle={contentTitle}
             text={spot.text ?? ""}
-            media={media}
+            media={spot.media ?? []}
+            threadItems={threadItems.map((item) => ({
+              id: item.id,
+              text: item.text ?? "",
+              media: item.media ?? [],
+            }))}
             linkCard={spot.linkCard}
             scheduled={scheduled}
           />

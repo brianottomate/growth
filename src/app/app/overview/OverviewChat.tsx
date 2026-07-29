@@ -1278,6 +1278,7 @@ function ApprovalCard({
         decision?: "accept" | "reject";
         intendedChannels?: string[];
         priority?: string;
+        posts?: Array<{ text?: string }>;
       }
     | undefined;
   const isAudienceWrite =
@@ -1296,26 +1297,29 @@ function ApprovalCard({
               : "Accept this grouping proposal?"
             : toolName === "contentWrite.createPlatformPost"
               ? "Create this channel draft?"
-              : toolName === "contentWrite.promotePlatformPost"
-                ? "Turn this post into a content idea?"
-                : toolName === "contentWrite.createIdea"
-                  ? "Create this idea?"
-                  : toolName === "audienceWrite.createTarget"
-                    ? "Create this audience target?"
-                    : toolName === "audienceWrite.updateTarget"
-                      ? "Save these audience changes?"
-                      : toolName === "strategyWrite.updateCadence"
-                        ? "Save these cadence changes?"
-                        : toolName === "strategyWrite.updateBrandMix"
-                          ? "Save these content mix changes?"
-                          : toolName === "contentMediaWrite.attachLibraryMedia"
-                            ? "Attach this library asset?"
-                            : toolName === "contentMediaWrite.makeCarousel"
-                              ? "Turn these images into platform carousels?"
-                              : toolName ===
-                                  "contentMediaWrite.recoverArchiveMedia"
-                                ? "Recover and attach this archive media?"
-                                : "Confirm this action?";
+              : toolName === "contentWrite.setThread"
+                ? `Save this ${inp?.posts?.length ?? ""}-post thread?`
+                : toolName === "contentWrite.promotePlatformPost"
+                  ? "Turn this post into a content idea?"
+                  : toolName === "contentWrite.createIdea"
+                    ? "Create this idea?"
+                    : toolName === "audienceWrite.createTarget"
+                      ? "Create this audience target?"
+                      : toolName === "audienceWrite.updateTarget"
+                        ? "Save these audience changes?"
+                        : toolName === "strategyWrite.updateCadence"
+                          ? "Save these cadence changes?"
+                          : toolName === "strategyWrite.updateBrandMix"
+                            ? "Save these content mix changes?"
+                            : toolName ===
+                                "contentMediaWrite.attachLibraryMedia"
+                              ? "Attach this library asset?"
+                              : toolName === "contentMediaWrite.makeCarousel"
+                                ? "Turn these images into platform carousels?"
+                                : toolName ===
+                                    "contentMediaWrite.recoverArchiveMedia"
+                                  ? "Recover and attach this archive media?"
+                                  : "Confirm this action?";
   const primaryLabel =
     toolName === "contentStrategyWrite.savePillar"
       ? "Save pillar"
@@ -1329,26 +1333,29 @@ function ApprovalCard({
               : "Accept grouping"
             : toolName === "contentWrite.createPlatformPost"
               ? "Create draft"
-              : toolName === "contentWrite.promotePlatformPost"
-                ? "Promote post"
-                : toolName === "contentWrite.createIdea"
-                  ? "Create it"
-                  : toolName === "audienceWrite.createTarget"
-                    ? "Create target"
-                    : toolName === "audienceWrite.updateTarget"
-                      ? "Save changes"
-                      : toolName === "strategyWrite.updateCadence"
-                        ? "Save cadence"
-                        : toolName === "strategyWrite.updateBrandMix"
-                          ? "Save content mix"
-                          : toolName === "contentMediaWrite.attachLibraryMedia"
-                            ? "Attach asset"
-                            : toolName === "contentMediaWrite.makeCarousel"
-                              ? "Make carousels"
-                              : toolName ===
-                                  "contentMediaWrite.recoverArchiveMedia"
-                                ? "Recover & attach"
-                                : "Confirm";
+              : toolName === "contentWrite.setThread"
+                ? "Save thread"
+                : toolName === "contentWrite.promotePlatformPost"
+                  ? "Promote post"
+                  : toolName === "contentWrite.createIdea"
+                    ? "Create it"
+                    : toolName === "audienceWrite.createTarget"
+                      ? "Create target"
+                      : toolName === "audienceWrite.updateTarget"
+                        ? "Save changes"
+                        : toolName === "strategyWrite.updateCadence"
+                          ? "Save cadence"
+                          : toolName === "strategyWrite.updateBrandMix"
+                            ? "Save content mix"
+                            : toolName ===
+                                "contentMediaWrite.attachLibraryMedia"
+                              ? "Attach asset"
+                              : toolName === "contentMediaWrite.makeCarousel"
+                                ? "Make carousels"
+                                : toolName ===
+                                    "contentMediaWrite.recoverArchiveMedia"
+                                  ? "Recover & attach"
+                                  : "Confirm";
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">

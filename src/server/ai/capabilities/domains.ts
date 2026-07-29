@@ -32,6 +32,7 @@ import {
   recoverArchiveMediaToContent,
   suggestMediaForContent,
   searchContentWorkItems,
+  setPlatformPostThread,
   upcomingContent,
   updateContentWorkItem,
 } from "./content";
@@ -172,6 +173,7 @@ export const contentWrite = growthDomainTool({
   actions: {
     createIdea,
     updateWorkItem: updateContentWorkItem,
+    setThread: setPlatformPostThread,
     addCrossPost: addContentCrossPost,
     createPlatformPost,
     promotePlatformPost,

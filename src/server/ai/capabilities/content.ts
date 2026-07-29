@@ -37,6 +37,7 @@ import {
 } from "@/lib/chat-attachment";
 import { getContentReadiness } from "@/lib/content-readiness";
 import { platformFormatsFor } from "@/server/content/formats";
+import { groupPlatformThreads } from "@/lib/platform-thread";
 import { growthAction } from "./types";
 import type { CapabilityContext } from "./types";
 import { orgBrandIds } from "./brands";
@@ -68,17 +69,27 @@ export const getContentWorkItem = growthAction({
   inputSchema: z.object({ contentPostId: z.string() }),
   execute: async ({ contentPostId }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
+    const platformGroups = groupPlatformThreads(content.platformPosts);
     const readiness = getContentReadiness({
       hook: content.hook,
       status: content.status,
-      spots: content.platformPosts.map((post) => ({
-        source: post.source,
-        platform: post.platform,
-        archetype: post.archetype,
-        text: post.text,
-        scheduledAt: post.scheduledAt,
-        mediaCount: post.media?.length ?? 0,
-        assetLinkCount: post.assetLinks?.length ?? 0,
+      spots: platformGroups.map((group) => ({
+        source: group.root.source,
+        platform: group.root.platform,
+        archetype: group.root.archetype,
+        text: group.items
+          .map((post) => post.text)
+          .filter(Boolean)
+          .join("\n\n"),
+        scheduledAt: group.root.scheduledAt,
+        mediaCount: group.items.reduce(
+          (count, post) => count + (post.media?.length ?? 0),
+          0,
+        ),
+        assetLinkCount: group.items.reduce(
+          (count, post) => count + (post.assetLinks?.length ?? 0),
+          0,
+        ),
       })),
     });
     return {
@@ -100,16 +111,23 @@ export const getContentWorkItem = growthAction({
         kpi: content.kpi,
       },
       media: content.media ?? [],
-      platformPosts: content.platformPosts.map((post) => ({
-        id: post.id,
-        platform: post.platform,
-        format: post.format,
-        archetype: post.archetype,
-        status: post.status,
-        text: post.text,
-        scheduledAt: post.scheduledAt,
-        media: post.media ?? [],
-        assetLinks: post.assetLinks ?? [],
+      platformPosts: platformGroups.map((group) => ({
+        id: group.root.id,
+        platform: group.root.platform,
+        format: group.root.format,
+        archetype: group.root.archetype,
+        status: group.root.status,
+        text: group.root.text,
+        scheduledAt: group.root.scheduledAt,
+        media: group.root.media ?? [],
+        assetLinks: group.root.assetLinks ?? [],
+        threadItems: group.items.map((post, index) => ({
+          id: post.id,
+          sequence: post.sequence ?? index,
+          text: post.text,
+          media: post.media ?? [],
+          assetLinks: post.assetLinks ?? [],
+        })),
       })),
       readiness,
       url: `/app/content/${content.id}`,
@@ -306,6 +324,83 @@ export const updateContentWorkItem = growthAction({
       updatedPlatformPosts:
         input.platformDrafts?.map((draft) => draft.platformPostId) ?? [],
       url: `/app/content/${content.id}`,
+    };
+  },
+});
+
+export const setPlatformPostThread = growthAction({
+  description:
+    "Create or replace the ordered native posts inside one owned X or Threads draft. This is one platform rendering with linked reply posts, not a content series and not several cross-posts. Use after getWorkItem when the operator asks for a thread, multiple tweets, multiple Threads posts, or asks to split numbered copy into native posts. Pass clean post text without 1/2/3 markers.",
+  inputSchema: z.object({
+    contentPostId: z.string(),
+    platformPostId: z
+      .string()
+      .describe("The root X or Threads platform post from getWorkItem."),
+    posts: z
+      .array(
+        z.object({
+          text: z
+            .string()
+            .trim()
+            .min(1)
+            .max(10_000)
+            .describe("One complete native post, without sequence numbering."),
+        }),
+      )
+      .min(1)
+      .max(25),
+  }),
+  execute: async (input, ctx) => {
+    const content = await requireContentWorkItem(input.contentPostId, ctx);
+    const root = content.platformPosts.find(
+      (post) =>
+        post.id === input.platformPostId &&
+        post.source === "owned" &&
+        !post.parentPlatformPostId,
+    );
+    if (!root) {
+      throw new Error(
+        "That root platform draft is not part of this content work item.",
+      );
+    }
+    if (root.platform !== "x" && root.platform !== "threads") {
+      throw new Error(
+        "Native post threads are currently supported on X and Threads.",
+      );
+    }
+
+    const children = content.platformPosts
+      .filter((post) => post.parentPlatformPostId === root.id)
+      .sort(
+        (a, b) =>
+          (a.sequence ?? Number.MAX_SAFE_INTEGER) -
+          (b.sequence ?? Number.MAX_SAFE_INTEGER),
+      );
+    const existing = [root, ...children];
+    const saved = await ContentService.saveSpotThread({
+      rootPlatformPostId: root.id,
+      expectedUpdatedAt: root.updatedAt.toISOString(),
+      items: input.posts.map((post, index) => ({
+        id: existing[index]?.id,
+        text: post.text,
+        media: existing[index]?.media ?? [],
+        assetLinks: existing[index]?.assetLinks ?? [],
+      })),
+    });
+    if (!saved) {
+      throw new Error(
+        "This platform draft changed while the thread was being prepared. Read the work item again and retry.",
+      );
+    }
+
+    return {
+      ok: true as const,
+      contentPostId: content.id,
+      platformPostId: root.id,
+      platform: root.platform,
+      postCount: saved.itemIds.length,
+      platformPostIds: saved.itemIds,
+      url: `/app/content/${content.id}#post-${root.id}`,
     };
   },
 });

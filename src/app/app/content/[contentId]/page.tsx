@@ -19,6 +19,7 @@ import { getSession } from "@/server/better-auth/server";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { getContentReadiness } from "@/lib/content-readiness";
 import { supportsNativeLinkPreview } from "@/lib/platform-link-preview";
+import { groupPlatformThreads } from "@/lib/platform-thread";
 import { IdeaOwnerControl } from "./OwnerControls";
 import { CommentThread } from "./CommentThread";
 import { AddSpotControl } from "./IdeaControls";
@@ -159,6 +160,12 @@ export default async function ContentDetailPage({
     const tb = (b.publishedAt ?? b.scheduledAt ?? b.createdAt).getTime();
     return ta - tb;
   });
+  const postGroups = groupPlatformThreads(posts);
+  const rootIdByPostId = new Map(
+    postGroups.flatMap((group) =>
+      group.items.map((post) => [post.id, group.root.id] as const),
+    ),
+  );
   // Simulate how planned reposts unfold on the amplifier's feed. A repost of
   // one of our posts renders as a quote-embed; a repost of the blog article
   // renders as the og-card the platform will build from the (predicted) page.
@@ -210,7 +217,9 @@ export default async function ContentDetailPage({
               content.media?.[0]?.url ??
               null,
           };
-    const sims = simsBySpot.get(edge.toPlatformPostId) ?? [];
+    const rootId =
+      rootIdByPostId.get(edge.toPlatformPostId) ?? edge.toPlatformPostId;
+    const sims = simsBySpot.get(rootId) ?? [];
     sims.push({
       linkId: edge.id,
       actorName: edge.from.brand?.name ?? "Amplifier",
@@ -219,30 +228,41 @@ export default async function ContentDetailPage({
       comment: edge.from.text,
       embed,
     });
-    simsBySpot.set(edge.toPlatformPostId, sims);
+    simsBySpot.set(rootId, sims);
   }
 
   // Preview URLs only where the destination platform renders a native card.
   const linkCardBySpot = new Map<string, LinkCard>();
-  for (const post of posts) {
-    if (!supportsNativeLinkPreview(post.platform)) continue;
-    const url = extractFirstUrl(post.text);
+  for (const group of postGroups) {
+    if (!supportsNativeLinkPreview(group.root.platform)) continue;
+    const url = group.items
+      .map((post) => extractFirstUrl(post.text))
+      .find((candidate): candidate is string => Boolean(candidate));
     if (!url) continue;
     const card = await resolveLinkCard(url);
-    if (card) linkCardBySpot.set(post.id, card);
+    if (card) linkCardBySpot.set(group.root.id, card);
   }
 
   const readiness = getContentReadiness({
     hook: content.hook,
     status: content.status,
-    spots: posts.map((post) => ({
-      source: post.source,
-      platform: post.platform,
-      archetype: post.archetype,
-      text: post.text,
-      scheduledAt: post.scheduledAt,
-      mediaCount: post.media?.length ?? 0,
-      assetLinkCount: post.assetLinks?.length ?? 0,
+    spots: postGroups.map((group) => ({
+      source: group.root.source,
+      platform: group.root.platform,
+      archetype: group.root.archetype,
+      text: group.items
+        .map((post) => post.text)
+        .filter(Boolean)
+        .join("\n\n"),
+      scheduledAt: group.root.scheduledAt,
+      mediaCount: group.items.reduce(
+        (count, post) => count + (post.media?.length ?? 0),
+        0,
+      ),
+      assetLinkCount: group.items.reduce(
+        (count, post) => count + (post.assetLinks?.length ?? 0),
+        0,
+      ),
     })),
   });
 
@@ -377,19 +397,19 @@ export default async function ContentDetailPage({
         brandName={content.brand?.name ?? "Brand"}
         contentTitle={content.title ?? "Untitled"}
         directMedia={content.media ?? []}
-        spots={posts.map((p) => ({
-          id: p.id,
-          platform: p.platform,
-          media: p.media ?? [],
+        spots={postGroups.map((group) => ({
+          id: group.root.id,
+          platform: group.root.platform,
+          media: group.items.flatMap((post) => post.media ?? []),
         }))}
       />
 
       {/* platform renderings */}
       <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
-        Platform posts · {posts.length}
+        Platform posts · {postGroups.length}
       </h2>
       <div className="flex flex-col gap-2.5">
-        {posts.map((p) => (
+        {postGroups.map(({ root: p, items }) => (
           <div key={p.id} id={`post-${p.id}`} className="scroll-mt-4">
             <SpotCard
               brandId={content.brandId}
@@ -434,6 +454,14 @@ export default async function ContentDetailPage({
                 stats: p.stats,
                 owner: toMember(p.owner),
                 linkCard: linkCardBySpot.get(p.id) ?? null,
+                threadItems: items.map((item) => ({
+                  id: item.id,
+                  updatedAtISO: item.updatedAt.toISOString(),
+                  text: item.text,
+                  media: item.media,
+                  assetLinks: item.assetLinks,
+                  sequence: item.sequence,
+                })),
               }}
             />
             <RepostSimulation sims={simsBySpot.get(p.id) ?? []} />
@@ -443,7 +471,7 @@ export default async function ContentDetailPage({
 
       <AddSpotControl
         contentPostId={content.id}
-        existingPlatforms={posts.map((p) => p.platform)}
+        existingPlatforms={postGroups.map((group) => group.root.platform)}
       />
 
       {/* series siblings */}

@@ -24,6 +24,7 @@ import { ContentService } from "@/server/services/content.service";
 import { generateSpotCaption } from "@/server/services/spot-generate.service";
 import { SPOT_PILL_IDS } from "@/lib/spot-pills";
 import { displayPoster } from "@/lib/utils/media";
+import { groupPlatformThreads } from "@/lib/platform-thread";
 import {
   deliverLinkedInPost,
   refreshLinkedInDelivery,
@@ -94,6 +95,12 @@ const mediaItemInput = z.object({
   assetId: z.string().optional(),
   derivedFrom: z.string().optional(),
 });
+const spotThreadItemInput = z.object({
+  id: z.string().optional(),
+  text: z.string().max(10_000).nullable(),
+  media: z.array(mediaItemInput).max(300),
+  assetLinks: z.array(z.string().trim().min(1).max(2000)).max(30),
+});
 
 export const contentRouter = createTRPCRouter({
   /**
@@ -132,6 +139,7 @@ export const contentRouter = createTRPCRouter({
         where: and(
           inArray(platformPostTable.brandId, brandIds),
           eq(platformPostTable.source, "owned"),
+          isNull(platformPostTable.parentPlatformPostId),
         ),
         columns: {
           id: true,
@@ -254,6 +262,7 @@ export const contentRouter = createTRPCRouter({
       }
 
       return posts.map((c) => {
+        const platformGroups = groupPlatformThreads(c.platformPosts);
         const platforms = [
           ...new Set(
             c.platformPosts.map((p) =>
@@ -299,7 +308,7 @@ export const contentRouter = createTRPCRouter({
           origin: c.origin,
           hook: c.hook,
           platforms,
-          postCount: c.platformPosts.length,
+          postCount: platformGroups.length,
           likes: totals.likes,
           views: totals.views,
           plannedAt: c.plannedAt ? c.plannedAt.toISOString() : null,
@@ -804,6 +813,55 @@ export const contentRouter = createTRPCRouter({
         });
       }
       return saved;
+    }),
+
+  /** Save one platform publishing unit, including ordered X/Threads replies. */
+  saveSpotThread: protectedProcedure
+    .input(
+      z.object({
+        rootPlatformPostId: z.string(),
+        expectedUpdatedAt: z.string().datetime(),
+        items: z.array(spotThreadItemInput).min(1).max(25),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const root = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.rootPlatformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!root) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, root.brand?.organizationId);
+      if (root.source !== "owned") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't edit a scraped post",
+        });
+      }
+      if (root.parentPlatformPostId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Open the root post to edit the complete thread.",
+        });
+      }
+
+      try {
+        const saved = await ContentService.saveSpotThread(input);
+        if (!saved) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message:
+              "This post changed while you were editing. Close and reopen the editor to review the latest version.",
+          });
+        }
+        return saved;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Could not save thread",
+        });
+      }
     }),
 
   /** Set a spot's concrete, platform-specific caption (`platform_post.text`) —
