@@ -305,7 +305,7 @@ export async function POST(req: Request): Promise<Response> {
         tools: runtime.tools,
         toolsContext: runtime.toolsContext,
         toolApproval: runtime.toolApproval,
-        stopWhen: stepCountIs(8),
+        stopWhen: stepCountIs(20),
       });
     } catch (error) {
       await failAssistantRun(runId, compactGrowthError(error));

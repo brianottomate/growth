@@ -22,14 +22,14 @@ import { growthTool } from "./types";
  */
 export const blogAgent = growthTool({
   description:
-    "Delegate a wander.com blog task to the DatoCMS blog agent. It can inspect the blog schema, read or review a full article, create a draft, patch fields, upload the operator's current chat image, and append body blocks, then report back with a preview link. Use for any 'review/create/edit/add to the blog' request. It works in DRAFTS only — it cannot publish. Give it a complete task description in one go, plus the article id when the task concerns an existing post.",
+    "Delegate a wander.com blog task to the DatoCMS blog agent. It can inspect the blog schema, read or review a full article, create a separate full-body draft, safely replace an existing draft body from Markdown, patch metadata, upload the operator's current chat image, and append body blocks, then report back with a preview link. Use for any 'review/create/edit/add to the blog' request. It works in DRAFTS only — it cannot publish. Give it a complete task description in one go, plus the article id when the task concerns an existing post.",
   inputSchema: z.object({
     action: z.literal("run"),
     task: z
       .string()
       .trim()
       .min(10)
-      .max(4000)
+      .max(20_000)
       .describe(
         "The full task, in plain language. Include the intent and any copy the operator supplied.",
       ),

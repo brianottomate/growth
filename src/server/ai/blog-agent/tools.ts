@@ -16,6 +16,7 @@ import {
   updateItemFields,
 } from "@/server/clients/datocms.client";
 import { getBlogArticleDraft } from "@/server/clients/datocms-cda.client";
+import { markdownToDatoStructuredText } from "@/lib/dato-markdown";
 import { datoStructuredTextToPlainText } from "@/lib/dato-structured-text";
 import { linkDatoBlogArticle } from "@/server/services/dato-blog-link.service";
 
@@ -156,7 +157,7 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
 
     createDraft: tool({
       description:
-        "Create a NEW blog article as a draft. Requires title, slug, description, and an author name that exists in Dato. Body is optional — you can add blocks afterwards. Never publishes.",
+        "Create a NEW blog article as a separate Dato draft. Accepts the complete article body as Markdown and can use the current chat upload or reuse the hero image from another article without changing that source article. Use this instead of editing when the operator asks to leave the current draft untouched. Never publishes.",
       inputSchema: z.object({
         title: z.string().trim().min(3).max(300),
         slug: z
@@ -169,9 +170,44 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
           .trim()
           .default("Wander")
           .describe("Must match an existing blog_author record."),
+        bodyMarkdown: z
+          .string()
+          .trim()
+          .min(1)
+          .max(20_000)
+          .optional()
+          .describe("The complete article body in Markdown."),
+        copyHeroFromItemId: z
+          .string()
+          .trim()
+          .optional()
+          .describe(
+            "An existing Dato article whose hero image should be reused on the new draft. The source article is not changed.",
+          ),
+        heroUploadId: z
+          .string()
+          .trim()
+          .optional()
+          .describe(
+            "Dato upload id returned by uploadAttachment when the new draft should use the operator's current chat image.",
+          ),
       }),
-      execute: async ({ title, slug, description, authorName }) => {
+      execute: async ({
+        title,
+        slug,
+        description,
+        authorName,
+        bodyMarkdown,
+        copyHeroFromItemId,
+        heroUploadId,
+      }) => {
         try {
+          if (copyHeroFromItemId && heroUploadId) {
+            return {
+              error:
+                "Choose either the current chat upload or an existing article hero, not both.",
+            };
+          }
           const [itemTypeId, authorId] = await Promise.all([
             resolveItemTypeId(BLOG_MODEL),
             findAuthorIdByName(authorName),
@@ -181,9 +217,32 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
               error: `No Dato blog author named "${authorName}". Pick an existing author.`,
             };
           }
+          const [body, sourceItem] = await Promise.all([
+            bodyMarkdown
+              ? markdownToDatoStructuredText(bodyMarkdown)
+              : Promise.resolve(null),
+            copyHeroFromItemId
+              ? getItem(copyHeroFromItemId)
+              : Promise.resolve(null),
+          ]);
+          const sourceHero =
+            (heroUploadId ? { upload_id: heroUploadId } : null) ??
+            sourceItem?.attributes.image;
+          if (copyHeroFromItemId && !sourceHero) {
+            return {
+              error: `Article ${copyHeroFromItemId} has no reusable hero image.`,
+            };
+          }
           const created = await createDraftItem({
             itemTypeId,
-            attributes: { title, url: slug, description, author: authorId },
+            attributes: {
+              title,
+              url: slug,
+              description,
+              author: authorId,
+              ...(body ? { body } : {}),
+              ...(sourceHero ? { image: sourceHero } : {}),
+            },
           });
           ctx.touchedItemIds.add(created.id);
           note(ctx, "createDraft", `created draft ${created.id} "${title}"`);
@@ -192,6 +251,8 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
             itemId: created.id,
             slug,
             status: "draft",
+            hasBody: Boolean(body),
+            hasHero: Boolean(sourceHero),
             plannedPublicUrl: `${PUBLIC_BASE}/${slug}`,
           };
         } catch (error) {
@@ -202,7 +263,7 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
 
     updateFields: tool({
       description:
-        "Patch named fields on an existing article (title, description, slug, ...). Only the fields you pass change. Do not use this to replace a body you have not read.",
+        "Patch named metadata fields on an existing article (title, description, slug, image, ...). Only the fields you pass change. Use replaceBody, not this tool, for body content.",
       inputSchema: z.object({
         itemId: z.string(),
         fields: z
@@ -213,10 +274,43 @@ export function buildBlogTools(ctx: BlogToolContext): ToolSet {
         try {
           const keys = Object.keys(fields);
           if (keys.length === 0) return { error: "No fields supplied." };
+          if (keys.includes("body")) {
+            return {
+              error:
+                "Use replaceBody for article body content so Markdown is converted safely.",
+            };
+          }
           await updateItemFields(itemId, fields);
           ctx.touchedItemIds.add(itemId);
           note(ctx, "updateFields", `patched ${keys.join(", ")} on ${itemId}`);
           return { ok: true, itemId, updated: keys };
+        } catch (error) {
+          return { error: (error as Error).message };
+        }
+      },
+    }),
+
+    replaceBody: tool({
+      description:
+        "Replace the complete body of an existing Dato DRAFT from Markdown. Use only when the operator explicitly asks to replace or reconcile the full article body, and call getArticle first. Refuses an article whose current Dato status is published.",
+      inputSchema: z.object({
+        itemId: z.string(),
+        bodyMarkdown: z.string().trim().min(1).max(20_000),
+      }),
+      execute: async ({ itemId, bodyMarkdown }) => {
+        try {
+          const item = await getItem(itemId);
+          if (item.meta.status === "published") {
+            return {
+              error:
+                "This article is published with no draft revision. Create a separate draft instead of replacing its body.",
+            };
+          }
+          const body = await markdownToDatoStructuredText(bodyMarkdown);
+          await updateItemFields(itemId, { body });
+          ctx.touchedItemIds.add(itemId);
+          note(ctx, "replaceBody", `replaced draft body on ${itemId}`);
+          return { ok: true, itemId, status: item.meta.status };
         } catch (error) {
           return { error: (error as Error).message };
         }

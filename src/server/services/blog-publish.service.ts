@@ -1,10 +1,8 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
-import { parse5ToStructuredText } from "datocms-html-to-structured-text";
-import { marked } from "marked";
-import { parse } from "parse5";
 
+import { markdownToDatoStructuredText } from "@/lib/dato-markdown";
 import { db } from "@/server/db";
 import { contentPostTable, platformPostTable } from "@/server/db/schema";
 import {
@@ -44,7 +42,10 @@ const slugify = (value: string) =>
 function splitDraft(markdown: string): { title: string | null; body: string } {
   const lines = markdown.trim().split("\n");
   if (lines[0]?.startsWith("# ")) {
-    return { title: lines[0].slice(2).trim(), body: lines.slice(1).join("\n").trim() };
+    return {
+      title: lines[0].slice(2).trim(),
+      body: lines.slice(1).join("\n").trim(),
+    };
   }
   return { title: null, body: markdown.trim() };
 }
@@ -56,7 +57,9 @@ export async function publishBlogDraft(input: {
   authorName?: string;
 }): Promise<PublishBlogDraftResult> {
   if (!isDatoCmsConfigured) {
-    throw new Error("DatoCMS publishing is not configured (DATOCMS_CMA_TOKEN).");
+    throw new Error(
+      "DatoCMS publishing is not configured (DATOCMS_CMA_TOKEN).",
+    );
   }
   const spot = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, input.platformPostId),
@@ -82,7 +85,10 @@ export async function publishBlogDraft(input: {
 
   const { title: draftTitle, body } = splitDraft(spot.text);
   const title = draftTitle ?? content?.title ?? null;
-  if (!title) throw new Error("Could not determine a title (no h1 and no content title).");
+  if (!title)
+    throw new Error(
+      "Could not determine a title (no h1 and no content title).",
+    );
 
   const hero = spot.media?.[0] ?? content?.media?.[0];
   if (!hero?.url) {
@@ -99,12 +105,7 @@ export async function publishBlogDraft(input: {
       .find((paragraph) => paragraph && !paragraph.startsWith("#")) ??
     "";
 
-  const html = await marked.parse(body);
-  // parse5 variant: htmlToStructuredText needs a browser DOMParser.
-  const structuredText = await parse5ToStructuredText(
-    parse(html, { sourceCodeLocationInfo: true }),
-  );
-  if (!structuredText) throw new Error("Markdown conversion produced no content.");
+  const structuredText = await markdownToDatoStructuredText(body);
 
   const authorName = input.authorName?.trim() || "Wander";
   const [itemTypeId, uploadId, adminDomain, authorId] = await Promise.all([

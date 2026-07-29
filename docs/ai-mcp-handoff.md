@@ -222,6 +222,11 @@ verifies that the R2 URL belongs to that operator, passes it into the temporary
 blog-agent run, uploads it to Dato, and patches only the requested image field.
 The article remains a draft and still needs a human publish action.
 
+The global in-app assistant is bounded at 20 top-level steps per turn. This is
+room for a legitimate read, delegated specialist loop, verification, and
+navigation sequence. It does not add tools or expand authority; the consequence
+policy and the specialist's own bounds still apply to every call.
+
 ## Problems that shaped the current design
 
 ### Too many atomic tools
@@ -307,13 +312,14 @@ The global assistant is broad, but several areas are deliberately incomplete:
 - The blog is delegated, not a domain pair. `blogAgent` hands one task to a
   sub-agent in `src/server/ai/blog-agent/`, which owns bespoke DatoCMS tools
   (`describeModel`, `listModels`, `getArticle`, `uploadAttachment`,
-  `createDraft`, `updateFields`, `insertBlock`, `linkToGrowth`, `previewUrl`,
-  and `publishArticle`) for the length of that call. Editing a CMS record is a
-  discover, write, and verify loop, so ten more top-level tools would widen the
-  catalog for an occasional job, and one do-everything action would hide which
-  writes ran. The sub-agent returns the trail of tools it called, so individual
-  writes stay visible. It works in drafts only: `publishArticle` exists but
-  refuses, because publishing is a human decision.
+  `createDraft`, `updateFields`, `replaceBody`, `insertBlock`, `linkToGrowth`,
+  `previewUrl`, and `publishArticle`) for the length of that call. Editing a CMS
+  record is a discover, write, and verify loop, so exposing every specialist
+  action globally would widen the catalog for an occasional job, and one
+  do-everything action would hide which writes ran. The sub-agent returns the
+  trail of tools it called, so individual writes stay visible. It works in
+  drafts only: `publishArticle` exists but refuses, because publishing is a
+  human decision.
 - The initiative and campaign API needs another product pass before it becomes
   a general `campaignRead` and `campaignWrite` contract.
 - The inbox does not expose provider reply actions to the global assistant.
@@ -379,8 +385,9 @@ exposed on demand instead of permanently.
   `growthTool`, registered in `growth-capabilities.ts` and `policy.ts` like
   anything else.
 - `src/server/ai/blog-agent/tools.ts`: the bespoke tools (`describeModel`,
-  `listModels`, `getArticle`, `createDraft`, `updateFields`, `insertBlock`,
-  `linkToGrowth`, `uploadAttachment`, `previewUrl`, `publishArticle`).
+  `listModels`, `getArticle`, `createDraft`, `updateFields`, `replaceBody`,
+  `insertBlock`, `linkToGrowth`, `uploadAttachment`, `previewUrl`,
+  `publishArticle`).
   `uploadAttachment` is only useful when the invoking operator supplied an
   owned chat image for that run. Built by `buildBlogTools(ctx)` per call.
 - `src/server/ai/blog-agent/persona.ts`: how it works and what it may not do.

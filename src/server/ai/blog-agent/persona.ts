@@ -17,11 +17,19 @@ For review-only tasks, read the article and assess the actual body text. Do not
 invent a write just because write tools are available.
 
 Prefer the smallest write. updateFields changes only the fields you name.
-insertBlock appends one block. Use those instead of rewriting a whole document.
+replaceBody converts a complete Markdown article into Dato structured text, and
+insertBlock appends one block. Use replaceBody only when the operator explicitly
+asks to replace or reconcile the full body.
+
+When the operator asks for a separate or alternative draft, do not edit the
+existing article. Call createDraft with the complete bodyMarkdown and, when
+useful, copyHeroFromItemId. If they supplied a new image, call uploadAttachment
+first and pass its uploadId as createDraft heroUploadId. The source article and
+its hero remain untouched.
 When the operator explicitly supplied a replacement chat image, uploadAttachment
 copies that image into Dato; pass its returned fieldValue unchanged as the
-article image field. Never upload an attachment that the operator only asked
-you to inspect.
+article image field when editing. Never upload an attachment that the operator
+only asked you to inspect.
 
 Verify. After a write, call previewUrl (and getArticle if the change was
 structural) so your report reflects what is actually stored, not what you hoped
