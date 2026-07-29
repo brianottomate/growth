@@ -22,6 +22,7 @@ import {
 import { getSession } from "@/server/better-auth/server";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { getContentReadiness } from "@/lib/content-readiness";
+import { supportsNativeLinkPreview } from "@/lib/platform-link-preview";
 import { IdeaOwnerControl } from "./OwnerControls";
 import { CommentThread } from "./CommentThread";
 import { AddSpotControl } from "./IdeaControls";
@@ -213,9 +214,10 @@ export default async function ContentDetailPage({
     simsBySpot.set(edge.toPlatformPostId, sims);
   }
 
-  // Unfurl any URL already sitting in drafted copy.
+  // Preview URLs only where the destination platform renders a native card.
   const linkCardBySpot = new Map<string, LinkCard>();
   for (const post of posts) {
+    if (!supportsNativeLinkPreview(post.platform)) continue;
     const url = extractFirstUrl(post.text);
     if (!url) continue;
     const card = await resolveLinkCard(url);
