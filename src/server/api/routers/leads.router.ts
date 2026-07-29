@@ -69,33 +69,6 @@ import { TRPCError } from "@trpc/server";
  * are fetched per-domain in the detail view.
  */
 
-// First cold-outbound test cohort (the "SEND-20"): the middle band of the
-// enriched net-new ranking — high pregen-fit but smaller operators, so we don't
-// burn the best prospects on iteration 1. Hardcoded for this one-off batch; when
-// batches become routine this should become a `send_batch` column / cohort tag.
-const SEND_BATCH_1 = [
-  "cityninestay.com",
-  "sunsetrentals1.com",
-  "sdurbanvacationrentals.com",
-  "pkpropertiestn.net",
-  "sunshineandcoastlinerentals.com",
-  "fleursdepoirier.com",
-  "snowandsand.com",
-  "resort-stay.com",
-  "grandcaymancondos.net",
-  "beachhotelcndo.com",
-  "fripprentals.com",
-  "ybgroup.es",
-  "sweethomes.co.nz",
-  "elkrapidsbeachresort.com",
-  "bookcobblestonecreek.ca",
-  "hummingbird.villas",
-  "a12properties.com",
-  "chesapeakebayvacations.com",
-  "stkittsandnevisvacation.com",
-  "casavaleta.com",
-] as const;
-
 const SOURCE_COLUMN = {
   builtwith: leadDomainTable.inBuiltwith,
   hubspot: leadDomainTable.inHubspot,
@@ -321,8 +294,10 @@ export const leadsRouter = createTRPCRouter({
           ),
         );
       }
+      // Any stamped pregen send batch. Replaces the hardcoded SEND_BATCH_1
+      // domain array, which the comment there always said should be a column.
       if (input.sendBatch)
-        conds.push(inArray(leadDomainTable.domain, [...SEND_BATCH_1]));
+        conds.push(sql`${leadDomainTable.pregenBatch} is not null`);
       if (input.minUnits != null)
         conds.push(gte(leadDomainTable.unitCount, input.minUnits));
       if (input.owner)

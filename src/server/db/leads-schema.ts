@@ -188,6 +188,13 @@ export const leadDomainTable = leadsSchema.table(
     scoreVersion: t.text(), // which scoring fn produced the above
     scoredAt: t.timestamp(),
 
+    // ---- Send batch ----
+    // Which pregen send batch this company belongs to, e.g. "pregen-1". Replaces
+    // the hardcoded SEND_BATCH_1 array the leads router carried, which was
+    // always flagged as wanting a column once batches became routine. Nullable:
+    // most of the 216k universe is in no batch.
+    pregenBatch: t.text(),
+
     // ---- Outreach gate ----
     // Operational kill-switch independent of score (existing customer, opted
     // out, bad domain). Checked before any Instantly push.
