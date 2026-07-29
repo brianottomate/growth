@@ -1,6 +1,6 @@
 # Growth AI and MCP handoff
 
-Status: current as of 2026-07-28.
+Status: current as of 2026-07-29.
 
 This document explains how Growth approaches chat editing, domain tools, MCP,
 provider access, and product safety. It is meant for engineers and operators who
@@ -29,13 +29,13 @@ explicit policy and approval path.
 
 | Surface          | Contract                | Purpose                                                                                     |
 | ---------------- | ----------------------- | ------------------------------------------------------------------------------------------- |
-| Global assistant | 34 canonical tools      | Broad chat across the Growth workspace. Every tool remains available on every page.         |
+| Global assistant | 36 canonical tools      | Broad chat across the Growth workspace. Every tool remains available on every page.         |
 | Planner chat     | 3 read-only tools       | A focused Form or Chat flow for brand context, research, and a reviewable moment blueprint. |
-| Detailed MCP     | 32 connector-safe tools | Deterministic remote access to Growth domains through OAuth.                                |
+| Detailed MCP     | 34 connector-safe tools | Deterministic remote access to Growth domains through OAuth.                                |
 | `invoke_growth`  | 1 coarse MCP facade     | A bounded internal Growth run for hosts that prefer one natural-language tool.              |
 
-The 34 canonical tools contain 103 advertised actions. The wire-visible MCP
-surface has 33 tools: 32 detailed domain tools plus `invoke_growth`.
+The 36 canonical tools contain 105 advertised actions. The wire-visible MCP
+surface has 35 tools: 34 detailed domain tools plus `invoke_growth`.
 
 The planner projection contains `brandRead`, `researchRead`, and
 `planningRead`. It does not own another registry and does not limit the global
@@ -86,27 +86,28 @@ the same capability and action IDs.
 
 ## Current domain coverage
 
-| Area                     | Current model-facing surface                                                               |
-| ------------------------ | ------------------------------------------------------------------------------------------ |
-| Workspace and navigation | Overview, named navigation, and a validated `/app` path fallback                           |
-| Brands                   | Brand list, map, and next-action readiness                                                 |
-| Product Atlas            | Read and write                                                                             |
-| Storefronts              | Read, write, references, freshness, and ownership                                          |
-| Audiences                | Read and write                                                                             |
-| Content                  | Pipeline, search, work-item reads, canonical edits, cross-posts, and platform posts        |
-| Content media            | Attachments, recovery, uploads, remote imports, Drive imports, and carousels               |
-| Editorial email          | Read drafts, create slots, save edits, and request a draft job                             |
-| Content structure        | Pillars, series, groupings, and organization                                               |
-| Ads                      | Scope, performance, alignment diagnosis, and conversion inspection                         |
-| Publishing               | Connection state and timeline navigation                                                   |
-| Source sync              | Channel discovery, registration, public-post scrape, owned history, website, and blog sync |
-| Media analysis           | Durable image and video analysis                                                           |
-| Strategy                 | Channel cadence, series cadence, brand mix, and target proposals                           |
-| Planning                 | Slot previews, moment blueprints, and cadence-driven slot generation                       |
-| Amplification            | Rolodex reads and platform-post amplification requests                                     |
-| Leads                    | Headline pipeline summary                                                                  |
-| Lifecycle                | Program and step reads and writes, campaign linking, cleanup state, archive, and restore   |
-| Listening                | Recent mentions and triage                                                                 |
+| Area                     | Current model-facing surface                                                                 |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| Workspace and navigation | Overview, named navigation, and a validated `/app` path fallback                             |
+| Brands                   | Brand list, map, and next-action readiness                                                   |
+| Product Atlas            | Read and write                                                                               |
+| Storefronts              | Read, write, references, freshness, and ownership                                            |
+| Audiences                | Read and write                                                                               |
+| Content                  | Pipeline, search, work-item reads, canonical edits, cross-posts, and platform posts          |
+| Content media            | Attachments, recovery, uploads, remote imports, Drive imports, and carousels                 |
+| Blog                     | Full draft reads and review, Dato draft creation and editing, image replacement, and preview |
+| Editorial email          | Direct read/write actions plus a draft-only newsletter specialist for iterative issue work   |
+| Content structure        | Pillars, series, groupings, and organization                                                 |
+| Ads                      | Scope, performance, alignment diagnosis, and conversion inspection                           |
+| Publishing               | Connection state and timeline navigation                                                     |
+| Source sync              | Channel discovery, registration, public-post scrape, owned history, website, and blog sync   |
+| Media analysis           | Durable image and video analysis                                                             |
+| Strategy                 | Channel cadence, series cadence, brand mix, and target proposals                             |
+| Planning                 | Slot previews, moment blueprints, and cadence-driven slot generation                         |
+| Amplification            | Rolodex reads and platform-post amplification requests                                       |
+| Leads                    | Headline pipeline summary                                                                    |
+| Lifecycle                | Program and step reads and writes, campaign linking, cleanup state, archive, and restore     |
+| Listening                | Recent mentions and triage                                                                   |
 
 This table describes the model contract, not every feature in the application.
 Several app surfaces intentionally remain outside the global catalog for now.
@@ -118,9 +119,15 @@ request includes the current pathname. The server turns that path into an
 organization-safe prompt section.
 
 Supported detail routes can add verified entity context such as a content item,
-series, Product Atlas product, or storefront. General routes add domain
-guidance. A page can suggest which read action should come first, but it cannot
-remove tools or grant access.
+series, Product Atlas product, storefront, or Dato-backed blog article. General
+routes add domain guidance. A page can suggest which read action should come
+first, but it cannot remove tools or grant access.
+
+The blog detail route demonstrates a useful extension of this pattern. On
+desktop it opens the assistant beside the draft and supplies the verified
+`platform_post` and Dato item IDs. The operator can say "review this article" or
+"use this image as the hero" without restating which record is on screen. This
+is convenience and grounding, not a separate page-scoped agent.
 
 `navigateWorkspace` has two lanes:
 
@@ -208,6 +215,13 @@ CMS draft. It does not publish the article live. Drive is another: the in-app
 assistant can browse Drive, while remote MCP hosts use their own Drive connector
 and hand Growth resolved file IDs.
 
+Chat attachments follow the same boundary. Pasting an image gives the model
+visual context, but does not save or upload anything by itself. When the
+operator explicitly asks to use the image on the current blog article, Growth
+verifies that the R2 URL belongs to that operator, passes it into the temporary
+blog-agent run, uploads it to Dato, and patches only the requested image field.
+The article remains a draft and still needs a human publish action.
+
 ## Problems that shaped the current design
 
 ### Too many atomic tools
@@ -271,6 +285,20 @@ weaker duplicates increased tool count and confused responsibility.
 MCP leaves research and Drive discovery to the host. Growth keeps the product
 operation that imports a resolved Drive file into its own media system.
 
+### An attachment looked writable before it was writable
+
+The global assistant could already see a pasted image, and normal content work
+could promote it into Growth's media library. That made "replace this blog
+image" appear supported even though the Dato specialist had no way to receive
+or upload the attachment.
+
+The fix was not another permanent media tool. The current turn carries an
+operator-owned attachment URL into `blogAgent`, and the inner
+`uploadAttachment` action exists only for that specialist run. Ownership is
+checked again before delegation, and the upload runs only after an explicit
+request. This preserves a small global catalog without pretending visual input
+and provider mutation are the same capability.
+
 ## Intentional gaps and holds
 
 The global assistant is broad, but several areas are deliberately incomplete:
@@ -278,9 +306,10 @@ The global assistant is broad, but several areas are deliberately incomplete:
 - Spend is reserved for a dedicated agent.
 - The blog is delegated, not a domain pair. `blogAgent` hands one task to a
   sub-agent in `src/server/ai/blog-agent/`, which owns bespoke DatoCMS tools
-  (describeModel, listModels, getArticle, createDraft, updateFields,
-  insertBlock, previewUrl) for the length of that call. Editing a CMS record is
-  a discover-write-verify loop, so seven more top-level tools would widen the
+  (`describeModel`, `listModels`, `getArticle`, `uploadAttachment`,
+  `createDraft`, `updateFields`, `insertBlock`, `linkToGrowth`, `previewUrl`,
+  and `publishArticle`) for the length of that call. Editing a CMS record is a
+  discover, write, and verify loop, so ten more top-level tools would widen the
   catalog for an occasional job, and one do-everything action would hide which
   writes ran. The sub-agent returns the trail of tools it called, so individual
   writes stay visible. It works in drafts only: `publishArticle` exists but
@@ -336,7 +365,7 @@ asks for one outcome, but reaching it takes an unknown number of dependent
 steps whose shape depends on what the previous step returned.
 
 Neither existing option fits. A domain read/write pair would push every step
-into the global catalog, so the assistant carries eight more tools for a job it
+into the global catalog, so the assistant carries ten more tools for a job it
 does occasionally. A single do-everything action would hide which writes ran,
 which is the `commitMomentPlan` mistake.
 
@@ -346,16 +375,16 @@ exposed on demand instead of permanently.
 
 `blogAgent` is the reference implementation:
 
-- `src/server/ai/capabilities/blog.ts` — the single catalog entry. Ordinary
+- `src/server/ai/capabilities/blog.ts`: the single catalog entry. Ordinary
   `growthTool`, registered in `growth-capabilities.ts` and `policy.ts` like
   anything else.
-- `src/server/ai/blog-agent/tools.ts` — the bespoke tools (`describeModel`,
+- `src/server/ai/blog-agent/tools.ts`: the bespoke tools (`describeModel`,
   `listModels`, `getArticle`, `createDraft`, `updateFields`, `insertBlock`,
-  `uploadAttachment`, `previewUrl`, `publishArticle`). `uploadAttachment` is
-  only useful when the invoking operator supplied an owned chat image for that
-  run. Built by `buildBlogTools(ctx)` per call.
-- `src/server/ai/blog-agent/persona.ts` — how it works and what it may not do.
-- `src/server/ai/blog-agent/run.ts` — the loop.
+  `linkToGrowth`, `uploadAttachment`, `previewUrl`, `publishArticle`).
+  `uploadAttachment` is only useful when the invoking operator supplied an
+  owned chat image for that run. Built by `buildBlogTools(ctx)` per call.
+- `src/server/ai/blog-agent/persona.ts`: how it works and what it may not do.
+- `src/server/ai/blog-agent/run.ts`: the loop.
 
 Rules that keep a sub-agent from becoming a macro:
 
@@ -366,7 +395,7 @@ Rules that keep a sub-agent from becoming a macro:
    a judgment with a write. The loop supplies the sequencing.
 3. **Discover, do not hardcode.** The agent reads the live schema rather than
    assuming fields, so a CMS change does not silently corrupt writes.
-4. **Bound the loop.** `stopWhen: stepCountIs(20)` — high enough to finish a
+4. **Bound the loop.** `stopWhen: stepCountIs(20)` is high enough to finish a
    real task, low enough that a confused agent stops.
 5. **Gate the dangerous verb explicitly.** `publishArticle` exists with a full
    schema and refuses in its body, so the agent knows publishing exists and
@@ -379,17 +408,19 @@ Reach for a sub-agent only when the work is genuinely iterative and the tools
 would otherwise be dead weight in the catalog. A one-shot action is still an
 action.
 
-`newsletterAgent` is the second instance, over `email-document.service`. Note
-what it does NOT do: it wraps the same product services the newsletter UI
-calls, rather than reaching into tables directly. A sub-agent is another caller
-of the product, not a private path into the database.
+`newsletterAgent` is the second instance, over `email-document.service`. Its
+temporary tools list brands, read an issue, create an issue, save a revision,
+and return the review route. `sendIssue` exists but refuses. The specialist
+wraps the same product services the newsletter UI calls rather than reaching
+into tables directly. A sub-agent is another caller of the product, not a
+private path into the database.
 
 ## Published mirrors and the platform_post spine
 
 Blog and newsletter both drifted the same way, and it is worth naming so the
 next provider integration does not repeat it.
 
-Each product had a _published mirror_ — `/app/blog` and `/app/newsletters` read
+Each product had a _published mirror_: `/app/blog` and `/app/newsletters` read
 `platform_post` filtered by `externalKind` (`blog_article`, `broadcast`) and, until
 recently, `publishedAt IS NOT NULL`. Drafting lived somewhere else entirely
 (Dato records; `email_document` rows). So an artifact being worked on had no
@@ -427,7 +458,7 @@ exposed to the AI layer, and `newsletterAgent.sendIssue` refuses. Sending is
 irreversible in a way drafting is not.
 
 When we do wire it, the shape should be: a product service that owns delivery,
-an approval gate in front of it, and only then an action that calls it — the
+an approval gate in front of it, and only then an action that calls it. The
 same order the rest of the catalog follows. Same reconcile question as the blog:
 prefer an on-demand "fetch recent broadcasts" over a Customer.io webhook until
 volume justifies the endpoint.
