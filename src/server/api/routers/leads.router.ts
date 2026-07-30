@@ -30,6 +30,7 @@ import {
 } from "@/server/services/lead-extraction.service";
 import {
   generatePregenHubspotDraft,
+  PregenPreconditionError,
   PregenMotionSchema,
 } from "@/server/services/pregen-hubspot-outreach.service";
 import { hubspotPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
@@ -557,10 +558,20 @@ export const leadsRouter = createTRPCRouter({
         });
       }
 
+      // Exclusion and an unreadable preview are operator-actionable refusals,
+      // not faults — surface the reason on the button rather than a 500.
       const result = await generatePregenHubspotDraft(row.domain, {
         motion,
         previewUrl,
         steer: input.steer,
+      }).catch((error) => {
+        if (error instanceof PregenPreconditionError) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: error.message,
+          });
+        }
+        throw error;
       });
       await ctx.db
         .delete(leadOutreachTable)

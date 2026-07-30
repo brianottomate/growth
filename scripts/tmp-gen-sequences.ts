@@ -68,19 +68,14 @@ for (const domain of DOMAINS) {
     continue;
   }
   const status = await previewIsReachable(previewUrl);
-  if (status !== 200 && !ALLOW_UNREACHABLE) {
-    console.log(
-      `\n### ${domain}: preview unreachable (${status ?? "no response"}) — ${previewUrl}` +
-        `\n    skipped; the generator would have no preview content to read.` +
-        `\n    re-run with ALLOW_UNREACHABLE=1 to generate anyway.`,
-    );
-    continue;
-  }
 
   try {
+    // The generator refuses an unreadable preview itself, so this only forwards
+    // the override; the probe above is kept for the status line in the output.
     const r = await generatePregenHubspotDraft(domain, {
       motion,
       previewUrl,
+      allowUnreachablePreview: ALLOW_UNREACHABLE,
     });
 
     await db
