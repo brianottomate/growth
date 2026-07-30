@@ -3,7 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   parseAsBoolean,
   parseAsInteger,
@@ -20,18 +25,15 @@ import {
 } from "@/lib/hubspot-pregen-lists";
 import { useTRPC } from "@/trpc/react";
 import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
+import {
+  ProspectReviewCard,
+  type ProspectCardData,
+} from "./ProspectReviewCard";
 
 const SOURCE_BADGE: Record<string, string> = {
   builtwith: "bg-slate-500/15 text-slate-300",
   hubspot: "bg-orange-500/15 text-orange-300",
   instantly: "bg-violet-500/15 text-violet-300",
-};
-
-const VERDICT_TONE: Record<string, string> = {
-  send: "bg-emerald-500/15 text-emerald-300",
-  review: "bg-amber-500/15 text-amber-300",
-  form: "bg-sky-500/15 text-sky-300",
-  skip: "bg-slate-500/15 text-slate-400",
 };
 
 const fmt = (n: number | null | undefined) =>
@@ -471,16 +473,10 @@ export function LeadsClient() {
           filtered set, so the two cannot show different facts about one company
           the way the screenshot-on-one-list-only bug did. */}
       {view === "review" ? (
-        <div className="mt-2 space-y-3">
-          {list.data?.items.map((d) => (
-            <ReviewCard key={d.id} item={d} />
-          ))}
-          {list.data?.items.length === 0 && (
-            <p className="text-muted-foreground py-8 text-center text-sm">
-              Nothing in this population matches those facets.
-            </p>
-          )}
-        </div>
+        <ReviewCardList
+          items={list.data?.items ?? []}
+          onInvalidate={() => void list.refetch()}
+        />
       ) : (
       <div className="mt-2 overflow-x-auto">
         <table className="w-full border-separate border-spacing-0 text-sm">
@@ -683,133 +679,152 @@ export function LeadsClient() {
 }
 
 /**
- * The send-review card, rendered from the shared list query.
+ * Map a list row onto the shared card's shape.
  *
- * Previously /leads and /leads/send-review ran different queries over the same
- * table, which is how the site screenshot ended up on send-review rows only and
- * invisible where it was looked for. Both densities now read one filtered set.
+ * The card deliberately does not know either surface's router output, so this is
+ * the only place /app/leads' row shape appears. `review` is null unless the query
+ * ran with `withReview`, which is exactly when the review density is active.
  */
-function ReviewCard({
-  item,
-}: {
-  item: {
-    id: string;
-    domain: string;
-    companyName: string | null;
-    pms: string | null;
-    unitCount: number | null;
-    scorePregenPotential: number | null;
-    pregenSiteUrl: string | null;
-    pregenCohorts: string[];
-    siteScreenshotUrl: string | null;
-    excludeFromOutreach: boolean;
-    excludeReason: string | null;
-    review: {
-      channel: {
-        bestEmail: string | null;
-        route: string;
-        verdict: string;
-        score: number;
-        candidates: Array<{
-          email: string;
-          name: string | null;
-          title: string | null;
-          score: number;
-          verdict: string;
-          risks: string[];
-        }>;
-      };
-      outreach: { status: string; angle: string | null } | null;
-    } | null;
-  };
-}) {
+function toCardData(item: LeadRow): ProspectCardData | null {
   const review = item.review;
-  // Exclusion overrides reachability. A company with a live deal or an active
-  // rep conversation is not "send · 85" no matter how good its contacts are —
-  // the old send-review query dropped these rows, and dropping them is why the
-  // merged list had to be told about them explicitly.
-  const excluded = item.excludeFromOutreach;
-  const verdict = excluded ? "skip" : (review?.channel.verdict ?? "skip");
-  return (
-    <div
-      className={`bg-card rounded-xl border p-4 ${
-        excluded
-          ? "border-red-500/30"
-          : verdict === "send"
-            ? "border-emerald-500/30"
-          : verdict === "review"
-            ? "border-amber-500/30"
-            : "border-border"
-      }`}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        {excluded ? (
-          <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-300">
-            excluded · {item.excludeReason ?? "no reason recorded"}
-          </span>
-        ) : (
-          <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${VERDICT_TONE[verdict]}`}
-          >
-            {verdict}
-            {review ? ` · ${review.channel.score}` : ""}
-          </span>
-        )}
-        <Link
-          href={`/app/leads/${encodeURIComponent(item.domain)}`}
-          className="font-medium hover:underline"
-        >
-          {item.domain}
-        </Link>
-        <span className="text-muted-foreground text-xs">
-          {[item.companyName, item.pms].filter(Boolean).join(" · ")}
-        </span>
-        <span className="flex-1" />
-        <span className="text-muted-foreground text-xs">
-          fit {item.scorePregenPotential ?? "—"} · units {item.unitCount ?? "—"}
-        </span>
-      </div>
+  if (!review) return null;
+  const outreach = review.outreach;
+  return {
+    id: item.id,
+    domain: item.domain,
+    companyName: item.companyName,
+    location: [item.city, item.state, item.country].filter(Boolean).join(", ") || null,
+    pms: item.pms,
+    fitScore: item.scorePregenPotential,
+    unitCount: item.unitCount,
+    unitConfidence: null,
+    contactCount: item.contactCount,
+    screenshotUrl: item.siteScreenshotUrl,
+    rankOverall: item.siteRankOverall,
+    pregenSiteUrl: item.pregenSiteUrl,
+    excludeReason: item.excludeFromOutreach ? (item.excludeReason ?? "excluded") : null,
+    channel: {
+      verdict: review.channel.verdict,
+      route: review.channel.route,
+      score: review.channel.score,
+      bestEmail: review.channel.bestEmail,
+      reasons: review.channel.reasons,
+      risks: review.channel.risks,
+      candidates: review.channel.candidates.map((c) => ({
+        kind: c.kind,
+        email: c.email,
+        name: c.name,
+        title: c.title,
+        score: c.score,
+        risks: c.risks,
+      })),
+    },
+    channels: review.channels.map((c) => ({
+      kind: c.kind,
+      value: c.value,
+      deliveryState: c.deliveryState,
+    })),
+    outreach: outreach
+      ? {
+          status: outreach.status,
+          angle: outreach.angle,
+          pretend: outreach.generationContext?.preview.pretend === true,
+          steps: (outreach.steps ?? []).map((step) => ({
+            subject: step.subject,
+            body: step.body,
+            delayDays: step.delayDays,
+          })),
+        }
+      : null,
+  };
+}
 
-      <div className="mt-3 grid gap-4 lg:grid-cols-2">
-        <div>
-          <p className="text-muted-foreground text-xs">Selected channel</p>
-          <p className="font-mono text-xs break-all">
-            {review?.channel.bestEmail ?? "no reachable contact"}
-          </p>
-          {review?.channel.candidates.length ? (
-            <ul className="mt-2 space-y-0.5">
-              {review.channel.candidates.slice(0, 5).map((candidate) => (
-                <li
-                  key={candidate.email}
-                  className="text-muted-foreground text-[11px]"
-                >
-                  <span className="tabular-nums">{candidate.score}</span>{" "}
-                  {candidate.email}
-                  {candidate.risks.length ? ` — ${candidate.risks[0]}` : ""}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-        <div>
-          <p className="text-muted-foreground text-xs">Sequence</p>
-          {review?.outreach ? (
-            <>
-              <p className="text-xs">{review.outreach.status}</p>
-              <p className="text-muted-foreground mt-1 line-clamp-3 text-[11px]">
-                {review.outreach.angle ?? "no angle recorded"}
-              </p>
-            </>
-          ) : (
-            <p className="text-muted-foreground text-xs">No draft yet</p>
-          )}
-          {!item.pregenSiteUrl && (
-            <p className="mt-1 text-[11px] text-amber-300">
-              No preview assigned — nothing can be generated yet.
-            </p>
-          )}
-        </div>
-      </div>
+/**
+ * The review density's card list.
+ *
+ * Mutations are hoisted here rather than created per card, so N rows do not mean
+ * N mutation hooks, and `pendingId` keeps the spinner on the row you clicked.
+ */
+function ReviewCardList({
+  items,
+  onInvalidate,
+}: {
+  items: LeadRow[];
+  onInvalidate: () => void;
+}) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState<{ id: string; kind: string } | null>(
+    null,
+  );
+
+  const settle = () => {
+    setPending(null);
+    onInvalidate();
+    void queryClient.invalidateQueries();
+  };
+
+  const resolve = useMutation(
+    trpc.leads.resolveChannel.mutationOptions({ onSettled: settle }),
+  );
+  const rank = useMutation(
+    trpc.leads.rankDomain.mutationOptions({ onSettled: settle }),
+  );
+  const generate = useMutation(
+    trpc.leads.generatePregenOutreach.mutationOptions({ onSettled: settle }),
+  );
+  const verify = useMutation(
+    trpc.leads.verifyDomainContacts.mutationOptions({ onSettled: settle }),
+  );
+
+  return (
+    <div className="mt-2 space-y-3">
+      {items.map((item) => {
+        const data = toCardData(item);
+        if (!data) return null;
+        const busy = (kind: string) =>
+          pending?.id === item.id && pending.kind === kind;
+        return (
+          <ProspectReviewCard
+            key={item.id}
+            data={data}
+            href={`/app/leads?lead=${encodeURIComponent(item.domain)}`}
+            actions={{
+              onResolve: (id) => {
+                setPending({ id, kind: "resolve" });
+                resolve.mutate({ domainId: id });
+              },
+              onRank: () => {
+                setPending({ id: item.id, kind: "rank" });
+                rank.mutate({ domain: item.domain, persist: true });
+              },
+              onGenerate: (id) => {
+                setPending({ id, kind: "generate" });
+                // No real preview yet for almost every domain, so the card's
+                // generate button iterates copy in pretend mode. Publishing
+                // refuses these, and the card says so above the touches.
+                generate.mutate({
+                  domainId: id,
+                  pretend: !item.pregenSiteUrl,
+                });
+              },
+              onVerify: (id) => {
+                setPending({ id, kind: "verify" });
+                verify.mutate({ domainId: id });
+              },
+              resolving: busy("resolve"),
+              ranking: busy("rank"),
+              generating: busy("generate"),
+              verifying: busy("verify"),
+            }}
+          />
+        );
+      })}
+      {items.length === 0 && (
+        <p className="text-muted-foreground py-8 text-center text-sm">
+          Nothing in this population matches those facets.
+        </p>
+      )}
     </div>
   );
 }

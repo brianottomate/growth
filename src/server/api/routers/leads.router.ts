@@ -450,6 +450,8 @@ export const leadsRouter = createTRPCRouter({
           // one URL and enrichment carries every provider payload we hold.
           siteScreenshotUrl:
             sql<string | null>`${leadDomainTable.enrichment} -> 'leadRank' ->> 'screenshotUrl'`,
+          siteRankOverall:
+            sql<number | null>`(${leadDomainTable.enrichment} -> 'leadRank' ->> 'overall')::int`,
           pregenStatus: leadDomainTable.pregenStatus,
           hubspotLeadStatus: leadDomainTable.hubspotLeadStatus,
           // The send-review surface filtered these out entirely. Carrying them
