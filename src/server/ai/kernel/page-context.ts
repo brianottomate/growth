@@ -60,7 +60,7 @@ function guidanceForPath(pathname: string): string | null {
   if (pathname.startsWith("/app/people"))
     return "This is the people and amplifier surface. Use amplificationRead before amplificationWrite.";
   if (pathname.startsWith("/app/leads"))
-    return "This is the Growth lead workspace. leadsRead currently provides the pipeline summary; Outreach, Customer.io, HubSpot, and Instantly remain Growth-only provider workflows.";
+    return "This is the Growth lead workspace. leadsRead provides the pipeline summary and one company's current sequence; leadsWrite action rewriteSequence regenerates a sequence as a DRAFT and never publishes or enrolls. Two rules hold regardless of what the operator asks: a company flagged excludeFromOutreach gets no prospecting copy, and a preview URL that does not resolve cannot be described — most stored previews are retired tunnels, so check before claiming anything about one. Outreach, Customer.io, HubSpot, and Instantly remain Growth-only provider workflows.";
   if (pathname.startsWith("/app/spend"))
     return "This is the spend workspace. Spend is intentionally reserved for its own agent and is not part of the global Growth capability catalog.";
   if (pathname.startsWith("/app/affiliate"))
