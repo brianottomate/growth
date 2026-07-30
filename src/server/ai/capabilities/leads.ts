@@ -141,17 +141,21 @@ export const leadsSequence = growthAction({
 /**
  * Rewrite a sequence from chat.
  *
- * Regeneration rather than patching: the copy policy gate runs over a whole
- * four-touch draft, so hand-editing one paragraph could quietly produce a
- * sequence that would never have passed review. `steer` is threaded in as
- * authoritative operator context, which is the same channel the review UI uses.
+ * Regeneration rather than patching, even when `touch` narrows the intent: the
+ * copy policy gate runs over a whole four-touch draft, so editing one paragraph
+ * in place could quietly produce a sequence that would never have passed review.
+ * A targeted change therefore regenerates everything and *holds* the untargeted
+ * touches as written, which gets section-level intent without a hole in the gate.
+ *
+ * `steer` is threaded in as authoritative operator context, the same channel the
+ * review UI uses.
  *
  * Always lands as `draft`. Nothing here writes to HubSpot or enrolls anyone —
  * publishing stays a separate, explicit human action.
  */
 export const leadsRewriteSequence = growthAction({
   description:
-    "Rewrite the outreach sequence for one lead domain, steered by an instruction (e.g. 'lead with the call Halli logged', 'shorter, drop the proof point in touch 1'). Regenerates all four touches through the copy-policy gate and saves as a DRAFT. Never publishes to HubSpot and never enrolls anyone.",
+    "Rewrite the outreach sequence for one lead domain, steered by an instruction (e.g. 'lead with the call Halli logged', 'drop the proof point'). Pass `touch` to change one touch and keep the rest. Re-checks all four touches against the copy-policy gate and saves as a DRAFT. Works before a real preview exists, in which case the draft is marked as written against a stand-in and cannot be published. Never publishes to HubSpot and never enrolls anyone.",
   inputSchema: z.object({
     domain: z
       .string()
@@ -166,15 +170,24 @@ export const leadsRewriteSequence = growthAction({
       .describe(
         "What to change, in plain language. Treated as authoritative operator context.",
       ),
+    touch: z
+      .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
+      .optional()
+      .describe(
+        "Limit the change to one touch, 1-4. The other touches are held as written and the whole sequence is still re-checked. Omit to rewrite all four.",
+      ),
   }),
-  execute: async ({ domain, steer }) => {
+  execute: async ({ domain, steer, touch }) => {
     const row = await db.query.leadDomainTable.findFirst({
       where: eq(leadDomainTable.domain, domain.toLowerCase()),
     });
     if (!row) throw new Error(`Lead domain not found: ${domain}`);
-    if (!row.pregenSiteUrl) {
+    // Same suppression rule the tRPC generator got in 5081f64. A finished draft
+    // lands in Send Review reading as cleared to send, so generating one for a
+    // company a rep is already talking to is the failure, not publishing it.
+    if (row.excludeFromOutreach) {
       throw new Error(
-        `${row.domain} has no assigned pregen preview, so there is nothing to write about yet.`,
+        `${row.domain} is excluded from outreach${row.excludeReason ? ` (${row.excludeReason})` : ""}, so no sequence should be written for it.`,
       );
     }
 
@@ -191,10 +204,45 @@ export const leadsRewriteSequence = growthAction({
       )
       .limit(1);
 
+    // Narrowing to one touch is expressed as operator context rather than a
+    // field-level patch: the model is told which touch to change and given the
+    // others verbatim to preserve, so the draft the gate sees is still a whole
+    // sequence written in one pass.
+    const [current] = await db
+      .select({ steps: leadOutreachTable.steps })
+      .from(leadOutreachTable)
+      .where(eq(leadOutreachTable.domainId, row.id))
+      .orderBy(desc(leadOutreachTable.createdAt))
+      .limit(1);
+    const existing = current?.steps ?? [];
+    if (touch && !existing.length) {
+      throw new Error(
+        `${row.domain} has no sequence yet, so there is no touch ${touch} to change. Generate one first, then steer it.`,
+      );
+    }
+    const scopedSteer =
+      touch && existing.length
+        ? [
+            `Change touch ${touch} only: ${steer}`,
+            "Keep every other touch as it is. Reproduce them with the same intent, structure and length — do not rewrite them to suit the new touch:",
+            ...existing
+              .map((step, index) =>
+                index + 1 === touch
+                  ? null
+                  : `Touch ${index + 1} (keep as written): ${step.body}`,
+              )
+              .filter((line): line is string => line !== null),
+          ].join("\n\n")
+        : steer;
+
     const result = await generatePregenHubspotDraft(row.domain, {
       motion: membership?.cohort === "recycled" ? "reengagement" : "fresh",
-      previewUrl: row.pregenSiteUrl,
-      steer,
+      // No preview is the normal case — 33 of 218K domains have one — so chat
+      // steering runs against a stand-in and the draft is marked unpublishable
+      // rather than refused outright.
+      previewUrl: row.pregenSiteUrl ?? "",
+      previewMode: row.pregenSiteUrl ? "require-live" : "pretend",
+      steer: scopedSteer,
     });
 
     await db
@@ -233,7 +281,10 @@ export const leadsRewriteSequence = growthAction({
         body: step.body,
         sendOnDay: step.delayDays,
       })),
-      note: "Saved as a draft. Review it before publishing to HubSpot.",
+      changed: touch ? `touch ${touch}` : "all four touches",
+      note: result.generationContext.preview.pretend
+        ? `Saved as a draft. ${row.domain} has no assigned preview, so this was written against a stand-in — anything it says about the page itself is invented, and publishing will refuse it until a real preview is assigned.`
+        : "Saved as a draft. Review it before publishing to HubSpot.",
     };
   },
 });
