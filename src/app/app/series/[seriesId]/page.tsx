@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
+import { CheckCircle2, CircleDashed } from "lucide-react";
 
+import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
 import { db } from "@/server/db";
 import {
   amplificationTargetTable,
@@ -46,7 +48,11 @@ const weekLabel = (d: Date) =>
   `Wk of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 
 const dayLabel = (d: Date) =>
-  d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 
 export default async function SeriesDetailPage({
   params,
@@ -96,6 +102,9 @@ export default async function SeriesDetailPage({
         plannedAt: true,
         targetSpots: true,
         media: true,
+        hook: true,
+        captionDirection: true,
+        visualDirection: true,
       },
       with: {
         owner: { columns: { id: true, name: true } },
@@ -187,6 +196,73 @@ export default async function SeriesDetailPage({
     .filter((week) => week.installments.length > 0 || week.context.length > 0)
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
+  const firstTwo = installments.slice(0, 2);
+  const hasPromise = Boolean(series.description ?? series.theme);
+  const hasCadence = cadence.length > 0;
+  const hasFirstIdeas = firstTwo.length >= 2;
+  const hasDistribution =
+    hasFirstIdeas &&
+    firstTwo.every(
+      (post) =>
+        post.platformPosts.length > 0 || (post.targetSpots?.length ?? 0) > 0,
+    );
+  const hasDates =
+    hasFirstIdeas && firstTwo.every((post) => Boolean(post.plannedAt));
+  const hasCreativeDirection =
+    hasFirstIdeas &&
+    firstTwo.every(
+      (post) =>
+        Boolean(post.hook) &&
+        Boolean(
+          post.visualDirection ??
+          post.captionDirection ??
+          (post.media?.length ? "media" : null),
+        ),
+    );
+  const planningChecks = [
+    {
+      label: "Recurring promise",
+      complete: hasPromise,
+      detail: hasPromise ? "Defined" : "Define what repeats and why it matters",
+    },
+    {
+      label: "Publishing rhythm",
+      complete: hasCadence,
+      detail: hasCadence
+        ? "Cadence set"
+        : "Choose channels, formats, and frequency",
+    },
+    {
+      label: "First two ideas",
+      complete: hasFirstIdeas,
+      detail: hasFirstIdeas
+        ? `${firstTwo.length} installments drafted`
+        : `${firstTwo.length}/2 installments drafted`,
+    },
+    {
+      label: "Channel map",
+      complete: hasDistribution,
+      detail: hasDistribution
+        ? "Renderings assigned"
+        : "Assign each idea to its publishing surfaces",
+    },
+    {
+      label: "Dates",
+      complete: hasDates,
+      detail: hasDates ? "Both planned" : "Place the first two on the calendar",
+    },
+    {
+      label: "Creative direction",
+      complete: hasCreativeDirection,
+      detail: hasCreativeDirection
+        ? "Hooks and creative direction set"
+        : "Add a hook and media or copy direction to each",
+    },
+  ];
+  const nextPlanningStep =
+    planningChecks.find((check) => !check.complete)?.detail ??
+    "The first two installments are mapped. Move into production when ready.";
+
   // The installment's hero image (first pool item) — shown as the card's
   // leading social-card thumbnail.
   const heroFor = (post: (typeof installments)[number]) =>
@@ -226,16 +302,14 @@ export default async function SeriesDetailPage({
   return (
     <div>
       <div className="text-muted-foreground text-xs">
-        <Link href="/app/pillars" className="hover:underline">
-          Pillars &amp; strategy
+        <Link href="/app/series" className="hover:underline">
+          Series
         </Link>{" "}
         / {series.brand.name}
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {series.name}
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{series.name}</h1>
         {pillar ? (
           <span
             className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
@@ -257,8 +331,8 @@ export default async function SeriesDetailPage({
             key={`${target.platform}-${target.archetype}`}
             className="text-muted-foreground rounded-full border px-2.5 py-0.5 text-[11px] tabular-nums"
           >
-            {target.count} {target.archetype.replace("_", " ")}/
-            {target.period} · {target.platform}
+            {target.count} {target.archetype.replace("_", " ")}/{target.period}{" "}
+            · {target.platform}
           </span>
         ))}
       </div>
@@ -269,10 +343,47 @@ export default async function SeriesDetailPage({
         </p>
       ) : null}
 
+      <section className="bg-card mt-5 rounded-xl border p-4">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">Map the first posts</h2>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Next: {nextPlanningStep}
+            </p>
+          </div>
+          <ContentStructureAssistantButton
+            brandId={series.brand.id}
+            brandName={series.brand.name}
+            source="series"
+            seriesName={series.name}
+          />
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {planningChecks.map((check) => (
+            <div
+              key={check.label}
+              className="bg-background flex items-start gap-2 rounded-lg border px-3 py-2"
+            >
+              {check.complete ? (
+                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-400" />
+              ) : (
+                <CircleDashed className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-medium">{check.label}</p>
+                <p className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
+                  {check.detail}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {unscheduled.length > 0 ? (
         <section className="mt-6">
-          <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-            Unscheduled
+          <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+            Unscheduled installments
           </h2>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
             {unscheduled.map((post) => (
@@ -290,8 +401,8 @@ export default async function SeriesDetailPage({
 
       <section className="mt-6">
         <div className="flex items-center gap-2">
-          <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-            Timeline
+          <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+            Scheduled installments
           </h2>
           <span className="text-muted-foreground text-[11px]">
             other {series.brand.name} posts dimmed
@@ -309,8 +420,8 @@ export default async function SeriesDetailPage({
           <div className="bg-card mt-3 rounded-xl border p-6 text-sm">
             <p className="font-medium">No installments yet</p>
             <p className="text-muted-foreground mt-1 text-xs">
-              Ask the assistant to add an installment or set a series cadence,
-              then generate slots from the content board.
+              Use “Plan first posts” to turn the series promise into distinct
+              installments, channel renderings, and dates.
             </p>
           </div>
         ) : (
@@ -326,7 +437,7 @@ export default async function SeriesDetailPage({
                       key={post.id}
                       post={post}
                       spots={spotsFor(post)}
-                hero={heroFor(post)}
+                      hero={heroFor(post)}
                       boosts={boostsFor(post)}
                     />
                   ))}
@@ -402,11 +513,7 @@ function SpotTile({ spot }: { spot: SpotPreview }) {
       <div className="h-14">
         {spot.thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={spot.thumb}
-            alt=""
-            className="h-full w-full object-cover"
-          />
+          <img src={spot.thumb} alt="" className="h-full w-full object-cover" />
         ) : spot.text ? (
           <p className="text-muted-foreground line-clamp-3 px-1.5 py-1 text-[9px] leading-tight">
             {spot.text}

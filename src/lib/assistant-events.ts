@@ -30,7 +30,7 @@ export type ShapeContentStructureIntent = {
   type: "shape_content_structure";
   brandId: string;
   brandName: string;
-  source: "brand" | "content" | "pillars";
+  source: "brand" | "content" | "pillars" | "series";
   visibleText: string;
 };
 

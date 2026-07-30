@@ -5,6 +5,7 @@ import { getSafeWorkspacePath, WORKSPACE_ROUTES } from "./workspace-navigation";
 describe("workspace navigation", () => {
   test("keeps named destinations on real app routes", () => {
     expect(WORKSPACE_ROUTES.product_atlas).toBe("/app/product-atlas");
+    expect(WORKSPACE_ROUTES.series).toBe("/app/series");
     expect(WORKSPACE_ROUTES.leads).toBe("/app/leads");
     expect(WORKSPACE_ROUTES.spend).toBe("/app/spend");
   });

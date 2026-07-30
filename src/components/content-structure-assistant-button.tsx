@@ -9,11 +9,13 @@ export function ContentStructureAssistantButton({
   brandId,
   brandName,
   source,
+  seriesName,
   size = "sm",
 }: {
   brandId: string;
   brandName: string;
-  source: "brand" | "content" | "pillars";
+  source: "brand" | "content" | "pillars" | "series";
+  seriesName?: string;
   size?: "sm" | "default";
 }) {
   return (
@@ -27,12 +29,14 @@ export function ContentStructureAssistantButton({
           brandId,
           brandName,
           source,
-          visibleText: `Help me shape ${brandName}’s content pillars and series`,
+          visibleText: seriesName
+            ? `Help me map the first posts for the “${seriesName}” series`
+            : `Help me shape ${brandName}’s content pillars and series`,
         })
       }
     >
       <Layers className="size-3.5" />
-      Shape content structure
+      {seriesName ? "Plan first posts" : "Shape content structure"}
     </Button>
   );
 }

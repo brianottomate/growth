@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { db } from "@/server/db";
 import {
+  cadenceTargetTable,
   contentPostTable,
   contentSuggestionTable,
   mixTargetTable,
@@ -46,7 +47,7 @@ async function requireBrandContentIdeas(
 
 export const getContentStrategy = growthAction({
   description:
-    "Read one brand's content strategy vocabulary and structure: brand-specific pillars and target mix, recurring series and their content counts, plus pending grouping proposals awaiting review. Use this before discussing pillars, series, editorial arcs, recurring formats, or whether past posts should be grouped.",
+    "Read one brand's content strategy vocabulary and structure: brand-specific pillars and target mix, recurring series with cadence, installments, and first-post gaps, plus pending grouping proposals awaiting review. Use this before discussing pillars, series, editorial arcs, recurring formats, or whether past posts should be grouped.",
   inputSchema: z.object({ brandId: z.string() }),
   execute: async ({ brandId }, ctx) => {
     const brand = await requireOwnedBrand(brandId, ctx);
@@ -59,7 +60,23 @@ export const getContentStrategy = growthAction({
         ),
         with: {
           contentPosts: {
-            columns: { id: true, title: true, pillar: true, status: true },
+            columns: {
+              id: true,
+              title: true,
+              pillar: true,
+              status: true,
+              plannedAt: true,
+              hook: true,
+              captionDirection: true,
+              visualDirection: true,
+              targetSpots: true,
+              media: true,
+            },
+            with: {
+              platformPosts: {
+                columns: { id: true, platform: true, archetype: true },
+              },
+            },
           },
         },
         orderBy: [desc(seriesTable.updatedAt)],
@@ -95,6 +112,32 @@ export const getContentStrategy = growthAction({
       if (row.pillar)
         countByPillar.set(row.pillar, (countByPillar.get(row.pillar) ?? 0) + 1);
     }
+    const cadence = series.length
+      ? await db.query.cadenceTargetTable.findMany({
+          where: and(
+            inArray(
+              cadenceTargetTable.seriesId,
+              series.map((item) => item.id),
+            ),
+            eq(cadenceTargetTable.isActive, true),
+            isNull(cadenceTargetTable.deletedAt),
+          ),
+          columns: {
+            seriesId: true,
+            platform: true,
+            archetype: true,
+            count: true,
+            period: true,
+          },
+        })
+      : [];
+    const cadenceBySeries = new Map<string, typeof cadence>();
+    for (const target of cadence) {
+      if (!target.seriesId) continue;
+      const targets = cadenceBySeries.get(target.seriesId) ?? [];
+      targets.push(target);
+      cadenceBySeries.set(target.seriesId, targets);
+    }
     return {
       brand: { id: brand.id, name: brand.name },
       pillars: pillars.map((pillar) => ({
@@ -107,17 +150,77 @@ export const getContentStrategy = growthAction({
         targetPct: mixByPillar.get(pillar.slug)?.targetPct ?? null,
         targetPeriod: mixByPillar.get(pillar.slug)?.period ?? null,
       })),
-      series: series.map((item) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        theme: item.theme,
-        pillarSlug: item.pillar,
-        status: item.status,
-        startAt: item.startAt,
-        endAt: item.endAt,
-        content: item.contentPosts,
-      })),
+      series: series.map((item) => {
+        const ordered = [...item.contentPosts].sort((a, b) => {
+          if (!a.plannedAt && !b.plannedAt) return 0;
+          if (!a.plannedAt) return 1;
+          if (!b.plannedAt) return -1;
+          return a.plannedAt.getTime() - b.plannedAt.getTime();
+        });
+        const firstTwo = ordered.slice(0, 2);
+        const seriesCadence = cadenceBySeries.get(item.id) ?? [];
+        const gaps = [
+          !item.description && !item.theme
+            ? "Define the recurring editorial promise."
+            : null,
+          seriesCadence.length === 0
+            ? "Choose the channel, format, and publishing cadence."
+            : null,
+          firstTwo.length < 2
+            ? `Draft ${2 - firstTwo.length} more distinct installment${2 - firstTwo.length === 1 ? "" : "s"}.`
+            : null,
+          firstTwo.length >= 2 &&
+          firstTwo.some(
+            (post) =>
+              post.platformPosts.length === 0 &&
+              (post.targetSpots?.length ?? 0) === 0,
+          )
+            ? "Assign channel renderings to both first installments."
+            : null,
+          firstTwo.length >= 2 && firstTwo.some((post) => !post.plannedAt)
+            ? "Place both first installments on the calendar."
+            : null,
+          firstTwo.length >= 2 &&
+          firstTwo.some(
+            (post) =>
+              !post.hook ||
+              !(
+                post.visualDirection ??
+                post.captionDirection ??
+                (post.media?.length ? "media" : null)
+              ),
+          )
+            ? "Add a hook and media or copy direction to both first installments."
+            : null,
+        ].filter((gap): gap is string => Boolean(gap));
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          theme: item.theme,
+          pillarSlug: item.pillar,
+          status: item.status,
+          startAt: item.startAt,
+          endAt: item.endAt,
+          cadence: seriesCadence,
+          firstPostGaps: gaps,
+          content: ordered.map((post) => ({
+            id: post.id,
+            title: post.title,
+            pillar: post.pillar,
+            status: post.status,
+            plannedAt: post.plannedAt,
+            hook: post.hook,
+            captionDirection: post.captionDirection,
+            visualDirection: post.visualDirection,
+            mediaCount: post.media?.length ?? 0,
+            targetSpots: post.targetSpots,
+            platformPosts: post.platformPosts,
+            url: `/app/content/${post.id}`,
+          })),
+          url: `/app/series/${item.id}`,
+        };
+      }),
       groupingProposals: groupings.map((proposal) => ({
         id: proposal.id,
         confidence: proposal.confidence,
@@ -256,7 +359,8 @@ export const saveContentSeries = growthAction({
         change: "updated" as const,
         series: updated,
         attachedIdeas: ideas.length,
-        url: "/app/content",
+        url: `/app/series/${existing.id}`,
+        next: "Read the series again, then tell the operator what is still missing to map its first two installments. Do not stop at “series updated.”",
       };
     }
     const [created] = await db
@@ -295,7 +399,8 @@ export const saveContentSeries = growthAction({
       change: "created" as const,
       series: created,
       attachedIdeas: ideas.length,
-      url: "/app/content",
+      url: `/app/series/${created.id}`,
+      next: "Read the series again, then tell the operator what is still missing to map its first two installments: editorial promise, cadence, distinct ideas, channel renderings, and dates. Do not stop at “series created.”",
     };
   },
 });

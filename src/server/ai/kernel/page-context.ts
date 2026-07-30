@@ -94,7 +94,7 @@ export async function composePageContextSection(options: {
       },
     });
     if (series?.brand.organizationId !== options.organizationId) return header;
-    return `${header}\nThis is the series page for “${series.name}” (seriesId: ${series.id}, status: ${series.status}) for ${series.brand.name} (brandId: ${series.brand.id}). Read the surrounding structure with contentStrategyRead action get before making claims about it; edit the series itself with contentStrategyWrite action saveSeries.`;
+    return `${header}\nThis is the series page for “${series.name}” (seriesId: ${series.id}, status: ${series.status}) for ${series.brand.name} (brandId: ${series.brand.id}). Read the surrounding structure with contentStrategyRead action get before making claims about it; its matching series result includes cadence, installment roll-up, and firstPostGaps. Edit the series itself with contentStrategyWrite action saveSeries, and create new installments with contentWrite action createIdea using this seriesId.`;
   }
 
   const contentPostId = /^\/app\/content\/([^/]+)$/.exec(pathname)?.[1];

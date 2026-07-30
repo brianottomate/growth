@@ -1324,12 +1324,16 @@ export const productionQueue = growthAction({
 
 export const createIdea = growthAction({
   description:
-    "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Search contentRead first when the operator may be referring to existing work, so this does not create a duplicate. Optionally seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt) and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This writes to the workspace: gather the essentials (which brand, a title, ideally a hook and channels), reflect the idea back in one line, and call it once the operator agrees. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you — turn that into the fields.",
+    "Create a new content idea — a draft on the /app/content board — for one of the org's brands. Search contentRead first when the operator may be referring to existing work, so this does not create a duplicate. Optionally create it directly inside an existing series, seed the editorial brief (hook, captionDirection, ctaText, pillar, plannedAt), and fan it out to channels (instagram, tiktok, x, facebook, youtube, threads, pinterest, linkedin) as spots. This writes to the workspace: gather the essentials (which brand, a title, ideally a hook and channels), reflect the idea back in one line, and call it once the operator agrees. If you don't already have a brandId, call listBrands first. An idea can start from anything the operator gives you — turn that into the fields.",
   inputSchema: z.object({
     brandId: z
       .string()
       .describe("The brand to create under (id from listBrands)."),
     title: z.string().min(1).describe("Short, scannable idea title."),
+    seriesId: z
+      .string()
+      .optional()
+      .describe("Existing series this idea should belong to."),
     hook: z.string().optional().describe("The scroll-stopping first line."),
     captionDirection: z
       .string()
@@ -1364,6 +1368,24 @@ export const createIdea = growthAction({
           "That brand isn't in your organization (or doesn't exist). Call listBrands to get a valid brandId.",
       };
     }
+    const series = input.seriesId
+      ? await db.query.seriesTable.findFirst({
+          where: and(
+            eq(seriesTable.id, input.seriesId),
+            eq(seriesTable.brandId, brand.id),
+            isNull(seriesTable.deletedAt),
+          ),
+          columns: { id: true, pillar: true },
+        })
+      : null;
+    if (input.seriesId && !series) {
+      return { error: "Series not found for this brand." };
+    }
+    if (series?.pillar && input.pillar && series.pillar !== input.pillar) {
+      return {
+        error: `This series belongs to ${series.pillar}; the new idea cannot use a conflicting pillar.`,
+      };
+    }
 
     const { id } = await ContentService.createIdea({
       brandId: brand.id,
@@ -1371,7 +1393,8 @@ export const createIdea = growthAction({
       hook: input.hook,
       captionDirection: input.captionDirection,
       ctaText: input.ctaText,
-      pillar: input.pillar,
+      seriesId: series?.id,
+      pillar: series?.pillar ?? input.pillar,
       plannedAt: input.plannedAt,
       platforms: input.platforms,
       ownerId: ctx.userId,
@@ -1384,6 +1407,7 @@ export const createIdea = growthAction({
       title: input.title,
       brandName: brand.name,
       platforms: input.platforms ?? [],
+      seriesId: series?.id ?? null,
       url: id ? `/app/content/${id}` : null,
     };
   },

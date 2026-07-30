@@ -20,6 +20,7 @@ import {
   Inbox as InboxIcon,
   Layers,
   LayoutDashboard,
+  ListTree,
   LogOut,
   type LucideIcon,
   Mail,
@@ -107,6 +108,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     label: "Plan & publish",
     items: [
       { label: "Content", href: "/app/content", icon: FileText },
+      { label: "Series", href: "/app/series", icon: ListTree },
       { label: "Calendar", href: "/app/calendar", icon: Calendar },
       { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
       { label: "Studio", href: "/app/studio", icon: Sparkles },
