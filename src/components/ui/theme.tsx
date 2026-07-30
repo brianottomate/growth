@@ -4,10 +4,7 @@ import * as React from "react";
 import * as z from "zod/v4";
 import { Sun, Moon, Monitor } from "lucide-react";
 
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -92,7 +89,7 @@ export function ThemeProvider({ children }: React.PropsWithChildren) {
   // Initialize deterministically so the server-rendered HTML and the first
   // client render agree (both "dark"). Reading localStorage during the initial
   // render would diverge from the server and cause a hydration mismatch — the
-  // visible CSS is already correct pre-hydration via `themeDetectorScript`.
+  // client instrumentation corrects the visible theme before hydration.
   const [themeMode, setThemeMode] = React.useState<ThemeMode>("dark");
 
   // After mount, sync to the real stored preference.

@@ -6,7 +6,6 @@ import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 import { cn } from "@/components/ui/lib/utils";
 import { ThemeProvider } from "@/components/ui/theme";
-import { themeDetectorScript } from "@/components/ui/theme-script";
 import { Toaster } from "@/components/ui/toast";
 import { AnalyticsProvider } from "@/contexts/AnalyticsContext";
 import { rootMetadata } from "@/lib/metadata";
@@ -29,13 +28,10 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
+      data-theme="dark"
       className={cn(instrumentSans.variable, geistMono.variable)}
     >
       <body className="bg-surface-primary text-primary min-h-screen font-sans antialiased">
-        <script
-          dangerouslySetInnerHTML={{ __html: themeDetectorScript }}
-          suppressHydrationWarning
-        />
         <TRPCReactProvider>
           <ThemeProvider>
             <AnalyticsProvider>

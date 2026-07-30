@@ -1,24 +1,39 @@
 /**
- * Client-side instrumentation (Next.js 15.3+)
+ * Client initialization that must finish before React hydration.
  *
- * Initializes PostHog early (before React hydration) with autocapture DISABLED.
- * Only manual events and session recording are enabled after user consent.
- * Autocapture remains disabled to ensure privacy-first analytics.
- *
- * See: https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation-client
+ * Theme selection and privacy-first analytics are intentionally independent:
+ * a storage failure must not prevent PostHog initialization.
  */
 import posthog from "posthog-js";
 
 import { env } from "./env";
 
+const validThemeModes = ["light", "dark", "auto"] as const;
+type ThemeMode = (typeof validThemeModes)[number];
+
+try {
+  const savedMode = window.localStorage.getItem("theme-mode") ?? "dark";
+  const mode: ThemeMode = validThemeModes.includes(savedMode as ThemeMode)
+    ? (savedMode as ThemeMode)
+    : "dark";
+
+  document.documentElement.dataset.theme =
+    mode === "auto"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+      : mode;
+} catch {
+  document.documentElement.dataset.theme = "dark";
+}
+
 if (env.NEXT_PUBLIC_POSTHOG_KEY) {
   posthog.init(env.NEXT_PUBLIC_POSTHOG_KEY, {
-    api_host: "/ingest", // Reverse proxy (better for bypassing ad blockers)
-    ui_host: "https://eu.posthog.com", // For session recordings playback
-    person_profiles: "identified_only", // Only create profiles for identified users
-    defaults: "2025-11-30", // Latest defaults (includes exception autocapture)
-    capture_performance: true, // Web Vitals (LCP, FCP, CLS, INP)
-    // Disable all tracking until consent is given (exceptions are still captured)
+    api_host: "/ingest",
+    ui_host: "https://eu.posthog.com",
+    person_profiles: "identified_only",
+    defaults: "2025-11-30",
+    capture_performance: true,
     autocapture: false,
     capture_pageview: false,
     capture_pageleave: false,
