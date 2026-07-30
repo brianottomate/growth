@@ -209,6 +209,56 @@ describe("findPregenHubspotDraftViolations", () => {
     ).toEqual([]);
   });
 
+  /**
+   * The verbatim touch 1 written for staymarquis.com on 2026-07-30. The ranker
+   * read the "at a glance" block from a screenshot taken as the page loaded and
+   * called it an unresolved bug; it actually counts up to 4.8/5, 804 properties,
+   * 21,806 bookings and $3B+. The generator then made it the lead.
+   */
+  test("rejects a hook built on the prospect's site being broken", () => {
+    const violations = findPregenHubspotDraftViolations(
+      draft(
+        "The 'StayMarquis at a Glance' block on your site still reads all zeros, 0.0/5, 0 properties, 0 bookings, $0+ AUM, next to real photography of Hamptons and North Fork homes. WanderOS is the platform 1,000+ property managers run their direct booking on.",
+        "Nothing in this private preview can be booked. Is this still worth a look?",
+      ),
+      { motion: "reengagement", pms: "Streamline" },
+    );
+    expect(
+      matching(violations, /^Touch 1 builds on something being wrong/),
+    ).toHaveLength(1);
+  });
+
+  /**
+   * What the model produced once the "book" verb was blocked. The claim is
+   * identical; only the verb moved. Any distribution verb has to count.
+   */
+  test("catches the OTA-absence claim when it swaps the verb", () => {
+    expect(
+      matching(
+        findPregenHubspotDraftViolations(
+          draft(
+            "StayMarquis covers the Hamptons, Shelter Island, and the North Fork, and every one of those homes gets sold under the StayMarquis name, not a marketplace listing. WanderOS is the platform 1,000+ property managers run their direct booking on.",
+            "Nothing in this private preview can be booked. Is this worth a second look?",
+          ),
+          { motion: "reengagement", pms: "Streamline" },
+        ),
+        /^Touch 1 asserts how much/,
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("still allows the durable facts a hook should rest on", () => {
+    expect(
+      findPregenHubspotDraftViolations(
+        draft(
+          "Marquis Rentals lists The Manor and Villa Vino Modern across the Hamptons, Shelter Island and the North Fork, sold under your own name. WanderOS is the platform 1,000+ property managers run their direct booking on. Skyler spoke with your team earlier this year.",
+          "Nothing in this private preview can be booked. Is this still worth a look?",
+        ),
+        { motion: "reengagement", pms: "Streamline" },
+      ),
+    ).toEqual([]);
+  });
+
   test("allows denying the connection, which is the copy we want", () => {
     expect(
       matching(

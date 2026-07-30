@@ -74,6 +74,22 @@ const PREVIEW_WIRING =
  * one deliberately does NOT skip negated sentences — the negation is the claim
  * ("it wasn't built for…").
  */
+/**
+ * Claims that something is wrong with the prospect's own site.
+ *
+ * Banned outright rather than validated. The evidence behind these is a single
+ * automated capture taken the instant the page loads, so anything animated or
+ * lazy-loaded reads as broken when it is fine — StayMarquis' stats block was
+ * reported as "all zeros" and actually counts up to 4.8/5, 804 properties and
+ * 21,806 bookings. Getting the observation right is not the fix: even a true
+ * defect is a gotcha opener, and it may be fixed before the mail lands. Site
+ * quality stays an internal targeting signal.
+ */
+const SITE_DEFECT_SUBJECT =
+  /\b(?:site|website|homepage|home page|page|block|section|stats?|counter|widget|banner|hero|gallery|listing page)\b/i;
+const SITE_DEFECT_CLAIM =
+  /\b(?:reads? (?:all )?zeroe?s?|all zeroe?s?|shows? (?:all )?zeroe?s?|0\.0\s*\/\s*5|\$0\+|\b0 (?:propert|booking|review|listing)\w*)\b|\b(?:still (?:reads|shows|says|displays)|unpopulated|not populated|placeholder(?:s)?|empty|blank|broken|glitch\w*|erroring|not loading|fails? to load|missing (?:image|images|photo|photos|logo)|typo|misspell\w*|out of date|outdated|stale)\b/i;
+
 const STACK_DEFICIENCY =
   /\b(?:wasn'?t|isn'?t|was not|is not|aren'?t|not)\s+(?:really\s+|ever\s+)?(?:built|designed|made|meant|intended|equipped)\b|\bfalls short\b|\bcan'?t handle\b|\bcannot handle\b|\bstruggles (?:with|to)\b|\boutgrown\b|\bdoes the job,?\s+but\b|\bonly goes so far\b/i;
 
@@ -215,18 +231,37 @@ export function findPregenHubspotDraftViolations(
     // otherwise is both unsupported and instantly recognisable as false to the
     // one person who knows their own channel mix. Label the investment in
     // direct; never claim the absence of marketplaces.
+    // The distribution verb is deliberately broad. Constrained to "book", the
+    // model rewrote the identical claim as "every one of those homes gets *sold*
+    // under the StayMarquis name, not a marketplace listing" and passed.
     if (
       sentences.some(
         (sentence) =>
           /\b(?:every|all|each|none|no)\b/i.test(sentence) &&
-          /\bbook(?:s|ed|ing|ings)?\b/i.test(sentence) &&
-          /\b(?:marketplace|marketplaces|listing|listings|airbnb|vrbo|ota|otas|third[- ]party)\b/i.test(
+          /\b(?:book(?:s|ed|ing|ings)?|sold|sells?|selling|list(?:s|ed|ing|ings)?|rent(?:s|ed|ing)?|market(?:s|ed|ing)?|distribut\w*|goes? out|reserv\w*)\b/i.test(
+            sentence,
+          ) &&
+          /\b(?:marketplace|marketplaces|listing|listings|airbnb|vrbo|ota|otas|third[- ]party|someone else'?s (?:page|site|platform))\b/i.test(
             sentence,
           ),
       )
     ) {
       violations.push(
         `${label} asserts how much of their business books direct. Their channel mix is unknown and they almost certainly also list on an OTA. Name the decision to invest in direct booking without quantifying it or claiming they have no marketplace listings.`,
+      );
+    }
+
+    // Site defects are never a hook — see SITE_DEFECT_CLAIM for why this is a
+    // ban and not a correctness problem to solve.
+    if (
+      sentences.some(
+        (sentence) =>
+          SITE_DEFECT_SUBJECT.test(sentence) &&
+          SITE_DEFECT_CLAIM.test(sentence),
+      )
+    ) {
+      violations.push(
+        `${label} builds on something being wrong with their site. Our evidence is one automated capture taken as the page loads, so animated and lazy-loaded content reads as broken when it is fine, and even a real defect is a gotcha opener that may be fixed before the mail lands. Site quality is an internal targeting signal only — write from the markets, property names, PMS on record, direct-booking decision, or logged history instead.`,
       );
     }
 
