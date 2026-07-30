@@ -22,6 +22,12 @@ export default defineConfig(
       // the Next.js app and their imports (e.g. `eve`) don't resolve from the
       // root install, so linting them here only produces phantom errors.
       "agents/**",
+      // Nested git worktrees are a whole second checkout of this repo. Linting
+      // them doubles the work and reports the same phantom errors as `agents/**`
+      // above, because those paths fall outside the root tsconfig's include so
+      // typed rules cannot resolve anything. `bun run check` fails the moment a
+      // worktree exists, which is exactly when you least want a red gate.
+      ".worktrees/**",
     ],
   },
   // Base config for all JS/TS files
