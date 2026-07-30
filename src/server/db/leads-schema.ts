@@ -138,6 +138,11 @@ export const leadDomainTable = leadsSchema.table(
     pregenSiteUrl: t.text(),
     pregenStatus: t.text(), // Retired compatibility column; keep null.
     pregenPageTitle: t.text(),
+    // Travels with pregenSiteUrl rather than living only on pregen_build: the
+    // copy generator and the review card read the URL and its lifetime on the
+    // same row, and WanderOS previews can carry a real expiry (expiresInDays).
+    // Until this is populated, copy must not claim the preview will come down.
+    pregenPreviewExpiresAt: t.timestamp(),
 
     // HubSpot signals — used for the pre-send guard, never to *drive* outreach.
     hubspotRecordId: t.text(),
@@ -737,3 +742,79 @@ export const hubspotWebhookEventTable = leadsSchema.table(
 export type HubspotWebhookEvent = typeof hubspotWebhookEventTable.$inferSelect;
 export type HubspotWebhookEventInsert =
   typeof hubspotWebhookEventTable.$inferInsert;
+
+/**
+ * Pregen site build lifecycle — one row per build we asked WanderOS for.
+ *
+ * The `pregen*` columns on `lead_domain` were explicitly not a lifecycle model
+ * ("introduce a separate lifecycle table when production generation is real").
+ * wandercom/wander#20939 is that moment: it adds `POST /internal/prospects`,
+ * which mints a `SaasWebsiteProspect`, and a fire-and-forget webhook that
+ * reports the build settling.
+ *
+ * A domain can be built more than once — retries, expiry, a rebuild after the
+ * source site changes — so the build is the entity the webhook addresses, keyed
+ * on WanderOS's `prospectId`. `lead_domain.pregenSiteUrl` stays as the
+ * denormalized "current preview" pointer, which is what generation, the
+ * reachability probe, the review card and the publish guard already read.
+ */
+export const pregenBuildTable = leadsSchema.table(
+  "pregen_build",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("pgb")),
+    domainId: t
+      .text()
+      .references(() => leadDomainTable.id, { onDelete: "cascade" })
+      .notNull(),
+    domain: t.text().notNull(),
+
+    // WanderOS identifiers. `prospectId` is the webhook's correlation key and is
+    // unique, so a redelivered event updates rather than duplicates.
+    prospectId: t.text(),
+    websiteId: t.text(),
+    previewToken: t.text(),
+
+    // What we asked for, kept so a retry can repeat the request faithfully.
+    businessName: t.text(),
+    sourceUrl: t.text(),
+
+    // WanderOS's own status string, stored verbatim rather than remapped — the
+    // vocabulary is theirs and mirroring it avoids a translation table that
+    // silently drifts when they add a state.
+    status: t.text(),
+    previewUrl: t.text(),
+    evalOverall: t.integer(),
+    errorMessage: t.text(),
+    expiresAt: t.timestamp(),
+
+    requestedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    // `occurredAt` from the last webhook applied. Guards against an out-of-order
+    // delivery overwriting a newer state with an older one.
+    lastEventAt: t.timestamp(),
+    settledAt: t.timestamp(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("pregen_build_prospect_id_idx").on(table.prospectId),
+    index("pregen_build_domain_idx").on(table.domainId),
+    index("pregen_build_status_idx").on(table.status),
+  ],
+);
+
+export type PregenBuild = typeof pregenBuildTable.$inferSelect;
+export type PregenBuildInsert = typeof pregenBuildTable.$inferInsert;

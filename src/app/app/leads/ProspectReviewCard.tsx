@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   FileText,
   Gauge,
+  Globe,
   Loader2,
   Mail,
   MessageCircle,
@@ -345,10 +346,13 @@ export interface ProspectCardActions {
   onGenerate?: (id: string) => void;
   onVerify?: (id: string) => void;
   onRank?: (id: string) => void;
+  /** Ask WanderOS to build a pregen site. Async — reports back over the webhook. */
+  onBuildPreview?: (id: string) => void;
   resolving?: boolean;
   generating?: boolean;
   verifying?: boolean;
   ranking?: boolean;
+  building?: boolean;
 }
 
 export function ProspectReviewCard({
@@ -536,6 +540,16 @@ export function ProspectReviewCard({
                   Icon={RefreshCw}
                 >
                   Resolve channel
+                </ActionButton>
+              )}
+              {actions.onBuildPreview && !data.pregenSiteUrl && (
+                <ActionButton
+                  onClick={() => actions.onBuildPreview!(data.id)}
+                  busy={actions.building}
+                  Icon={Globe}
+                  title="Ask WanderOS to build a preview site from their current site"
+                >
+                  Build preview
                 </ActionButton>
               )}
               {actions.onRank && (

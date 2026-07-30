@@ -22,7 +22,13 @@ import {
   hubspotListMembershipTable,
   leadImportTable,
   leadOutreachTable,
+  pregenBuildTable,
 } from "@/server/db/leads-schema";
+import {
+  createWebsiteProspect,
+  isWanderApiConfigured,
+  listWebsiteProspects,
+} from "@/server/clients/wander.client";
 import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
 import { discoverDomain } from "@/server/services/lead-discovery.service";
 import {
@@ -806,6 +812,140 @@ export const leadsRouter = createTRPCRouter({
    * lived in different places: generation had a button and ranking had a
    * terminal. 203 domains carry a score and only 5 came from the current ranker.
    */
+  /**
+   * Ask WanderOS to build a pregen site for this prospect.
+   *
+   * Returns once the prospect record exists. The build is async and reports back
+   * over /api/webhooks/pregen; the returned status means "accepted", not "built".
+   */
+  requestPregenSite: protectedProcedure
+    .input(z.object({ domainId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isWanderApiConfigured) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "The WanderOS API is not configured yet. Set WANDER_API_URL and WANDER_API_KEY.",
+        });
+      }
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+      // Same suppression rule as generation. Building a preview for a company a
+      // rep is already working spends a build and invites the send it exists for.
+      if (row.excludeFromOutreach) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `${row.domain} is excluded from outreach${row.excludeReason ? ` (${row.excludeReason})` : ""}.`,
+        });
+      }
+      const inFlight = await ctx.db.query.pregenBuildTable.findFirst({
+        where: and(
+          eq(pregenBuildTable.domainId, row.id),
+          isNull(pregenBuildTable.settledAt),
+        ),
+      });
+      if (inFlight) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `A build for ${row.domain} is already in flight (${inFlight.status ?? "requested"}).`,
+        });
+      }
+
+      const sourceUrl = `https://${row.domain}`;
+      const prospect = await createWebsiteProspect({
+        businessName: row.companyName ?? row.domain,
+        sourceUrl,
+      });
+
+      const [build] = await ctx.db
+        .insert(pregenBuildTable)
+        .values({
+          domainId: row.id,
+          domain: row.domain,
+          prospectId: prospect.id,
+          websiteId: prospect.websiteId,
+          previewToken: prospect.previewToken ?? null,
+          businessName: row.companyName ?? row.domain,
+          sourceUrl,
+          status: prospect.status,
+          previewUrl: prospect.previewUrl ?? null,
+          expiresAt: prospect.expiresAt ? new Date(prospect.expiresAt) : null,
+        })
+        .returning();
+      return build ?? null;
+    }),
+
+  /**
+   * Pull current state for this prospect's latest build.
+   *
+   * On demand only. The webhook is the delivery path and there is no reconcile
+   * sweep behind it, so this exists to unstick a build whose event was dropped —
+   * a button someone presses, not a loop. WanderOS exposes list rather than
+   * get-by-id, so this filters the list on our stored prospectId.
+   */
+  refreshPregenSite: protectedProcedure
+    .input(z.object({ domainId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isWanderApiConfigured) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "The WanderOS API is not configured yet.",
+        });
+      }
+      const [build] = await ctx.db
+        .select()
+        .from(pregenBuildTable)
+        .where(eq(pregenBuildTable.domainId, input.domainId))
+        .orderBy(desc(pregenBuildTable.requestedAt))
+        .limit(1);
+      if (!build?.prospectId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No pregen build has been requested for this domain.",
+        });
+      }
+
+      const { items } = await listWebsiteProspects();
+      const current = items.find((item) => item.id === build.prospectId);
+      if (!current) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `WanderOS no longer lists prospect ${build.prospectId}.`,
+        });
+      }
+
+      const settled = ["ready", "failed", "error", "expired", "cancelled"].includes(
+        current.status.toLowerCase(),
+      );
+      await ctx.db
+        .update(pregenBuildTable)
+        .set({
+          status: current.status,
+          websiteId: current.websiteId ?? build.websiteId,
+          previewUrl: current.previewUrl ?? build.previewUrl,
+          evalOverall: current.evalOverall ?? build.evalOverall,
+          errorMessage: current.errorMessage ?? null,
+          expiresAt: current.expiresAt ? new Date(current.expiresAt) : build.expiresAt,
+          settledAt: settled ? (build.settledAt ?? new Date()) : build.settledAt,
+        })
+        .where(eq(pregenBuildTable.id, build.id));
+
+      if (current.previewUrl) {
+        await ctx.db
+          .update(leadDomainTable)
+          .set({
+            pregenSiteUrl: current.previewUrl,
+            pregenPreviewExpiresAt: current.expiresAt
+              ? new Date(current.expiresAt)
+              : null,
+          })
+          .where(eq(leadDomainTable.id, input.domainId));
+      }
+      return { status: current.status, previewUrl: current.previewUrl ?? null };
+    }),
+
   rankDomain: protectedProcedure
     .input(
       z.object({

@@ -776,6 +776,9 @@ function ReviewCardList({
   const verify = useMutation(
     trpc.leads.verifyDomainContacts.mutationOptions({ onSettled: settle }),
   );
+  const buildPreview = useMutation(
+    trpc.leads.requestPregenSite.mutationOptions({ onSettled: settle }),
+  );
 
   return (
     <div className="mt-2 space-y-3">
@@ -812,10 +815,15 @@ function ReviewCardList({
                 setPending({ id, kind: "verify" });
                 verify.mutate({ domainId: id });
               },
+              onBuildPreview: (id) => {
+                setPending({ id, kind: "build" });
+                buildPreview.mutate({ domainId: id });
+              },
               resolving: busy("resolve"),
               ranking: busy("rank"),
               generating: busy("generate"),
               verifying: busy("verify"),
+              building: busy("build"),
             }}
           />
         );
