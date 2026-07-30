@@ -82,3 +82,6 @@ scripts/amplitude-taxonomy/
 # Bright Data scrape dumps (discovery)
 scripts/.brightdata-*.json
 scripts/.social-handles-*.json
+
+# Nested git worktrees — a second checkout of this repo, never content of it.
+.worktrees/
