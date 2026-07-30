@@ -478,7 +478,18 @@ export type PregenGenerationContext = {
   steer: string | null;
   hubspotCompanyId: string | null;
   previewUrl: string;
-  preview: { readable: boolean; detail: string; characters: number };
+  preview: {
+    readable: boolean;
+    detail: string;
+    characters: number;
+    /**
+     * Written against a stand-in rather than a real preview — a copy-iteration
+     * run, not a sendable draft. Previews do not exist yet for most of the
+     * universe, so the copy still has to be workable before they do; this flag
+     * is what keeps such a draft out of HubSpot.
+     */
+     pretend: boolean;
+  };
   website: { characters: number };
   emails: {
     available: number;

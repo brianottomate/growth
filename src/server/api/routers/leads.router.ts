@@ -46,6 +46,7 @@ import {
   scoreLeadChannel,
   type StoredLeadContact,
 } from "@/server/services/lead-channel.service";
+import { rankLeadDomain } from "@/server/services/lead-ranker.service";
 import { verifyContactPerson } from "@/server/services/lead-verify.service";
 import { isMinervaConfigured } from "@/server/clients/minerva.client";
 import {
@@ -433,6 +434,11 @@ export const leadsRouter = createTRPCRouter({
             sql<string | null>`${leadDomainTable.enrichment} -> 'leadRank' ->> 'screenshotUrl'`,
           pregenStatus: leadDomainTable.pregenStatus,
           hubspotLeadStatus: leadDomainTable.hubspotLeadStatus,
+          // The send-review surface filtered these out entirely. Carrying them
+          // instead means a review card can say "excluded" rather than looking
+          // sendable — realjoy.com rendered as "send · 85" with a live deal.
+          excludeFromOutreach: leadDomainTable.excludeFromOutreach,
+          excludeReason: leadDomainTable.excludeReason,
           inBuiltwith: leadDomainTable.inBuiltwith,
           inHubspot: leadDomainTable.inHubspot,
           inPregen: leadDomainTable.inPregen,
@@ -761,6 +767,36 @@ export const leadsRouter = createTRPCRouter({
       return { available: true as const, companyId: company.id, emails, activity };
     }),
 
+  /**
+   * Rank one prospect on demand.
+   *
+   * rankLeadDomain has been ready for this since it was written — its script
+   * header says "thin on purpose ... so the same call can back an API route
+   * later" — but ranking stayed script-only, so the two halves of the workflow
+   * lived in different places: generation had a button and ranking had a
+   * terminal. 203 domains carry a score and only 5 came from the current ranker.
+   */
+  rankDomain: protectedProcedure
+    .input(
+      z.object({
+        domain: z.string().trim().min(3),
+        // Off means score it and show the result without writing.
+        persist: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        return await rankLeadDomain(input.domain.toLowerCase(), {
+          persist: input.persist,
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }),
+
   // ---- Manual enrichment (inspect-only; no DB write yet) ----
 
   // Discovery only — raw, fault-tolerant fan-out across search/scrape providers.
@@ -804,6 +840,12 @@ export const leadsRouter = createTRPCRouter({
         motion: PregenMotionSchema.optional(),
         previewUrl: z.url().optional(),
         steer: z.string().trim().max(2000).optional(),
+        /**
+         * Iterate on copy before a real preview exists. The draft is marked and
+         * publishing refuses it — see the service for why this is a separate
+         * workflow rather than a relaxed guard.
+         */
+        pretend: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -844,12 +886,20 @@ export const leadsRouter = createTRPCRouter({
           .limit(1);
         motion = membership?.cohort === "recycled" ? "reengagement" : "fresh";
       }
-      const previewUrl = input.previewUrl ?? row.pregenSiteUrl;
+      // In pretend mode a company with no preview at all still gets a draft —
+      // that is the point, since only 33 of 218K domains have one. The stand-in
+      // is deliberately self-describing so it is obvious in a rendered body.
+      const previewUrl =
+        input.previewUrl ??
+        row.pregenSiteUrl ??
+        (input.pretend
+          ? `https://preview.wander.com/pretend/${row.domain}`
+          : null);
       if (!previewUrl) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message:
-            "Assign a real pregen preview before generating HubSpot copy",
+            "Assign a real pregen preview before generating HubSpot copy, or generate in pretend mode to iterate on the copy first",
         });
       }
 
@@ -859,6 +909,7 @@ export const leadsRouter = createTRPCRouter({
         motion,
         previewUrl,
         steer: input.steer,
+        previewMode: input.pretend ? "pretend" : "require-live",
       }).catch((error) => {
         if (error instanceof PregenPreconditionError) {
           throw new TRPCError({
@@ -942,6 +993,15 @@ export const leadsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: "Generate and review a pregen sequence first",
+        });
+      }
+      // The property that makes pretend mode safe. A draft written against a
+      // stand-in reads exactly as well as a real one, so the artifact cannot be
+      // trusted on inspection alone — it is refused here instead.
+      if (outreach.generationContext?.preview.pretend) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `This draft was written in pretend mode, before ${row.domain} had a readable preview, so it describes a page that did not exist. Regenerate it against the assigned preview before publishing.`,
         });
       }
 

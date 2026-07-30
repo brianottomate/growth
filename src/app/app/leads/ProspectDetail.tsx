@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -77,7 +77,21 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const trpc = useTRPC();
   const [showCrm, setShowCrm] = useState(false);
 
+  const queryClient = useQueryClient();
   const prospect = useQuery(trpc.leads.prospect.queryOptions({ domain }));
+  const invalidate = () =>
+    queryClient.invalidateQueries({
+      queryKey: trpc.leads.prospect.queryKey({ domain }),
+    });
+
+  const rank_ = useMutation(
+    trpc.leads.rankDomain.mutationOptions({ onSuccess: invalidate }),
+  );
+  const generate = useMutation(
+    trpc.leads.generatePregenOutreach.mutationOptions({
+      onSuccess: invalidate,
+    }),
+  );
 
   // Live HubSpot correspondence is a provider read, so it waits to be asked for.
   // The draft's own snapshot below is what the copy was written from.
@@ -323,7 +337,20 @@ export function ProspectDetail({ domain }: { domain: string }) {
             ) : null}
 
             {context ? (
-              <div className="border-border bg-muted/30 rounded border p-3 text-xs">
+              <div
+                className={`rounded border p-3 text-xs ${
+                  context.preview.pretend
+                    ? "border-amber-500/40 bg-amber-500/5"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                {context.preview.pretend ? (
+                  <p className="mb-1.5 font-medium text-amber-300">
+                    Stand-in draft — written before a readable preview existed,
+                    so it describes no real page. Publishing refuses it. Use it
+                    to iterate on copy, then regenerate against the real preview.
+                  </p>
+                ) : null}
                 <p className="font-medium">What the generator read</p>
                 <div className="mt-1.5 space-y-0.5">
                   <div>
@@ -448,6 +475,61 @@ export function ProspectDetail({ domain }: { domain: string }) {
         ) : (
           <p className="text-muted-foreground text-sm">Nothing returned.</p>
         )}
+      </Section>
+
+      {/* The two workflows, in one place. Ranking was script-only until now, so
+          scoring a prospect and writing its copy lived in different tools. */}
+      <Section
+        title="Run"
+        note="Ranking scores the site and writes back. Generating saves a draft — it never publishes or enrolls."
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={rank_.isPending}
+            onClick={() => rank_.mutate({ domain, persist: true })}
+          >
+            {rank_.isPending ? "Ranking…" : "Rank this prospect"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={generate.isPending}
+            onClick={() =>
+              generate.mutate({ domainId: row.id, pretend: false })
+            }
+          >
+            {generate.isPending ? "Generating…" : "Generate sequence"}
+          </Button>
+          {/* The preview does not exist for most of the universe, so copy has to
+              be workable before it does. Marked, and publishing refuses it. */}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={generate.isPending}
+            onClick={() => generate.mutate({ domainId: row.id, pretend: true })}
+          >
+            Draft against a stand-in
+          </Button>
+          {preview.state !== "live" && (
+            <span className="text-muted-foreground text-xs">
+              Preview is {preview.state} — a real generation will refuse; the
+              stand-in draft is for iterating on copy.
+            </span>
+          )}
+        </div>
+        {rank_.error ? (
+          <p className="mt-2 text-xs text-red-300">{rank_.error.message}</p>
+        ) : null}
+        {generate.error ? (
+          <p className="mt-2 text-xs text-red-300">{generate.error.message}</p>
+        ) : null}
+        {rank_.data ? (
+          <p className="mt-2 text-xs text-emerald-300">
+            Ranked — reload to see the new assessment.
+          </p>
+        ) : null}
       </Section>
 
       {/* Hand off to the assistant rather than growing a button per action */}

@@ -64,9 +64,17 @@ for (const domain of DOMAINS) {
     .limit(1);
   const motion = m?.cohort === "recycled" ? "reengagement" : "fresh";
 
-  const previewUrl = row.pregenSiteUrl;
+  // Pretend mode works with no assigned preview at all — that is most of the
+  // universe, and the copy still has to be iterable before hosting exists.
+  const previewUrl =
+    row.pregenSiteUrl ??
+    (ALLOW_UNREACHABLE
+      ? `https://preview.wander.com/pretend/${row.domain}`
+      : null);
   if (!previewUrl) {
-    console.log(`\n### ${domain}: no pregenSiteUrl — assign a preview first`);
+    console.log(
+      `\n### ${domain}: no pregenSiteUrl — assign a preview, or ALLOW_UNREACHABLE=1 to draft against a stand-in`,
+    );
     continue;
   }
   const status = await previewIsReachable(previewUrl);
@@ -77,7 +85,7 @@ for (const domain of DOMAINS) {
     const r = await generatePregenHubspotDraft(domain, {
       motion,
       previewUrl,
-      allowUnreachablePreview: ALLOW_UNREACHABLE,
+      previewMode: ALLOW_UNREACHABLE ? "pretend" : "require-live",
     });
 
     if (DRY_RUN) {

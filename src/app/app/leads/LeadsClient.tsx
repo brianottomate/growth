@@ -680,6 +680,8 @@ function ReviewCard({
     pregenSiteUrl: string | null;
     pregenCohorts: string[];
     siteScreenshotUrl: string | null;
+    excludeFromOutreach: boolean;
+    excludeReason: string | null;
     review: {
       channel: {
         bestEmail: string | null;
@@ -700,24 +702,37 @@ function ReviewCard({
   };
 }) {
   const review = item.review;
-  const verdict = review?.channel.verdict ?? "skip";
+  // Exclusion overrides reachability. A company with a live deal or an active
+  // rep conversation is not "send · 85" no matter how good its contacts are —
+  // the old send-review query dropped these rows, and dropping them is why the
+  // merged list had to be told about them explicitly.
+  const excluded = item.excludeFromOutreach;
+  const verdict = excluded ? "skip" : (review?.channel.verdict ?? "skip");
   return (
     <div
       className={`bg-card rounded-xl border p-4 ${
-        verdict === "send"
-          ? "border-emerald-500/30"
+        excluded
+          ? "border-red-500/30"
+          : verdict === "send"
+            ? "border-emerald-500/30"
           : verdict === "review"
             ? "border-amber-500/30"
             : "border-border"
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded px-2 py-0.5 text-xs font-medium ${VERDICT_TONE[verdict]}`}
-        >
-          {verdict}
-          {review ? ` · ${review.channel.score}` : ""}
-        </span>
+        {excluded ? (
+          <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-300">
+            excluded · {item.excludeReason ?? "no reason recorded"}
+          </span>
+        ) : (
+          <span
+            className={`rounded px-2 py-0.5 text-xs font-medium ${VERDICT_TONE[verdict]}`}
+          >
+            {verdict}
+            {review ? ` · ${review.channel.score}` : ""}
+          </span>
+        )}
         <Link
           href={`/app/leads/${encodeURIComponent(item.domain)}`}
           className="font-medium hover:underline"
