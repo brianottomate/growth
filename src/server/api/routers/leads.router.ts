@@ -288,6 +288,13 @@ export const leadsRouter = createTRPCRouter({
         // owning BDR (resolved rep name as stored on the domain).
         owner: z.string().trim().min(1).optional(),
         minUnits: z.number().int().nonnegative().optional(),
+        /**
+         * Attach the review payload — scored channel and latest draft — for the
+         * returned page. This is what lets one list render either compact rows
+         * or review cards from a single filtered set, instead of /leads and
+         * /leads/send-review being two surfaces over the same table that drift.
+         */
+        withReview: z.boolean().optional(),
         sort: z
           .enum(["composite", "units", "domain", "updated"])
           .default("units"),
@@ -477,11 +484,110 @@ export const leadsRouter = createTRPCRouter({
         cohortsByDomain.set(row.domainId, cohorts);
       }
 
+      // Review payload for this page only — three grouped queries plus the same
+      // scorer the send-review surface uses, so a card here and a card there
+      // cannot disagree about who is reachable.
+      const review = input.withReview
+        ? await (async () => {
+            if (!ids.length) return null;
+            const [reviewContacts, outreachRows, channelRows, domainEnrichment] =
+              await Promise.all([
+                ctx.db
+                  .select({
+                    id: leadContactTable.id,
+                    domainId: leadContactTable.domainId,
+                    email: leadContactTable.email,
+                    firstName: leadContactTable.firstName,
+                    lastName: leadContactTable.lastName,
+                    jobTitle: leadContactTable.jobTitle,
+                    verificationStatus: leadContactTable.verificationStatus,
+                    verification: leadContactTable.verification,
+                  })
+                  .from(leadContactTable)
+                  .where(
+                    and(
+                      inArray(leadContactTable.domainId, ids),
+                      isNull(leadContactTable.deletedAt),
+                    ),
+                  ),
+                ctx.db
+                  .select()
+                  .from(leadOutreachTable)
+                  .where(inArray(leadOutreachTable.domainId, ids))
+                  .orderBy(desc(leadOutreachTable.createdAt)),
+                ctx.db
+                  .select({
+                    domainId: leadChannelTable.domainId,
+                    kind: leadChannelTable.kind,
+                    value: leadChannelTable.value,
+                    deliveryState: leadChannelTable.deliveryState,
+                  })
+                  .from(leadChannelTable)
+                  .where(
+                    and(
+                      inArray(leadChannelTable.domainId, ids),
+                      isNull(leadChannelTable.deletedAt),
+                    ),
+                  ),
+                ctx.db
+                  .select({
+                    id: leadDomainTable.id,
+                    enrichment: leadDomainTable.enrichment,
+                  })
+                  .from(leadDomainTable)
+                  .where(inArray(leadDomainTable.id, ids)),
+              ]);
+
+            const contactsByDomain = new Map<string, StoredLeadContact[]>();
+            for (const contact of reviewContacts) {
+              const list = contactsByDomain.get(contact.domainId) ?? [];
+              list.push(contact);
+              contactsByDomain.set(contact.domainId, list);
+            }
+            const latestOutreach = new Map<
+              string,
+              (typeof outreachRows)[number]
+            >();
+            for (const row of outreachRows) {
+              if (!latestOutreach.has(row.domainId))
+                latestOutreach.set(row.domainId, row);
+            }
+            const channelsByDomain = new Map<
+              string,
+              (typeof channelRows)[number][]
+            >();
+            for (const row of channelRows) {
+              const list = channelsByDomain.get(row.domainId) ?? [];
+              list.push(row);
+              channelsByDomain.set(row.domainId, list);
+            }
+            const enrichmentById = new Map(
+              domainEnrichment.map((row) => [row.id, row.enrichment]),
+            );
+
+            return new Map(
+              ids.map((id) => [
+                id,
+                {
+                  channel: scoreLeadChannel({
+                    domain: items.find((i) => i.id === id)!.domain,
+                    contactChannel: parseContactChannel(enrichmentById.get(id)),
+                    contacts: contactsByDomain.get(id) ?? [],
+                  }),
+                  channels: channelsByDomain.get(id) ?? [],
+                  outreach: latestOutreach.get(id) ?? null,
+                },
+              ]),
+            );
+          })()
+        : null;
+
       return {
         items: items.map((i) => ({
           ...i,
           contactCount: countMap.get(i.id) ?? 0,
           pregenCohorts: [...(cohortsByDomain.get(i.id) ?? [])].sort(),
+          review: review?.get(i.id) ?? null,
         })),
         total,
         hasMore: input.offset + items.length < total,

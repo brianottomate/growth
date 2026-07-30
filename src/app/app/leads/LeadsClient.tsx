@@ -4,7 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useQueryState } from "nuqs";
+import {
+  parseAsBoolean,
+  parseAsInteger,
+  parseAsString,
+  parseAsStringLiteral,
+  useQueryState,
+} from "nuqs";
 import { ExternalLink } from "lucide-react";
 
 import {
@@ -21,8 +27,70 @@ const SOURCE_BADGE: Record<string, string> = {
   instantly: "bg-violet-500/15 text-violet-300",
 };
 
+const VERDICT_TONE: Record<string, string> = {
+  send: "bg-emerald-500/15 text-emerald-300",
+  review: "bg-amber-500/15 text-amber-300",
+  form: "bg-sky-500/15 text-sky-300",
+  skip: "bg-slate-500/15 text-slate-400",
+};
+
 const fmt = (n: number | null | undefined) =>
   n == null ? "—" : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : `${n}`;
+
+/**
+ * Who am I looking at — exactly one answer at a time.
+ *
+ * These used to be four independent toggles (inAnyCohort, pregenCohort, netNew,
+ * sendBatch) that could be combined into contradictions. "Target list only" plus
+ * "Net-new target" returned zero rows every time, because target list requires
+ * HubSpot list membership and net-new requires never having been in HubSpot —
+ * and target list was on by default, so the net-new pill looked broken. Making
+ * this single-select removes the failure mode rather than documenting it.
+ *
+ * Facets (search, BDR, PMS, enrollable, has-preview, integrated) still compose,
+ * because they narrow *within* a population instead of redefining it.
+ */
+const POPULATIONS = {
+  target: {
+    label: "Target list",
+    hint: "Members of either pre-gen cohort — the active motion",
+    input: { inAnyCohort: true },
+  },
+  recycled: {
+    label: "Recycled",
+    hint: "Prior Wander outreach to acknowledge",
+    input: { pregenCohort: "recycled" as const },
+  },
+  untouched: {
+    label: "Untouched",
+    hint: "In the pre-gen cohort, no prior outreach",
+    input: { pregenCohort: "untouched" as const },
+  },
+  netnew: {
+    label: "Net-new",
+    hint: "Never in the CRM, ranked, has a credible contact",
+    input: { netNew: true },
+  },
+  send20: {
+    label: "Send-20",
+    hint: "Stamped into a pre-gen send batch",
+    input: { sendBatch: true },
+  },
+  all: {
+    label: "Whole universe",
+    hint: "Every deduped domain, cohort or not",
+    input: {},
+  },
+} as const;
+
+const POPULATION_KEYS = [
+  "target",
+  "recycled",
+  "untouched",
+  "netnew",
+  "send20",
+  "all",
+] as const;
 
 type SourceKey = "builtwith" | "hubspot" | "instantly";
 
@@ -76,26 +144,45 @@ function Pill({
 export function LeadsClient() {
   const trpc = useTRPC();
 
-  const [q, setQ] = useState("");
-  // Default to the pregen target list. The 217.8K universe is the exception you
-  // opt into, not the thing you land on: the ~900 cohort companies are the
-  // active motion, and everything else buries them.
-  const [cohortOnly, setCohortOnly] = useState(true);
-  const [source, setSource] = useState<SourceKey | undefined>(undefined);
-  const [pms, setPms] = useState<string | undefined>(undefined);
-  const [integratedOnly, setIntegratedOnly] = useState(false);
-  const [hasPregen, setHasPregen] = useState(false);
-  const [pregenCohort, setPregenCohort] = useState<
-    HubspotPregenCohort | undefined
-  >(undefined);
-  const [netNew, setNetNew] = useState(false);
-  const [sendBatch, setSendBatch] = useState(false);
-  const [enrollableOnly, setEnrollableOnly] = useState(false);
-  const [owner, setOwner] = useState<string | undefined>(undefined);
-  const [sort, setSort] = useState<
-    "units" | "composite" | "domain" | "updated"
-  >("units");
-  const [page, setPage] = useState(0);
+  // Every filter lives in the URL, so a view is a link. Previously all eleven
+  // were useState and nothing about a filtered list was shareable.
+  const [population, setPopulation] = useQueryState(
+    "pop",
+    parseAsStringLiteral(POPULATION_KEYS).withDefault("target"),
+  );
+  const [view, setView] = useQueryState(
+    "view",
+    parseAsStringLiteral(["compact", "review"] as const).withDefault("compact"),
+  );
+  const [q, setQ] = useQueryState("q", parseAsString.withDefault(""));
+  const [source, setSource] = useQueryState(
+    "source",
+    parseAsStringLiteral(["builtwith", "hubspot", "instantly"] as const),
+  );
+  const [pms, setPms] = useQueryState("pms", parseAsString);
+  const [integratedOnly, setIntegratedOnly] = useQueryState(
+    "integrated",
+    parseAsBoolean.withDefault(false),
+  );
+  const [hasPregen, setHasPregen] = useQueryState(
+    "preview",
+    parseAsBoolean.withDefault(false),
+  );
+  const [enrollableOnly, setEnrollableOnly] = useQueryState(
+    "enrollable",
+    parseAsBoolean.withDefault(false),
+  );
+  const [owner, setOwner] = useQueryState("bdr", parseAsString);
+  const [sort, setSort] = useQueryState(
+    "sort",
+    parseAsStringLiteral([
+      "units",
+      "composite",
+      "domain",
+      "updated",
+    ] as const).withDefault("units"),
+  );
+  const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(0));
   const [enrichLead, setEnrichLead] = useState<LeadRow | null>(null);
   // Deep-link: ?lead=<domain> opens that lead's drawer (shareable / bookmarkable).
   const [leadParam, setLeadParam] = useQueryState("lead");
@@ -113,17 +200,18 @@ export function LeadsClient() {
   const list = useQuery(
     trpc.leads.listDomains.queryOptions(
       {
+        // Exactly one population, then facets on top of it.
+        ...POPULATIONS[population].input,
         q: q || undefined,
-        source,
-        pms,
+        source: source ?? undefined,
+        pms: pms ?? undefined,
         integratedPmsOnly: integratedOnly || undefined,
         hasPregenSite: hasPregen || undefined,
-        pregenCohort,
-        inAnyCohort: cohortOnly || undefined,
-        netNew: netNew || undefined,
-        sendBatch: sendBatch || undefined,
         enrollableOnly: enrollableOnly || undefined,
-        owner,
+        owner: owner ?? undefined,
+        // The review card needs the scored channel and latest draft; the compact
+        // row does not, so it does not pay for them.
+        withReview: view === "review" || undefined,
         sort,
         dir: sort === "domain" ? "asc" : "desc",
         limit,
@@ -150,7 +238,7 @@ export function LeadsClient() {
     if (item) setEnrichLead(item);
   }, [leadParam, enrichLead, list.data, deepLink.data]);
 
-  const resetPage = () => setPage(0);
+  const resetPage = () => void setPage(0);
   const s = stats.data;
   const membershipCount = (
     cohort: HubspotPregenCohort,
@@ -198,7 +286,7 @@ export function LeadsClient() {
             const companies = membershipCount(cohort, "company");
             const contacts = membershipCount(cohort, "contact");
             const reach = enrollableCount(cohort);
-            const active = pregenCohort === cohort;
+            const active = population === cohort;
             return (
               <div
                 key={cohort}
@@ -209,7 +297,7 @@ export function LeadsClient() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => {
-                      setPregenCohort(active ? undefined : cohort);
+                      void setPopulation(active ? "target" : cohort);
                       resetPage();
                     }}
                     className={`rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -267,38 +355,6 @@ export function LeadsClient() {
           })}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-          <Pill
-            active={cohortOnly}
-            onClick={() => {
-              setCohortOnly(!cohortOnly);
-              resetPage();
-            }}
-          >
-            {cohortOnly ? "Target list only" : "Whole universe"}
-          </Pill>
-          <Pill
-            active={enrollableOnly}
-            onClick={() => {
-              setEnrollableOnly(!enrollableOnly);
-              resetPage();
-            }}
-          >
-            Enrollable only
-          </Pill>
-          {(pregenCohort || enrollableOnly) && (
-            <button
-              onClick={() => {
-                setPregenCohort(undefined);
-                setEnrollableOnly(false);
-                resetPage();
-              }}
-              className="text-muted-foreground text-xs hover:underline"
-            >
-              Clear cohort filters
-            </button>
-          )}
-        </div>
       </div>
 
       {/* summary cards — the wider universe behind the cohorts */}
@@ -314,9 +370,9 @@ export function LeadsClient() {
           hint="across domains"
         />
         <StatCard
-          label="Untouched"
+          label="Not in CRM"
           value={fmt(s?.untouched)}
-          hint="BuiltWith, no CRM"
+          hint="BuiltWith only — not the Untouched cohort"
           accent
         />
         <StatCard
@@ -332,12 +388,41 @@ export function LeadsClient() {
         />
       </div>
 
-      {/* filter bar */}
-      <div className="mt-6 flex flex-wrap items-center gap-2 border-b pb-4">
+      {/* Population — one answer to "who am I looking at", then density. */}
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground mr-1 text-xs">Population</span>
+        {POPULATION_KEYS.map((key) => (
+          <Pill
+            key={key}
+            active={population === key}
+            onClick={() => {
+              void setPopulation(key);
+              resetPage();
+            }}
+          >
+            {POPULATIONS[key].label}
+            {key === "netnew" && s ? ` · ${fmt(s.netNew)}` : ""}
+          </Pill>
+        ))}
+        <span className="flex-1" />
+        <span className="text-muted-foreground mr-1 text-xs">View</span>
+        <Pill active={view === "compact"} onClick={() => void setView("compact")}>
+          Compact
+        </Pill>
+        <Pill active={view === "review"} onClick={() => void setView("review")}>
+          Review cards
+        </Pill>
+      </div>
+      <p className="text-muted-foreground mt-1.5 text-xs">
+        {POPULATIONS[population].hint}
+      </p>
+
+      {/* Facets — these narrow within the population, so they compose freely. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-b pb-4">
         <input
           value={q}
           onChange={(e) => {
-            setQ(e.target.value);
+            void setQ(e.target.value);
             resetPage();
           }}
           placeholder="Search domain or company…"
@@ -347,7 +432,7 @@ export function LeadsClient() {
         <Pill
           active={!source}
           onClick={() => {
-            setSource(undefined);
+            void setSource(null);
             resetPage();
           }}
         >
@@ -358,7 +443,7 @@ export function LeadsClient() {
             key={sk}
             active={source === sk}
             onClick={() => {
-              setSource(source === sk ? undefined : sk);
+              void setSource(source === sk ? null : sk);
               resetPage();
             }}
           >
@@ -370,7 +455,7 @@ export function LeadsClient() {
         <select
           value={owner ?? ""}
           onChange={(event) => {
-            setOwner(event.target.value || undefined);
+            void setOwner(event.target.value || null);
             resetPage();
           }}
           className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
@@ -385,7 +470,7 @@ export function LeadsClient() {
         <select
           value={pms ?? ""}
           onChange={(e) => {
-            setPms(e.target.value || undefined);
+            void setPms(e.target.value || null);
             resetPage();
           }}
           className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
@@ -400,7 +485,7 @@ export function LeadsClient() {
         <Pill
           active={integratedOnly}
           onClick={() => {
-            setIntegratedOnly((v) => !v);
+            void setIntegratedOnly(!integratedOnly);
             resetPage();
           }}
         >
@@ -409,36 +494,26 @@ export function LeadsClient() {
         <Pill
           active={hasPregen}
           onClick={() => {
-            setHasPregen((v) => !v);
+            void setHasPregen(!hasPregen);
             resetPage();
           }}
         >
           Has preview URL
         </Pill>
-        <span className="bg-border mx-1 h-4 w-px" />
         <Pill
-          active={netNew}
+          active={enrollableOnly}
           onClick={() => {
-            setNetNew((v) => !v);
+            void setEnrollableOnly(!enrollableOnly);
             resetPage();
           }}
         >
-          🎯 Net-new target{s ? ` · ${fmt(s.netNew)}` : ""}
-        </Pill>
-        <Pill
-          active={sendBatch}
-          onClick={() => {
-            setSendBatch((v) => !v);
-            resetPage();
-          }}
-        >
-          🚀 Send-20
+          Enrollable only
         </Pill>
         <span className="flex-1" />
         <select
           value={sort}
           onChange={(e) => {
-            setSort(e.target.value as typeof sort);
+            void setSort(e.target.value as typeof sort);
             resetPage();
           }}
           className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
@@ -457,7 +532,21 @@ export function LeadsClient() {
           : "Loading…"}
       </div>
 
-      {/* table */}
+      {/* Review cards — the send-review surface as a density level over the same
+          filtered set, so the two cannot show different facts about one company
+          the way the screenshot-on-one-list-only bug did. */}
+      {view === "review" ? (
+        <div className="mt-2 space-y-3">
+          {list.data?.items.map((d) => (
+            <ReviewCard key={d.id} item={d} />
+          ))}
+          {list.data?.items.length === 0 && (
+            <p className="text-muted-foreground py-8 text-center text-sm">
+              Nothing in this population matches those facets.
+            </p>
+          )}
+        </div>
+      ) : (
       <div className="mt-2 overflow-x-auto">
         <table className="w-full border-separate border-spacing-0 text-sm">
           <thead>
@@ -616,6 +705,7 @@ export function LeadsClient() {
           </div>
         )}
       </div>
+      )}
 
       {/* pagination */}
       {list.data && list.data.total > limit && (
@@ -627,14 +717,14 @@ export function LeadsClient() {
           <div className="flex gap-2">
             <button
               disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              onClick={() => void setPage((p) => Math.max(0, p - 1))}
               className="border-border rounded-md border px-3 py-1 text-xs disabled:opacity-40"
             >
               Previous
             </button>
             <button
               disabled={!list.data.hasMore}
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => void setPage((p) => p + 1)}
               className="border-border rounded-md border px-3 py-1 text-xs disabled:opacity-40"
             >
               Next
@@ -653,6 +743,123 @@ export function LeadsClient() {
           }
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * The send-review card, rendered from the shared list query.
+ *
+ * Previously /leads and /leads/send-review ran different queries over the same
+ * table, which is how the site screenshot ended up on send-review rows only and
+ * invisible where it was looked for. Both densities now read one filtered set.
+ */
+function ReviewCard({
+  item,
+}: {
+  item: {
+    id: string;
+    domain: string;
+    companyName: string | null;
+    pms: string | null;
+    unitCount: number | null;
+    scorePregenPotential: number | null;
+    pregenSiteUrl: string | null;
+    pregenCohorts: string[];
+    siteScreenshotUrl: string | null;
+    review: {
+      channel: {
+        bestEmail: string | null;
+        route: string;
+        verdict: string;
+        score: number;
+        candidates: Array<{
+          email: string;
+          name: string | null;
+          title: string | null;
+          score: number;
+          verdict: string;
+          risks: string[];
+        }>;
+      };
+      outreach: { status: string; angle: string | null } | null;
+    } | null;
+  };
+}) {
+  const review = item.review;
+  const verdict = review?.channel.verdict ?? "skip";
+  return (
+    <div
+      className={`bg-card rounded-xl border p-4 ${
+        verdict === "send"
+          ? "border-emerald-500/30"
+          : verdict === "review"
+            ? "border-amber-500/30"
+            : "border-border"
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`rounded px-2 py-0.5 text-xs font-medium ${VERDICT_TONE[verdict]}`}
+        >
+          {verdict}
+          {review ? ` · ${review.channel.score}` : ""}
+        </span>
+        <Link
+          href={`/app/leads/${encodeURIComponent(item.domain)}`}
+          className="font-medium hover:underline"
+        >
+          {item.domain}
+        </Link>
+        <span className="text-muted-foreground text-xs">
+          {[item.companyName, item.pms].filter(Boolean).join(" · ")}
+        </span>
+        <span className="flex-1" />
+        <span className="text-muted-foreground text-xs">
+          fit {item.scorePregenPotential ?? "—"} · units {item.unitCount ?? "—"}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
+        <div>
+          <p className="text-muted-foreground text-xs">Selected channel</p>
+          <p className="font-mono text-xs break-all">
+            {review?.channel.bestEmail ?? "no reachable contact"}
+          </p>
+          {review?.channel.candidates.length ? (
+            <ul className="mt-2 space-y-0.5">
+              {review.channel.candidates.slice(0, 5).map((candidate) => (
+                <li
+                  key={candidate.email}
+                  className="text-muted-foreground text-[11px]"
+                >
+                  <span className="tabular-nums">{candidate.score}</span>{" "}
+                  {candidate.email}
+                  {candidate.risks.length ? ` — ${candidate.risks[0]}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <div>
+          <p className="text-muted-foreground text-xs">Sequence</p>
+          {review?.outreach ? (
+            <>
+              <p className="text-xs">{review.outreach.status}</p>
+              <p className="text-muted-foreground mt-1 line-clamp-3 text-[11px]">
+                {review.outreach.angle ?? "no angle recorded"}
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground text-xs">No draft yet</p>
+          )}
+          {!item.pregenSiteUrl && (
+            <p className="mt-1 text-[11px] text-amber-300">
+              No preview assigned — nothing can be generated yet.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

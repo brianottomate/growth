@@ -99,9 +99,21 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const { domain: row, channel, channels, preview, outreach, cohort } =
     prospect.data;
   const context = outreach?.generationContext ?? null;
-  const screenshot = (
-    row.enrichment as { leadRank?: { siteScreenshotUrl?: string } } | null
-  )?.leadRank?.siteScreenshotUrl;
+  // enrichment.leadRank.screenshotUrl — `siteScreenshotUrl` exists nowhere in
+  // this table, so the earlier spelling could never have found one.
+  const rank = (
+    row.enrichment as {
+      leadRank?: {
+        screenshotUrl?: string;
+        overall?: number;
+        relationshipSummary?: string;
+        reengagementHook?: string;
+        concerns?: string[];
+        copyNotes?: string;
+      };
+    } | null
+  )?.leadRank;
+  const screenshot = rank?.screenshotUrl;
 
   return (
     <div className="space-y-4">
@@ -198,6 +210,34 @@ export function ProspectDetail({ domain }: { domain: string }) {
           ) : null}
         </Section>
       </div>
+
+      {/* The ranker's own read. Internal only — the copy policy forbids telling a
+          prospect anything about their site's quality or alluding to a score. */}
+      {rank ? (
+        <Section
+          title="Ranker assessment"
+          note={`${rank.overall != null ? `overall ${rank.overall} · ` : ""}internal only — never quoted to the prospect`}
+        >
+          <div className="space-y-2 text-sm">
+            {rank.relationshipSummary ? (
+              <Row label="Relationship">{rank.relationshipSummary}</Row>
+            ) : null}
+            {rank.reengagementHook ? (
+              <Row label="Hook">{rank.reengagementHook}</Row>
+            ) : null}
+            {rank.copyNotes ? <Row label="Copy notes">{rank.copyNotes}</Row> : null}
+            {rank.concerns?.length ? (
+              <Row label="Concerns">
+                <ul className="list-disc pl-4">
+                  {rank.concerns.map((concern, index) => (
+                    <li key={index}>{concern}</li>
+                  ))}
+                </ul>
+              </Row>
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
 
       {/* Reachability — with the rejected rows visible, not hidden */}
       <Section
