@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   isPlaceholderEmail,
+  scoreLeadChannel,
   scoreStoredContact,
   type StoredLeadContact,
 } from "./lead-channel.service";
@@ -75,5 +76,50 @@ describe("scoreStoredContact", () => {
 
     expect(scored.score).toBeGreaterThan(0);
     expect(scored.reasons).toContain("has a named person");
+  });
+});
+
+describe("scoreLeadChannel", () => {
+  test("does not select a placeholder as the channel when it is the only contact", () => {
+    // skywatercabins.com: one contact, and it is a placeholder.
+    const scored = scoreLeadChannel({
+      domain: "skywatercabins.com",
+      contactChannel: null,
+      contacts: [
+        contact({
+          email: "55889823108@fake-email.com",
+          firstName: "Skywater Cabins",
+          lastName: "- Mainline",
+        }),
+      ],
+    });
+
+    expect(scored.bestEmail).toBeNull();
+    expect(scored.verdict).toBe("skip");
+    // Still visible to the reviewer, with the reason it was rejected.
+    expect(scored.candidates).toHaveLength(1);
+    expect(scored.candidates[0]!.risks.join(" ")).toContain("placeholder");
+  });
+
+  test("prefers the real contact over a higher-titled placeholder", () => {
+    const scored = scoreLeadChannel({
+      domain: "fisher3vacations.com",
+      contactChannel: null,
+      contacts: [
+        contact({
+          email: "230402084130@fake-email.com",
+          firstName: "Megan",
+          jobTitle: "Co-founder",
+        }),
+        contact({
+          email: "charlief@fisher3e.com",
+          firstName: "Charlie",
+          lastName: "Fisher",
+          jobTitle: "Partner",
+        }),
+      ],
+    });
+
+    expect(scored.bestEmail).toBe("charlief@fisher3e.com");
   });
 });

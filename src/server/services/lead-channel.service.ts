@@ -402,7 +402,12 @@ export function scoreLeadChannel(input: {
 
   const route = input.contactChannel?.route ?? "none";
   const bestSiteEmail = input.contactChannel?.bestEmail ?? null;
-  const bestCandidate = candidates[0] ?? null;
+  // A placeholder mailbox must never become the selected channel, even when it
+  // is the only row on the company. skywatercabins.com has exactly one contact
+  // and it is a placeholder, which used to render as its selected channel.
+  // Every candidate stays in `candidates` so the reviewer can still see why.
+  const bestCandidate =
+    candidates.find((candidate) => !isPlaceholderEmail(candidate.email)) ?? null;
   const bestEmail = bestSiteEmail ?? bestCandidate?.email ?? null;
 
   if (route === "form" && !bestEmail) {
