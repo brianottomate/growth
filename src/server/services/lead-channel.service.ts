@@ -1,5 +1,7 @@
 import "server-only";
 
+import { sql } from "drizzle-orm";
+
 import type { LeadContactVerification } from "@/server/db/leads-schema";
 
 export type LeadChannelRoute = "instantly" | "form" | "none";
@@ -62,6 +64,43 @@ const DECISION_MAKER =
   /owner|founder|ceo|president|principal|partner|director|vp|vice|general manager|\bgm\b|coo|cmo|head/i;
 
 const TIMEOUT_MS = 10_000;
+
+/**
+ * Placeholder mailboxes that exist to satisfy a required field, not to be
+ * written to. HubSpot's appended-contact rows carry `<numeric-id>@fake-email.com`
+ * — 203,237 of 325,640 contacts, spread over 177,868 domains — and they used to
+ * score 55 on the strength of a name and a job title, level with a real
+ * corporate address, and could be picked as the selected channel.
+ *
+ * Matched on the exact domain, never as a substring: real prospects include
+ * `corporatestays.com` and `elevatestr.com`, both of which contain "test".
+ */
+export const PLACEHOLDER_EMAIL_DOMAINS = [
+  "fake-email.com",
+  "fakeemail.com",
+  "test.com",
+  "testing.com",
+  "example.com",
+  "example.net",
+  "example.org",
+  "mailinator.com",
+] as const;
+
+export function isPlaceholderEmail(email: string): boolean {
+  const host = email.trim().toLowerCase().split("@")[1];
+  return host != null && PLACEHOLDER_EMAIL_DOMAINS.includes(host as never);
+}
+
+/**
+ * The same list as a SQL array, so the enrollable counts, the enrollable-only
+ * list filter and the chat summary all exclude exactly what the scorer zeroes.
+ * These three drifting apart is how the page came to advertise 497 enrollable
+ * untouched companies when 372 have a deliverable address.
+ */
+export const PLACEHOLDER_EMAIL_DOMAINS_SQL = sql`array[${sql.join(
+  PLACEHOLDER_EMAIL_DOMAINS.map((domain) => sql`${domain}`),
+  sql`, `,
+)}]::text[]`;
 
 function isFreemail(email: string): boolean {
   return FREEMAIL.test(email);
@@ -228,6 +267,25 @@ export function scoreStoredContact(
   const reasons: string[] = [];
   const risks: string[] = [];
   const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
+
+  // Hard zero, before any promoter runs. A name and a decision-maker title are
+  // exactly what these rows carry, so scoring them additively rated an
+  // undeliverable address as reviewable — and "has a named person" read as
+  // evidence *for* a mailbox that cannot receive mail.
+  if (isPlaceholderEmail(contact.email)) {
+    return {
+      kind: "stored",
+      email: contact.email,
+      name: name || null,
+      title: contact.jobTitle,
+      score: 0,
+      verdict: "skip",
+      reasons: [],
+      risks: [
+        `${contact.email.split("@")[1]} is a placeholder mailbox, not a deliverable address`,
+      ],
+    };
+  }
 
   if (isCorporateForDomain(contact.email, domain)) {
     score += 30;

@@ -10,6 +10,7 @@ import {
   leadDomainTable,
   leadOutreachTable,
 } from "@/server/db/leads-schema";
+import { PLACEHOLDER_EMAIL_DOMAINS_SQL } from "@/server/services/lead-channel.service";
 import { generatePregenHubspotDraft } from "@/server/services/pregen-hubspot-outreach.service";
 import { growthAction } from "./types";
 
@@ -55,6 +56,10 @@ export const leadsSummary = growthAction({
                 and(
                   eq(leadContactTable.domainId, leadDomainTable.id),
                   isNull(leadContactTable.deletedAt),
+                  // A placeholder mailbox is not a sendable contact, and 62% of
+                  // this table is one, so leaving it in overstated "net-new
+                  // sendable" by more than the number itself.
+                  sql`lower(split_part(${leadContactTable.email}, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})`,
                   sql`(${leadContactTable.firstName} is not null or ${leadContactTable.lastName} is not null or ${leadContactTable.email} !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')`,
                 ),
               ),

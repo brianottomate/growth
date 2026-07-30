@@ -36,6 +36,7 @@ import { hubspotPropertiesFromRenderedSteps } from "@/server/services/pregen-hub
 import {
   isFreemailEmail,
   parseContactChannel,
+  PLACEHOLDER_EMAIL_DOMAINS_SQL,
   scoreLeadChannel,
   type StoredLeadContact,
 } from "@/server/services/lead-channel.service";
@@ -168,6 +169,7 @@ export const leadsRouter = createTRPCRouter({
               and nullif(btrim(contact.email), '') is not null
               and contact.hubspot_contact_id is not null
               and coalesce(contact.email_opt_out, false) = false
+              and lower(split_part(contact.email, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})
           )
         )::int as enrollable
       from leads.hubspot_list_membership as membership
@@ -327,6 +329,7 @@ export const leadsRouter = createTRPCRouter({
             and nullif(btrim(enrollable_contact.email), '') is not null
             and enrollable_contact.hubspot_contact_id is not null
             and coalesce(enrollable_contact.email_opt_out, false) = false
+            and lower(split_part(enrollable_contact.email, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})
         )`);
 
       const where = conds.length ? and(...conds) : undefined;
