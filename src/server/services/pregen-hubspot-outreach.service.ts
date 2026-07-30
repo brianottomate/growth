@@ -11,7 +11,11 @@ import {
   HS_OWNER_NAMES,
 } from "@/server/clients/hubspot.client";
 import { db } from "@/server/db";
-import { leadContactTable, leadDomainTable } from "@/server/db/leads-schema";
+import {
+  leadContactTable,
+  leadDomainTable,
+  type PregenGenerationContext,
+} from "@/server/db/leads-schema";
 import {
   formatCompanyActivityHistoryForModel,
   formatCompanyEmailHistoryForModel,
@@ -397,6 +401,7 @@ export async function generatePregenHubspotDraft(
     body: string;
     delayDays: number;
   }>;
+  generationContext: PregenGenerationContext;
 }> {
   const row = await db.query.leadDomainTable.findFirst({
     where: eq(leadDomainTable.domain, domain),
@@ -474,6 +479,54 @@ export async function generatePregenHubspotDraft(
   const selectedHistory = history
     ? selectCompanyHistoryForGeneration(history)
     : null;
+
+  // Snapshot of the inputs, so a reviewer can check the copy against what the
+  // model actually saw rather than against HubSpot as it stands later. Excerpts
+  // only — the point is to answer "who is this person it named and which side of
+  // the call were they on", not to mirror the CRM.
+  const generationContext: PregenGenerationContext = {
+    generatedAt: new Date().toISOString(),
+    motion: options.motion,
+    pms: row.pms ?? null,
+    steer: options.steer?.trim() || null,
+    hubspotCompanyId: company?.id ?? null,
+    previewUrl: options.previewUrl,
+    preview: {
+      readable: previewText.ok,
+      detail: previewText.detail,
+      characters: previewText.ok ? previewText.text.length : 0,
+    },
+    website: { characters: websiteText.length },
+    emails: selectedHistory
+      ? {
+          available: selectedHistory.available,
+          retained: selectedHistory.retained,
+          inbound: selectedHistory.inbound,
+          outbound: selectedHistory.outbound,
+          items: selectedHistory.items.map((item) => ({
+            sentAt: item.sentAt,
+            direction: item.direction,
+            subject: item.subject,
+            excerpt: item.body.replace(/\s+/g, " ").trim().slice(0, 600),
+          })),
+        }
+      : null,
+    activity: activity
+      ? {
+          available: activity.available,
+          retained: activity.retained,
+          items: activity.items.map((item) => ({
+            at: item.occurredAt,
+            kind: item.kind,
+            // Call direction / meeting outcome — the field that says whether a
+            // name in the copy is theirs or ours.
+            qualifier: item.qualifier,
+            title: item.title,
+            excerpt: item.body.replace(/\s+/g, " ").trim().slice(0, 600),
+          })),
+        }
+      : null,
+  };
   const historyText = selectedHistory
     ? formatCompanyEmailHistoryForModel(selectedHistory)
     : "No HubSpot company was linked, so no correspondence was available.";
@@ -584,5 +637,6 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
       ),
       delayDays: touch.delayDays,
     })),
+    generationContext,
   };
 }

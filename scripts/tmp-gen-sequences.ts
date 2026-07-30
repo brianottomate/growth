@@ -23,6 +23,8 @@ import { generatePregenHubspotDraft } from "@/server/services/pregen-hubspot-out
 
 const DOMAINS = process.argv.slice(2).filter((a) => a.includes("."));
 const ALLOW_UNREACHABLE = process.env.ALLOW_UNREACHABLE === "1";
+/** Generate and print the provenance snapshot without touching leads.outreach. */
+const DRY_RUN = process.env.DRY_RUN === "1";
 
 async function previewIsReachable(url: string): Promise<number | null> {
   try {
@@ -78,26 +80,32 @@ for (const domain of DOMAINS) {
       allowUnreachablePreview: ALLOW_UNREACHABLE,
     });
 
-    await db
-      .delete(leadOutreachTable)
-      .where(
-        and(
-          eq(leadOutreachTable.domainId, row.id),
-          eq(leadOutreachTable.status, "draft"),
-        ),
-      );
-    await db.insert(leadOutreachTable).values({
-      domainId: row.id,
-      domain: row.domain,
-      status: "draft",
-      angle: r.draft.angle,
-      personalizedOn: [
-        ...r.draft.personalizedOn,
-        ...r.draft.historyUsed.map((v) => `History: ${v}`),
-      ],
-      steps: r.renderedSteps,
-      model: r.model,
-    });
+    if (DRY_RUN) {
+      console.log(`\n### ${domain}: DRY_RUN — nothing written`);
+      console.log(JSON.stringify(r.generationContext, null, 2));
+    } else {
+      await db
+        .delete(leadOutreachTable)
+        .where(
+          and(
+            eq(leadOutreachTable.domainId, row.id),
+            eq(leadOutreachTable.status, "draft"),
+          ),
+        );
+      await db.insert(leadOutreachTable).values({
+        domainId: row.id,
+        domain: row.domain,
+        status: "draft",
+        angle: r.draft.angle,
+        personalizedOn: [
+          ...r.draft.personalizedOn,
+          ...r.draft.historyUsed.map((v) => `History: ${v}`),
+        ],
+        steps: r.renderedSteps,
+        generationContext: r.generationContext,
+        model: r.model,
+      });
+    }
 
     console.log(`\n${"=".repeat(74)}`);
     console.log(`### ${domain} · ${motion} · rank ${row.scorePregenPotential}`);

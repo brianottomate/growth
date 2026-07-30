@@ -593,6 +593,7 @@ export const leadsRouter = createTRPCRouter({
             ...result.draft.historyUsed.map((value) => `History: ${value}`),
           ],
           steps: result.renderedSteps,
+          generationContext: result.generationContext,
           model: result.model,
         })
         .returning();

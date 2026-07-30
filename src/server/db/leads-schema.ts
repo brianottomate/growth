@@ -460,6 +460,52 @@ export type OutreachStep = {
   delayDays: number;
 };
 
+/**
+ * What the generator actually read when it wrote a draft.
+ *
+ * HubSpot email and call history is fetched live at generation time and was
+ * previously discarded, which made a draft unreviewable: `personalizedOn` says
+ * the copy used "a logged call with Shaun", but not who Shaun is or which side
+ * of the call he was on. Re-fetching on review answers a different question —
+ * what HubSpot says *now*, not what the copy was written from.
+ *
+ * Kept deliberately small: counts plus short excerpts, not the full bodies.
+ */
+export type PregenGenerationContext = {
+  generatedAt: string;
+  motion: "fresh" | "reengagement";
+  pms: string | null;
+  steer: string | null;
+  hubspotCompanyId: string | null;
+  previewUrl: string;
+  preview: { readable: boolean; detail: string; characters: number };
+  website: { characters: number };
+  emails: {
+    available: number;
+    retained: number;
+    inbound: number;
+    outbound: number;
+    items: Array<{
+      sentAt: string;
+      direction: "outbound" | "inbound" | "unknown";
+      subject: string;
+      excerpt: string;
+    }>;
+  } | null;
+  activity: {
+    available: number;
+    retained: number;
+    items: Array<{
+      at: string;
+      kind: string;
+      /** Call direction or meeting outcome — says whether a name is theirs or ours. */
+      qualifier: string | null;
+      title: string;
+      excerpt: string;
+    }>;
+  } | null;
+};
+
 export const leadOutreachTable = leadsSchema.table(
   "outreach",
   (t) => ({
@@ -481,6 +527,8 @@ export const leadOutreachTable = leadsSchema.table(
     personalizedOn: t.jsonb().$type<string[]>(),
     steps: t.jsonb().$type<OutreachStep[]>(),
     model: t.text(),
+    // Provenance for review — see PregenGenerationContext.
+    generationContext: t.jsonb().$type<PregenGenerationContext>(),
     // Instantly linkage once queued/sent.
     instantlyCampaignId: t.text(),
     instantlyLeadId: t.text(),
