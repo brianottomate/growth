@@ -150,7 +150,7 @@ Worth adding a reconciliation pass so that stays detectable.
 
 To dig further, Vercel runtime logs for `/api/webhooks/hubspot` — note the
 project lives under team **`wanderdev`**, so the CLI needs `--scope wanderdev`
-(its default here is `boe-ventures`).
+when the local CLI is linked to a different team.
 
 Subscribe to a **narrow property allow-list**, not all contact properties. The
 company subscription alone produced 142k events; contacts outnumber companies

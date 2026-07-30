@@ -7,7 +7,7 @@ import { db } from "@/server/db";
 import { userTable } from "@/server/db/schema";
 
 /**
- * Dev-only passwordless login for local agent testing (ported from Homi).
+ * Dev-only passwordless login for local agent testing.
  * Mints a real Better Auth session for an existing user using Better Auth's
  * own primitives — internalAdapter.createSession + a cookie signed exactly
  * like setSessionCookie's (`encodeURIComponent(token + "." + HMAC)`), so the

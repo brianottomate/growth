@@ -148,7 +148,7 @@ function BlueprintCalendar({
  * launch drawer. Pin the beats you're sure of, blank the ones you want
  * re-proposed, drop a steer, then regenerate (only the open beats change).
  * Edits are reported up via onEdited for commit; regenerate goes up via
- * onRegenerate as a refine payload. Prior art: boe-ventures/chronicler remix.
+ * onRegenerate as a refine payload.
  */
 export function BlueprintReview({
   blueprint,

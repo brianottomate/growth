@@ -7,10 +7,7 @@ import { env } from "@/env";
  * dep-free. Each throws on failure; the discovery service wraps every call in
  * a per-provider envelope so one failing provider never sinks the others.
  *
- * Call signatures mirror proven usage in sibling repos:
- *   - Parallel  → boe-ventures/native parallel-ai.service.ts (v1beta/search)
- *   - Perplexity→ boe-ventures/wepost-saga (sonar models)
- *   - Exa       → boe-ventures/homi exa.client.ts (search + contents)
+ * Request shapes follow the providers' public API contracts.
  */
 
 export const isPerplexityConfigured = !!env.PERPLEXITY_API_KEY;

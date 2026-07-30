@@ -1,7 +1,4 @@
-/**
- * Auth utility functions for email provider detection and callback URL handling
- * Ported from Homi's implementation
- */
+/** Auth utilities for email provider detection and callback URL handling. */
 
 export const DEFAULT_PASSWORD_RESET_REDIRECT = "/reset-password";
 export const AUTH_RETURN_TO_HEADER = "x-auth-return-to";

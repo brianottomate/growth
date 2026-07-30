@@ -292,5 +292,8 @@ vars with the `vercel-env` skill; inspect deploy logs with the `vercel-logs` ski
 - Provider sends, publishes, deletes, campaign changes, and conversion-action
   mutations require explicit policy and operator approval. Read-only audits do
   not authorize provider changes.
-- Keep Wander credentials, Google Ads contexts, and provider identities separate
-  from Bifrost, Homi, and other portfolio projects.
+- Treat this repository as Wander-owned work. Do not copy or cherry-pick code
+  from personal, client, or unrelated private repositories.
+- Reimplement portable ideas from public documentation and Growth-native
+  requirements. Keep branch names, commits, PRs, docs, fixtures, credentials,
+  provider identities, and comments free of unrelated project provenance.

@@ -30,8 +30,8 @@ export type BrandEnrichment = {
  *
  * Intentionally simple: pulls title/description/logo from the page's
  * OpenGraph/meta tags via Firecrawl. Returns null if the scrape fails so
- * callers can degrade gracefully. Layer in AI summarization / social
- * discovery here later (see boe-ventures/native's brand services).
+ * callers can degrade gracefully. AI summarization and social discovery can
+ * be layered in here later.
  */
 export async function enrichBrandFromWebsite(
   url: string,

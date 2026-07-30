@@ -127,7 +127,7 @@ export function PlanChat({
         )}
         {messages.map((m, mi) => {
           // Animate only the last text part of the assistant message that's
-          // still streaming — same rule Homi's MessageList uses.
+          // still streaming.
           const isLast = mi === messages.length - 1;
           const streaming =
             status === "streaming" && isLast && m.role !== "user";

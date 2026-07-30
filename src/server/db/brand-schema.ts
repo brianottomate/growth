@@ -25,7 +25,6 @@ export type InspirationPurpose =
   (typeof inspirationPurposeEnum.enumValues)[number];
 
 // Access-grant role hierarchy (viewer < contributor < editor < admin < owner).
-// Mirrors homi's collection access roles.
 export const accessRoleEnum = pgEnum("access_role", [
   "viewer",
   "contributor",
@@ -35,7 +34,7 @@ export const accessRoleEnum = pgEnum("access_role", [
 ]);
 export type AccessRole = (typeof accessRoleEnum.enumValues)[number];
 
-// Polymorphic access subject (mirrors homi collection_access.subjectType).
+// Polymorphic subject for resource access grants.
 export const accessSubjectTypeEnum = pgEnum("access_subject_type", [
   "user",
   "organization",
@@ -156,8 +155,8 @@ export const brandTable = pgTable(
       .text()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
 
-    // The user who owns/manages this brand — implicit full-access owner (like
-    // homi's collection.ownerId). NULL for reference/competitor brands.
+    // The user who owns/manages this brand — implicit full-access owner.
+    // NULL for reference/competitor brands.
     ownerId: t.text().references(() => userTable.id),
 
     type: brandTypeEnum().default("company").notNull(),
@@ -267,7 +266,7 @@ export const brandInspirationTable = pgTable(
 export type BrandInspiration = typeof brandInspirationTable.$inferSelect;
 export type BrandInspirationInsert = typeof brandInspirationTable.$inferInsert;
 
-// ---- ACCESS (notion-style grants, modeled on homi collection_access) ------
+// ---- ACCESS GRANTS --------------------------------------------------------
 
 /**
  * Access — grants a polymorphic subject (user / organization / team) a role on
@@ -294,7 +293,7 @@ export const accessTable = pgTable(
     subjectId: t.text().notNull(), // user.id | organization.id | team.id
 
     role: accessRoleEnum().default("viewer").notNull(),
-    permissions: t.jsonb(), // flexible escape hatch (matches homi)
+    permissions: t.jsonb(), // flexible escape hatch for provider-specific grants
     label: t.text(), // optional human label for the grant
 
     invitedBy: t.text().references(() => userTable.id),

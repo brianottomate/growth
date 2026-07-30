@@ -1,7 +1,7 @@
 # Dev-only passwordless login (agent testing)
 
-`src/app/api/dev/login/route.ts` — ported from the Homi project's helper.
-Mints a real Better Auth session for an existing user, no password, using
+`src/app/api/dev/login/route.ts` mints a real Better Auth session for an
+existing user, no password, using
 Better Auth's own primitives (`auth.$context` →
 `ctx.internalAdapter.createSession(user.id)`; cookie signed with
 `makeSignature` from `better-auth/crypto`, matching `setSessionCookie`).

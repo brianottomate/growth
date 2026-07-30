@@ -70,9 +70,9 @@ const SPOT_TARGETS = [
 
 /**
  * The global "Add idea" create surface. Form-first, but laid out chat-ready:
- * the brief (the artifact) is the main column with a chat rail beside it we
- * light up next (homi-onboarding shape). An idea can start from anywhere —
- * blank, a hook, pasted text, or (soon) a piece of media.
+ * the brief (the artifact) is the main column with a chat rail beside it. An
+ * idea can start from anywhere — blank, a hook, pasted text, or (soon) a piece
+ * of media.
  */
 export function AddIdeaDrawer({
   brands,
