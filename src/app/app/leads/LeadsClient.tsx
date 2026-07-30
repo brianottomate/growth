@@ -94,30 +94,6 @@ const POPULATION_KEYS = [
 
 type SourceKey = "builtwith" | "hubspot" | "instantly";
 
-function StatCard({
-  label,
-  value,
-  hint,
-  accent,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  accent?: boolean;
-}) {
-  return (
-    <div
-      className={`bg-card rounded-xl border p-4 ${accent ? "border-emerald-500/30" : ""}`}
-    >
-      <div className="text-muted-foreground text-xs font-medium">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      {hint && (
-        <div className="text-muted-foreground mt-0.5 text-[11px]">{hint}</div>
-      )}
-    </div>
-  );
-}
-
 function Pill({
   active,
   onClick,
@@ -183,6 +159,7 @@ export function LeadsClient() {
     ] as const).withDefault("units"),
   );
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(0));
+  const [showCohortDetail, setShowCohortDetail] = useState(false);
   const [enrichLead, setEnrichLead] = useState<LeadRow | null>(null);
   // Deep-link: ?lead=<domain> opens that lead's drawer (shareable / bookmarkable).
   const [leadParam, setLeadParam] = useQueryState("lead");
@@ -250,6 +227,21 @@ export function LeadsClient() {
   const enrollableCount = (cohort: HubspotPregenCohort) =>
     s?.targetEnrollable.find((row) => row.cohort === cohort);
 
+  // Counts on the population pills, so the two big cohort cards that used to
+  // carry them are no longer needed above the list.
+  const populationCount = (key: (typeof POPULATION_KEYS)[number]) => {
+    if (!s) return null;
+    if (key === "netnew") return fmt(s.netNew);
+    if (key === "send20") return fmt(s.sendBatch);
+    if (key === "all") return fmt(s.domains);
+    if (key === "recycled" || key === "untouched")
+      return fmt(enrollableCount(key)?.enrollable);
+    // Target list is both cohorts, which is what the enrollable numbers add to.
+    return fmt(
+      s.targetEnrollable.reduce((sum, row) => sum + row.enrollable, 0),
+    );
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
@@ -258,23 +250,26 @@ export function LeadsClient() {
         deduped on domain
       </p>
 
-      {/* Pre-Gen cohorts lead the page: this is the active outbound motion, and
-          everything below is the wider universe it was selected from. */}
-      <div className="border-primary/25 bg-card mt-5 rounded-xl border p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <div className="text-sm font-medium">Pre-Gen target cohorts</div>
-            <div className="text-muted-foreground mt-0.5 text-xs">
-              Live HubSpot list memberships mirrored into Growth. No enrichment
-              or enrollment is triggered here.
-            </div>
-          </div>
-          <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium text-amber-300">
-            Targeting only
-          </span>
-        </div>
+      {/* One quiet line for the universe. These are reference numbers looked at
+          occasionally, and as six tiles they cost more attention than they earn —
+          two of them also duplicated filter pills, so it read as if a tile were a
+          control. Details on demand. */}
+      <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+        <span className="text-muted-foreground">
+          {fmt(s?.domains)} domains · {fmt(s?.contacts)} contacts ·{" "}
+          {fmt(s?.withPregenSite)} previews · {fmt(s?.ranked)} ranked ·{" "}
+          {fmt(s?.integratedPms)} integrated PMS · {fmt(s?.untouched)} not in CRM
+        </span>
+        <button
+          onClick={() => setShowCohortDetail(!showCohortDetail)}
+          className="text-muted-foreground hover:text-foreground underline underline-offset-2"
+        >
+          {showCohortDetail ? "hide cohort detail" : "cohort detail"}
+        </button>
+      </div>
 
-        <div className="mt-3 grid gap-2 lg:grid-cols-2">
+      {showCohortDetail && (
+        <div className="border-border mt-2 grid gap-2 rounded-lg border p-3 text-xs lg:grid-cols-2">
           {(
             Object.entries(HUBSPOT_PREGEN_LISTS) as Array<
               [
@@ -283,110 +278,35 @@ export function LeadsClient() {
               ]
             >
           ).map(([cohort, config]) => {
+            const reach = enrollableCount(cohort);
             const companies = membershipCount(cohort, "company");
             const contacts = membershipCount(cohort, "contact");
-            const reach = enrollableCount(cohort);
-            const active = population === cohort;
             return (
-              <div
-                key={cohort}
-                className={`rounded-lg border px-3 py-2.5 transition-colors ${
-                  active ? "border-foreground/40 bg-accent/40" : "border-border"
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => {
-                      void setPopulation(active ? "target" : cohort);
-                      resetPage();
-                    }}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      active
-                        ? "bg-foreground text-background"
-                        : "bg-muted hover:bg-accent"
-                    }`}
-                  >
-                    {config.label}
-                  </button>
-                  <span className="flex-1" />
-                  <a
-                    href={hubspotListUrl(config.company.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
-                  >
-                    Companies <ExternalLink className="size-3" />
-                  </a>
-                  <a
-                    href={hubspotListUrl(config.contact.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
-                  >
-                    Contacts <ExternalLink className="size-3" />
-                  </a>
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <span className="text-lg font-semibold tabular-nums">
-                    {fmt(reach?.enrollable)}
-                  </span>
-                  <span className="text-muted-foreground text-[11px]">
-                    enrollable now
-                    {reach && reach.linked > 0
-                      ? ` · of ${fmt(reach.linked)} linked`
-                      : ""}
-                  </span>
-                  <span className="flex-1" />
-                  <span className="text-muted-foreground text-xs tabular-nums">
-                    {fmt(companies?.count)} companies · {fmt(contacts?.count)}{" "}
-                    contacts
-                  </span>
-                </div>
-
-                {reach && reach.linked > reach.enrollable && (
-                  <div className="text-muted-foreground mt-1 text-[11px]">
-                    {fmt(reach.linked - reach.enrollable)} not reachable — no
-                    emailable HubSpot contact, or opted out
-                  </div>
-                )}
+              <div key={cohort} className="flex flex-wrap items-center gap-x-3">
+                <span className="font-medium">{config.label}</span>
+                <span className="text-muted-foreground">
+                  {fmt(reach?.enrollable)} enrollable of {fmt(reach?.linked)}{" "}
+                  linked
+                  {reach && reach.linked > reach.enrollable
+                    ? ` · ${fmt(reach.linked - reach.enrollable)} not reachable`
+                    : ""}
+                  {" · "}
+                  {fmt(companies?.count)} companies · {fmt(contacts?.count)}{" "}
+                  contacts
+                </span>
+                <a
+                  href={hubspotListUrl(config.company.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground inline-flex items-center gap-1 hover:underline"
+                >
+                  HubSpot <ExternalLink className="size-3" />
+                </a>
               </div>
             );
           })}
         </div>
-
-      </div>
-
-      {/* summary cards — the wider universe behind the cohorts */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard
-          label="Domains"
-          value={fmt(s?.domains)}
-          hint="unique, deduped"
-        />
-        <StatCard
-          label="Contacts"
-          value={fmt(s?.contacts)}
-          hint="across domains"
-        />
-        <StatCard
-          label="Not in CRM"
-          value={fmt(s?.untouched)}
-          hint="BuiltWith only — not the Untouched cohort"
-          accent
-        />
-        <StatCard
-          label="Preview URLs"
-          value={fmt(s?.withPregenSite)}
-          hint="draft artifacts"
-        />
-        <StatCard label="Ranked" value={fmt(s?.ranked)} hint="own model" />
-        <StatCard
-          label="Integrated PMS"
-          value={fmt(s?.integratedPms)}
-          hint="API-connected"
-        />
-      </div>
+      )}
 
       {/* Population — one answer to "who am I looking at", then density. */}
       <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -401,7 +321,7 @@ export function LeadsClient() {
             }}
           >
             {POPULATIONS[key].label}
-            {key === "netnew" && s ? ` · ${fmt(s.netNew)}` : ""}
+            {populationCount(key) != null ? ` · ${populationCount(key)}` : ""}
           </Pill>
         ))}
         <span className="flex-1" />
@@ -428,30 +348,23 @@ export function LeadsClient() {
           placeholder="Search domain or company…"
           className="border-border bg-background focus:ring-ring w-64 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
         />
-        <span className="bg-border mx-1 h-4 w-px" />
-        <Pill
-          active={!source}
-          onClick={() => {
-            void setSource(null);
+        <select
+          value={source ?? ""}
+          onChange={(event) => {
+            void setSource(
+              (event.target.value || null) as typeof source,
+            );
             resetPage();
           }}
+          className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
         >
-          All sources
-        </Pill>
-        {(["builtwith", "hubspot", "instantly"] as SourceKey[]).map((sk) => (
-          <Pill
-            key={sk}
-            active={source === sk}
-            onClick={() => {
-              void setSource(source === sk ? null : sk);
-              resetPage();
-            }}
-          >
-            {sk}
-            {s ? ` · ${fmt(s[sk])}` : ""}
-          </Pill>
-        ))}
-        <span className="bg-border mx-1 h-4 w-px" />
+          <option value="">All sources</option>
+          {(["builtwith", "hubspot", "instantly"] as SourceKey[]).map((sk) => (
+            <option key={sk} value={sk}>
+              {sk} {s ? `(${fmt(s[sk])})` : ""}
+            </option>
+          ))}
+        </select>
         <select
           value={owner ?? ""}
           onChange={(event) => {
