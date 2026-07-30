@@ -179,6 +179,10 @@ export const leadsRouter = createTRPCRouter({
                 and(
                   eq(leadContactTable.domainId, leadDomainTable.id),
                   isNull(leadContactTable.deletedAt),
+                  // Same credible-contact rule as leadsSummary — a placeholder
+                  // mailbox is not a contact. Three definitions of one number
+                  // should not differ, even while they happen to agree at 19.
+                  sql`lower(split_part(${leadContactTable.email}, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})`,
                   sql`(${leadContactTable.firstName} is not null or ${leadContactTable.lastName} is not null or ${leadContactTable.email} !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')`,
                 ),
               ),
@@ -367,6 +371,10 @@ export const leadsRouter = createTRPCRouter({
                 and(
                   eq(leadContactTable.domainId, leadDomainTable.id),
                   isNull(leadContactTable.deletedAt),
+                  // Same credible-contact rule as leadsSummary — a placeholder
+                  // mailbox is not a contact. Three definitions of one number
+                  // should not differ, even while they happen to agree at 19.
+                  sql`lower(split_part(${leadContactTable.email}, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})`,
                   sql`(${leadContactTable.firstName} is not null or ${leadContactTable.lastName} is not null or ${leadContactTable.email} !~* '@(gmail|yahoo|hotmail|aol|outlook|msn|icloud)\\.')`,
                 ),
               ),
