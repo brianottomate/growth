@@ -118,7 +118,10 @@ export function OverviewAssistantPopup({
   useEffect(() => {
     const receiveIntent = (event: Event) => {
       const intent = (event as CustomEvent<AssistantIntent>).detail;
-      setIntentBrandId(intent.brandId ?? null);
+      // Not every intent is brand-scoped — the leads pipeline is deliberately
+      // global (its own Postgres schema, no organizationId), so a prospect
+      // handed to the assistant carries no brand to select.
+      setIntentBrandId("brandId" in intent ? (intent.brandId ?? null) : null);
       if (intent.type === "work_content_post") {
         setWorkContext({
           type: intent.type,

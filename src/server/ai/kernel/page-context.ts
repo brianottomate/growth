@@ -5,6 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   contentPostTable,
+  leadDomainTable,
   platformPostTable,
   productTable,
   seriesTable,
@@ -159,6 +160,33 @@ export async function composePageContextSection(options: {
     if (storefront?.product.organizationId !== options.organizationId)
       return header;
     return `${header}\nThis is the ${storefront.surface.replaceAll("_", " ")} storefront for “${storefront.product.name}” (storefrontId: ${storefront.id}, productId: ${storefront.product.id}) for ${storefront.product.brand.name} (brandId: ${storefront.product.brand.id}). Call storefrontRead action get before making claims about its content, freshness, or references.`;
+  }
+
+  // Leads are deliberately global (their own Postgres schema, no
+  // organizationId), so there is no org check to make here — unlike the entity
+  // routes above, which verify ownership before naming anything.
+  const prospectDomain = /^\/app\/leads\/([^/]+)$/.exec(pathname)?.[1];
+  if (prospectDomain && prospectDomain !== "send-review") {
+    const domain = decodeURIComponent(prospectDomain).toLowerCase();
+    const row = await db.query.leadDomainTable.findFirst({
+      where: eq(leadDomainTable.domain, domain),
+      columns: {
+        domain: true,
+        companyName: true,
+        pms: true,
+        excludeFromOutreach: true,
+        excludeReason: true,
+        pregenSiteUrl: true,
+      },
+    });
+    if (!row) return header;
+    const excluded = row.excludeFromOutreach
+      ? ` This company is EXCLUDED from outreach (${row.excludeReason ?? "no reason recorded"}); do not draft prospecting copy for it.`
+      : "";
+    const preview = row.pregenSiteUrl
+      ? `Its assigned preview is ${row.pregenSiteUrl} — most stored previews sit on retired tunnels, so check it resolves before describing it.`
+      : "It has no assigned preview, so no sequence can be generated yet.";
+    return `${header}\nThis is the prospect page for ${row.domain}${row.companyName ? ` (${row.companyName})` : ""}${row.pms ? `, PMS ${row.pms}` : ""}. When the operator says "this prospect", "this lead" or "this company", they mean ${row.domain}. ${preview}${excluded} Read leadsRead before making claims about its pipeline state, and leadsWrite action rewriteSequence to change copy — it saves a draft and never publishes.`;
   }
 
   const guidance = guidanceForPath(pathname);

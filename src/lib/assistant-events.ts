@@ -41,12 +41,29 @@ export type PlanEmailIntent = {
   visibleText: string;
 };
 
+/**
+ * Hand one prospect to the assistant from the leads surface.
+ *
+ * The alternative was a button per action on the card — resolve channels, verify
+ * people, generate, revise — which is the tool-count problem in UI form. Working
+ * a prospect is order-dependent (does the preview resolve, is anyone reachable,
+ * is there history worth leading with), so the operator states the goal and the
+ * assistant sequences it.
+ */
+export type WorkProspectIntent = {
+  type: "work_prospect";
+  domain: string;
+  companyName: string | null;
+  visibleText: string;
+};
+
 export type AssistantIntent =
   | PlanTwoWeeksIntent
   | WorkContentIntent
   | BuildChannelStrategyIntent
   | ShapeContentStructureIntent
-  | PlanEmailIntent;
+  | PlanEmailIntent
+  | WorkProspectIntent;
 
 export type ContentWorkContext = Omit<WorkContentIntent, "visibleText">;
 

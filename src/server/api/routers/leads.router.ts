@@ -35,6 +35,11 @@ import {
 } from "@/server/services/pregen-hubspot-outreach.service";
 import { hubspotPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
 import {
+  readHubspotCompanyActivityHistory,
+  readHubspotCompanyEmailHistory,
+} from "@/server/services/hubspot-company-email-context.service";
+import { classifyFetchUrl } from "@/server/ai/url-safety";
+import {
   isFreemailEmail,
   parseContactChannel,
   PLACEHOLDER_EMAIL_DOMAINS_SQL,
@@ -83,6 +88,56 @@ const SORTS = {
   domain: leadDomainTable.domain,
   updated: leadDomainTable.updatedAt,
 } as const;
+
+export type PreviewProbe = {
+  url: string | null;
+  state: "none" | "live" | "dead" | "blocked";
+  status: number | null;
+  detail: string;
+};
+
+/**
+ * Does the assigned preview actually resolve?
+ *
+ * 26 of the 33 stored preview URLs point at retired per-company localcan
+ * tunnels and 502, and nothing in the UI said so — a reviewer read four
+ * polished touches about a page nobody could open. Cheap because it hits our
+ * own preview host, not a provider.
+ */
+async function probePreview(url: string | null): Promise<PreviewProbe> {
+  if (!url?.trim()) {
+    return { url: null, state: "none", status: null, detail: "no preview assigned" };
+  }
+  const classified = classifyFetchUrl(url);
+  if (!classified.ok || !classified.url) {
+    return {
+      url,
+      state: "blocked",
+      status: null,
+      detail: classified.reason ?? "invalid URL",
+    };
+  }
+  try {
+    const response = await fetch(classified.url, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(8_000),
+      headers: { "user-agent": "WanderGrowth/1.0 (preview check)" },
+    });
+    return {
+      url,
+      state: response.ok ? "live" : "dead",
+      status: response.status,
+      detail: `HTTP ${response.status}`,
+    };
+  } catch (error) {
+    return {
+      url,
+      state: "dead",
+      status: null,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
 
 export const leadsRouter = createTRPCRouter({
   // High-level dashboard numbers.
@@ -464,6 +519,132 @@ export const leadsRouter = createTRPCRouter({
         )
         .orderBy(asc(leadChannelTable.kind));
       return { domain, contacts, outreach: outreach ?? null, channels };
+    }),
+
+  /**
+   * One prospect, addressed by domain rather than id so the URL is shareable and
+   * page-context can resolve "this prospect" in chat.
+   *
+   * Carries the two things the list card could not show, both of which decided
+   * whether a draft was sendable: whether the assigned preview actually resolves,
+   * and which contacts are undeliverable placeholders. Deliberately excludes live
+   * HubSpot correspondence — see `crmHistory`.
+   */
+  prospect: protectedProcedure
+    .input(z.object({ domain: z.string().trim().min(3) }))
+    .query(async ({ ctx, input }) => {
+      const domain = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.domain, input.domain.toLowerCase()),
+      });
+      if (!domain) return null;
+
+      const [contacts, channels, outreachRows, memberships] = await Promise.all([
+        ctx.db
+          .select({
+            id: leadContactTable.id,
+            email: leadContactTable.email,
+            firstName: leadContactTable.firstName,
+            lastName: leadContactTable.lastName,
+            jobTitle: leadContactTable.jobTitle,
+            verificationStatus: leadContactTable.verificationStatus,
+            verification: leadContactTable.verification,
+            hubspotContactId: leadContactTable.hubspotContactId,
+            emailOptOut: leadContactTable.emailOptOut,
+          })
+          .from(leadContactTable)
+          .where(
+            and(
+              eq(leadContactTable.domainId, domain.id),
+              isNull(leadContactTable.deletedAt),
+            ),
+          )
+          .orderBy(asc(leadContactTable.email))
+          .limit(200),
+        ctx.db
+          .select()
+          .from(leadChannelTable)
+          .where(
+            and(
+              eq(leadChannelTable.domainId, domain.id),
+              isNull(leadChannelTable.deletedAt),
+            ),
+          )
+          .orderBy(asc(leadChannelTable.kind)),
+        ctx.db
+          .select()
+          .from(leadOutreachTable)
+          .where(eq(leadOutreachTable.domainId, domain.id))
+          .orderBy(desc(leadOutreachTable.createdAt))
+          .limit(5),
+        ctx.db
+          .select({ cohort: hubspotListMembershipTable.cohort })
+          .from(hubspotListMembershipTable)
+          .where(
+            and(
+              eq(hubspotListMembershipTable.domainId, domain.id),
+              eq(hubspotListMembershipTable.objectType, "company"),
+            ),
+          )
+          .limit(1),
+      ]);
+
+      const channel = scoreLeadChannel({
+        domain: domain.domain,
+        contactChannel: parseContactChannel(domain.enrichment),
+        contacts,
+      });
+
+      return {
+        domain,
+        cohort: memberships[0]?.cohort ?? null,
+        channel,
+        channels,
+        contacts,
+        outreach: outreachRows[0] ?? null,
+        outreachHistory: outreachRows,
+        // Probing our own preview host, not a provider — cheap enough to do on
+        // load, and it is the fact that gates the Generate button.
+        preview: await probePreview(domain.pregenSiteUrl),
+      };
+    }),
+
+  /**
+   * Live HubSpot correspondence for one company, fetched only when asked.
+   *
+   * Deliberately not part of `prospect`: browsing prospects would issue a
+   * HubSpot read per view, and these endpoints already 429 under bulk load
+   * (7290223). For "what did the copy get written from", read the draft's
+   * generationContext instead — that is the snapshot, this is the current state.
+   */
+  crmHistory: protectedProcedure
+    .input(z.object({ domain: z.string().trim().min(3) }))
+    .query(async ({ ctx, input }) => {
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.domain, input.domain.toLowerCase()),
+        columns: { hubspotRecordId: true, domain: true },
+      });
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!isHubspotConfigured) {
+        return { available: false as const, reason: "HubSpot not configured" };
+      }
+      const company =
+        row.hubspotRecordId != null
+          ? { id: row.hubspotRecordId }
+          : await findCompanyByDomain(row.domain);
+      if (!company) {
+        return { available: false as const, reason: "no linked HubSpot company" };
+      }
+      const [emails, activity] = await Promise.all([
+        readHubspotCompanyEmailHistory(company.id, {
+          limit: 100,
+          maxBodyCharacters: 1_600,
+        }),
+        readHubspotCompanyActivityHistory(company.id, {
+          limit: 40,
+          maxBodyCharacters: 1_200,
+        }),
+      ]);
+      return { available: true as const, companyId: company.id, emails, activity };
     }),
 
   // ---- Manual enrichment (inspect-only; no DB write yet) ----

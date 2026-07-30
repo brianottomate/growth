@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
@@ -512,6 +513,16 @@ export function LeadsClient() {
                       {d.domain}
                       <ExternalLink className="size-3 opacity-40" />
                     </a>
+                    {/* Full prospect view — linkable, and what page-context
+                        resolves as "this prospect" in chat. The row click still
+                        opens the drawer. */}
+                    <Link
+                      href={`/app/leads/${encodeURIComponent(d.domain)}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+                    >
+                      open
+                    </Link>
                   </div>
                 </td>
                 <td className="text-muted-foreground border-b px-3 py-2">

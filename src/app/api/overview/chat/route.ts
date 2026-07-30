@@ -172,7 +172,11 @@ export async function POST(req: Request): Promise<Response> {
         }
       : null;
   const requestedBrandId =
-    activeWorkContext?.brandId ?? assistantIntent?.brandId ?? brandId;
+    activeWorkContext?.brandId ??
+    (assistantIntent && "brandId" in assistantIntent
+      ? assistantIntent.brandId
+      : null) ??
+    brandId;
   const brand = requestedBrandId
     ? await db.query.brandTable.findFirst({
         where: and(
