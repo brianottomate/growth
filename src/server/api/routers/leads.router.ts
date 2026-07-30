@@ -57,9 +57,9 @@ import { rankLeadDomain } from "@/server/services/lead-ranker.service";
 import { verifyContactPerson } from "@/server/services/lead-verify.service";
 import { isMinervaConfigured } from "@/server/clients/minerva.client";
 import {
-  queueOutreach,
-  launchPersonalizedCampaign,
-} from "@/server/services/outreach-send.service";
+  queueInstantlyLead,
+  activateInstantlyCampaign,
+} from "@/server/services/instantly-send.service";
 import {
   proposeMerge,
   MERGEABLE_FIELDS,
@@ -1129,12 +1129,13 @@ export const leadsRouter = createTRPCRouter({
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.domainId),
       });
-      if (!row?.pregenSiteUrl) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "This lead has no assigned pregen preview",
-        });
+      if (!row) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
       }
+      // A missing preview no longer blocks — refusing here made the publish path
+      // untestable until hosting existed, which is the one thing this motion has
+      // been waiting on. The URL comes off the draft below, which records the
+      // exact address the copy was written against, real or stand-in.
       const contact = await ctx.db.query.leadContactTable.findFirst({
         where: and(
           eq(leadContactTable.id, input.contactId),
@@ -1165,19 +1166,20 @@ export const leadsRouter = createTRPCRouter({
           message: "Generate and review a pregen sequence first",
         });
       }
-      // The property that makes pretend mode safe. A draft written against a
-      // stand-in reads exactly as well as a real one, so the artifact cannot be
-      // trusted on inspection alone — it is refused here instead.
-      if (outreach.generationContext?.preview.pretend) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `This draft was written in pretend mode, before ${row.domain} had a readable preview, so it describes a page that did not exist. Regenerate it against the assigned preview before publishing.`,
-        });
-      }
+      // Pretend drafts publish. Blocking them made the end-to-end loop
+      // untestable before previews exist, which is backwards: publishing here
+      // writes copy onto a HubSpot contact property for a rep to use, it does
+      // not send anything, so the cost of a stand-in reaching HubSpot is a
+      // property that has to be regenerated — not a mail to a prospect.
+      //
+      // The fact travels with the result instead, so the caller can surface it
+      // and `generationContext.preview.pretend` still records it on the draft.
+      const writtenFromPretendPreview =
+        outreach.generationContext?.preview.pretend === true;
 
       const properties = hubspotPropertiesFromRenderedSteps(
         outreach.steps,
-        row.pregenSiteUrl,
+        outreach.generationContext?.previewUrl ?? row.pregenSiteUrl ?? "",
       );
       await updateContact(contact.hubspotContactId, properties);
       await ctx.db
@@ -1189,13 +1191,17 @@ export const leadsRouter = createTRPCRouter({
         contactId: contact.id,
         hubspotContactId: contact.hubspotContactId,
         propertyNames: Object.keys(properties),
+        writtenFromPretendPreview,
+        warning: writtenFromPretendPreview
+          ? `This copy was written against a stand-in preview, so anything it says about the page itself is invented. It is now on the HubSpot contact — regenerate and re-publish once ${row.domain} has a real preview.`
+          : null,
       };
     }),
 
   // Push a lead's draft into the shared headless "Personalized" Instantly
   // campaign as custom variables (does NOT activate — nothing sends until that
   // campaign is launched). Recipient = the scraped corporate email, or override.
-  queueOutreach: protectedProcedure
+  queueInstantlyLead: protectedProcedure
     .input(
       z.object({
         domainId: z.string(),
@@ -1220,13 +1226,13 @@ export const leadsRouter = createTRPCRouter({
             "No recipient email — run the contact resolver or pass one explicitly",
         });
       }
-      return queueOutreach(input.domainId, recipient);
+      return queueInstantlyLead(input.domainId, recipient);
     }),
 
   // Activate the shared personalized campaign from the app — sends to everyone
   // currently queued in it. Campaign-level (not per lead).
-  launchOutreachCampaign: protectedProcedure.mutation(async () => {
-    return launchPersonalizedCampaign();
+  launchInstantlyCampaign: protectedProcedure.mutation(async () => {
+    return activateInstantlyCampaign();
   }),
 
   // Pull the live HubSpot company (+contacts) for a domain and diff it against

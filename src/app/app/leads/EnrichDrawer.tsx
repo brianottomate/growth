@@ -124,9 +124,9 @@ export function EnrichDrawer({
   const publishPregen = useMutation(
     trpc.leads.publishPregenOutreach.mutationOptions(),
   );
-  const queue = useMutation(trpc.leads.queueOutreach.mutationOptions());
+  const queue = useMutation(trpc.leads.queueInstantlyLead.mutationOptions());
   const launch = useMutation(
-    trpc.leads.launchOutreachCampaign.mutationOptions(),
+    trpc.leads.launchInstantlyCampaign.mutationOptions(),
   );
 
   // Our own contacts for this domain (the people we'd actually email), ranked.

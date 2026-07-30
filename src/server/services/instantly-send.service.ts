@@ -87,7 +87,7 @@ export type QueueResult = {
  * Push a lead's latest draft into the shared personalized campaign as custom
  * variables, and mark the outreach row queued. Does NOT activate the campaign.
  */
-export async function queueOutreach(
+export async function queueInstantlyLead(
   domainId: string,
   recipientEmail: string,
 ): Promise<QueueResult> {
@@ -131,7 +131,7 @@ export async function queueOutreach(
  * Activate the shared personalized campaign — everyone currently queued in it
  * starts sending per the schedule. Campaign-level action (not per lead).
  */
-export async function launchPersonalizedCampaign(): Promise<{
+export async function activateInstantlyCampaign(): Promise<{
   campaignId: string;
 }> {
   const existing = await listCampaigns({ search: CAMPAIGN_NAME, limit: 10 });
