@@ -148,6 +148,12 @@ export function LeadsClient() {
     "enrollable",
     parseAsBoolean.withDefault(false),
   );
+  // Excluded companies are not prospects, and they skew large, so units-sorted
+  // they crowded out everything workable. Off by default, count always shown.
+  const [showExcluded, setShowExcluded] = useQueryState(
+    "excluded",
+    parseAsBoolean.withDefault(false),
+  );
   const [owner, setOwner] = useQueryState("bdr", parseAsString);
   const [sort, setSort] = useQueryState(
     "sort",
@@ -185,6 +191,7 @@ export function LeadsClient() {
         integratedPmsOnly: integratedOnly || undefined,
         hasPregenSite: hasPregen || undefined,
         enrollableOnly: enrollableOnly || undefined,
+        includeExcluded: showExcluded || undefined,
         owner: owner ?? undefined,
         // The review card needs the scored channel and latest draft; the compact
         // row does not, so it does not pay for them.
@@ -422,6 +429,17 @@ export function LeadsClient() {
         >
           Enrollable only
         </Pill>
+        <Pill
+          active={showExcluded}
+          onClick={() => {
+            void setShowExcluded(!showExcluded);
+            resetPage();
+          }}
+        >
+          {showExcluded
+            ? "Hide excluded"
+            : `Show excluded${list.data?.excludedHeld ? ` · ${fmt(list.data.excludedHeld)}` : ""}`}
+        </Pill>
         <span className="flex-1" />
         <select
           value={sort}
@@ -441,7 +459,11 @@ export function LeadsClient() {
       {/* result count */}
       <div className="text-muted-foreground mt-3 text-xs">
         {list.data
-          ? `${fmt(list.data.total)} matching domains · click a row to inspect & enrich`
+          ? `${fmt(list.data.total)} matching domains${
+              list.data.excludedHeld
+                ? ` · ${fmt(list.data.excludedHeld)} excluded and hidden`
+                : ""
+            } · click a row to inspect & enrich`
           : "Loading…"}
       </div>
 

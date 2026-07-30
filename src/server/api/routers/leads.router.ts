@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   and,
+  type SQL,
   asc,
   desc,
   eq,
@@ -300,6 +301,14 @@ export const leadsRouter = createTRPCRouter({
          * /leads/send-review being two surfaces over the same table that drift.
          */
         withReview: z.boolean().optional(),
+        /**
+         * Include companies flagged excludeFromOutreach. Off by default: 342 of
+         * the 903 target-list domains are excluded, they average roughly five
+         * times the units of the addressable ones, and the default sort is
+         * units-descending — so leaving them in filled the top of the working
+         * list with companies nobody may contact.
+         */
+        includeExcluded: z.boolean().optional(),
         sort: z
           .enum(["composite", "units", "domain", "updated"])
           .default("units"),
@@ -309,13 +318,15 @@ export const leadsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const conds = [];
+      // Everything except the exclusion rule, so the same predicate can answer
+      // both "what can I work" and "how many am I not being shown".
+      const conds: SQL[] = [];
       if (input.q) {
         conds.push(
           or(
             ilike(leadDomainTable.domain, `%${input.q}%`),
             ilike(leadDomainTable.companyName, `%${input.q}%`),
-          ),
+          )!,
         );
       }
       if (input.source) conds.push(eq(SOURCE_COLUMN[input.source], true));
@@ -390,6 +401,7 @@ export const leadsRouter = createTRPCRouter({
         conds.push(gte(leadDomainTable.unitCount, input.minUnits));
       if (input.owner)
         conds.push(eq(leadDomainTable.hubspotOwner, input.owner));
+
       // Same definition as the enrollable counts in `stats` — keep them in step,
       // or the card promises a number the filtered list cannot produce.
       if (input.enrollableOnly)
@@ -404,7 +416,13 @@ export const leadsRouter = createTRPCRouter({
             and lower(split_part(enrollable_contact.email, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})
         )`);
 
-      const where = conds.length ? and(...conds) : undefined;
+      const workableOnly = !input.includeExcluded;
+      const where = and(
+        ...conds,
+        ...(workableOnly
+          ? [eq(leadDomainTable.excludeFromOutreach, false)]
+          : []),
+      );
       const orderCol = SORTS[input.sort];
       // NULLs last for numeric sorts so scored/sized rows surface first.
       const orderBy =
@@ -455,6 +473,15 @@ export const leadsRouter = createTRPCRouter({
         .from(leadDomainTable)
         .where(where);
       const total = totalRow?.total ?? 0;
+
+      // How many the exclusion filter is holding back under the same population
+      // and facets, so the toggle can name a number instead of hiding one.
+      const [excludedRow] = workableOnly
+        ? await ctx.db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(leadDomainTable)
+            .where(and(...conds, eq(leadDomainTable.excludeFromOutreach, true)))
+        : [{ count: 0 }];
 
       // Contact counts for this page — a separate grouped query, NOT a correlated
       // subquery in the select (those render unreliably here; see the netNew fix).
@@ -604,6 +631,7 @@ export const leadsRouter = createTRPCRouter({
           review: review?.get(i.id) ?? null,
         })),
         total,
+        excludedHeld: excludedRow?.count ?? 0,
         hasMore: input.offset + items.length < total,
       };
     }),
