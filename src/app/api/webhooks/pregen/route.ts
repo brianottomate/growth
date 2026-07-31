@@ -32,7 +32,6 @@ const ProspectWebhookPayload = z.object({
   sourceUrl: z.string(),
   status: z.string().min(1),
   previewUrl: z.string().optional(),
-  evalOverall: z.number().optional(),
   errorMessage: z.string().optional(),
   occurredAt: z.string(),
 });
@@ -40,11 +39,16 @@ const ProspectWebhookPayload = z.object({
 /**
  * Statuses where the build has stopped moving on its own.
  *
+ * GENERATING is deliberately absent — it is the normal in-flight state for the
+ * whole build, not a stall. EXPIRED is absent because it is never written:
+ * preview expiry was removed on the grounds that a link dying mid-conversation
+ * costs more than a stale one.
+ *
  * CLAIMED is terminal *and* is the outcome this motion exists for — the prospect
  * signed up and took ownership of the pre-generated site. It is not just a build
  * finishing, so it is recorded separately from settledAt.
  */
-const SETTLED = new Set(["READY", "CLAIMED", "FAILED", "EXPIRED"]);
+const SETTLED = new Set(["READY", "CLAIMED", "FAILED"]);
 
 function secretMatches(provided: string | null): boolean {
   const expected = env.PREGEN_WEBHOOK_SECRET;
@@ -132,7 +136,6 @@ export async function POST(request: NextRequest) {
         websiteId: payload.websiteId,
         status: payload.status,
         previewUrl: payload.previewUrl ?? existing.previewUrl,
-        evalOverall: payload.evalOverall ?? existing.evalOverall,
         errorMessage: payload.errorMessage ?? null,
         lastEventAt: occurredAt,
         settledAt: settled ? occurredAt : existing.settledAt,
@@ -149,7 +152,6 @@ export async function POST(request: NextRequest) {
       sourceUrl: payload.sourceUrl,
       status: payload.status,
       previewUrl: payload.previewUrl ?? null,
-      evalOverall: payload.evalOverall ?? null,
       errorMessage: payload.errorMessage ?? null,
       lastEventAt: occurredAt,
       settledAt: settled ? occurredAt : null,

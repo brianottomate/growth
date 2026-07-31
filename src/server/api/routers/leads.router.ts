@@ -872,7 +872,6 @@ export const leadsRouter = createTRPCRouter({
           sourceUrl,
           status: prospect.status,
           previewUrl: prospect.previewUrl ?? null,
-          expiresAt: prospect.expiresAt ? new Date(prospect.expiresAt) : null,
         })
         .returning();
       return build ?? null;
@@ -929,22 +928,19 @@ export const leadsRouter = createTRPCRouter({
           status: current.status,
           websiteId: current.websiteId ?? build.websiteId,
           previewUrl: current.previewUrl ?? build.previewUrl,
-          evalOverall: current.evalOverall ?? build.evalOverall,
           errorMessage: current.errorMessage ?? null,
-          expiresAt: current.expiresAt ? new Date(current.expiresAt) : build.expiresAt,
           settledAt: settled ? (build.settledAt ?? new Date()) : build.settledAt,
+          claimedAt:
+            current.status === "CLAIMED"
+              ? (build.claimedAt ?? new Date())
+              : build.claimedAt,
         })
         .where(eq(pregenBuildTable.id, build.id));
 
       if (current.previewUrl) {
         await ctx.db
           .update(leadDomainTable)
-          .set({
-            pregenSiteUrl: current.previewUrl,
-            pregenPreviewExpiresAt: current.expiresAt
-              ? new Date(current.expiresAt)
-              : null,
-          })
+          .set({ pregenSiteUrl: current.previewUrl })
           .where(eq(leadDomainTable.id, input.domainId));
       }
       return { status: current.status, previewUrl: current.previewUrl ?? null };

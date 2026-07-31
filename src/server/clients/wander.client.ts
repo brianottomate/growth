@@ -25,18 +25,30 @@ export const isWanderApiConfigured = !!env.WANDER_API_URL && !!env.WANDER_API_KE
 export type ProspectTone = "existing" | "professional" | "friendly" | "luxury";
 
 /**
- * WanderOS's own prospect lifecycle. Stored verbatim rather than remapped.
+ * WanderOS's prospect lifecycle. Stored verbatim rather than remapped.
+ *
+ *   GENERATING → READY → CLAIMED
+ *              ↘ FAILED
+ *
+ * GENERATING is where a prospect sits for the entire build — minutes, not
+ * moments — so it is the status most rows will be in at any given time, not an
+ * edge case.
  *
  * CLAIMED is the one that matters commercially: the prospect signed up and took
  * ownership of the pre-generated site. That is the conversion this whole motion
  * exists to produce, not merely a build finishing.
+ *
+ * Two enum values are deliberately absent. PENDING is the schema default but
+ * create writes GENERATING directly, so no prospect is ever observably PENDING.
+ * EXPIRED is never written — preview expiry was removed on the grounds that a
+ * link dying mid-conversation costs more than a stale one. Both are dead values
+ * on the WanderOS side; handling them here would be handling for nothing.
  */
 export const PROSPECT_STATUSES = [
-  "PENDING",
+  "GENERATING",
   "READY",
   "CLAIMED",
   "FAILED",
-  "EXPIRED",
 ] as const;
 export type ProspectStatus = (typeof PROSPECT_STATUSES)[number];
 
@@ -45,7 +57,6 @@ export const SETTLED_PROSPECT_STATUSES: readonly ProspectStatus[] = [
   "READY",
   "CLAIMED",
   "FAILED",
-  "EXPIRED",
 ];
 
 export interface CreateProspectInput {
@@ -54,8 +65,6 @@ export interface CreateProspectInput {
   sourceUrl: string;
   email?: string;
   tone?: ProspectTone;
-  /** Preview link lifetime in days. Omit for no expiry. */
-  expiresInDays?: number;
 }
 
 export interface WanderProspect {
@@ -67,9 +76,7 @@ export interface WanderProspect {
   status: ProspectStatus;
   previewToken?: string | null;
   previewUrl?: string | null;
-  evalOverall?: number | null;
   errorMessage?: string | null;
-  expiresAt?: string | null;
 }
 
 const TIMEOUT_MS = 20_000;
@@ -125,7 +132,6 @@ export function createWebsiteProspect(
       sourceUrl: input.sourceUrl,
       ...(input.email ? { email: input.email } : {}),
       tone: input.tone ?? "existing",
-      ...(input.expiresInDays ? { expiresInDays: input.expiresInDays } : {}),
     },
   });
 }
@@ -133,9 +139,13 @@ export function createWebsiteProspect(
 /**
  * Current state for prospects WanderOS holds.
  *
- * POST with a body rather than a GET with query params, and paginated at 100 —
- * so a caller looking for one prospect should pass its status to narrow rather
- * than walking every page.
+ * POST with a body rather than a GET with query params. `take` caps at 100 and
+ * defaults to 20 on their side, so it is always passed explicitly here — an
+ * omitted `take` is a page of 20, not everything.
+ *
+ * This is also the repair path. Delivery of the webhook is best-effort by
+ * agreement on both sides, so anything that surfaces a prospect should be able
+ * to re-read it from here rather than assuming the last event arrived.
  */
 export function listWebsiteProspects(
   input: { skip?: number; take?: number; status?: ProspectStatus } = {},

@@ -2,7 +2,7 @@
 
 **Audience:** whoever is working on `wandercom/wander` PR #20939 (`feature/wos-4563-prospect-pipeline-properties-claim`) and the WanderOS prospect pipeline.
 
-**Status:** the growth side is **built and merged to `main`, dormant**. Nothing calls WanderOS until `WANDER_API_URL` / `WANDER_API_KEY` are set, and the webhook returns 503 until `PREGEN_WEBHOOK_SECRET` is set. We are not blocked on you and you are not blocked on us — but there are three asks at the bottom, one of which is load-bearing.
+**Status:** the growth side is **built and merged to `main`, dormant**. Revised after the backend response of 2026-07-31 — status vocabulary, expiry and `evalOverall` corrected, and the reconciliation section rewritten now that both sides have settled on best-effort delivery. Nothing calls WanderOS until `WANDER_API_URL` / `WANDER_API_KEY` are set, and the webhook returns 503 until `PREGEN_WEBHOOK_SECRET` is set. We are not blocked on you and you are not blocked on us — but there are three asks at the bottom, one of which is load-bearing.
 
 Everything below was read off the PR branch, not assumed. Where we guessed wrong we have already corrected our side; those corrections are listed so you can sanity-check that we read your intent right.
 
@@ -28,8 +28,8 @@ One client: `src/server/clients/wander.client.ts`. Three calls, all `POST`.
 POST {WANDER_API_URL}/internal/prospects
 x-api-key: {WANDER_API_KEY}
 
-{ businessName, sourceUrl, tone: "existing", email?, expiresInDays? }
-→ WebsiteProspect { id, websiteId, status, previewUrl?, expiresAt?, ... }
+{ businessName, sourceUrl, tone: "existing", email? }
+→ WebsiteProspect { id, websiteId, status, previewUrl?, previewToken?, ... }
 ```
 
 Called from a **Build preview** button on a prospect card in `/app/leads`, one domain at a time. `sourceUrl` is `https://{lead_domain.domain}` and `businessName` is `companyName ?? domain`.
@@ -38,7 +38,7 @@ We treat the response `status` as **accepted, not built**. We never block a user
 
 We refuse to call this at all for a domain flagged `exclude_from_outreach` — no point spending a build on a company nobody may contact.
 
-### List (used only by the manual refresh, below)
+### List (the refresh path — see §4)
 
 ```
 POST /internal/prospects/list
@@ -55,6 +55,27 @@ POST /internal/prospects/retry
 
 Not wired to a button yet. We will call it for `FAILED` builds once we've seen what failures actually look like.
 
+### 3a. Status vocabulary
+
+```
+GENERATING → READY → CLAIMED
+           ↘ FAILED
+```
+
+Growth's live set is **`GENERATING` `READY` `CLAIMED` `FAILED`**. Settled for our purposes: `READY`, `CLAIMED`, `FAILED`.
+
+Two enum values are deliberately unhandled:
+
+- **`PENDING`** — the schema default, but `create.ts` writes `GENERATING` directly, so no prospect is ever observably `PENDING`.
+- **`EXPIRED`** — never written. Preview expiry was removed from the PR entirely, on the reasoning that a link dying mid-conversation costs more than a stale one. Dead enum value.
+
+We store the status string verbatim rather than remapping, so adding a state is safe — we simply won't treat it as terminal. **If you add a state that *is* terminal, tell us**, because the failure mode is a build sitting in our UI as permanently in-flight.
+
+Consequences of expiry being gone, on our side:
+- `expiresInDays` is not sent, `expiresAt` is not stored, and `lead_domain.pregen_preview_expires_at` has been removed (it was added for expiry and never populated).
+- Our copy policy forbids claiming the preview will come down. That rule was previously "until expiry is real"; it is now **permanent**, which is simpler. The generator was caught inventing *"before it comes down"* — that stays a violation forever.
+- `evalOverall` removed from our client, webhook schema and build table.
+
 ### Corrections we made after reading the branch
 
 We had guessed a REST-ish shape and were wrong on all three. Flagging in case it tells you something about how the routes read from outside:
@@ -63,7 +84,9 @@ We had guessed a REST-ish shape and were wrong on all three. Flagging in case it
 | --- | --- | --- |
 | list | `GET /internal/prospects` → `{ items }` | `POST …/list`, body `{skip,take,status?}` → `{ prospects, total }` |
 | retry | `POST …/{id}/retry` | `POST …/retry`, body `{ prospectId }` |
-| status | lowercase, guessed values | `PENDING` `READY` `CLAIMED` `FAILED` `EXPIRED` |
+| status | lowercase, guessed values | see §3a — six enum values, four observable |
+
+`take` defaults to **20**, not "everything", so we always pass it explicitly.
 
 No complaint about the design — POST-with-body is fine and consistent. Just noting that nothing about `/internal/prospects` hints that `list` and `retry` are sub-paths rather than REST verbs, so an OpenAPI dump or a one-paragraph README in that folder would have saved us the round trip.
 
@@ -76,7 +99,7 @@ POST {PROSPECT_WEBHOOK_URL}          # https://growth-red.vercel.app/api/webhook
 x-pregen-secret: {PROSPECT_WEBHOOK_SECRET}
 
 { event: "prospect.updated", prospectId, websiteId, businessName,
-  sourceUrl, status, previewUrl?, evalOverall?, errorMessage?, occurredAt }
+  sourceUrl, status, previewUrl?, errorMessage?, occurredAt }
 ```
 
 This is exactly your `ProspectWebhookPayload` — we parse it with a zod schema mirroring it field for field, so if you add a field we ignore it and if you rename one we 400 loudly rather than silently dropping events.
@@ -95,36 +118,25 @@ This is exactly your `ProspectWebhookPayload` — we parse it with a zod schema 
 **How we apply it:**
 
 - Correlate on `prospectId` first. Falls back to `sourceUrl` → bare host → `lead_domain.domain` for the first event on a prospect we didn't create ourselves. (`https://www.foo.com/x` → `foo.com`; a real subdomain like `sunkasa.holidayfuture.com` stays distinct, because it's a separate lead.)
-- Compare `occurredAt` against the last event we applied, so a late `PENDING` can't overwrite a newer `READY`.
+- Compare `occurredAt` against the last event we applied, so a late `GENERATING` can't overwrite a newer `READY`.
 - Write a `leads.pregen_build` row (one per build — retries and rebuilds are separate rows, keyed unique on `prospectId`).
 - Promote `previewUrl` onto `lead_domain.pregen_site_url`, which is the field everything downstream already reads: the copy generator grounds on it, the reachability probe checks it, the review card links it, publishing requires it. **That single field is the whole integration surface for the rest of growth** — nothing else needs to know your API exists.
 
 ---
 
-## 4. Reconciliation — we're not doing it, and that's a decision
+## 4. Reconciliation — killed on both sides
 
-Your `notify-prospect-webhook.ts` says:
+Settled, and we agree on the reasoning: a reconcile loop is a second source of truth that quietly compensates for webhook bugs instead of surfacing them. The silent `CLAIMED` gap is the proof — a sweep would have papered over it, and it would have rotted for months while looking healthy.
 
-> *reconcile-on-read remains the delivery backstop for missed events*
+So: **no polling reconcile in growth, no retry-with-backoff on your sender.** Delivery is best-effort by agreement, not by oversight.
 
-**Growth is not implementing that backstop.** No polling cron, no sweep, no periodic diff. This was an explicit call, not an oversight, and it's worth being blunt about why:
+What we hold up on our end:
 
-- Growth is on Neon's free tier — 100 CPU-hrs/month — and cost is driven by *distinct cron wake windows*, not job count. A reconcile sweep taking prod down on 2026-07-27 is not hypothetical; that's exactly what happened when two crons collapsed the union to every 10 minutes.
-- More importantly: a reconcile loop is a second source of truth that hides webhook bugs. If delivery is broken we would rather it be visibly broken than quietly papered over by a sweep, because the papered-over version is the one that rots for six months.
+- **Idempotent on `prospectId` + `occurredAt`.** Duplicates are free, and a late duplicate carrying older state is ignored rather than applied. Retry freely if you ever change your mind.
+- **`/leads` is re-fetchable.** `leads.refreshPregenSite` re-reads one prospect from `POST /internal/prospects/list` and reconciles it, so a stale row is one click from correct. Human-triggered, not scheduled.
+- **We answer 200 on anything we understood** — including events for prospects outside our lead universe — so a slow write never costs the single delivery attempt.
 
-**What that means for you.** Right now delivery is fire-and-forget: 5s timeout, non-OK logged at `warn` and dropped, no retry. That's a sensible default *when the receiver reconciles*. Since we don't, a single dropped POST means a prospect builds successfully and growth never learns the preview URL — the lead sits with no preview forever and nobody notices.
-
-So the ask is: **make the webhook at-least-once.** In rough order of preference:
-
-1. **Retry with backoff on non-2xx and on timeout.** Three or four attempts over a few minutes covers essentially every transient case (cold Vercel lambda, Neon waking from scale-to-zero — that last one is real and can exceed 5s).
-2. **A small outbox** — persist the event, mark delivered on 2xx, drain on a schedule. More work, fully robust.
-3. **Raise the timeout to ~10s.** Cheapest single change and probably removes most of the failures on its own.
-
-We are idempotent on `prospectId` + `occurredAt`, so **retry as aggressively as you like** — duplicates are free, and a redelivered older event is explicitly ignored rather than applied.
-
-Our only recovery path is a manual **Refresh from WanderOS** button on the prospect (`leads.refreshPregenSite`), which calls `/internal/prospects/list` and reconciles that one prospect. A human pressing a button when they notice something stuck. That is deliberately not a loop, and it does not scale past "someone noticed" — which is exactly why point 1 above matters.
-
----
+**The one thing we'd ask you to watch:** if dropped events turn out to be common rather than theoretical, that is a signal about the transport, and we'd both rather hear it than absorb it. A 5s timeout against a Vercel lambda that may be cold, in front of a Neon instance that scale-to-zeroes, is the plausible source. We are not asking for retries; we are asking that a rising `[ProspectWebhook] Non-OK` / delivery-failed rate is treated as a bug rather than noise.
 
 ## 5. `CLAIMED` is the number this programme gets judged on
 
@@ -134,8 +146,9 @@ Growth now stores `claimed_at` separately from `settled_at` for exactly this rea
 
 Two requests:
 
-- **Please make sure a `CLAIMED` transition fires the webhook**, not just build-lifecycle transitions. If claiming happens through `management/website/claim-prospect.ts` on a different path, it may not be wired to `sendProspectWebhook`. This is the single most valuable event you can send us.
-- If you have or can add `convertedOrgId` on that event, we'll take it — it lets us join a claimed prospect to the resulting org and close the loop from cold domain to customer.
+**Confirmed and fixed:** claiming was silent — `claim.ts` had zero calls to `sendProspectWebhook`, so the conversion never reached growth at all. Now wired and pushed. Verified on the branch: `claim.ts` fires with `status: 'CLAIMED'`.
+
+Still open: if you can add **`convertedOrgId`** to that event we'll take it. It lets us join a claimed prospect to the resulting org and close the loop from cold domain to paying customer, which is the only version of this funnel anyone will actually ask about.
 
 ---
 
@@ -143,8 +156,8 @@ Two requests:
 
 1. **API key scope.** The route is `authenticate: 'api-key-or-wander-os'` and then separately `canUser({ organizationId: wanderOrganizationId, resource: 'all', action: 'manage' })`. So a key that authenticates fine will still 403 without org-manage. Who issues that key, and is a service key with `manage` on the Wander org actually available to us?
 2. **Preview hosting.** `previewUrl` is documented as *"Absent when no public preview host is configured."* This is the thing that has blocked the whole motion for weeks — we currently have 33 preview URLs spread across six ad-hoc hosts and almost none resolve. **Is a public preview host configured in staging and production, and what's the URL shape?** If `previewUrl` comes back absent, none of this integration does anything useful.
-3. **Expiry.** We store `expiresAt` and pass `expiresInDays` (currently omitted → no expiry). Is there a house default we should match? Our copy is currently forbidden from claiming the preview will expire, because until now that was invented; once expiry is real we'd like to relax that deliberately.
-4. **Status vocabulary stability.** We store your status string verbatim rather than remapping it, so adding a state is safe for us — we just won't treat it as terminal. If you add one that *is* terminal, tell us.
+3. ~~**Expiry.**~~ Resolved — removed entirely, see §3a.
+4. **Status vocabulary stability.** See §3a. Adding a state is safe; adding a *terminal* state is not, so tell us.
 5. **Rate/volume.** Is there a sane ceiling on builds? Our workable cohort is 561 domains and we'd likely ramp in batches of ~20, but we'd rather know your limit than discover it.
 
 ---

@@ -138,11 +138,6 @@ export const leadDomainTable = leadsSchema.table(
     pregenSiteUrl: t.text(),
     pregenStatus: t.text(), // Retired compatibility column; keep null.
     pregenPageTitle: t.text(),
-    // Travels with pregenSiteUrl rather than living only on pregen_build: the
-    // copy generator and the review card read the URL and its lifetime on the
-    // same row, and WanderOS previews can carry a real expiry (expiresInDays).
-    // Until this is populated, copy must not claim the preview will come down.
-    pregenPreviewExpiresAt: t.timestamp(),
 
     // HubSpot signals — used for the pre-send guard, never to *drive* outreach.
     hubspotRecordId: t.text(),
@@ -786,9 +781,7 @@ export const pregenBuildTable = leadsSchema.table(
     // silently drifts when they add a state.
     status: t.text(),
     previewUrl: t.text(),
-    evalOverall: t.integer(),
     errorMessage: t.text(),
-    expiresAt: t.timestamp(),
 
     requestedAt: t
       .timestamp()
