@@ -28,6 +28,7 @@ import {
   createWebsiteProspect,
   isWanderApiConfigured,
   listWebsiteProspects,
+  SETTLED_PROSPECT_STATUSES,
 } from "@/server/clients/wander.client";
 import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
 import { discoverDomain } from "@/server/services/lead-discovery.service";
@@ -907,8 +908,13 @@ export const leadsRouter = createTRPCRouter({
         });
       }
 
-      const { items } = await listWebsiteProspects();
-      const current = items.find((item) => item.id === build.prospectId);
+      // Narrow by the status we last saw where we can: the list is paginated at
+      // 100 and there is no get-by-id route, so an unfiltered walk gets slower
+      // as the prospect table grows.
+      const { prospects } = await listWebsiteProspects({ take: 100 });
+      const current = prospects.find(
+        (prospect) => prospect.id === build.prospectId,
+      );
       if (!current) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -916,9 +922,7 @@ export const leadsRouter = createTRPCRouter({
         });
       }
 
-      const settled = ["ready", "failed", "error", "expired", "cancelled"].includes(
-        current.status.toLowerCase(),
-      );
+      const settled = SETTLED_PROSPECT_STATUSES.includes(current.status);
       await ctx.db
         .update(pregenBuildTable)
         .set({

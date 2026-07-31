@@ -24,6 +24,30 @@ export const isWanderApiConfigured = !!env.WANDER_API_URL && !!env.WANDER_API_KE
 /** Brand-kit tone accepted by the prospect pipeline; "existing" mirrors their site. */
 export type ProspectTone = "existing" | "professional" | "friendly" | "luxury";
 
+/**
+ * WanderOS's own prospect lifecycle. Stored verbatim rather than remapped.
+ *
+ * CLAIMED is the one that matters commercially: the prospect signed up and took
+ * ownership of the pre-generated site. That is the conversion this whole motion
+ * exists to produce, not merely a build finishing.
+ */
+export const PROSPECT_STATUSES = [
+  "PENDING",
+  "READY",
+  "CLAIMED",
+  "FAILED",
+  "EXPIRED",
+] as const;
+export type ProspectStatus = (typeof PROSPECT_STATUSES)[number];
+
+/** Statuses where the build has stopped moving on its own. */
+export const SETTLED_PROSPECT_STATUSES: readonly ProspectStatus[] = [
+  "READY",
+  "CLAIMED",
+  "FAILED",
+  "EXPIRED",
+];
+
 export interface CreateProspectInput {
   businessName: string;
   /** The prospect's current PM website — the source the onboarding crawls. */
@@ -40,7 +64,7 @@ export interface WanderProspect {
   businessName: string | null;
   email: string | null;
   sourceUrl: string | null;
-  status: string;
+  status: ProspectStatus;
   previewToken?: string | null;
   previewUrl?: string | null;
   evalOverall?: number | null;
@@ -106,17 +130,38 @@ export function createWebsiteProspect(
   });
 }
 
-/** Current state for prospects WanderOS holds. Used by the on-demand refresh. */
-export function listWebsiteProspects(): Promise<{ items: WanderProspect[] }> {
-  return wanderFetch<{ items: WanderProspect[] }>("/internal/prospects");
+/**
+ * Current state for prospects WanderOS holds.
+ *
+ * POST with a body rather than a GET with query params, and paginated at 100 —
+ * so a caller looking for one prospect should pass its status to narrow rather
+ * than walking every page.
+ */
+export function listWebsiteProspects(
+  input: { skip?: number; take?: number; status?: ProspectStatus } = {},
+): Promise<{ prospects: WanderProspect[]; total: number }> {
+  return wanderFetch<{ prospects: WanderProspect[]; total: number }>(
+    "/internal/prospects/list",
+    {
+      method: "POST",
+      body: {
+        skip: input.skip ?? 0,
+        take: input.take ?? 100,
+        ...(input.status ? { status: input.status } : {}),
+      },
+    },
+  );
 }
 
-/** Re-run a build that failed. WanderOS keeps the same prospect id. */
+/**
+ * Re-run a FAILED build. WanderOS keeps the same prospect id, wipes the failed
+ * run's pages and recreates them, so our stored prospectId stays valid.
+ */
 export function retryWebsiteProspect(
   prospectId: string,
 ): Promise<WanderProspect> {
-  return wanderFetch<WanderProspect>(
-    `/internal/prospects/${encodeURIComponent(prospectId)}/retry`,
-    { method: "POST" },
-  );
+  return wanderFetch<WanderProspect>("/internal/prospects/retry", {
+    method: "POST",
+    body: { prospectId },
+  });
 }

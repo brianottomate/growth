@@ -37,8 +37,14 @@ const ProspectWebhookPayload = z.object({
   occurredAt: z.string(),
 });
 
-/** Statuses that mean the build stopped moving, either way. */
-const SETTLED = new Set(["ready", "failed", "error", "expired", "cancelled"]);
+/**
+ * Statuses where the build has stopped moving on its own.
+ *
+ * CLAIMED is terminal *and* is the outcome this motion exists for — the prospect
+ * signed up and took ownership of the pre-generated site. It is not just a build
+ * finishing, so it is recorded separately from settledAt.
+ */
+const SETTLED = new Set(["READY", "CLAIMED", "FAILED", "EXPIRED"]);
 
 function secretMatches(provided: string | null): boolean {
   const expected = env.PREGEN_WEBHOOK_SECRET;
@@ -115,7 +121,8 @@ export async function POST(request: NextRequest) {
 
   const stale =
     existing?.lastEventAt != null && existing.lastEventAt > occurredAt;
-  const settled = SETTLED.has(payload.status.toLowerCase());
+  const settled = SETTLED.has(payload.status.toUpperCase());
+  const claimed = payload.status.toUpperCase() === "CLAIMED";
 
   if (existing) {
     if (stale) return NextResponse.json({ ok: true, stale: true });
@@ -129,6 +136,7 @@ export async function POST(request: NextRequest) {
         errorMessage: payload.errorMessage ?? null,
         lastEventAt: occurredAt,
         settledAt: settled ? occurredAt : existing.settledAt,
+        claimedAt: claimed ? (existing.claimedAt ?? occurredAt) : existing.claimedAt,
       })
       .where(eq(pregenBuildTable.id, existing.id));
   } else {
@@ -145,6 +153,7 @@ export async function POST(request: NextRequest) {
       errorMessage: payload.errorMessage ?? null,
       lastEventAt: occurredAt,
       settledAt: settled ? occurredAt : null,
+      claimedAt: claimed ? occurredAt : null,
     });
   }
 
@@ -169,5 +178,5 @@ export async function POST(request: NextRequest) {
       );
   }
 
-  return NextResponse.json({ ok: true, matched: true, settled });
+  return NextResponse.json({ ok: true, matched: true, settled, claimed });
 }

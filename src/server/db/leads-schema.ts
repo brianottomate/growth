@@ -798,6 +798,15 @@ export const pregenBuildTable = leadsSchema.table(
     // delivery overwriting a newer state with an older one.
     lastEventAt: t.timestamp(),
     settledAt: t.timestamp(),
+    /**
+     * When the prospect claimed the site — signed up and took ownership.
+     *
+     * The conversion this whole motion produces. Kept separate from settledAt
+     * because CLAIMED is both terminal and the only terminal state that is a
+     * win, and "how many pregen sites got claimed" is the question the
+     * programme will be judged on.
+     */
+    claimedAt: t.timestamp(),
 
     createdAt: t
       .timestamp()
