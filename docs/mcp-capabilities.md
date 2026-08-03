@@ -32,8 +32,8 @@ endpoint verifies token issuer, audience, expiry, and scope and then re-checks
 the user's live organization membership on every request. There is no parallel
 connector table and no fallback to the browser session's active or first org.
 
-The MCP tools and the in-app Growth assistant are projections of the same 34-tool
-native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 32
+The MCP tools and the in-app Growth assistant are projections of the same 37-tool
+native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 35
 connector-safe capabilities and omits open-world `researchRead` plus in-app
 `driveRead`. Read-only,
 destructive, and idempotency annotations are derived from the same action policy
@@ -87,3 +87,23 @@ catalog is updated.
 The endpoint is intentionally not anonymous and no longer accepts Better Auth
 session tokens as MCP credentials. Use a standards-based OAuth access token with
 the MCP resource URL as its audience.
+
+## Protocol compatibility
+
+The production endpoint uses the official TypeScript MCP server and client
+packages. Each request receives a fresh server instance, so MCP 2026-07-28 is
+stateless and safe to distribute across Vercel instances. Existing clients can
+continue negotiating the stateless 2025 transport while ChatGPT and Claude
+migrate independently. No server-side MCP session store is required.
+
+Local protocol checks pin both paths and verify the connector-safe catalog:
+
+```sh
+bun run test:mcp:protocol
+```
+
+After deployment, use an OAuth access token without printing it:
+
+```sh
+GROWTH_MCP_TOKEN=... bun run smoke:mcp:modern
+```

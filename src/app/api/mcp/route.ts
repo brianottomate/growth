@@ -1,35 +1,23 @@
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import type { AuthInfo } from "@modelcontextprotocol/server";
 import { oauthProviderResourceClient } from "@better-auth/oauth-provider/resource-client";
-import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { and, eq } from "drizzle-orm";
 
-import { MCP_TOOLS } from "@/server/ai/capabilities";
-import { registerMcpTools } from "@/server/ai/capabilities/to-mcp-server";
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import {
   GROWTH_AUTH_ISSUER,
   GROWTH_JWKS_URL,
   GROWTH_MCP_RESOURCE,
+  GROWTH_MCP_RESOURCE_METADATA,
   GROWTH_MCP_SCOPE,
-  GROWTH_PUBLIC_ORIGIN,
 } from "@/server/mcp/config";
+import { growthMcpHttpHandler } from "@/server/mcp/server";
 
 export const maxDuration = 800;
 
-const mcpHandler = createMcpHandler(
-  (server) => registerMcpTools(server, MCP_TOOLS),
-  {},
-  { basePath: "/api", maxDuration, verboseLogs: false },
-);
-
 const { verifyAccessToken } = oauthProviderResourceClient().getActions();
 
-async function verifyToken(
-  _request: Request,
-  bearerToken?: string,
-): Promise<AuthInfo | undefined> {
-  if (!bearerToken) return undefined;
+async function verifyToken(bearerToken: string): Promise<AuthInfo | undefined> {
   const claims = await verifyAccessToken(bearerToken, {
     verifyOptions: {
       audience: GROWTH_MCP_RESOURCE,
@@ -63,6 +51,7 @@ async function verifyToken(
     clientId: typeof claims.azp === "string" ? claims.azp : userId,
     scopes: grantedScopes,
     expiresAt: claims.exp,
+    resource: new URL(GROWTH_MCP_RESOURCE),
     extra: {
       userId,
       orgId: membership.organizationId,
@@ -70,10 +59,57 @@ async function verifyToken(
   };
 }
 
-const handler = withMcpAuth(mcpHandler, verifyToken, {
-  required: true,
-  requiredScopes: [GROWTH_MCP_SCOPE],
-  resourceUrl: GROWTH_PUBLIC_ORIGIN,
-});
+function unauthorized(
+  message = "Authentication required",
+  authError?: "invalid_token" | "insufficient_scope",
+) {
+  const parameters = [
+    `resource_metadata="${GROWTH_MCP_RESOURCE_METADATA}"`,
+    `scope="${GROWTH_MCP_SCOPE}"`,
+    ...(authError ? [`error="${authError}"`] : []),
+  ];
 
-export { handler as DELETE, handler as GET, handler as POST };
+  return Response.json(
+    {
+      error: authError ?? "unauthorized",
+      error_description: message,
+    },
+    {
+      status: 401,
+      headers: {
+        "Cache-Control": "no-store",
+        "WWW-Authenticate": `Bearer ${parameters.join(", ")}`,
+      },
+    },
+  );
+}
+
+async function handleMcpRequest(request: Request) {
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) return unauthorized();
+
+  let authInfo: AuthInfo | undefined;
+  try {
+    authInfo = await verifyToken(token);
+  } catch {
+    return unauthorized(
+      "The access token is invalid, expired, wrong-audience, or insufficient",
+      "invalid_token",
+    );
+  }
+  if (!authInfo) {
+    return unauthorized(
+      "The access token is not attached to an active Growth organization membership",
+      "invalid_token",
+    );
+  }
+
+  return growthMcpHttpHandler.fetch(request, { authInfo });
+}
+
+export {
+  handleMcpRequest as DELETE,
+  handleMcpRequest as GET,
+  handleMcpRequest as POST,
+};

@@ -47,8 +47,40 @@ const compact = (n: number | null | undefined) =>
     : `$${Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n)}`;
 const int = (n: number | null | undefined) =>
   n === null || n === undefined ? "—" : n.toLocaleString("en-US");
-// Missing data renders as "—", never $0 (tracker house rule).
-const moneyOrDash = (n: number | null | undefined) => (n ? money(n) : "—");
+// House rule: data we don't have renders "—", never $0. A real, measured zero
+// DOES render as $0/0 — that's how a paused channel (Comcast, affiliate,
+// influencers from Aug 2026) reads as "paused" rather than "missing".
+const moneyOr = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : money(n);
+const compactOr = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : compact(n);
+const intOr = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : int(n);
+const roasOr = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : `${n.toFixed(1)}x`;
+
+/** Per-channel health dot: CPB against the $500 target; grey = nothing attributed. */
+function channelTone(c: {
+  bookings: number | null;
+  cpb?: number | null;
+}): "good" | "bad" | null {
+  if (!c.bookings || c.cpb === null || c.cpb === undefined) return null;
+  return c.cpb <= CPB_TARGET ? "good" : "bad";
+}
+
+/**
+ * KPI tile for this page — same StatCard, growth-tracker sizing (roomier card,
+ * big mono figure) so the numbers read at a glance on a wall screen.
+ */
+function Kpi(props: Parameters<typeof StatCard>[0]) {
+  return (
+    <StatCard
+      {...props}
+      className="p-5"
+      valueClassName="mt-1.5 font-mono text-3xl tracking-tight"
+    />
+  );
+}
 
 export default async function SpendPage({
   searchParams,
@@ -151,52 +183,58 @@ export default async function SpendPage({
         </div>
       </div>
 
-      {/* KPI grid */}
+      {/* KPI grid — growth-tracker card order */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-        <StatCard
+        <Kpi
           label="Marketing Spend"
           explainer="Everything spent on marketing in this window: ad platforms (Meta, Google) plus fixed monthly costs (BDRs, TV, content, affiliate) pro-rated per day. Loyalty points and coupons are not included."
           value={compact(t.totalMarketingSpend)}
           hint={`${compact(t.adSpend)} ads + ${compact(t.fixedCosts)} fixed`}
         />
-        <StatCard
+        <Kpi
+          label="Total Bookings"
+          explainer="Finance-aligned count: confirmed, profit-generating bookings; Sites excluded; cancellations NOT netted. Deliberately does not match the channel table's sum — that view uses platform attribution."
+          value={int(t.bookings)}
+          hint={`${int(t.directBookings)} direct (${int(t.wanderDirectBookings)} wander + ${int(t.manualBookings)} manual) · ${int(t.otaBookings)} OTA`}
+        />
+        <Kpi
           label="DCPB · primary"
           explainer="Direct Cost Per Booking — the primary efficiency metric. Total marketing spend ÷ direct bookings (booked on wander.com, not OTAs). Target under $500: green <$400, amber ≤$500, red above."
           value={money(e.directCpb)}
           hint={`target $${CPB_TARGET} · spend / direct bookings`}
           tone={dcpbTone}
         />
-        <StatCard
+        <Kpi
           label="CPB"
           explainer="Spend ÷ ALL bookings including OTAs (Airbnb, Vrbo, Booking.com, Amex). Reference only — OTA bookings arrive without ad spend, so this always looks better than DCPB."
           value={money(e.cpb)}
           hint="spend / all bookings incl. OTA"
         />
-        <StatCard
-          label="ROAS"
-          explainer="For every $1 of AD spend (fixed costs excluded), dollars of estimated take-rate revenue: GMV × 20% blended take rate — a locked, deliberately Operated-leaning constant."
-          value={`${e.roas.toFixed(1)}x`}
-          hint="GMV × 20% take / ad spend"
-        />
-        <StatCard
-          label="Total Bookings"
-          explainer="Finance-aligned count: confirmed, profit-generating bookings; Sites excluded; cancellations NOT netted. Deliberately does not match the channel table's sum — that view uses platform attribution."
-          value={int(t.bookings)}
-          hint={`${int(t.directBookings)} direct (${int(t.wanderDirectBookings)} wander + ${int(t.manualBookings)} manual) · ${int(t.otaBookings)} OTA`}
-        />
-        <StatCard
+        <Kpi
           label="Total GMV"
           explainer="Full booking value at the moment of booking (not revenue-recognized), including bookings later cancelled. Dylan Wright's canonical definition (analytics.report_gmv)."
           value={compact(t.gmv)}
           hint={`${compact(t.directGmv)} direct · ${compact(t.otaGmv)} OTA`}
         />
-        <StatCard
+        <Kpi
+          label="Fixed Costs"
+          explainer="Pre-committed monthly costs (BDRs + OpenPhone, TV, amortized content, affiliate, SEO, influencers) pro-rated across the days in this window; the in-progress UTC day counts $0. Effective-dated in spend-tracker.config.ts — a cancelled retainer drops to $0 from its effective month."
+          value={compact(t.fixedCosts)}
+          hint="daily pro-rated"
+        />
+        <Kpi
+          label="Checkouts Started"
+          explainer="Checkout starts attributed last-touch. A top-of-funnel volume signal — most don't convert."
+          value={int(t.checkoutStarted)}
+          hint="last-touch attribution"
+        />
+        <Kpi
           label="Gross Take"
           explainer="Wander's revenue share (platform + management fees) from the dbt north-star model. Recognition-based: recent days keep filling in for about a week."
           value={summary.northStar ? compact(summary.northStar.grossTake) : "—"}
           hint="dbt north-star model"
         />
-        <StatCard
+        <Kpi
           label="Net Take"
           explainer="Gross take minus ALL marketing spend. Gross take backfills for ~a week while spend is final immediately, so recent windows read low at first — trust the settled figure (both sides clipped to a week ago)."
           value={summary.northStar ? compact(summary.northStar.netTake) : "—"}
@@ -214,19 +252,7 @@ export default async function SpendPage({
               : undefined
           }
         />
-        <StatCard
-          label="Checkouts Started"
-          explainer="Checkout starts attributed last-touch. A top-of-funnel volume signal — most don't convert."
-          value={int(t.checkoutStarted)}
-          hint="last-touch attribution"
-        />
-        <StatCard
-          label="Account Creations"
-          explainer="New account signups, last-touch attribution. CPAC = total marketing spend per new account."
-          value={int(t.accountCreations)}
-          hint={`CPAC ${money(e.cpac)}`}
-        />
-        <StatCard
+        <Kpi
           label="Net Take / Direct"
           explainer="Profit per direct booking after every marketing dollar (ads + fixed costs)."
           value={
@@ -234,9 +260,31 @@ export default async function SpendPage({
               ? money(summary.northStar.netTake / t.directBookings)
               : "—"
           }
-          hint="profit per direct booking"
+          hint="per direct booking"
         />
-        <StatCard
+        <Kpi
+          label="Net Take / Total"
+          explainer="Profit per booking across every channel including the OTAs, which arrive without ad spend. Always flatters the direct figure — reference only."
+          value={
+            summary.northStar && t.bookings > 0
+              ? money(summary.northStar.netTake / t.bookings)
+              : "—"
+          }
+          hint="per total booking"
+        />
+        <Kpi
+          label="ROAS"
+          explainer="For every $1 of AD spend (fixed costs excluded), dollars of estimated take-rate revenue: GMV × 20% blended take rate — a locked, deliberately Operated-leaning constant."
+          value={`${e.roas.toFixed(1)}x`}
+          hint="GMV × 20% take / ad spend"
+        />
+        <Kpi
+          label="Account Creations"
+          explainer="New account signups, last-touch attribution. CPAC = total marketing spend per new account."
+          value={int(t.accountCreations)}
+          hint={`CPAC ${money(e.cpac)}`}
+        />
+        <Kpi
           label="Take Rate Revenue"
           explainer="What Wander actually earned on this window's bookings: booking_revenue_recognized summed from BigQuery. The 'real' counterpart to the 20% ROAS proxy."
           value={compact(t.takeRateRevenue)}
@@ -248,59 +296,102 @@ export default async function SpendPage({
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
+            <tr className="text-muted-foreground border-b text-left text-xs tracking-wide uppercase">
               <th className="px-4 py-3 font-medium">Channel</th>
               <th className="px-4 py-3 text-right font-medium">Spend</th>
               {showPacing && (
-                <th className="px-4 py-3 text-right font-medium" title="Projected end-of-month spend, extrapolated from completed days only (the in-progress day is excluded — fixed costs count it as $0 and ad platforms report it late).">Pacing (EOM)</th>
+                <th
+                  className="px-4 py-3 text-right font-medium"
+                  title="Projected end-of-month spend, extrapolated from completed days only (the in-progress day is excluded — fixed costs count it as $0 and ad platforms report it late)."
+                >
+                  Pacing
+                </th>
               )}
               <th className="px-4 py-3 text-right font-medium">Bookings</th>
-              <th className="px-4 py-3 text-right font-medium">GMV</th>
               <th className="px-4 py-3 text-right font-medium">CPB</th>
               <th className="px-4 py-3 text-right font-medium">ROAS</th>
+              <th className="px-4 py-3 text-right font-medium">GMV</th>
+              {showPacing && (
+                <th
+                  className="px-4 py-3 text-right font-medium"
+                  title="Projected end-of-month GMV on the same completed-days run rate as spend pacing."
+                >
+                  GMV pacing
+                </th>
+              )}
               <th className="px-4 py-3 text-right font-medium">Checkouts</th>
-              <th className="px-4 py-3 font-medium">Source</th>
+              <th className="px-4 py-3 font-medium">
+                <span className="sr-only">CPB vs target</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {summary.channels.map((c) => {
               const cfg = CHANNEL_CONFIG[c.channel];
+              const tone = channelTone(c);
               return (
                 <tr key={c.channel} className="border-b last:border-0">
                   <td className="px-4 py-2.5">
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center gap-3">
                       <span
-                        className="inline-block size-2.5 rounded-full"
+                        aria-hidden
+                        className="flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
                         style={{ backgroundColor: cfg.color }}
-                      />
-                      <span className="font-medium">{cfg.name}</span>
+                      >
+                        {cfg.abbreviation}
+                      </span>
+                      <span>
+                        <span className="block leading-tight font-medium">
+                          {cfg.name}
+                        </span>
+                        <span className="text-muted-foreground block text-xs leading-tight">
+                          {c.dataSource}
+                        </span>
+                      </span>
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
-                    {moneyOrDash(c.spend)}
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                    {compactOr(c.spend)}
                   </td>
                   {showPacing && (
-                    <td className="text-muted-foreground px-4 py-2.5 text-right tabular-nums">
-                      {c.pacing ? money(c.pacing) : "—"}
+                    <td className="text-muted-foreground px-4 py-2.5 text-right font-mono tabular-nums">
+                      {compactOr(c.pacing)}
                     </td>
                   )}
-                  <td className="px-4 py-2.5 text-right tabular-nums">
-                    {c.bookings ? int(c.bookings) : "—"}
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                    {intOr(c.bookings)}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
-                    {moneyOrDash(c.gmv)}
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                    {moneyOr(c.cpb)}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
-                    {c.cpb ? money(c.cpb) : "—"}
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                    {roasOr(c.roas)}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
-                    {c.roas ? `${c.roas.toFixed(1)}x` : "—"}
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                    {compactOr(c.gmv)}
                   </td>
-                  <td className="text-muted-foreground px-4 py-2.5 text-right tabular-nums">
-                    {c.checkoutStarted ? int(c.checkoutStarted) : "—"}
+                  {showPacing && (
+                    <td className="text-muted-foreground px-4 py-2.5 text-right font-mono tabular-nums">
+                      {compactOr(c.gmvPacing)}
+                    </td>
+                  )}
+                  <td className="text-muted-foreground px-4 py-2.5 text-right font-mono tabular-nums">
+                    {intOr(c.checkoutStarted)}
                   </td>
-                  <td className="text-muted-foreground px-4 py-2.5 text-xs">
-                    {c.dataSource}
+                  <td className="px-4 py-2.5">
+                    <span
+                      className={cn(
+                        "inline-block size-2 rounded-full",
+                        tone === "good" && "bg-emerald-400",
+                        tone === "bad" && "bg-red-400",
+                        tone === null && "bg-muted-foreground/30",
+                      )}
+                      title={
+                        tone === null
+                          ? "No attributed bookings in this window"
+                          : `CPB ${money(c.cpb)} vs $${CPB_TARGET} target`
+                      }
+                    />
                   </td>
                 </tr>
               );
@@ -309,9 +400,11 @@ export default async function SpendPage({
         </table>
       </div>
       <p className="text-muted-foreground -mt-6 text-xs">
-        Channel rows are platform-attributed (Meta = 28d click + 1d view;
-        others = BigQuery last-touch). Top-line KPI cards use finance-aligned
-        totals — the two don&apos;t sum to each other by design.
+        Channel rows are platform-attributed (Meta = 28d click + 1d view; others
+        = BigQuery last-touch) and labelled with their source under the channel
+        name. Top-line KPI cards use finance-aligned totals — the two don&apos;t
+        sum to each other by design. The dot reads CPB against the ${CPB_TARGET}{" "}
+        target; grey means nothing was attributed to that channel.
       </p>
 
       {/* Trend */}
