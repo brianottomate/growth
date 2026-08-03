@@ -1,6 +1,8 @@
 import { CallToAction } from "@wandercom/website-registry/components/CallToAction";
 import { FeatureImageCards } from "@wandercom/website-registry/components/Cards/FeatureImageCards";
+import { Footer } from "@wandercom/website-registry/components/Footer";
 import { HomepageHero } from "@wandercom/website-registry/components/HomepageHero/HomepageHero";
+import { NavBar } from "@wandercom/website-registry/components/Navbar";
 import { PropertyGallery } from "@wandercom/website-registry/components/PropertyGallery/PropertyGallery";
 
 import type { PregenArtifact } from "../lib/artifact";
@@ -24,8 +26,15 @@ export function RenderSections({ artifact }: { artifact: PregenArtifact }) {
       ? (artifact.searchUnits as SearchUnitLike[])
       : artifact.extractedProperties.map((unit, index) => toSearchUnit(unit, index));
 
+  const website = {
+    title: artifact.config.title || artifact.prospect.name || artifact.prospect.domain,
+    logoUrl: artifact.config.logoUrl ?? null,
+    faviconUrl: artifact.config.faviconUrl ?? null,
+  };
+
   return (
     <>
+      <NavBar website={website} />
       {(homepage.sections as Section[]).map((section, index) => (
         <RenderSection
           key={index}
@@ -34,6 +43,11 @@ export function RenderSections({ artifact }: { artifact: PregenArtifact }) {
           properties={properties}
         />
       ))}
+      <Footer
+        website={website}
+        hasRentalAgreement={false}
+        pagesLinks={[{ title: "Home", path: "/" }]}
+      />
     </>
   );
 }

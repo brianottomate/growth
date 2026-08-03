@@ -38,6 +38,12 @@ const ExtractedListing = z
     price: z.coerce.number().optional().describe("Nightly price in dollars, as a number"),
     currency: z.string().optional(),
     rating: z.coerce.number().optional().describe("Star rating out of 5"),
+    reviewCount: z.coerce
+      .number()
+      .optional()
+      .describe(
+        "Number of reviews, only when the page prints one (e.g. '4.9 (23 reviews)')",
+      ),
     bedrooms: z.coerce.number().optional(),
     beds: z.coerce.number().optional(),
     baths: z.coerce.number().optional(),
@@ -52,6 +58,7 @@ type SourceProperty = {
   price: number | null;
   priceEstimated?: boolean;
   rating: number | null;
+  reviewCount: number | null;
   features: { bedrooms: number; beds: number; baths: number } | null;
 };
 
@@ -99,6 +106,7 @@ export async function extractPropertiesFromPages(
           imageUrls: images,
           price: normalizePositive(listing.price),
           rating: normalizePositive(listing.rating),
+          reviewCount: normalizePositive(listing.reviewCount),
           features: toFeatures(listing),
         },
         page.markdown,
@@ -133,7 +141,7 @@ export function groundNumericClaims(
   pageText: string,
 ): SourceProperty {
   if (!pageText) {
-    return { ...property, price: null, rating: null };
+    return { ...property, price: null, rating: null, reviewCount: null };
   }
   const priceGrounded =
     property.price != null &&
@@ -147,10 +155,20 @@ export function groundNumericClaims(
           "i",
         ).test(pageText) || pageText.includes(`${property.rating}.0`)
       : pageText.includes(property.rating.toString()));
+  // A review count is only shown when the page prints the integer AND the
+  // rating survived grounding — a count without a rating is meaningless on the
+  // card, and an invented count is exactly the fabrication this guard exists
+  // to prevent.
+  const reviewCountGrounded =
+    property.reviewCount != null &&
+    Number.isInteger(property.reviewCount) &&
+    new RegExp(`\\b${property.reviewCount}\\b`).test(pageText);
+
   return {
     ...property,
     price: priceGrounded ? property.price : null,
     rating: ratingGrounded ? property.rating : null,
+    reviewCount: ratingGrounded && reviewCountGrounded ? property.reviewCount : null,
   };
 }
 
@@ -163,7 +181,7 @@ const MAP_TILE_PATTERN =
   /(^|\.)tile\.|tiles?\.|openstreetmap|mapbox|maptiler|googleapis\.com\/maps|basemaps?\./i;
 const MAX_PAGE_IMAGE_CANDIDATES = 12;
 
-const isPageImageCandidate = (url: string): boolean =>
+export const isPageImageCandidate = (url: string): boolean =>
   url.startsWith("http") &&
   !JUNK_IMAGE_PATTERN.test(url) &&
   !MAP_TILE_PATTERN.test(url) &&
@@ -370,6 +388,11 @@ export function toGalleryUnits(
       ...(p.price != null ? { pricePerNight: p.price } : {}),
       ...(p.priceEstimated ? { priceEstimated: true } : {}),
       ...(p.rating != null ? { overallRating: Math.min(p.rating, 5) } : {}),
+      // The card only renders a rating when a count accompanies it, so both
+      // must survive grounding together or neither is shown.
+      ...(p.rating != null && p.reviewCount != null
+        ? { totalReviews: p.reviewCount }
+        : {}),
       ...(p.location ? { city: p.location } : {}),
     }));
 }

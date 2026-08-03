@@ -21,7 +21,11 @@ Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
 Astro.response.headers.set("Referrer-Policy", "no-referrer");
 ---
 
-<PreviewLayout title={artifact.config.title} description={artifact.config.description}>
+<PreviewLayout
+  title={artifact.config.title}
+  description={artifact.config.description}
+  faviconUrl={artifact.config.faviconUrl}
+>
   <main>
     <RenderSections artifact={artifact} client:load />
   </main>

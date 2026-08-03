@@ -7,6 +7,7 @@ import {
   pregenNativeBuildTable,
   pregenNativeCrawlPageTable,
 } from "@/server/db/schema";
+import { rankUnitImages } from "../generation/image-ranking";
 import {
   applyPriceEstimates,
   dropJunkUnits,
@@ -62,7 +63,11 @@ export async function injectPropertiesStep(ctx: StepContext) {
     build?.brandKit?.businessName ?? "",
     pageText,
   );
-  const units = toGalleryUnits(rankAndTrim(priced));
+  // Vision-rank each surviving unit's photos before the 3-image slice: the
+  // crawl's order leads with bathrooms and laundry rooms often enough that an
+  // unranked lead image is the main thing making a preview look generated.
+  const ranked = await rankUnitImages(rankAndTrim(priced));
+  const units = toGalleryUnits(ranked);
 
   if (units.length < MIN_GALLERY_UNITS) {
     throw new Error(

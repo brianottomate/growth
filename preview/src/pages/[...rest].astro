@@ -1,0 +1,29 @@
+---
+import PreviewLayout from "../layouts/PreviewLayout.astro";
+
+// Catch-all for in-preview navigation (property pages, search, root): these
+// surfaces come alive when the site is claimed. A soft interstitial beats a
+// dead 404 — the /p/ and /m/ routes are more specific and always win.
+Astro.response.status = 404;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
+---
+
+<PreviewLayout title="Preview" description="This page is part of a website preview.">
+  <main class="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-6 text-center">
+    <p class="text-sm font-medium tracking-wide uppercase opacity-60">Website preview</p>
+    <h1 class="max-w-xl text-3xl font-semibold text-balance">
+      This part of the site comes alive when it's claimed
+    </h1>
+    <p class="max-w-md text-balance opacity-70">
+      You're looking at a preview. Property pages, search, and booking activate
+      once the site goes live.
+    </p>
+    <button
+      class="mt-2 rounded-full border px-6 py-2.5 text-sm font-medium"
+      onclick="history.back()"
+    >
+      Back to the preview
+    </button>
+  </main>
+</PreviewLayout>
