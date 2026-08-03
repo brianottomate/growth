@@ -102,12 +102,18 @@ export type PregenNativePage = {
 
 /** Brand kit extracted from the homepage (monolith: SiteEditorEvaluatedBrandKit). */
 export type PregenNativeBrandKit = {
-  businessName?: string;
-  locations?: string[];
-  propertyTypes?: string[];
-  inventoryMode?: string;
-  voiceBrief?: string;
-  branding?: Record<string, unknown>;
+  businessName: string;
+  locations: string[];
+  locationContext?: {
+    guestFacingLocation: string;
+    destination?: string;
+    mailingAddressLocation?: string;
+    sourceOfTruth: string;
+    confidence: string;
+  };
+  propertyTypes: string[];
+  inventoryMode: string;
+  voiceBrief: { heroTitle: string; heroSubtitle: string; ctaText: string };
 };
 
 // ---- TABLES --------------------------------------------------------
