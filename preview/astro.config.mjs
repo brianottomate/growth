@@ -38,6 +38,13 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    ssr: {
+      // Keep the registry inside Vite's resolver so the icons-root alias
+      // below applies in dev SSR too. Design-system packages stay external:
+      // they're CJS, and Node's import-CJS interop handles them correctly
+      // where Vite's ESM bundling would not.
+      noExternal: ["@wandercom/website-registry"],
+    },
     resolve: {
       alias: [
         // Published registry dist imports the icons package ROOT, which the
