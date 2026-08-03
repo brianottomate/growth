@@ -34,7 +34,21 @@ export function RenderSections({ artifact }: { artifact: PregenArtifact }) {
 
   return (
     <>
-      <NavBar website={website} />
+      <NavBar
+        website={website}
+        // Without an explicit logoIcon the mobile header renders no brand at
+        // all (the text logo is desktop-only), which reads as an unfinished
+        // site on the device most prospects open the email on.
+        logoIcon={<span className="text-base font-semibold">{website.title}</span>}
+        actionButton={
+          <a
+            href="#properties"
+            className="bg-content-primary text-default rounded-full px-4 py-2 text-sm font-medium"
+          >
+            Browse homes
+          </a>
+        }
+      />
       {(homepage.sections as Section[]).map((section, index) => (
         <RenderSection
           key={index}
@@ -72,6 +86,10 @@ function RenderSection({
           properties={
             section.showPropertyGallery ? (properties as never) : ([] as never)
           }
+          // Vision picks bright daylight exteriors and aerials for the hero, so
+          // the template's 35% scrim leaves the subtitle hard to read. 45 is the
+          // next supported step.
+          backgroundOpacity={45}
           pricingDisplayMode="SHOW_PRICING"
         />
       );
@@ -79,6 +97,7 @@ function RenderSection({
       return (
         <PropertyGallery
           {...(s as object)}
+          id="properties"
           properties={properties as never}
           pricingDisplayMode="SHOW_PRICING"
         />
