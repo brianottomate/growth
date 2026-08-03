@@ -17,6 +17,10 @@ export default defineConfig(
       "node_modules/**",
       ".velite/**",
       "scripts/amplitude-taxonomy/**",
+      // `preview/**` is the standalone pregen preview Astro app with its own
+      // package.json, tsconfig and toolchain (astro check). Not part of the
+      // Next.js app; its imports don't resolve from the root.
+      "preview/**",
       // `agents/**` are standalone sub-projects with their own package.json,
       // dependencies and tsconfig (see agents/gdpr-scan). They are not part of
       // the Next.js app and their imports (e.g. `eve`) don't resolve from the
