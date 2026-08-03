@@ -21,14 +21,21 @@ export type PregenArtifact = {
   }>;
   extractedProperties: Array<{
     name: string;
-    url?: string;
     imageUrls: string[];
     bedrooms?: number;
     bathrooms?: number;
-    sleeps?: number;
-    location?: string;
-    priceHint?: string;
+    occupancy?: number;
+    pricePerNight?: number;
+    priceEstimated?: boolean;
+    overallRating?: number;
+    totalReviews?: number;
+    city?: string;
   }>;
+  /**
+   * Track-1 (monolith) source only: units already in SearchUnit shape from
+   * the search endpoint's prospect override — used directly, no mapping.
+   */
+  searchUnits?: unknown[];
 };
 
 /**

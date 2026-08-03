@@ -19,9 +19,10 @@ export function RenderSections({ artifact }: { artifact: PregenArtifact }) {
     artifact.pages.find((p) => p.kind === "HOMEPAGE") ?? artifact.pages[0];
   if (!homepage) return null;
 
-  const properties = artifact.extractedProperties.map((unit, index) =>
-    toSearchUnit(unit, index),
-  );
+  const properties =
+    artifact.searchUnits && artifact.searchUnits.length > 0
+      ? (artifact.searchUnits as SearchUnitLike[])
+      : artifact.extractedProperties.map((unit, index) => toSearchUnit(unit, index));
 
   return (
     <>

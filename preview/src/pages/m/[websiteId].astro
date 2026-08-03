@@ -1,0 +1,32 @@
+---
+import PreviewLayout from "../../layouts/PreviewLayout.astro";
+import { RenderSections } from "../../components/RenderSections";
+import { getMonolithPreview } from "../../lib/monolith";
+
+// Track-1 source: monolith-built prospect previews. websiteId in the path,
+// preview token in ?t= (the monolith's token, not a pv_ native token).
+const { websiteId } = Astro.params;
+const token = Astro.url.searchParams.get("t");
+const artifact =
+  websiteId && token ? await getMonolithPreview(websiteId, token) : null;
+
+if (!artifact) {
+  return new Response("Not found", {
+    status: 404,
+    headers: {
+      "Cache-Control": "private, no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    },
+  });
+}
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+---
+
+<PreviewLayout title={artifact.config.title} description={artifact.config.description}>
+  <main>
+    <RenderSections artifact={artifact} client:load />
+  </main>
+</PreviewLayout>
