@@ -1,0 +1,45 @@
+---
+import { Font } from "astro:assets";
+import "../styles/global.css";
+
+export type Props = {
+  title?: string;
+  description?: string;
+};
+
+const {
+  title = "Blocks Preview",
+  description = "Interactive preview of Wander website blocks and UI components.",
+} = Astro.props;
+
+const pageTitle = title === "Blocks Preview" ? title : `${title} — Blocks Preview`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- Favicons -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/favicon-16x16.png" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+
+    <Font cssVariable="--font-instrument-sans" preload />
+  </head>
+  <body class="bg-surface-primary text-primary isolate h-svh overflow-hidden">
+    <main class="@container h-full">
+      <slot />
+    </main>
+  </body>
+</html>
