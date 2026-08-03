@@ -1,4 +1,4 @@
-import { MONOLITH_API_URL } from "astro:env/server";
+import { MONOLITH_PROD_API_URL, MONOLITH_STG_API_URL } from "astro:env/server";
 
 import type { PregenArtifact } from "./artifact";
 
@@ -8,8 +8,20 @@ import type { PregenArtifact } from "./artifact";
 // comes from the search endpoint, which the monolith answers from the
 // prospect's extractedUnits for org-less preview requests — the units arrive
 // already SearchUnit-shaped and pass through untouched (`searchUnits`).
+//
+// One URL, every environment: /m/<id>?t= tries staging then prod, so a link
+// keeps working no matter which environment built the prospect. Tokens are
+// per-environment bearer credentials; a cross-environment miss is a plain
+// 404, so the fallthrough probes nothing. `?env=stg|prod` pins one explicitly.
 
 const MAX_PAGES = 8;
+
+export type MonolithEnv = "stg" | "prod";
+
+const ENV_BASES: Array<{ env: MonolithEnv; base: string | undefined }> = [
+  { env: "stg", base: MONOLITH_STG_API_URL },
+  { env: "prod", base: MONOLITH_PROD_API_URL },
+];
 
 type MonolithConfig = {
   id: string;
@@ -27,9 +39,25 @@ type MonolithPageSummary = { slug: string; name: string; kind: string };
 export async function getMonolithPreview(
   websiteId: string,
   token: string,
+  env?: MonolithEnv,
 ): Promise<PregenArtifact | null> {
-  if (!MONOLITH_API_URL || !websiteId || !token) return null;
-  const base = MONOLITH_API_URL.replace(/\/$/, "");
+  const bases = ENV_BASES.filter(
+    (candidate) => candidate.base && (!env || candidate.env === env),
+  );
+  for (const candidate of bases) {
+    const artifact = await loadFromBase(candidate.base!, websiteId, token);
+    if (artifact) return artifact;
+  }
+  return null;
+}
+
+async function loadFromBase(
+  baseUrl: string,
+  websiteId: string,
+  token: string,
+): Promise<PregenArtifact | null> {
+  if (!websiteId || !token) return null;
+  const base = baseUrl.replace(/\/$/, "");
   const headers = {
     Accept: "application/json",
     "X-Prospect-Preview-Token": token,

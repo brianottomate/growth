@@ -1,14 +1,19 @@
 ---
 import PreviewLayout from "../../layouts/PreviewLayout.astro";
 import { RenderSections } from "../../components/RenderSections";
-import { getMonolithPreview } from "../../lib/monolith";
+import { getMonolithPreview, type MonolithEnv } from "../../lib/monolith";
 
 // Track-1 source: monolith-built prospect previews. websiteId in the path,
 // preview token in ?t= (the monolith's token, not a pv_ native token).
+// Environments are tried staging→prod so one link survives iteration across
+// them; `?env=stg|prod` pins a specific one.
 const { websiteId } = Astro.params;
 const token = Astro.url.searchParams.get("t");
+const envParam = Astro.url.searchParams.get("env");
+const env: MonolithEnv | undefined =
+  envParam === "stg" || envParam === "prod" ? envParam : undefined;
 const artifact =
-  websiteId && token ? await getMonolithPreview(websiteId, token) : null;
+  websiteId && token ? await getMonolithPreview(websiteId, token, env) : null;
 
 if (!artifact) {
   return new Response("Not found", {

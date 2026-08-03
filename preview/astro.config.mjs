@@ -63,11 +63,17 @@ export default defineConfig({
   env: {
     schema: {
       PREGEN_API_URL: envField.string({ context: "server", access: "secret" }),
-      MONOLITH_API_URL: envField.string({
+      MONOLITH_STG_API_URL: envField.string({
         context: "server",
         access: "secret",
         optional: true,
         default: "https://api.gke.staging.wander.com",
+      }),
+      MONOLITH_PROD_API_URL: envField.string({
+        context: "server",
+        access: "secret",
+        optional: true,
+        default: "https://api.gke.wander.com",
       }),
       PUBLIC_API_URL: envField.string({ context: "client", access: "public", optional: true }),
       PUBLIC_IMAGE_API_URL: envField.string({
