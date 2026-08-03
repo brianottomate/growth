@@ -1,7 +1,6 @@
 import "server-only";
 
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AuthInfo, McpServer } from "@modelcontextprotocol/server";
 import { anthropic } from "@ai-sdk/anthropic";
 import {
   generateText,
@@ -24,10 +23,10 @@ import { growthActionPolicies } from "../kernel/policy";
 import { buildGrowthToolRuntime } from "../kernel/runtime";
 import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
 
-type ToolExtra = { authInfo?: AuthInfo };
+type ToolContext = { http?: { authInfo?: AuthInfo } };
 
-function identityFrom(extra: ToolExtra) {
-  const values = extra.authInfo?.extra as
+export function identityFromMcpContext(context: ToolContext) {
+  const values = context.http?.authInfo?.extra as
     | { orgId?: unknown; userId?: unknown }
     | undefined;
   if (typeof values?.orgId !== "string" || typeof values.userId !== "string") {
@@ -108,7 +107,7 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
     async (input, extra) => {
       let runId: string | undefined;
       try {
-        const identity = identityFrom(extra);
+        const identity = identityFromMcpContext(extra);
         const context = composeGrowthContext({
           surface: "invoke-growth",
           maximumCharacters: 40_000,
@@ -215,7 +214,7 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
         let runId: string | undefined;
         try {
           const validatedInput = nativeDefinition.validationSchema.parse(input);
-          const identity = identityFrom(extra);
+          const identity = identityFromMcpContext(extra);
           const manifest = mcpContextManifest();
           runId = await startAssistantRun({
             organizationId: identity.orgId,
@@ -261,7 +260,7 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
             content: [{ type: "text" as const, text: JSON.stringify(output) }],
             structuredContent:
               output && typeof output === "object"
-                ? (output as Record<string, unknown>)
+                ? output
                 : { result: output },
           };
         } catch (error) {
