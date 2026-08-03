@@ -38,6 +38,20 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    resolve: {
+      alias: [
+        // Published registry dist imports the icons package ROOT, which the
+        // published icons package doesn't export ("./*" only). Exact-match
+        // regex so subpath imports (including the shim's own) pass through.
+        {
+          find: /^@wandercom\/design-system-icons$/,
+          replacement: new URL(
+            "./src/shims/design-system-icons.ts",
+            import.meta.url,
+          ).pathname,
+        },
+      ],
+    },
   },
   env: {
     schema: {
