@@ -89,10 +89,19 @@ const optString = () => z.string().optional();
 
 const EMPTY: CopySchema = { schema: z.object({}).strict(), promptHint: [] };
 
-const tuple = (schemas: z.ZodTypeAny[]) => {
-  const [first, ...rest] = schemas;
-  return first ? z.tuple([first, ...rest]) : z.tuple([]);
-};
+/**
+ * Positional contract as a fixed-key object (s1..sN). The monolith uses
+ * z.tuple, but Anthropic's structured-output API rejects tuple schemas
+ * ("Array types must be specified with a single object schema for 'items'"),
+ * so position rides in the key. Strictness semantics are identical: wrong
+ * shape → validation failure → template fallback.
+ */
+const positional = (schemas: z.ZodTypeAny[]) =>
+  z
+    .object(
+      Object.fromEntries(schemas.map((schema, i) => [`s${i + 1}`, schema])),
+    )
+    .strict();
 
 const homepageHero = (): CopySchema => ({
   schema: z.object({ title: optString(), description: optString() }).strict(),
@@ -220,7 +229,7 @@ export const buildCopySchema = (template: TemplateSection[]) => {
   const sectionSchemas = buildCopyGenerationPlan(template).map(
     ({ section }) => getCopySchema(section).schema,
   );
-  return z.object({ sections: tuple(sectionSchemas) });
+  return z.object({ sections: positional(sectionSchemas) });
 };
 
 // ---- PROMPT (verbatim text blocks, homepage path) ---------------------
@@ -548,9 +557,12 @@ export async function generateHomepageCopy(input: {
       prompt,
     });
 
+    const generated = output.sections;
     const sections = [...template];
     plan.forEach(({ templateIndex }, outputIndex) => {
-      const copy = output.sections[outputIndex] as Record<string, unknown> | undefined;
+      const copy = generated[`s${outputIndex + 1}`] as
+        | Record<string, unknown>
+        | undefined;
       const templateSection = sections[templateIndex];
       if (copy && templateSection) {
         sections[templateIndex] = mergeSectionCopy(templateSection, copy);
@@ -558,7 +570,12 @@ export async function generateHomepageCopy(input: {
     });
 
     return { sections, usedFallback: false };
-  } catch {
+  } catch (error) {
+    // Fallback keeps monolith behavior (stub copy beats a dead build), but the
+    // reason must be visible — a silent fallback looks like a working build.
+    console.error("[pregen] homepage copy generation failed, using template stubs", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { sections: template, usedFallback: true };
   }
 }

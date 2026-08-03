@@ -65,7 +65,7 @@ export async function crawlStep(ctx: StepContext) {
 
   const links = (mapped?.links ?? [])
     .map((l: { url: string } | string) => (typeof l === "string" ? l : l.url))
-    .filter((u: string) => sameOrigin(u, origin));
+    .filter((u: string) => sameSite(u, origin) && !NON_PAGE_PATH.test(u));
 
   const listingUrls = await selectListingPages(links);
 
@@ -194,10 +194,19 @@ function normalizeToOrigin(input: string): string {
   return new URL(withScheme).origin;
 }
 
-function sameOrigin(url: string, origin: string): boolean {
+const NON_PAGE_PATH = /\.(xml|pdf|jpe?g|png|webp|gif|svg|css|js|ico|txt)(\?|#|$)/i;
+
+/**
+ * Same site, www-insensitive: prospects' sites routinely redirect apex ↔ www,
+ * and Firecrawl maps the canonical host — an exact-origin filter silently
+ * drops every mapped link (first E2E run, cascadiagetaways.com).
+ */
+function sameSite(url: string, origin: string): boolean {
   try {
-    return new URL(url).origin === origin;
+    return stripWww(new URL(url).hostname) === stripWww(new URL(origin).hostname);
   } catch {
     return false;
   }
 }
+
+const stripWww = (hostname: string) => hostname.replace(/^www\./i, "");
