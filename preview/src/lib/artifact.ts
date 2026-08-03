@@ -1,9 +1,8 @@
-import { DATABASE_URL } from "astro:env/server";
-import { neon } from "@neondatabase/serverless";
+import { PREGEN_API_URL } from "astro:env/server";
 
 export type PregenArtifact = {
-  prospectId: string;
-  domain: string;
+  prospect: { domain: string; name: string | null };
+  version: number;
   config: {
     title: string;
     description: string;
@@ -33,45 +32,20 @@ export type PregenArtifact = {
 };
 
 /**
- * Resolve a preview token to its latest artifact. The token is the bearer
- * credential (`/p/<token>`); unknown tokens resolve to null and the route
- * 404s — same non-probing contract as the monolith preview endpoints.
+ * Resolve a preview token via the growth artifact API — the deliberate
+ * boundary between this renderer and the growth database. Unknown tokens
+ * are 404s and resolve to null; the route then 404s in turn.
  */
 export async function getArtifactByToken(
   token: string,
 ): Promise<PregenArtifact | null> {
-  if (!DATABASE_URL || !token) return null;
+  if (!PREGEN_API_URL || !token) return null;
 
-  const sql = neon(DATABASE_URL);
-  const rows = (await sql`
-    select
-      p.id as prospect_id,
-      p.domain,
-      a.config,
-      a.pages,
-      b.extracted_properties
-    from pregen_native_prospect p
-    join pregen_native_artifact a on a.prospect_id = p.id
-    join pregen_native_build b on b.id = a.build_id
-    where p.preview_token = ${token}
-    order by a.created_at desc
-    limit 1
-  `) as Array<{
-    prospect_id: string;
-    domain: string;
-    config: PregenArtifact["config"];
-    pages: PregenArtifact["pages"];
-    extracted_properties: PregenArtifact["extractedProperties"] | null;
-  }>;
+  const response = await fetch(
+    `${PREGEN_API_URL.replace(/\/$/, "")}/api/pregen/preview/${encodeURIComponent(token)}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!response.ok) return null;
 
-  const row = rows[0];
-  if (!row) return null;
-
-  return {
-    prospectId: row.prospect_id,
-    domain: row.domain,
-    config: row.config,
-    pages: row.pages,
-    extractedProperties: row.extracted_properties ?? [],
-  };
+  return (await response.json()) as PregenArtifact;
 }

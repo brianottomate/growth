@@ -41,7 +41,7 @@ export default defineConfig({
   },
   env: {
     schema: {
-      DATABASE_URL: envField.string({ context: "server", access: "secret" }),
+      PREGEN_API_URL: envField.string({ context: "server", access: "secret" }),
       PUBLIC_API_URL: envField.string({ context: "client", access: "public", optional: true }),
       PUBLIC_IMAGE_API_URL: envField.string({
         context: "client",

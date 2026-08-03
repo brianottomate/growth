@@ -100,6 +100,16 @@ export type PregenNativePage = {
   sections: unknown[]; // registry section unions; validated at generation time
 };
 
+/** Brand kit extracted from the homepage (monolith: SiteEditorEvaluatedBrandKit). */
+export type PregenNativeBrandKit = {
+  businessName?: string;
+  locations?: string[];
+  propertyTypes?: string[];
+  inventoryMode?: string;
+  voiceBrief?: string;
+  branding?: Record<string, unknown>;
+};
+
 // ---- TABLES --------------------------------------------------------
 
 /**
@@ -169,6 +179,12 @@ export const pregenNativeBuildTable = pgTable(
 
     /** Properties extracted during crawl, input to inject_properties. */
     extractedProperties: t.jsonb().$type<PregenNativeExtractedProperty[]>(),
+
+    // Step checkpoints: each generation step writes its output here so the
+    // runner can resume mid-pipeline and persist_artifact is pure assembly.
+    brandKit: t.jsonb().$type<PregenNativeBrandKit>(),
+    draftConfig: t.jsonb().$type<PregenNativeSiteConfig>(),
+    draftPages: t.jsonb().$type<PregenNativePage[]>(),
 
     startedAt: t.timestamp(),
     finishedAt: t.timestamp(),
