@@ -64,17 +64,21 @@ export type PregenNativeStepLogEntry = {
 
 /**
  * Property extracted from the prospect's site for the build-time property
- * grid. Deliberately NOT authoritative PMS data — display-grade only.
+ * grid. Mirrors the monolith's ProspectExtractedUnit so the same gallery
+ * component renders both sources. Display-grade, never authoritative PMS data.
  */
 export type PregenNativeExtractedProperty = {
   name: string;
-  url?: string;
   imageUrls: string[];
   bedrooms?: number;
   bathrooms?: number;
-  sleeps?: number;
-  location?: string;
-  priceHint?: string;
+  occupancy?: number;
+  pricePerNight?: number;
+  /** True when the price is a labeled estimate, not printed on their page. */
+  priceEstimated?: boolean;
+  overallRating?: number;
+  totalReviews?: number;
+  city?: string;
 };
 
 /**

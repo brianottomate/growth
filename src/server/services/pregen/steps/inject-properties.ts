@@ -1,11 +1,86 @@
 import "server-only";
 
+import { and, eq } from "drizzle-orm";
+
+import { db } from "@/server/db";
+import {
+  pregenNativeBuildTable,
+  pregenNativeCrawlPageTable,
+} from "@/server/db/schema";
+import {
+  applyPriceEstimates,
+  dropJunkUnits,
+  extractPropertiesFromPages,
+  fillUnitDetailsFromNames,
+  rankAndTrim,
+  toGalleryUnits,
+} from "../generation/units";
+
 import type { StepContext } from "../pipeline";
 
+/** Below this many units the gallery reads as broken; the build should fail
+ * loudly rather than ship a two-card grid. (Monolith MIN_GALLERY_UNITS.) */
+const MIN_GALLERY_UNITS = 3;
+
 /**
- * PORT PENDING — implemented against the monolith site-editor spec
- * (see docs/pregen-native-port-spec.md once the pipeline map lands).
+ * Property extraction (monolith: prospect-enrichment steps 4–6). Reads the
+ * crawl step's listing captures, extracts + grounds + filters units, and
+ * checkpoints them on the build row — the artifact API serves them to the
+ * renderer's property-gallery at build time (no search override needed).
  */
-export async function injectPropertiesStep(_ctx: StepContext) {
-  throw new Error("injectPropertiesStep not implemented yet (port in progress)");
+export async function injectPropertiesStep(ctx: StepContext) {
+  const [build, listingPages] = await Promise.all([
+    db.query.pregenNativeBuildTable.findFirst({
+      where: eq(pregenNativeBuildTable.id, ctx.buildId),
+      columns: { brandKit: true },
+    }),
+    db.query.pregenNativeCrawlPageTable.findMany({
+      where: and(
+        eq(pregenNativeCrawlPageTable.buildId, ctx.buildId),
+        eq(pregenNativeCrawlPageTable.kind, "property"),
+      ),
+      columns: { url: true, markdown: true, metadata: true },
+    }),
+  ]);
+
+  if (listingPages.length === 0) {
+    throw new Error("inject_properties: no listing pages captured by crawl");
+  }
+
+  const { properties, pageText } = await extractPropertiesFromPages(
+    listingPages.map((page) => ({
+      url: page.url,
+      markdown: page.markdown ?? "",
+      imageUrls: asStringArray(page.metadata?.imageUrls),
+    })),
+  );
+
+  const kept = await dropJunkUnits(properties);
+  const filled = fillUnitDetailsFromNames(kept);
+  const priced = await applyPriceEstimates(
+    filled,
+    build?.brandKit?.businessName ?? "",
+    pageText,
+  );
+  const units = toGalleryUnits(rankAndTrim(priced));
+
+  if (units.length < MIN_GALLERY_UNITS) {
+    throw new Error(
+      `inject_properties: only ${units.length} renderable units (need ${MIN_GALLERY_UNITS}) — extracted ${properties.length}, ${kept.length} after junk filter`,
+    );
+  }
+
+  await db
+    .update(pregenNativeBuildTable)
+    .set({ extractedProperties: units })
+    .where(eq(pregenNativeBuildTable.id, ctx.buildId));
+
+  return {
+    extracted: properties.length,
+    afterJunkFilter: kept.length,
+    galleryUnits: units.length,
+  };
 }
+
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
