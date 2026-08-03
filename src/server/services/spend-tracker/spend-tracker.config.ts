@@ -154,7 +154,7 @@ export const ACTIVE_CHANNELS: Channel[] = [
 export const FIXED_COST_TO_CHANNEL: Record<string, Channel> = {
   tv_linear: "mountain", // Comcast → TV
   content: "content", // Amortized content production (Brian, May 16 2026)
-  influencer: "influencer", // Influencer Program (Lefty etc.)
+  influencer: "influencer", // Influencer Program (Lefty retired Aug 2026)
   demand_sales: "demand_sales",
   direct_mail: "direct_mail",
   affiliate: "affiliate",
@@ -181,7 +181,7 @@ export const CHANNEL_CONFIG: Record<Channel, ChannelConfig> = {
   microsoft: { id: "microsoft", name: "Microsoft/Bing", abbreviation: "B", color: "#00897b", sourceLabel: "Paid Search" },
   criteo: { id: "criteo", name: "Criteo", abbreviation: "CR", color: "#f97316", sourceLabel: "Display" },
   mountain: { id: "mountain", name: "Comcast + Ad IDs", abbreviation: "TV", color: "#8b5cf6", sourceLabel: "Fixed Cost" },
-  influencer: { id: "influencer", name: "Influencers + Lefty", abbreviation: "INF", color: "#ec4899", sourceLabel: "Fixed Cost" },
+  influencer: { id: "influencer", name: "Influencers", abbreviation: "INF", color: "#ec4899", sourceLabel: "Fixed Cost" },
   content: { id: "content", name: "Amortized Content", abbreviation: "CNT", color: "#d946ef", sourceLabel: "Fixed Cost" },
   lifecycle: { id: "lifecycle", name: "Lifecycle", abbreviation: "CIO", color: "#10b981", sourceLabel: "Fixed Cost" },
   demand_sales: { id: "demand_sales", name: "Demand Sales + OpenPhone", abbreviation: "BDR", color: "#f59e0b", sourceLabel: "Fixed Cost" },
@@ -250,8 +250,8 @@ export const FIXED_COSTS: FixedCostEntry[] = [
   { category: "seo", partner: "Digitaloft", monthlyAmount: 0, effectiveMonth: "2026-06", note: "SEO cut from June onward (Decision #9i)" },
 
   // ---- August 2026 (migration 013 + Kyle Slack 2026-07-23) ----
-  { category: "influencer", partner: null, monthlyAmount: 0, effectiveMonth: "2026-08", note: "no active influencer spend after Lefty cancels; reconfirmed by Kyle 2026-07-23" },
-  { category: "affiliate", partner: "Acceleration Partners", monthlyAmount: 0, effectiveMonth: "2026-08", note: "Kyle Slack 2026-07-23: AP goes to $0 for August. NB: Kyle quoted the current amount as $6,500/mo; this config has carried $10,000 since 2026-05 (Decision #9a reconciliation) — discrepancy flagged, moot from August" },
+  { category: "influencer", partner: null, monthlyAmount: 0, effectiveMonth: "2026-08", note: "Lefty ($1,000/mo) cancelled — no active influencer retainer. Kyle 2026-07-23, reconfirmed by Kyle in #marketing-leads 2026-08-03" },
+  { category: "affiliate", partner: null, monthlyAmount: 0, effectiveMonth: "2026-08", note: "Acceleration Partners retainer ended — AP handed the Impact.com program back to Wander 8/1/26 (docs/affiliate-program-takeover.md), so there is no agency line item left to precommit. Kyle 2026-07-23, reconfirmed in #marketing-leads 2026-08-03. NB: Kyle quoted the old amount as $6,500/mo; this config carried $10,000 from 2026-05 (Decision #9a reconciliation) — discrepancy flagged, moot from August" },
   { category: "tv_linear", partner: "Comcast + Ad IDs", monthlyAmount: 0, effectiveMonth: "2026-08", note: "Kyle Slack 2026-07-23: Comcast paused while improving the marketplace" },
 ];
 
