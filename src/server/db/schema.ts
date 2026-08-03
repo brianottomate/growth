@@ -28,4 +28,5 @@ export * from "./lifecycle-schema";
 export * from "./transactional-schema";
 export * from "./listening-schema";
 export * from "./media-schema";
+export * from "./pregen-native-schema";
 export * from "./website-schema";
