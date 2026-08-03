@@ -101,7 +101,7 @@ export async function evaluateHomepage(
   tone: BrandKitTone,
 ): Promise<EvaluatedBrandKit> {
   const { output } = await generateText({
-    model: anthropic("claude-haiku-4-5-20251001"),
+    model: anthropic("claude-sonnet-5"),
     output: Output.object({ schema: BusinessContextOutput }),
     temperature: 0,
     system: buildEvaluateHomepagePrompt(tone),

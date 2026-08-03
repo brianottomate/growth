@@ -541,7 +541,7 @@ export async function generateHomepageCopy(input: {
 
   try {
     const { output } = await generateText({
-      model: anthropic("claude-haiku-4-5-20251001"),
+      model: anthropic("claude-sonnet-5"),
       output: Output.object({ schema }),
       temperature: 0.2,
       maxOutputTokens: 16_000,
