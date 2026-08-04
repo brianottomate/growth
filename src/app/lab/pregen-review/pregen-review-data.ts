@@ -8,9 +8,25 @@ import {
   type PregenNativeBuildStep,
 } from "@/server/db/schema";
 import {
+  listLatestReceiptsByKind,
+  type PregenEvaluationReceiptRow,
+} from "@/server/services/pregen/evaluation";
+import {
   parsePregenSourceVisualReceipt,
   type PregenSourceVisualReceipt,
 } from "@/server/services/pregen/source-visual-types";
+
+export type PregenEvaluationView = {
+  id: string;
+  kind: PregenEvaluationReceiptRow["kind"];
+  status: PregenEvaluationReceiptRow["status"];
+  evaluatorType: PregenEvaluationReceiptRow["evaluatorType"];
+  evaluatorName: string;
+  evaluatorVersion: string;
+  model: string | null;
+  createdAt: string;
+  result: Record<string, unknown>;
+};
 
 export type PregenLiveRun = {
   prospect: {
@@ -63,6 +79,7 @@ export type PregenLiveRun = {
     state: "live" | "unavailable";
     checkedAt: string;
   };
+  evaluations: PregenEvaluationView[];
 };
 
 export async function loadPregenLiveRun(
@@ -120,9 +137,10 @@ export async function loadPregenLiveRun(
       ? "http://localhost:4400"
       : "https://pregen-preview.vercel.app";
   const previewUrl = `${previewBaseUrl}/p/${encodeURIComponent(prospect.previewToken)}`;
-  const [previewState, sourcePreview] = await Promise.all([
+  const [previewState, sourcePreview, latestReceipts] = await Promise.all([
     checkPreview(previewUrl),
     checkSourcePreview(prospect.sourceUrl),
+    listLatestReceiptsByKind(build.id),
   ]);
 
   return {
@@ -169,6 +187,17 @@ export async function loadPregenLiveRun(
       state: previewState,
       checkedAt: new Date().toISOString(),
     },
+    evaluations: latestReceipts.map((receipt) => ({
+      id: receipt.id,
+      kind: receipt.kind,
+      status: receipt.status,
+      evaluatorType: receipt.evaluatorType,
+      evaluatorName: receipt.evaluatorName,
+      evaluatorVersion: receipt.evaluatorVersion,
+      model: receipt.model,
+      createdAt: receipt.createdAt.toISOString(),
+      result: receipt.result,
+    })),
   };
 }
 

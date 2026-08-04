@@ -10,6 +10,7 @@ import {
   ExternalLink,
   FileJson2,
   FlaskConical,
+  Gavel,
   Monitor,
   RefreshCw,
   Smartphone,
@@ -18,7 +19,10 @@ import {
 
 import type { PregenSourceVisualReceipt } from "@/server/services/pregen/source-visual-types";
 
-import type { PregenLiveRun } from "./pregen-review-data";
+import type {
+  PregenEvaluationView,
+  PregenLiveRun,
+} from "./pregen-review-data";
 
 type Viewport = "desktop" | "mobile";
 type SourceMode = "receipt" | "live";
@@ -41,6 +45,10 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
     "idle" | "capturing" | "failed"
   >("idle");
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [evalState, setEvalState] = useState<"idle" | "running" | "failed">(
+    "idle",
+  );
+  const [evalError, setEvalError] = useState<string | null>(null);
   const rendererLive = run.preview.state === "live";
   const sourceLive = run.sourcePreview.state === "live";
   const sourceReceipt = run.sourceCapture.visualReceipt;
@@ -49,6 +57,30 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
   );
   const frameClass =
     viewport === "mobile" ? "h-[780px] w-[390px]" : "h-[820px] w-[1280px]";
+
+  async function runEvaluations() {
+    setEvalState("running");
+    setEvalError(null);
+
+    try {
+      const response = await fetch("/api/lab/pregen-review/evaluate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ buildId: run.build.id }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? "Evaluation failed");
+      }
+      setEvalState("idle");
+      router.refresh();
+    } catch (error) {
+      setEvalState("failed");
+      setEvalError(
+        error instanceof Error ? error.message : "Evaluation failed",
+      );
+    }
+  }
 
   async function captureOriginal() {
     setCaptureState("capturing");
@@ -138,12 +170,32 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
               )}
               {sourceReceipt ? "Recapture original" : "Capture original"}
             </button>
+            <button
+              type="button"
+              onClick={runEvaluations}
+              disabled={evalState === "running"}
+              className="flex items-center gap-2 rounded-xl border border-lime-300/20 bg-lime-300/[0.06] px-3 py-2 text-xs font-medium text-lime-200 hover:bg-lime-300/10 disabled:cursor-wait disabled:opacity-60"
+            >
+              {evalState === "running" ? (
+                <RefreshCw className="size-3 animate-spin" />
+              ) : (
+                <Gavel className="size-3" />
+              )}
+              {run.evaluations.length > 0
+                ? "Re-run evaluations"
+                : "Run evaluations"}
+            </button>
           </div>
         </div>
 
         {captureError ? (
           <div className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/[0.04] px-3 py-2 text-[9px] text-amber-100">
             Capture failed: {captureError}
+          </div>
+        ) : null}
+        {evalError ? (
+          <div className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/[0.04] px-3 py-2 text-[9px] text-amber-100">
+            Evaluation failed: {evalError}
           </div>
         ) : null}
 
@@ -166,8 +218,25 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
           <SurfaceCard
             number="3"
             title="Evaluation lab"
-            detail="No model, deterministic, or human evaluation receipts exist for this run yet."
-            state="not run"
+            detail={
+              run.evaluations.length > 0
+                ? run.evaluations
+                    .map((receipt) => `${humanize(receipt.kind)}: ${receipt.status}`)
+                    .join(" · ")
+                : "No model, deterministic, or human evaluation receipts exist for this run yet."
+            }
+            state={
+              run.evaluations.length > 0
+                ? `${run.evaluations.length} receipts`
+                : "not run"
+            }
+            active={
+              run.evaluations.length > 0 &&
+              run.evaluations.every((receipt) => receipt.status === "passed")
+            }
+            warning={run.evaluations.some(
+              (receipt) => receipt.status === "failed",
+            )}
           />
         </div>
       </header>
@@ -216,6 +285,28 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
           ))}
         </div>
       </section>
+
+      {run.evaluations.length > 0 ? (
+        <section className="border-b border-white/10 bg-[#0e0e0d] px-5 py-5">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <Gavel className="size-3.5 text-lime-300" /> Evaluation
+                receipts
+              </div>
+              <p className="mt-1 text-[9px] text-stone-500">
+                Independent verdicts on the persisted build. Reruns append;
+                these are the newest per kind.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2 lg:grid-cols-3">
+            {run.evaluations.map((receipt) => (
+              <EvaluationReceiptDetail key={receipt.id} receipt={receipt} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid min-h-[820px] lg:grid-cols-[250px_minmax(0,1fr)]">
         <aside className="border-r border-white/10 bg-[#0f0f0e] p-4">
@@ -292,10 +383,45 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
             </ReceiptCard>
           )}
 
-          <ReceiptCard title="Evaluation receipts" state="not run" tone="stone">
-            Fidelity, grounding, responsive, and editorial evaluations remain
-            future work.
-          </ReceiptCard>
+          {run.evaluations.length > 0 ? (
+            <ReceiptCard
+              title="Evaluation receipts"
+              state={`latest of ${run.evaluations.length}`}
+              tone={
+                run.evaluations.some((receipt) => receipt.status === "failed")
+                  ? "amber"
+                  : "lime"
+              }
+            >
+              <div className="space-y-2">
+                {run.evaluations.map((receipt) => (
+                  <div key={receipt.id} className="flex justify-between gap-3">
+                    <span>{humanize(receipt.kind)}</span>
+                    <span
+                      className={
+                        receipt.status === "passed"
+                          ? "font-medium text-lime-200"
+                          : receipt.status === "failed"
+                            ? "font-medium text-amber-200"
+                            : "font-medium text-stone-300"
+                      }
+                    >
+                      {humanize(receipt.status)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </ReceiptCard>
+          ) : (
+            <ReceiptCard
+              title="Evaluation receipts"
+              state="not run"
+              tone="stone"
+            >
+              Run evaluations to append immutable grounding, image-provenance,
+              and source-fidelity receipts for this build.
+            </ReceiptCard>
+          )}
         </aside>
 
         <section className="min-w-0 overflow-x-auto p-5">
@@ -600,6 +726,148 @@ function SourceStoryboard({
       </div>
     </section>
   );
+}
+
+function EvaluationReceiptDetail({
+  receipt,
+}: {
+  receipt: PregenEvaluationView;
+}) {
+  const statusTone =
+    receipt.status === "passed"
+      ? "border-lime-300/25 bg-lime-300/[0.05]"
+      : receipt.status === "failed"
+        ? "border-amber-300/30 bg-amber-300/[0.05]"
+        : "border-white/12 bg-white/[0.03]";
+
+  return (
+    <article className={`rounded-xl border p-4 ${statusTone}`}>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold text-white">
+          {humanize(receipt.kind)}
+        </span>
+        <span
+          className={`rounded px-1.5 py-0.5 text-[8px] font-bold tracking-widest uppercase ${
+            receipt.status === "passed"
+              ? "bg-lime-300/15 text-lime-200"
+              : receipt.status === "failed"
+                ? "bg-amber-300/20 text-amber-200"
+                : "bg-white/10 text-stone-300"
+          }`}
+        >
+          {humanize(receipt.status)}
+        </span>
+        <span className="ml-auto font-mono text-[7px] text-stone-600">
+          {receipt.evaluatorName}/{receipt.evaluatorVersion}
+          {receipt.model ? ` · ${receipt.model}` : ""}
+        </span>
+      </div>
+      <div className="mt-1 text-[8px] text-stone-600">
+        {humanize(receipt.evaluatorType)} evaluator ·{" "}
+        {formatTimestamp(receipt.createdAt)}
+      </div>
+      <div className="mt-3 space-y-2 text-[9px] leading-relaxed text-stone-400">
+        <ReceiptResultSummary receipt={receipt} />
+      </div>
+    </article>
+  );
+}
+
+function ReceiptResultSummary({ receipt }: { receipt: PregenEvaluationView }) {
+  const result = receipt.result;
+
+  if (result.skipped === true) {
+    return <p>Skipped: {String(result.reason ?? "no reason recorded")}</p>;
+  }
+
+  if (receipt.kind === "grounding") {
+    const claims = Array.isArray(result.claims)
+      ? (result.claims as Array<{
+          subject: string;
+          claim: string;
+          value: string;
+          grounded: boolean;
+          severity: string;
+        }>)
+      : [];
+    const ungrounded = claims.filter((claim) => !claim.grounded);
+    return (
+      <>
+        <p>
+          {String(result.groundedCount ?? 0)} of{" "}
+          {String(result.claimCount ?? 0)} numeric claims trace to the crawl
+          corpus.
+        </p>
+        {ungrounded.slice(0, 6).map((claim, index) => (
+          <p key={index} className="text-amber-200/90">
+            {claim.severity === "hard" ? "✗" : "▲"} {claim.subject}: {claim.claim}{" "}
+            {claim.value} not found in source
+          </p>
+        ))}
+        {ungrounded.length > 6 ? (
+          <p className="text-stone-600">
+            +{ungrounded.length - 6} more ungrounded claims in the stored
+            receipt
+          </p>
+        ) : null}
+      </>
+    );
+  }
+
+  if (receipt.kind === "image_selection") {
+    const unknown = Array.isArray(result.unknownProvenance)
+      ? (result.unknownProvenance as string[])
+      : [];
+    return (
+      <>
+        <p>
+          {String(result.imageCount ?? 0)} rendered images ·{" "}
+          {String(result.placeholderCount ?? 0)} placeholders ·{" "}
+          {String(result.unknownProvenanceCount ?? 0)} without source
+          provenance.
+        </p>
+        {unknown.slice(0, 3).map((url) => (
+          <p key={url} className="truncate font-mono text-[7px] text-amber-200/80">
+            {url}
+          </p>
+        ))}
+      </>
+    );
+  }
+
+  if (receipt.kind === "source_fidelity") {
+    const findings = Array.isArray(result.findings)
+      ? (result.findings as Array<{
+          excerpt: string;
+          issue: string;
+          severity: string;
+        }>)
+      : [];
+    return (
+      <>
+        <p>{String(result.summary ?? "")}</p>
+        {findings.slice(0, 4).map((finding, index) => (
+          <p
+            key={index}
+            className={
+              finding.severity === "major"
+                ? "text-amber-200/90"
+                : "text-stone-400"
+            }
+          >
+            [{finding.severity}] “{finding.excerpt}” — {finding.issue}
+          </p>
+        ))}
+        {findings.length > 4 ? (
+          <p className="text-stone-600">
+            +{findings.length - 4} more findings in the stored receipt
+          </p>
+        ) : null}
+      </>
+    );
+  }
+
+  return <p>Receipt stored; open the database row for full detail.</p>;
 }
 
 function ViewportButton({
