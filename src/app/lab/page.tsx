@@ -5,6 +5,11 @@ import Link from "next/link";
 
 const PAGES: { name: string; href: string; note?: string }[] = [
   {
+    name: "Property showcase",
+    href: "/lab/property-showcase",
+    note: "North Topsail scroll-world storyboard",
+  },
+  {
     name: "OG map",
     href: "/lab/og-map",
     note: "wander.com OG-image audit (Firecrawl)",
