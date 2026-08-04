@@ -1237,6 +1237,11 @@ function GroupTable({ group }: { group: PageGroup }) {
 // PAGE
 // =====================================================
 
+// The audit fetches the live sitemap and every page's meta tags. At build
+// time that network sweep races the 60s static-generation ceiling and can
+// fail the whole deploy; an audit should reflect request-time reality anyway.
+export const dynamic = "force-dynamic";
+
 export default async function OgMapPage() {
   const startTime = Date.now();
   const { audits, filteredCount, groups, source, error } =
