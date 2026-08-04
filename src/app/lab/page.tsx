@@ -4,20 +4,40 @@ import Link from "next/link";
 // Add new experiments here so they stay findable.
 
 const PAGES: { name: string; href: string; note?: string }[] = [
-  { name: "OG map", href: "/lab/og-map", note: "wander.com OG-image audit (Firecrawl)" },
-  { name: "Tracking audit", href: "/lab/tracking-audit", note: "provider × surface matrix" },
+  {
+    name: "OG map",
+    href: "/lab/og-map",
+    note: "wander.com OG-image audit (Firecrawl)",
+  },
+  {
+    name: "Tracking audit",
+    href: "/lab/tracking-audit",
+    note: "provider × surface matrix",
+  },
   { name: "Whiteboard", href: "/lab/whiteboard" },
   { name: "Pregen sites", href: "/lab/pregen-sites" },
+  {
+    name: "Pregen composition review",
+    href: "/lab/pregen-review",
+    note: "fixture-backed source → proposed → decision receipt",
+  },
   { name: "Growth system", href: "/lab/growth-system", note: "system map" },
   { name: "Message streams", href: "/lab/message-streams", note: "system map" },
   { name: "System map", href: "/lab/system" },
 ];
 
 const DIAGNOSTICS: { name: string; href: string; note?: string }[] = [
-  { name: "BigQuery", href: "/api/lab/bigquery", note: "connectivity + table access; ?email= for lead lookup" },
+  {
+    name: "BigQuery",
+    href: "/api/lab/bigquery",
+    note: "connectivity + table access; ?email= for lead lookup",
+  },
   { name: "BigQuery analytics", href: "/api/lab/bigquery-analytics" },
   { name: "BigQuery conversions", href: "/api/lab/bigquery-conversions" },
-  { name: "BigQuery property images", href: "/api/lab/bigquery-property-images" },
+  {
+    name: "BigQuery property images",
+    href: "/api/lab/bigquery-property-images",
+  },
   { name: "Customer.io", href: "/api/lab/cio" },
   { name: "Minerva", href: "/api/lab/minerva" },
   { name: "Outreach", href: "/api/lab/outreach" },
@@ -40,7 +60,7 @@ export default function LabIndexPage() {
       </div>
 
       <section>
-        <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wide">
+        <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
           Pages
         </h2>
         <ul className="space-y-2">
@@ -50,7 +70,9 @@ export default function LabIndexPage() {
                 {p.name}
               </Link>
               {p.note && (
-                <span className="text-muted-foreground ml-2 text-xs">{p.note}</span>
+                <span className="text-muted-foreground ml-2 text-xs">
+                  {p.note}
+                </span>
               )}
             </li>
           ))}
@@ -58,7 +80,7 @@ export default function LabIndexPage() {
       </section>
 
       <section>
-        <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wide">
+        <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
           Integration diagnostics (JSON)
         </h2>
         <ul className="space-y-2">
@@ -68,7 +90,9 @@ export default function LabIndexPage() {
                 {d.name}
               </Link>
               {d.note && (
-                <span className="text-muted-foreground ml-2 text-xs">{d.note}</span>
+                <span className="text-muted-foreground ml-2 text-xs">
+                  {d.note}
+                </span>
               )}
             </li>
           ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -77,6 +78,7 @@ export const useAnalytics = () => {
 // =====================================================
 
 export function AnalyticsProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const session = authClient.useSession();
   const lastIdentifiedUserId = useRef<string | null>(null);
 
@@ -378,11 +380,13 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-      <CookieBanner
-        isOpen={showBanner}
-        onAccept={handleAccept}
-        onDecline={handleDecline}
-      />
+      {!pathname.startsWith("/lab") ? (
+        <CookieBanner
+          isOpen={showBanner}
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+        />
+      ) : null}
     </AnalyticsContext.Provider>
   );
 }
