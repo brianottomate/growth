@@ -1,0 +1,101 @@
+{
+  "run_id": "cbr_01J9Z6M4T2A9",
+  "target_domain": "emeraldcoastcollection.com",
+  "status": "completed",
+  "brief_id": "3f2b6c18-7a54-4c2e-9d31-9a0f8f6b21c7",
+  "error": null,
+  "brief": {
+    "brief_id": "3f2b6c18-7a54-4c2e-9d31-9a0f8f6b21c7",
+    "context_package_id": "b41e9d02-5f77-4a19-8f4c-2c6e1d3a77b5",
+    "measurement_id": "msr_01J9Z4K2Q7X8",
+    "target_query": "best large beach houses with private pools in Destin for a family of 14",
+    "guest_intent": "A trip planner booking for a multi-generational group of about 14 wants to confirm which Destin-area beach houses genuinely sleep that many, which have a private pool they can heat in shoulder season, and how close the walk to the sand really is, before shortlisting a home.",
+    "working_title": "Destin Beach Houses With Private Pools That Sleep 14",
+    "summary": "A single decision-stage guide for groups of roughly 12 to 20 planning a Destin or 30A stay, answering the questions that decide the booking: how sleeping capacity is actually counted across bedrooms and bunk rooms, what a private pool means versus a shared community pool, when pool heating matters on the Emerald Coast, and how to judge beach-access distance. The page should give a citable, specific answer to each question rather than a listicle of homes, use the local context (walkable beach access, golf-cart travel, bay-side versus gulf-front trade-offs) that generic travel roundups omit, and close with a short checklist a planner can take into an availability search.",
+    "outline": [
+      {
+        "heading": "What 'sleeps 14' actually means in a Destin beach house",
+        "key_points": [
+          "How capacity is counted across bedrooms, bunk rooms and sleeper sofas, and why two homes with the same headline number sleep very differently",
+          "Bed-configuration questions to ask for a multi-generational group: primary suites on separate floors, a bunk room for kids, ground-floor bedroom for grandparents",
+          "Bathroom-to-guest ratio as the practical comfort limit for groups of 12 to 20"
+        ]
+      },
+      {
+        "heading": "Private pool vs shared pool: what to check before booking",
+        "key_points": [
+          "Private heated pool attached to the home versus a shared community pool, and how listings blur the two",
+          "When pool heating is worth it on the Emerald Coast, typically in the cooler shoulder months",
+          "Pool safety considerations for groups travelling with young children"
+        ]
+      },
+      {
+        "heading": "Beachfront, gulf-view or bayfront: picking the right side of the road",
+        "key_points": [
+          "Beachfront houses versus gulf-view condos versus bayfront cottages, and the trade-offs in price, privacy and noise",
+          "What a walkable beach access under three minutes means in practice compared with a listed distance in miles",
+          "Why bay-side homes suit paddleboarding and boat-oriented trips while gulf-front suits beach-day-heavy trips"
+        ]
+      },
+      {
+        "heading": "Destin vs 30A / Santa Rosa Beach for a big group",
+        "key_points": [
+          "Destin for charter fishing, dining density and shorter drives; 30A for quieter beaches and a slower pace",
+          "How golf-cart access changes what is reachable without moving cars",
+          "Typical drive times between the two areas so a group can split activity days"
+        ]
+      },
+      {
+        "heading": "Amenities that matter at group scale",
+        "key_points": [
+          "Elevator for multi-storey homes with older travellers or heavy beach gear",
+          "Game room and outdoor space as the difference between a group co-existing and a group crowding",
+          "Beach chair service and included golf cart as cost items that are easy to overlook when comparing nightly rates",
+          "Pet-friendly rules and where they commonly carry restrictions"
+        ]
+      },
+      {
+        "heading": "What a group of 14 should expect to pay",
+        "key_points": [
+          "Seasonality on the Emerald Coast and how peak summer, spring break and shoulder season differ",
+          "Nightly rate ranges roughly from the low four hundreds to just over one thousand depending on season and position",
+          "Per-person maths as the fairer comparison against booking several condos or hotel rooms",
+          "Minimum-stay patterns in peak weeks and how they constrain arrival days"
+        ]
+      },
+      {
+        "heading": "Booking checklist for a 14-guest stay",
+        "key_points": [
+          "Confirm true sleeping capacity, pool privacy and heating, beach-access distance, parking count and cancellation terms",
+          "Book far enough ahead for peak summer weeks, when large private-pool homes go first",
+          "Ask about 24/7 local guest support before arrival, and how mid-stay issues are handled"
+        ]
+      }
+    ],
+    "entities_to_cover": [
+      "Destin",
+      "30A",
+      "Santa Rosa Beach",
+      "Florida Panhandle",
+      "Emerald Coast",
+      "private heated pool",
+      "bunk room",
+      "beachfront house",
+      "gulf-view condo",
+      "bayfront cottage",
+      "elevator",
+      "golf cart",
+      "beach chair service",
+      "pet friendly",
+      "multi-generational family travel",
+      "deep-sea fishing charter",
+      "paddleboarding",
+      "sunset dolphin cruise",
+      "state park hiking",
+      "shoulder season pricing",
+      "minimum stay"
+    ],
+    "recommended_page_kind": "guide",
+    "suggested_word_count": 1600
+  }
+}

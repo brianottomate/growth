@@ -71,6 +71,8 @@ test-data/
 generated-videos/
 reports/
 runs/
+# Immutable blog-workbench run fixtures are tracked despite the generic runs/ ignore.
+!fixtures/blog/runs/
 future-plans/
 
 # Private, locally generated HubSpot email corpora live under reports/private/.

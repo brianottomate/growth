@@ -1,0 +1,427 @@
+import "server-only";
+
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, Output } from "ai";
+import { z } from "zod";
+
+import { runDeterministicChecks, type CheckReceipt } from "./checks";
+import type { GeneratedArticle } from "./checks";
+import {
+  ADAPTER_VERSION,
+  MISSING_INPUTS,
+  normalizeSeoResponseToBrief,
+  seoEngineResponseSchema,
+  type ContentBriefInput,
+  type MissingInput,
+  type SeoEngineResponse,
+} from "./contract";
+import { evaluateArticle, type EvaluatorReceipt } from "./evaluate";
+import {
+  buildCrawlDerivedGrounding,
+  type GroundingContextRecord,
+} from "./grounding";
+import { buildContentBriefPagePrompt, PROMPT_VERSION } from "./prompt";
+
+// The executable golden run: one complete content-generation run, persisted
+// as an immutable record the workbench renders. Successful runs are never
+// edited; a rerun writes a new directory and latest.json moves.
+
+export const RUN_SCHEMA_VERSION = "blog-golden-run/v1";
+
+const WRITER_MODEL = "claude-opus-5";
+
+// Assumed per-MTok USD rates for the cost estimate. Estimates only; verify
+// against current pricing before quoting anywhere that matters.
+const ESTIMATED_RATES: Record<string, { input: number; output: number }> = {
+  "claude-opus-5": { input: 15, output: 75 },
+  "claude-sonnet-5": { input: 3, output: 15 },
+};
+
+export type UsageEntry = {
+  stage: string;
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number;
+  estCostUsd: number | null;
+};
+
+export type BlogRunRecord = {
+  schemaVersion: typeof RUN_SCHEMA_VERSION;
+  runId: string;
+  createdAt: string;
+  fixturePath: string;
+  adapterVersion: string;
+  promptVersion: string;
+  writerModel: string;
+  missingInputs: MissingInput[];
+  transportAdjustments: string[];
+  stages: {
+    rawResponse: SeoEngineResponse;
+    normalizedBrief: ContentBriefInput;
+    grounding: GroundingContextRecord;
+    prompt: { version: string; text: string };
+    article: GeneratedArticle;
+  };
+  storyboard: Array<{
+    index: number;
+    heading: string;
+    keyPoints: string[];
+    generatedHeading: string | null;
+    wordCount: number;
+  }>;
+  receipts: {
+    deterministic: CheckReceipt[];
+    evaluator: EvaluatorReceipt;
+  };
+  usage: UsageEntry[];
+  totals: { estCostUsd: number | null; wordCount: number; latencyMs: number };
+};
+
+const FIXTURE_DIR = path.resolve("fixtures/blog");
+const FIXTURE_RESPONSE = path.join(FIXTURE_DIR, "seo-engine-response.json");
+
+// Long-form prose is generated as plain markdown, not structured JSON: a
+// 1,600-word article inside a strict schema is exactly the shape that dies
+// on provider validation (the first attempt came back without a valid
+// `sections` array). Sections are split deterministically at `## ` headings
+// afterwards, and SEO metadata comes from a separate small structured call.
+const MetadataOutput = z.object({
+  metaTitle: z
+    .string()
+    .describe("SEO title tag for the page, at most 60 characters"),
+  metaDescription: z
+    .string()
+    .describe("SEO meta description, at most 160 characters"),
+});
+
+export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
+  const raw = seoEngineResponseSchema.parse(
+    JSON.parse(await readFile(FIXTURE_RESPONSE, "utf8")),
+  );
+  const brief = normalizeSeoResponseToBrief(raw);
+
+  // Grounding is cached on disk: the crawl-derived stand-in is itself a
+  // fixture once built, so reruns iterate on generation, not crawling.
+  const groundingPath = path.join(
+    FIXTURE_DIR,
+    "grounding",
+    `${raw.target_domain.replace(/[^a-z0-9]+/gi, "-")}.json`,
+  );
+  let grounding: GroundingContextRecord;
+  try {
+    grounding = JSON.parse(
+      await readFile(groundingPath, "utf8"),
+    ) as GroundingContextRecord;
+  } catch {
+    grounding = await buildCrawlDerivedGrounding(raw.target_domain);
+    await mkdir(path.dirname(groundingPath), { recursive: true });
+    await writeFile(
+      groundingPath,
+      `${JSON.stringify(grounding, null, 2)}\n`,
+      "utf8",
+    );
+  }
+
+  const promptText = buildContentBriefPagePrompt(brief, grounding.context);
+
+  const usage: UsageEntry[] = [];
+  const transportAdjustments: string[] = [];
+
+  const writerStart = Date.now();
+  const { text: articleMarkdown, usage: writerUsage } = await generateText({
+    model: anthropic(WRITER_MODEL),
+    maxOutputTokens: 32_000,
+    system: promptText,
+    prompt: [
+      "Write the guide now as markdown, following the section outline",
+      "exactly: one `## ` heading per outline heading, verbatim, in order.",
+      "No title line before the first heading, no closing sign-off after",
+      "the last section.",
+    ].join("\n"),
+  });
+  usage.push(
+    usageEntry("writer", WRITER_MODEL, writerUsage, Date.now() - writerStart),
+  );
+
+  const sections = splitMarkdownSections(articleMarkdown, transportAdjustments);
+
+  const metadataStart = Date.now();
+  const { output: metadata, usage: metadataUsage } = await generateText({
+    model: anthropic("claude-sonnet-5"),
+    output: Output.object({ schema: MetadataOutput }),
+    system: [
+      "Write SEO metadata for the article below. metaTitle at most 60",
+      "characters, metaDescription at most 160. Plain, specific, no",
+      "clickbait, no em dashes.",
+    ].join("\n"),
+    prompt: [
+      `Working title: ${brief.workingTitle}`,
+      `Target query: ${brief.targetQuery}`,
+      "",
+      articleMarkdown.slice(0, 8_000),
+    ].join("\n"),
+  });
+  usage.push(
+    usageEntry(
+      "metadata",
+      "claude-sonnet-5",
+      metadataUsage,
+      Date.now() - metadataStart,
+    ),
+  );
+
+  // The narrow transport adapter from the blog-workbench handoff: metadata
+  // slightly over a hard limit is shortened at a word boundary and recorded,
+  // instead of discarding an otherwise complete article. Deliberately small;
+  // resist growing it into a rewriting utility.
+  const article: GeneratedArticle = {
+    metaTitle: shortenAtWordBoundary(
+      metadata.metaTitle,
+      60,
+      "metaTitle",
+      transportAdjustments,
+    ),
+    metaDescription: shortenAtWordBoundary(
+      metadata.metaDescription,
+      160,
+      "metaDescription",
+      transportAdjustments,
+    ),
+    sections,
+  };
+
+  const deterministic = runDeterministicChecks(
+    article,
+    brief,
+    grounding.context,
+  );
+  const evaluator = await evaluateArticle(article, brief, grounding.context);
+  usage.push({
+    stage: "evaluator",
+    model: evaluator.model,
+    inputTokens: evaluator.usage.inputTokens,
+    outputTokens: evaluator.usage.outputTokens,
+    latencyMs: evaluator.latencyMs,
+    estCostUsd: estimateCost(evaluator.model, evaluator.usage),
+  });
+  if (grounding.usage.inputTokens != null) {
+    usage.push({
+      stage: "grounding-extraction",
+      model: grounding.model,
+      inputTokens: grounding.usage.inputTokens,
+      outputTokens: grounding.usage.outputTokens,
+      latencyMs: 0,
+      estCostUsd: estimateCost(grounding.model, grounding.usage),
+    });
+  }
+
+  const runId = `bgr_${new Date().toISOString().replace(/[:.]/g, "-")}`;
+  const record: BlogRunRecord = {
+    schemaVersion: RUN_SCHEMA_VERSION,
+    runId,
+    createdAt: new Date().toISOString(),
+    fixturePath: "fixtures/blog/seo-engine-response.json",
+    adapterVersion: ADAPTER_VERSION,
+    promptVersion: PROMPT_VERSION,
+    writerModel: WRITER_MODEL,
+    missingInputs: MISSING_INPUTS,
+    transportAdjustments,
+    stages: {
+      rawResponse: raw,
+      normalizedBrief: brief,
+      grounding,
+      prompt: { version: PROMPT_VERSION, text: promptText },
+      article,
+    },
+    storyboard: brief.outline.map((section, index) => ({
+      index: index + 1,
+      heading: section.heading,
+      keyPoints: section.keyPoints,
+      generatedHeading: article.sections[index]?.heading ?? null,
+      wordCount: countWords(article.sections[index]?.markdown ?? ""),
+    })),
+    receipts: { deterministic, evaluator },
+    usage,
+    totals: {
+      estCostUsd: sumCosts(usage),
+      wordCount: article.sections.reduce(
+        (total, section) => total + countWords(section.markdown),
+        0,
+      ),
+      latencyMs: usage.reduce((total, entry) => total + entry.latencyMs, 0),
+    },
+  };
+
+  const runDirectory = path.join(FIXTURE_DIR, "runs", runId);
+  await mkdir(runDirectory, { recursive: true });
+  await writeFile(
+    path.join(runDirectory, "run.json"),
+    `${JSON.stringify(record, null, 2)}\n`,
+    "utf8",
+  );
+  await writeFile(
+    path.join(runDirectory, "article.mdx"),
+    serializeArticleMdx(record),
+    "utf8",
+  );
+  await writeFile(
+    path.join(FIXTURE_DIR, "runs", "latest.json"),
+    `${JSON.stringify({ runId }, null, 2)}\n`,
+    "utf8",
+  );
+
+  return record;
+}
+
+export async function loadLatestBlogRun(): Promise<BlogRunRecord | null> {
+  try {
+    const pointer = JSON.parse(
+      await readFile(path.join(FIXTURE_DIR, "runs", "latest.json"), "utf8"),
+    ) as { runId: string };
+    return JSON.parse(
+      await readFile(
+        path.join(FIXTURE_DIR, "runs", pointer.runId, "run.json"),
+        "utf8",
+      ),
+    ) as BlogRunRecord;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadRawFixture(): Promise<SeoEngineResponse> {
+  return seoEngineResponseSchema.parse(
+    JSON.parse(await readFile(FIXTURE_RESPONSE, "utf8")),
+  );
+}
+
+/**
+ * Serializes the typed article into MDX with frontmatter shaped for the
+ * production velite posts collection. Drafts publish at the end of time,
+ * so compiling one never surfaces it as published content.
+ */
+function serializeArticleMdx(record: BlogRunRecord): string {
+  const { article, normalizedBrief } = record.stages;
+  const frontmatter = [
+    "---",
+    `h1: ${JSON.stringify(normalizedBrief.workingTitle)}`,
+    `metaTitle: ${JSON.stringify(article.metaTitle)}`,
+    `metaDescription: ${JSON.stringify(article.metaDescription)}`,
+    `publishedAt: "9999-12-31"`,
+    `category: Guides`,
+    `tags: []`,
+    "---",
+  ].join("\n");
+  const body = article.sections
+    .map((section) => `## ${section.heading}\n\n${section.markdown}`)
+    .join("\n\n");
+  return `${frontmatter}\n\n${body}\n`;
+}
+
+/**
+ * Deterministic transport step: split the writer's markdown into sections at
+ * `## ` headings. Preamble before the first heading is folded into the first
+ * section and recorded as an adjustment rather than silently dropped.
+ */
+function splitMarkdownSections(
+  markdown: string,
+  adjustments: string[],
+): Array<{ heading: string; markdown: string }> {
+  const sections: Array<{ heading: string; markdown: string }> = [];
+  let preamble = "";
+  let current: { heading: string; markdown: string } | null = null;
+
+  for (const line of markdown.split("\n")) {
+    const headingMatch = /^##\s+(.+?)\s*$/.exec(line);
+    if (headingMatch?.[1]) {
+      if (current) sections.push(current);
+      current = { heading: headingMatch[1], markdown: "" };
+      continue;
+    }
+    if (current) {
+      current.markdown += `${line}\n`;
+    } else if (line.trim() && !/^#\s/.test(line)) {
+      preamble += `${line}\n`;
+    }
+  }
+  if (current) sections.push(current);
+
+  if (preamble.trim() && sections[0]) {
+    sections[0].markdown = `${preamble}\n${sections[0].markdown}`;
+    adjustments.push(
+      `writer emitted ${countWords(preamble)} words before the first heading; folded into the first section`,
+    );
+  }
+
+  return sections.map((section) => ({
+    heading: section.heading,
+    markdown: section.markdown.trim(),
+  }));
+}
+
+function shortenAtWordBoundary(
+  value: string,
+  limit: number,
+  field: string,
+  adjustments: string[],
+): string {
+  if (value.length <= limit) return value;
+  const shortened = value
+    .slice(0, limit)
+    .replace(/\s+\S*$/, "")
+    .replace(/[,;:\s]+$/, "");
+  adjustments.push(
+    `${field} shortened at a word boundary from ${value.length} to ${shortened.length} chars`,
+  );
+  return shortened;
+}
+
+function usageEntry(
+  stage: string,
+  model: string,
+  usage: { inputTokens?: number; outputTokens?: number },
+  latencyMs: number,
+): UsageEntry {
+  const tokens = {
+    inputTokens: usage.inputTokens ?? null,
+    outputTokens: usage.outputTokens ?? null,
+  };
+  return {
+    stage,
+    model,
+    ...tokens,
+    latencyMs,
+    estCostUsd: estimateCost(model, tokens),
+  };
+}
+
+function estimateCost(
+  model: string,
+  usage: { inputTokens: number | null; outputTokens: number | null },
+): number | null {
+  const rates = ESTIMATED_RATES[model];
+  if (!rates || usage.inputTokens == null || usage.outputTokens == null) {
+    return null;
+  }
+  return (
+    (usage.inputTokens / 1_000_000) * rates.input +
+    (usage.outputTokens / 1_000_000) * rates.output
+  );
+}
+
+function sumCosts(entries: UsageEntry[]): number | null {
+  const costs = entries
+    .map((entry) => entry.estCostUsd)
+    .filter((cost): cost is number => cost != null);
+  return costs.length > 0
+    ? costs.reduce((total, cost) => total + cost, 0)
+    : null;
+}
+
+function countWords(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}

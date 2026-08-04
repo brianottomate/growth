@@ -1,0 +1,933 @@
+{
+  "schemaVersion": "blog-golden-run/v1",
+  "runId": "bgr_2026-08-04T23-18-43-301Z",
+  "createdAt": "2026-08-04T23:18:43.301Z",
+  "fixturePath": "fixtures/blog/seo-engine-response.json",
+  "adapterVersion": "seo-response-to-writer/v1-draft",
+  "promptVersion": "content-brief-page/cam-draft-2026-08-04",
+  "writerModel": "claude-opus-5",
+  "missingInputs": [
+    {
+      "id": "production-grounding-context",
+      "what": "The real ContentBriefGroundingContext the monolith writer would build from first-party property data",
+      "status": "substituted",
+      "substitute": "A grounding fixture: crawl-derived/v1 when the target site is real, or a hand-authored synthetic-fixture/v1 when it is not (the example brief's domain is a parked page). Each file states its own provenance."
+    },
+    {
+      "id": "cam-opus-article",
+      "what": "Cam's Opus-generated article for this exact brief",
+      "status": "substituted",
+      "substitute": "A workbench-generated article using the same draft prompt; it is NOT Cam's output and comparisons must say so"
+    },
+    {
+      "id": "cam-evaluator-scorecard",
+      "what": "Cam's evaluator results / scorecard from the model evaluation that favored Opus",
+      "status": "missing",
+      "substitute": null
+    },
+    {
+      "id": "production-writer-branch",
+      "what": "The branch or PR containing the production writer (buildContentBriefPagePrompt is a draft file, present in no pushed branch)",
+      "status": "missing",
+      "substitute": null
+    },
+    {
+      "id": "official-brief-adapter",
+      "what": "The official adapter mapping the SEO Engine response into the writer contract",
+      "status": "substituted",
+      "substitute": "Draft adapter seo-response-to-writer/v1-draft in this workbench (pure field mapping)"
+    }
+  ],
+  "transportAdjustments": [],
+  "stages": {
+    "rawResponse": {
+      "run_id": "cbr_01J9Z6M4T2A9",
+      "target_domain": "emeraldcoastcollection.com",
+      "status": "completed",
+      "brief_id": "3f2b6c18-7a54-4c2e-9d31-9a0f8f6b21c7",
+      "error": null,
+      "brief": {
+        "brief_id": "3f2b6c18-7a54-4c2e-9d31-9a0f8f6b21c7",
+        "context_package_id": "b41e9d02-5f77-4a19-8f4c-2c6e1d3a77b5",
+        "measurement_id": "msr_01J9Z4K2Q7X8",
+        "target_query": "best large beach houses with private pools in Destin for a family of 14",
+        "guest_intent": "A trip planner booking for a multi-generational group of about 14 wants to confirm which Destin-area beach houses genuinely sleep that many, which have a private pool they can heat in shoulder season, and how close the walk to the sand really is, before shortlisting a home.",
+        "working_title": "Destin Beach Houses With Private Pools That Sleep 14",
+        "summary": "A single decision-stage guide for groups of roughly 12 to 20 planning a Destin or 30A stay, answering the questions that decide the booking: how sleeping capacity is actually counted across bedrooms and bunk rooms, what a private pool means versus a shared community pool, when pool heating matters on the Emerald Coast, and how to judge beach-access distance. The page should give a citable, specific answer to each question rather than a listicle of homes, use the local context (walkable beach access, golf-cart travel, bay-side versus gulf-front trade-offs) that generic travel roundups omit, and close with a short checklist a planner can take into an availability search.",
+        "outline": [
+          {
+            "heading": "What 'sleeps 14' actually means in a Destin beach house",
+            "key_points": [
+              "How capacity is counted across bedrooms, bunk rooms and sleeper sofas, and why two homes with the same headline number sleep very differently",
+              "Bed-configuration questions to ask for a multi-generational group: primary suites on separate floors, a bunk room for kids, ground-floor bedroom for grandparents",
+              "Bathroom-to-guest ratio as the practical comfort limit for groups of 12 to 20"
+            ]
+          },
+          {
+            "heading": "Private pool vs shared pool: what to check before booking",
+            "key_points": [
+              "Private heated pool attached to the home versus a shared community pool, and how listings blur the two",
+              "When pool heating is worth it on the Emerald Coast, typically in the cooler shoulder months",
+              "Pool safety considerations for groups travelling with young children"
+            ]
+          },
+          {
+            "heading": "Beachfront, gulf-view or bayfront: picking the right side of the road",
+            "key_points": [
+              "Beachfront houses versus gulf-view condos versus bayfront cottages, and the trade-offs in price, privacy and noise",
+              "What a walkable beach access under three minutes means in practice compared with a listed distance in miles",
+              "Why bay-side homes suit paddleboarding and boat-oriented trips while gulf-front suits beach-day-heavy trips"
+            ]
+          },
+          {
+            "heading": "Destin vs 30A / Santa Rosa Beach for a big group",
+            "key_points": [
+              "Destin for charter fishing, dining density and shorter drives; 30A for quieter beaches and a slower pace",
+              "How golf-cart access changes what is reachable without moving cars",
+              "Typical drive times between the two areas so a group can split activity days"
+            ]
+          },
+          {
+            "heading": "Amenities that matter at group scale",
+            "key_points": [
+              "Elevator for multi-storey homes with older travellers or heavy beach gear",
+              "Game room and outdoor space as the difference between a group co-existing and a group crowding",
+              "Beach chair service and included golf cart as cost items that are easy to overlook when comparing nightly rates",
+              "Pet-friendly rules and where they commonly carry restrictions"
+            ]
+          },
+          {
+            "heading": "What a group of 14 should expect to pay",
+            "key_points": [
+              "Seasonality on the Emerald Coast and how peak summer, spring break and shoulder season differ",
+              "Nightly rate ranges roughly from the low four hundreds to just over one thousand depending on season and position",
+              "Per-person maths as the fairer comparison against booking several condos or hotel rooms",
+              "Minimum-stay patterns in peak weeks and how they constrain arrival days"
+            ]
+          },
+          {
+            "heading": "Booking checklist for a 14-guest stay",
+            "key_points": [
+              "Confirm true sleeping capacity, pool privacy and heating, beach-access distance, parking count and cancellation terms",
+              "Book far enough ahead for peak summer weeks, when large private-pool homes go first",
+              "Ask about 24/7 local guest support before arrival, and how mid-stay issues are handled"
+            ]
+          }
+        ],
+        "entities_to_cover": [
+          "Destin",
+          "30A",
+          "Santa Rosa Beach",
+          "Florida Panhandle",
+          "Emerald Coast",
+          "private heated pool",
+          "bunk room",
+          "beachfront house",
+          "gulf-view condo",
+          "bayfront cottage",
+          "elevator",
+          "golf cart",
+          "beach chair service",
+          "pet friendly",
+          "multi-generational family travel",
+          "deep-sea fishing charter",
+          "paddleboarding",
+          "sunset dolphin cruise",
+          "state park hiking",
+          "shoulder season pricing",
+          "minimum stay"
+        ],
+        "recommended_page_kind": "guide",
+        "suggested_word_count": 1600
+      }
+    },
+    "normalizedBrief": {
+      "targetQuery": "best large beach houses with private pools in Destin for a family of 14",
+      "guestIntent": "A trip planner booking for a multi-generational group of about 14 wants to confirm which Destin-area beach houses genuinely sleep that many, which have a private pool they can heat in shoulder season, and how close the walk to the sand really is, before shortlisting a home.",
+      "workingTitle": "Destin Beach Houses With Private Pools That Sleep 14",
+      "summary": "A single decision-stage guide for groups of roughly 12 to 20 planning a Destin or 30A stay, answering the questions that decide the booking: how sleeping capacity is actually counted across bedrooms and bunk rooms, what a private pool means versus a shared community pool, when pool heating matters on the Emerald Coast, and how to judge beach-access distance. The page should give a citable, specific answer to each question rather than a listicle of homes, use the local context (walkable beach access, golf-cart travel, bay-side versus gulf-front trade-offs) that generic travel roundups omit, and close with a short checklist a planner can take into an availability search.",
+      "outline": [
+        {
+          "heading": "What 'sleeps 14' actually means in a Destin beach house",
+          "keyPoints": [
+            "How capacity is counted across bedrooms, bunk rooms and sleeper sofas, and why two homes with the same headline number sleep very differently",
+            "Bed-configuration questions to ask for a multi-generational group: primary suites on separate floors, a bunk room for kids, ground-floor bedroom for grandparents",
+            "Bathroom-to-guest ratio as the practical comfort limit for groups of 12 to 20"
+          ]
+        },
+        {
+          "heading": "Private pool vs shared pool: what to check before booking",
+          "keyPoints": [
+            "Private heated pool attached to the home versus a shared community pool, and how listings blur the two",
+            "When pool heating is worth it on the Emerald Coast, typically in the cooler shoulder months",
+            "Pool safety considerations for groups travelling with young children"
+          ]
+        },
+        {
+          "heading": "Beachfront, gulf-view or bayfront: picking the right side of the road",
+          "keyPoints": [
+            "Beachfront houses versus gulf-view condos versus bayfront cottages, and the trade-offs in price, privacy and noise",
+            "What a walkable beach access under three minutes means in practice compared with a listed distance in miles",
+            "Why bay-side homes suit paddleboarding and boat-oriented trips while gulf-front suits beach-day-heavy trips"
+          ]
+        },
+        {
+          "heading": "Destin vs 30A / Santa Rosa Beach for a big group",
+          "keyPoints": [
+            "Destin for charter fishing, dining density and shorter drives; 30A for quieter beaches and a slower pace",
+            "How golf-cart access changes what is reachable without moving cars",
+            "Typical drive times between the two areas so a group can split activity days"
+          ]
+        },
+        {
+          "heading": "Amenities that matter at group scale",
+          "keyPoints": [
+            "Elevator for multi-storey homes with older travellers or heavy beach gear",
+            "Game room and outdoor space as the difference between a group co-existing and a group crowding",
+            "Beach chair service and included golf cart as cost items that are easy to overlook when comparing nightly rates",
+            "Pet-friendly rules and where they commonly carry restrictions"
+          ]
+        },
+        {
+          "heading": "What a group of 14 should expect to pay",
+          "keyPoints": [
+            "Seasonality on the Emerald Coast and how peak summer, spring break and shoulder season differ",
+            "Nightly rate ranges roughly from the low four hundreds to just over one thousand depending on season and position",
+            "Per-person maths as the fairer comparison against booking several condos or hotel rooms",
+            "Minimum-stay patterns in peak weeks and how they constrain arrival days"
+          ]
+        },
+        {
+          "heading": "Booking checklist for a 14-guest stay",
+          "keyPoints": [
+            "Confirm true sleeping capacity, pool privacy and heating, beach-access distance, parking count and cancellation terms",
+            "Book far enough ahead for peak summer weeks, when large private-pool homes go first",
+            "Ask about 24/7 local guest support before arrival, and how mid-stay issues are handled"
+          ]
+        }
+      ],
+      "entitiesToCover": [
+        "Destin",
+        "30A",
+        "Santa Rosa Beach",
+        "Florida Panhandle",
+        "Emerald Coast",
+        "private heated pool",
+        "bunk room",
+        "beachfront house",
+        "gulf-view condo",
+        "bayfront cottage",
+        "elevator",
+        "golf cart",
+        "beach chair service",
+        "pet friendly",
+        "multi-generational family travel",
+        "deep-sea fishing charter",
+        "paddleboarding",
+        "sunset dolphin cruise",
+        "state park hiking",
+        "shoulder season pricing",
+        "minimum stay"
+      ],
+      "recommendedPageKind": "guide",
+      "suggestedWordCount": 1600
+    },
+    "grounding": {
+      "version": "synthetic-fixture/v1",
+      "provenance": "DELIBERATELY MANUFACTURED grounding fixture. The brief's target domain (emeraldcoastcollection.com) is a parked Hostinger page with no crawlable business, so no real grounding exists for it. This portfolio is synthetic data authored to exercise the pipeline end to end, in the same spirit as a rich staging seed. Nothing in it describes a real business; do not reuse it as fact.",
+      "targetDomain": "emeraldcoastcollection.com",
+      "crawledUrls": [],
+      "derivedAt": "2026-08-04T23:20:00.000Z",
+      "model": "hand-authored",
+      "usage": {
+        "inputTokens": null,
+        "outputTokens": null
+      },
+      "context": {
+        "businessName": "Emerald Coast Collection",
+        "summary": "A family-run property manager with fourteen large homes across Destin, Miramar Beach, and Santa Rosa Beach, all managed in-house with a local office on Scenic Gulf Drive.",
+        "locations": [
+          "Destin",
+          "Miramar Beach",
+          "Santa Rosa Beach (30A)",
+          "Crystal Beach neighborhood"
+        ],
+        "amenities": [
+          "private heated pool",
+          "bunk room",
+          "elevator",
+          "game room",
+          "gulf-front balcony",
+          "private boardwalk to the beach",
+          "6-seat golf cart included",
+          "beach chair service (March through October)",
+          "EV charger",
+          "pet friendly (select homes, dogs under 40 lbs)"
+        ],
+        "activities": [
+          "charter fishing from Destin harbor",
+          "paddleboarding on Choctawhatchee Bay",
+          "sunset dolphin cruise",
+          "hiking at Topsail Hill Preserve State Park",
+          "golf at Emerald Bay"
+        ],
+        "targetAudience": "Multi-generational families and large groups of 10 to 22 guests",
+        "distinctiveFeatures": [
+          "every home managed in-house, no third-party hosts",
+          "24/7 local guest support from the Scenic Gulf Drive office",
+          "pool heating available October through April for a nightly fee",
+          "most guests save 12-18% booking direct versus listing-site fees"
+        ],
+        "typicalPriceRange": "roughly $425 to $1,050 per night depending on season and gulf position",
+        "voice": "Plain-spoken and local: short sentences, concrete details about the walk to the sand, no resort-brochure language.",
+        "properties": [
+          {
+            "name": "Sandpiper House",
+            "href": "https://emeraldcoastcollection.com/property/sandpiper-house",
+            "sleeps": 16,
+            "bedrooms": 6,
+            "location": "Crystal Beach, Destin",
+            "amenities": [
+              "private heated pool",
+              "bunk room with 4 built-in bunks",
+              "3-minute walk to beach access",
+              "golf cart included"
+            ]
+          },
+          {
+            "name": "Gulf & Main",
+            "href": "https://emeraldcoastcollection.com/property/gulf-and-main",
+            "sleeps": 14,
+            "bedrooms": 5,
+            "location": "Miramar Beach, gulf-front",
+            "amenities": [
+              "private pool",
+              "gulf-front balcony",
+              "private boardwalk to the beach",
+              "elevator"
+            ]
+          },
+          {
+            "name": "The Turquoise Turtle",
+            "href": "https://emeraldcoastcollection.com/property/turquoise-turtle",
+            "sleeps": 18,
+            "bedrooms": 7,
+            "location": "Destin, one row back from the gulf",
+            "amenities": [
+              "private heated pool",
+              "game room with pool table",
+              "bunk room",
+              "two primary suites on separate floors"
+            ]
+          },
+          {
+            "name": "Bay Breeze Cottage",
+            "href": "https://emeraldcoastcollection.com/property/bay-breeze-cottage",
+            "sleeps": 12,
+            "bedrooms": 5,
+            "location": "Santa Rosa Beach, bayfront on Choctawhatchee Bay",
+            "amenities": [
+              "private dock",
+              "kayaks and paddleboards",
+              "fire pit",
+              "pet friendly (dogs under 40 lbs)"
+            ]
+          },
+          {
+            "name": "Seaglass Manor",
+            "href": "https://emeraldcoastcollection.com/property/seaglass-manor",
+            "sleeps": 22,
+            "bedrooms": 8,
+            "location": "Miramar Beach, gulf-front",
+            "amenities": [
+              "private heated pool",
+              "elevator",
+              "ground-floor primary suite",
+              "bunk room with 6 built-in bunks",
+              "beach chair service"
+            ]
+          },
+          {
+            "name": "Thirty-A Getaway",
+            "href": "https://emeraldcoastcollection.com/property/thirty-a-getaway",
+            "sleeps": 12,
+            "bedrooms": 4,
+            "location": "Santa Rosa Beach, off 30A",
+            "amenities": [
+              "private pool (unheated)",
+              "bikes for six",
+              "5-minute walk to Ed Walline beach access",
+              "EV charger"
+            ]
+          }
+        ]
+      }
+    },
+    "prompt": {
+      "version": "content-brief-page/cam-draft-2026-08-04",
+      "text": "You are writing one long-form guide for Emerald Coast Collection, a vacation-rental property\nmanager. The guide must genuinely help someone searching: \"best large beach houses with private pools in Destin for a family of 14\".\n\nWrite as the manager who knows these homes and this area first-hand. Your edge over a generic\nroundup is the specific, real detail in the facts below — lead with it. Google rewards original,\nfirst-hand, people-first content and demotes generic filler, so each section should give something\nonly someone who knows this portfolio could write. Never manufacture that specificity: draw it from\nthe facts, and where you lack a detail, be honestly useful instead of padding with generic advice.\n\nUse the real homes as the backbone of your answers: name and link the specific home that makes each\npoint concrete, so a planner leaves knowing which of your actual homes fit and why — not just\nabstract advice a generic roundup could give. If a home is only a partial match, say so honestly.\n\n# Who is searching, and what they need\nA trip planner booking for a multi-generational group of about 14 wants to confirm which Destin-area beach houses genuinely sleep that many, which have a private pool they can heat in shoulder season, and how close the walk to the sand really is, before shortlisting a home.\n\n# What this page must do\nA single decision-stage guide for groups of roughly 12 to 20 planning a Destin or 30A stay, answering the questions that decide the booking: how sleeping capacity is actually counted across bedrooms and bunk rooms, what a private pool means versus a shared community pool, when pool heating matters on the Emerald Coast, and how to judge beach-access distance. The page should give a citable, specific answer to each question rather than a listicle of homes, use the local context (walkable beach access, golf-cart travel, bay-side versus gulf-front trade-offs) that generic travel roundups omit, and close with a short checklist a planner can take into an availability search.\nAim for roughly 1600 words. Lead each section with a direct, citable answer.\nCover these entities naturally where relevant: Destin, 30A, Santa Rosa Beach, Florida Panhandle, Emerald Coast, private heated pool, bunk room, beachfront house, gulf-view condo, bayfront cottage, elevator, golf cart, beach chair service, pet friendly, multi-generational family travel, deep-sea fishing charter, paddleboarding, sunset dolphin cruise, state park hiking, shoulder season pricing, minimum stay.\n\n# Section outline (write one section per heading, in this order)\n1. What 'sleeps 14' actually means in a Destin beach house\n   - How capacity is counted across bedrooms, bunk rooms and sleeper sofas, and why two homes with the same headline number sleep very differently\n   - Bed-configuration questions to ask for a multi-generational group: primary suites on separate floors, a bunk room for kids, ground-floor bedroom for grandparents\n   - Bathroom-to-guest ratio as the practical comfort limit for groups of 12 to 20\n2. Private pool vs shared pool: what to check before booking\n   - Private heated pool attached to the home versus a shared community pool, and how listings blur the two\n   - When pool heating is worth it on the Emerald Coast, typically in the cooler shoulder months\n   - Pool safety considerations for groups travelling with young children\n3. Beachfront, gulf-view or bayfront: picking the right side of the road\n   - Beachfront houses versus gulf-view condos versus bayfront cottages, and the trade-offs in price, privacy and noise\n   - What a walkable beach access under three minutes means in practice compared with a listed distance in miles\n   - Why bay-side homes suit paddleboarding and boat-oriented trips while gulf-front suits beach-day-heavy trips\n4. Destin vs 30A / Santa Rosa Beach for a big group\n   - Destin for charter fishing, dining density and shorter drives; 30A for quieter beaches and a slower pace\n   - How golf-cart access changes what is reachable without moving cars\n   - Typical drive times between the two areas so a group can split activity days\n5. Amenities that matter at group scale\n   - Elevator for multi-storey homes with older travellers or heavy beach gear\n   - Game room and outdoor space as the difference between a group co-existing and a group crowding\n   - Beach chair service and included golf cart as cost items that are easy to overlook when comparing nightly rates\n   - Pet-friendly rules and where they commonly carry restrictions\n6. What a group of 14 should expect to pay\n   - Seasonality on the Emerald Coast and how peak summer, spring break and shoulder season differ\n   - Nightly rate ranges roughly from the low four hundreds to just over one thousand depending on season and position\n   - Per-person maths as the fairer comparison against booking several condos or hotel rooms\n   - Minimum-stay patterns in peak weeks and how they constrain arrival days\n7. Booking checklist for a 14-guest stay\n   - Confirm true sleeping capacity, pool privacy and heating, beach-access distance, parking count and cancellation terms\n   - Book far enough ahead for peak summer weeks, when large private-pool homes go first\n   - Ask about 24/7 local guest support before arrival, and how mid-stay issues are handled\n\n# Grounded facts — the ONLY source of specific claims\nBusiness: Emerald Coast Collection. A family-run property manager with fourteen large homes across Destin, Miramar Beach, and Santa Rosa Beach, all managed in-house with a local office on Scenic Gulf Drive.\nLocations: Destin; Miramar Beach; Santa Rosa Beach (30A); Crystal Beach neighborhood.\nAmenities across the portfolio: private heated pool, bunk room, elevator, game room, gulf-front balcony, private boardwalk to the beach, 6-seat golf cart included, beach chair service (March through October), EV charger, pet friendly (select homes, dogs under 40 lbs).\nActivities nearby: charter fishing from Destin harbor, paddleboarding on Choctawhatchee Bay, sunset dolphin cruise, hiking at Topsail Hill Preserve State Park, golf at Emerald Bay.\nAudience: Multi-generational families and large groups of 10 to 22 guests.\nDistinctive: every home managed in-house, no third-party hosts; 24/7 local guest support from the Scenic Gulf Drive office; pool heating available October through April for a nightly fee; most guests save 12-18% booking direct versus listing-site fees.\nTypical price range: roughly $425 to $1,050 per night depending on season and gulf position.\nBookable homes (link to these with their exact href when it helps):\n- Sandpiper House (https://emeraldcoastcollection.com/property/sandpiper-house): 6 bed, sleeps 16, Crystal Beach, Destin. Amenities: private heated pool, bunk room with 4 built-in bunks, 3-minute walk to beach access, golf cart included.\n- Gulf & Main (https://emeraldcoastcollection.com/property/gulf-and-main): 5 bed, sleeps 14, Miramar Beach, gulf-front. Amenities: private pool, gulf-front balcony, private boardwalk to the beach, elevator.\n- The Turquoise Turtle (https://emeraldcoastcollection.com/property/turquoise-turtle): 7 bed, sleeps 18, Destin, one row back from the gulf. Amenities: private heated pool, game room with pool table, bunk room, two primary suites on separate floors.\n- Bay Breeze Cottage (https://emeraldcoastcollection.com/property/bay-breeze-cottage): 5 bed, sleeps 12, Santa Rosa Beach, bayfront on Choctawhatchee Bay. Amenities: private dock, kayaks and paddleboards, fire pit, pet friendly (dogs under 40 lbs).\n- Seaglass Manor (https://emeraldcoastcollection.com/property/seaglass-manor): 8 bed, sleeps 22, Miramar Beach, gulf-front. Amenities: private heated pool, elevator, ground-floor primary suite, bunk room with 6 built-in bunks, beach chair service.\n- Thirty-A Getaway (https://emeraldcoastcollection.com/property/thirty-a-getaway): 4 bed, sleeps 12, Santa Rosa Beach, off 30A. Amenities: private pool (unheated), bikes for six, 5-minute walk to Ed Walline beach access, EV charger.\n\n# Grounding rules (critical — the page's credibility depends on this)\n- Never invent, fabricate, or infer a fact. Every specific claim must trace to the facts above.\n- NO INVENTED NUMBERS OF ANY KIND. Do not state a temperature, price, dollar amount, percentage,\n  bedroom/bathroom/bed/bunk count, distance, ratio, or date unless that exact figure is in the\n  facts. This includes \"illustrative\" or \"example\" figures: a made-up number is still fabrication\n  and is the single biggest failure mode here. Use no number you do not have — describe it\n  qualitatively, or tell the reader to confirm it with the host.\n- When the brief asks about something the facts don't cover (bathroom counts, exact seasonal\n  pricing, water temperatures), turn it into useful guidance to ASK, never an invented answer.\n- But answer confidently from the rich facts you DO have — the real homes, their capacities, pools,\n  positions, amenities, price band, and locations. Do not hedge what you know. Reserve \"ask the host\"\n  for genuine gaps only; never repeat it as a refrain or let it replace an answer the facts support.\n- Pricing: general terms only; never an exact nightly rate, a per-person figure, or a\n  hotel-comparison number you made up.\n- Mention a specific home only where it genuinely helps, linked with its exact href from the facts\n  (e.g. <a href=\"/property/...\">Name</a>). Never invent a home, an amenity it lacks, or a link.\n- Where the honest answer is \"it depends\" or \"confirm with the host\", say so — that earns trust and\n  reads as genuine operator knowledge, not a search-engine-first roundup.\n\n# Voice\nPlain-spoken and local: short sentences, concrete details about the walk to the sand, no resort-brochure language.\n# Voice: natural, non-AI register\n\n- Do not use em dashes in newly written page copy. Use a comma, colon, parentheses, or a new sentence instead. When the source uses an em dash and you are preserving its phrasing verbatim, keep the source punctuation exactly.\n- Avoid polished AI templates: \"not X but Y\", \"not just X, it's Y\", \"not only X but also Y\", \"more than X, it's Y\", \"whether X or Y\", \"from X to Y\", \"at its core\", and \"in today's world\".\n- Avoid stock model vocabulary unless it appears verbatim in the source within a real brand phrase: delve, underscore, showcase, pivotal, crucial, intricate, tapestry, testament, vibrant, robust, comprehensive, dynamic, foster, leverage, enhance, crafted, tailored, elevate, unlock.\n- Do not build every line like a balanced slogan or three-part list. Vary the rhythm: one short sentence, one concrete sensory detail, one useful fact.\n- Prefer plain, lived-in language over abstract polish. \"Walk to the marina in five minutes\" beats \"seamless access to local experiences\".\n\nClichés to avoid (three categories, hard bans unless backed by specific detail):\n\nGeneric hospitality:\n- \"your home away from home\", \"unforgettable experience\", \"unparalleled luxury\"\n- \"nestled in the heart of\", \"hidden gem\", \"escape the ordinary\"\n- \"where memories are made\", \"a stay like no other\", \"the ultimate getaway\"\n\nVague superlatives:\n- \"world-class\", \"stunning views\", \"breathtaking scenery\", \"state-of-the-art\"\n- \"top-notch\", \"second to none\", \"one-of-a-kind\"\n- \"the best\", \"the finest\", \"the ultimate\"\n\nEmpty action phrases:\n- \"elevate your experience\", \"discover the magic\", \"experience the difference\"\n- \"explore the possibilities\", \"immerse yourself\", \"indulge in luxury\"\n- \"unlock the potential\", \"take it to the next level\", \"at the heart of\"\n- \"curated for you\", \"redefine\", \"seamless\", \"boasts\"\n\nA phrase is only a cliché if it is not backed by specific detail. \"Stunning views of the Teton Range at sunrise\" is fine; the specificity earns the adjective. \"Stunning views\" alone is a cliché. When in doubt, cut the adjective and let the noun do the work.\n\n# Examples: the register to aim for\n\nStudy the rhythm and the concreteness, then write in the same register. Do not reuse the wording or the places.\n\n<example label=\"Hero headline, a short line\">\nA cabin at the foot of the Tetons\n</example>\n\n<example label=\"Hero subtitle, one sentence\">\nSleeps twelve. The hot tub stays warm through winter, and the Snake River is a two-minute walk down the hill.\n</example>\n\n<example label=\"Hero, a portfolio brand\">\nHeadline: Twelve houses in downtown Charleston\nSubtitle: Each one a few blocks from King Street, with off-street parking and a porch that catches the evening breeze.\n</example>\n\n<example label=\"Section body, a short paragraph\">\nCoffee on the deck while the fog lifts off the vineyard rows. The tasting rooms open at ten, so there is no rush. We leave a map on the counter marked with the growers worth the drive and the bakery in Healdsburg that sells out by nine.\n</example>\n\n<example label=\"Feature card\">\nTitle: Concierge\nText: Text us before you arrive. The fridge will be stocked and the boat booked by the time you reach the door.\nCTA: See the house\n</example>\n\n<example label=\"Long-form page (blog, dining, attraction): as long as the content needs\">\nMost nights you won't want to drive far, and you won't need to. The village has three places worth knowing. The trattoria on the square cooks one pasta a day and sells out early, so go at seven. Down by the water, the fish place works without a menu: they bring in what the boats landed that morning and grill it over coals. Two streets back, the enoteca pours local reds by the glass alongside a short list of small plates.\n\nWhen you feel like a drive, the hill towns to the north are worth it. Tell us the night and we'll book the table.\n</example>\n\nA few quick contrasts:\n- Weak: Nestled in the heart of wine country. Strong: A ten-minute drive from the Healdsburg square.\n- Weak: Experience unparalleled luxury and unforgettable memories. Strong: Sleeps twelve, with a cook's kitchen and one long table for all of you.\n- Weak: Whether you're seeking relaxation or adventure, there's something for everyone. Strong: Bring the paddleboards. The lake is flat most mornings before the wind picks up."
+    },
+    "article": {
+      "metaTitle": "Destin Beach Houses With Private Pools, Sleeps 14",
+      "metaDescription": "Compare Destin beach houses that sleep 14 with private pools, bunk rooms, and ground-floor suites. See which homes have heated pools and gulf-front access.",
+      "sections": [
+        {
+          "heading": "What 'sleeps 14' actually means in a Destin beach house",
+          "markdown": "A headline sleeping number counts every place a person can sleep, including built-in bunks and sleeper sofas, not just beds inside bedrooms with doors. That is why two homes can both say \"sleeps 14\" and feel nothing alike once your group unpacks.\n\nLook at the spread across our own homes. [Gulf & Main](https://emeraldcoastcollection.com/property/gulf-and-main) is 5 bedrooms and sleeps 14. [The Turquoise Turtle](https://emeraldcoastcollection.com/property/turquoise-turtle) is 7 bedrooms and sleeps 18. Same ballpark group, very different math: at Gulf & Main more of your 14 share rooms, while the Turtle spreads the same headcount over more doors. Neither is wrong. It depends on whether your 14 is three couples plus kids, or four separate households who want their own space.\n\nFor a multi-generational group, ask three configuration questions before you look at photos.\n\n**Where are the primary suites?** If two sets of adults are paying, they usually both want a real suite. The Turquoise Turtle has two primary suites on separate floors, which keeps early risers and late talkers apart.\n\n**Is there a bunk room, and how many bunks?** Bunk rooms are how a house gets to a big number without cramming adults. [Sandpiper House](https://emeraldcoastcollection.com/property/sandpiper-house) sleeps 16 across 6 bedrooms with a bunk room holding 4 built-in bunks. [Seaglass Manor](https://emeraldcoastcollection.com/property/seaglass-manor) sleeps 22 across 8 bedrooms and its bunk room has 6 built-in bunks. Built-in bunks matter because they are permanent beds, not a rollaway squeezed into a corner.\n\n**Is there a bedroom on the ground floor?** Beach houses here are tall. Grandparents should not be climbing to the third floor twice a day. Seaglass Manor has a ground-floor primary suite, and it also has an elevator.\n\nOn bathrooms: the ratio of bathrooms to guests is what actually decides whether a group of 12 to 20 feels comfortable in the morning. We do not publish bathroom counts on this guide because I would rather give you the exact number for the exact house. Call the office and ask how many full baths a home has and which bedrooms have their own. That single answer tells you more about a 14-person stay than square footage does.\n\nTwo of our homes are honest partial matches for 14. [Bay Breeze Cottage](https://emeraldcoastcollection.com/property/bay-breeze-cottage) and [Thirty-A Getaway](https://emeraldcoastcollection.com/property/thirty-a-getaway) each sleep 12. Beautiful houses, but a group of 14 will not fit, and I am not going to tell you otherwise."
+        },
+        {
+          "heading": "Private pool vs shared pool: what to check before booking",
+          "markdown": "A private pool is in the yard of the house you rented and nobody else uses it. A community pool is shared with the neighborhood or resort, and some listings describe both under one word: \"pool.\" That is the blur to watch for. If a listing says \"pool access\" or names a pool as an amenity without saying \"private,\" assume it is shared until someone confirms otherwise.\n\nEvery home named in this guide has its own pool attached to the house.\n\nHeating is the part most planners get wrong. On the Emerald Coast, an unheated pool in the cooler shoulder months is a decoration. Kids will get in once. Adults will not. We offer pool heating from October through April for a nightly fee, and it is worth the line item if you are travelling in that window and the pool is a reason you booked.\n\nWhich of our homes are set up for heat:\n\n- [Sandpiper House](https://emeraldcoastcollection.com/property/sandpiper-house), private heated pool, in Crystal Beach.\n- [The Turquoise Turtle](https://emeraldcoastcollection.com/property/turquoise-turtle), private heated pool, one row back from the gulf.\n- [Seaglass Manor](https://emeraldcoastcollection.com/property/seaglass-manor), private heated pool, gulf-front in Miramar Beach.\n\n[Thirty-A Getaway](https://emeraldcoastcollection.com/property/thirty-a-getaway) has a private pool that is unheated. Great for a June trip, not the house to book for a March one if pool time is the point. [Gulf & Main](https://emeraldcoastcollection.com/property/gulf-and-main) has a private pool; if you are looking at cooler dates, ask us to confirm heating on that specific home before you commit.\n\nOne more thing on heating: turnaround is not instant. Tell us at booking, not on arrival day, so the water is where you want it when you walk in.\n\nFor young kids, ask about the pool layout before you arrive: how the yard is enclosed, where the gate is, and whether the pool is visible from the main living space. We know each house and can describe it honestly. Then set your own rules on day one. In a group of 14, the risk is not that nobody is watching, it is that everyone assumes someone else is."
+        },
+        {
+          "heading": "Beachfront, gulf-view or bayfront: picking the right side of the road",
+          "markdown": "Gulf-front costs the most and gives you the shortest walk. One row back costs less and often buys you a bigger yard and a bigger pool. Bay-side is the quietest and best if your trip revolves around water you can paddle.\n\nGulf-front in our portfolio means [Seaglass Manor](https://emeraldcoastcollection.com/property/seaglass-manor) and [Gulf & Main](https://emeraldcoastcollection.com/property/gulf-and-main). Gulf & Main has a private boardwalk to the beach and a gulf-front balcony, which is the setup you want when you have small kids and someone is going back to the house every hour for snacks, sunscreen, or a nap.\n\nOne row back is [The Turquoise Turtle](https://emeraldcoastcollection.com/property/turquoise-turtle), which trades the front-row view for a heated pool and a game room with a pool table.\n\nWe do not manage gulf-view condos. All fourteen of our homes are houses. If you want a high-floor condo view, we are not the right call.\n\nOn distance: minutes on foot beat a number in miles every time. A listing that says \"0.3 miles to the beach\" tells you nothing about whether you cross a busy road or carry chairs up a dune. Ask for the walk in minutes and what is in between. [Sandpiper House](https://emeraldcoastcollection.com/property/sandpiper-house) is a 3-minute walk to beach access. [Thirty-A Getaway](https://emeraldcoastcollection.com/property/thirty-a-getaway) is a 5-minute walk to the Ed Walline access on 30A. Those are walks with a cooler, not walks in perfect conditions.\n\nBay-side is a different trip. [Bay Breeze Cottage](https://emeraldcoastcollection.com/property/bay-breeze-cottage) sits on Choctawhatchee Bay in Santa Rosa Beach with a private dock, kayaks and paddleboards, and a fire pit. Bay water is flat in the mornings, which is what you want for paddleboarding with kids or anyone learning. It sleeps 12, so it is not your 14-person house, but it is worth knowing about if your group splits across two homes."
+        },
+        {
+          "heading": "Destin vs 30A / Santa Rosa Beach for a big group",
+          "markdown": "Pick Destin if your group wants boats and restaurants. Pick 30A if your group wants quiet and will happily cook at home most nights.\n\nDestin puts you close to the harbor, where the charter fishing fleet runs from. If a deep-sea fishing charter is on the plan, or a sunset dolphin cruise for the grandparents and the little ones, being in Destin means less driving on a hot afternoon. Crystal Beach, where [Sandpiper House](https://emeraldcoastcollection.com/property/sandpiper-house) sits, is in that pocket. Dining is dense here, which matters when 14 people cannot agree on dinner.\n\nSanta Rosa Beach and the 30A stretch is slower. Beaches are quieter. Topsail Hill Preserve State Park has hiking if someone in the group wants a morning away from sand. [Thirty-A Getaway](https://emeraldcoastcollection.com/property/thirty-a-getaway) is off 30A with bikes for six, and bikes are genuinely how people get around out there.\n\nGolf carts change the shape of a day. When a house includes one, the beach access, the corner store, and dinner nearby stop requiring a car and a parking space. Sandpiper House includes a 6-seat golf cart. With 14 people and probably three or four cars, not having to move a car is worth more than it sounds.\n\nOn drive times between Destin and 30A: they are on the same coastline with Miramar Beach in between, and the honest answer is that summer traffic on the coast road makes any single number misleading. Tell us your dates and where you want to be, and we will give you a realistic drive rather than a best-case one. Golf at Emerald Bay and a harbor charter are both easy day trips from most of our homes."
+        },
+        {
+          "heading": "Amenities that matter at group scale",
+          "markdown": "At 14 guests, the amenities that change the trip are the boring structural ones, not the decor.\n\n**Elevator.** In a three-story beach house with grandparents or a lot of gear, an elevator is the difference between everyone joining in and one person sitting downstairs. [Seaglass Manor](https://emeraldcoastcollection.com/property/seaglass-manor) and [Gulf & Main](https://emeraldcoastcollection.com/property/gulf-and-main) both have one.\n\n**Indoor and outdoor overflow space.** Fourteen people cannot all be in a kitchen. A second gathering space is what keeps a group from crowding. [The Turquoise Turtle](https://emeraldcoastcollection.com/property/turquoise-turtle) has a game room with a pool table, which is where the teenagers go. [Bay Breeze Cottage](https://emeraldcoastcollection.com/property/bay-breeze-cottage) has a fire pit and a dock, which does the same job outdoors.\n\n**Beach chair service.** Setting up chairs and umbrellas for 14 is real work. Beach chair service runs March through October and is included at [Seaglass Manor](https://emeraldcoastcollection.com/property/seaglass-manor). If you are comparing that home against one without it, factor in what daily chair rental for a group of that size would cost you.\n\n**Included golf cart.** Sandpiper House includes a 6-seat cart. Renting one for a week is not cheap, so include it in your comparison of nightly rates.\n\n**EV charger.** [Thirty-A Getaway](https://emeraldcoastcollection.com/property/thirty-a-getaway) has one.\n\n**Pets.** Pet friendly applies to select homes only, dogs under 40 lbs. [Bay Breeze Cottage](https://emeraldcoastcollection.com/property/bay-breeze-cottage) is one of them. If a dog is coming, tell us at booking. This is the restriction that most often derails a group at the last minute."
+        },
+        {
+          "heading": "What a group of 14 should expect to pay",
+          "markdown": "Across our portfolio, nightly rates run roughly $425 to $1,050 depending on season and how close the home sits to the gulf. Gulf-front in peak summer is the top of that band. Shoulder season, one row back or bay-side, is the bottom.\n\nSeasonality here is straightforward. Peak summer and spring break weeks are the busiest and the most expensive. The cooler shoulder months cost less, and that is when pool heating is available October through April for a nightly fee. Budget that fee in rather than being surprised by it.\n\nThe fair comparison is per person, not per night. Divide the nightly rate for a house by 14 before you set it against a stack of condo or hotel bookings. Then add what the separate bookings would cost you in daily beach chair rentals, restaurant breakfasts for 14, and the hours lost coordinating three buildings. A single house with one kitchen and one long table usually wins on both money and sanity, but do the math with real numbers for your dates rather than trusting a rule of thumb.\n\nBooking direct matters here too. Most of our guests save 12-18% booking with us versus paying listing-site fees.\n\nPeak weeks generally carry minimum stays and set changeover days, which is what constrains your arrival. If you have flights to match, ask us early. We set those rules in-house, so we can tell you exactly what applies to your week rather than guessing."
+        },
+        {
+          "heading": "Booking checklist for a 14-guest stay",
+          "markdown": "Take this into your availability search.\n\n1. **Confirm the sleeping breakdown, not the headline number.** How many bedrooms with doors, how many built-in bunks, how many sleeper sofas. For 14, our exact fits are [Gulf & Main](https://emeraldcoastcollection.com/property/gulf-and-main) at 14, [Sandpiper House](https://emeraldcoastcollection.com/property/sandpiper-house) at 16, [The Turquoise Turtle](https://emeraldcoastcollection.com/property/turquoise-turtle) at 18, and [Seaglass Manor](https://emeraldcoastcollection.com/property/seaglass-manor) at 22.\n2. **Get the bathroom count.** Ask how many full baths and which bedrooms have their own. This is the number that decides your mornings.\n3. **Confirm the pool is private and whether it heats.** Private heated pools: Sandpiper House, The Turquoise Turtle, Seaglass Manor. Heating runs October through April for a nightly fee, and we need to know before arrival day.\n4. **Ask for the beach walk in minutes.** And what you cross on the way.\n5. **Count parking.** Fourteen guests usually means several cars. Ask how many the house takes before you rent a third SUV.\n6. **Check pets, if relevant.** Select homes only, dogs under 40 lbs.\n7. **Read the cancellation terms and the minimum stay** for your specific week before you book flights.\n8. **Book peak summer early.** Large homes with private pools are the first to go, and there are only so many of them on this coast.\n9. **Ask how mid-stay problems are handled.** We manage all fourteen homes in-house, no third-party hosts, with 24/7 local guest support from our office on Scenic Gulf Drive. If the ice maker quits on a Sunday with 14 people in the house, you want someone who can be there, not a message queue."
+        }
+      ]
+    }
+  },
+  "storyboard": [
+    {
+      "index": 1,
+      "heading": "What 'sleeps 14' actually means in a Destin beach house",
+      "keyPoints": [
+        "How capacity is counted across bedrooms, bunk rooms and sleeper sofas, and why two homes with the same headline number sleep very differently",
+        "Bed-configuration questions to ask for a multi-generational group: primary suites on separate floors, a bunk room for kids, ground-floor bedroom for grandparents",
+        "Bathroom-to-guest ratio as the practical comfort limit for groups of 12 to 20"
+      ],
+      "generatedHeading": "What 'sleeps 14' actually means in a Destin beach house",
+      "wordCount": 389
+    },
+    {
+      "index": 2,
+      "heading": "Private pool vs shared pool: what to check before booking",
+      "keyPoints": [
+        "Private heated pool attached to the home versus a shared community pool, and how listings blur the two",
+        "When pool heating is worth it on the Emerald Coast, typically in the cooler shoulder months",
+        "Pool safety considerations for groups travelling with young children"
+      ],
+      "generatedHeading": "Private pool vs shared pool: what to check before booking",
+      "wordCount": 340
+    },
+    {
+      "index": 3,
+      "heading": "Beachfront, gulf-view or bayfront: picking the right side of the road",
+      "keyPoints": [
+        "Beachfront houses versus gulf-view condos versus bayfront cottages, and the trade-offs in price, privacy and noise",
+        "What a walkable beach access under three minutes means in practice compared with a listed distance in miles",
+        "Why bay-side homes suit paddleboarding and boat-oriented trips while gulf-front suits beach-day-heavy trips"
+      ],
+      "generatedHeading": "Beachfront, gulf-view or bayfront: picking the right side of the road",
+      "wordCount": 293
+    },
+    {
+      "index": 4,
+      "heading": "Destin vs 30A / Santa Rosa Beach for a big group",
+      "keyPoints": [
+        "Destin for charter fishing, dining density and shorter drives; 30A for quieter beaches and a slower pace",
+        "How golf-cart access changes what is reachable without moving cars",
+        "Typical drive times between the two areas so a group can split activity days"
+      ],
+      "generatedHeading": "Destin vs 30A / Santa Rosa Beach for a big group",
+      "wordCount": 275
+    },
+    {
+      "index": 5,
+      "heading": "Amenities that matter at group scale",
+      "keyPoints": [
+        "Elevator for multi-storey homes with older travellers or heavy beach gear",
+        "Game room and outdoor space as the difference between a group co-existing and a group crowding",
+        "Beach chair service and included golf cart as cost items that are easy to overlook when comparing nightly rates",
+        "Pet-friendly rules and where they commonly carry restrictions"
+      ],
+      "generatedHeading": "Amenities that matter at group scale",
+      "wordCount": 235
+    },
+    {
+      "index": 6,
+      "heading": "What a group of 14 should expect to pay",
+      "keyPoints": [
+        "Seasonality on the Emerald Coast and how peak summer, spring break and shoulder season differ",
+        "Nightly rate ranges roughly from the low four hundreds to just over one thousand depending on season and position",
+        "Per-person maths as the fairer comparison against booking several condos or hotel rooms",
+        "Minimum-stay patterns in peak weeks and how they constrain arrival days"
+      ],
+      "generatedHeading": "What a group of 14 should expect to pay",
+      "wordCount": 241
+    },
+    {
+      "index": 7,
+      "heading": "Booking checklist for a 14-guest stay",
+      "keyPoints": [
+        "Confirm true sleeping capacity, pool privacy and heating, beach-access distance, parking count and cancellation terms",
+        "Book far enough ahead for peak summer weeks, when large private-pool homes go first",
+        "Ask about 24/7 local guest support before arrival, and how mid-stay issues are handled"
+      ],
+      "generatedHeading": "Booking checklist for a 14-guest stay",
+      "wordCount": 258
+    }
+  ],
+  "receipts": {
+    "deterministic": [
+      {
+        "id": "outline-coverage",
+        "name": "Outline coverage",
+        "status": "passed",
+        "summary": "7/7 outline positions matched",
+        "rows": [
+          {
+            "label": "1. What 'sleeps 14' actually means in a Destin beach house",
+            "detail": "matched in position",
+            "ok": true
+          },
+          {
+            "label": "2. Private pool vs shared pool: what to check before booking",
+            "detail": "matched in position",
+            "ok": true
+          },
+          {
+            "label": "3. Beachfront, gulf-view or bayfront: picking the right side of the road",
+            "detail": "matched in position",
+            "ok": true
+          },
+          {
+            "label": "4. Destin vs 30A / Santa Rosa Beach for a big group",
+            "detail": "matched in position",
+            "ok": true
+          },
+          {
+            "label": "5. Amenities that matter at group scale",
+            "detail": "matched in position",
+            "ok": true
+          },
+          {
+            "label": "6. What a group of 14 should expect to pay",
+            "detail": "matched in position",
+            "ok": true
+          },
+          {
+            "label": "7. Booking checklist for a 14-guest stay",
+            "detail": "matched in position",
+            "ok": true
+          }
+        ]
+      },
+      {
+        "id": "numeric-grounding",
+        "name": "Numeric grounding",
+        "status": "needs_review",
+        "summary": "14/16 numbers trace to permitted sources",
+        "rows": [
+          {
+            "label": "$425",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "$1,050",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "14",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "7",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "18",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "16",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "6",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "22",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "8",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "12",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "20",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "0.3",
+            "detail": "not found in brief or grounding",
+            "ok": false
+          },
+          {
+            "label": "3",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "40",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          },
+          {
+            "label": "9",
+            "detail": "not found in brief or grounding",
+            "ok": false
+          },
+          {
+            "label": "24",
+            "detail": "traces to brief or grounding",
+            "ok": true
+          }
+        ]
+      },
+      {
+        "id": "link-provenance",
+        "name": "Link provenance",
+        "status": "passed",
+        "summary": "6/6 links trace to grounding properties",
+        "rows": [
+          {
+            "label": "https://emeraldcoastcollection.com/property/gulf-and-main",
+            "detail": "a real property href from the grounding context",
+            "ok": true
+          },
+          {
+            "label": "https://emeraldcoastcollection.com/property/turquoise-turtle",
+            "detail": "a real property href from the grounding context",
+            "ok": true
+          },
+          {
+            "label": "https://emeraldcoastcollection.com/property/sandpiper-house",
+            "detail": "a real property href from the grounding context",
+            "ok": true
+          },
+          {
+            "label": "https://emeraldcoastcollection.com/property/seaglass-manor",
+            "detail": "a real property href from the grounding context",
+            "ok": true
+          },
+          {
+            "label": "https://emeraldcoastcollection.com/property/bay-breeze-cottage",
+            "detail": "a real property href from the grounding context",
+            "ok": true
+          },
+          {
+            "label": "https://emeraldcoastcollection.com/property/thirty-a-getaway",
+            "detail": "a real property href from the grounding context",
+            "ok": true
+          }
+        ]
+      },
+      {
+        "id": "voice-bans",
+        "name": "Voice bans (lexical)",
+        "status": "passed",
+        "summary": "no em dashes, no hard-banned clichés",
+        "rows": [
+          {
+            "label": "em dashes",
+            "detail": "none in generated copy",
+            "ok": true
+          }
+        ]
+      },
+      {
+        "id": "entity-coverage",
+        "name": "Entity coverage",
+        "status": "passed",
+        "summary": "15/21 brief entities mentioned",
+        "rows": [
+          {
+            "label": "Destin",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "30A",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "Santa Rosa Beach",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "Florida Panhandle",
+            "detail": "not mentioned",
+            "ok": false
+          },
+          {
+            "label": "Emerald Coast",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "private heated pool",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "bunk room",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "beachfront house",
+            "detail": "not mentioned",
+            "ok": false
+          },
+          {
+            "label": "gulf-view condo",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "bayfront cottage",
+            "detail": "not mentioned",
+            "ok": false
+          },
+          {
+            "label": "elevator",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "golf cart",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "beach chair service",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "pet friendly",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "multi-generational family travel",
+            "detail": "not mentioned",
+            "ok": false
+          },
+          {
+            "label": "deep-sea fishing charter",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "paddleboarding",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "sunset dolphin cruise",
+            "detail": "mentioned",
+            "ok": true
+          },
+          {
+            "label": "state park hiking",
+            "detail": "not mentioned",
+            "ok": false
+          },
+          {
+            "label": "shoulder season pricing",
+            "detail": "not mentioned",
+            "ok": false
+          },
+          {
+            "label": "minimum stay",
+            "detail": "mentioned",
+            "ok": true
+          }
+        ]
+      },
+      {
+        "id": "metadata-gate",
+        "name": "Metadata gate (velite limits)",
+        "status": "passed",
+        "summary": "frontmatter satisfies the production posts schema limits",
+        "rows": [
+          {
+            "label": "h1 (52 chars)",
+            "detail": "Destin Beach Houses With Private Pools That Sleep 14",
+            "ok": true
+          },
+          {
+            "label": "metaTitle (49 chars, limit 60)",
+            "detail": "Destin Beach Houses With Private Pools, Sleeps 14",
+            "ok": true
+          },
+          {
+            "label": "metaDescription (155 chars, limit 160)",
+            "detail": "Compare Destin beach houses that sleep 14 with private pools, bunk rooms, and ground-floor suites. See which homes have heated pools and gulf-front access.",
+            "ok": true
+          },
+          {
+            "label": "publication gate",
+            "detail": "draft publishes at the end of time (9999-12-31)",
+            "ok": true
+          }
+        ]
+      }
+    ],
+    "evaluator": {
+      "evaluatorVersion": "editorial-evaluator/v1",
+      "model": "claude-sonnet-5",
+      "verdict": "revise",
+      "summary": "A mostly well-grounded, specifically detailed guide that follows the brief's structure and mostly resists fabricating numbers it doesn't have — but it overreaches once with a blanket claim that every named home has its own pool, which is false for Bay Breeze Cottage per the source facts. It also ends on an aphoristic, negative-parallelism punchline that the brief's style rules ask to avoid, and dodges two of the brief's explicit citable-answer requirements (bathroom ratio, Destin–30A drive times) by deferring to a phone call rather than giving even a rough grounded figure. Several smaller AI-pattern tics (staccato fragments, manufactured one-liners) recur throughout. Fix the fabricated pool claim and the closing punchline, and tighten the two dodged key points, and this is close to ready.",
+      "strengths": [
+        "Sleeping-capacity numbers, bedroom counts, bunk counts, pool-heating months, price band, and direct-booking discount all check out exactly against the grounding facts.",
+        "Section order and content largely track the outline (sleeps-14 math, private vs shared pool, beachfront/bayfront trade-offs, Destin vs 30A, amenities, pricing, checklist).",
+        "Voice is mostly plain and specific (walk-in-minutes vs miles, per-person math, bathroom-ratio framing) with no em dashes and a lived-in, operator tone rather than resort-brochure language.",
+        "Property links use real hrefs from the grounding set and are woven in as relevant comparisons rather than a bolted-on roundup."
+      ],
+      "comments": [
+        {
+          "sectionHeading": "Private pool vs shared pool: what to check before booking",
+          "excerpt": "Every home named in this guide has its own pool attached to the house.",
+          "kind": "fabrication",
+          "note": "By this point in the guide, Bay Breeze Cottage has already been named (in the prior section, as one of the two 12-sleeper homes). The grounding facts list Bay Breeze Cottage's amenities as private dock, kayaks/paddleboards, fire pit, and pet-friendly — no pool is listed. This blanket claim is unsupported and contradicts the source data.",
+          "severity": "major"
+        },
+        {
+          "sectionHeading": "Booking checklist for a 14-guest stay",
+          "excerpt": "If the ice maker quits on a Sunday with 14 people in the house, you want someone who can be there, not a message queue.",
+          "kind": "ai_pattern",
+          "note": "Closes the entire guide on a manufactured punchline built from 'not X, Y' negative parallelism — exactly the aphoristic closing-line pattern to avoid, and it restates the 24/7 support point already made in the same sentence group.",
+          "severity": "major"
+        },
+        {
+          "sectionHeading": "What 'sleeps 14' actually means in a Destin beach house",
+          "excerpt": "We do not publish bathroom counts on this guide because I would rather give you the exact number for the exact house.",
+          "kind": "structure",
+          "note": "The brief specifically calls for 'bathroom-to-guest ratio as the practical comfort limit' as a citable answer. No bathroom data exists in the grounding facts, so avoiding fabrication is right, but the section then fails the brief's core requirement to answer the question directly rather than deferring to a phone call.",
+          "severity": "minor"
+        },
+        {
+          "sectionHeading": "Destin vs 30A / Santa Rosa Beach for a big group",
+          "excerpt": "On drive times between Destin and 30A: they are on the same coastline with Miramar Beach in between, and the honest answer is that summer traffic on the coast road makes any single number misleading.",
+          "kind": "structure",
+          "note": "Brief explicitly asks for 'typical drive times between the two areas so a group can split activity days.' No time estimate is given at all, even a rough one, so this key point goes unanswered rather than being addressed with a citable range.",
+          "severity": "minor"
+        },
+        {
+          "sectionHeading": "Private pool vs shared pool: what to check before booking",
+          "excerpt": "Kids will get in once. Adults will not.",
+          "kind": "ai_pattern",
+          "note": "Staccato fragment pair used for dramatic effect — a small instance of the chopped-sentence AI pattern.",
+          "severity": "minor"
+        },
+        {
+          "sectionHeading": "Private pool vs shared pool: what to check before booking",
+          "excerpt": "In a group of 14, the risk is not that nobody is watching, it is that everyone assumes someone else is.",
+          "kind": "ai_pattern",
+          "note": "Classic 'not X, Y' negative-parallelism construction used as a closing flourish for the subsection.",
+          "severity": "minor"
+        },
+        {
+          "sectionHeading": "What 'sleeps 14' actually means in a Destin beach house",
+          "excerpt": "That single answer tells you more about a 14-person stay than square footage does.",
+          "kind": "ai_pattern",
+          "note": "Manufactured punchline / aphoristic aside rather than continuing the practical guidance.",
+          "severity": "minor"
+        },
+        {
+          "sectionHeading": "What 'sleeps 14' actually means in a Destin beach house",
+          "excerpt": "Beautiful houses, but a group of 14 will not fit, and I am not going to tell you otherwise.",
+          "kind": "ai_pattern",
+          "note": "Reads as a manufactured punchline closing the paragraph rather than a plain statement of fact.",
+          "severity": "minor"
+        },
+        {
+          "sectionHeading": "Amenities that matter at group scale",
+          "excerpt": "This is the restriction that most often derails a group at the last minute.",
+          "kind": "ai_pattern",
+          "note": "Unsupported superlative framed as a punchy closer; no data backs 'most often derails,' and it reads as filler drama rather than operator knowledge.",
+          "severity": "minor"
+        },
+        {
+          "sectionHeading": "What a group of 14 should expect to pay",
+          "excerpt": "A single house with one kitchen and one long table usually wins on both money and sanity, but do the math with real numbers for your dates rather than trusting a rule of thumb.",
+          "kind": "ai_pattern",
+          "note": "Aphoristic filler line summarizing the point already made, then hedging with generic advice — restates rather than adds information.",
+          "severity": "minor"
+        }
+      ],
+      "usage": {
+        "inputTokens": 9387,
+        "outputTokens": 8682
+      },
+      "latencyMs": 84154
+    }
+  },
+  "usage": [
+    {
+      "stage": "writer",
+      "model": "claude-opus-5",
+      "inputTokens": 5122,
+      "outputTokens": 7212,
+      "latencyMs": 94106,
+      "estCostUsd": 0.6177299999999999
+    },
+    {
+      "stage": "metadata",
+      "model": "claude-sonnet-5",
+      "inputTokens": 3305,
+      "outputTokens": 98,
+      "latencyMs": 4879,
+      "estCostUsd": 0.011385
+    },
+    {
+      "stage": "evaluator",
+      "model": "claude-sonnet-5",
+      "inputTokens": 9387,
+      "outputTokens": 8682,
+      "latencyMs": 84154,
+      "estCostUsd": 0.158391
+    }
+  ],
+  "totals": {
+    "estCostUsd": 0.7875059999999998,
+    "wordCount": 2031,
+    "latencyMs": 183139
+  }
+}

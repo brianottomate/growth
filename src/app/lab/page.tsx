@@ -27,9 +27,14 @@ const PAGES: { name: string; href: string; note?: string }[] = [
   { name: "Whiteboard", href: "/lab/whiteboard" },
   { name: "Pregen sites", href: "/lab/pregen-sites" },
   {
-    name: "Pregen composition review",
+    name: "Pregen run workbench",
     href: "/lab/pregen-review",
-    note: "fixture-backed source → proposed → decision receipt",
+    note: "live persisted runs: source capture, renderer, evaluation receipts",
+  },
+  {
+    name: "Blog golden run",
+    href: "/lab/blog-workbench",
+    note: "SEO brief → grounding → Opus article → receipts, fixture-backed",
   },
   { name: "Growth system", href: "/lab/growth-system", note: "system map" },
   { name: "Message streams", href: "/lab/message-streams", note: "system map" },

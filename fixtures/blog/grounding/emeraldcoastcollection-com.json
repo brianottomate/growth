@@ -1,0 +1,128 @@
+{
+  "version": "synthetic-fixture/v1",
+  "provenance": "DELIBERATELY MANUFACTURED grounding fixture. The brief's target domain (emeraldcoastcollection.com) is a parked Hostinger page with no crawlable business, so no real grounding exists for it. This portfolio is synthetic data authored to exercise the pipeline end to end, in the same spirit as a rich staging seed. Nothing in it describes a real business; do not reuse it as fact.",
+  "targetDomain": "emeraldcoastcollection.com",
+  "crawledUrls": [],
+  "derivedAt": "2026-08-04T23:20:00.000Z",
+  "model": "hand-authored",
+  "usage": { "inputTokens": null, "outputTokens": null },
+  "context": {
+    "businessName": "Emerald Coast Collection",
+    "summary": "A family-run property manager with fourteen large homes across Destin, Miramar Beach, and Santa Rosa Beach, all managed in-house with a local office on Scenic Gulf Drive.",
+    "locations": [
+      "Destin",
+      "Miramar Beach",
+      "Santa Rosa Beach (30A)",
+      "Crystal Beach neighborhood"
+    ],
+    "amenities": [
+      "private heated pool",
+      "bunk room",
+      "elevator",
+      "game room",
+      "gulf-front balcony",
+      "private boardwalk to the beach",
+      "6-seat golf cart included",
+      "beach chair service (March through October)",
+      "EV charger",
+      "pet friendly (select homes, dogs under 40 lbs)"
+    ],
+    "activities": [
+      "charter fishing from Destin harbor",
+      "paddleboarding on Choctawhatchee Bay",
+      "sunset dolphin cruise",
+      "hiking at Topsail Hill Preserve State Park",
+      "golf at Emerald Bay"
+    ],
+    "targetAudience": "Multi-generational families and large groups of 10 to 22 guests",
+    "distinctiveFeatures": [
+      "every home managed in-house, no third-party hosts",
+      "24/7 local guest support from the Scenic Gulf Drive office",
+      "pool heating available October through April for a nightly fee",
+      "most guests save 12-18% booking direct versus listing-site fees"
+    ],
+    "typicalPriceRange": "roughly $425 to $1,050 per night depending on season and gulf position",
+    "voice": "Plain-spoken and local: short sentences, concrete details about the walk to the sand, no resort-brochure language.",
+    "properties": [
+      {
+        "name": "Sandpiper House",
+        "href": "https://emeraldcoastcollection.com/property/sandpiper-house",
+        "sleeps": 16,
+        "bedrooms": 6,
+        "location": "Crystal Beach, Destin",
+        "amenities": [
+          "private heated pool",
+          "bunk room with 4 built-in bunks",
+          "3-minute walk to beach access",
+          "golf cart included"
+        ]
+      },
+      {
+        "name": "Gulf & Main",
+        "href": "https://emeraldcoastcollection.com/property/gulf-and-main",
+        "sleeps": 14,
+        "bedrooms": 5,
+        "location": "Miramar Beach, gulf-front",
+        "amenities": [
+          "private pool",
+          "gulf-front balcony",
+          "private boardwalk to the beach",
+          "elevator"
+        ]
+      },
+      {
+        "name": "The Turquoise Turtle",
+        "href": "https://emeraldcoastcollection.com/property/turquoise-turtle",
+        "sleeps": 18,
+        "bedrooms": 7,
+        "location": "Destin, one row back from the gulf",
+        "amenities": [
+          "private heated pool",
+          "game room with pool table",
+          "bunk room",
+          "two primary suites on separate floors"
+        ]
+      },
+      {
+        "name": "Bay Breeze Cottage",
+        "href": "https://emeraldcoastcollection.com/property/bay-breeze-cottage",
+        "sleeps": 12,
+        "bedrooms": 5,
+        "location": "Santa Rosa Beach, bayfront on Choctawhatchee Bay",
+        "amenities": [
+          "private dock",
+          "kayaks and paddleboards",
+          "fire pit",
+          "pet friendly (dogs under 40 lbs)"
+        ]
+      },
+      {
+        "name": "Seaglass Manor",
+        "href": "https://emeraldcoastcollection.com/property/seaglass-manor",
+        "sleeps": 22,
+        "bedrooms": 8,
+        "location": "Miramar Beach, gulf-front",
+        "amenities": [
+          "private heated pool",
+          "elevator",
+          "ground-floor primary suite",
+          "bunk room with 6 built-in bunks",
+          "beach chair service"
+        ]
+      },
+      {
+        "name": "Thirty-A Getaway",
+        "href": "https://emeraldcoastcollection.com/property/thirty-a-getaway",
+        "sleeps": 12,
+        "bedrooms": 4,
+        "location": "Santa Rosa Beach, off 30A",
+        "amenities": [
+          "private pool (unheated)",
+          "bikes for six",
+          "5-minute walk to Ed Walline beach access",
+          "EV charger"
+        ]
+      }
+    ]
+  }
+}
