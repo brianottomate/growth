@@ -41,10 +41,12 @@
     "ai:contracts": "bun --conditions=react-server src/scripts/ai-kernel-gauntlet.ts --contracts-only",
     "ai:gauntlet": "bun --conditions=react-server src/scripts/ai-kernel-gauntlet.ts",
     "test:mcp:protocol": "bun test src/server/mcp/server.protocol.test.ts",
-    "smoke:mcp:modern": "node scripts/smoke-mcp-modern.mjs"
+    "smoke:mcp:modern": "node scripts/smoke-mcp-modern.mjs",
+    "lab:motion-original": "bun scripts/lab/run-original-property-motion.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.15",
+    "@ai-sdk/openai": "^4.0.15",
     "@ai-sdk/react": "^4.0.32",
     "@anthropic-ai/sdk": "^0.98.0",
     "@auth/drizzle-adapter": "^1.11.2",
@@ -149,6 +151,7 @@
     "react-map-gl": "^8.1.1",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "replicate": "1.1.0",
     "resend": "^6.12.4",
     "sanitize-html": "^2.17.5",
     "serpapi": "^2.2.1",

@@ -28,6 +28,7 @@ export const env = createEnv({
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
     FAL_AI_API_KEY: z.string().optional(), // fal.ai image/video generation
+    REPLICATE_API_TOKEN: z.string().optional(), // Legacy Wander motion pipeline: Seedance, segmentation, upscaling
     GEMINI_API_KEY: z.string().optional(), // Direct Google Gemini image generation
     DATOCMS_CMA_TOKEN: z.string().optional(), // wander.com blog publishing (Content Management API)
     FIRECRAWL_API_KEY: z.string().min(1), // For web scraping
@@ -166,6 +167,7 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     FAL_AI_API_KEY: process.env.FAL_AI_API_KEY,
+    REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     DATOCMS_CMA_TOKEN: process.env.DATOCMS_CMA_TOKEN,
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,

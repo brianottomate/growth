@@ -10,6 +10,11 @@ const PAGES: { name: string; href: string; note?: string }[] = [
     note: "North Topsail scroll-world storyboard",
   },
   {
+    name: "Property-card motion",
+    href: "/lab/motion",
+    note: "original masked hover vs full-frame treatment",
+  },
+  {
     name: "OG map",
     href: "/lab/og-map",
     note: "wander.com OG-image audit (Firecrawl)",
