@@ -12,6 +12,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:apply:hubspot-sync": "bun --conditions=react-server scripts/apply-hubspot-company-sync-schema.ts",
+    "db:apply:pregen-evaluation-receipts": "bun --conditions=react-server scripts/apply-pregen-evaluation-receipt-schema.ts",
     "hubspot:import:companies": "bun --conditions=react-server scripts/import-hubspot-company-export.ts",
     "hubspot:process:webhooks": "bun --conditions=react-server scripts/process-hubspot-webhook-backlog.ts",
     "hubspot:build:sales-email-corpus": "bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts",
@@ -42,7 +43,8 @@
     "ai:gauntlet": "bun --conditions=react-server src/scripts/ai-kernel-gauntlet.ts",
     "test:mcp:protocol": "bun test src/server/mcp/server.protocol.test.ts",
     "smoke:mcp:modern": "node scripts/smoke-mcp-modern.mjs",
-    "lab:motion-original": "bun scripts/lab/run-original-property-motion.ts"
+    "lab:motion-original": "bun scripts/lab/run-original-property-motion.ts",
+    "lab:export-pregen-fixture": "bun --conditions=react-server scripts/lab/export-pregen-run-fixture.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.15",

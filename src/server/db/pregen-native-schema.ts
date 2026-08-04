@@ -120,6 +120,25 @@ export type PregenNativeBrandKit = {
   voiceBrief: { heroTitle: string; heroSubtitle: string; ctaText: string };
 };
 
+export type PregenNativeEvaluationKind =
+  | "source_fidelity"
+  | "grounding"
+  | "responsive"
+  | "editorial"
+  | "visual_quality"
+  | "image_selection";
+
+export type PregenNativeEvaluationStatus = "passed" | "failed" | "needs_review";
+
+export type PregenNativeEvaluatorType = "deterministic" | "model" | "human";
+
+export type PregenNativeEvaluationInputRef = {
+  kind: string;
+  id: string;
+  version?: string;
+  sha256?: string;
+};
+
 // ---- TABLES --------------------------------------------------------
 
 /**
@@ -271,6 +290,61 @@ export const pregenNativeArtifactTable = pgTable(
   ],
 );
 
+/**
+ * Immutable, build-scoped evaluation output. A rerun inserts a new receipt;
+ * callers select the newest receipt for a kind instead of mutating history.
+ * The input references make each judgment independently reproducible.
+ */
+export const pregenNativeEvaluationReceiptTable = pgTable(
+  "pregen_native_evaluation_receipt",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("pger")),
+    buildId: t
+      .text()
+      .references(() => pregenNativeBuildTable.id, { onDelete: "cascade" })
+      .notNull(),
+    kind: t
+      .text({
+        enum: [
+          "source_fidelity",
+          "grounding",
+          "responsive",
+          "editorial",
+          "visual_quality",
+          "image_selection",
+        ],
+      })
+      .notNull(),
+    status: t.text({ enum: ["passed", "failed", "needs_review"] }).notNull(),
+    evaluatorType: t
+      .text({ enum: ["deterministic", "model", "human"] })
+      .notNull(),
+    evaluatorName: t.text().notNull(),
+    evaluatorVersion: t.text().notNull(),
+    model: t.text(),
+    inputRefs: t.jsonb().$type<PregenNativeEvaluationInputRef[]>().notNull(),
+    result: t.jsonb().$type<Record<string, unknown>>().notNull(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (t) => [
+    index("pregen_native_evaluation_receipt_build_created_idx").on(
+      t.buildId,
+      t.createdAt,
+    ),
+    index("pregen_native_evaluation_receipt_build_kind_created_idx").on(
+      t.buildId,
+      t.kind,
+      t.createdAt,
+    ),
+  ],
+);
+
 // ---- RELATIONS -----------------------------------------------------
 
 export const pregenNativeProspectRelations = relations(
@@ -290,6 +364,7 @@ export const pregenNativeBuildRelations = relations(
     }),
     crawlPages: many(pregenNativeCrawlPageTable),
     artifact: one(pregenNativeArtifactTable),
+    evaluationReceipts: many(pregenNativeEvaluationReceiptTable),
   }),
 );
 
@@ -313,6 +388,16 @@ export const pregenNativeArtifactRelations = relations(
     prospect: one(pregenNativeProspectTable, {
       fields: [pregenNativeArtifactTable.prospectId],
       references: [pregenNativeProspectTable.id],
+    }),
+  }),
+);
+
+export const pregenNativeEvaluationReceiptRelations = relations(
+  pregenNativeEvaluationReceiptTable,
+  ({ one }) => ({
+    build: one(pregenNativeBuildTable, {
+      fields: [pregenNativeEvaluationReceiptTable.buildId],
+      references: [pregenNativeBuildTable.id],
     }),
   }),
 );
