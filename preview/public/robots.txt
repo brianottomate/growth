@@ -1,0 +1,6 @@
+# Every surface here is a private, unpublished prospect preview built from a
+# business's own site. Nothing on this host should ever be indexed; the
+# X-Robots-Tag header on every response is the enforcing layer, this is the
+# polite one.
+User-agent: *
+Disallow: /

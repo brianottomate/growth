@@ -38,6 +38,12 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      // Dev only. Vite rejects unexpected Host headers, which blocks testing
+      // host-mode previews locally with `curl -H "Host: slug.zone"` or a
+      // /etc/hosts entry. Production host handling is the middleware's job.
+      allowedHosts: [".trywanderos.com", ".localhost", "localhost"],
+    },
     ssr: {
       // Keep the registry inside Vite's resolver so the icons-root alias
       // below applies in dev SSR too. Design-system packages stay external:
@@ -63,17 +69,35 @@ export default defineConfig({
   env: {
     schema: {
       PREGEN_API_URL: envField.string({ context: "server", access: "secret" }),
+      // Canonical API hostnames. `api.gke.*.wander.com` still resolves to the
+      // same backend but is the deprecated legacy form — don't reintroduce it.
       MONOLITH_STG_API_URL: envField.string({
         context: "server",
         access: "secret",
         optional: true,
-        default: "https://api.gke.staging.wander.com",
+        default: "https://api.staging.wander.com",
       }),
       MONOLITH_PROD_API_URL: envField.string({
         context: "server",
         access: "secret",
         optional: true,
-        default: "https://api.gke.wander.com",
+        default: "https://api.wander.com",
+      }),
+      // Where "Claim this site" hands off. app.wander.com onboarding v3 reads
+      // the claim params (app#1519).
+      APP_BASE_URL: envField.string({
+        context: "server",
+        access: "secret",
+        optional: true,
+        default: "https://app.wander.com",
+      }),
+      // Apex of the per-prospect preview zone, e.g. "trywanderos.com". Unset
+      // means host mode is off and only /p/ and /m/ resolve.
+      PREVIEW_HOST_ZONE: envField.string({
+        context: "server",
+        access: "secret",
+        optional: true,
+        default: "",
       }),
       PUBLIC_API_URL: envField.string({ context: "client", access: "public", optional: true }),
       PUBLIC_IMAGE_API_URL: envField.string({

@@ -32,6 +32,8 @@ type MonolithConfig = {
   faviconUrl?: string | null;
   accentColor?: string | null;
   internalDomain?: string;
+  /** The prospect's own site, surfaced by the monolith preview endpoint. */
+  prospectSourceUrl?: string;
 };
 
 type MonolithPageSummary = { slug: string; name: string; kind: string };
@@ -102,7 +104,11 @@ async function loadFromBase(
   );
 
   return {
-    prospect: { domain: config.internalDomain ?? websiteId, name: config.title },
+    prospect: {
+      domain: config.internalDomain ?? websiteId,
+      name: config.title,
+      sourceUrl: config.prospectSourceUrl,
+    },
     version: 0,
     config: {
       title: config.title,

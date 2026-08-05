@@ -1,0 +1,106 @@
+---
+import { sourceDomainOf } from "../lib/claim";
+
+// Ported from the sites renderer (sites#919) so both preview surfaces present
+// the same bar. Deliberately routing-agnostic: it takes a claim URL and knows
+// nothing about /p/, /m/, or a preview subdomain.
+
+interface Props {
+  businessName: string;
+  claimUrl: string;
+  sourceUrl?: string;
+  /** False for growth-native previews, which have no monolith site to attach. */
+  claimable?: boolean;
+}
+
+const { businessName, claimUrl, sourceUrl, claimable = true } = Astro.props;
+
+const sourceDomain = sourceDomainOf(sourceUrl);
+
+// Only claims we can actually stand behind before a PMS is connected. Inventory counts are
+// deliberately absent: what we extracted off their site is not the same as what they manage,
+// and being caught overstating it on the first screen costs more than the line is worth.
+const proofPoints = [
+  sourceDomain ? `Composed from ${sourceDomain}` : "Composed from your existing site",
+  "Your photos and words",
+  "Nothing bookable yet",
+];
+---
+
+<div
+  class="sticky top-0 z-[60] border-t-2 border-emerald-400 bg-neutral-950 px-4 py-3.5 text-white sm:px-[22px] sm:py-[18px]"
+  data-prospect-preview-bar
+>
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-[26px]">
+    <div
+      class="flex items-center justify-between gap-2 sm:shrink-0 sm:flex-col sm:items-start sm:gap-1.5 sm:border-r sm:border-white/15 sm:pr-[26px]"
+    >
+      <span
+        class="inline-flex items-center gap-[7px] text-[10.5px] font-semibold tracking-[0.11em] text-emerald-300 uppercase"
+      >
+        <span class="h-[5px] w-[5px] shrink-0 rounded-full bg-emerald-400" aria-hidden="true"
+        ></span>
+        Private preview
+      </span>
+      <span class="text-xs text-neutral-500">Draft · not indexed</span>
+    </div>
+
+    <div class="flex min-w-0 flex-col gap-[7px] sm:flex-1">
+      <p
+        class="text-base leading-[21px] font-semibold tracking-[-0.01em] text-pretty sm:text-[19px] sm:leading-6"
+      >
+        Wander built this site for {businessName}
+      </p>
+      <p
+        class="flex flex-wrap items-center gap-x-2.5 text-[12.5px] leading-[18px] text-neutral-400 sm:text-[13px]"
+      >
+        {
+          proofPoints.map((point, index) => (
+            <>
+              {index > 0 && (
+                <span class="opacity-45" aria-hidden="true">
+                  •
+                </span>
+              )}
+              <span>{point}</span>
+            </>
+          ))
+        }
+      </p>
+    </div>
+
+    <div class="flex flex-col items-center gap-2 sm:shrink-0 sm:items-end">
+      <a
+        href={claimUrl}
+        data-claim-dialog-trigger
+        class="flex h-12 w-full items-center justify-center rounded-full bg-white px-[22px] text-[15px] font-semibold text-neutral-950 transition-colors hover:bg-neutral-200 sm:h-11 sm:w-auto"
+      >
+        {claimable ? "Claim this site →" : "Build this with Wander →"}
+      </a>
+      {
+        sourceUrl && (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-[12.5px] text-white/55 transition-colors hover:text-white"
+          >
+            Compare with {sourceDomain ?? "your site"} ↗
+          </a>
+        )
+      }
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    var bar = document.querySelector("[data-prospect-preview-bar]");
+    if (!bar) return;
+    var apply = function () {
+      document.body.style.setProperty("--announcement-bar-height", bar.offsetHeight + "px");
+    };
+    apply();
+    new ResizeObserver(apply).observe(bar);
+  })();
+</script>

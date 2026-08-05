@@ -1,20 +1,28 @@
 ---
 import PreviewLayout from "../../layouts/PreviewLayout.astro";
 import { RenderSections } from "../../components/RenderSections";
-import { getArtifactByToken } from "../../lib/artifact";
+import { previewNotFound, resolvePreview } from "../../lib/resolve";
+import type { MonolithEnv } from "../../lib/monolith";
 
+// Token-in-path entry point, and the target every host-mode request rewrites
+// to. Source resolution is centralized in resolvePreview, so this route no
+// longer assumes the prospect is growth-native — it can equally be a monolith
+// prospect reached through a preview subdomain, where the host label is the
+// websiteId (handed over on locals, never in the URL).
 const { token } = Astro.params;
-const artifact = token ? await getArtifactByToken(token) : null;
+const envParam = Astro.url.searchParams.get("env");
+const env: MonolithEnv | undefined =
+  envParam === "stg" || envParam === "prod" ? envParam : undefined;
 
-if (!artifact) {
-  return new Response("Not found", {
-    status: 404,
-    headers: {
-      "Cache-Control": "private, no-store",
-      "X-Robots-Tag": "noindex, nofollow",
-    },
-  });
-}
+const resolved = await resolvePreview({
+  token,
+  candidateId: Astro.locals.previewSlug,
+  env,
+});
+
+if (!resolved) return previewNotFound();
+
+const { artifact, claim } = resolved;
 
 Astro.response.headers.set("Cache-Control", "private, no-store");
 Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
@@ -25,6 +33,10 @@ Astro.response.headers.set("Referrer-Policy", "no-referrer");
   title={artifact.config.title}
   description={artifact.config.description}
   faviconUrl={artifact.config.faviconUrl}
+  businessName={artifact.config.title || artifact.prospect.name || "Your business"}
+  sourceUrl={artifact.prospect.sourceUrl}
+  prospectDomain={artifact.prospect.domain}
+  claim={claim}
 >
   <main>
     <RenderSections artifact={artifact} client:load />

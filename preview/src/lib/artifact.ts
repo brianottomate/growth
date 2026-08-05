@@ -1,7 +1,7 @@
 import { PREGEN_API_URL } from "astro:env/server";
 
 export type PregenArtifact = {
-  prospect: { domain: string; name: string | null };
+  prospect: { domain: string; name: string | null; sourceUrl?: string };
   version: number;
   config: {
     title: string;

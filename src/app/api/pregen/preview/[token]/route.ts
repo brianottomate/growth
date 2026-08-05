@@ -34,7 +34,8 @@ export async function GET(
 
   const prospect = await db.query.pregenNativeProspectTable.findFirst({
     where: eq(pregenNativeProspectTable.previewToken, token),
-    columns: { id: true, domain: true, name: true },
+    // sourceUrl feeds the preview chrome's "Compare with <their site>" link.
+    columns: { id: true, domain: true, name: true, sourceUrl: true },
   });
   if (!prospect) {
     return NextResponse.json({ error: "not_found" }, { status: 404, headers });
