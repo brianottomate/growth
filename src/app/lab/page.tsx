@@ -68,9 +68,11 @@ export default function LabIndexPage() {
       <div>
         <h1 className="text-2xl font-semibold">Lab</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Private workspace — prototypes, system maps, and integration
-          diagnostics. Admin-gated; API routes also accept{" "}
-          <code>Authorization: Bearer &lt;ADMIN_TOKEN&gt;</code> for curl.
+          Internal workspace — prototypes, workbenches, system maps, and
+          integration diagnostics. Open to any signed-in teammate; API routes
+          also accept <code>Authorization: Bearer &lt;ADMIN_TOKEN&gt;</code> for
+          curl. Some diagnostics return real lead data, so treat what you see
+          here as production data.
         </p>
       </div>
 

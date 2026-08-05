@@ -6,33 +6,29 @@ import { env } from "@/env";
 import { getSession } from "@/server/better-auth/server";
 
 /**
- * /lab access — Kristian's private workspace (exploratory pages under
+ * /lab access — the team's internal workspace (exploratory pages under
  * `src/app/lab/` and diagnostic endpoints under `src/app/api/lab/`).
  *
  * History: the old /api/test/* diagnostics shipped UNAUTHENTICATED and leaked
  * lead PII (removed 2026-07-10, commit 4bc58c1). Everything lab-shaped now
- * goes through this one gate so that can't happen again.
+ * goes through this one gate so that can't happen again. The gate stays
+ * closed to anonymous traffic for that reason; what it no longer does is
+ * restrict to one person.
  *
- * Access = admin email session (browser) OR Bearer ADMIN_TOKEN (curl/scripts).
- * Dev mode is open, matching adminProcedure's posture.
+ * Access = any signed-in user (browser) OR Bearer ADMIN_TOKEN (curl/scripts).
+ * Sign-up is restricted to @wander.com in the Better Auth config, so a
+ * session is a teammate. Dev mode is open.
  */
-
-/** Single source of truth for admin emails (also referenced by trpc adminProcedure). */
-export const ADMIN_EMAILS = [
-  "kristian@wander.com",
-  // Add more admin emails here as needed
-];
 
 export async function hasLabSession(): Promise<boolean> {
   if (process.env.NODE_ENV === "development") return true;
   const session = await getSession();
-  const email = session?.user?.email?.toLowerCase() ?? "";
-  return ADMIN_EMAILS.includes(email);
+  return Boolean(session?.user);
 }
 
 /**
- * Route-handler guard. Returns a 404 response for outsiders (don't advertise
- * the lab's existence), null when access is granted.
+ * Route-handler guard. Returns a 404 response for anonymous callers (don't
+ * advertise the lab's existence), null when access is granted.
  */
 export async function assertLabAccess(
   request: Request,
