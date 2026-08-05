@@ -45,6 +45,10 @@ export const env = createEnv({
     WANDER_API_KEY: z.string().optional(),
     // Shared secret WanderOS sends as `x-pregen-secret` on prospect webhooks.
     PREGEN_WEBHOOK_SECRET: z.string().optional(),
+    // Apex of the pregen preview zone, e.g. "trywanderos.com". Previews are
+    // served per-prospect at `<label>.<zone>/?t=<token>` by the standalone
+    // renderer; unset means we cannot build a link and say so.
+    PREGEN_PREVIEW_HOST_ZONE: z.string().optional(),
     OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK: z.coerce.boolean().default(false), // Dev-only escape hatch for webhook debugging
     // Customer.io
     CUSTOMER_IO_APP_KEY: z.string().min(1), // App API key (Bearer) for reading customer data
@@ -186,6 +190,7 @@ export const env = createEnv({
     WANDER_API_URL: process.env.WANDER_API_URL,
     WANDER_API_KEY: process.env.WANDER_API_KEY,
     PREGEN_WEBHOOK_SECRET: process.env.PREGEN_WEBHOOK_SECRET,
+    PREGEN_PREVIEW_HOST_ZONE: process.env.PREGEN_PREVIEW_HOST_ZONE,
     OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK:
       process.env.OUTREACH_DISABLE_WEBHOOK_SIGNATURE_CHECK,
     // Customer.io

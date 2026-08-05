@@ -149,14 +149,16 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
                 <Smartphone className="size-3.5" />
               </ViewportButton>
             </div>
-            <a
-              href={run.preview.url}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-stone-300 hover:bg-white/10 hover:text-white"
-            >
-              Open renderer <ExternalLink className="size-3" />
-            </a>
+            {run.preview.url && (
+              <a
+                href={run.preview.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-stone-300 hover:bg-white/10 hover:text-white"
+              >
+                Open renderer <ExternalLink className="size-3" />
+              </a>
+            )}
             <button
               type="button"
               onClick={captureOriginal}
@@ -572,7 +574,7 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
                 <iframe
                   key={viewport}
                   title={`${run.prospect.name} generated preview`}
-                  src={run.preview.url}
+                  src={run.preview.url ?? undefined}
                   referrerPolicy="no-referrer"
                   className={`rounded-xl border border-white/10 bg-white shadow-2xl ${frameClass}`}
                 />
@@ -583,12 +585,14 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
                   <div className="max-w-sm p-8 text-center">
                     <CircleDashed className="mx-auto size-6 text-amber-300" />
                     <h3 className="mt-4 text-sm font-semibold">
-                      Preview renderer unavailable
+                      {run.preview.state === "unconfigured"
+                        ? "No preview host configured"
+                        : "Preview renderer unavailable"}
                     </h3>
                     <p className="mt-2 text-[10px] leading-relaxed text-stone-500">
-                      Start the Astro preview service on port 4400 and refresh
-                      this exact run URL. The workbench will not replace it with
-                      a fixture.
+                      {run.preview.state === "unconfigured"
+                        ? "Previews are served per prospect at <label>.<zone>. Set PREGEN_PREVIEW_HOST_ZONE and refresh."
+                        : "The renderer did not answer for this prospect. Refresh this exact run URL. The workbench will not replace it with a fixture."}
                     </p>
                   </div>
                 </div>

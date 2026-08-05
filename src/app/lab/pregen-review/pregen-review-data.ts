@@ -11,6 +11,7 @@ import {
   listLatestReceiptsByKind,
   type PregenEvaluationReceiptRow,
 } from "@/server/services/pregen/evaluation";
+import { pregenPreviewUrl } from "@/server/services/pregen/preview-url";
 import {
   parsePregenSourceVisualReceipt,
   type PregenSourceVisualReceipt,
@@ -75,8 +76,9 @@ export type PregenLiveRun = {
   };
   extractedPropertyCount: number;
   preview: {
-    url: string;
-    state: "live" | "unavailable";
+    /** Null when no preview host zone is configured — there is no URL to give. */
+    url: string | null;
+    state: "live" | "unavailable" | "unconfigured";
     checkedAt: string;
   };
   evaluations: PregenEvaluationView[];
@@ -132,11 +134,10 @@ export async function loadPregenLiveRun(
     }
   }
 
-  const previewBaseUrl =
-    process.env.NODE_ENV === "development"
-      ? "http://localhost:4400"
-      : "https://pregen-preview.vercel.app";
-  const previewUrl = `${previewBaseUrl}/p/${encodeURIComponent(prospect.previewToken)}`;
+  // Previews live on their own hostname now, so there is no localhost variant
+  // to swap in: dev points PREGEN_PREVIEW_HOST_ZONE at a tunnelled zone or the
+  // workbench reports the preview as unconfigured.
+  const previewUrl = pregenPreviewUrl(prospect);
   const [previewState, sourcePreview, latestReceipts] = await Promise.all([
     checkPreview(previewUrl),
     checkSourcePreview(prospect.sourceUrl),
@@ -238,7 +239,10 @@ async function checkSourcePreview(
   }
 }
 
-async function checkPreview(url: string): Promise<"live" | "unavailable"> {
+async function checkPreview(
+  url: string | null,
+): Promise<"live" | "unavailable" | "unconfigured"> {
+  if (!url) return "unconfigured";
   try {
     const response = await fetch(url, {
       cache: "no-store",

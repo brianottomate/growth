@@ -8,6 +8,7 @@ import {
   pregenNativeProspectTable,
 } from "@/server/db/schema";
 import { runBuild } from "@/server/services/pregen/pipeline";
+import { pregenPreviewUrl } from "@/server/services/pregen/preview-url";
 
 /**
  * pregenNative — the growth-native pregen pipeline (crawl → generate →
@@ -48,7 +49,12 @@ export const pregenNativeRouter = createTRPCRouter({
       return {
         prospectId: prospect.id,
         buildId: build.id,
-        previewPath: `/p/${prospect.previewToken}`,
+        // Absolute: the preview is served from its own hostname, not from a
+        // path on this app. Null when no preview zone is configured.
+        previewUrl: pregenPreviewUrl({
+          domain,
+          previewToken: prospect.previewToken,
+        }),
       };
     }),
 
