@@ -19,7 +19,6 @@ import {
   Image as ImageIcon,
   Inbox as InboxIcon,
   Layers,
-  LayoutDashboard,
   ListTree,
   LogOut,
   type LucideIcon,
@@ -36,8 +35,6 @@ import {
   MailCheck,
   Repeat,
   Radio,
-  Rocket,
-  Rss,
   Rows3,
   Search,
   Settings,
@@ -89,8 +86,6 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { label: "Next", href: "/app/next", icon: MessageSquare },
       { label: "Review", href: "/app/review", icon: ClipboardCheck },
-      { label: "Overview", href: "/app/overview", icon: MessageSquare },
-      { label: "Dashboard", href: "/app", icon: LayoutDashboard },
     ],
   },
   {
@@ -112,14 +107,12 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Calendar", href: "/app/calendar", icon: Calendar },
       { label: "Campaigns", href: "/app/campaigns", icon: Megaphone },
       { label: "Studio", href: "/app/studio", icon: Sparkles },
-      { label: "Plan", href: "/app/plan", icon: Rocket },
     ],
   },
   {
     label: "Observe",
     items: [
       { label: "Timeline", href: "/app/feed-v5", icon: Rows3 },
-      { label: "Feed", href: "/app/feed", icon: Rss },
       { label: "Blog", href: "/app/blog", icon: Newspaper },
       { label: "Newsletters", href: "/app/newsletters", icon: Mail },
       { label: "Ads", href: "/app/ads", icon: Crosshair },
