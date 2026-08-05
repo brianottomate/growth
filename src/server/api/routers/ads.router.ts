@@ -1,4 +1,6 @@
 import type { TRPCRouterRecord } from "@trpc/server";
+import { TRPCError } from "@trpc/server";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -8,6 +10,8 @@ import {
 } from "@/server/services/ads-analytics.service";
 
 import { protectedProcedure } from "../trpc";
+import { memberTable } from "@/server/db/schema";
+import type { Database } from "@/server/db";
 
 // Powers the interactive ad-performance cards on /overview: the chat renders the
 // first paint from the capability output, then control changes refetch through
@@ -16,19 +20,49 @@ import { protectedProcedure } from "../trpc";
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+type AdsContext = {
+  db: Database;
+  session: {
+    user: { id: string };
+    session: { activeOrganizationId?: string | null };
+  };
+};
+
+async function organizationIdFor(ctx: AdsContext) {
+  const active = ctx.session.session.activeOrganizationId;
+  const membership = await ctx.db.query.memberTable.findFirst({
+    where: active
+      ? and(
+          eq(memberTable.userId, ctx.session.user.id),
+          eq(memberTable.organizationId, active),
+        )
+      : eq(memberTable.userId, ctx.session.user.id),
+    columns: { organizationId: true },
+  });
+  if (!membership) throw new TRPCError({ code: "FORBIDDEN" });
+  return membership.organizationId;
+}
+
 export const adsRouter = {
   scope: protectedProcedure
     .input(
       z.object({
+        brandSlug: z.string().trim().min(1),
         fromDate: dateStr.optional(),
         toDate: dateStr.optional(),
       }),
     )
-    .query(async ({ input }) => computeAdsScope(input)),
+    .query(async ({ ctx, input }) =>
+      computeAdsScope({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
 
   topAds: protectedProcedure
     .input(
       z.object({
+        brandSlug: z.string().trim().min(1),
         fromDate: dateStr.optional(),
         toDate: dateStr.optional(),
         objective: z.string().optional(),
@@ -40,5 +74,10 @@ export const adsRouter = {
         limit: z.number().int().min(1).max(30).default(15),
       }),
     )
-    .query(async ({ input }) => computeTopAds(input)),
+    .query(async ({ ctx, input }) =>
+      computeTopAds({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
 } satisfies TRPCRouterRecord;

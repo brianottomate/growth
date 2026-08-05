@@ -29,6 +29,7 @@ import {
 } from "@/server/db/schema";
 import { publishBlogDraft as publishBlogDraftToDato } from "@/server/services/blog-publish.service";
 import { ContentService } from "@/server/services/content.service";
+import { saveSocialFirstComment } from "@/server/services/content-publishing.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import {
@@ -119,6 +120,10 @@ export const getContentWorkItem = growthAction({
         status: group.root.status,
         text: group.root.text,
         scheduledAt: group.root.scheduledAt,
+        provider: group.root.provider,
+        deliveryStatus: group.root.deliveryStatus,
+        firstComment: group.root.firstCommentText,
+        firstCommentStatus: group.root.firstCommentStatus,
         media: group.root.media ?? [],
         assetLinks: group.root.assetLinks ?? [],
         threadItems: group.items.map((post, index) => ({
@@ -325,6 +330,27 @@ export const updateContentWorkItem = growthAction({
         input.platformDrafts?.map((draft) => draft.platformPostId) ?? [],
       url: `/app/content/${content.id}`,
     };
+  },
+});
+
+export const setPlatformPostFirstComment = growthAction({
+  description:
+    "Prepare or clear the local first comment for one owned Instagram or LinkedIn post. This only changes Growth's draft. If the post is already queued in Zernio, use publishingWrite.updateFirstComment with approval to change the provider job.",
+  inputSchema: z.object({
+    platformPostId: z.string(),
+    firstComment: z.string().trim().max(2_200).nullable(),
+  }),
+  execute: async (input, ctx) => {
+    const post = await db.query.platformPostTable.findFirst({
+      where: eq(platformPostTable.id, input.platformPostId),
+      with: { brand: true },
+    });
+    if (post?.source !== "owned" || post?.brand?.organizationId !== ctx.orgId) {
+      throw new Error(
+        "That owned social post is not available in this organization",
+      );
+    }
+    return saveSocialFirstComment(input);
   },
 });
 

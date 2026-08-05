@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { AMPLIFICATION_ACTIONS } from "@/lib/amplification-slack";
 import { db } from "@/server/db";
 import {
   amplificationTargetTable,
@@ -11,6 +12,7 @@ import {
   platformPostLinkTable,
   platformPostTable,
 } from "@/server/db/schema";
+import { notifyAmplificationTarget } from "@/server/services/amplification-notification.service";
 import { requireOwnedBrand } from "./brand-access";
 import { growthAction } from "./types";
 
@@ -62,6 +64,7 @@ export const listAmplifiers = growthAction({
         type: amplifier.type,
         handles: amplifier.handles ?? [],
         linkedBrandId: amplifier.promotedBrandId,
+        slackUserId: amplifier.slackUserId,
         notes: amplifier.notes,
         history: historyFor(amplifier.id),
       })),
@@ -71,7 +74,7 @@ export const listAmplifiers = growthAction({
 
 export const requestAmplification = growthAction({
   description:
-    "Recruit amplifiers for ONE platform post. Creates an amplification target per amplifier (ask lifecycle: planned → asked → confirmed → fulfilled). For amplifiers linked to an owned brand with a channel on the post's platform, also mints their repost draft immediately and links it (the live URL is injected at publish). Idempotent per (post, amplifier).",
+    "Plan human amplification for ONE platform post. Creates or updates one target per amplifier without contacting anyone. For repost or quote actions, amplifiers linked to an owned brand with a matching channel also get a linked draft. Use notifyAmplification separately, with approval, to send a Slack request.",
   inputSchema: z.object({
     platformPostId: z.string(),
     amplifierIds: z.array(z.string()).min(1).max(10),
@@ -83,6 +86,8 @@ export const requestAmplification = growthAction({
       .default(180)
       .describe("Repost delay after the post's scheduled time"),
     note: z.string().trim().max(500).optional(),
+    actionKind: z.enum(AMPLIFICATION_ACTIONS).default("repost"),
+    draftText: z.string().trim().max(1500).optional(),
   }),
   execute: async (input, ctx) => {
     const post = await db.query.platformPostTable.findFirst({
@@ -118,14 +123,30 @@ export const requestAmplification = growthAction({
           amplifierId: amplifier.id,
           ask: "planned",
           plannedAt,
+          actionKind: input.actionKind,
+          draftText: input.draftText ?? null,
           notes: input.note ?? null,
         })
-        .onConflictDoNothing()
+        .onConflictDoUpdate({
+          target: [
+            amplificationTargetTable.platformPostId,
+            amplificationTargetTable.amplifierId,
+          ],
+          set: {
+            plannedAt,
+            actionKind: input.actionKind,
+            draftText: input.draftText ?? null,
+            notes: input.note ?? null,
+          },
+        })
         .returning({ id: amplificationTargetTable.id });
 
       let mintedRepostId: string | null = null;
       let mode: "owned" | "ask" = "ask";
-      if (amplifier.promotedBrandId) {
+      if (
+        amplifier.promotedBrandId &&
+        (input.actionKind === "repost" || input.actionKind === "quote")
+      ) {
         const channel = await db.query.channelTable.findFirst({
           where: and(
             eq(channelTable.brandId, amplifier.promotedBrandId),
@@ -166,7 +187,7 @@ export const requestAmplification = growthAction({
               await db.insert(platformPostLinkTable).values({
                 fromPlatformPostId: draft.id,
                 toPlatformPostId: post.id,
-                kind: "repost",
+                kind: input.actionKind,
                 injectUrlAtPublish: true,
                 metadata: { role: "amplifier", amplifierId: amplifier.id },
               });
@@ -177,7 +198,7 @@ export const requestAmplification = growthAction({
       results.push({
         amplifier: amplifier.name,
         mode,
-        target: target ? "created" : "already_recruited",
+        target: target ? "saved" : "unchanged",
         mintedRepostId,
       });
     }
@@ -185,7 +206,19 @@ export const requestAmplification = growthAction({
   },
 });
 
+export const notifyAmplification = growthAction({
+  description:
+    "Send one planned amplification request to the configured Slack channel and tag the amplifier by stored Slack member ID. This is an external message and requires explicit approval. Idempotent after Slack returns a persisted message receipt.",
+  inputSchema: z.object({ targetId: z.string() }),
+  execute: (input, ctx) =>
+    notifyAmplificationTarget({
+      targetId: input.targetId,
+      organizationId: ctx.orgId,
+    }),
+});
+
 export const AMPLIFICATION_TOOLS = {
   listAmplifiers,
   requestAmplification,
+  notifyAmplification,
 } as const;

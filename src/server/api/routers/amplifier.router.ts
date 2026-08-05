@@ -17,6 +17,11 @@ import {
   platformPostTable,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import {
+  AMPLIFICATION_ACTIONS,
+  isSlackMemberId,
+} from "@/lib/amplification-slack";
+import { notifyAmplificationTarget } from "@/server/services/amplification-notification.service";
 import { discoverAmplifierHandles } from "@/server/services/social-discovery.service";
 
 type Ctx = {
@@ -139,6 +144,11 @@ export function profileUrlForAmplifierHandle(platform: string, handle: string) {
 }
 
 const handleSchema = z.object({ platform: z.string(), handle: z.string() });
+const slackUserIdSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .refine(isSlackMemberId, "Use a Slack member ID such as U012ABCDEF");
 
 /**
  * Amplifiers — the lightweight contacts (investors / press / partners) recruited
@@ -164,6 +174,8 @@ export const amplifierRouter = createTRPCRouter({
         name: z.string().min(1),
         type: z.string().optional(),
         handles: z.array(handleSchema).optional(),
+        notes: z.string().max(1000).optional(),
+        slackUserId: slackUserIdSchema.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -176,6 +188,8 @@ export const amplifierRouter = createTRPCRouter({
           name: input.name,
           type: input.type,
           handles: input.handles ?? [],
+          notes: input.notes,
+          slackUserId: input.slackUserId,
         })
         .returning();
       return a;
@@ -190,6 +204,7 @@ export const amplifierRouter = createTRPCRouter({
         type: z.string().optional(),
         handles: z.array(handleSchema).optional(),
         notes: z.string().optional(),
+        slackUserId: slackUserIdSchema.nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -320,6 +335,9 @@ export const amplifierRouter = createTRPCRouter({
         amplifierId: z.string(),
         ask: z.string().optional(),
         plannedAt: z.string().optional(),
+        actionKind: z.enum(AMPLIFICATION_ACTIONS).default("repost"),
+        draftText: z.string().trim().max(1500).optional(),
+        notes: z.string().trim().max(1000).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -337,6 +355,21 @@ export const amplifierRouter = createTRPCRouter({
           amplifierId: input.amplifierId,
           ask: input.ask ?? "planned",
           plannedAt: input.plannedAt ? new Date(input.plannedAt) : undefined,
+          actionKind: input.actionKind,
+          draftText: input.draftText,
+          notes: input.notes,
+        })
+        .onConflictDoUpdate({
+          target: [
+            amplificationTargetTable.platformPostId,
+            amplificationTargetTable.amplifierId,
+          ],
+          set: {
+            actionKind: input.actionKind,
+            draftText: input.draftText,
+            notes: input.notes,
+            plannedAt: input.plannedAt ? new Date(input.plannedAt) : undefined,
+          },
         })
         .returning();
       return t;
@@ -397,6 +430,18 @@ export const amplifierRouter = createTRPCRouter({
         .where(eq(amplificationTargetTable.id, input.targetId))
         .returning();
       return t;
+    }),
+
+  /** Explicit external handoff. Planning a target never sends Slack. */
+  notifyTarget: protectedProcedure
+    .input(z.object({ targetId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const target = await assertTargetAccess(ctx, input.targetId);
+      const amplifier = await assertAmplifierAccess(ctx, target.amplifierId);
+      return notifyAmplificationTarget({
+        targetId: input.targetId,
+        organizationId: amplifier.organizationId,
+      });
     }),
 
   /** Drop an amplifier from a moment (leaves the rolodex row intact). */

@@ -29,13 +29,13 @@ explicit policy and approval path.
 
 | Surface          | Contract                | Purpose                                                                                     |
 | ---------------- | ----------------------- | ------------------------------------------------------------------------------------------- |
-| Global assistant | 36 canonical tools      | Broad chat across the Growth workspace. Every tool remains available on every page.         |
+| Global assistant | 38 canonical tools      | Broad chat across the Growth workspace. Every tool remains available on every page.         |
 | Planner chat     | 3 read-only tools       | A focused Form or Chat flow for brand context, research, and a reviewable moment blueprint. |
-| Detailed MCP     | 34 connector-safe tools | Deterministic remote access to Growth domains through OAuth.                                |
+| Detailed MCP     | 35 connector-safe tools | Deterministic remote access to Growth domains through OAuth.                                |
 | `invoke_growth`  | 1 coarse MCP facade     | A bounded internal Growth run for hosts that prefer one natural-language tool.              |
 
-The 36 canonical tools contain 105 advertised actions. The wire-visible MCP
-surface has 35 tools: 34 detailed domain tools plus `invoke_growth`.
+The 38 canonical tools contain 114 advertised actions. The wire-visible MCP
+surface has 36 tools: 35 detailed domain tools plus `invoke_growth`.
 
 The planner projection contains `brandRead`, `researchRead`, and
 `planningRead`. It does not own another registry and does not limit the global
@@ -214,6 +214,18 @@ DatoCMS is a good example. `contentWrite.publishBlogDraft` creates an external
 CMS draft. It does not publish the article live. Drive is another: the in-app
 assistant can browse Drive, while remote MCP hosts use their own Drive connector
 and hand Growth resolved file IDs.
+
+Social publishing follows the same rule. `contentWrite.setFirstComment` only
+prepares local copy. `publishingWrite` is the one Zernio provider boundary for
+schedule, publish-now, reschedule, and queued-first-comment updates. Every
+action requires operator approval, and Growth advances delivery state only from
+a Zernio receipt or signed webhook reconciliation.
+
+Amplification keeps planning and contact separate. `amplificationWrite.request`
+creates or updates a local target. `amplificationWrite.notify` is a separate,
+approval-gated Slack write that tags the amplifier's stored member ID and saves
+the returned channel and message timestamp. Repeating a successful notification
+returns the saved receipt instead of posting twice.
 
 Chat attachments follow the same boundary. Pasting an image gives the model
 visual context, but does not save or upload anything by itself. When the

@@ -12,6 +12,11 @@ import { growthAction } from "./types";
 // Optional analysis window — both default to "last 365 days" (resolved in the
 // service). The model only needs to pass dates when the operator names a range.
 const windowSchema = {
+  brandSlug: z
+    .string()
+    .trim()
+    .min(1)
+    .describe("Exact owned brand slug, such as wander or wanderos."),
   fromDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -28,7 +33,8 @@ export const adsScope = growthAction({
   description:
     "CHEAP lay-of-the-land for Wander's Meta (Facebook) ad performance over a window (default last 365 days): totals (impressions/clicks/CTR/spend/engagement), spend-by-month, and breakdowns by objective (OUTCOME_SALES≈consumer marketplace vs OUTCOME_LEADS≈PM/WanderOS) and by ad DESTINATION (audit / os / marketplace / lead-form / …). Includes flags like hasAuditAds. CALL THIS FIRST for any 'which ads / ad performance / what are we running / are we driving to X' question — it grounds your follow-ups (e.g. it tells you instantly that we've run zero audit-destination ads). Then call topAds to drill in.",
   inputSchema: z.object(windowSchema),
-  execute: async (input) => computeAdsScope(input),
+  execute: async (input, ctx) =>
+    computeAdsScope({ ...input, organizationId: ctx.orgId }),
 });
 
 export const topAds = growthAction({
@@ -60,5 +66,6 @@ export const topAds = growthAction({
       .describe("Ranking metric."),
     limit: z.number().int().min(1).max(30).default(15),
   }),
-  execute: async (input) => computeTopAds(input),
+  execute: async (input, ctx) =>
+    computeTopAds({ ...input, organizationId: ctx.orgId }),
 });

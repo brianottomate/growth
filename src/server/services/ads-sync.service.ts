@@ -9,11 +9,8 @@ import {
   type CampaignStatus,
 } from "@/server/db/ads-schema";
 import { brandTable } from "@/server/db/brand-schema";
-import {
-  type ChannelPlatform,
-  channelTable,
-} from "@/server/db/channel-schema";
-import { getAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
+import { type ChannelPlatform, channelTable } from "@/server/db/channel-schema";
+import { getAllAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
 import {
   getZernioAdsTree,
   isZernioConfigured,
@@ -94,7 +91,7 @@ function pickHeroThumbnail(ads: ZernioAd[]): string | undefined {
   for (const a of ads) {
     const thumb = str(a.creative?.thumbnailUrl);
     if (!thumb) continue;
-    const spend = num((a.metrics)?.spend) ?? 0;
+    const spend = num(a.metrics?.spend) ?? 0;
     if (!best || spend > best.spend) best = { spend, thumb };
     const ms = adDateMs(a) ?? 0;
     if (!fallback || ms > fallback.ms) fallback = { ms, thumb };
@@ -201,7 +198,7 @@ export async function syncZernioAds(options?: {
   });
   if (!brand) throw new Error(`Brand "${brandSlug}" not found`);
 
-  const allowedAccounts = await getAllowedAdAccountIds();
+  const allowedAccounts = await getAllAllowedAdAccountIds();
   // Meta allowlist rows carry the `act_` prefix; Zernio sometimes reports the
   // bare id. Compare both spellings.
   const isAllowed = (acct: string) =>
@@ -313,11 +310,13 @@ export async function syncZernioAds(options?: {
       status,
       // Google campaigns carry no platformObjective; the channel type
       // (SEARCH / PERFORMANCE_MAX / DISPLAY / DEMAND_GEN) is the objective.
-      objective:
-        str(obj.platformObjective) ?? str(obj.advertisingChannelType),
+      objective: str(obj.platformObjective) ?? str(obj.advertisingChannelType),
       startAt: firstMs !== undefined ? new Date(firstMs) : undefined,
       // Active campaigns are ongoing — no end date. Else last creative date.
-      endAt: status === "live" || lastMs === undefined ? undefined : new Date(lastMs),
+      endAt:
+        status === "live" || lastMs === undefined
+          ? undefined
+          : new Date(lastMs),
       spend: stats.spend !== undefined ? Math.round(stats.spend) : undefined,
       adSpots: ads.length,
       stats,

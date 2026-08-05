@@ -1,5 +1,6 @@
 import "server-only";
 
+import { and, eq, isNull } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 
 import {
@@ -11,6 +12,8 @@ import {
   filterToAllowedAdAccounts,
   getAllowedAdAccountIds,
 } from "@/server/services/ad-account-allowlist.service";
+import { db } from "@/server/db";
+import { brandTable } from "@/server/db/schema";
 
 /**
  * Ad-performance analytics over the Zernio ad tree — the shared logic behind
@@ -105,12 +108,35 @@ const fetchTreeCached = unstable_cache(
 async function fetchAllowedTree(
   fromDate: string,
   toDate: string,
+  brandId: string,
 ): Promise<ZernioAdsTreeCampaign[]> {
   const [tree, allowed] = await Promise.all([
     fetchTreeCached(fromDate, toDate),
-    getAllowedAdAccountIds(),
+    getAllowedAdAccountIds(brandId),
   ]);
-  return filterToAllowedAdAccounts(tree, allowed, "zernio-ads-tree");
+  return filterToAllowedAdAccounts(
+    tree,
+    allowed,
+    "zernio-ads-tree-brand-scope",
+    false,
+  );
+}
+
+async function resolveOwnedAdBrand(input: {
+  organizationId: string;
+  brandSlug: string;
+}) {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.organizationId, input.organizationId),
+      eq(brandTable.slug, input.brandSlug),
+      isNull(brandTable.deletedAt),
+    ),
+    columns: { id: true, slug: true, name: true },
+  });
+  if (!brand?.slug)
+    throw new Error(`Owned brand not found: ${input.brandSlug}`);
+  return { ...brand, slug: brand.slug };
 }
 
 // ---- FLATTEN + CLASSIFY ----------------------------------------------------
@@ -137,7 +163,8 @@ type FlatAd = {
 /** linkUrl + objective → destination bucket (lifted from the scan script). */
 export function classifyDestination(ad: ZernioAd): AdDestination {
   const link = (ad.creative?.linkUrl ?? "").toLowerCase();
-  if (link.includes("audit.wander.com") || link.includes("/audit")) return "audit";
+  if (link.includes("audit.wander.com") || link.includes("/audit"))
+    return "audit";
   if (link.includes("/os") || link.includes("wanderos")) return "os";
   if (link.includes("/list")) return "list";
   if (link.includes("wander.com")) return "marketplace";
@@ -210,9 +237,14 @@ function bucketBy(ads: FlatAd[], keyFn: (a: FlatAd) => string): Bucket[] {
   const map = new Map<string, Omit<Bucket, "ctr">>();
   for (const a of ads) {
     const k = keyFn(a);
-    const e =
-      map.get(k) ??
-      { key: k, ads: 0, impressions: 0, clicks: 0, engagement: 0, spend: 0 };
+    const e = map.get(k) ?? {
+      key: k,
+      ads: 0,
+      impressions: 0,
+      clicks: 0,
+      engagement: 0,
+      spend: 0,
+    };
     e.ads++;
     e.impressions += a.impressions;
     e.clicks += a.clicks;
@@ -226,6 +258,7 @@ function bucketBy(ads: FlatAd[], keyFn: (a: FlatAd) => string): Bucket[] {
 }
 
 export type AdsScopeResult = {
+  brand: { id: string; slug: string; name: string };
   window: { fromDate: string; toDate: string };
   account: { id?: string; name?: string };
   totals: {
@@ -238,37 +271,68 @@ export type AdsScopeResult = {
     engagement: number;
     conversions: number;
   };
-  byMonth: { month: string; ads: number; impressions: number; clicks: number; spend: number }[];
+  byMonth: {
+    month: string;
+    ads: number;
+    impressions: number;
+    clicks: number;
+    spend: number;
+  }[];
   byObjective: Bucket[];
   byDestination: Bucket[];
   flags: { hasAuditAds: boolean; hasOsAds: boolean };
 };
 
 export async function computeAdsScope(input: {
+  organizationId: string;
+  brandSlug: string;
   fromDate?: string;
   toDate?: string;
 }): Promise<AdsScopeResult> {
   const window = resolveAdsWindow(input);
-  const tree = await fetchAllowedTree(window.fromDate, window.toDate);
+  const brand = await resolveOwnedAdBrand(input);
+  const tree = await fetchAllowedTree(window.fromDate, window.toDate, brand.id);
   const all = flattenWindowedAds(tree);
   const delivered = all.filter((a) => a.impressions > 0);
 
   const first = (tree[0] ?? {}) as Record<string, unknown>;
   const account = {
-    id: typeof first.platformAdAccountId === "string" ? first.platformAdAccountId : undefined,
-    name: typeof first.platformAdAccountName === "string" ? first.platformAdAccountName : undefined,
+    id:
+      typeof first.platformAdAccountId === "string"
+        ? first.platformAdAccountId
+        : undefined,
+    name:
+      typeof first.platformAdAccountName === "string"
+        ? first.platformAdAccountName
+        : undefined,
   };
 
-  const sum = (f: (a: FlatAd) => number) => delivered.reduce((n, a) => n + f(a), 0);
+  const sum = (f: (a: FlatAd) => number) =>
+    delivered.reduce((n, a) => n + f(a), 0);
   const impressions = sum((a) => a.impressions);
   const clicks = sum((a) => a.clicks);
 
   // Bucket delivered ads by launch month (platformCreatedAt) — a spend-over-time proxy.
-  const monthMap = new Map<string, { month: string; ads: number; impressions: number; clicks: number; spend: number }>();
+  const monthMap = new Map<
+    string,
+    {
+      month: string;
+      ads: number;
+      impressions: number;
+      clicks: number;
+      spend: number;
+    }
+  >();
   for (const a of delivered) {
     if (!a.createdAt) continue;
     const month = a.createdAt.slice(0, 7);
-    const e = monthMap.get(month) ?? { month, ads: 0, impressions: 0, clicks: 0, spend: 0 };
+    const e = monthMap.get(month) ?? {
+      month,
+      ads: 0,
+      impressions: 0,
+      clicks: 0,
+      spend: 0,
+    };
     e.ads++;
     e.impressions += a.impressions;
     e.clicks += a.clicks;
@@ -277,6 +341,7 @@ export async function computeAdsScope(input: {
   }
 
   return {
+    brand,
     window,
     account,
     totals: {
@@ -289,7 +354,9 @@ export async function computeAdsScope(input: {
       engagement: sum((a) => a.engagement),
       conversions: sum((a) => a.conversions),
     },
-    byMonth: [...monthMap.values()].sort((a, b) => a.month.localeCompare(b.month)),
+    byMonth: [...monthMap.values()].sort((a, b) =>
+      a.month.localeCompare(b.month),
+    ),
     byObjective: bucketBy(delivered, (a) => a.objective),
     byDestination: bucketBy(delivered, (a) => a.destination),
     flags: {
@@ -322,6 +389,7 @@ export type RankedAd = {
 };
 
 export type TopAdsResult = {
+  brand: { id: string; slug: string; name: string };
   window: { fromDate: string; toDate: string };
   filters: {
     objective?: string;
@@ -338,6 +406,8 @@ const metricValue = (a: FlatAd, metric: AdsMetric): number =>
   metric === "ctr" ? a.ctr : a[metric];
 
 export async function computeTopAds(input: {
+  organizationId: string;
+  brandSlug: string;
   fromDate?: string;
   toDate?: string;
   objective?: string;
@@ -351,15 +421,19 @@ export async function computeTopAds(input: {
   const metric = input.metric ?? "impressions";
   const limit = Math.min(Math.max(input.limit ?? 15, 1), 30);
 
-  const tree = await fetchAllowedTree(window.fromDate, window.toDate);
+  const brand = await resolveOwnedAdBrand(input);
+  const tree = await fetchAllowedTree(window.fromDate, window.toDate, brand.id);
   let ads = flattenWindowedAds(tree).filter((a) => a.impressions > 0);
   ads = ads.filter((a) => passesStatus(a, status));
   if (input.objective) ads = ads.filter((a) => a.objective === input.objective);
-  if (input.destination) ads = ads.filter((a) => a.destination === input.destination);
+  if (input.destination)
+    ads = ads.filter((a) => a.destination === input.destination);
 
   // CTR ranking applies a delivery floor so low-impression flukes don't win.
   const ranked = ads
-    .filter((a) => (metric === "ctr" ? a.impressions >= MIN_IMPRESSIONS_FOR_CTR : true))
+    .filter((a) =>
+      metric === "ctr" ? a.impressions >= MIN_IMPRESSIONS_FOR_CTR : true,
+    )
     .sort((a, b) => metricValue(b, metric) - metricValue(a, metric));
 
   const top: RankedAd[] = ranked.slice(0, limit).map((a) => ({
@@ -383,8 +457,15 @@ export async function computeTopAds(input: {
   }));
 
   return {
+    brand,
     window,
-    filters: { objective: input.objective, destination: input.destination, status, metric, limit },
+    filters: {
+      objective: input.objective,
+      destination: input.destination,
+      status,
+      metric,
+      limit,
+    },
     matched: ranked.length,
     ads: top,
   };

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
-import { CheckCircle2, CircleDashed } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
+import { getSeriesRunway } from "@/lib/series-runway";
 import { db } from "@/server/db";
 import {
   amplificationTargetTable,
@@ -149,7 +150,12 @@ export default async function SeriesDetailPage({
     ? await db.query.amplificationTargetTable.findMany({
         where: inArray(amplificationTargetTable.platformPostId, allSpotIds),
         with: { amplifier: { columns: { name: true } } },
-        columns: { id: true, platformPostId: true, ask: true },
+        columns: {
+          id: true,
+          platformPostId: true,
+          ask: true,
+          actionKind: true,
+        },
       })
     : [];
   const spotPlatform = new Map(
@@ -166,6 +172,7 @@ export default async function SeriesDetailPage({
         name: target.amplifier.name,
         platform: spotPlatform.get(target.platformPostId) ?? "",
         ask: target.ask,
+        actionKind: target.actionKind,
       }));
   };
 
@@ -262,6 +269,11 @@ export default async function SeriesDetailPage({
   const nextPlanningStep =
     planningChecks.find((check) => !check.complete)?.detail ??
     "The first two installments are mapped. Move into production when ready.";
+  const runway = getSeriesRunway({
+    now,
+    cadence,
+    installments,
+  });
 
   // The installment's hero image (first pool item) — shown as the card's
   // leading social-card thumbnail.
@@ -341,6 +353,37 @@ export default async function SeriesDetailPage({
         <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
           {series.description}
         </p>
+      ) : null}
+
+      {runway ? (
+        <section
+          className={`mt-5 rounded-xl border p-4 ${
+            runway.shortfall > 0
+              ? "border-amber-500/35 bg-amber-500/5"
+              : "bg-card"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {runway.shortfall > 0 ? (
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" />
+            ) : (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+            )}
+            <div>
+              <h2 className="text-sm font-semibold">Two-week runway</h2>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {runway.scheduled}/{runway.required} installments scheduled
+                {runway.reserve > 0
+                  ? `, with ${runway.reserve} unscheduled in reserve`
+                  : ""}
+                .
+                {runway.shortfall > 0
+                  ? ` Plan ${runway.shortfall} more to cover the fastest channel cadence.`
+                  : " The current cadence is covered."}
+              </p>
+            </div>
+          </div>
+        </section>
       ) : null}
 
       <section className="bg-card mt-5 rounded-xl border p-4">
@@ -541,6 +584,7 @@ type Boost = {
   name: string;
   platform: string;
   ask: string;
+  actionKind: string;
 };
 
 const ASK_DOT: Record<string, string> = {
@@ -617,14 +661,15 @@ function InstallmentCard({
             <span
               key={boost.id}
               className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"
-              title={`${boost.platform} · ${boost.ask}`}
+              title={`${boost.platform} · ${boost.actionKind} · ${boost.ask}`}
             >
               <span
                 className={`size-1.5 rounded-full ${
                   ASK_DOT[boost.ask] ?? ASK_DOT.planned
                 }`}
               />
-              {boost.name} · {boost.platform}
+              {boost.name} · {boost.actionKind.replace("_", " ")} ·{" "}
+              {boost.platform}
             </span>
           ))}
         </div>

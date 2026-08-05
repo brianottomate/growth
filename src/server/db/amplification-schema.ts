@@ -42,6 +42,10 @@ export const amplifierTable = pgTable(
     type: t.text(), // investor | press | partner | creator | team (soft)
     handles: t.jsonb().$type<AmplifierHandle[]>().default([]),
     notes: t.text(),
+    // Slack member ID (U… / W…) used only by an explicit notify action.
+    // Keeping identity on the reusable contact avoids hiding people in a
+    // campaign-specific metadata blob.
+    slackUserId: t.text(),
 
     // Set if this amplifier graduated into a tracked brand (handles → channels).
     promotedBrandId: t
@@ -90,12 +94,24 @@ export const amplificationTargetTable = pgTable(
     // auto-set by matching the hero post's retweeters against the amplifier's
     // handles.
     ask: t.text().default("planned").notNull(),
+    // What the person is being asked to do. This is deliberately separate
+    // from the platform post format: amplification is a relationship/action.
+    actionKind: t.text().default("repost").notNull(),
+    draftText: t.text(),
     plannedAt: t.timestamp({ withTimezone: true }),
     fulfilledAt: t.timestamp({ withTimezone: true }),
     // Soft pointer to the platform_post that fulfilled it (no FK — avoids a
     // cross-file cycle; resolve in app code).
     fulfilledByPostId: t.text(),
     notes: t.text(),
+
+    // Receipt for the explicit Slack handoff. A sent receipt makes retries
+    // idempotent and keeps "planned" distinct from "actually asked".
+    slackStatus: t.text(),
+    slackChannel: t.text(),
+    slackMessageTs: t.text(),
+    slackError: t.text(),
+    slackNotifiedAt: t.timestamp({ withTimezone: true }),
 
     createdAt: t
       .timestamp()

@@ -85,6 +85,7 @@ export const env = createEnv({
     X_BEARER_TOKEN: z.string().optional(),
     // Zernio (social channel centralization + ROI)
     ZERNIO_API_KEY: z.string().optional(),
+    ZERNIO_WEBHOOK_SECRET: z.string().optional(),
     // Apify (actor runs for scraping/enrichment)
     APIFY_API_KEY: z.string().optional(),
     // Bright Data (dataset scrapes for competitor/peer social posts)
@@ -117,6 +118,11 @@ export const env = createEnv({
     // IDs via chat.postMessage (#radio-social-listening, etc.). Missing → posts
     // are skipped (no-op), never an error.
     SLACK_API_TOKEN: z.string().optional(), // Bot token (xoxb-…)
+    SLACK_AMPLIFICATION_CHANNEL_ID: z.string().optional(),
+    SLACK_AMPLIFICATION_COORDINATOR_USER_ID: z
+      .string()
+      .regex(/^[UW][A-Z0-9]{7,}$/)
+      .optional(),
     // Impact.com Brand API (affiliate program ops — docs/affiliate-program-takeover.md).
     // Basic auth: AccountSID as username, AuthToken as password. Created in the
     // Impact dashboard under Settings → API Access. Missing → the client no-ops.
@@ -222,6 +228,7 @@ export const env = createEnv({
     X_BEARER_TOKEN: process.env.X_BEARER_TOKEN,
     // Zernio
     ZERNIO_API_KEY: process.env.ZERNIO_API_KEY,
+    ZERNIO_WEBHOOK_SECRET: process.env.ZERNIO_WEBHOOK_SECRET,
     // Apify
     APIFY_API_KEY: process.env.APIFY_API_KEY,
     // Bright Data
@@ -247,6 +254,9 @@ export const env = createEnv({
       process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
     RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET,
     SLACK_API_TOKEN: process.env.SLACK_API_TOKEN,
+    SLACK_AMPLIFICATION_CHANNEL_ID: process.env.SLACK_AMPLIFICATION_CHANNEL_ID,
+    SLACK_AMPLIFICATION_COORDINATOR_USER_ID:
+      process.env.SLACK_AMPLIFICATION_COORDINATOR_USER_ID,
     IMPACT_ACCOUNT_SID: process.env.IMPACT_ACCOUNT_SID,
     IMPACT_AUTH_TOKEN: process.env.IMPACT_AUTH_TOKEN,
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,

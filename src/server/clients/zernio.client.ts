@@ -139,6 +139,8 @@ export type ZernioPostPlatform = {
   platformPostId?: string;
   platformPostUrl?: string; // published posts only
   error?: string;
+  customContent?: string;
+  platformSpecificData?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
@@ -149,7 +151,9 @@ export type ZernioPost = {
   status?: string; // draft | scheduled | published | failed
   scheduledFor?: string;
   timezone?: string;
+  mediaItems?: Array<{ type?: "image" | "video"; url?: string }>;
   platforms?: ZernioPostPlatform[];
+  metadata?: Record<string, unknown>;
   tags?: string[];
   createdAt?: string;
   updatedAt?: string;
@@ -200,6 +204,25 @@ export async function createZernioPost(
     }
   }
   throw new Error("Zernio created the post but returned no post object");
+}
+
+/** Replace one draft/scheduled composer job with a complete payload. */
+export async function updateZernioPost(
+  postId: string,
+  input: CreateZernioPostInput,
+): Promise<ZernioPost> {
+  const data = await zernioFetch<unknown>(
+    `/posts/${encodeURIComponent(postId)}`,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
+  if (data && typeof data === "object") {
+    const object = data as Record<string, unknown>;
+    if (object.post && typeof object.post === "object") {
+      return object.post as ZernioPost;
+    }
+    if (typeof object._id === "string") return object;
+  }
+  throw new Error("Zernio updated the post but returned no post object");
 }
 
 export async function listZernioPosts(

@@ -655,6 +655,7 @@ type AdsBucket = {
 };
 
 export interface AdsScopeOutput {
+  brand: { id: string; slug: string; name: string };
   window: { fromDate: string; toDate: string };
   account: { id?: string; name?: string };
   totals: {
@@ -700,6 +701,7 @@ export interface RankedAd {
 }
 
 export interface AdsRankedOutput {
+  brand: { id: string; slug: string; name: string };
   window: { fromDate: string; toDate: string };
   filters: {
     objective?: string;
@@ -2019,6 +2021,7 @@ export function AdsRankedCard({ output }: { output: AdsRankedOutput }) {
   );
 
   const input: TopAdsInput = {
+    brandSlug: output.brand.slug,
     fromDate: output.window.fromDate,
     toDate: output.window.toDate,
     objective: objective || undefined,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Search, Sparkles, X } from "lucide-react";
+import { Loader2, Plus, Search, Send, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,10 +24,26 @@ const ASKS = ["planned", "asked", "confirmed", "fulfilled"] as const;
 type Ask = (typeof ASKS)[number];
 
 const ASK_META: Record<Ask, { label: string; cls: string; dot: string }> = {
-  planned: { label: "Planned", cls: "text-muted-foreground", dot: "bg-muted-foreground/40" },
-  asked: { label: "Asked", cls: "text-amber-600 dark:text-amber-400", dot: "bg-amber-500" },
-  confirmed: { label: "Confirmed", cls: "text-blue-600 dark:text-blue-400", dot: "bg-blue-500" },
-  fulfilled: { label: "Fulfilled", cls: "text-emerald-600 dark:text-emerald-400", dot: "bg-emerald-500" },
+  planned: {
+    label: "Planned",
+    cls: "text-muted-foreground",
+    dot: "bg-muted-foreground/40",
+  },
+  asked: {
+    label: "Asked",
+    cls: "text-amber-600 dark:text-amber-400",
+    dot: "bg-amber-500",
+  },
+  confirmed: {
+    label: "Confirmed",
+    cls: "text-blue-600 dark:text-blue-400",
+    dot: "bg-blue-500",
+  },
+  fulfilled: {
+    label: "Fulfilled",
+    cls: "text-emerald-600 dark:text-emerald-400",
+    dot: "bg-emerald-500",
+  },
 };
 
 const TYPE_OPTIONS = [
@@ -71,11 +87,24 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
       onError: (e) => toast.error(e.message || "Failed to remove"),
     }),
   );
+  const notifyTarget = useMutation(
+    trpc.amplifier.notifyTarget.mutationOptions({
+      onSuccess: async (result) => {
+        await invalidate();
+        toast.success(
+          result.status === "already_sent"
+            ? "Slack request was already sent"
+            : "Slack request sent",
+        );
+      },
+      onError: (error) => toast.error(error.message || "Slack request failed"),
+    }),
+  );
 
   return (
     <section className="mt-10">
       <div className="flex items-center justify-between">
-        <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+        <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
           Amplifiers · {targets?.length ?? 0}
         </h2>
         <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
@@ -90,9 +119,9 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
         </div>
       ) : !targets || targets.length === 0 ? (
         <p className="text-muted-foreground mt-4 text-sm">
-          No one recruited yet. Add a friend-of-the-company, investor, or creator
-          to boost this launch — they live in a shared org rolodex, so you can
-          reuse them across brands.
+          No one recruited yet. Add a friend-of-the-company, investor, or
+          creator to boost this launch — they live in a shared org rolodex, so
+          you can reuse them across brands.
         </p>
       ) : (
         <div className="mt-3 flex flex-col gap-1.5">
@@ -111,6 +140,9 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
                     {t.amplifier.type}
                   </span>
                 )}
+                <span className="text-muted-foreground text-[10px] capitalize">
+                  {t.actionKind.replace("_", " ")}
+                </span>
                 <div className="flex min-w-0 flex-1 items-center gap-1.5">
                   {(t.amplifier.handles ?? []).map((h) => (
                     <span
@@ -136,9 +168,34 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
                   }))}
                   aria-label="Recruitment status"
                 />
-                <span className={`flex shrink-0 items-center gap-1 text-[11px] ${meta.cls}`}>
+                <span
+                  className={`flex shrink-0 items-center gap-1 text-[11px] ${meta.cls}`}
+                >
                   <span className={`size-1.5 rounded-full ${meta.dot}`} />
                 </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    t.slackStatus === "sent" ||
+                    (notifyTarget.isPending &&
+                      notifyTarget.variables?.targetId === t.id)
+                  }
+                  onClick={() => notifyTarget.mutate({ targetId: t.id })}
+                  title={
+                    t.slackStatus === "sent"
+                      ? "Slack request sent"
+                      : "Notify the configured amplification coordinator in Slack"
+                  }
+                >
+                  {notifyTarget.isPending &&
+                  notifyTarget.variables?.targetId === t.id ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Send className="size-3.5" />
+                  )}
+                  {t.slackStatus === "sent" ? "Sent" : "Notify"}
+                </Button>
                 <button
                   type="button"
                   aria-label="Remove amplifier"
@@ -157,7 +214,9 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
         open={addOpen}
         onOpenChange={setAddOpen}
         posts={posts}
-        existingAmplifierIds={new Set((targets ?? []).map((t) => t.amplifierId))}
+        existingAmplifierIds={
+          new Set((targets ?? []).map((t) => t.amplifierId))
+        }
         onAdded={invalidate}
       />
     </section>
@@ -233,9 +292,7 @@ function AddAmplifierDialog({
     trpc.amplifier.create.mutationOptions({
       onSuccess: async (amp) => {
         if (!amp || !selectedPostId) return;
-        await queryClient.invalidateQueries(
-          trpc.amplifier.list.queryOptions(),
-        );
+        await queryClient.invalidateQueries(trpc.amplifier.list.queryOptions());
         addTarget.mutate({
           platformPostId: selectedPostId,
           amplifierId: amp.id,
@@ -298,7 +355,7 @@ function AddAmplifierDialog({
         {tab === "pick" ? (
           <>
             <div className="relative">
-              <Search className="text-muted-foreground absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
+              <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -387,14 +444,12 @@ function AddAmplifierDialog({
                 aria-label="Platform"
               />
               <div className="relative flex-1">
-                <span className="text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 text-sm">
+                <span className="text-muted-foreground absolute top-1/2 left-2.5 -translate-y-1/2 text-sm">
                   @
                 </span>
                 <Input
                   value={handle}
-                  onChange={(e) =>
-                    setHandle(e.target.value.replace(/^@/, ""))
-                  }
+                  onChange={(e) => setHandle(e.target.value.replace(/^@/, ""))}
                   placeholder="handle"
                   className="pl-6"
                 />

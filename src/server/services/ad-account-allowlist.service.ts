@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { adAccountTable } from "@/server/db/schema";
@@ -20,13 +20,29 @@ import { adAccountTable } from "@/server/db/schema";
  * with `bun run scripts/seed-ad-accounts.ts` or Drizzle Studio.
  */
 
-/** All externalIds with isAllowed = true, across platforms. */
-export async function getAllowedAdAccountIds(): Promise<Set<string>> {
+/** Allowed account IDs for one explicit owned brand. */
+export async function getAllowedAdAccountIds(
+  brandId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ externalId: adAccountTable.externalId })
+    .from(adAccountTable)
+    .where(
+      and(
+        eq(adAccountTable.isAllowed, true),
+        eq(adAccountTable.brandId, brandId),
+      ),
+    );
+  return new Set(rows.map((r) => r.externalId));
+}
+
+/** Operational sync may ingest every explicitly allowed owned account. */
+export async function getAllAllowedAdAccountIds(): Promise<Set<string>> {
   const rows = await db
     .select({ externalId: adAccountTable.externalId })
     .from(adAccountTable)
     .where(eq(adAccountTable.isAllowed, true));
-  return new Set(rows.map((r) => r.externalId));
+  return new Set(rows.map((row) => row.externalId));
 }
 
 /**
@@ -41,13 +57,23 @@ export function filterToAllowedAdAccounts<T extends object>(
   items: T[],
   allowed: Set<string>,
   context: string,
+  keepUnscoped = true,
 ): T[] {
   const dropped = new Map<string, number>();
   const kept: T[] = [];
   for (const item of items) {
     const rec = item as Record<string, unknown>;
     const id = rec.platformAdAccountId;
-    if (typeof id !== "string" || id.length === 0 || allowed.has(id)) {
+    if (typeof id !== "string" || id.length === 0) {
+      if (keepUnscoped) kept.push(item);
+      else
+        dropped.set(
+          "(missing account id)",
+          (dropped.get("(missing account id)") ?? 0) + 1,
+        );
+      continue;
+    }
+    if (allowed.has(id)) {
       kept.push(item);
       continue;
     }

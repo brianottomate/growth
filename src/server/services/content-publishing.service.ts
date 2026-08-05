@@ -8,6 +8,7 @@ import {
   isZernioConfigured,
   mapZernioPlatform,
   retryZernioPost,
+  updateZernioPost,
   type CreateZernioPostInput,
   type ZernioPost,
 } from "@/server/clients/zernio.client";
@@ -18,6 +19,7 @@ import {
   platformPostTable,
 } from "@/server/db/schema";
 import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
+import { buildZernioReschedulePayload } from "@/lib/zernio-reschedule";
 
 export type SocialDeliveryMode = "schedule" | "publish_now";
 export type SocialPublishingPlatform =
@@ -173,15 +175,34 @@ function deliveryPayload(input: {
   platform: SocialPublishingPlatform;
   format: string | null;
   items: DeliveryItem[];
+  firstComment?: string | null;
 }): DeliveryPayload {
   const root = input.items[0];
   if (!root) throw new Error("Platform post not found");
+  const firstComment = input.firstComment?.trim() || null;
+  const firstCommentLimit =
+    input.platform === "instagram"
+      ? 2_200
+      : input.platform === "linkedin"
+        ? 1_250
+        : null;
+  if (firstComment && firstCommentLimit === null) {
+    throw new Error("This platform format does not support a first comment");
+  }
+  if (firstComment && firstComment.length > firstCommentLimit!) {
+    throw new Error(
+      `First comments can contain at most ${firstCommentLimit} characters`,
+    );
+  }
 
   if (input.platform === "linkedin") {
     if (input.items.length > 1) {
       throw new Error("LinkedIn thread groups are not supported");
     }
-    return validateLinkedIn(root);
+    return {
+      ...validateLinkedIn(root),
+      platformSpecificData: firstComment ? { firstComment } : undefined,
+    };
   }
 
   if (input.platform === "instagram") {
@@ -192,7 +213,13 @@ function deliveryPayload(input: {
     return {
       text,
       media,
-      platformSpecificData: isStory ? { contentType: "story" } : undefined,
+      platformSpecificData:
+        isStory || firstComment
+          ? {
+              ...(isStory ? { contentType: "story" } : {}),
+              ...(firstComment ? { firstComment } : {}),
+            }
+          : undefined,
     };
   }
 
@@ -307,6 +334,7 @@ async function loadSocialSpot(platformPostId: string) {
         platform,
         format: spot.format,
         items,
+        firstComment: spot.firstCommentText,
       });
   if (story) {
     items.forEach((item, index) => validateStoryFrame(item, index + 1));
@@ -355,6 +383,20 @@ async function persistDelivery(
       deliveryStatus,
       deliveryError: target?.error ?? (failed ? "Publishing failed" : null),
       deliveryUpdatedAt: new Date(),
+      firstCommentStatus: spot.firstCommentText
+        ? published
+          ? "posted"
+          : failed || cancelled
+            ? "failed"
+            : "queued"
+        : undefined,
+      firstCommentError:
+        spot.firstCommentText && (failed || cancelled)
+          ? (target?.error ?? "First comment was not delivered")
+          : spot.firstCommentText
+            ? null
+            : undefined,
+      firstCommentUpdatedAt: spot.firstCommentText ? new Date() : undefined,
       status: published
         ? "published"
         : failed || cancelled
@@ -548,6 +590,241 @@ export async function deliverSocialPost(input: {
   );
 }
 
+export async function saveSocialFirstComment(input: {
+  platformPostId: string;
+  firstComment: string | null;
+}) {
+  const spot = await db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.id, input.platformPostId),
+  });
+  if (!spot) throw new Error("Platform post not found");
+  if (spot.parentPlatformPostId) {
+    throw new Error("Prepare the first comment on the root post");
+  }
+  if (
+    isStoryFormat(spot.format) ||
+    (spot.platform !== "instagram" && spot.platform !== "linkedin")
+  ) {
+    throw new Error("This platform format does not support a first comment");
+  }
+  const firstComment = input.firstComment?.trim() || null;
+  const limit = spot.platform === "instagram" ? 2_200 : 1_250;
+  if (firstComment && firstComment.length > limit) {
+    throw new Error(`First comments can contain at most ${limit} characters`);
+  }
+  await db
+    .update(platformPostTable)
+    .set({
+      firstCommentText: firstComment,
+      firstCommentStatus: firstComment ? "draft" : null,
+      firstCommentError: null,
+      firstCommentUpdatedAt: new Date(),
+    })
+    .where(eq(platformPostTable.id, spot.id));
+  return {
+    platformPostId: spot.id,
+    firstCommentStatus: firstComment ? "draft" : null,
+  };
+}
+
+/** Provider update for a first comment on an already queued post. */
+export async function updateQueuedSocialFirstComment(input: {
+  platformPostId: string;
+  firstComment: string;
+}) {
+  const { spot, platform, connectedAccountId, items, story } =
+    await loadSocialSpot(input.platformPostId);
+  if (story || (platform !== "instagram" && platform !== "linkedin")) {
+    throw new Error("This platform format does not support a first comment");
+  }
+  if (!spot.deliveryExternalId) {
+    throw new Error(
+      "Schedule the post in Zernio before updating its first comment",
+    );
+  }
+  if (spot.status === "published" || spot.deliveryStatus === "published") {
+    throw new Error("This post is already published");
+  }
+  const firstComment = input.firstComment.trim();
+  if (!firstComment) throw new Error("Write the first comment before updating");
+  const payload = deliveryPayload({
+    platform,
+    format: spot.format,
+    items,
+    firstComment,
+  });
+  const current = await getZernioPost(spot.deliveryExternalId);
+  if (!current) throw new Error("The Zernio post no longer exists");
+  const scheduledFor = current.scheduledFor ?? spot.scheduledAt?.toISOString();
+  if (!scheduledFor) throw new Error("The Zernio post has no scheduled time");
+  const providerPayload = buildZernioReschedulePayload(current, scheduledFor);
+  let matchedTarget = false;
+  providerPayload.platforms = providerPayload.platforms.map((target) => {
+    if (
+      target.platform !== ZERNIO_PLATFORM[platform] ||
+      target.accountId !== connectedAccountId
+    ) {
+      return target;
+    }
+    matchedTarget = true;
+    return {
+      ...target,
+      platformSpecificData: {
+        ...target.platformSpecificData,
+        firstComment: payload.platformSpecificData?.firstComment,
+      },
+    };
+  });
+  if (!matchedTarget) {
+    throw new Error("Zernio returned no matching platform target");
+  }
+  const providerPost = await updateZernioPost(
+    spot.deliveryExternalId,
+    providerPayload,
+  );
+  const status = providerPost.status ?? spot.deliveryStatus ?? "scheduled";
+  const failed = ["failed", "partial", "cancelled"].includes(status);
+  await db
+    .update(platformPostTable)
+    .set({
+      firstCommentText: firstComment,
+      firstCommentStatus:
+        status === "published" ? "posted" : failed ? "failed" : "queued",
+      firstCommentError: failed
+        ? "Zernio did not accept the first comment update"
+        : null,
+      firstCommentUpdatedAt: new Date(),
+      deliveryStatus: status,
+      deliveryUpdatedAt: new Date(),
+    })
+    .where(eq(platformPostTable.id, spot.id));
+  return {
+    platformPostId: spot.id,
+    providerPostId: providerPost._id ?? spot.deliveryExternalId,
+    deliveryStatus: status,
+    firstCommentStatus:
+      status === "published" ? "posted" : failed ? "failed" : "queued",
+  };
+}
+
+/** Save, approve, and hand the complete publishing unit to Zernio. */
+export async function approveAndScheduleSocialPost(input: {
+  platformPostId: string;
+  scheduledAt: string;
+}) {
+  const scheduledAt = new Date(input.scheduledAt);
+  if (
+    Number.isNaN(scheduledAt.getTime()) ||
+    scheduledAt.getTime() <= Date.now()
+  ) {
+    throw new Error("Choose a future publish time");
+  }
+  const { spot, channel, items, story } = await loadSocialSpot(
+    input.platformPostId,
+  );
+  await Promise.all(
+    items.map((item, index) =>
+      db
+        .update(platformPostTable)
+        .set({
+          channelId: channel.id,
+          username: spot.username ?? channel.handle,
+          scheduledAt: story
+            ? sequenceScheduledAt(scheduledAt, index)
+            : scheduledAt,
+          status: "approved",
+        })
+        .where(eq(platformPostTable.id, item.id)),
+    ),
+  );
+  return deliverSocialPost({ platformPostId: spot.id, mode: "schedule" });
+}
+
+/** Move an existing provider job using its receipt as the payload source. */
+export async function rescheduleQueuedSocialPost(input: {
+  platformPostId: string;
+  scheduledAt: string;
+}) {
+  const scheduledAt = new Date(input.scheduledAt);
+  if (
+    Number.isNaN(scheduledAt.getTime()) ||
+    scheduledAt.getTime() <= Date.now()
+  ) {
+    throw new Error("Choose a future publish time");
+  }
+  const { spot, connectedAccountId, items, platform, story } =
+    await loadSocialSpot(input.platformPostId);
+  if (spot.status === "published" || spot.deliveryStatus === "published") {
+    throw new Error("This post is already published");
+  }
+
+  if (story) {
+    if (items.some((item) => !item.deliveryExternalId)) {
+      throw new Error("Retry the incomplete Story handoff before rescheduling");
+    }
+    const deliveries = [];
+    for (const [index, item] of items.entries()) {
+      const current = await getZernioPost(item.deliveryExternalId!);
+      if (!current) {
+        throw new Error(`Zernio no longer has Story frame ${index + 1}`);
+      }
+      const nextTime = sequenceScheduledAt(scheduledAt, index).toISOString();
+      const updated = await updateZernioPost(
+        item.deliveryExternalId!,
+        buildZernioReschedulePayload(current, nextTime),
+      );
+      if (
+        !updated.scheduledFor ||
+        new Date(updated.scheduledFor).getTime() !==
+          new Date(nextTime).getTime()
+      ) {
+        throw new Error(
+          `Zernio did not confirm the new time for Story frame ${index + 1}`,
+        );
+      }
+      deliveries.push(
+        await persistDelivery(
+          spot,
+          [item.id],
+          updated,
+          connectedAccountId,
+          platform,
+          "scheduled",
+          item.id,
+        ),
+      );
+    }
+    return {
+      platformPostId: spot.id,
+      scheduledAt: scheduledAt.toISOString(),
+      deliveries,
+    };
+  }
+
+  if (!spot.deliveryExternalId)
+    throw new Error("This post is not in Zernio yet");
+  const current = await getZernioPost(spot.deliveryExternalId);
+  if (!current) throw new Error("The Zernio post no longer exists");
+  const updated = await updateZernioPost(
+    spot.deliveryExternalId,
+    buildZernioReschedulePayload(current, scheduledAt.toISOString()),
+  );
+  if (
+    !updated.scheduledFor ||
+    new Date(updated.scheduledFor).getTime() !== scheduledAt.getTime()
+  ) {
+    throw new Error("Zernio did not confirm the new publish time");
+  }
+  return persistDelivery(
+    spot,
+    items.map((item) => item.id),
+    updated,
+    connectedAccountId,
+    platform,
+    "scheduled",
+  );
+}
+
 export async function refreshSocialDelivery(platformPostId: string) {
   const { spot, connectedAccountId, items, platform, story } =
     await loadSocialSpot(platformPostId);
@@ -603,6 +880,18 @@ export async function refreshSocialDelivery(platformPostId: string) {
     platform,
     "unknown",
   );
+}
+
+/** Signed webhooks are wake-up hints; the provider record remains canonical. */
+export async function reconcileZernioPostDelivery(providerPostId: string) {
+  const local = await db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.deliveryExternalId, providerPostId),
+    columns: { id: true, parentPlatformPostId: true },
+  });
+  if (!local) return { matched: false as const };
+  const rootPlatformPostId = local.parentPlatformPostId ?? local.id;
+  const delivery = await refreshSocialDelivery(rootPlatformPostId);
+  return { matched: true as const, rootPlatformPostId, delivery };
 }
 
 export async function retrySocialDelivery(platformPostId: string) {

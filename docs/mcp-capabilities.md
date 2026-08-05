@@ -32,8 +32,8 @@ endpoint verifies token issuer, audience, expiry, and scope and then re-checks
 the user's live organization membership on every request. There is no parallel
 connector table and no fallback to the browser session's active or first org.
 
-The MCP tools and the in-app Growth assistant are projections of the same 37-tool
-native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 35
+The MCP tools and the in-app Growth assistant are projections of the same 38-tool
+native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 36
 connector-safe capabilities and omits open-world `researchRead` plus in-app
 `driveRead`. Read-only,
 destructive, and idempotency annotations are derived from the same action policy
@@ -75,6 +75,14 @@ Notable portable workflows:
 - draft a non-persistent moment blueprint; accepted work is materialized through
   the product review flow rather than an AI commit macro;
 - propose cadence and mix changes from own performance and peer behavior.
+- prepare first comments, then approval-gate Zernio schedule, publish-now,
+  reschedule, and queued-first-comment updates;
+- plan a human amplification request without sending it, then explicitly notify
+  one stored Slack member with an idempotent provider receipt;
+- read brand-scoped ad performance through the default-deny account registry.
+
+For a content operator connecting a personal Claude client, use
+[`claude-mcp-setup.md`](claude-mcp-setup.md).
 
 The in-app assistant receives the operator's current `/app` location as
 orientation, including verified entity context on supported detail routes. Page

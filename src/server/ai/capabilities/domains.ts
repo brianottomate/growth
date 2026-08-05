@@ -32,6 +32,7 @@ import {
   recoverArchiveMediaToContent,
   suggestMediaForContent,
   searchContentWorkItems,
+  setPlatformPostFirstComment,
   setPlatformPostThread,
   upcomingContent,
   updateContentWorkItem,
@@ -42,11 +43,7 @@ import {
   importDriveFilesToContent,
 } from "./drive";
 import { EMAIL_TOOLS } from "./email";
-import {
-  leadsRewriteSequence,
-  leadsSequence,
-  leadsSummary,
-} from "./leads";
+import { leadsRewriteSequence, leadsSequence, leadsSummary } from "./leads";
 import { recentMentions } from "./listening";
 import { nextForBrand } from "./next";
 import {
@@ -72,6 +69,12 @@ import {
   updateChannelCadence,
 } from "./operations";
 import { PLANNING_TOOLS } from "./planning";
+import {
+  publishSocialPostNow,
+  rescheduleSocialPost,
+  scheduleSocialPost,
+  updateScheduledFirstComment,
+} from "./publishing";
 import {
   assignProductStorefrontManager,
   captureProductStorefrontReference,
@@ -177,6 +180,7 @@ export const contentWrite = growthDomainTool({
   actions: {
     createIdea,
     updateWorkItem: updateContentWorkItem,
+    setFirstComment: setPlatformPostFirstComment,
     setThread: setPlatformPostThread,
     addCrossPost: addContentCrossPost,
     createPlatformPost,
@@ -250,6 +254,17 @@ export const publishingRead = growthDomainTool({
   },
 });
 
+export const publishingWrite = growthDomainTool({
+  description:
+    "Schedule, immediately publish, reschedule, or update a queued first comment through Zernio. Every action is an approval-gated provider write.",
+  actions: {
+    schedule: scheduleSocialPost,
+    publishNow: publishSocialPostNow,
+    reschedule: rescheduleSocialPost,
+    updateFirstComment: updateScheduledFirstComment,
+  },
+});
+
 export const sourceSyncWrite = growthDomainTool({
   description:
     "Discover, register, and synchronize provider-backed brand sources.",
@@ -320,8 +335,11 @@ export const amplificationRead = growthDomainTool({
 
 export const amplificationWrite = growthDomainTool({
   description:
-    "Recruit amplifiers for a specific platform post; owned-brand amplifiers get their repost draft minted and linked immediately.",
-  actions: { request: AMPLIFICATION_TOOLS.requestAmplification },
+    "Plan amplification for a specific platform post, then explicitly notify one human through Slack when approved.",
+  actions: {
+    request: AMPLIFICATION_TOOLS.requestAmplification,
+    notify: AMPLIFICATION_TOOLS.notifyAmplification,
+  },
 });
 
 export const leadsRead = growthDomainTool({
@@ -360,6 +378,7 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   contentStrategyWrite,
   adsRead,
   publishingRead,
+  publishingWrite,
   sourceSyncWrite,
   mediaAnalysisRead,
   mediaAnalysisWrite,

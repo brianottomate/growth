@@ -1,5 +1,7 @@
-import { pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { brandTable } from "./brand-schema";
 import { createId } from "./utils";
 
 // ---- AD ACCOUNTS: aggregator allowlist ------------------------------
@@ -42,6 +44,10 @@ export const adAccountTable = pgTable(
     /** Display name as the platform reports it, for humans. */
     name: t.text(),
 
+    /** Owned brand whose reporting may consume this account. Null means the
+     * row is an unclassified/foreign denial record and can never be allowed. */
+    brandId: t.text().references(() => brandTable.id, { onDelete: "restrict" }),
+
     /** Default-deny: only rows with isAllowed = true are consumed. */
     isAllowed: t.boolean().notNull().default(false),
     /** Why this row exists — provenance of the allow/deny decision. */
@@ -55,6 +61,11 @@ export const adAccountTable = pgTable(
       .$onUpdate(() => new Date()),
   }),
   (table) => [
+    check(
+      "ad_account_allowed_brand_check",
+      sql`${table.isAllowed} = false OR ${table.brandId} IS NOT NULL`,
+    ),
+    index("ad_account_brand_idx").on(table.brandId),
     uniqueIndex("ad_account_platform_external_id_idx").on(
       table.platform,
       table.externalId,

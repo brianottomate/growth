@@ -57,6 +57,7 @@ type Amplifier = {
   type: string | null;
   handles: AmplifierHandle[] | null;
   notes: string | null;
+  slackUserId: string | null;
 };
 
 export function AmplifierRolodex() {
@@ -76,7 +77,9 @@ export function AmplifierRolodex() {
     trpc.amplifier.discoverHandles.mutationOptions({
       onSuccess: (r) => {
         void invalidate();
-        toast.success(`Found ${r.handles.length} handle${r.handles.length === 1 ? "" : "s"}`);
+        toast.success(
+          `Found ${r.handles.length} handle${r.handles.length === 1 ? "" : "s"}`,
+        );
       },
       onError: (e) => toast.error(e.message || "Discovery failed"),
     }),
@@ -92,13 +95,13 @@ export function AmplifierRolodex() {
     <section className="mt-10">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+          <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
             Amplifiers · {amplifiers?.length ?? 0}
           </h2>
           <p className="text-muted-foreground/80 mt-1 text-xs">
-            Friends-of-the-company, investors, press &amp; creators you recruit to
-            boost launches. Shared across every brand — recruit them onto a moment
-            from a campaign.
+            Friends-of-the-company, investors, press &amp; creators you recruit
+            to boost launches. Shared across every brand — recruit them onto a
+            moment from a campaign.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
@@ -124,8 +127,8 @@ export function AmplifierRolodex() {
         </div>
       ) : !amplifiers || amplifiers.length === 0 ? (
         <div className="bg-card text-muted-foreground rounded-2xl border p-5 text-sm shadow-sm">
-          No amplifiers yet. Add the people who can repost for you — like a friend
-          of the company who could retweet a launch.
+          No amplifiers yet. Add the people who can repost for you — like a
+          friend of the company who could retweet a launch.
         </div>
       ) : (
         <div className="bg-card divide-y rounded-2xl border shadow-sm">
@@ -143,6 +146,11 @@ export function AmplifierRolodex() {
                     {a.type}
                   </span>
                 )}
+                {a.slackUserId ? (
+                  <span className="border-border text-muted-foreground shrink-0 rounded-full border px-1.5 py-0.5 text-[10px]">
+                    Slack {a.slackUserId}
+                  </span>
+                ) : null}
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   {(a.handles ?? []).length === 0 ? (
                     <span className="text-muted-foreground/60 text-[11px] italic">
@@ -155,7 +163,10 @@ export function AmplifierRolodex() {
                         className="text-muted-foreground flex items-center gap-1 text-[11px]"
                         title={`${platformLabel(h.platform)}: @${h.handle}`}
                       >
-                        <ChannelLogo platform={h.platform} className="size-3.5" />
+                        <ChannelLogo
+                          platform={h.platform}
+                          className="size-3.5"
+                        />
                         @{h.handle}
                       </span>
                     ))
@@ -186,6 +197,7 @@ export function AmplifierRolodex() {
                         type: a.type,
                         handles: a.handles,
                         notes: a.notes,
+                        slackUserId: a.slackUserId,
                       })
                     }
                     title="Edit"
@@ -242,6 +254,7 @@ function AmplifierDialog({
   const [type, setType] = useState("creator");
   const [handles, setHandles] = useState<AmplifierHandle[]>([]);
   const [notes, setNotes] = useState("");
+  const [slackUserId, setSlackUserId] = useState("");
   // draft row for adding a handle
   const [platform, setPlatform] = useState("x");
   const [handle, setHandle] = useState("");
@@ -253,6 +266,7 @@ function AmplifierDialog({
     setType(initial?.type ?? "friend");
     setHandles(initial?.handles ?? []);
     setNotes(initial?.notes ?? "");
+    setSlackUserId(initial?.slackUserId ?? "");
     setPlatform("x");
     setHandle("");
   }, [open, initial]);
@@ -291,9 +305,22 @@ function AmplifierDialog({
     const trimmed = name.trim();
     if (!trimmed) return;
     if (isEdit && initial) {
-      update.mutate({ id: initial.id, name: trimmed, type, handles, notes });
+      update.mutate({
+        id: initial.id,
+        name: trimmed,
+        type,
+        handles,
+        notes,
+        slackUserId: slackUserId.trim().toUpperCase() || null,
+      });
     } else {
-      create.mutate({ name: trimmed, type, handles });
+      create.mutate({
+        name: trimmed,
+        type,
+        handles,
+        notes: notes || undefined,
+        slackUserId: slackUserId.trim().toUpperCase() || undefined,
+      });
     }
   }
 
@@ -301,10 +328,12 @@ function AmplifierDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit amplifier" : "Add amplifier"}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? "Edit amplifier" : "Add amplifier"}
+          </DialogTitle>
           <DialogDescription>
-            A lightweight contact in the org rolodex — reusable across every brand
-            and launch.
+            A lightweight contact in the org rolodex — reusable across every
+            brand and launch.
           </DialogDescription>
         </DialogHeader>
 
@@ -331,8 +360,8 @@ function AmplifierDialog({
                   key={`${h.platform}:${h.handle}`}
                   className="bg-muted flex items-center gap-1 rounded-md px-2 py-1 text-xs"
                 >
-                  <ChannelLogo platform={h.platform} className="size-3.5" />
-                  @{h.handle}
+                  <ChannelLogo platform={h.platform} className="size-3.5" />@
+                  {h.handle}
                   <button
                     type="button"
                     aria-label="Remove handle"
@@ -340,7 +369,9 @@ function AmplifierDialog({
                       setHandles(
                         handles.filter(
                           (x) =>
-                            !(x.platform === h.platform && x.handle === h.handle),
+                            !(
+                              x.platform === h.platform && x.handle === h.handle
+                            ),
                         ),
                       )
                     }
@@ -363,7 +394,7 @@ function AmplifierDialog({
               aria-label="Platform"
             />
             <div className="relative flex-1">
-              <span className="text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 text-sm">
+              <span className="text-muted-foreground absolute top-1/2 left-2.5 -translate-y-1/2 text-sm">
                 @
               </span>
               <Input
@@ -384,18 +415,28 @@ function AmplifierDialog({
             </Button>
           </div>
 
-          {isEdit && (
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notes (optional)"
-              rows={2}
-            />
-          )}
+          <Input
+            value={slackUserId}
+            onChange={(event) =>
+              setSlackUserId(event.target.value.toUpperCase())
+            }
+            placeholder="Slack member ID (for example U012ABCDEF)"
+          />
+
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            rows={2}
+          />
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+          >
             Cancel
           </Button>
           <Button onClick={save} disabled={!name.trim() || busy}>

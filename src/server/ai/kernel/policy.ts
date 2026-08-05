@@ -129,6 +129,7 @@ export const growthActionPolicies = {
   contentWrite: {
     createIdea: write(),
     updateWorkItem: write({ idempotent: true }),
+    setFirstComment: write({ idempotent: true }),
     setThread: write({ idempotent: true }),
     addCrossPost: write(),
     createPlatformPost: write(),
@@ -168,6 +169,31 @@ export const growthActionPolicies = {
     inspectConversions: read(),
   },
   publishingRead: { connections: read(), openTimelinePost: read() },
+  publishingWrite: {
+    schedule: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+    }),
+    publishNow: write({
+      consequence: "provider-write",
+      approval: "user",
+      reversible: false,
+    }),
+    reschedule: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+    }),
+    updateFirstComment: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+    }),
+  },
   sourceSyncWrite: {
     discoverChannels: write({
       consequence: "background-run",
@@ -201,7 +227,15 @@ export const growthActionPolicies = {
   },
   planningWrite: { generateSlots: write() },
   amplificationRead: { list: read() },
-  amplificationWrite: { request: write({ idempotent: true }) },
+  amplificationWrite: {
+    request: write({ idempotent: true }),
+    notify: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+    }),
+  },
   leadsRead: { summary: read(), sequence: read() },
   // Regenerating a draft is reversible (the prior draft is replaced, nothing
   // leaves Growth) but it does spend model tokens, so it is a write.

@@ -27,9 +27,13 @@ import { SPOT_PILL_IDS } from "@/lib/spot-pills";
 import { displayPoster } from "@/lib/utils/media";
 import { groupPlatformThreads } from "@/lib/platform-thread";
 import {
+  approveAndScheduleSocialPost,
   deliverSocialPost,
   refreshSocialDelivery,
+  rescheduleQueuedSocialPost,
   retrySocialDelivery,
+  saveSocialFirstComment,
+  updateQueuedSocialFirstComment,
 } from "@/server/services/content-publishing.service";
 import { resolveGroupingSuggestion } from "@/server/services/content-grouping.service";
 
@@ -701,6 +705,89 @@ export const contentRouter = createTRPCRouter({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: error instanceof Error ? error.message : "Could not publish",
+        });
+      }
+    }),
+
+  approveAndScheduleSocial: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        scheduledAt: z.string().datetime(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      try {
+        return await approveAndScheduleSocialPost(input);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Could not schedule",
+        });
+      }
+    }),
+
+  rescheduleSocial: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        scheduledAt: z.string().datetime(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      try {
+        return await rescheduleQueuedSocialPost(input);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error ? error.message : "Could not reschedule",
+        });
+      }
+    }),
+
+  setFirstComment: protectedProcedure
+    .input(
+      z.object({
+        platformPostId: z.string(),
+        firstComment: z.string().max(2_200).nullable(),
+        updateProvider: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      try {
+        return input.updateProvider
+          ? updateQueuedSocialFirstComment({
+              platformPostId: input.platformPostId,
+              firstComment: input.firstComment ?? "",
+            })
+          : saveSocialFirstComment(input);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Could not save first comment",
         });
       }
     }),

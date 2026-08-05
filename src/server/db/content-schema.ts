@@ -492,6 +492,13 @@ export const platformPostTable = pgTable(
     deliveryError: t.text(),
     deliveryUpdatedAt: t.timestamp({ withTimezone: true }),
 
+    // Optional provider-native first comment. The copy remains local until an
+    // explicitly approved Zernio schedule/publish/update action sends it.
+    firstCommentText: t.text(),
+    firstCommentStatus: t.text(),
+    firstCommentError: t.text(),
+    firstCommentUpdatedAt: t.timestamp({ withTimezone: true }),
+
     // The connector that most recently hydrated this mirror. Kept separate
     // from `provider`: a native Instagram post may be ingested through Zernio,
     // Bright Data, or an official API without having been published by it.
