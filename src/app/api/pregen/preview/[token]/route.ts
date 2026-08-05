@@ -57,7 +57,15 @@ export async function GET(
 
   return NextResponse.json(
     {
-      prospect: { domain: prospect.domain, name: prospect.name },
+      // sourceUrl is what the renderer's chrome checks before it will say
+      // "Composed from <domain>" or offer "Compare with <domain>" — it only
+      // names a site we actually crawled. Omitting it here made every
+      // growth-served preview fall back to the generic "your existing site".
+      prospect: {
+        domain: prospect.domain,
+        name: prospect.name,
+        sourceUrl: prospect.sourceUrl,
+      },
       version: artifact.version,
       config: artifact.config,
       pages: artifact.pages,
