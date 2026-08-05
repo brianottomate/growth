@@ -2,11 +2,13 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 
 import {
+  loadDatoDraft,
   loadLatestBlogRun,
   loadRawFixture,
   type BlogRunRecord,
 } from "@/server/services/blog-workbench/run";
 import type { CheckReceipt } from "@/server/services/blog-workbench/checks";
+import type { DatoDraftExport } from "@/server/services/blog-workbench/datocms";
 
 // The Growth Blog Workbench: one complete content-generation run, every
 // transformation inspectable. Fixture-backed golden run, not a production
@@ -40,6 +42,7 @@ export default async function BlogWorkbenchPage({
     loadLatestBlogRun(),
     loadRawFixture(),
   ]);
+  const datoDraft = run ? await loadDatoDraft(run.runId) : null;
 
   return (
     <main className="min-h-screen bg-[#0b0b0a] text-stone-100">
@@ -97,7 +100,9 @@ export default async function BlogWorkbenchPage({
       </header>
 
       <div className="p-5">
-        {view === "overview" ? <OverviewView run={run} /> : null}
+        {view === "overview" ? (
+          <OverviewView run={run} datoDraft={datoDraft} />
+        ) : null}
         {view === "brief" ? <BriefView run={run} fixtureJson={fixture} /> : null}
         {view === "grounding" ? <GroundingView run={run} /> : null}
         {view === "prompt" ? <PromptView run={run} /> : null}
@@ -110,7 +115,13 @@ export default async function BlogWorkbenchPage({
 
 // ---- VIEWS ------------------------------------------------------------
 
-function OverviewView({ run }: { run: BlogRunRecord | null }) {
+function OverviewView({
+  run,
+  datoDraft,
+}: {
+  run: BlogRunRecord | null;
+  datoDraft: DatoDraftExport | null;
+}) {
   const stages: Array<{ title: string; detail: string; done: boolean }> = [
     {
       title: "Raw SEO Engine response",
@@ -232,6 +243,53 @@ function OverviewView({ run }: { run: BlogRunRecord | null }) {
               Transport adjustments: {run.transportAdjustments.join("; ")}
             </p>
           ) : null}
+        </section>
+      ) : null}
+
+      {run ? (
+        <section>
+          <SectionTitle>Publish targets (serialized artifacts)</SectionTitle>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded-xl border border-lime-300/25 bg-lime-300/[0.04] p-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-white">
+                  Velite MDX (growth blog stack)
+                </span>
+                <Pill tone="lime">written</Pill>
+              </div>
+              <p className="mt-1.5 text-[9px] leading-relaxed text-stone-500">
+                fixtures/blog/runs/{run.runId}/article.mdx · frontmatter passes
+                the production posts schema limits · draft-gated to 9999-12-31
+              </p>
+            </div>
+            <div
+              className={`rounded-xl border p-3 ${
+                datoDraft?.dastValidation.valid
+                  ? "border-lime-300/25 bg-lime-300/[0.04]"
+                  : "border-white/12 bg-white/[0.03]"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-white">
+                  DatoCMS draft (real wander.com blog)
+                </span>
+                {datoDraft ? (
+                  <Pill tone={datoDraft.dastValidation.valid ? "lime" : "amber"}>
+                    {datoDraft.dastValidation.valid
+                      ? "dast valid"
+                      : "dast INVALID"}
+                  </Pill>
+                ) : (
+                  <Pill tone="stone">not derived</Pill>
+                )}
+              </div>
+              <p className="mt-1.5 text-[9px] leading-relaxed text-stone-500">
+                {datoDraft
+                  ? `blog_article shape: title, slug "${datoDraft.attributes.url}", description, body as structured text. Unresolved at push time: ${datoDraft.unresolved.map((item) => item.field).join(", ")}. Pushing needs a CMA token (CDA token is read-only).`
+                  : "Derive with bun --conditions=react-server scripts/lab/export-blog-dato-draft.ts"}
+              </p>
+            </div>
+          </div>
         </section>
       ) : null}
 

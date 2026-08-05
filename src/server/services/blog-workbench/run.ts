@@ -7,6 +7,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
+import { buildDatoDraftExport, type DatoDraftExport } from "./datocms";
 import { runDeterministicChecks, type CheckReceipt } from "./checks";
 import type { GeneratedArticle } from "./checks";
 import {
@@ -269,12 +270,65 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
     "utf8",
   );
   await writeFile(
+    path.join(runDirectory, "datocms-draft.json"),
+    `${JSON.stringify(buildDatoDraftExport(record), null, 2)}\n`,
+    "utf8",
+  );
+  await writeFile(
     path.join(FIXTURE_DIR, "runs", "latest.json"),
     `${JSON.stringify({ runId }, null, 2)}\n`,
     "utf8",
   );
 
   return record;
+}
+
+/**
+ * Derives (or re-derives) the DatoCMS draft for an already-persisted run.
+ * Serializers are deterministic over run.json, so this is a derived artifact,
+ * not a mutation of the immutable run record.
+ */
+export async function exportDatoDraftForRun(
+  runId?: string,
+): Promise<{ runId: string; export: DatoDraftExport; path: string }> {
+  const resolvedRunId =
+    runId ??
+    (
+      JSON.parse(
+        await readFile(path.join(FIXTURE_DIR, "runs", "latest.json"), "utf8"),
+      ) as { runId: string }
+    ).runId;
+  const record = JSON.parse(
+    await readFile(
+      path.join(FIXTURE_DIR, "runs", resolvedRunId, "run.json"),
+      "utf8",
+    ),
+  ) as BlogRunRecord;
+
+  const draft = buildDatoDraftExport(record);
+  const exportPath = path.join(
+    FIXTURE_DIR,
+    "runs",
+    resolvedRunId,
+    "datocms-draft.json",
+  );
+  await writeFile(exportPath, `${JSON.stringify(draft, null, 2)}\n`, "utf8");
+  return { runId: resolvedRunId, export: draft, path: exportPath };
+}
+
+export async function loadDatoDraft(
+  runId: string,
+): Promise<DatoDraftExport | null> {
+  try {
+    return JSON.parse(
+      await readFile(
+        path.join(FIXTURE_DIR, "runs", runId, "datocms-draft.json"),
+        "utf8",
+      ),
+    ) as DatoDraftExport;
+  } catch {
+    return null;
+  }
 }
 
 export async function loadLatestBlogRun(): Promise<BlogRunRecord | null> {

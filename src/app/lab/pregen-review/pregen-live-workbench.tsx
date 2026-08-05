@@ -773,11 +773,16 @@ function EvaluationReceiptDetail({
   );
 }
 
+const asCount = (value: unknown): number =>
+  typeof value === "number" ? value : 0;
+const asText = (value: unknown): string =>
+  typeof value === "string" ? value : "";
+
 function ReceiptResultSummary({ receipt }: { receipt: PregenEvaluationView }) {
   const result = receipt.result;
 
   if (result.skipped === true) {
-    return <p>Skipped: {String(result.reason ?? "no reason recorded")}</p>;
+    return <p>Skipped: {asText(result.reason) || "no reason recorded"}</p>;
   }
 
   if (receipt.kind === "grounding") {
@@ -794,9 +799,8 @@ function ReceiptResultSummary({ receipt }: { receipt: PregenEvaluationView }) {
     return (
       <>
         <p>
-          {String(result.groundedCount ?? 0)} of{" "}
-          {String(result.claimCount ?? 0)} numeric claims trace to the crawl
-          corpus.
+          {asCount(result.groundedCount)} of {asCount(result.claimCount)}{" "}
+          numeric claims trace to the crawl corpus.
         </p>
         {ungrounded.slice(0, 6).map((claim, index) => (
           <p key={index} className="text-amber-200/90">
@@ -821,10 +825,9 @@ function ReceiptResultSummary({ receipt }: { receipt: PregenEvaluationView }) {
     return (
       <>
         <p>
-          {String(result.imageCount ?? 0)} rendered images ·{" "}
-          {String(result.placeholderCount ?? 0)} placeholders ·{" "}
-          {String(result.unknownProvenanceCount ?? 0)} without source
-          provenance.
+          {asCount(result.imageCount)} rendered images ·{" "}
+          {asCount(result.placeholderCount)} placeholders ·{" "}
+          {asCount(result.unknownProvenanceCount)} without source provenance.
         </p>
         {unknown.slice(0, 3).map((url) => (
           <p key={url} className="truncate font-mono text-[7px] text-amber-200/80">
@@ -845,7 +848,7 @@ function ReceiptResultSummary({ receipt }: { receipt: PregenEvaluationView }) {
       : [];
     return (
       <>
-        <p>{String(result.summary ?? "")}</p>
+        <p>{asText(result.summary)}</p>
         {findings.slice(0, 4).map((finding, index) => (
           <p
             key={index}

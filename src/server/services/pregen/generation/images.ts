@@ -12,7 +12,6 @@ import { isPageImageCandidate } from "./units";
 // photo beats a gray box. The monolith's LLM slot-assignment + generation
 // pipeline can layer on later.
 
-const PLACEHOLDER_PATTERN = /placehold\.co/;
 
 export type ImageSources = {
   ogImage?: string;
@@ -65,7 +64,7 @@ export function applyArtifactImages(
 }
 
 const isPlaceholder = (value: unknown): boolean =>
-  typeof value !== "string" || value.length === 0 || PLACEHOLDER_PATTERN.test(value);
+  typeof value !== "string" || value.length === 0 || value.includes("placehold.co");
 
 /**
  * Ordered candidate pool: og:image first (the site's own choice of hero),

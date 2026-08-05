@@ -38,6 +38,29 @@ production integration yet.
    (`run.json` + `article.mdx` with a `publishedAt: 9999-12-31` draft gate)
    and move `latest.json`.
 
+## Publish targets
+
+The typed article is the artifact; serialization targets are pluggable and
+derived deterministically from `run.json`:
+
+- **Velite MDX** (`article.mdx`): the workbench's compile gate, mirroring the
+  growth blog's production posts schema. Velite stays a workbench-internal
+  form; it is not the real wander.com blog's stack.
+- **DatoCMS draft** (`datocms-draft.json`, via
+  `scripts/lab/export-blog-dato-draft.ts`): the real wander.com blog is
+  DatoCMS (`BlogArticleRecord`), whose body is Structured Text (dast), not
+  markdown. The export converts markdown to dast with a bounded converter
+  (`datocms.ts`, marked lexer over exactly the node set the writer emits) and
+  validates it with DatoCMS's own `datocms-structured-text-utils` validator.
+  Scalars (title, slug, description, body) are complete; link records (tags,
+  author) and the cover image upload are listed as unresolved because they
+  need CMA lookups at push time. Pushing needs a CMA token; the configured
+  CDA token is read-only, so nothing auto-publishes.
+- **Monolith site-editor pages** (not built): Cam's writer path persists
+  monolith `PageSections` for customer sites and never touches Dato. When the
+  production writer lands, a third serializer maps the same typed article to
+  that contract.
+
 ## Honesty rules
 
 - Missing production inputs are modeled, never silently fabricated. The
