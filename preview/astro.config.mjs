@@ -42,7 +42,9 @@ export default defineConfig({
       // Dev only. Vite rejects unexpected Host headers, which blocks testing
       // host-mode previews locally with `curl -H "Host: slug.zone"` or a
       // /etc/hosts entry. Production host handling is the middleware's job.
-      allowedHosts: [".trywanderos.com", ".localhost", "localhost"],
+      // .localcan.dev: real-cert HTTPS tunnels for demoing host mode before
+      // the trywanderos.com wildcard DNS lands (one tunnel per prospect slug).
+      allowedHosts: [".trywanderos.com", ".localhost", "localhost", ".localcan.dev"],
     },
     ssr: {
       // Keep the registry inside Vite's resolver so the icons-root alias
