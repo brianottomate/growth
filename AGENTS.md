@@ -14,6 +14,13 @@ have been removed.
 > Sibling repos and the wandercom monorepo layout are documented in `../CLAUDE.md`.
 > This file is scoped to the `growth/` repo only.
 
+> **The pregen preview renderer now lives in its own repo**: `wandercom/pregen-preview`
+> (sibling checkout `../pregen-preview`, Astro, Vercel project `wanderdev/pregen-preview`,
+> dev port 4400). It used to be `growth/preview/`. Growth still owns the pregen
+> generation pipeline (`src/server/services/pregen/`) and the artifact API the
+> renderer reads (`src/app/api/pregen/preview/[token]`) — that HTTP boundary is
+> the only coupling between them.
+
 ## Commands
 
 Package manager is **Bun** (not npm/yarn/pnpm).
