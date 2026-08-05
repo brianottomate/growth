@@ -309,9 +309,10 @@ export const AE_OTE_ROUND_ROBIN: Record<string, number> = {
 };
 
 export const AE_SMB_ROUND_ROBIN: Record<string, number> = {
-  "76731285": 0.33, // Pierce Butler
-  "725103433": 0.33, // Chris Boley
-  "91455876": 0.33, // Kris Salguero
+  "76731285": 0.28, // Pierce Butler
+  "725103433": 0.28, // Chris Boley
+  "91455876": 0.28, // Kris Salguero
+  "94290553": 0.16, // Sean Kearney
 };
 
 export const AE_MM_ROUND_ROBIN: Record<string, number> = {
@@ -1559,26 +1560,26 @@ function getRoundRobinForProperties(
 ): { rr: Record<string, number>; sizeFilter: PortfolioSizeFilter } | null {
   if (numProperties < 10)
     return { rr: UNDER_10_ROUND_ROBIN, sizeFilter: { max: 9 } };
-  if (numProperties < 20)
+  if (numProperties < 17)
     return {
       rr: role === "BDR" ? BDR_OTE_ROUND_ROBIN : AE_OTE_ROUND_ROBIN,
-      sizeFilter: { min: 10, max: 19 },
+      sizeFilter: { min: 10, max: 16 },
     };
-  if (numProperties < 50)
+  if (numProperties < 100)
     return {
       rr: role === "BDR" ? BDR_SMB_ROUND_ROBIN : AE_SMB_ROUND_ROBIN,
-      sizeFilter: { min: 20, max: 49 },
+      sizeFilter: { min: 17, max: 99 },
     };
-  if (numProperties < 200)
+  if (numProperties < 250)
     return {
       rr: role === "BDR" ? BDR_MM_ROUND_ROBIN : AE_MM_ROUND_ROBIN,
-      sizeFilter: { min: 50, max: 199 },
+      sizeFilter: { min: 100, max: 249 },
     };
   if (numProperties < 500)
     return {
       rr:
         role === "BDR" ? BDR_ENTERPRISE_ROUND_ROBIN : AE_ENTERPRISE_ROUND_ROBIN,
-      sizeFilter: { min: 200, max: 499 },
+      sizeFilter: { min: 250, max: 499 },
     };
   if (numProperties >= 500)
     return {
@@ -1626,6 +1627,7 @@ export async function nextRepInRR(
     propertyName: string;
     operator: FilterOperatorEnum;
     value?: string;
+    highValue?: string;
     values?: string[];
   }> = [
     {
@@ -1650,20 +1652,57 @@ export async function nextRepInRR(
     },
   ];
 
-  if (sizeFilter.min !== undefined) {
+  // Collapse the portfolio-size band into a single filter. HubSpot caps each
+  // filterGroup at 6 filters, and the OR'd country groups already spend one on
+  // the country clause — a separate Gte + Lte would blow the group to 7.
+  if (sizeFilter.min !== undefined && sizeFilter.max !== undefined) {
+    filters.push({
+      propertyName: "portfolio_size_inbound_form",
+      operator: FilterOperatorEnum.Between,
+      value: String(sizeFilter.min),
+      highValue: String(sizeFilter.max),
+    });
+  } else if (sizeFilter.min !== undefined) {
     filters.push({
       propertyName: "portfolio_size_inbound_form",
       operator: FilterOperatorEnum.Gte,
       value: String(sizeFilter.min),
     });
-  }
-  if (sizeFilter.max !== undefined) {
+  } else if (sizeFilter.max !== undefined) {
     filters.push({
       propertyName: "portfolio_size_inbound_form",
       operator: FilterOperatorEnum.Lte,
       value: String(sizeFilter.max),
     });
   }
+
+  // Exclude Mexico contacts from the monthly count — they route to Kris
+  // outside the normal round robin, so they shouldn't skew rep deficits.
+  // HubSpot's Neq drops records with no `country` value, so OR in a
+  // NotHasProperty group to keep unset-country contacts counted. Filters
+  // within a group are ANDed; groups are ORed — hence two groups sharing
+  // the same base `filters` and differing only on the country condition.
+  const filterGroups = [
+    {
+      filters: [
+        ...filters,
+        {
+          propertyName: "country",
+          operator: FilterOperatorEnum.Neq,
+          value: "Mexico",
+        },
+      ],
+    },
+    {
+      filters: [
+        ...filters,
+        {
+          propertyName: "country",
+          operator: FilterOperatorEnum.NotHasProperty,
+        },
+      ],
+    },
+  ];
 
   const counts: Record<string, number> = Object.fromEntries(
     ownerIds.map((id) => [id, 0]),
@@ -1672,7 +1711,7 @@ export async function nextRepInRR(
 
   do {
     const result = await client().crm.contacts.searchApi.doSearch({
-      filterGroups: [{ filters }],
+      filterGroups,
       properties: [ownerIdPropertyName],
       limit: 100,
       sorts: [],
