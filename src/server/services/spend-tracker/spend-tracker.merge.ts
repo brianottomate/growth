@@ -178,7 +178,9 @@ export function mergeSpendBookingsAndFunnel(
   // "affiliate shows 0 bookings all 2026", CONTEXT §12 open item). Here we skip
   // only the SPEND and keep the rows additive, so fixed channels retain their
   // BQ bookings/funnel data while never double-counting spend.
-  const fixedCostChannels = new Set<Channel>(Object.values(FIXED_COST_TO_CHANNEL));
+  const fixedCostChannels = new Set<Channel>(
+    Object.values(FIXED_COST_TO_CHANNEL),
+  );
   for (const row of spendRows) {
     const channel = mapPlatformToChannel(row.platform);
     if (channel === "meta" || fixedCostChannels.has(channel)) continue;
@@ -312,12 +314,17 @@ export function mergeSpendBookingsAndFunnel(
       takeRateRevenue: entry.takeRateRevenue,
       directBookings: entry.directBookings,
       otaBookings: entry.otaBookings,
-      cpac: entry.accountCreations > 0 ? entry.spend / entry.accountCreations : null,
+      cpac:
+        entry.accountCreations > 0
+          ? entry.spend / entry.accountCreations
+          : null,
       cpcp: null,
-      cpc: entry.checkoutStarted > 0 ? entry.spend / entry.checkoutStarted : null,
+      cpc:
+        entry.checkoutStarted > 0 ? entry.spend / entry.checkoutStarted : null,
       cpb: entry.bookings > 0 ? entry.spend / entry.bookings : null,
       // ROAS = (GMV × 20% blended take rate) / spend (Kyle / data team, Mar 2026)
-      roas: entry.spend > 0 ? (entry.gmv * BLENDED_TAKE_RATE) / entry.spend : null,
+      roas:
+        entry.spend > 0 ? (entry.gmv * BLENDED_TAKE_RATE) / entry.spend : null,
       dataSource,
       attribution,
       lastUpdated: new Date().toISOString(),
@@ -349,7 +356,10 @@ export function buildFixedCostRows(
   todayUTC: string = new Date().toISOString().split("T")[0]!,
 ): ChannelMetrics[] {
   const rows: ChannelMetrics[] = [];
-  const monthCache = new Map<string, ReturnType<typeof resolveFixedCostsForMonth>>();
+  const monthCache = new Map<
+    string,
+    ReturnType<typeof resolveFixedCostsForMonth>
+  >();
 
   const cursor = new Date(`${startDate}T00:00:00Z`);
   const endD = new Date(`${endDate}T00:00:00Z`);

@@ -488,7 +488,7 @@ export type PregenGenerationContext = {
      * universe, so the copy still has to be workable before they do; this flag
      * is what keeps such a draft out of HubSpot.
      */
-     pretend: boolean;
+    pretend: boolean;
   };
   website: { characters: number };
   emails: {

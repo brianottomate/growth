@@ -76,7 +76,9 @@ export interface WeeklyReportResult {
 // Same channel as affiliate-notify (#radio-affiliate) — kept local to avoid exporting it.
 const RADIO_AFFILIATE_CHANNEL = "C0BH31P8W3S";
 
-export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> {
+export async function runWeeklyAffiliateReport(): Promise<
+  WeeklyReportResult[]
+> {
   const programs = await db
     .select()
     .from(partnerProgramTable)
@@ -84,7 +86,11 @@ export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> 
 
   const results: WeeklyReportResult[] = [];
   for (const program of programs) {
-    if (program.network !== "impact" || !isImpactConfigured() || !program.externalProgramId) {
+    if (
+      program.network !== "impact" ||
+      !isImpactConfigured() ||
+      !program.externalProgramId
+    ) {
       results.push({ programId: program.id, skipped: "not configured" });
       continue;
     }
@@ -100,7 +106,9 @@ export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> 
       });
 
       // Prior-week comparison from our own snapshots (14d of program-level rows).
-      const since = new Date(now.getTime() - 14 * 864e5).toISOString().slice(0, 10);
+      const since = new Date(now.getTime() - 14 * 864e5)
+        .toISOString()
+        .slice(0, 10);
       const metricRows = await db
         .select()
         .from(affiliateMetricDailyTable)
@@ -111,7 +119,9 @@ export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> 
             gte(affiliateMetricDailyTable.date, since),
           ),
         );
-      const midpoint = new Date(now.getTime() - 7 * 864e5).toISOString().slice(0, 10);
+      const midpoint = new Date(now.getTime() - 7 * 864e5)
+        .toISOString()
+        .slice(0, 10);
       const priorWeek = metricRows.filter((r) => r.date < midpoint);
 
       const partners = await db
@@ -134,7 +144,8 @@ export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> 
           ),
         );
       const openByKind: Record<string, number> = {};
-      for (const i of openItems) openByKind[i.kind] = (openByKind[i.kind] ?? 0) + 1;
+      for (const i of openItems)
+        openByKind[i.kind] = (openByKind[i.kind] ?? 0) + 1;
 
       // Junk the triage auto-filed this week (resolvedById null = system) — the
       // audit line that keeps silent filtering honest in the report.
@@ -166,7 +177,10 @@ export async function runWeeklyAffiliateReport(): Promise<WeeklyReportResult[]> 
         .slice(0, 20);
 
       const data = {
-        week: { start: weekAgo.toISOString().slice(0, 10), end: now.toISOString().slice(0, 10) },
+        week: {
+          start: weekAgo.toISOString().slice(0, 10),
+          end: now.toISOString().slice(0, 10),
+        },
         actionsThisWeek: actions.map(summarizeAction),
         priorWeekTotals: {
           actions: priorWeek.reduce((s, r) => s + (r.actions ?? 0), 0),
@@ -208,7 +222,11 @@ Write the report.`,
       console.log(
         `[affiliate-report] ${program.id}: ${actions.length} action(s), posted=${result.success}`,
       );
-      results.push({ programId: program.id, posted: result.success, actions: actions.length });
+      results.push({
+        programId: program.id,
+        posted: result.success,
+        actions: actions.length,
+      });
     } catch (error) {
       console.error(`[affiliate-report] ${program.id} failed:`, error);
       results.push({

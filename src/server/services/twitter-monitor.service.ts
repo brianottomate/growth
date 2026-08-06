@@ -4,10 +4,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { channelTable } from "@/server/db/channel-schema";
-import {
-  mentionTable,
-  type MentionInsert,
-} from "@/server/db/listening-schema";
+import { mentionTable, type MentionInsert } from "@/server/db/listening-schema";
 import {
   INTENT_TAGS,
   type DraftPill,
@@ -64,10 +61,12 @@ ${partnerGuardrail("score")}`;
 // brand's own X account need no affiliation disclaimer (the handle IS the
 // disclosure), while a personal-account reply must disclose. Resolved from the
 // DB (listening source → brand → its X channel) at draft time.
-function buildDraftMechanics(identity: {
-  handle: string;
-  brandName: string;
-} | null): string {
+function buildDraftMechanics(
+  identity: {
+    handle: string;
+    brandName: string;
+  } | null,
+): string {
   const identityRules = identity
     ? `1. You are replying AS ${identity.handle} — ${identity.brandName}'s official
    X account. The handle itself is the affiliation disclosure; never add

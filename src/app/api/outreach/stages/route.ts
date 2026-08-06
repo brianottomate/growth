@@ -24,10 +24,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const pageSize = Number.parseInt(searchParams.get("pageSize") ?? "100", 10);
-  const pageNumber = Number.parseInt(
-    searchParams.get("pageNumber") ?? "1",
-    10,
-  );
+  const pageNumber = Number.parseInt(searchParams.get("pageNumber") ?? "1", 10);
   const provideAuthorizationMeta =
     searchParams.get("provideAuthorizationMeta") === "true";
 

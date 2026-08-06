@@ -110,9 +110,7 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
       inputSchema: z.object({
         brandId: z.string().describe("From listBrands."),
         title: z.string().trim().min(3).max(200),
-        format: z
-          .enum(EMAIL_DOCUMENT_FORMATS)
-          .default("newsletter.broadcast"),
+        format: z.enum(EMAIL_DOCUMENT_FORMATS).default("newsletter.broadcast"),
         hook: z.string().trim().optional(),
         purpose: z.string().trim().optional(),
       }),
@@ -133,7 +131,11 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
             (created as { id?: string }).id ??
             "";
           note(ctx, "createIssue", `created issue ${spotId} "${input.title}"`);
-          return { ok: true, platformPostId: spotId, url: `/app/newsletters/${spotId}` };
+          return {
+            ok: true,
+            platformPostId: spotId,
+            url: `/app/newsletters/${spotId}`,
+          };
         } catch (error) {
           return { error: (error as Error).message };
         }

@@ -19,7 +19,10 @@ export function Stats({ stats, title }: StatsProps) {
       )}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat, index) => (
-          <div key={index} className="bg-surface-secondary border-secondary rounded-lg border p-6 shadow-sm">
+          <div
+            key={index}
+            className="bg-surface-secondary border-secondary rounded-lg border p-6 shadow-sm"
+          >
             <div className="text-3xl font-bold text-amber-600">
               {stat.value}
             </div>

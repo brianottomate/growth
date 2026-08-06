@@ -138,7 +138,8 @@ export const STREAMS: MessageStream[] = [
   {
     id: "onboarding",
     label: "Onboarding",
-    description: "Welcome sequence introducing Wander, key features, and first-booking nudges",
+    description:
+      "Welcome sequence introducing Wander, key features, and first-booking nudges",
     tool: "customer-io",
     owner: "Growth / Lifecycle",
     type: "automated",
@@ -163,7 +164,8 @@ export const STREAMS: MessageStream[] = [
   {
     id: "newsletter",
     label: "Newsletter & Topics",
-    description: "General newsletter, destination guides, seasonal promotions, company updates",
+    description:
+      "General newsletter, destination guides, seasonal promotions, company updates",
     tool: "customer-io",
     owner: "Marketing (Brian's team)",
     type: "semi-automated",
@@ -181,7 +183,8 @@ export const STREAMS: MessageStream[] = [
   {
     id: "property-recs",
     label: "Property Recommendations",
-    description: "Personalized property recommendations based on search history, wishlists, and preferences",
+    description:
+      "Personalized property recommendations based on search history, wishlists, and preferences",
     tool: "customer-io",
     owner: "Growth Engineering",
     type: "automated",
@@ -203,13 +206,15 @@ export const STREAMS: MessageStream[] = [
   {
     id: "sales-outreach",
     label: "Sales Outreach",
-    description: "1:1 BDR outreach for high-value leads — personalized sequences via Outreach",
+    description:
+      "1:1 BDR outreach for high-value leads — personalized sequences via Outreach",
     tool: "outreach",
     owner: "Sales — Sorrell Becker (Demand)",
     type: "semi-automated",
     color: "#f59e0b",
     activePhases: ["qualified", "booking", "post-trip"],
-    trigger: "High intent signals: Payment Info Entered, high-value search, repeat visitor, enterprise inquiry",
+    trigger:
+      "High intent signals: Payment Info Entered, high-value search, repeat visitor, enterprise inquiry",
     exitCriteria: [
       "User books",
       "User declines / opts out",
@@ -227,7 +232,8 @@ export const STREAMS: MessageStream[] = [
   {
     id: "transactional",
     label: "Transactional / Booking",
-    description: "System-generated notifications tied to booking lifecycle events",
+    description:
+      "System-generated notifications tied to booking lifecycle events",
     tool: "system",
     owner: "Engineering",
     type: "automated",
@@ -250,7 +256,8 @@ export const STREAMS: MessageStream[] = [
   {
     id: "concierge",
     label: "Concierge",
-    description: "Human-led 1:1 conversation for booked guests — trip planning, special requests, VIP treatment",
+    description:
+      "Human-led 1:1 conversation for booked guests — trip planning, special requests, VIP treatment",
     tool: "human",
     owner: "Concierge — Nick Waze",
     type: "human",
@@ -279,7 +286,8 @@ export const SUPPRESSION_RULES: SuppressionRule[] = [
     dominant: "onboarding",
     suppressed: "newsletter",
     condition: "User is in onboarding sequence (days 0-14)",
-    description: "No newsletters during onboarding — too much noise, dilutes welcome sequence",
+    description:
+      "No newsletters during onboarding — too much noise, dilutes welcome sequence",
     severity: "hard",
   },
   {
@@ -287,7 +295,8 @@ export const SUPPRESSION_RULES: SuppressionRule[] = [
     dominant: "onboarding",
     suppressed: "property-recs",
     condition: "User is in onboarding sequence",
-    description: "Onboarding already includes curated property content — separate recs would conflict",
+    description:
+      "Onboarding already includes curated property content — separate recs would conflict",
     severity: "hard",
   },
   {
@@ -295,15 +304,18 @@ export const SUPPRESSION_RULES: SuppressionRule[] = [
     dominant: "sales-outreach",
     suppressed: "property-recs",
     condition: "User is in active Outreach sequence",
-    description: "BDR is sending personalized suggestions — automated recs would undercut the personal touch",
+    description:
+      "BDR is sending personalized suggestions — automated recs would undercut the personal touch",
     severity: "soft",
   },
   {
     id: "sales-coordinates-newsletter",
     dominant: "sales-outreach",
     suppressed: "newsletter",
-    condition: "User is in active Outreach sequence AND BDR has sent message in last 48h",
-    description: "Avoid marketing email on same day as BDR outreach — feels overwhelming",
+    condition:
+      "User is in active Outreach sequence AND BDR has sent message in last 48h",
+    description:
+      "Avoid marketing email on same day as BDR outreach — feels overwhelming",
     severity: "soft",
   },
   {
@@ -311,7 +323,8 @@ export const SUPPRESSION_RULES: SuppressionRule[] = [
     dominant: "transactional",
     suppressed: "newsletter",
     condition: "Transactional email sent in last 24h",
-    description: "Don't send newsletter same day as booking confirmation or check-in instructions",
+    description:
+      "Don't send newsletter same day as booking confirmation or check-in instructions",
     severity: "soft",
   },
   {
@@ -319,7 +332,8 @@ export const SUPPRESSION_RULES: SuppressionRule[] = [
     dominant: "transactional",
     suppressed: "property-recs",
     condition: "User has active booking (pre-trip or during-trip)",
-    description: "Don't recommend other properties while guest has upcoming/active trip",
+    description:
+      "Don't recommend other properties while guest has upcoming/active trip",
     severity: "hard",
   },
   {
@@ -327,7 +341,8 @@ export const SUPPRESSION_RULES: SuppressionRule[] = [
     dominant: "concierge",
     suppressed: "transactional",
     condition: "Concierge has active conversation about same booking",
-    description: "Concierge may handle check-in instructions personally — avoid duplicate system messages",
+    description:
+      "Concierge may handle check-in instructions personally — avoid duplicate system messages",
     severity: "soft",
   },
 ];
@@ -350,7 +365,8 @@ export const CONFLICT_ZONES: ConflictZone[] = [
     streams: ["sales-outreach", "newsletter", "property-recs"],
     phases: ["qualified"],
     risk: "BDR sends personal outreach, then user gets generic marketing email same day — breaks the illusion of 1:1 relationship",
-    resolution: "Sync Outreach enrollment status back to CIO, suppress marketing for active sales leads",
+    resolution:
+      "Sync Outreach enrollment status back to CIO, suppress marketing for active sales leads",
     status: "needs-rules",
   },
   {
@@ -358,7 +374,8 @@ export const CONFLICT_ZONES: ConflictZone[] = [
     streams: ["transactional", "concierge", "newsletter"],
     phases: ["booking", "pre-trip"],
     risk: "User books and gets: confirmation email, concierge intro, newsletter, and pre-trip checklist within 48 hours",
-    resolution: "Suppress newsletter for 48h post-booking. Coordinate concierge intro timing with transactional.",
+    resolution:
+      "Suppress newsletter for 48h post-booking. Coordinate concierge intro timing with transactional.",
     status: "needs-rules",
   },
   {
@@ -366,7 +383,8 @@ export const CONFLICT_ZONES: ConflictZone[] = [
     streams: ["concierge", "transactional"],
     phases: ["pre-trip", "during-trip"],
     risk: "Concierge personally sends check-in info, then system also sends automated check-in instructions",
-    resolution: "Flag in CIO when concierge has handled check-in. Skip automated message if flag set.",
+    resolution:
+      "Flag in CIO when concierge has handled check-in. Skip automated message if flag set.",
     status: "needs-rules",
   },
   {
@@ -374,7 +392,8 @@ export const CONFLICT_ZONES: ConflictZone[] = [
     streams: ["transactional", "concierge", "newsletter", "property-recs"],
     phases: ["post-trip"],
     risk: "After checkout: review request + concierge follow-up + newsletter + recs all hit inbox",
-    resolution: "Sequence post-trip: day 1 review request, day 3 concierge follow-up, day 7 resume recs, day 14 resume newsletter",
+    resolution:
+      "Sequence post-trip: day 1 review request, day 3 concierge follow-up, day 7 resume recs, day 14 resume newsletter",
     status: "needs-rules",
   },
 ];
@@ -383,7 +402,10 @@ export const CONFLICT_ZONES: ConflictZone[] = [
 // TOOL METADATA
 // ─────────────────────────────────────────
 
-export const TOOLS: Record<ToolId, { label: string; color: string; description: string }> = {
+export const TOOLS: Record<
+  ToolId,
+  { label: string; color: string; description: string }
+> = {
   "customer-io": {
     label: "Customer.io",
     color: "#10b981",
@@ -410,8 +432,12 @@ export const TOOLS: Record<ToolId, { label: string; color: string; description: 
 // HELPERS
 // ─────────────────────────────────────────
 
-export const PHASE_MAP = Object.fromEntries(PHASES.map((p) => [p.id, p])) as Record<PhaseId, Phase>;
-export const STREAM_MAP = Object.fromEntries(STREAMS.map((s) => [s.id, s])) as Record<StreamId, MessageStream>;
+export const PHASE_MAP = Object.fromEntries(
+  PHASES.map((p) => [p.id, p]),
+) as Record<PhaseId, Phase>;
+export const STREAM_MAP = Object.fromEntries(
+  STREAMS.map((s) => [s.id, s]),
+) as Record<StreamId, MessageStream>;
 
 export function getActiveStreamsForPhase(phaseId: PhaseId): MessageStream[] {
   return STREAMS.filter((s) => s.activePhases.includes(phaseId));
@@ -421,6 +447,10 @@ export function getConflictsForPhase(phaseId: PhaseId): ConflictZone[] {
   return CONFLICT_ZONES.filter((c) => c.phases.includes(phaseId));
 }
 
-export function getSuppressionsForStream(streamId: StreamId): SuppressionRule[] {
-  return SUPPRESSION_RULES.filter((r) => r.dominant === streamId || r.suppressed === streamId);
+export function getSuppressionsForStream(
+  streamId: StreamId,
+): SuppressionRule[] {
+  return SUPPRESSION_RULES.filter(
+    (r) => r.dominant === streamId || r.suppressed === streamId,
+  );
 }

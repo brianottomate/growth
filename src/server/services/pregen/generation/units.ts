@@ -33,9 +33,14 @@ const EXTRACTION_PROMPT =
 
 const ExtractedListing = z
   .object({
-    name: z.string().describe("The listing name exactly as the page presents it"),
+    name: z
+      .string()
+      .describe("The listing name exactly as the page presents it"),
     location: z.string().optional().describe("City, state, or neighborhood"),
-    price: z.coerce.number().optional().describe("Nightly price in dollars, as a number"),
+    price: z.coerce
+      .number()
+      .optional()
+      .describe("Nightly price in dollars, as a number"),
     currency: z.string().optional(),
     rating: z.coerce.number().optional().describe("Star rating out of 5"),
     reviewCount: z.coerce
@@ -146,7 +151,9 @@ export function groundNumericClaims(
   const priceGrounded =
     property.price != null &&
     (pageText.includes(`$${Math.round(property.price)}`) ||
-      pageText.includes(`$${Math.round(property.price).toLocaleString("en-US")}`));
+      pageText.includes(
+        `$${Math.round(property.price).toLocaleString("en-US")}`,
+      ));
   const ratingGrounded =
     property.rating != null &&
     (Number.isInteger(property.rating)
@@ -168,7 +175,8 @@ export function groundNumericClaims(
     ...property,
     price: priceGrounded ? property.price : null,
     rating: ratingGrounded ? property.rating : null,
-    reviewCount: ratingGrounded && reviewCountGrounded ? property.reviewCount : null,
+    reviewCount:
+      ratingGrounded && reviewCountGrounded ? property.reviewCount : null,
   };
 }
 
@@ -278,7 +286,9 @@ const EstimatedPrices = z.object({
         pricePerNight: z.number(),
       }),
     )
-    .describe("One entry per listed unit, plausible market nightly rate in USD, round numbers."),
+    .describe(
+      "One entry per listed unit, plausible market nightly rate in USD, round numbers.",
+    ),
 });
 
 export async function applyPriceEstimates(
@@ -320,7 +330,10 @@ export async function applyPriceEstimates(
         `Estimate a plausible nightly rate (USD, round to $5) for each vacation rental below, managed by "${businessName}". Use the market/region and any pricing signals in their listing text; scale by bedroom count. These render as clearly-labeled ESTIMATES — aim for believable, slightly conservative numbers.`,
         "",
         `Units:\n${missing
-          .map((p) => `- ${p.name}${p.features ? ` (${p.features.bedrooms}bd)` : ""}`)
+          .map(
+            (p) =>
+              `- ${p.name}${p.features ? ` (${p.features.bedrooms}bd)` : ""}`,
+          )
           .join("\n")}`,
         "",
         `Their listing text (market context):\n${pageText.slice(0, 6000)}`,

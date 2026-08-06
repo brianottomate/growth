@@ -27,9 +27,7 @@ type ComposeGenericEmail = (
 // from leaking into Growth's tRPC output inference while runtime composition
 // still comes from the canonical package.
 async function composeGenericEmail(props: GenericHtmlProps) {
-  const designSystemEmails = await import(
-    "@wandercom/design-system-emails"
-  );
+  const designSystemEmails = await import("@wandercom/design-system-emails");
   // The package's public registry intentionally exposes Required<> props for
   // cross-template strictness even though the generic component itself has
   // runtime defaults. Keep that large registry type local to this adapter.

@@ -46,12 +46,15 @@ async function mapWithConcurrency<T, R>(
 ): Promise<R[]> {
   const results: R[] = new Array<R>(items.length);
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++;
-      results[index] = await fn(items[index]!, index);
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        results[index] = await fn(items[index]!, index);
+      }
+    },
+  );
   await Promise.all(workers);
   return results;
 }
@@ -65,9 +68,13 @@ async function mapWithConcurrency<T, R>(
  */
 export const getRecentConversationsWithThreads = unstable_cache(
   async (): Promise<{ items: ConversationWithThread[] }> => {
-    const { conversations } = await listAllDmConversations({ perPlatformLimit: 50 });
+    const { conversations } = await listAllDmConversations({
+      perPlatformLimit: 50,
+    });
     const sorted = conversations
-      .filter((c) => typeof c.id === "string" && typeof c.accountId === "string")
+      .filter(
+        (c) => typeof c.id === "string" && typeof c.accountId === "string",
+      )
       .slice(0, MAX_CONVERSATIONS);
 
     const items = await mapWithConcurrency(
@@ -77,7 +84,10 @@ export const getRecentConversationsWithThreads = unstable_cache(
         // Beyond the cutoff, skip the (possibly billed) thread read — the card
         // degrades to its lastMessage preview.
         if (index >= MAX_THREAD_FETCHES) {
-          return { conversation, messages: [] } satisfies ConversationWithThread;
+          return {
+            conversation,
+            messages: [],
+          } satisfies ConversationWithThread;
         }
         try {
           const { messages } = await getZernioConversationMessages(
@@ -90,7 +100,10 @@ export const getRecentConversationsWithThreads = unstable_cache(
             `[inbox] thread fetch failed for ${conversation.id}:`,
             error,
           );
-          return { conversation, messages: [] } satisfies ConversationWithThread;
+          return {
+            conversation,
+            messages: [],
+          } satisfies ConversationWithThread;
         }
       },
     );

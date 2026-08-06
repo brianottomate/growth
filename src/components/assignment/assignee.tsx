@@ -18,7 +18,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/components/ui/lib/utils";
 
 export type Member = { id: string; name: string | null; image: string | null };
@@ -72,7 +76,10 @@ export function OwnerAvatar({
     );
   }
   return (
-    <span className={cn("relative shrink-0", className)} title={member.name ?? undefined}>
+    <span
+      className={cn("relative shrink-0", className)}
+      title={member.name ?? undefined}
+    >
       {member.image ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -96,7 +103,7 @@ export function OwnerAvatar({
         </span>
       )}
       {suggested && (
-        <Sparkles className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-violet-500/90 p-0.5 text-white" />
+        <Sparkles className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full bg-violet-500/90 p-0.5 text-white" />
       )}
     </span>
   );
@@ -169,10 +176,14 @@ export function AssigneeButton({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label={value ? `Owner: ${value.name ?? "assigned"}` : label}
-        className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="focus-visible:ring-ring rounded-full outline-none focus-visible:ring-2"
         onClick={(e) => e.stopPropagation()}
       >
-        <OwnerAvatar member={value} suggested={!value && !!suggested} size={size} />
+        <OwnerAvatar
+          member={value}
+          suggested={!value && !!suggested}
+          size={size}
+        />
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -209,7 +220,9 @@ export function AssigneeButton({
                   <OwnerAvatar member={m} size="sm" />
                   <span className="truncate">{m.name ?? "Unknown"}</span>
                   {m.id === currentUserId && (
-                    <span className="text-muted-foreground ml-auto text-xs">you</span>
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      you
+                    </span>
                   )}
                   {value?.id === m.id && (
                     <span className="text-foreground ml-auto text-xs">✓</span>
@@ -290,7 +303,9 @@ export function MultiAssigneeButton({
                   <OwnerAvatar member={m} size="sm" />
                   <span className="truncate">{m.name ?? "Unknown"}</span>
                   {m.id === currentUserId && (
-                    <span className="text-muted-foreground ml-auto text-xs">you</span>
+                    <span className="text-muted-foreground ml-auto text-xs">
+                      you
+                    </span>
                   )}
                   {selected.has(m.id) && (
                     <span

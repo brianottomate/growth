@@ -253,7 +253,8 @@ async function evaluateGrounding(loaded: LoadedBuild) {
  */
 async function evaluateImageProvenance(loaded: LoadedBuild) {
   const serialized = JSON.stringify(loaded.artifact.pages);
-  const placeholders = serialized.match(/https?:\/\/placehold\.co[^"\s]*/g) ?? [];
+  const placeholders =
+    serialized.match(/https?:\/\/placehold\.co[^"\s]*/g) ?? [];
 
   const imageUrls = new Set<string>();
   walkStrings(loaded.artifact.pages, (key, value) => {

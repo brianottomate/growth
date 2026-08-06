@@ -102,7 +102,8 @@ export function ImportReviewClient({ importId }: { importId: string }) {
   const applicable = items.filter(
     (i) =>
       !i.appliedContentPostId &&
-      (effectiveStatus(i) === "accepted" || effectiveStatus(i) === "accepted_refine"),
+      (effectiveStatus(i) === "accepted" ||
+        effectiveStatus(i) === "accepted_refine"),
   ).length;
   const bulkTargets = items.filter(
     (i) =>
@@ -142,7 +143,9 @@ export function ImportReviewClient({ importId }: { importId: string }) {
   const consumedCount = slots.filter(isConsumed).length;
 
   if (isLoading || !data) {
-    return <div className="text-muted-foreground p-8 text-sm">Loading import…</div>;
+    return (
+      <div className="text-muted-foreground p-8 text-sm">Loading import…</div>
+    );
   }
 
   const imp = data.import;
@@ -173,8 +176,8 @@ export function ImportReviewClient({ importId }: { importId: string }) {
           {imp.status}
         </span>
         <span className="text-muted-foreground text-xs tabular-nums">
-          {items.length} ideas · {tally.accepted} ✓ · {tally.accepted_refine} ✓✎ ·{" "}
-          {tally.rejected} ✕ · {tally.pending} pending
+          {items.length} ideas · {tally.accepted} ✓ · {tally.accepted_refine} ✓✎
+          · {tally.rejected} ✕ · {tally.pending} pending
           {applied > 0 ? ` · ${applied} applied` : ""}
         </span>
         <div className="ml-auto flex items-center gap-2">
@@ -266,7 +269,10 @@ export function ImportReviewClient({ importId }: { importId: string }) {
                             scoreTint(m.score),
                           )}
                         >
-                          <ChannelLogo platform={m.platform} className="size-3" />
+                          <ChannelLogo
+                            platform={m.platform}
+                            className="size-3"
+                          />
                           → {m.slotDate.slice(5)}{" "}
                           {m.dayDelta === 0
                             ? ""
@@ -278,7 +284,8 @@ export function ImportReviewClient({ importId }: { importId: string }) {
                           key={p}
                           className="flex items-center gap-1 rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] text-amber-400"
                         >
-                          <ChannelLogo platform={p} className="size-3" /> new spot
+                          <ChannelLogo platform={p} className="size-3" /> new
+                          spot
                         </span>
                       ))}
                       {item.applyError && (
@@ -306,7 +313,7 @@ export function ImportReviewClient({ importId }: { importId: string }) {
                     {isApplied ? (
                       <Link
                         href={`/app/content/${item.appliedContentPostId}`}
-                        className="text-emerald-400 hover:underline text-xs"
+                        className="text-xs text-emerald-400 hover:underline"
                       >
                         applied · open →
                       </Link>
@@ -345,7 +352,9 @@ export function ImportReviewClient({ importId }: { importId: string }) {
                   <div className="bg-muted/20 space-y-2 border-t px-4 py-3 text-sm">
                     {idea.hook && (
                       <p>
-                        <span className="text-muted-foreground text-xs">Hook · </span>
+                        <span className="text-muted-foreground text-xs">
+                          Hook ·{" "}
+                        </span>
                         {idea.hook}
                       </p>
                     )}
@@ -357,7 +366,10 @@ export function ImportReviewClient({ importId }: { importId: string }) {
                     {idea.spots.map((s) => (
                       <div key={s.platform} className="rounded-lg border p-2">
                         <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs">
-                          <ChannelLogo platform={s.platform} className="size-3.5" />
+                          <ChannelLogo
+                            platform={s.platform}
+                            className="size-3.5"
+                          />
                           {s.format}
                           {s.template ? ` · ${s.template}` : ""}
                           {s.date ? ` · ships ${s.date}` : ""}
@@ -367,22 +379,31 @@ export function ImportReviewClient({ importId }: { importId: string }) {
                             {s.caption}
                           </p>
                         ) : (
-                          <p className="text-muted-foreground/60 text-xs">No caption in the sheet</p>
+                          <p className="text-muted-foreground/60 text-xs">
+                            No caption in the sheet
+                          </p>
                         )}
                       </div>
                     ))}
                     <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                      {idea.ctaKeyword && <span>Keyword: {idea.ctaKeyword}</span>}
+                      {idea.ctaKeyword && (
+                        <span>Keyword: {idea.ctaKeyword}</span>
+                      )}
                       {idea.kpi && <span>KPI: {idea.kpi}</span>}
                       {idea.ownerName && (
                         <span>
                           Owner: {idea.ownerName}
                           {!idea.ownerId && (
-                            <span className="text-amber-400"> (no matching member)</span>
+                            <span className="text-amber-400">
+                              {" "}
+                              (no matching member)
+                            </span>
                           )}
                         </span>
                       )}
-                      {idea.sheetStatus && <span>Sheet status: {idea.sheetStatus}</span>}
+                      {idea.sheetStatus && (
+                        <span>Sheet status: {idea.sheetStatus}</span>
+                      )}
                       {idea.assetLinks.length > 0 && (
                         <span>
                           {idea.assetLinks.map((url, i) => (
@@ -398,7 +419,9 @@ export function ImportReviewClient({ importId }: { importId: string }) {
                           ))}
                         </span>
                       )}
-                      <span>Sheet rows: {idea.sourceRowIndexes.join(", ")}</span>
+                      <span>
+                        Sheet rows: {idea.sourceRowIndexes.join(", ")}
+                      </span>
                     </div>
                     {item.reasoning && (
                       <p className="text-muted-foreground/70 text-[11px]">

@@ -71,7 +71,7 @@ function buildSystem(platform: string): string {
   const formats = platformFormatsFor(platform as ChannelPlatform);
   const formatList = formats.length
     ? formats.map((f) => `- ${f.id} — ${f.label} (${f.archetype})`).join("\n")
-    : "(no registry formats for this platform — leave format \"\" and just pick the archetype)";
+    : '(no registry formats for this platform — leave format "" and just pick the archetype)';
   return `You classify a single social post along THREE axes, independent of the platform's own labels:
 
 1. FORMAT — the concrete platform product. Allowed values for ${platform}:

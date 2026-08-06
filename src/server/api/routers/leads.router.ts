@@ -115,7 +115,12 @@ export type PreviewProbe = {
  */
 async function probePreview(url: string | null): Promise<PreviewProbe> {
   if (!url?.trim()) {
-    return { url: null, state: "none", status: null, detail: "no preview assigned" };
+    return {
+      url: null,
+      state: "none",
+      status: null,
+      detail: "no preview assigned",
+    };
   }
   const classified = classifyFetchUrl(url);
   if (!classified.ok || !classified.url) {
@@ -455,10 +460,12 @@ export const leadsRouter = createTRPCRouter({
           scorePregenPotential: leadDomainTable.scorePregenPotential,
           // Only the screenshot, not the whole enrichment blob — the row needs
           // one URL and enrichment carries every provider payload we hold.
-          siteScreenshotUrl:
-            sql<string | null>`${leadDomainTable.enrichment} -> 'leadRank' ->> 'screenshotUrl'`,
-          siteRankOverall:
-            sql<number | null>`(${leadDomainTable.enrichment} -> 'leadRank' ->> 'overall')::int`,
+          siteScreenshotUrl: sql<
+            string | null
+          >`${leadDomainTable.enrichment} -> 'leadRank' ->> 'screenshotUrl'`,
+          siteRankOverall: sql<
+            number | null
+          >`(${leadDomainTable.enrichment} -> 'leadRank' ->> 'overall')::int`,
           pregenStatus: leadDomainTable.pregenStatus,
           hubspotLeadStatus: leadDomainTable.hubspotLeadStatus,
           // The send-review surface filtered these out entirely. Carrying them
@@ -540,53 +547,57 @@ export const leadsRouter = createTRPCRouter({
       const review = input.withReview
         ? await (async () => {
             if (!ids.length) return null;
-            const [reviewContacts, outreachRows, channelRows, domainEnrichment] =
-              await Promise.all([
-                ctx.db
-                  .select({
-                    id: leadContactTable.id,
-                    domainId: leadContactTable.domainId,
-                    email: leadContactTable.email,
-                    firstName: leadContactTable.firstName,
-                    lastName: leadContactTable.lastName,
-                    jobTitle: leadContactTable.jobTitle,
-                    verificationStatus: leadContactTable.verificationStatus,
-                    verification: leadContactTable.verification,
-                  })
-                  .from(leadContactTable)
-                  .where(
-                    and(
-                      inArray(leadContactTable.domainId, ids),
-                      isNull(leadContactTable.deletedAt),
-                    ),
+            const [
+              reviewContacts,
+              outreachRows,
+              channelRows,
+              domainEnrichment,
+            ] = await Promise.all([
+              ctx.db
+                .select({
+                  id: leadContactTable.id,
+                  domainId: leadContactTable.domainId,
+                  email: leadContactTable.email,
+                  firstName: leadContactTable.firstName,
+                  lastName: leadContactTable.lastName,
+                  jobTitle: leadContactTable.jobTitle,
+                  verificationStatus: leadContactTable.verificationStatus,
+                  verification: leadContactTable.verification,
+                })
+                .from(leadContactTable)
+                .where(
+                  and(
+                    inArray(leadContactTable.domainId, ids),
+                    isNull(leadContactTable.deletedAt),
                   ),
-                ctx.db
-                  .select()
-                  .from(leadOutreachTable)
-                  .where(inArray(leadOutreachTable.domainId, ids))
-                  .orderBy(desc(leadOutreachTable.createdAt)),
-                ctx.db
-                  .select({
-                    domainId: leadChannelTable.domainId,
-                    kind: leadChannelTable.kind,
-                    value: leadChannelTable.value,
-                    deliveryState: leadChannelTable.deliveryState,
-                  })
-                  .from(leadChannelTable)
-                  .where(
-                    and(
-                      inArray(leadChannelTable.domainId, ids),
-                      isNull(leadChannelTable.deletedAt),
-                    ),
+                ),
+              ctx.db
+                .select()
+                .from(leadOutreachTable)
+                .where(inArray(leadOutreachTable.domainId, ids))
+                .orderBy(desc(leadOutreachTable.createdAt)),
+              ctx.db
+                .select({
+                  domainId: leadChannelTable.domainId,
+                  kind: leadChannelTable.kind,
+                  value: leadChannelTable.value,
+                  deliveryState: leadChannelTable.deliveryState,
+                })
+                .from(leadChannelTable)
+                .where(
+                  and(
+                    inArray(leadChannelTable.domainId, ids),
+                    isNull(leadChannelTable.deletedAt),
                   ),
-                ctx.db
-                  .select({
-                    id: leadDomainTable.id,
-                    enrichment: leadDomainTable.enrichment,
-                  })
-                  .from(leadDomainTable)
-                  .where(inArray(leadDomainTable.id, ids)),
-              ]);
+                ),
+              ctx.db
+                .select({
+                  id: leadDomainTable.id,
+                  enrichment: leadDomainTable.enrichment,
+                })
+                .from(leadDomainTable)
+                .where(inArray(leadDomainTable.id, ids)),
+            ]);
 
             const contactsByDomain = new Map<string, StoredLeadContact[]>();
             for (const contact of reviewContacts) {
@@ -695,55 +706,57 @@ export const leadsRouter = createTRPCRouter({
       });
       if (!domain) return null;
 
-      const [contacts, channels, outreachRows, memberships] = await Promise.all([
-        ctx.db
-          .select({
-            id: leadContactTable.id,
-            email: leadContactTable.email,
-            firstName: leadContactTable.firstName,
-            lastName: leadContactTable.lastName,
-            jobTitle: leadContactTable.jobTitle,
-            verificationStatus: leadContactTable.verificationStatus,
-            verification: leadContactTable.verification,
-            hubspotContactId: leadContactTable.hubspotContactId,
-            emailOptOut: leadContactTable.emailOptOut,
-          })
-          .from(leadContactTable)
-          .where(
-            and(
-              eq(leadContactTable.domainId, domain.id),
-              isNull(leadContactTable.deletedAt),
-            ),
-          )
-          .orderBy(asc(leadContactTable.email))
-          .limit(200),
-        ctx.db
-          .select()
-          .from(leadChannelTable)
-          .where(
-            and(
-              eq(leadChannelTable.domainId, domain.id),
-              isNull(leadChannelTable.deletedAt),
-            ),
-          )
-          .orderBy(asc(leadChannelTable.kind)),
-        ctx.db
-          .select()
-          .from(leadOutreachTable)
-          .where(eq(leadOutreachTable.domainId, domain.id))
-          .orderBy(desc(leadOutreachTable.createdAt))
-          .limit(5),
-        ctx.db
-          .select({ cohort: hubspotListMembershipTable.cohort })
-          .from(hubspotListMembershipTable)
-          .where(
-            and(
-              eq(hubspotListMembershipTable.domainId, domain.id),
-              eq(hubspotListMembershipTable.objectType, "company"),
-            ),
-          )
-          .limit(1),
-      ]);
+      const [contacts, channels, outreachRows, memberships] = await Promise.all(
+        [
+          ctx.db
+            .select({
+              id: leadContactTable.id,
+              email: leadContactTable.email,
+              firstName: leadContactTable.firstName,
+              lastName: leadContactTable.lastName,
+              jobTitle: leadContactTable.jobTitle,
+              verificationStatus: leadContactTable.verificationStatus,
+              verification: leadContactTable.verification,
+              hubspotContactId: leadContactTable.hubspotContactId,
+              emailOptOut: leadContactTable.emailOptOut,
+            })
+            .from(leadContactTable)
+            .where(
+              and(
+                eq(leadContactTable.domainId, domain.id),
+                isNull(leadContactTable.deletedAt),
+              ),
+            )
+            .orderBy(asc(leadContactTable.email))
+            .limit(200),
+          ctx.db
+            .select()
+            .from(leadChannelTable)
+            .where(
+              and(
+                eq(leadChannelTable.domainId, domain.id),
+                isNull(leadChannelTable.deletedAt),
+              ),
+            )
+            .orderBy(asc(leadChannelTable.kind)),
+          ctx.db
+            .select()
+            .from(leadOutreachTable)
+            .where(eq(leadOutreachTable.domainId, domain.id))
+            .orderBy(desc(leadOutreachTable.createdAt))
+            .limit(5),
+          ctx.db
+            .select({ cohort: hubspotListMembershipTable.cohort })
+            .from(hubspotListMembershipTable)
+            .where(
+              and(
+                eq(hubspotListMembershipTable.domainId, domain.id),
+                eq(hubspotListMembershipTable.objectType, "company"),
+              ),
+            )
+            .limit(1),
+        ],
+      );
 
       const channel = scoreLeadChannel({
         domain: domain.domain,
@@ -789,7 +802,10 @@ export const leadsRouter = createTRPCRouter({
           ? { id: row.hubspotRecordId }
           : await findCompanyByDomain(row.domain);
       if (!company) {
-        return { available: false as const, reason: "no linked HubSpot company" };
+        return {
+          available: false as const,
+          reason: "no linked HubSpot company",
+        };
       }
       const [emails, activity] = await Promise.all([
         readHubspotCompanyEmailHistory(company.id, {
@@ -801,7 +817,12 @@ export const leadsRouter = createTRPCRouter({
           maxBodyCharacters: 1_200,
         }),
       ]);
-      return { available: true as const, companyId: company.id, emails, activity };
+      return {
+        available: true as const,
+        companyId: company.id,
+        emails,
+        activity,
+      };
     }),
 
   /**
@@ -832,7 +853,8 @@ export const leadsRouter = createTRPCRouter({
       const row = await ctx.db.query.leadDomainTable.findFirst({
         where: eq(leadDomainTable.id, input.domainId),
       });
-      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
+      if (!row)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
       // Same suppression rule as generation. Building a preview for a company a
       // rep is already working spends a build and invites the send it exists for.
       if (row.excludeFromOutreach) {
@@ -929,7 +951,9 @@ export const leadsRouter = createTRPCRouter({
           websiteId: current.websiteId ?? build.websiteId,
           previewUrl: current.previewUrl ?? build.previewUrl,
           errorMessage: current.errorMessage ?? null,
-          settledAt: settled ? (build.settledAt ?? new Date()) : build.settledAt,
+          settledAt: settled
+            ? (build.settledAt ?? new Date())
+            : build.settledAt,
           claimedAt:
             current.status === "CLAIMED"
               ? (build.claimedAt ?? new Date())

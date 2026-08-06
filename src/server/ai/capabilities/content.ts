@@ -464,9 +464,7 @@ export const addContentCrossPost = growthAction({
   inputSchema: z.object({
     contentPostId: z.string(),
     platforms: z.array(z.enum(channelPlatformEnum.enumValues)).min(1).max(8),
-    contentType: z
-      .enum(["image", "video", "carousel"])
-      .optional(),
+    contentType: z.enum(["image", "video", "carousel"]).optional(),
   }),
   execute: async ({ contentPostId, platforms, contentType }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);

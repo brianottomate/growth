@@ -52,10 +52,14 @@ export type TrackedLinkInput = {
 export function buildTrackedLink(
   mention: TrackedLinkInput,
   // Preset id (keeps autocomplete) or any raw path / URL for the custom case.
-  destination: TrackedLinkDestinationId | (string & {}) = DEFAULT_TRACKED_DESTINATION,
+  destination:
+    | TrackedLinkDestinationId
+    | (string & {}) = DEFAULT_TRACKED_DESTINATION,
 ): string {
   const preset = TRACKED_LINK_DESTINATIONS.find((d) => d.id === destination);
-  const base = preset ? `${WANDER_COM}${preset.path}` : resolveCustomBase(destination);
+  const base = preset
+    ? `${WANDER_COM}${preset.path}`
+    : resolveCustomBase(destination);
 
   const url = new URL(base);
   const set = (key: string, value?: string | null) => {

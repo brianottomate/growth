@@ -112,7 +112,8 @@ export async function getXUserTweets(options: {
     "media.fields": MEDIA_FIELDS,
   });
   if (exclude) params.set("exclude", exclude);
-  if (options.paginationToken) params.set("pagination_token", options.paginationToken);
+  if (options.paginationToken)
+    params.set("pagination_token", options.paginationToken);
   if (options.sinceId) params.set("since_id", options.sinceId);
 
   const data = await xFetch<{
@@ -167,13 +168,22 @@ function xTweetMedia(tweet: XTweet, media: Map<string, XMedia>): MediaItem[] {
     const m = media.get(key);
     if (!m) continue;
     if (m.type === "photo" && m.url) {
-      items.push({ url: m.url, type: "image", width: m.width, height: m.height });
+      items.push({
+        url: m.url,
+        type: "image",
+        width: m.width,
+        height: m.height,
+      });
     } else if (m.type === "video" || m.type === "animated_gif") {
       const best = (m.variants ?? [])
         .filter((v) => v.content_type === "video/mp4" && v.url)
         .sort((a, b) => (b.bit_rate ?? 0) - (a.bit_rate ?? 0))[0]?.url;
       if (best)
-        items.push({ url: best, type: "video", thumbnail: m.preview_image_url });
+        items.push({
+          url: best,
+          type: "video",
+          thumbnail: m.preview_image_url,
+        });
     }
   }
   return items;
@@ -186,7 +196,12 @@ function xTweetMedia(tweet: XTweet, media: Map<string, XMedia>): MediaItem[] {
 export function mapXTweetToPlatformPost(
   tweet: XTweet,
   media: Map<string, XMedia>,
-  ctx: { brandId: string; channelId?: string; username?: string; scrapedAt?: Date },
+  ctx: {
+    brandId: string;
+    channelId?: string;
+    username?: string;
+    scrapedAt?: Date;
+  },
 ) {
   const pm = tweet.public_metrics ?? {};
   const stats: PostStats = {

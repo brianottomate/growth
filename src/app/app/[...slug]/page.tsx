@@ -19,7 +19,8 @@ export default async function PlaceholderPage({
       </div>
       <div className="text-lg font-semibold capitalize">{title}</div>
       <p className="text-muted-foreground max-w-sm text-sm">
-        Not built yet — we&apos;re adding screens one at a time. This one&apos;s queued.
+        Not built yet — we&apos;re adding screens one at a time. This one&apos;s
+        queued.
       </p>
       <Link
         href="/app"

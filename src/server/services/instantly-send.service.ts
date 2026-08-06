@@ -49,7 +49,15 @@ async function ensurePersonalizedCampaign(): Promise<string> {
         // real prospects we'll likely narrow to business hours per timezone.
         name: "Always on",
         timing: { from: "00:00", to: "23:59" },
-        days: { "0": true, "1": true, "2": true, "3": true, "4": true, "5": true, "6": true },
+        days: {
+          "0": true,
+          "1": true,
+          "2": true,
+          "3": true,
+          "4": true,
+          "5": true,
+          "6": true,
+        },
         timezone: "America/Detroit",
       },
     ],
@@ -59,7 +67,9 @@ async function ensurePersonalizedCampaign(): Promise<string> {
     delay: STEP_DELAYS[i] ?? 0,
     delay_unit: "days" as const,
     // step 1 has a subject; follow-ups reply in-thread (empty subject)
-    variants: [{ subject: i === 0 ? "{{subject}}" : "", body: `{{body${i + 1}}}` }],
+    variants: [
+      { subject: i === 0 ? "{{subject}}" : "", body: `{{body${i + 1}}}` },
+    ],
   }));
 
   const c = await createCampaign({
@@ -97,7 +107,8 @@ export async function queueInstantlyLead(
     .where(eq(leadOutreachTable.domainId, domainId))
     .orderBy(desc(leadOutreachTable.createdAt))
     .limit(1);
-  if (!row?.steps?.length) throw new Error("No outreach draft to queue for this domain");
+  if (!row?.steps?.length)
+    throw new Error("No outreach draft to queue for this domain");
 
   const campaignId = await ensurePersonalizedCampaign();
 
@@ -121,7 +132,11 @@ export async function queueInstantlyLead(
 
   await db
     .update(leadOutreachTable)
-    .set({ status: "queued", instantlyCampaignId: campaignId, instantlyLeadId: leadId })
+    .set({
+      status: "queued",
+      instantlyCampaignId: campaignId,
+      instantlyLeadId: leadId,
+    })
     .where(eq(leadOutreachTable.id, row.id));
 
   return { campaignId, leadId, recipient: recipientEmail };
@@ -137,7 +152,9 @@ export async function activateInstantlyCampaign(): Promise<{
   const existing = await listCampaigns({ search: CAMPAIGN_NAME, limit: 10 });
   const found = existing.items.find((c) => c.name === CAMPAIGN_NAME);
   if (!found) {
-    throw new Error("Personalized campaign doesn't exist yet — queue a lead first");
+    throw new Error(
+      "Personalized campaign doesn't exist yet — queue a lead first",
+    );
   }
   await activateCampaign(found.id);
   return { campaignId: found.id };

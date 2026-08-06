@@ -27,12 +27,18 @@ export async function GET(request: NextRequest) {
   const denied = await assertLabAccess(request);
   if (denied) return denied;
   if (!isAuthorized(request)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   if (!isInstantlyConfigured) {
     return NextResponse.json(
-      { success: false, error: "Instantly is not configured. Set INSTANTLY_API_KEY." },
+      {
+        success: false,
+        error: "Instantly is not configured. Set INSTANTLY_API_KEY.",
+      },
       { status: 500 },
     );
   }
@@ -43,7 +49,12 @@ export async function GET(request: NextRequest) {
   const runId = Date.now();
   const sentinelEmail = `claude-smoke-test+${runId}@wander.com`;
 
-  const steps: Array<{ step: string; ok: boolean; data?: unknown; error?: string }> = [];
+  const steps: Array<{
+    step: string;
+    ok: boolean;
+    data?: unknown;
+    error?: string;
+  }> = [];
 
   // 1. CREATE
   let leadId: string | undefined;
@@ -64,7 +75,10 @@ export async function GET(request: NextRequest) {
     steps.push({ step: "create", ok: true, data: created });
   } catch (error) {
     steps.push({ step: "create", ok: false, error: errorMessage(error) });
-    return NextResponse.json({ success: false, sentinelEmail, steps }, { status: 500 });
+    return NextResponse.json(
+      { success: false, sentinelEmail, steps },
+      { status: 500 },
+    );
   }
 
   // 2. PATCH — write-back custom_variables (the pregen use case shape)

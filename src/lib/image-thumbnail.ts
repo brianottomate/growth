@@ -43,6 +43,70 @@ async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
 }
 
 /**
+ * Grab a poster frame from a video file, same contract as the image path.
+ *
+ * Video used to upload with no tile at all, so the library and the pickers
+ * showed rows of anonymous film icons. The browser already has to decode the
+ * file to play it, so one seek and one canvas draw gets a real poster for free.
+ *
+ * Seeks a little way in rather than to frame zero: the first frame of a phone
+ * clip is very often black. Never throws, and resolves null for a codec the
+ * browser cannot decode (HEVC 10-bit, most notably), which is exactly when
+ * there is nothing useful to show anyway.
+ */
+export async function createVideoThumbnail(
+  file: File,
+): Promise<ThumbnailResult> {
+  const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  try {
+    return await new Promise<ThumbnailResult>((resolve) => {
+      const empty = { sourceWidth: 0, sourceHeight: 0, thumbnail: null };
+      // A decode that never fires an event must not hang the upload.
+      const timer = setTimeout(() => resolve(empty), 10_000);
+      const done = (result: ThumbnailResult) => {
+        clearTimeout(timer);
+        resolve(result);
+      };
+
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.onerror = () => done(empty);
+      video.onloadedmetadata = () => {
+        const { videoWidth, videoHeight, duration } = video;
+        if (!videoWidth || !videoHeight) return done(empty);
+        video.currentTime = Number.isFinite(duration)
+          ? Math.min(1, duration / 2)
+          : 0;
+      };
+      video.onseeked = () => {
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
+        const longestEdge = Math.max(sourceWidth, sourceHeight);
+        const scale = Math.min(1, THUMBNAIL_MAX_EDGE / longestEdge);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+        canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+        const context = canvas.getContext("2d");
+        if (!context)
+          return done({ sourceWidth, sourceHeight, thumbnail: null });
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        void toBlob(canvas).then((thumbnail) =>
+          done({ sourceWidth, sourceHeight, thumbnail }),
+        );
+      };
+      video.src = objectUrl;
+    });
+  } catch {
+    return { sourceWidth: 0, sourceHeight: 0, thumbnail: null };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+    video.removeAttribute("src");
+  }
+}
+
+/**
  * Decode `file` once, returning its true dimensions plus a downscaled WebP tile
  * when one is worth making. Never throws — a failed decode degrades to
  * "no dimensions, no thumbnail" so an upload is never blocked by it.

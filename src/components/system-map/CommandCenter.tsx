@@ -156,7 +156,11 @@ async function computeElkLayout(
         parentId: elkGroup.id,
         extent: "parent" as const,
         position: { x: elkChild.x ?? 0, y: elkChild.y ?? 0 },
-        data: { ...ecoNode, color: CATEGORY_COLORS[ecoNode.category], groupColor: group.color },
+        data: {
+          ...ecoNode,
+          color: CATEGORY_COLORS[ecoNode.category],
+          groupColor: group.color,
+        },
       });
     }
   }
@@ -206,33 +210,53 @@ function EcoNodeComponent({ data }: NodeProps) {
       className="relative rounded-lg border px-3 py-2 shadow-md transition-shadow hover:shadow-lg"
       style={{
         background: `${d.color}15`,
-        borderColor: hasIssue ? "#f59e0b" : isLegacy ? "#64748b55" : `${d.color}40`,
+        borderColor: hasIssue
+          ? "#f59e0b"
+          : isLegacy
+            ? "#64748b55"
+            : `${d.color}40`,
         minWidth: NODE_WIDTH - 16,
         opacity: isLegacy ? 0.6 : 1,
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: "transparent", border: "none" }} />
-      <Handle type="target" position={Position.Left} id="left" style={{ background: "transparent", border: "none" }} />
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{ background: "transparent", border: "none" }}
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left"
+        style={{ background: "transparent", border: "none" }}
+      />
       <div className="flex items-center gap-1.5">
         <div
           className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
           style={{ background: d.color }}
         />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[11px] font-semibold leading-tight text-white">
+          <div className="truncate text-[11px] leading-tight font-semibold text-white">
             {d.label}
           </div>
           {d.description && (
-            <div className="mt-0.5 truncate text-[9px] text-white/40" style={{ maxWidth: 140 }}>
+            <div
+              className="mt-0.5 truncate text-[9px] text-white/40"
+              style={{ maxWidth: 140 }}
+            >
               {d.description}
             </div>
           )}
         </div>
         {isLegacy && (
-          <span className="shrink-0 rounded bg-gray-700/60 px-1 py-0.5 text-[8px] text-gray-400">LEGACY</span>
+          <span className="shrink-0 rounded bg-gray-700/60 px-1 py-0.5 text-[8px] text-gray-400">
+            LEGACY
+          </span>
         )}
         {isPlanned && (
-          <span className="shrink-0 rounded bg-blue-900/40 px-1 py-0.5 text-[8px] text-blue-300">PLANNED</span>
+          <span className="shrink-0 rounded bg-blue-900/40 px-1 py-0.5 text-[8px] text-blue-300">
+            PLANNED
+          </span>
         )}
       </div>
       {(d.notes || hasIssue) && (
@@ -242,8 +266,17 @@ function EcoNodeComponent({ data }: NodeProps) {
           style={{ background: hasIssue ? "#f59e0b" : "#6b7280" }}
         />
       )}
-      <Handle type="source" position={Position.Bottom} style={{ background: "transparent", border: "none" }} />
-      <Handle type="source" position={Position.Right} id="right" style={{ background: "transparent", border: "none" }} />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={{ background: "transparent", border: "none" }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        style={{ background: "transparent", border: "none" }}
+      />
     </div>
   );
 }
@@ -252,7 +285,7 @@ function GroupNodeComponent({ data }: NodeProps) {
   const d = data as unknown as { label: string };
   return (
     <div className="h-full w-full">
-      <div className="px-2 pt-2 text-[11px] font-bold uppercase tracking-wider text-white/50">
+      <div className="px-2 pt-2 text-[11px] font-bold tracking-wider text-white/50 uppercase">
         {d.label}
       </div>
     </div>
@@ -266,11 +299,32 @@ const nodeTypes: NodeTypes = {
 
 // ─── Sidebar: Issues ──────────────────────────────────────
 
-function IssueCard({ issue, onHover }: { issue: SystemIssue; onHover: (nodeIds: string[] | null) => void }) {
+function IssueCard({
+  issue,
+  onHover,
+}: {
+  issue: SystemIssue;
+  onHover: (nodeIds: string[] | null) => void;
+}) {
   const severityColors = {
-    critical: { bg: "bg-red-900/30", border: "border-red-500/40", text: "text-red-300", badge: "bg-red-500/20 text-red-300" },
-    warning: { bg: "bg-amber-900/30", border: "border-amber-500/40", text: "text-amber-300", badge: "bg-amber-500/20 text-amber-300" },
-    info: { bg: "bg-blue-900/30", border: "border-blue-500/40", text: "text-blue-300", badge: "bg-blue-500/20 text-blue-300" },
+    critical: {
+      bg: "bg-red-900/30",
+      border: "border-red-500/40",
+      text: "text-red-300",
+      badge: "bg-red-500/20 text-red-300",
+    },
+    warning: {
+      bg: "bg-amber-900/30",
+      border: "border-amber-500/40",
+      text: "text-amber-300",
+      badge: "bg-amber-500/20 text-amber-300",
+    },
+    info: {
+      bg: "bg-blue-900/30",
+      border: "border-blue-500/40",
+      text: "text-blue-300",
+      badge: "bg-blue-500/20 text-blue-300",
+    },
   };
   const s = severityColors[issue.severity];
 
@@ -281,7 +335,9 @@ function IssueCard({ issue, onHover }: { issue: SystemIssue; onHover: (nodeIds: 
       onMouseLeave={() => onHover(null)}
     >
       <div className="mb-1 flex items-center gap-2">
-        <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${s.badge}`}>
+        <span
+          className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${s.badge}`}
+        >
           {issue.severity}
         </span>
         <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] text-white/40">
@@ -289,7 +345,9 @@ function IssueCard({ issue, onHover }: { issue: SystemIssue; onHover: (nodeIds: 
         </span>
       </div>
       <div className={`text-xs font-medium ${s.text}`}>{issue.title}</div>
-      <div className="mt-1 text-[10px] leading-relaxed text-white/40">{issue.description}</div>
+      <div className="mt-1 text-[10px] leading-relaxed text-white/40">
+        {issue.description}
+      </div>
     </div>
   );
 }
@@ -300,38 +358,57 @@ function StatsPanel() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/40">Tracking Plan</h3>
+        <h3 className="mb-2 text-[10px] font-bold tracking-wider text-white/40 uppercase">
+          Tracking Plan
+        </h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-white/5 p-2.5">
-            <div className="text-lg font-bold text-white">{TRACKING_STATS.totalEvents}</div>
+            <div className="text-lg font-bold text-white">
+              {TRACKING_STATS.totalEvents}
+            </div>
             <div className="text-[10px] text-white/40">Total Events</div>
           </div>
           <div className="rounded-lg bg-white/5 p-2.5">
-            <div className="text-lg font-bold text-white">{TRACKING_STATS.segmentSources}</div>
+            <div className="text-lg font-bold text-white">
+              {TRACKING_STATS.segmentSources}
+            </div>
             <div className="text-[10px] text-white/40">Segment Sources</div>
           </div>
           <div className="rounded-lg bg-white/5 p-2.5">
-            <div className="text-lg font-bold text-amber-400">{TRACKING_STATS.crossSurfaceEvents}</div>
+            <div className="text-lg font-bold text-amber-400">
+              {TRACKING_STATS.crossSurfaceEvents}
+            </div>
             <div className="text-[10px] text-white/40">Cross-Surface</div>
           </div>
           <div className="rounded-lg bg-white/5 p-2.5">
-            <div className="text-lg font-bold text-white">{TRACKING_STATS.funnels.length}</div>
+            <div className="text-lg font-bold text-white">
+              {TRACKING_STATS.funnels.length}
+            </div>
             <div className="text-[10px] text-white/40">Funnels Defined</div>
           </div>
         </div>
       </div>
 
       <div>
-        <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/40">Events by Surface</h3>
+        <h3 className="mb-2 text-[10px] font-bold tracking-wider text-white/40 uppercase">
+          Events by Surface
+        </h3>
         <div className="space-y-1.5">
           {TRACKING_STATS.surfaces.map((s) => (
-            <div key={s.name} className="flex items-center justify-between rounded bg-white/5 px-2.5 py-1.5">
+            <div
+              key={s.name}
+              className="flex items-center justify-between rounded bg-white/5 px-2.5 py-1.5"
+            >
               <div>
-                <div className="text-[11px] font-medium text-white">{s.name}</div>
+                <div className="text-[11px] font-medium text-white">
+                  {s.name}
+                </div>
                 <div className="text-[9px] text-white/30">{s.workspace}</div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-bold text-white">{s.eventCount}</div>
+                <div className="text-sm font-bold text-white">
+                  {s.eventCount}
+                </div>
                 <div className="text-[9px] text-white/30">{s.type}</div>
               </div>
             </div>
@@ -340,10 +417,15 @@ function StatsPanel() {
       </div>
 
       <div>
-        <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/40">Funnels</h3>
+        <h3 className="mb-2 text-[10px] font-bold tracking-wider text-white/40 uppercase">
+          Funnels
+        </h3>
         <div className="space-y-1">
           {TRACKING_STATS.funnels.map((f) => (
-            <div key={f.name} className="flex items-center justify-between rounded bg-white/5 px-2.5 py-1.5">
+            <div
+              key={f.name}
+              className="flex items-center justify-between rounded bg-white/5 px-2.5 py-1.5"
+            >
               <span className="text-[10px] text-white/70">{f.name}</span>
               <span className="text-[9px] text-white/30">{f.steps} steps</span>
             </div>
@@ -359,7 +441,9 @@ function StatsPanel() {
 function NodeDetail({ node, onClose }: { node: EcoNode; onClose: () => void }) {
   const group = GROUP_MAP[node.group];
   const color = CATEGORY_COLORS[node.category];
-  const relatedIssues = SYSTEM_ISSUES.filter((i) => i.affectedNodes.includes(node.id));
+  const relatedIssues = SYSTEM_ISSUES.filter((i) =>
+    i.affectedNodes.includes(node.id),
+  );
   const incomingEdges = EDGES.filter((e) => e.target === node.id);
   const outgoingEdges = EDGES.filter((e) => e.source === node.id);
 
@@ -370,36 +454,58 @@ function NodeDetail({ node, onClose }: { node: EcoNode; onClose: () => void }) {
           className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
           style={{ background: `${color}22`, color }}
         >
-          <div className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+          <div
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: color }}
+          />
           {node.category}
         </div>
-        <button onClick={onClose} className="text-white/30 hover:text-white/70 text-sm">x</button>
+        <button
+          onClick={onClose}
+          className="text-sm text-white/30 hover:text-white/70"
+        >
+          x
+        </button>
       </div>
 
       <div>
         <h2 className="text-base font-semibold text-white">{node.label}</h2>
-        {node.description && <p className="mt-1 text-sm text-white/60">{node.description}</p>}
+        {node.description && (
+          <p className="mt-1 text-sm text-white/60">{node.description}</p>
+        )}
       </div>
 
       {node.owner && (
         <div>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Owner</div>
+          <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+            Owner
+          </div>
           <div className="text-sm text-white/80">{node.owner}</div>
         </div>
       )}
 
       <div>
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Group</div>
-        <div className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs" style={{ background: `${group.color}20`, color: group.color }}>
+        <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+          Group
+        </div>
+        <div
+          className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs"
+          style={{ background: `${group.color}20`, color: group.color }}
+        >
           {group.label}
         </div>
       </div>
 
       <div>
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Lenses</div>
+        <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+          Lenses
+        </div>
         <div className="flex flex-wrap gap-1">
           {node.lenses.map((l) => (
-            <span key={l} className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">
+            <span
+              key={l}
+              className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60"
+            >
               {LENS_META[l].label}
             </span>
           ))}
@@ -408,17 +514,29 @@ function NodeDetail({ node, onClose }: { node: EcoNode; onClose: () => void }) {
 
       {(incomingEdges.length > 0 || outgoingEdges.length > 0) && (
         <div>
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Connections</div>
+          <div className="mb-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+            Connections
+          </div>
           {incomingEdges.length > 0 && (
             <div className="mb-2">
               <div className="mb-1 text-[9px] text-white/20">INCOMING</div>
               {incomingEdges.map((e) => {
                 const sourceNode = NODES.find((n) => n.id === e.source);
                 return (
-                  <div key={e.id} className="flex items-center gap-1.5 py-0.5 text-[10px]">
-                    <span className="h-1 w-1 rounded-full" style={{ background: EDGE_COLORS[e.kind] }} />
-                    <span className="text-white/50">{sourceNode?.label ?? e.source}</span>
-                    {e.label && <span className="text-white/25">({e.label})</span>}
+                  <div
+                    key={e.id}
+                    className="flex items-center gap-1.5 py-0.5 text-[10px]"
+                  >
+                    <span
+                      className="h-1 w-1 rounded-full"
+                      style={{ background: EDGE_COLORS[e.kind] }}
+                    />
+                    <span className="text-white/50">
+                      {sourceNode?.label ?? e.source}
+                    </span>
+                    {e.label && (
+                      <span className="text-white/25">({e.label})</span>
+                    )}
                   </div>
                 );
               })}
@@ -430,10 +548,20 @@ function NodeDetail({ node, onClose }: { node: EcoNode; onClose: () => void }) {
               {outgoingEdges.map((e) => {
                 const targetNode = NODES.find((n) => n.id === e.target);
                 return (
-                  <div key={e.id} className="flex items-center gap-1.5 py-0.5 text-[10px]">
-                    <span className="h-1 w-1 rounded-full" style={{ background: EDGE_COLORS[e.kind] }} />
-                    <span className="text-white/50">{targetNode?.label ?? e.target}</span>
-                    {e.label && <span className="text-white/25">({e.label})</span>}
+                  <div
+                    key={e.id}
+                    className="flex items-center gap-1.5 py-0.5 text-[10px]"
+                  >
+                    <span
+                      className="h-1 w-1 rounded-full"
+                      style={{ background: EDGE_COLORS[e.kind] }}
+                    />
+                    <span className="text-white/50">
+                      {targetNode?.label ?? e.target}
+                    </span>
+                    {e.label && (
+                      <span className="text-white/25">({e.label})</span>
+                    )}
                   </div>
                 );
               })}
@@ -443,7 +571,12 @@ function NodeDetail({ node, onClose }: { node: EcoNode; onClose: () => void }) {
       )}
 
       {node.url && (
-        <a href={node.url} target="_blank" rel="noreferrer" className="block text-xs text-blue-400 hover:underline">
+        <a
+          href={node.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block text-xs text-blue-400 hover:underline"
+        >
           {node.url}
         </a>
       )}
@@ -456,10 +589,16 @@ function NodeDetail({ node, onClose }: { node: EcoNode; onClose: () => void }) {
 
       {relatedIssues.length > 0 && (
         <div>
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">Related Issues</div>
+          <div className="mb-2 text-[10px] font-semibold tracking-wider text-white/30 uppercase">
+            Related Issues
+          </div>
           <div className="space-y-2">
             {relatedIssues.map((issue) => (
-              <IssueCard key={issue.id} issue={issue} onHover={() => undefined} />
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                onHover={() => undefined}
+              />
             ))}
           </div>
         </div>
@@ -477,7 +616,15 @@ function LensBar({
   active: Lens;
   onChange: (lens: Lens) => void;
 }) {
-  const lenses: Lens[] = ["full", "data-spine", "guest-journey", "sales-motion", "attribution", "host-journey", "content-flow"];
+  const lenses: Lens[] = [
+    "full",
+    "data-spine",
+    "guest-journey",
+    "sales-motion",
+    "attribution",
+    "host-journey",
+    "content-flow",
+  ];
   return (
     <div className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
       {lenses.map((lens) => (
@@ -501,7 +648,13 @@ function LensBar({
 
 type SidebarTab = "issues" | "stats" | "detail";
 
-function SidebarTabButton({ tab, active, label, count, onClick }: {
+function SidebarTabButton({
+  tab,
+  active,
+  label,
+  count,
+  onClick,
+}: {
   tab: SidebarTab;
   active: SidebarTab;
   label: string;
@@ -512,14 +665,18 @@ function SidebarTabButton({ tab, active, label, count, onClick }: {
     <button
       onClick={onClick}
       className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-medium transition-all ${
-        active === tab ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"
+        active === tab
+          ? "bg-white/10 text-white"
+          : "text-white/40 hover:text-white/70"
       }`}
     >
       {label}
       {count !== undefined && (
-        <span className={`rounded-full px-1.5 py-0.5 text-[8px] ${
-          active === tab ? "bg-white/20" : "bg-white/5"
-        }`}>
+        <span
+          className={`rounded-full px-1.5 py-0.5 text-[8px] ${
+            active === tab ? "bg-white/20" : "bg-white/5"
+          }`}
+        >
           {count}
         </span>
       )}
@@ -535,11 +692,17 @@ function CommandCenterInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<EcoNode | null>(null);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("issues");
-  const [highlightedNodes, setHighlightedNodes] = useState<Set<string> | null>(null);
+  const [highlightedNodes, setHighlightedNodes] = useState<Set<string> | null>(
+    null,
+  );
 
   const buildGraph = useCallback(
     async (lens: Lens) => {
-      const { nodes: rfNodes, edges: rfEdges } = await computeElkLayout(NODES, EDGES, lens);
+      const { nodes: rfNodes, edges: rfEdges } = await computeElkLayout(
+        NODES,
+        EDGES,
+        lens,
+      );
       setNodes(rfNodes);
       setEdges(rfEdges);
     },
@@ -552,19 +715,19 @@ function CommandCenterInner() {
   }, [activeLens, buildGraph]);
 
   // Issue counts by severity
-  const issueCounts = useMemo(() => ({
-    critical: SYSTEM_ISSUES.filter((i) => i.severity === "critical").length,
-    warning: SYSTEM_ISSUES.filter((i) => i.severity === "warning").length,
-    info: SYSTEM_ISSUES.filter((i) => i.severity === "info").length,
-    total: SYSTEM_ISSUES.length,
-  }), []);
-
-  const handleIssueHover = useCallback(
-    (nodeIds: string[] | null) => {
-      setHighlightedNodes(nodeIds ? new Set(nodeIds) : null);
-    },
+  const issueCounts = useMemo(
+    () => ({
+      critical: SYSTEM_ISSUES.filter((i) => i.severity === "critical").length,
+      warning: SYSTEM_ISSUES.filter((i) => i.severity === "warning").length,
+      info: SYSTEM_ISSUES.filter((i) => i.severity === "info").length,
+      total: SYSTEM_ISSUES.length,
+    }),
     [],
   );
+
+  const handleIssueHover = useCallback((nodeIds: string[] | null) => {
+    setHighlightedNodes(nodeIds ? new Set(nodeIds) : null);
+  }, []);
 
   // Apply highlighting
   const displayNodes = useMemo(() => {
@@ -575,7 +738,7 @@ function CommandCenterInner() {
       return {
         ...n,
         style: {
-          ...((n.style) ?? {}),
+          ...(n.style ?? {}),
           opacity: isHighlighted ? 1 : 0.2,
           transition: "opacity 0.2s",
         },
@@ -589,8 +752,12 @@ function CommandCenterInner() {
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-sm font-semibold text-white">Wander Command Center</h1>
-            <p className="text-[10px] text-white/30">{LENS_META[activeLens].description}</p>
+            <h1 className="text-sm font-semibold text-white">
+              Wander Command Center
+            </h1>
+            <p className="text-[10px] text-white/30">
+              {LENS_META[activeLens].description}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1 rounded bg-red-900/30 px-2 py-0.5 text-[10px] text-red-300">
@@ -628,7 +795,12 @@ function CommandCenterInner() {
             maxZoom={2}
             colorMode="dark"
           >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(255,255,255,0.04)" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              color="rgba(255,255,255,0.04)"
+            />
             <Controls />
             <MiniMap
               nodeColor={(n) => {
@@ -646,7 +818,9 @@ function CommandCenterInner() {
             {/* Legend overlay */}
             <Panel position="bottom-left">
               <div className="rounded-lg border border-white/10 bg-gray-900/90 p-3 backdrop-blur-sm">
-                <div className="mb-2 text-[9px] font-bold uppercase tracking-wider text-white/30">Node Types</div>
+                <div className="mb-2 text-[9px] font-bold tracking-wider text-white/30 uppercase">
+                  Node Types
+                </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
                   {(
                     [
@@ -663,7 +837,10 @@ function CommandCenterInner() {
                     ] as const
                   ).map(([type, label]) => (
                     <div key={type} className="flex items-center gap-1">
-                      <div className="h-1.5 w-1.5 rounded-full" style={{ background: CATEGORY_COLORS[type] }} />
+                      <div
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: CATEGORY_COLORS[type] }}
+                      />
                       <span className="text-[9px] text-white/35">{label}</span>
                     </div>
                   ))}
@@ -685,7 +862,9 @@ function CommandCenterInner() {
                         className="h-px w-4"
                         style={{
                           background: EDGE_COLORS[kind],
-                          borderTop: dashed ? `1px dashed ${EDGE_COLORS[kind]}` : undefined,
+                          borderTop: dashed
+                            ? `1px dashed ${EDGE_COLORS[kind]}`
+                            : undefined,
                         }}
                       />
                       <span className="text-[9px] text-white/35">{label}</span>
@@ -728,24 +907,42 @@ function CommandCenterInner() {
           <div className="flex-1 overflow-y-auto p-3">
             {sidebarTab === "issues" && (
               <div className="space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">
+                <div className="text-[10px] font-bold tracking-wider text-white/30 uppercase">
                   Critical ({issueCounts.critical})
                 </div>
-                {SYSTEM_ISSUES.filter((i) => i.severity === "critical").map((issue) => (
-                  <IssueCard key={issue.id} issue={issue} onHover={handleIssueHover} />
-                ))}
-                <div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-white/30">
+                {SYSTEM_ISSUES.filter((i) => i.severity === "critical").map(
+                  (issue) => (
+                    <IssueCard
+                      key={issue.id}
+                      issue={issue}
+                      onHover={handleIssueHover}
+                    />
+                  ),
+                )}
+                <div className="mt-3 text-[10px] font-bold tracking-wider text-white/30 uppercase">
                   Warnings ({issueCounts.warning})
                 </div>
-                {SYSTEM_ISSUES.filter((i) => i.severity === "warning").map((issue) => (
-                  <IssueCard key={issue.id} issue={issue} onHover={handleIssueHover} />
-                ))}
-                <div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-white/30">
+                {SYSTEM_ISSUES.filter((i) => i.severity === "warning").map(
+                  (issue) => (
+                    <IssueCard
+                      key={issue.id}
+                      issue={issue}
+                      onHover={handleIssueHover}
+                    />
+                  ),
+                )}
+                <div className="mt-3 text-[10px] font-bold tracking-wider text-white/30 uppercase">
                   Info ({issueCounts.info})
                 </div>
-                {SYSTEM_ISSUES.filter((i) => i.severity === "info").map((issue) => (
-                  <IssueCard key={issue.id} issue={issue} onHover={handleIssueHover} />
-                ))}
+                {SYSTEM_ISSUES.filter((i) => i.severity === "info").map(
+                  (issue) => (
+                    <IssueCard
+                      key={issue.id}
+                      issue={issue}
+                      onHover={handleIssueHover}
+                    />
+                  ),
+                )}
               </div>
             )}
             {sidebarTab === "stats" && <StatsPanel />}

@@ -1,5 +1,8 @@
 import type { MetaCampaignDayRecord } from "@/server/clients/meta.client";
-import { isMarketplaceCampaign, type MetaInsightRow } from "./spend-tracker.config";
+import {
+  isMarketplaceCampaign,
+  type MetaInsightRow,
+} from "./spend-tracker.config";
 
 /**
  * Meta daily insights for the spend tracker — campaign-level fetch, filtered
@@ -103,7 +106,9 @@ export function buildMetaDailyRows(
     );
     for (const [n, s] of exBy) console.log(`  - ${n}: $${s.toFixed(0)}`);
   }
-  const kept = campaignDays.filter((r) => isMarketplaceCampaign(r.campaign_name));
+  const kept = campaignDays.filter((r) =>
+    isMarketplaceCampaign(r.campaign_name),
+  );
 
   // Group kept campaign-rows by day. Extract bookings/values PER campaign-row
   // first, then sum — never concat actions arrays (28d_click + 1d_view math).

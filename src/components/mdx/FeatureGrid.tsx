@@ -105,7 +105,10 @@ export function FeatureGrid({
         const IconComponent = feature.icon ? iconMap[feature.icon] : null;
 
         return (
-          <div key={index} className="border-secondary bg-surface-secondary rounded-lg border p-6">
+          <div
+            key={index}
+            className="border-secondary bg-surface-secondary rounded-lg border p-6"
+          >
             {IconComponent && (
               <div className="bg-surface-tertiary mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg">
                 <IconComponent className="text-primary h-6 w-6" />

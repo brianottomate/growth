@@ -30,7 +30,9 @@ export function IdeaOwnerControl({
   const router = useRouter();
   const [owner, setOwner] = useState<Member | null>(initialOwner);
   const mut = useMutation(
-    trpc.content.setOwner.mutationOptions({ onSettled: () => router.refresh() }),
+    trpc.content.setOwner.mutationOptions({
+      onSettled: () => router.refresh(),
+    }),
   );
   const change = (ownerId: string | null) => {
     setOwner(ownerId ? (members.find((m) => m.id === ownerId) ?? null) : null);
@@ -70,7 +72,9 @@ export function SpotOwnerControl({
   const router = useRouter();
   const [owner, setOwner] = useState<Member | null>(initialOwner);
   const mut = useMutation(
-    trpc.content.setSpotOwner.mutationOptions({ onSettled: () => router.refresh() }),
+    trpc.content.setSpotOwner.mutationOptions({
+      onSettled: () => router.refresh(),
+    }),
   );
   const change = (ownerId: string | null) => {
     setOwner(ownerId ? (members.find((m) => m.id === ownerId) ?? null) : null);

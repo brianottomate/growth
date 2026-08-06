@@ -105,7 +105,6 @@ export async function scrapeUrl(params: {
       hasMarkdown: !!result.markdown,
     });
 
-
     return {
       markdown: result.markdown,
       metadata: result.metadata,

@@ -122,7 +122,7 @@ export function CampaignsClient({
         const meta = STATUS_META[s];
         return (
           <section key={s} className="mt-8">
-            <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
+            <h2 className="text-muted-foreground mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider uppercase">
               <span className={`size-1.5 rounded-full ${meta.dot}`} />
               {meta.label} · {list.length}
             </h2>

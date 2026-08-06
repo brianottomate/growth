@@ -304,7 +304,11 @@ function RedditSection() {
         </h3>
         <p className="mt-1 text-sm text-gray-600">
           Tier 1 STR-operator subs we monitor — via F5Bot keyword alerts plus
-          the on-demand live scan. Duplicated from <a href="/growth" className="font-mono hover:text-rose-600">/growth</a>.
+          the on-demand live scan. Duplicated from{" "}
+          <a href="/growth" className="font-mono hover:text-rose-600">
+            /growth
+          </a>
+          .
         </p>
         <ul className="mt-3 space-y-1 text-sm text-gray-700">
           {SUBREDDITS.map((sub) => (

@@ -69,7 +69,10 @@ function parseWebhookPayload(raw: string): OutreachWebhookPayload {
       data.relationships = {
         org: {
           data: {
-            id: orgData && typeof orgData.id === "string" ? orgData.id : undefined,
+            id:
+              orgData && typeof orgData.id === "string"
+                ? orgData.id
+                : undefined,
           },
         },
       };

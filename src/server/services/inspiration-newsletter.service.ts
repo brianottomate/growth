@@ -137,7 +137,11 @@ export async function ingestInspirationEmail(email: {
   const body = email.html ?? email.text ?? "";
   if (body) {
     try {
-      const key = R2.buildUploadKey("newsletters", brand.id, `${email.id}.html`);
+      const key = R2.buildUploadKey(
+        "newsletters",
+        brand.id,
+        `${email.id}.html`,
+      );
       externalUrl = await R2.putBuffer(
         key,
         Buffer.from(body, "utf-8"),

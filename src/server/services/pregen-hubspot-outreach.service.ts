@@ -135,7 +135,11 @@ function stripUrls(value: string): string {
  * to read as a caveat the model must respect rather than a key it may skim past.
  */
 type ExtractionContext = {
-  company?: { brandName?: string; description?: string; serviceAreas?: string[] };
+  company?: {
+    brandName?: string;
+    description?: string;
+    serviceAreas?: string[];
+  };
   pms?: { detected?: string };
   portfolio?: { propertyTypes?: string[] };
   brand?: { voice?: string; hasOnlineBooking?: boolean };
@@ -155,7 +159,9 @@ function labelledEnrichment(enrichment: LeadEnrichmentContext): string {
     extraction.portfolio?.propertyTypes?.length
       ? `Property types: ${extraction.portfolio.propertyTypes.join(", ")}`
       : "",
-    extraction.brand?.voice ? `Their brand voice: ${extraction.brand.voice}` : "",
+    extraction.brand?.voice
+      ? `Their brand voice: ${extraction.brand.voice}`
+      : "",
     typeof extraction.brand?.hasOnlineBooking === "boolean"
       ? `Already has online booking: ${extraction.brand.hasOnlineBooking}`
       : "",

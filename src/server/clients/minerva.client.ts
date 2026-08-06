@@ -17,13 +17,10 @@ import { env } from "@/env";
  * warehouse or sales-engagement provider.
  */
 
-export const isMinervaConfigured =
-  !!env.MINERVA_API_KEY;
+export const isMinervaConfigured = !!env.MINERVA_API_KEY;
 
 if (!isMinervaConfigured) {
-  console.warn(
-    "⚠️ [Minerva] Not configured. Need MINERVA_API_KEY",
-  );
+  console.warn("⚠️ [Minerva] Not configured. Need MINERVA_API_KEY");
 }
 
 // =====================================================
@@ -340,9 +337,7 @@ export async function verifyContactGeo(
  * Called when the available profile sources lack a phone number.
  * Used in the real-time sync pipeline phone enrichment chain.
  */
-export async function enrichPhone(
-  email: string,
-): Promise<string | null> {
+export async function enrichPhone(email: string): Promise<string | null> {
   if (!isMinervaConfigured) return null;
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -381,13 +376,12 @@ export async function enrichPhone(
  */
 export async function batchEnrichIncome(
   emails: string[],
-): Promise<
-  Array<{ email: string; estimatedIncomeRange: string | null }>
-> {
+): Promise<Array<{ email: string; estimatedIncomeRange: string | null }>> {
   if (!isMinervaConfigured) return [];
 
-  const normalizedEmails = [...new Set(emails.map((e) => e.trim().toLowerCase()))]
-    .filter(Boolean);
+  const normalizedEmails = [
+    ...new Set(emails.map((e) => e.trim().toLowerCase())),
+  ].filter(Boolean);
   if (normalizedEmails.length === 0) return [];
 
   const output: Array<{ email: string; estimatedIncomeRange: string | null }> =
@@ -433,10 +427,9 @@ export async function batchEnrichIncome(
         const result = byRecordId.get(emailValue);
         output.push({
           email: emailValue,
-          estimatedIncomeRange:
-            result?.is_match
-              ? (result.financial_information?.estimated_income_range ?? null)
-              : null,
+          estimatedIncomeRange: result?.is_match
+            ? (result.financial_information?.estimated_income_range ?? null)
+            : null,
         });
       }
     } catch (error) {

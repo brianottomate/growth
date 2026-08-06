@@ -105,8 +105,8 @@ export function ImportZernioBrands() {
           <DialogHeader>
             <DialogTitle>Import brands from Zernio</DialogTitle>
             <DialogDescription>
-              Choose workspace profiles to create as owned workspace brands. Every
-              connected account will be imported as its exact channel.
+              Choose workspace profiles to create as owned workspace brands.
+              Every connected account will be imported as its exact channel.
             </DialogDescription>
           </DialogHeader>
 

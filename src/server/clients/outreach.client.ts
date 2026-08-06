@@ -112,9 +112,7 @@ function isCachedTokenValid(): boolean {
   }
 
   const now = new Date();
-  const expiryWithBuffer = new Date(
-    tokenExpiresAt.getTime() - TOKEN_BUFFER_MS,
-  );
+  const expiryWithBuffer = new Date(tokenExpiresAt.getTime() - TOKEN_BUFFER_MS);
 
   return now < expiryWithBuffer;
 }
@@ -156,11 +154,8 @@ function parsePrivateKey(privateKey: string): string {
  */
 async function generateAppToken(): Promise<string> {
   if (!env.OUTREACH_S2S_GUID || !env.OUTREACH_PRIVATE_KEY) {
-    throw new OutreachError(
-      "Missing S2S configuration (GUID or private key)",
-    );
+    throw new OutreachError("Missing S2S configuration (GUID or private key)");
   }
-
 
   try {
     // Parse and import the private key
@@ -194,13 +189,10 @@ async function generateAppToken(): Promise<string> {
  * Makes a request to Outreach's token endpoint to exchange the JWT
  * for an access token that can be used for API calls.
  */
-async function exchangeTokenForAccessToken(
-  appToken: string,
-): Promise<string> {
+async function exchangeTokenForAccessToken(appToken: string): Promise<string> {
   if (!env.OUTREACH_INSTALL_ID) {
     throw new OutreachError("Missing OUTREACH_INSTALL_ID");
   }
-
 
   try {
     // Note: This endpoint uses /api/app/installs (not /api/v2/oauth/app/installs)
@@ -248,9 +240,7 @@ async function exchangeTokenForAccessToken(
     const accessToken = data.data.meta.accessToken;
 
     if (!accessToken) {
-      throw new OutreachError(
-        "No access token in response",
-      );
+      throw new OutreachError("No access token in response");
     }
 
     return accessToken;
@@ -289,7 +279,6 @@ export async function getS2SAccessToken(): Promise<string> {
   // Cache the token
   cachedToken = accessToken;
   tokenExpiresAt = new Date(Date.now() + TOKEN_TTL_MS);
-
 
   return accessToken;
 }
@@ -330,7 +319,10 @@ export function getOAuthAuthorizationUrl(params: {
   authUrl.searchParams.set("response_type", "code");
   // Outreach OAuth scopes - space separated
   // Request broad read access to start
-  authUrl.searchParams.set("scope", "accounts.read prospects.read opportunities.read sequences.read users.read");
+  authUrl.searchParams.set(
+    "scope",
+    "accounts.read prospects.read opportunities.read sequences.read users.read",
+  );
 
   if (params.state) {
     authUrl.searchParams.set("state", params.state);
@@ -355,7 +347,6 @@ export async function exchangeOAuthCode(params: {
   if (!env.OUTREACH_OAUTH_CLIENT_ID || !env.OUTREACH_OAUTH_CLIENT_SECRET) {
     throw new OutreachError("OAuth not configured");
   }
-
 
   try {
     const response = await fetch("https://api.outreach.io/oauth/token", {
@@ -391,7 +382,6 @@ export async function exchangeOAuthCode(params: {
       token_type: string;
     };
 
-
     return {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -413,9 +403,7 @@ export async function exchangeOAuthCode(params: {
  *
  * Use refresh token to get a new access token when it expires.
  */
-export async function refreshOAuthToken(
-  refreshToken: string,
-): Promise<{
+export async function refreshOAuthToken(refreshToken: string): Promise<{
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
@@ -423,7 +411,6 @@ export async function refreshOAuthToken(
   if (!env.OUTREACH_OAUTH_CLIENT_ID || !env.OUTREACH_OAUTH_CLIENT_SECRET) {
     throw new OutreachError("OAuth not configured");
   }
-
 
   try {
     const response = await fetch("https://api.outreach.io/oauth/token", {
@@ -458,7 +445,6 @@ export async function refreshOAuthToken(
       token_type: string;
     };
 
-
     return {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -491,7 +477,6 @@ export function storeOAuthTokens(params: {
     refreshToken: params.refreshToken,
     expiresAt,
   });
-
 }
 
 /**
@@ -510,7 +495,9 @@ export async function getOAuthAccessToken(userId: string): Promise<string> {
 
   // Check if token is still valid (with 5min buffer)
   const now = new Date();
-  const expiryWithBuffer = new Date(cached.expiresAt.getTime() - TOKEN_BUFFER_MS);
+  const expiryWithBuffer = new Date(
+    cached.expiresAt.getTime() - TOKEN_BUFFER_MS,
+  );
 
   if (now < expiryWithBuffer) {
     return cached.accessToken;
@@ -728,7 +715,6 @@ export async function testConnection(authParams?: {
   }
 
   try {
-
     // Simple API call to test auth
     await outreachRequest(
       "/prospects?page[limit]=1&page[offset]=0",
@@ -737,7 +723,6 @@ export async function testConnection(authParams?: {
       },
       authParams,
     );
-
 
     return {
       success: true,
@@ -826,7 +811,6 @@ export async function getProspects(options?: {
     },
   );
 
-
   return response;
 }
 
@@ -872,7 +856,6 @@ export async function getUsers(options?: {
     });
   }
 
-
   const response = await outreachRequest<UsersResponse>(
     `/users?${params.toString()}`,
     { method: "GET" },
@@ -881,7 +864,6 @@ export async function getUsers(options?: {
       preferOAuth: options?.preferOAuth,
     },
   );
-
 
   return response;
 }
@@ -1262,9 +1244,7 @@ export async function searchProspectByEmail(
   }
 
   const prospect = response.data[0]!;
-  console.log(
-    `✅ [Outreach] Found prospect ${prospect.id} for ${email}`,
-  );
+  console.log(`✅ [Outreach] Found prospect ${prospect.id} for ${email}`);
   return prospect;
 }
 
@@ -1310,23 +1290,16 @@ export async function createProspect(params: {
     data: {
       type: "prospect",
       attributes: params.attributes,
-      ...(Object.keys(relationships).length > 0
-        ? { relationships }
-        : {}),
+      ...(Object.keys(relationships).length > 0 ? { relationships } : {}),
     },
   };
 
-  const response = await outreachRequest<ProspectResponse>(
-    "/prospects",
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
-  );
+  const response = await outreachRequest<ProspectResponse>("/prospects", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
-  console.log(
-    `✅ [Outreach] Created prospect ${response.data.id}`,
-  );
+  console.log(`✅ [Outreach] Created prospect ${response.data.id}`);
   return response.data;
 }
 
@@ -1370,9 +1343,7 @@ export async function updateProspect(
       type: "prospect",
       id: prospectId,
       attributes: params.attributes,
-      ...(Object.keys(relationships).length > 0
-        ? { relationships }
-        : {}),
+      ...(Object.keys(relationships).length > 0 ? { relationships } : {}),
     },
   };
 
@@ -1384,9 +1355,7 @@ export async function updateProspect(
     },
   );
 
-  console.log(
-    `✅ [Outreach] Updated prospect ${response.data.id}`,
-  );
+  console.log(`✅ [Outreach] Updated prospect ${response.data.id}`);
   return response.data;
 }
 
@@ -1431,10 +1400,9 @@ export async function getUserById(
   }
 
   try {
-    const response = await outreachRequest<UserResponse>(
-      `/users/${userId}`,
-      { method: "GET" },
-    );
+    const response = await outreachRequest<UserResponse>(`/users/${userId}`, {
+      method: "GET",
+    });
     return response.data;
   } catch (error) {
     if (error instanceof OutreachError && error.statusCode === 404) {
@@ -1553,7 +1521,9 @@ export async function listOutreachWebhooks(): Promise<OutreachWebhookConfig[]> {
 /**
  * Delete an Outreach webhook by ID using S2S credentials.
  */
-export async function deleteOutreachWebhookById(id: number | string): Promise<void> {
+export async function deleteOutreachWebhookById(
+  id: number | string,
+): Promise<void> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${OUTREACH_API_BASE}/webhooks/${id}`, {
     method: "DELETE",
@@ -1561,7 +1531,9 @@ export async function deleteOutreachWebhookById(id: number | string): Promise<vo
   });
   if (res.status !== 204 && res.status !== 200 && res.status !== 404) {
     const body = await res.text();
-    throw new OutreachError(`Delete webhook failed: ${res.status} ${body}`, { statusCode: res.status });
+    throw new OutreachError(`Delete webhook failed: ${res.status} ${body}`, {
+      statusCode: res.status,
+    });
   }
 }
 

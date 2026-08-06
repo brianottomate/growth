@@ -76,7 +76,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     .update(leadContactTable)
     .set(set)
     .where(
-      and(eq(leadContactTable.email, email), isNull(leadContactTable.deletedAt)),
+      and(
+        eq(leadContactTable.email, email),
+        isNull(leadContactTable.deletedAt),
+      ),
     )
     .returning({ id: leadContactTable.id });
 

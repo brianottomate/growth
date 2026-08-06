@@ -56,7 +56,9 @@ const serverAnalyticsProviders: ServerAnalyticsProvider[] = [
               event,
               properties: properties,
               timestamp: meta?.timestamp,
-              groups: meta?.groups as Record<string, string | number> | undefined,
+              groups: meta?.groups as
+                | Record<string, string | number>
+                | undefined,
             });
           },
           identifyServerUser: (userId: string, traits: UserTraits) => {

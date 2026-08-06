@@ -58,11 +58,15 @@ export function LaunchClient({
   const [mode, setMode] = useState<"form" | "chat">("form");
   // Seed from a deep-link (e.g. "Launch" from /media) when present.
   const [name, setName] = useState(initial?.name ?? "");
-  const [brandId, setBrandId] = useState(initial?.brandId ?? brands[0]?.id ?? "");
+  const [brandId, setBrandId] = useState(
+    initial?.brandId ?? brands[0]?.id ?? "",
+  );
   const [launchDate, setLaunchDate] = useState("");
   const [goal, setGoal] = useState("");
   const [prompt, setPrompt] = useState(initial?.prompt ?? "");
-  const [imageText, setImageText] = useState(initial?.imageUrls?.join(" ") ?? "");
+  const [imageText, setImageText] = useState(
+    initial?.imageUrls?.join(" ") ?? "",
+  );
   // Primary input: paste a link (press release, landing page) and/or image URLs.
   // On generate these are scraped/passed through into name/brief/images first.
   const [sources, setSources] = useState("");
@@ -111,7 +115,9 @@ export function LaunchClient({
     if (sourceList.length) {
       const res = await ingest.mutateAsync({ sources: sourceList });
       const mergedName = name.trim() || res.name || "";
-      const mergedPrompt = [prompt.trim(), res.brief].filter(Boolean).join("\n\n");
+      const mergedPrompt = [prompt.trim(), res.brief]
+        .filter(Boolean)
+        .join("\n\n");
       const mergedImages = [...imageUrls, ...res.imageUrls];
       // Reflect the ingest into the editable fields so the operator can tweak.
       if (!name.trim() && res.name) setName(res.name);
@@ -145,7 +151,11 @@ export function LaunchClient({
       brandId,
       name: name.trim(),
       launchDateISO: new Date(launchDate).toISOString(),
-      blueprint: { ...blueprint, slots: eff.slots, amplifierAsks: eff.amplifierAsks },
+      blueprint: {
+        ...blueprint,
+        slots: eff.slots,
+        amplifierAsks: eff.amplifierAsks,
+      },
     });
   };
 
@@ -166,8 +176,8 @@ export function LaunchClient({
       <h1 className="text-2xl font-semibold tracking-tight">Plan a moment</h1>
       <p className="text-muted-foreground mt-1 text-sm">
         Paste a link — a press release, a landing page — and/or image URLs, and
-        that’s your input. We’ll read it, propose the shape, then you edit and save.
-        Or just describe the moment below.
+        that’s your input. We’ll read it, propose the shape, then you edit and
+        save. Or just describe the moment below.
       </p>
 
       {/* Two ways in to the same blueprint: the structured Form, or the agent. */}
@@ -194,118 +204,119 @@ export function LaunchClient({
             <span className="text-muted-foreground text-xs">
               Paste a link or image URL — this is your brief
             </span>
-          <textarea
-            value={sources}
-            onChange={(e) => setSources(e.target.value)}
-            rows={2}
-            placeholder="https://propertymanagementinc.com/pmi-news/…wanderos-partnership   https://…/hero.jpg"
-            className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-          />
-          <span className="text-muted-foreground/70 mt-1 block text-[11px]">
-            Page links are read for context; image links are used as hero
-            creative. Fills the fields below — tweak before generating if you like.
-          </span>
-        </label>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex-1">
-            <span className="text-muted-foreground text-xs">Moment</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Series C / List on Wander video"
+            <textarea
+              value={sources}
+              onChange={(e) => setSources(e.target.value)}
+              rows={2}
+              placeholder="https://propertymanagementinc.com/pmi-news/…wanderos-partnership   https://…/hero.jpg"
               className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
             />
+            <span className="text-muted-foreground/70 mt-1 block text-[11px]">
+              Page links are read for context; image links are used as hero
+              creative. Fills the fields below — tweak before generating if you
+              like.
+            </span>
           </label>
-          <label>
-            <span className="text-muted-foreground text-xs">Brand</span>
-            <select
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              className="border-border bg-background mt-1 block rounded-md border px-2 py-1.5 text-sm"
-            >
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="text-muted-foreground text-xs">Launch date</span>
-            <DatePicker
-              value={fromDateInputValue(launchDate)}
-              onChange={(d) => setLaunchDate(d ? toDateInput(d) : "")}
-              placeholder="Launch date"
-              className="mt-1 flex w-full justify-start py-1.5 text-sm"
-            />
-          </label>
-          <label className="w-28">
-            <span className="text-muted-foreground text-xs">Goal (opt)</span>
-            <input
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="fundraise"
-              className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-muted-foreground text-xs">Launch date:</span>
-          {DATE_PRESETS.map((p) => {
-            const value = toDateInput(p.get());
-            const active = launchDate === value;
-            return (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => setLaunchDate(value)}
-                className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
-                  active
-                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex-1">
+              <span className="text-muted-foreground text-xs">Moment</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Series C / List on Wander video"
+                className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label>
+              <span className="text-muted-foreground text-xs">Brand</span>
+              <select
+                value={brandId}
+                onChange={(e) => setBrandId(e.target.value)}
+                className="border-border bg-background mt-1 block rounded-md border px-2 py-1.5 text-sm"
               >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
-        <label className="block">
-          <span className="text-muted-foreground text-xs">
-            Prompt / brief (what’s happening, the assets, the ask)
-          </span>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={3}
-            placeholder="New founder hero video for wander.com/list — goes on the landing page, small paid push, and organic. Drive supply."
-            className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-          />
-        </label>
-        <label className="block">
-          <span className="text-muted-foreground text-xs">
-            Reference image URLs (optional, space/newline separated)
-          </span>
-          <input
-            value={imageText}
-            onChange={(e) => setImageText(e.target.value)}
-            placeholder="https://…/hero-frame.jpg"
-            className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
-          />
-        </label>
-        <div className="flex justify-end">
-          <button
-            disabled={!canGenerate}
-            onClick={handleGenerate}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            {ingest.isPending
-              ? "Reading link…"
-              : generate.isPending
-                ? "Generating…"
-                : "✨ Generate shape"}
-          </button>
-        </div>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="text-muted-foreground text-xs">Launch date</span>
+              <DatePicker
+                value={fromDateInputValue(launchDate)}
+                onChange={(d) => setLaunchDate(d ? toDateInput(d) : "")}
+                placeholder="Launch date"
+                className="mt-1 flex w-full justify-start py-1.5 text-sm"
+              />
+            </label>
+            <label className="w-28">
+              <span className="text-muted-foreground text-xs">Goal (opt)</span>
+              <input
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="fundraise"
+                className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-muted-foreground text-xs">Launch date:</span>
+            {DATE_PRESETS.map((p) => {
+              const value = toDateInput(p.get());
+              const active = launchDate === value;
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setLaunchDate(value)}
+                  className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                    active
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+          <label className="block">
+            <span className="text-muted-foreground text-xs">
+              Prompt / brief (what’s happening, the assets, the ask)
+            </span>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={3}
+              placeholder="New founder hero video for wander.com/list — goes on the landing page, small paid push, and organic. Drive supply."
+              className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-muted-foreground text-xs">
+              Reference image URLs (optional, space/newline separated)
+            </span>
+            <input
+              value={imageText}
+              onChange={(e) => setImageText(e.target.value)}
+              placeholder="https://…/hero-frame.jpg"
+              className="border-border bg-background mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+            />
+          </label>
+          <div className="flex justify-end">
+            <button
+              disabled={!canGenerate}
+              onClick={handleGenerate}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {ingest.isPending
+                ? "Reading link…"
+                : generate.isPending
+                  ? "Generating…"
+                  : "✨ Generate shape"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -371,7 +382,9 @@ export function LaunchClient({
             blueprint={blueprint}
             launchDate={launchDate}
             onEdited={setEdited}
-            onRegenerate={(refine) => generate.mutate({ ...baseGenInput(), refine })}
+            onRegenerate={(refine) =>
+              generate.mutate({ ...baseGenInput(), refine })
+            }
             regenerating={generate.isPending}
           />
 

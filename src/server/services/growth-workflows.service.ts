@@ -138,7 +138,9 @@ async function runCandidates(params: {
       completedCount += 1;
       if (completedCount % PROGRESS_LOG_INTERVAL === 0) {
         const pct = Math.round((completedCount / total) * 100);
-        const successSoFar = results.filter((r) => r.status === "success").length;
+        const successSoFar = results.filter(
+          (r) => r.status === "success",
+        ).length;
         const failedSoFar = results.filter((r) => r.status === "failed").length;
         const elapsedS = ((Date.now() - startedMs) / 1000).toFixed(1);
         console.log(
@@ -249,7 +251,9 @@ async function runBackfillCheckout(
   const concurrency = options.concurrency ?? 5;
 
   const dateLabel = options.sinceDate ?? `last ${options.hoursBack ?? 336}h`;
-  console.log(`🔍 [backfill_checkout] Fetching candidates since ${dateLabel} (limit: ${limit})...`);
+  console.log(
+    `🔍 [backfill_checkout] Fetching candidates since ${dateLabel} (limit: ${limit})...`,
+  );
 
   const candidates = await fetchRecentSyncCandidates({
     hoursBack: options.hoursBack ?? 336, // fallback: 14 days

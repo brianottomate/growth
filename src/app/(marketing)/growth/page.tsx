@@ -51,9 +51,7 @@ function KeywordMonitoringSection() {
       <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              F5Bot
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900">F5Bot</h3>
             <p className="mt-1 text-sm text-gray-600">
               Free keyword-alert service that emails when your terms appear on
               Reddit, Hacker News, or Lobsters. Right tool for brand monitoring
@@ -105,7 +103,6 @@ function KeywordMonitoringSection() {
             · <span className="font-mono">no-comments</span> = posts only
           </p>
         </div>
-
       </div>
     </section>
   );
@@ -127,13 +124,14 @@ function XSection() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              Smoke test: <code className="font-mono text-base">scripts/test-x.ts</code>
+              Smoke test:{" "}
+              <code className="font-mono text-base">scripts/test-x.ts</code>
             </h3>
             <p className="mt-1 text-sm text-gray-600">
               Hits <code className="font-mono">/users/by/username/wander</code>{" "}
               and <code className="font-mono">/tweets/search/recent</code> to
-              verify auth + tier access. Both endpoints return 200 — credits
-              are funded and reads work.
+              verify auth + tier access. Both endpoints return 200 — credits are
+              funded and reads work.
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-900">
@@ -179,13 +177,15 @@ function RedditSection() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
               F5Bot →{" "}
-              <code className="font-mono text-base">#radio-social-listening</code>
+              <code className="font-mono text-base">
+                #radio-social-listening
+              </code>
             </h3>
             <p className="mt-1 text-sm text-gray-600">
               Keyword alerts across Reddit/HN/Lobsters, scored and broadcast to
               Slack. The hourly{" "}
-              <code className="font-mono">/api/cron/reddit</code> keyword scanner
-              was retired — log-only and redundant with F5Bot.
+              <code className="font-mono">/api/cron/reddit</code> keyword
+              scanner was retired — log-only and redundant with F5Bot.
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-900">
@@ -216,9 +216,7 @@ function RedditSection() {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-gray-900">
-              Match tags
-            </h4>
+            <h4 className="text-sm font-semibold text-gray-900">Match tags</h4>
             <ul className="mt-2 space-y-1 text-sm text-gray-700">
               <li>
                 <span className="font-mono text-xs">brand</span> — direct
@@ -345,7 +343,8 @@ const LEARNINGS: Learning[] = [
   {
     date: "2026-05-21",
     kind: "finding",
-    title: "AI scoring outperforms keyword filter — confirmed against live data",
+    title:
+      "AI scoring outperforms keyword filter — confirmed against live data",
     body: "Claude Sonnet 4.6 (via the AI SDK with a Zod schema) scored 100 fresh posts in under a minute for cents per run and surfaced things keywords missed: notably a 10/10 critical brand mention on r/vrbohosts ('My Experience with Wander.com — A Warning for Hosts and Property Managers') and a 9/10 high-intent rant about Airbnb's new guest-phone masking. It also correctly classified ambiguous-language posts (e.g. 'How are you all handling bookings…') as monitor/skip rather than over-scoring them. Drafting uses Opus 4.7 — pricier, but the marketing plan's disclosure + no-pitch-first rules really benefit from the smarter model.",
   },
 ];

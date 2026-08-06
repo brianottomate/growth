@@ -407,7 +407,8 @@ export function scoreLeadChannel(input: {
   // and it is a placeholder, which used to render as its selected channel.
   // Every candidate stays in `candidates` so the reviewer can still see why.
   const bestCandidate =
-    candidates.find((candidate) => !isPlaceholderEmail(candidate.email)) ?? null;
+    candidates.find((candidate) => !isPlaceholderEmail(candidate.email)) ??
+    null;
   const bestEmail = bestSiteEmail ?? bestCandidate?.email ?? null;
 
   if (route === "form" && !bestEmail) {

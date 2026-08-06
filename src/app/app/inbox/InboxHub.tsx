@@ -64,7 +64,7 @@ export function InboxHub({ defaultTab }: { defaultTab: InboxTabId }) {
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-2 text-sm">
           Everything inbound on our own surfaces — DMs and comments on owned
           posts and ads. Triage on-demand, copy context to Claude / ChatGPT, or
           reply natively.
@@ -78,7 +78,7 @@ export function InboxHub({ defaultTab }: { defaultTab: InboxTabId }) {
 async function DmsSection() {
   if (!isZernioConfigured) {
     return (
-      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+      <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
         Zernio isn&apos;t configured (no{" "}
         <code className="font-mono">ZERNIO_API_KEY</code>).
       </div>
@@ -89,7 +89,7 @@ async function DmsSection() {
     return <InboxClient initialItems={items} />;
   } catch (error) {
     return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+      <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-4 text-sm">
         <p className="font-semibold">Failed to load conversations</p>
         <p className="mt-1 font-mono text-xs">
           {error instanceof Error ? error.message : String(error)}
@@ -112,7 +112,7 @@ function Section({
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{blurb}</p>
+        <p className="text-muted-foreground mt-1 text-sm">{blurb}</p>
       </div>
       {children}
     </section>
@@ -121,7 +121,7 @@ function Section({
 
 function Loading({ label }: { label: string }) {
   return (
-    <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+    <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
       Loading {label}…
     </div>
   );

@@ -54,8 +54,12 @@ export function ProduceDrawer({
   const pillar = pillarChoice ? PILLAR_BY_SLUG[pillarChoice] : undefined;
   const brandPillars = PILLARS.filter((p) => p.brandSlug === brandSlug);
 
-  const { data: channels } = useQuery(trpc.studio.channels.queryOptions({ brandId }));
-  const { data: references } = useQuery(trpc.studio.references.queryOptions({ brandId }));
+  const { data: channels } = useQuery(
+    trpc.studio.channels.queryOptions({ brandId }),
+  );
+  const { data: references } = useQuery(
+    trpc.studio.references.queryOptions({ brandId }),
+  );
   const { data: media } = useQuery(trpc.media.list.queryOptions({ brandId }));
 
   // Fan-out targets: the brand's social channels, else a sensible default set.
@@ -67,7 +71,10 @@ export function ProduceDrawer({
         label: c.handle ?? c.displayName ?? platformLabel(c.platform),
       }));
     }
-    return DEFAULT_PLATFORMS.map((p) => ({ platform: p, label: platformLabel(p) }));
+    return DEFAULT_PLATFORMS.map((p) => ({
+      platform: p,
+      label: platformLabel(p),
+    }));
   }, [channels]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -90,7 +97,9 @@ export function ProduceDrawer({
 
   const key = (t: Target) => t.channelId ?? t.platform;
   const selectedTargets = targets.filter((t) => selected.has(key(t)));
-  const selectedPlatforms = [...new Set(selectedTargets.map((t) => t.platform))];
+  const selectedPlatforms = [
+    ...new Set(selectedTargets.map((t) => t.platform)),
+  ];
 
   const draftIdea = useMutation(
     trpc.studio.draftIdea.mutationOptions({
@@ -109,7 +118,9 @@ export function ProduceDrawer({
   const createFromDraft = useMutation(
     trpc.studio.createFromDraft.mutationOptions({
       onSuccess: async (res) => {
-        toast.success(`Saved — ${res.platformPostCount} platform posts created`);
+        toast.success(
+          `Saved — ${res.platformPostCount} platform posts created`,
+        );
         await queryClient.invalidateQueries(
           trpc.studio.wheel.queryOptions({ brandId, year: when.getFullYear() }),
         );
@@ -120,7 +131,13 @@ export function ProduceDrawer({
     }),
   );
 
-  const toggleMedia = (m: { url: string | null; kind: string; thumbnailUrl: string | null; width: number | null; height: number | null }) => {
+  const toggleMedia = (m: {
+    url: string | null;
+    kind: string;
+    thumbnailUrl: string | null;
+    width: number | null;
+    height: number | null;
+  }) => {
     const url = m.kind === "video" ? (m.thumbnailUrl ?? "") : (m.url ?? "");
     if (!url) return;
     setPickedMedia((prev) =>
@@ -161,7 +178,10 @@ export function ProduceDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+      <SheetContent
+        side="right"
+        className="w-full overflow-y-auto sm:max-w-2xl"
+      >
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="size-4" />
@@ -170,12 +190,21 @@ export function ProduceDrawer({
           <SheetDescription className="flex items-center gap-2">
             {pillar && (
               <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full" style={{ background: pillar.color }} />
+                <span
+                  className="size-2 rounded-full"
+                  style={{ background: pillar.color }}
+                />
                 {pillar.name}
               </span>
             )}
             <span>·</span>
-            <span>{when.toLocaleDateString([], { month: "long", day: "numeric", year: "numeric" })}</span>
+            <span>
+              {when.toLocaleDateString([], {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
           </SheetDescription>
         </SheetHeader>
 
@@ -201,7 +230,9 @@ export function ProduceDrawer({
                     }
                     className={cn(
                       "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
-                      on ? "border-primary bg-primary/10" : "border-border opacity-60",
+                      on
+                        ? "border-primary bg-primary/10"
+                        : "border-border opacity-60",
                     )}
                   >
                     <ChannelLogo platform={t.platform} className="size-4" />
@@ -217,7 +248,10 @@ export function ProduceDrawer({
             <div className="space-y-2">
               <Label>Pull references (optional)</Label>
               <div className="grid max-h-44 grid-cols-1 gap-1.5 overflow-y-auto rounded-md border p-2">
-                {[...(references?.own ?? []), ...(references?.tracked ?? [])].map((r) => {
+                {[
+                  ...(references?.own ?? []),
+                  ...(references?.tracked ?? []),
+                ].map((r) => {
                   const on = refIds.has(r.id);
                   return (
                     <button
@@ -233,18 +267,27 @@ export function ProduceDrawer({
                       }
                       className={cn(
                         "flex items-start gap-2 rounded-md border p-1.5 text-left text-xs transition-colors",
-                        on ? "border-primary bg-primary/5" : "border-transparent hover:bg-accent/40",
+                        on
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-accent/40 border-transparent",
                       )}
                     >
-                      <ChannelLogo platform={r.platform} className="size-4 shrink-0" />
+                      <ChannelLogo
+                        platform={r.platform}
+                        className="size-4 shrink-0"
+                      />
                       <span className="min-w-0 flex-1">
                         <span className="text-muted-foreground block text-[10px] uppercase">
                           {r.kind} · {r.brandName}
                           {r.likes ? ` · ${r.likes}♥` : ""}
                         </span>
-                        <span className="line-clamp-2">{r.text ?? "(no text)"}</span>
+                        <span className="line-clamp-2">
+                          {r.text ?? "(no text)"}
+                        </span>
                       </span>
-                      {on && <Check className="text-primary size-3.5 shrink-0" />}
+                      {on && (
+                        <Check className="text-primary size-3.5 shrink-0" />
+                      )}
                     </button>
                   );
                 })}
@@ -258,7 +301,10 @@ export function ProduceDrawer({
             <SimpleSelect
               value={pillarChoice}
               onValueChange={setPillarChoice}
-              options={brandPillars.map((p) => ({ value: p.slug, label: p.name }))}
+              options={brandPillars.map((p) => ({
+                value: p.slug,
+                label: p.name,
+              }))}
               placeholder="Choose a pillar…"
               size="sm"
               aria-label="Pillar"
@@ -286,7 +332,9 @@ export function ProduceDrawer({
                 })
               }
               disabled={
-                draftIdea.isPending || selectedPlatforms.length === 0 || !pillarChoice
+                draftIdea.isPending ||
+                selectedPlatforms.length === 0 ||
+                !pillarChoice
               }
               className="w-full"
             >
@@ -307,7 +355,12 @@ export function ProduceDrawer({
           {/* Master idea */}
           <div className="space-y-2 border-t pt-4">
             <Label htmlFor="title">Main piece</Label>
-            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title"
+            />
             <Textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -334,7 +387,8 @@ export function ProduceDrawer({
                   .map((m) => {
                     const url = m.kind === "video" ? m.thumbnailUrl : m.url;
                     const picked = pickedMedia.some(
-                      (x) => x.url === (m.kind === "video" ? m.thumbnailUrl : m.url),
+                      (x) =>
+                        x.url === (m.kind === "video" ? m.thumbnailUrl : m.url),
                     );
                     return (
                       <button
@@ -348,12 +402,16 @@ export function ProduceDrawer({
                       >
                         {url ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={url} alt="" className="size-full object-cover" />
+                          <img
+                            src={url}
+                            alt=""
+                            className="size-full object-cover"
+                          />
                         ) : (
                           <ImageIcon className="text-muted-foreground m-auto size-4" />
                         )}
                         {picked && (
-                          <Check className="text-primary absolute right-0.5 top-0.5 size-3.5 rounded-full bg-white" />
+                          <Check className="text-primary absolute top-0.5 right-0.5 size-3.5 rounded-full bg-white" />
                         )}
                       </button>
                     );
@@ -363,43 +421,51 @@ export function ProduceDrawer({
           )}
 
           {/* Per-platform copy / previews */}
-          {selectedTargets.length > 0 && (drafted || selectedTargets.length > 0) && (
-            <div className="space-y-2 border-t pt-4">
-              <Label>Platform posts</Label>
-              <div className="space-y-3">
-                {selectedTargets.map((t) => (
-                  <div key={key(t)} className="rounded-lg border p-3">
-                    <div className="mb-1.5 flex items-center gap-2">
-                      <ChannelLogo platform={t.platform} className="size-5" />
-                      <span className="text-sm font-medium">{platformLabel(t.platform)}</span>
-                      <span className="text-muted-foreground text-xs">{t.label}</span>
-                    </div>
-                    <Textarea
-                      value={hooks[t.platform] ?? ""}
-                      onChange={(e) =>
-                        setHooks((prev) => ({ ...prev, [t.platform]: e.target.value }))
-                      }
-                      placeholder={`Copy for ${platformLabel(t.platform)}…`}
-                      rows={3}
-                    />
-                    {pickedMedia.length > 0 && (
-                      <div className="mt-2 flex gap-1.5">
-                        {pickedMedia.slice(0, 4).map((m, i) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            key={i}
-                            src={m.thumbnail ?? m.url}
-                            alt=""
-                            className="size-10 rounded object-cover"
-                          />
-                        ))}
+          {selectedTargets.length > 0 &&
+            (drafted || selectedTargets.length > 0) && (
+              <div className="space-y-2 border-t pt-4">
+                <Label>Platform posts</Label>
+                <div className="space-y-3">
+                  {selectedTargets.map((t) => (
+                    <div key={key(t)} className="rounded-lg border p-3">
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <ChannelLogo platform={t.platform} className="size-5" />
+                        <span className="text-sm font-medium">
+                          {platformLabel(t.platform)}
+                        </span>
+                        <span className="text-muted-foreground text-xs">
+                          {t.label}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <Textarea
+                        value={hooks[t.platform] ?? ""}
+                        onChange={(e) =>
+                          setHooks((prev) => ({
+                            ...prev,
+                            [t.platform]: e.target.value,
+                          }))
+                        }
+                        placeholder={`Copy for ${platformLabel(t.platform)}…`}
+                        rows={3}
+                      />
+                      {pickedMedia.length > 0 && (
+                        <div className="mt-2 flex gap-1.5">
+                          {pickedMedia.slice(0, 4).map((m, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={i}
+                              src={m.thumbnail ?? m.url}
+                              alt=""
+                              className="size-10 rounded object-cover"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Footer */}
@@ -409,10 +475,17 @@ export function ProduceDrawer({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={createFromDraft.isPending || selectedTargets.length === 0 || !title.trim()}
+            disabled={
+              createFromDraft.isPending ||
+              selectedTargets.length === 0 ||
+              !title.trim()
+            }
           >
-            {createFromDraft.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Save {selectedTargets.length} draft{selectedTargets.length === 1 ? "" : "s"}
+            {createFromDraft.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : null}
+            Save {selectedTargets.length} draft
+            {selectedTargets.length === 1 ? "" : "s"}
           </Button>
         </div>
       </SheetContent>

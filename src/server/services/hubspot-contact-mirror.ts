@@ -194,7 +194,9 @@ export async function mirrorContacts(
   // Dedupe within the batch — HubSpot can hold two contact records with the
   // same email under one company, and Postgres rejects a statement that hits
   // the same conflict target twice. Last write wins, matching a re-run.
-  const deduped = [...new Map(rows.map((r) => [`${r.domain}|${r.email}`, r])).values()];
+  const deduped = [
+    ...new Map(rows.map((r) => [`${r.domain}|${r.email}`, r])).values(),
+  ];
 
   await db
     .insert(leadContactTable)
@@ -337,7 +339,12 @@ export async function softDeleteMirroredContacts(
     const updated = await db
       .update(leadContactTable)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(inArray(leadContactTable.hubspotContactId, unique.slice(index, index + 500)))
+      .where(
+        inArray(
+          leadContactTable.hubspotContactId,
+          unique.slice(index, index + 500),
+        ),
+      )
       .returning({ id: leadContactTable.id });
     removed += updated.length;
   }

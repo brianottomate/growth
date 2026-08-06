@@ -26,7 +26,9 @@ function verifySignature(rawBody: string, header: string | null): boolean {
   }
   if (!header) return false;
   const parts = Object.fromEntries(
-    header.split(",").map((kv) => kv.split("=").map((s) => s.trim()) as [string, string]),
+    header
+      .split(",")
+      .map((kv) => kv.split("=").map((s) => s.trim()) as [string, string]),
   );
   const time = parts.time;
   const sig = parts.sig1;

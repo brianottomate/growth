@@ -195,16 +195,14 @@ export const acquisitionShapeEnum = pgEnum("acquisition_shape", [
   // keyword surface exists for IG, so the watchlist of accounts IS the query;
   // relevant posts land in `mention` as engagement opportunities (config.accounts).
 ]);
-export type AcquisitionShape =
-  (typeof acquisitionShapeEnum.enumValues)[number];
+export type AcquisitionShape = (typeof acquisitionShapeEnum.enumValues)[number];
 
 export const listeningTriggerEnum = pgEnum("listening_trigger", [
   "on_demand", // a "Scan now" button
   "scheduled", // a cron picks it up (uses scheduleCron)
   "webhook", // a provider pushes (F5Bot via Resend inbound)
 ]);
-export type ListeningTrigger =
-  (typeof listeningTriggerEnum.enumValues)[number];
+export type ListeningTrigger = (typeof listeningTriggerEnum.enumValues)[number];
 
 // A keyword alert as configured in a provider (F5Bot today, Mentionkit later).
 // This is the INTENT — "what we want to monitor" — mirrored from the provider's

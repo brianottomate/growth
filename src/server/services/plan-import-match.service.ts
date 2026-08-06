@@ -4,10 +4,7 @@ import { and, eq, gte, isNull, lt, ne } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { contentPostTable } from "@/server/db/schema";
-import type {
-  PlanImportIdea,
-  SlotMatch,
-} from "@/server/db/plan-import-schema";
+import type { PlanImportIdea, SlotMatch } from "@/server/db/plan-import-schema";
 
 /**
  * Idea ↔ slot matching — deterministic, no AI. Scores every candidate
@@ -98,11 +95,7 @@ function score(
   if (dd > MAX_DAY_DISTANCE) return 0;
   const dateScore = Math.max(0, 1 - dd / MAX_DAY_DISTANCE);
   const pillarScore =
-    ideaPillar && slot.pillar
-      ? ideaPillar === slot.pillar
-        ? 1
-        : 0.15
-      : 0.5;
+    ideaPillar && slot.pillar ? (ideaPillar === slot.pillar ? 1 : 0.15) : 0.5;
   const archetypeScore =
     slot.archetype && ideaArchetype === slot.archetype ? 1 : 0.3;
   return 0.6 * dateScore + 0.25 * pillarScore + 0.15 * archetypeScore;
@@ -155,7 +148,9 @@ export function matchIdeasToSlots(
     if (usedSlots.has(c.slot.contentPostId) || filled.has(key)) continue;
     usedSlots.add(c.slot.contentPostId);
     filled.add(key);
-    (byIdea.get(c.ideaIdx) ?? byIdea.set(c.ideaIdx, []).get(c.ideaIdx)!).push(c);
+    (byIdea.get(c.ideaIdx) ?? byIdea.set(c.ideaIdx, []).get(c.ideaIdx)!).push(
+      c,
+    );
   }
 
   return ideas.map((idea, ideaIdx) => {
@@ -178,7 +173,8 @@ export function matchIdeasToSlots(
       .map((s) => s.platform)
       .filter((p) => !matchedPlatforms.has(p));
 
-    const kind = matches.length > 0 ? ("fill_slots" as const) : ("new_idea" as const);
+    const kind =
+      matches.length > 0 ? ("fill_slots" as const) : ("new_idea" as const);
     const total = idea.spots.length || 1;
     const mean = matches.length
       ? matches.reduce((n, m) => n + m.score, 0) / matches.length

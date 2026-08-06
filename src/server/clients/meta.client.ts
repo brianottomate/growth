@@ -87,7 +87,8 @@ async function fetchInsightsWithWindow(
   });
 
   const all: MetaInsightsRecord[] = [];
-  let fetchUrl: string | null = `${BASE_URL}/${adAccountId}/insights?${params.toString()}`;
+  let fetchUrl: string | null =
+    `${BASE_URL}/${adAccountId}/insights?${params.toString()}`;
   let page = 0;
 
   while (fetchUrl) {

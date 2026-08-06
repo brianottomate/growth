@@ -10,10 +10,7 @@
  */
 import "server-only";
 
-import {
-  getProspectById,
-  getUserById,
-} from "@/server/clients/outreach.client";
+import { getProspectById, getUserById } from "@/server/clients/outreach.client";
 import {
   updateBdrAssignment,
   updateCustomerAttributes,
@@ -63,7 +60,14 @@ export async function processOutreachProspectUpdate(params: {
   actorType: string | null;
 }): Promise<OutreachToCioSyncResult> {
   const startMs = Date.now();
-  const { prospectId, newOwnerId, oldOwnerId, newStageId, oldStageId, actorType } = params;
+  const {
+    prospectId,
+    newOwnerId,
+    oldOwnerId,
+    newStageId,
+    oldStageId,
+    actorType,
+  } = params;
 
   const ownerChanged = newOwnerId !== null && newOwnerId !== oldOwnerId;
   const stageChanged = newStageId !== null && newStageId !== oldStageId;

@@ -56,7 +56,9 @@ export async function GET(request: NextRequest) {
       .sign(privateKey);
 
     // Exchange installSetupToken for INSTALL_ID
-    console.log("🔄 [Outreach Install] Exchanging setup token for install ID...");
+    console.log(
+      "🔄 [Outreach Install] Exchanging setup token for install ID...",
+    );
 
     const response = await fetch(
       `https://api.outreach.io/api/app/installs/${installSetupToken}/actions/setupToken`,
@@ -71,8 +73,13 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("❌ [Outreach Install] Setup token exchange failed:", errorText);
-      throw new Error(`Setup token exchange failed: ${response.status} ${errorText}`);
+      console.error(
+        "❌ [Outreach Install] Setup token exchange failed:",
+        errorText,
+      );
+      throw new Error(
+        `Setup token exchange failed: ${response.status} ${errorText}`,
+      );
     }
 
     const data = (await response.json()) as {
@@ -100,7 +107,10 @@ export async function GET(request: NextRequest) {
     const orgId = data.data.relationships.org.data.id;
     const installedAt = data.data.attributes.installedAt;
 
-    console.log("✅ [Outreach Install] Successfully obtained install ID:", installId);
+    console.log(
+      "✅ [Outreach Install] Successfully obtained install ID:",
+      installId,
+    );
 
     // Return HTML page with the install ID
     return new NextResponse(

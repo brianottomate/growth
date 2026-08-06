@@ -365,7 +365,7 @@ export function CampaignDialog({
                   aria-label={`color ${c}`}
                   className={`size-6 rounded-full transition-transform ${
                     color === c
-                      ? "ring-ring scale-110 ring-2 ring-offset-2 ring-offset-background"
+                      ? "ring-ring ring-offset-background scale-110 ring-2 ring-offset-2"
                       : "hover:scale-105"
                   }`}
                   style={{ background: c }}

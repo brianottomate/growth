@@ -11,13 +11,25 @@ export function MetaAdsLogo(props: SVGProps<SVGSVGElement>) {
     >
       <title>Meta Ads</title>
       <defs>
-        <linearGradient id="meta-ads-a" x1="13.878%" x2="89.144%" y1="55.934%" y2="58.694%">
+        <linearGradient
+          id="meta-ads-a"
+          x1="13.878%"
+          x2="89.144%"
+          y1="55.934%"
+          y2="58.694%"
+        >
           <stop offset="0%" stopColor="#0064E1" />
           <stop offset="40%" stopColor="#0064E1" />
           <stop offset="83%" stopColor="#0073EE" />
           <stop offset="100%" stopColor="#0082FB" />
         </linearGradient>
-        <linearGradient id="meta-ads-b" x1="54.315%" x2="54.315%" y1="82.782%" y2="39.307%">
+        <linearGradient
+          id="meta-ads-b"
+          x1="54.315%"
+          x2="54.315%"
+          y1="82.782%"
+          y2="39.307%"
+        >
           <stop offset="0%" stopColor="#0082FB" />
           <stop offset="100%" stopColor="#0064E0" />
         </linearGradient>

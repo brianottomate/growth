@@ -74,7 +74,10 @@ function itemBody(item: AffiliateItem): string {
   return raw?.text ?? item.snippet ?? "";
 }
 
-const affiliateScoringChannel: ScoringChannel<AffiliateItem, AffiliateIntentTag> = {
+const affiliateScoringChannel: ScoringChannel<
+  AffiliateItem,
+  AffiliateIntentTag
+> = {
   intentTags: AFFILIATE_INTENT_TAGS,
   systemPrompt: AFFILIATE_SCORING_SYSTEM,
   getId: (i) => i.id,
@@ -120,11 +123,17 @@ export interface AffiliateIngestResult {
 }
 
 /** "Name <a@b.com>" → { name, email }; best-effort. */
-function parseFrom(from: string | null): { name: string | null; email: string | null } {
+function parseFrom(from: string | null): {
+  name: string | null;
+  email: string | null;
+} {
   if (!from) return { name: null, email: null };
   const match = /^\s*(?:"?([^"<]*)"?\s*)?<([^>]+)>\s*$/.exec(from);
   if (match) {
-    return { name: match[1]?.trim() || null, email: match[2]?.trim().toLowerCase() ?? null };
+    return {
+      name: match[1]?.trim() || null,
+      email: match[2]?.trim().toLowerCase() ?? null,
+    };
   }
   const bare = from.trim();
   return bare.includes("@")
@@ -154,7 +163,9 @@ async function resolveProgram(recipients: string[]): Promise<string | null> {
       where: eq(partnerProgramTable.id, token),
     });
     if (byId) return byId.id;
-    console.warn(`[affiliate] address token "${token}" matches no program; falling back`);
+    console.warn(
+      `[affiliate] address token "${token}" matches no program; falling back`,
+    );
   }
   const active = await db.query.partnerProgramTable.findFirst({
     where: eq(partnerProgramTable.status, "active"),
@@ -181,13 +192,17 @@ export async function ingestAffiliateEmail(email: {
   // Loop guard: the group forward includes Wander-internal mail (a teammate
   // replying inside the thread). Our own domain never needs triage.
   if (fromEmail?.endsWith("@wander.com")) {
-    console.log(`[affiliate] skipping internal sender ${fromEmail} (${email.id})`);
+    console.log(
+      `[affiliate] skipping internal sender ${fromEmail} (${email.id})`,
+    );
     return { inserted: false, scored: false, reason: "internal-sender" };
   }
 
   const programId = await resolveProgram(email.recipients);
   if (!programId) {
-    console.warn(`[affiliate] no active partner_program — email ${email.id} ignored`);
+    console.warn(
+      `[affiliate] no active partner_program — email ${email.id} ignored`,
+    );
     return { inserted: false, scored: false, reason: "no-program" };
   }
 
@@ -232,7 +247,9 @@ export async function ingestAffiliateEmail(email: {
   let scoredItem: AffiliateItem = item;
   let scored = false;
   try {
-    const { scored: results } = await scoreItems(affiliateScoringChannel, [item]);
+    const { scored: results } = await scoreItems(affiliateScoringChannel, [
+      item,
+    ]);
     const r = results[0];
     if (r) {
       // banRisk is a triage-engine field about content removal — meaningless
@@ -301,7 +318,10 @@ Draft the reply.`,
         .where(eq(affiliateItemTable.id, scoredItem.id));
       scoredItem = { ...scoredItem, suggestedReply };
     } catch (error) {
-      console.error("[affiliate] reply drafting failed (item still scored):", error);
+      console.error(
+        "[affiliate] reply drafting failed (item still scored):",
+        error,
+      );
     }
   }
 

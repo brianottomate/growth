@@ -29,11 +29,7 @@ function isAuthorized(request: NextRequest): boolean {
   return bearer === env.ADMIN_TOKEN;
 }
 
-function intParam(
-  request: NextRequest,
-  key: string,
-  fallback: number,
-): number {
+function intParam(request: NextRequest, key: string, fallback: number): number {
   const raw = request.nextUrl.searchParams.get(key);
   const parsed = raw == null ? NaN : Number.parseInt(raw, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;

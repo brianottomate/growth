@@ -420,9 +420,8 @@ async function generateSlotsForRange(opts: {
       if (!series) continue;
       const target = rangeTotal(t.count, t.period, days, fullMonth);
       const existing =
-        existingBySeriesKey.get(
-          `${series.id}|${t.platform}|${t.archetype}`,
-        ) ?? 0;
+        existingBySeriesKey.get(`${series.id}|${t.platform}|${t.archetype}`) ??
+        0;
       const need = Math.max(0, target - existing);
       rows.push({
         platform: t.platform,

@@ -152,7 +152,9 @@ export function GenerateSlotsDialog({
                 <tr className="text-muted-foreground bg-muted/30 sticky top-0 text-left">
                   <th className="px-2 py-1.5 font-medium">Format</th>
                   <th className="px-2 py-1.5 text-right font-medium">Target</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Existing</th>
+                  <th className="px-2 py-1.5 text-right font-medium">
+                    Existing
+                  </th>
                   <th className="px-2 py-1.5 text-right font-medium">New</th>
                 </tr>
               </thead>
@@ -163,7 +165,10 @@ export function GenerateSlotsDialog({
                     <tr className="bg-muted/20 border-t">
                       <td colSpan={3} className="px-2 py-1.5">
                         <span className="flex items-center gap-1.5 text-[11px] font-semibold">
-                          <ChannelLogo platform={platform} className="size-3.5" />
+                          <ChannelLogo
+                            platform={platform}
+                            className="size-3.5"
+                          />
                           {platformLabel(platform)}
                           <span className="text-muted-foreground/60 font-normal tabular-nums">
                             ≈
@@ -183,24 +188,36 @@ export function GenerateSlotsDialog({
                           </span>
                         </span>
                       </td>
-                      <td className="px-2 py-1.5 text-right font-semibold tabular-nums text-emerald-400">
+                      <td className="px-2 py-1.5 text-right font-semibold text-emerald-400 tabular-nums">
                         +{rows.reduce((n, r) => n + r.created, 0)}
                       </td>
                     </tr>
                     {rows.map((r) => (
-                      <tr key={`${r.platform}|${r.archetype}`} className="border-t">
+                      <tr
+                        key={`${r.platform}|${r.archetype}`}
+                        className="border-t"
+                      >
                         <td className="text-muted-foreground px-2 py-1 pl-7">
                           {r.archetype}
                           <span className="text-muted-foreground/50 ml-1.5 tabular-nums">
-                            {r.count}/{r.period === "week" ? "wk" : r.period === "month" ? "mo" : "day"}
+                            {r.count}/
+                            {r.period === "week"
+                              ? "wk"
+                              : r.period === "month"
+                                ? "mo"
+                                : "day"}
                           </span>
                         </td>
-                        <td className="px-2 py-1 text-right tabular-nums">{r.target}</td>
-                        <td className="px-2 py-1 text-right tabular-nums">{r.existing}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">
+                          {r.target}
+                        </td>
+                        <td className="px-2 py-1 text-right tabular-nums">
+                          {r.existing}
+                        </td>
                         <td
                           className={
                             r.created > 0
-                              ? "px-2 py-1 text-right font-semibold tabular-nums text-emerald-400"
+                              ? "px-2 py-1 text-right font-semibold text-emerald-400 tabular-nums"
                               : "text-muted-foreground px-2 py-1 text-right tabular-nums"
                           }
                         >

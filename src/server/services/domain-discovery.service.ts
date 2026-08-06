@@ -92,13 +92,17 @@ const verdictSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]),
   isStrOperator: z
     .boolean()
-    .describe("Whether the site is a short-term-rental / property-management operator."),
+    .describe(
+      "Whether the site is a short-term-rental / property-management operator.",
+    ),
   evidence: z
     .array(z.string())
     .describe(
       "Concrete corroboration found on the site, e.g. 'permit phone (504) 717-0897 on contact page', 'exact company name in footer'.",
     ),
-  reasoning: z.string().describe("One or two sentences explaining the verification verdict."),
+  reasoning: z
+    .string()
+    .describe("One or two sentences explaining the verification verdict."),
   fit: z
     .object({
       tier: z
@@ -118,10 +122,14 @@ const verdictSchema = z.object({
       ]),
       disqualifiers: z
         .array(z.string())
-        .describe("Reasons this is NOT a good target, if any (e.g. 'national timeshare brand (Marriott)')."),
+        .describe(
+          "Reasons this is NOT a good target, if any (e.g. 'national timeshare brand (Marriott)').",
+        ),
       rationale: z.string().describe("One sentence on the fit judgment."),
     })
-    .describe("Target-fit assessment — separate from whether the domain is verified."),
+    .describe(
+      "Target-fit assessment — separate from whether the domain is verified.",
+    ),
 });
 type Verdict = z.infer<typeof verdictSchema>;
 
@@ -187,14 +195,20 @@ export async function discoverDomain(
       prompt: `Find and verify the website for this permit company, and score its fit:\n\n${record}`,
       tools: {
         web_search: tool({
-          description: "Search the web. Returns up to 8 results (url, title, snippet).",
+          description:
+            "Search the web. Returns up to 8 results (url, title, snippet).",
           inputSchema: z.object({ query: z.string() }),
           execute: async ({ query }) => {
             toolCalls++;
             try {
-              const res = await firecrawl.search(query, { limit: 8, sources: ["web"] });
+              const res = await firecrawl.search(query, {
+                limit: 8,
+                sources: ["web"],
+              });
               const web = (res.web ?? []).filter(
-                (r): r is { url: string; title?: string; description?: string } =>
+                (
+                  r,
+                ): r is { url: string; title?: string; description?: string } =>
                   typeof (r as { url?: unknown }).url === "string",
               );
               return {
@@ -205,7 +219,9 @@ export async function discoverDomain(
                 })),
               };
             } catch (e) {
-              return { error: e instanceof Error ? e.message : "search failed" };
+              return {
+                error: e instanceof Error ? e.message : "search failed",
+              };
             }
           },
         }),

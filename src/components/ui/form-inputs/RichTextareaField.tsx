@@ -103,14 +103,14 @@ export function RichTextareaField<
   // Use useController for the text field if provided
   const textFieldController = useController({
     control,
-    name: (textFieldName ?? name),
+    name: textFieldName ?? name,
     disabled: !textFieldName,
   });
 
   // Use useController for the markdown field if provided
   const markdownFieldController = useController({
     control,
-    name: (markdownFieldName ?? name),
+    name: markdownFieldName ?? name,
     disabled: !markdownFieldName,
   });
 

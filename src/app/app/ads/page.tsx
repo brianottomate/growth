@@ -29,14 +29,15 @@ const FUNNELS: { key: ConversionFunnel; label: string; sub: string }[] = [
   { key: "demand", label: "Demand", sub: "wander.com — guest / booking" },
 ];
 
-const STATUS_STYLE: Record<
-  ConversionStatus,
-  { badge: string; label: string }
-> = {
-  verified: { badge: "bg-emerald-500/15 text-emerald-300", label: "verified" },
-  wanted: { badge: "bg-amber-500/15 text-amber-300", label: "wanted" },
-  not_implemented: { badge: "bg-red-500/15 text-red-300", label: "not impl" },
-};
+const STATUS_STYLE: Record<ConversionStatus, { badge: string; label: string }> =
+  {
+    verified: {
+      badge: "bg-emerald-500/15 text-emerald-300",
+      label: "verified",
+    },
+    wanted: { badge: "bg-amber-500/15 text-amber-300", label: "wanted" },
+    not_implemented: { badge: "bg-red-500/15 text-red-300", label: "not impl" },
+  };
 
 type EventRow = typeof conversionEventTable.$inferSelect;
 type MappingRow = typeof conversionMappingTable.$inferSelect & {
@@ -100,9 +101,7 @@ export default async function AdsPage() {
   });
   const org = membership?.organization;
   if (!org) {
-    return (
-      <div className="text-muted-foreground">No organization found.</div>
-    );
+    return <div className="text-muted-foreground">No organization found.</div>;
   }
 
   const brands = await db.query.brandTable.findMany({
@@ -149,9 +148,7 @@ export default async function AdsPage() {
   const cell = (eventId: string, platform: string) =>
     cellMap.get(`${eventId}|${platform}`) ?? [];
 
-  const totalMapped = mappings.filter(
-    (m) => m.status === "verified",
-  ).length;
+  const totalMapped = mappings.filter((m) => m.status === "verified").length;
 
   // Markdown export for the AI sync pass / ChatGPT hand-off.
   const md = [
@@ -208,7 +205,7 @@ export default async function AdsPage() {
         const brandEvents = eventsByBrand.get(brand.id) ?? [];
         return (
           <section key={brand.id} className="mt-8">
-            <h2 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider">
+            <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
               {brand.name}
             </h2>
             {brandEvents.length === 0 ? (
@@ -274,16 +271,16 @@ function FunnelGroup({
       <tr className="bg-muted/40 border-b">
         <td
           colSpan={1 + AD_PLATFORMS.length}
-          className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide"
+          className="px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase"
         >
           {label}{" "}
-          <span className="text-muted-foreground font-normal normal-case tracking-normal">
+          <span className="text-muted-foreground font-normal tracking-normal normal-case">
             · {sub}
           </span>
         </td>
       </tr>
       {rows.map((e) => (
-        <tr key={e.id} className="border-b last:border-0 align-top">
+        <tr key={e.id} className="border-b align-top last:border-0">
           <td className="p-3">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-medium">{e.name}</span>

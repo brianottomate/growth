@@ -19,14 +19,23 @@ import { discoverDomain, type DiscoveryResult } from "./lead-discovery.service";
 const UNIT_MODEL = "claude-sonnet-5";
 const MAX_CHARS_PER_PROVIDER = 12000; // listing pages are dense — give it room
 
-export const UnitBasis = ["managed_units", "listings", "mixed", "unknown"] as const;
+export const UnitBasis = [
+  "managed_units",
+  "listings",
+  "mixed",
+  "unknown",
+] as const;
 export const Confidence = ["high", "medium", "low"] as const;
 
 export const UnitEstimateSchema = z.object({
   signals: z
     .array(
       z.object({
-        value: z.number().int().nullable().describe("Unit/listing count from this signal"),
+        value: z
+          .number()
+          .int()
+          .nullable()
+          .describe("Unit/listing count from this signal"),
         sourceType: z
           .enum([
             "own_site_listings", // counted listings on their booking/inventory pages
@@ -38,24 +47,39 @@ export const UnitEstimateSchema = z.object({
           .describe("Where this number came from"),
         basis: z
           .enum(["managed_units", "listings", "unknown"])
-          .describe("Does this number represent managed units or just listings shown?"),
+          .describe(
+            "Does this number represent managed units or just listings shown?",
+          ),
         citation: z.string().nullable().describe("Source URL"),
-        snippet: z.string().nullable().describe("The exact text/evidence supporting it"),
+        snippet: z
+          .string()
+          .nullable()
+          .describe("The exact text/evidence supporting it"),
         confidence: z.enum(Confidence),
       }),
     )
     .describe("Every independent unit-count signal found (empty if none)"),
-  estimate: z.number().int().nullable().describe("Best single estimate of MANAGED units"),
+  estimate: z
+    .number()
+    .int()
+    .nullable()
+    .describe("Best single estimate of MANAGED units"),
   low: z.number().int().nullable().describe("Low end of a plausible range"),
   high: z.number().int().nullable().describe("High end of a plausible range"),
   basis: z.enum(UnitBasis).describe("What the final estimate represents"),
-  confidence: z.enum(Confidence).describe("Overall confidence, driven by source agreement"),
+  confidence: z
+    .enum(Confidence)
+    .describe("Overall confidence, driven by source agreement"),
   method: z.string().describe("Which signal/approach drove the final number"),
-  reasoning: z.string().describe("How the estimate was reconciled across signals"),
+  reasoning: z
+    .string()
+    .describe("How the estimate was reconciled across signals"),
   discrepancyVsSalesPortfolio: z
     .string()
     .nullable()
-    .describe("If it differs from the sales portfolio_size prior, explain why (e.g. listings vs managed units)"),
+    .describe(
+      "If it differs from the sales portfolio_size prior, explain why (e.g. listings vs managed units)",
+    ),
 });
 
 export type UnitEstimate = z.infer<typeof UnitEstimateSchema>;
@@ -87,14 +111,21 @@ Rules:
 
 function buildContext(discovery: DiscoveryResult, priors: UnitPriors): string {
   const priorLines = [
-    priors.salesPortfolioSize != null && `- sales portfolio_size: ${priors.salesPortfolioSize}`,
-    priors.clayPortfolioSize != null && `- clay_portfolio_size: ${priors.clayPortfolioSize}`,
-    priors.browseruseGuess != null && `- browseruse ai_guess_1: ${priors.browseruseGuess}`,
-    priors.oursPregen != null && `- our imported unit_count: ${priors.oursPregen}`,
+    priors.salesPortfolioSize != null &&
+      `- sales portfolio_size: ${priors.salesPortfolioSize}`,
+    priors.clayPortfolioSize != null &&
+      `- clay_portfolio_size: ${priors.clayPortfolioSize}`,
+    priors.browseruseGuess != null &&
+      `- browseruse ai_guess_1: ${priors.browseruseGuess}`,
+    priors.oursPregen != null &&
+      `- our imported unit_count: ${priors.oursPregen}`,
   ].filter(Boolean);
 
   const sections: string[] = [];
-  if (priorLines.length) sections.push(`### PRIORS (existing data points)\n${priorLines.join("\n")}`);
+  if (priorLines.length)
+    sections.push(
+      `### PRIORS (existing data points)\n${priorLines.join("\n")}`,
+    );
 
   for (const p of discovery.providers) {
     if (!p.ok) continue;
@@ -104,7 +135,8 @@ function buildContext(discovery: DiscoveryResult, priors: UnitPriors): string {
     } catch {
       body = String(p.data);
     }
-    if (body.length > MAX_CHARS_PER_PROVIDER) body = body.slice(0, MAX_CHARS_PER_PROVIDER) + "\n…[truncated]";
+    if (body.length > MAX_CHARS_PER_PROVIDER)
+      body = body.slice(0, MAX_CHARS_PER_PROVIDER) + "\n…[truncated]";
     sections.push(`### ${p.source}\n${body}`);
   }
   return sections.join("\n\n");
@@ -121,7 +153,8 @@ export async function estimateUnitsFromDiscovery(
     model: anthropic(UNIT_MODEL),
     output: Output.object({
       name: "UnitEstimate",
-      description: "Triangulated managed-unit estimate with range, confidence, and citations",
+      description:
+        "Triangulated managed-unit estimate with range, confidence, and citations",
       schema: UnitEstimateSchema,
     }),
     prompt: `${GUIDANCE}\n\nDOMAIN: ${discovery.domain}\n\n=== EVIDENCE ===\n${context}`,

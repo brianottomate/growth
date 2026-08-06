@@ -15,7 +15,10 @@ const rel = (iso: string) => {
   if (h < 24) return `${h}h ago`;
   const d = Math.round(h / 24);
   if (d < 7) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
 };
 
 /** Light team discussion on a content idea. Distinct from audience comment
@@ -63,8 +66,12 @@ export function CommentThread({
           <OwnerAvatar member={c.author} size="sm" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{c.author?.name ?? "Unknown"}</span>
-              <span className="text-muted-foreground text-xs">{rel(c.createdAt)}</span>
+              <span className="text-sm font-medium">
+                {c.author?.name ?? "Unknown"}
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {rel(c.createdAt)}
+              </span>
               {c.authorId === currentUserId && (
                 <button
                   onClick={() => del.mutate({ id: c.id })}
@@ -74,7 +81,7 @@ export function CommentThread({
                 </button>
               )}
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-snug">{c.body}</p>
+            <p className="text-sm leading-snug whitespace-pre-wrap">{c.body}</p>
           </div>
         </div>
       ))}

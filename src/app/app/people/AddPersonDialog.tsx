@@ -27,7 +27,11 @@ import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
 import { PhotoPickerField, usePhotoPicker } from "./PhotoPicker";
 
-export function AddPersonDialog({ organizationId }: { organizationId: string }) {
+export function AddPersonDialog({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
   const trpc = useTRPC();
   const router = useRouter();
   const photoPicker = usePhotoPicker();
@@ -36,9 +40,10 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
-  const [created, setCreated] = useState<{ email: string; tempPassword: string } | null>(
-    null,
-  );
+  const [created, setCreated] = useState<{
+    email: string;
+    tempPassword: string;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const createPerson = useMutation(
@@ -93,7 +98,10 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
           Add person
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[440px]" onPaste={photoPicker.handlePaste}>
+      <DialogContent
+        className="sm:max-w-[440px]"
+        onPaste={photoPicker.handlePaste}
+      >
         {created ? (
           <>
             <DialogHeader>
@@ -148,8 +156,8 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
                 Add person
               </DialogTitle>
               <DialogDescription>
-                Pre-create a teammate&apos;s account. No email is sent — you get a
-                temp password to hand out. Must be a @wander.com address.
+                Pre-create a teammate&apos;s account. No email is sent — you get
+                a temp password to hand out. Must be a @wander.com address.
               </DialogDescription>
             </DialogHeader>
 
@@ -179,7 +187,10 @@ export function AddPersonDialog({ organizationId }: { organizationId: string }) 
 
               <div className="space-y-1.5">
                 <Label>Role</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
+                <Select
+                  value={role}
+                  onValueChange={(v) => setRole(v as typeof role)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

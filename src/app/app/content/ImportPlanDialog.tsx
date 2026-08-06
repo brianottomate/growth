@@ -55,7 +55,9 @@ export function ImportPlanDialog({
   const create = useMutation(
     trpc.planImport.createFromPaste.mutationOptions({
       onSuccess: ({ importId, itemCount, fillCount }) => {
-        toast.success(`Parsed ${itemCount} ideas (${fillCount} match open slots)`);
+        toast.success(
+          `Parsed ${itemCount} ideas (${fillCount} match open slots)`,
+        );
         onOpenChange(false);
         router.push(`/app/content/import/${importId}`);
       },
@@ -69,7 +71,10 @@ export function ImportPlanDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !create.isPending && onOpenChange(o)}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => !create.isPending && onOpenChange(o)}
+    >
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import a month plan</DialogTitle>
@@ -131,7 +136,10 @@ export function ImportPlanDialog({
                 <span className="text-muted-foreground">
                   {imp.itemCount} ideas
                   {imp.tally.pending > 0 && (
-                    <span className="text-amber-400"> · {imp.tally.pending} pending review</span>
+                    <span className="text-amber-400">
+                      {" "}
+                      · {imp.tally.pending} pending review
+                    </span>
                   )}
                 </span>
                 <span className="text-muted-foreground/60 ml-auto tabular-nums">
@@ -157,10 +165,14 @@ export function ImportPlanDialog({
           </button>
           <button
             onClick={submit}
-            disabled={create.isPending || rawText.trim().length < 50 || !brandId}
+            disabled={
+              create.isPending || rawText.trim().length < 50 || !brandId
+            }
             className="rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {create.isPending ? "Parsing… (can take a minute)" : "Parse & review"}
+            {create.isPending
+              ? "Parsing… (can take a minute)"
+              : "Parse & review"}
           </button>
         </div>
       </DialogContent>

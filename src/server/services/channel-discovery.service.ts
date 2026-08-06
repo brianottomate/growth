@@ -129,15 +129,24 @@ const CONTACT_PATH_RE =
 // model is load-bearing; vendor is a best-effort HTML sniff (lazy-loaded
 // widgets frequently don't survive Firecrawl's pre-render).
 const CHAT_VENDOR_SIGNATURES: Array<{ vendor: string; re: RegExp }> = [
-  { vendor: "intercom", re: /widget\.intercom\.io|intercomcdn|intercomSettings/i },
+  {
+    vendor: "intercom",
+    re: /widget\.intercom\.io|intercomcdn|intercomSettings/i,
+  },
   { vendor: "drift", re: /js\.driftt\.com|drift\.com\/|driftt\.com/i },
   { vendor: "crisp", re: /client\.crisp\.chat|crisp\.chat/i },
   { vendor: "tidio", re: /code\.tidio\.co|tidio\.com/i },
   { vendor: "tawk", re: /embed\.tawk\.to|tawk\.to/i },
   { vendor: "zendesk", re: /static\.zdassets\.com|zopim|zendesk/i },
-  { vendor: "hubspot", re: /js\.hs-scripts\.com|hubspotchat|usemessages\.com/i },
+  {
+    vendor: "hubspot",
+    re: /js\.hs-scripts\.com|hubspotchat|usemessages\.com/i,
+  },
   { vendor: "livechat", re: /cdn\.livechatinc\.com|livechatinc/i },
-  { vendor: "facebook", re: /connect\.facebook\.net\/.+\/sdk\/xfbml\.customerchat/i },
+  {
+    vendor: "facebook",
+    re: /connect\.facebook\.net\/.+\/sdk\/xfbml\.customerchat/i,
+  },
 ];
 
 function detectChatVendorFromHtml(html: string | undefined): string | null {
@@ -237,7 +246,9 @@ function toResult(
 }
 
 /** Project a naive `ResolvedContactChannel` (fetch+regex fallback) into channels. */
-function fromResolved(resolved: ResolvedContactChannel): ChannelDiscoveryResult {
+function fromResolved(
+  resolved: ResolvedContactChannel,
+): ChannelDiscoveryResult {
   const channels: DiscoveredChannel[] = resolved.emails.map((value) => ({
     kind: "email" as const,
     value,

@@ -66,7 +66,11 @@ function listenTab(source: string): string {
 }
 
 function trackedLinkFor(m: Mention): string {
-  return buildTrackedLink({ id: m.id, source: m.source, subreddit: m.subreddit });
+  return buildTrackedLink({
+    id: m.id,
+    source: m.source,
+    subreddit: m.subreddit,
+  });
 }
 
 // Layout follows Hashim Warren's 2026-07-27 read on the channel: the old
@@ -118,9 +122,7 @@ function buildBlocks(m: Mention) {
   if (m.rationale) {
     blocks.push({
       type: "context",
-      elements: [
-        { type: "mrkdwn", text: `_${escapeSlackText(m.rationale)}_` },
-      ],
+      elements: [{ type: "mrkdwn", text: `_${escapeSlackText(m.rationale)}_` }],
     });
   }
 
@@ -147,7 +149,10 @@ function buildBlocks(m: Mention) {
 // Slack mrkdwn treats these three as control characters; a mention title or
 // snippet quoting "<3" or "R&D" would otherwise render mangled.
 function escapeSlackText(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 // The action kit, hung off the alert in a thread so the channel stays scannable:
@@ -238,14 +243,14 @@ export async function postMentionToRadio(m: Mention) {
  * never throws — a Slack failure must not fail mention ingestion. An empty list
  * (e.g. scoring failed upstream) is a no-op. Returns the count actually posted.
  */
-export async function postMentionsToRadio(mentions: Mention[]): Promise<number> {
+export async function postMentionsToRadio(
+  mentions: Mention[],
+): Promise<number> {
   // Engage-worthy AND not already broadcast — `slackTs` is set once a mention
   // has been posted, so a re-run (or a row that slipped through twice) is a
   // no-op rather than a duplicate alert. The manual "Test → Slack" button calls
   // postMentionToRadio directly and intentionally bypasses this guard.
-  const worth = mentions
-    .filter(isWorthBroadcasting)
-    .filter((m) => !m.slackTs);
+  const worth = mentions.filter(isWorthBroadcasting).filter((m) => !m.slackTs);
   if (worth.length === 0) return 0;
 
   let posted = 0;

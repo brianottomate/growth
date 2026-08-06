@@ -31,21 +31,52 @@ const LIST_INPUT = {
 };
 
 // Intent taxonomy → colour. Tolerant: unknown tags render muted.
-const INTENT_META: Record<string, { label: string; text: string; dot: string }> = {
+const INTENT_META: Record<
+  string,
+  { label: string; text: string; dot: string }
+> = {
   brand: { label: "Brand", text: "text-emerald-400", dot: "bg-emerald-400" },
-  "brand-critical": { label: "Brand critical", text: "text-red-400", dot: "bg-red-400" },
-  "high-intent": { label: "High intent", text: "text-emerald-400", dot: "bg-emerald-400" },
-  "medium-intent": { label: "Medium intent", text: "text-sky-400", dot: "bg-sky-400" },
-  positioning: { label: "Positioning", text: "text-purple-400", dot: "bg-purple-400" },
-  "operator-pain": { label: "Operator pain", text: "text-amber-400", dot: "bg-amber-400" },
-  noise: { label: "Noise", text: "text-muted-foreground", dot: "bg-muted-foreground" },
+  "brand-critical": {
+    label: "Brand critical",
+    text: "text-red-400",
+    dot: "bg-red-400",
+  },
+  "high-intent": {
+    label: "High intent",
+    text: "text-emerald-400",
+    dot: "bg-emerald-400",
+  },
+  "medium-intent": {
+    label: "Medium intent",
+    text: "text-sky-400",
+    dot: "bg-sky-400",
+  },
+  positioning: {
+    label: "Positioning",
+    text: "text-purple-400",
+    dot: "bg-purple-400",
+  },
+  "operator-pain": {
+    label: "Operator pain",
+    text: "text-amber-400",
+    dot: "bg-amber-400",
+  },
+  noise: {
+    label: "Noise",
+    text: "text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
 };
 
 function intentMeta(tag: string | null | undefined) {
   if (!tag) return null;
   const key = tag.toLowerCase().replace(/\s+/g, "-");
   return (
-    INTENT_META[key] ?? { label: tag, text: "text-muted-foreground", dot: "bg-muted-foreground" }
+    INTENT_META[key] ?? {
+      label: tag,
+      text: "text-muted-foreground",
+      dot: "bg-muted-foreground",
+    }
   );
 }
 
@@ -61,7 +92,10 @@ function relTime(date: Date | string): string {
 }
 
 const compact = (n: number) =>
-  new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(n);
 
 // ---- raw payload (engagement metrics) ---------------------------------------
 //
@@ -104,7 +138,9 @@ function statsLine(s: TweetStats): string | null {
   const parts = [
     engagement || null,
     s.viewCount != null ? `${compact(s.viewCount)} views` : null,
-    s.authorFollowers != null ? `${compact(s.authorFollowers)} followers` : null,
+    s.authorFollowers != null
+      ? `${compact(s.authorFollowers)} followers`
+      : null,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -240,7 +276,9 @@ export function Twitter() {
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">X — mentions queue</h2>
+          <h2 className="text-lg font-semibold tracking-tight">
+            X — mentions queue
+          </h2>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
             One persisted queue of X signal. The 6-hourly cron searches the
             watchlist terms, scores each tweet, and drafts replies for the
@@ -278,28 +316,60 @@ export function Twitter() {
               onClick={() => setFilter(null)}
               className="text-muted-foreground hover:text-foreground text-xs"
             >
-              Filtered by {filter === UNMATCHED ? "unmatched" : `“${filter}”`} — clear ✕
+              Filtered by {filter === UNMATCHED ? "unmatched" : `“${filter}”`} —
+              clear ✕
             </button>
           )}
 
           {act.length > 0 && (
             <QueueGroup label="Act today" count={act.length} tone="emerald">
               {act.map((m) => (
-                <TweetCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                <TweetCard
+                  key={m.id}
+                  m={m}
+                  onState={onState}
+                  pending={setStatus.isPending}
+                  members={members}
+                  currentUserId={currentUserId}
+                  onAssign={onAssign}
+                  onRefetch={refetch}
+                />
               ))}
             </QueueGroup>
           )}
           {monitor.length > 0 && (
-            <QueueGroup label="Monitor — revisit" count={monitor.length} tone="amber">
+            <QueueGroup
+              label="Monitor — revisit"
+              count={monitor.length}
+              tone="amber"
+            >
               {monitor.map((m) => (
-                <TweetCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                <TweetCard
+                  key={m.id}
+                  m={m}
+                  onState={onState}
+                  pending={setStatus.isPending}
+                  members={members}
+                  currentUserId={currentUserId}
+                  onAssign={onAssign}
+                  onRefetch={refetch}
+                />
               ))}
             </QueueGroup>
           )}
           {handled.length > 0 && (
             <QueueGroup label="Handled" count={handled.length} tone="muted">
               {handled.map((m) => (
-                <TweetCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                <TweetCard
+                  key={m.id}
+                  m={m}
+                  onState={onState}
+                  pending={setStatus.isPending}
+                  members={members}
+                  currentUserId={currentUserId}
+                  onAssign={onAssign}
+                  onRefetch={refetch}
+                />
               ))}
             </QueueGroup>
           )}
@@ -314,9 +384,22 @@ export function Twitter() {
               </button>
               {showSkipped && (
                 <div className="mt-3">
-                  <QueueGroup label="Skipped" count={skipped.length} tone="muted">
+                  <QueueGroup
+                    label="Skipped"
+                    count={skipped.length}
+                    tone="muted"
+                  >
                     {skipped.map((m) => (
-                      <TweetCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                      <TweetCard
+                        key={m.id}
+                        m={m}
+                        onState={onState}
+                        pending={setStatus.isPending}
+                        members={members}
+                        currentUserId={currentUserId}
+                        onAssign={onAssign}
+                        onRefetch={refetch}
+                      />
                     ))}
                   </QueueGroup>
                 </div>
@@ -404,10 +487,17 @@ function QueueGroup({
   return (
     <div>
       <div className="mb-2 flex items-baseline gap-2">
-        <span className={cn("text-xs font-semibold tracking-wide uppercase", toneCls)}>
+        <span
+          className={cn(
+            "text-xs font-semibold tracking-wide uppercase",
+            toneCls,
+          )}
+        >
           {label}
         </span>
-        <span className="text-muted-foreground text-xs tabular-nums">{count}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {count}
+        </span>
       </div>
       <div className="bg-card divide-y overflow-hidden rounded-xl border">
         {children}
@@ -471,7 +561,9 @@ function TweetCard({
   const provLabel = PROVIDER_LABEL[m.provider] ?? m.provider;
   const matchedTerms = termsOf(m).filter((t) => t !== UNMATCHED);
   const provDetail =
-    matchedTerms.length > 0 ? matchedTerms.map((t) => `“${t}”`).join(", ") : null;
+    matchedTerms.length > 0
+      ? matchedTerms.map((t) => `“${t}”`).join(", ")
+      : null;
 
   const context = [
     "Help me write a reply to this tweet. Wander is a direct-booking platform for short-term-rental operators (WanderOS, Wander Sites, Wander Operated). Tone: warm, peer-to-peer, genuinely helpful, not a pitch. Disclose Wander affiliation. Keep it under 270 characters.",
@@ -479,8 +571,12 @@ function TweetCard({
     m.author
       ? `Author: @${m.author}${stats.authorFollowers != null ? ` (${compact(stats.authorFollowers)} followers)` : ""}`
       : null,
-    matchedTerms.length > 0 ? `Matched terms: ${matchedTerms.join(", ")}` : null,
-    m.relevance != null ? `Intent: ${m.intentTag} · relevance ${m.relevance}/10` : null,
+    matchedTerms.length > 0
+      ? `Matched terms: ${matchedTerms.join(", ")}`
+      : null,
+    m.relevance != null
+      ? `Intent: ${m.intentTag} · relevance ${m.relevance}/10`
+      : null,
     m.rationale ? `Why: ${m.rationale}` : null,
     `Tweet: ${m.snippet ?? "(none)"}`,
     `Link: ${m.url}`,
@@ -558,7 +654,9 @@ function TweetCard({
       {open && (
         <div className="flex flex-col gap-2.5 px-4 pb-3">
           {m.rationale && (
-            <p className="text-muted-foreground text-xs italic">{m.rationale}</p>
+            <p className="text-muted-foreground text-xs italic">
+              {m.rationale}
+            </p>
           )}
           {handled && (
             <p className="text-muted-foreground text-[11px]">

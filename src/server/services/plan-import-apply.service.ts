@@ -312,7 +312,8 @@ export async function applyImport(opts: {
 
   for (const item of items) {
     if (item.appliedContentPostId) continue; // converged on a prior run
-    if (item.status !== "accepted" && item.status !== "accepted_refine") continue;
+    if (item.status !== "accepted" && item.status !== "accepted_refine")
+      continue;
     try {
       const { consumed } = await applyItem(item, {
         userId: opts.userId,
@@ -340,7 +341,10 @@ export async function applyImport(opts: {
     columns: { id: true, status: true },
   });
   const unfinished = remaining.filter(
-    (r) => r.status === "pending" || r.status === "accepted" || r.status === "accepted_refine",
+    (r) =>
+      r.status === "pending" ||
+      r.status === "accepted" ||
+      r.status === "accepted_refine",
   );
   if (unfinished.length === 0) {
     await db

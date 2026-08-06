@@ -468,7 +468,6 @@ export function ImageUpload({
           </div>
         </div>
       )}
-
     </div>
   );
 }

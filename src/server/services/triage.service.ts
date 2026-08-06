@@ -265,7 +265,8 @@ export function composeListeningSystemPrompt(input: {
   if (sub) {
     const lines: string[] = [`SUBREDDIT — r/${sub.name}:`];
     if (sub.stance) lines.push(`Engagement stance: ${sub.stance}.`);
-    if (sub.riskFlags?.length) lines.push(`Risks: ${sub.riskFlags.join(", ")}.`);
+    if (sub.riskFlags?.length)
+      lines.push(`Risks: ${sub.riskFlags.join(", ")}.`);
     if (sub.sanctionedPath)
       lines.push(`Sanctioned path: ${sub.sanctionedPath}.`);
     if (sub.cultureSummary) lines.push(sub.cultureSummary.trim());

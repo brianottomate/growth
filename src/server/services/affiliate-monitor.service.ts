@@ -119,13 +119,17 @@ async function snapshotMetrics(
 async function syncPartners(
   program: PartnerProgram,
   campaignId: string,
-): Promise<{ synced: number; pending: Array<{ id: string; name?: string; website?: string }> }> {
+): Promise<{
+  synced: number;
+  pending: Array<{ id: string; name?: string; website?: string }>;
+}> {
   const partners = await listMediaPartners({ campaignId });
   const pending: Array<{ id: string; name?: string; website?: string }> = [];
 
   for (const p of partners) {
     if (!p.Id) continue;
-    if (p.State === "PENDING") pending.push({ id: p.Id, name: p.Name, website: p.Website });
+    if (p.State === "PENDING")
+      pending.push({ id: p.Id, name: p.Name, website: p.Website });
     await db
       .insert(affiliatePartnerTable)
       .values({
@@ -138,7 +142,10 @@ async function syncPartners(
         lastSyncedAt: new Date(),
       })
       .onConflictDoUpdate({
-        target: [affiliatePartnerTable.programId, affiliatePartnerTable.externalId],
+        target: [
+          affiliatePartnerTable.programId,
+          affiliatePartnerTable.externalId,
+        ],
         set: {
           name: p.Name,
           state: p.State,
@@ -202,7 +209,10 @@ async function checkTrackingHealth(
     .toISOString()
     .slice(0, 10);
   const trailing = await db
-    .select({ actions: affiliateMetricDailyTable.actions, date: affiliateMetricDailyTable.date })
+    .select({
+      actions: affiliateMetricDailyTable.actions,
+      date: affiliateMetricDailyTable.date,
+    })
     .from(affiliateMetricDailyTable)
     .where(
       and(
@@ -255,7 +265,8 @@ async function checkInquiries(
     if (["RESOLVED", "CLOSED", "COMPLETED"].includes(status)) continue;
     const r = inq.raw;
     const partner =
-      (r.MediaPartnerName as string | undefined) ?? (r.MediaName as string | undefined);
+      (r.MediaPartnerName as string | undefined) ??
+      (r.MediaName as string | undefined);
     const inserted = await db
       .insert(affiliateItemTable)
       .values({
@@ -321,7 +332,9 @@ async function checkOverdueInvoices(program: PartnerProgram): Promise<number> {
   return fresh.length;
 }
 
-export async function runDailyAffiliateMonitor(): Promise<ProgramMonitorResult[]> {
+export async function runDailyAffiliateMonitor(): Promise<
+  ProgramMonitorResult[]
+> {
   const programs = await db
     .select()
     .from(partnerProgramTable)
@@ -330,26 +343,39 @@ export async function runDailyAffiliateMonitor(): Promise<ProgramMonitorResult[]
   const results: ProgramMonitorResult[] = [];
   for (const program of programs) {
     if (program.network !== "impact") {
-      results.push({ programId: program.id, skipped: `network ${program.network}` });
+      results.push({
+        programId: program.id,
+        skipped: `network ${program.network}`,
+      });
       continue;
     }
     if (!isImpactConfigured()) {
-      console.log(`[affiliate-monitor] ${program.id}: IMPACT_* credentials not set — skipping`);
+      console.log(
+        `[affiliate-monitor] ${program.id}: IMPACT_* credentials not set — skipping`,
+      );
       results.push({ programId: program.id, skipped: "no credentials" });
       continue;
     }
     if (!program.externalProgramId) {
-      console.log(`[affiliate-monitor] ${program.id}: externalProgramId not set — skipping`);
+      console.log(
+        `[affiliate-monitor] ${program.id}: externalProgramId not set — skipping`,
+      );
       results.push({ programId: program.id, skipped: "no externalProgramId" });
       continue;
     }
 
     try {
       const metrics = await snapshotMetrics(program, program.externalProgramId);
-      const { synced, pending } = await syncPartners(program, program.externalProgramId);
+      const { synced, pending } = await syncPartners(
+        program,
+        program.externalProgramId,
+      );
       const applicationsQueued = await queueApplications(program, pending);
       const trackingAlert = await checkTrackingHealth(program, metrics.actions);
-      const inquiriesQueued = await checkInquiries(program, program.externalProgramId);
+      const inquiriesQueued = await checkInquiries(
+        program,
+        program.externalProgramId,
+      );
       const overdueInvoices = await checkOverdueInvoices(program);
       results.push({
         programId: program.id,

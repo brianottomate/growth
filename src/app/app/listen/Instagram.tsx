@@ -30,18 +30,41 @@ const LIST_INPUT = {
   limit: 300,
 };
 
-const INTENT_META: Record<string, { label: string; text: string; dot: string }> = {
-  "destination-match": { label: "Destination match", text: "text-emerald-400", dot: "bg-emerald-400" },
-  "audience-fit": { label: "Audience fit", text: "text-sky-400", dot: "bg-sky-400" },
-  "brand-adjacent": { label: "Brand adjacent", text: "text-purple-400", dot: "bg-purple-400" },
-  "off-topic": { label: "Off-topic", text: "text-muted-foreground", dot: "bg-muted-foreground" },
+const INTENT_META: Record<
+  string,
+  { label: string; text: string; dot: string }
+> = {
+  "destination-match": {
+    label: "Destination match",
+    text: "text-emerald-400",
+    dot: "bg-emerald-400",
+  },
+  "audience-fit": {
+    label: "Audience fit",
+    text: "text-sky-400",
+    dot: "bg-sky-400",
+  },
+  "brand-adjacent": {
+    label: "Brand adjacent",
+    text: "text-purple-400",
+    dot: "bg-purple-400",
+  },
+  "off-topic": {
+    label: "Off-topic",
+    text: "text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
 };
 
 function intentMeta(tag: string | null | undefined) {
   if (!tag) return null;
   const key = tag.toLowerCase().replace(/\s+/g, "-");
   return (
-    INTENT_META[key] ?? { label: tag, text: "text-muted-foreground", dot: "bg-muted-foreground" }
+    INTENT_META[key] ?? {
+      label: tag,
+      text: "text-muted-foreground",
+      dot: "bg-muted-foreground",
+    }
   );
 }
 
@@ -115,7 +138,9 @@ export function Instagram() {
       (m.status !== "engaged" || justEngaged.has(m.id)) &&
       matches(m),
   );
-  const act = open.filter((m) => m.suggestedAction === "engage").sort(byRelevance);
+  const act = open
+    .filter((m) => m.suggestedAction === "engage")
+    .sort(byRelevance);
   const monitor = open
     .filter((m) => m.suggestedAction !== "engage")
     .sort(byRelevance);
@@ -152,10 +177,10 @@ export function Instagram() {
             Instagram — account watch
           </h2>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Posts from the tastemaker / travel accounts we watch, scored for whether
-            Wander&apos;s account should drop a clever public comment — each with a
-            drafted suggestion. Scans daily; status sticks across reloads and
-            teammates. Posting the comment stays manual.
+            Posts from the tastemaker / travel accounts we watch, scored for
+            whether Wander&apos;s account should drop a clever public comment —
+            each with a drafted suggestion. Scans daily; status sticks across
+            reloads and teammates. Posting the comment stays manual.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -185,8 +210,8 @@ export function Instagram() {
           No Instagram posts yet. Add an account-watch source under{" "}
           <span className="font-medium">What we monitor</span> (e.g.{" "}
           <code className="font-mono">@whowhatwear</code>), then hit{" "}
-          <span className="font-medium">Scan now</span> — relevant recent posts land
-          here with a drafted comment.
+          <span className="font-medium">Scan now</span> — relevant recent posts
+          land here with a drafted comment.
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-[220px_1fr]">
@@ -217,21 +242,52 @@ export function Instagram() {
             {act.length > 0 && (
               <QueueGroup label="Act today" count={act.length} tone="emerald">
                 {act.map((m) => (
-                  <IgCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={invalidate} />
+                  <IgCard
+                    key={m.id}
+                    m={m}
+                    onState={onState}
+                    pending={setStatus.isPending}
+                    members={members}
+                    currentUserId={currentUserId}
+                    onAssign={onAssign}
+                    onRefetch={invalidate}
+                  />
                 ))}
               </QueueGroup>
             )}
             {monitor.length > 0 && (
-              <QueueGroup label="Monitor — revisit" count={monitor.length} tone="amber">
+              <QueueGroup
+                label="Monitor — revisit"
+                count={monitor.length}
+                tone="amber"
+              >
                 {monitor.map((m) => (
-                  <IgCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={invalidate} />
+                  <IgCard
+                    key={m.id}
+                    m={m}
+                    onState={onState}
+                    pending={setStatus.isPending}
+                    members={members}
+                    currentUserId={currentUserId}
+                    onAssign={onAssign}
+                    onRefetch={invalidate}
+                  />
                 ))}
               </QueueGroup>
             )}
             {handled.length > 0 && (
               <QueueGroup label="Handled" count={handled.length} tone="muted">
                 {handled.map((m) => (
-                  <IgCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={invalidate} />
+                  <IgCard
+                    key={m.id}
+                    m={m}
+                    onState={onState}
+                    pending={setStatus.isPending}
+                    members={members}
+                    currentUserId={currentUserId}
+                    onAssign={onAssign}
+                    onRefetch={invalidate}
+                  />
                 ))}
               </QueueGroup>
             )}
@@ -246,9 +302,22 @@ export function Instagram() {
                 </button>
                 {showSkipped && (
                   <div className="mt-3">
-                    <QueueGroup label="Skipped" count={skipped.length} tone="muted">
+                    <QueueGroup
+                      label="Skipped"
+                      count={skipped.length}
+                      tone="muted"
+                    >
                       {skipped.map((m) => (
-                        <IgCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={invalidate} />
+                        <IgCard
+                          key={m.id}
+                          m={m}
+                          onState={onState}
+                          pending={setStatus.isPending}
+                          members={members}
+                          currentUserId={currentUserId}
+                          onAssign={onAssign}
+                          onRefetch={invalidate}
+                        />
                       ))}
                     </QueueGroup>
                   </div>
@@ -335,10 +404,17 @@ function QueueGroup({
   return (
     <div>
       <div className="mb-2 flex items-baseline gap-2">
-        <span className={cn("text-xs font-semibold tracking-wide uppercase", toneCls)}>
+        <span
+          className={cn(
+            "text-xs font-semibold tracking-wide uppercase",
+            toneCls,
+          )}
+        >
           {label}
         </span>
-        <span className="text-muted-foreground text-xs tabular-nums">{count}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {count}
+        </span>
       </div>
       <div className="bg-card divide-y overflow-hidden rounded-xl border">
         {children}
@@ -412,7 +488,9 @@ function IgCard({
     "Help me refine a short, clever PUBLIC comment for Wander's official Instagram account to leave on this third-party post (a tastemaker we admire — not our post). Tone: warm, witty, one sentence, no hard pitch, no links. Wander runs design-forward luxury vacation homes across many US destinations.",
     "",
     m.keyword ? `Account: @${m.keyword}` : null,
-    m.relevance != null ? `Intent: ${m.intentTag} · relevance ${m.relevance}/10` : null,
+    m.relevance != null
+      ? `Intent: ${m.intentTag} · relevance ${m.relevance}/10`
+      : null,
     m.rationale ? `Why: ${m.rationale}` : null,
     `Caption: ${m.snippet ?? "(none)"}`,
     m.suggestedReply ? `Draft comment: ${m.suggestedReply}` : null,
@@ -431,7 +509,7 @@ function IgCard({
           {intent && (
             <span
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium border-current/40",
+                "inline-flex items-center gap-1.5 rounded-full border border-current/40 px-2 py-0.5 text-[10px] font-medium",
                 intent.text,
               )}
             >
@@ -467,13 +545,17 @@ function IgCard({
             {m.snippet}
           </span>
         )}
-        <span className="text-muted-foreground/80 font-mono text-[11px]">{meta}</span>
+        <span className="text-muted-foreground/80 font-mono text-[11px]">
+          {meta}
+        </span>
       </button>
 
       {open && (
         <div className="flex flex-col gap-2.5 px-4 pb-3">
           {m.rationale && (
-            <p className="text-muted-foreground text-xs italic">{m.rationale}</p>
+            <p className="text-muted-foreground text-xs italic">
+              {m.rationale}
+            </p>
           )}
 
           {/* The deliverable: the drafted clever comment, copy-ready. */}
@@ -488,11 +570,17 @@ function IgCard({
                   onClick={copyComment}
                   className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px]"
                 >
-                  {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                  {copied ? (
+                    <Check className="size-3" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed">{m.suggestedReply}</p>
+              <p className="mt-1.5 text-sm leading-relaxed">
+                {m.suggestedReply}
+              </p>
             </div>
           )}
 

@@ -113,6 +113,8 @@ export const rootMetadata: Metadata = {
     card: "summary_large_image",
     title: SITE_NAME,
     description: DEFAULT_DESCRIPTION,
-    images: [ogImageUrl({ title: SITE_NAME, description: DEFAULT_DESCRIPTION })],
+    images: [
+      ogImageUrl({ title: SITE_NAME, description: DEFAULT_DESCRIPTION }),
+    ],
   },
 };

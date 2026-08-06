@@ -3,7 +3,12 @@ import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "./lib/utils";
 
-type TextVariant = "body-lg-long" | "body-lg" | "body-long" | "body" | "body-sm";
+type TextVariant =
+  | "body-lg-long"
+  | "body-lg"
+  | "body-long"
+  | "body"
+  | "body-sm";
 type ResponsiveVariant =
   | TextVariant
   | Partial<Record<"base" | "sm" | "md" | "lg" | "xl" | "2xl", TextVariant>>;
@@ -23,12 +28,23 @@ function responsiveClasses(variant: ResponsiveVariant | undefined) {
   return Object.entries(variant)
     .map(([breakpoint, value]) => {
       if (!value) return "";
-      return breakpoint === "base" ? classes[value] : `${breakpoint}:${classes[value]}`;
+      return breakpoint === "base"
+        ? classes[value]
+        : `${breakpoint}:${classes[value]}`;
     })
     .join(" ");
 }
 
-type TextElement = "p" | "span" | "div" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+type TextElement =
+  | "p"
+  | "span"
+  | "div"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "h4"
+  | "h5"
+  | "h6";
 
 export function Text({
   className,

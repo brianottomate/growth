@@ -146,7 +146,9 @@ function parseArgs(argv: string[]): CliOptions {
   const limit = limitRaw ? toInt(limitRaw, 0, 1, 100000) : undefined;
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
-  const out = resolve(args.get("out") ?? `./reports/cio-assignment-repair-${ts}.json`);
+  const out = resolve(
+    args.get("out") ?? `./reports/cio-assignment-repair-${ts}.json`,
+  );
 
   return {
     input: resolve(input),
@@ -230,86 +232,91 @@ async function run(): Promise<void> {
     .filter((record) => !!record.outreachOwner?.email)
     .slice(0, options.limit ?? records.length);
 
-  const results = await mapWithConcurrency(candidates, options.concurrency, async (record) => {
-    const owner = record.outreachOwner;
-    const before = {
-      assigned_bdr_email: record.cioAssignment?.assignedBdrEmail ?? null,
-      assigned_bdr_name: record.cioAssignment?.assignedBdrName ?? null,
-      assigned_bdr_outreach_id: record.cioAssignment?.assignedBdrOutreachId ?? null,
-    };
+  const results = await mapWithConcurrency(
+    candidates,
+    options.concurrency,
+    async (record) => {
+      const owner = record.outreachOwner;
+      const before = {
+        assigned_bdr_email: record.cioAssignment?.assignedBdrEmail ?? null,
+        assigned_bdr_name: record.cioAssignment?.assignedBdrName ?? null,
+        assigned_bdr_outreach_id:
+          record.cioAssignment?.assignedBdrOutreachId ?? null,
+      };
 
-    if (!owner?.email) {
-      return {
-        email: record.email,
-        status: "skipped",
-        reason: "Owner email missing; cannot update CIO assignment safely",
-        outreachOwner: owner,
-        cioBefore: before,
-        cioAfter: before,
-      } satisfies RepairResult;
-    }
+      if (!owner?.email) {
+        return {
+          email: record.email,
+          status: "skipped",
+          reason: "Owner email missing; cannot update CIO assignment safely",
+          outreachOwner: owner,
+          cioBefore: before,
+          cioAfter: before,
+        } satisfies RepairResult;
+      }
 
-    const target = {
-      assigned_bdr_email: normalizeEmail(owner.email),
-      assigned_bdr_name: owner.name,
-      assigned_bdr_outreach_id: owner.id,
-    };
+      const target = {
+        assigned_bdr_email: normalizeEmail(owner.email),
+        assigned_bdr_name: owner.name,
+        assigned_bdr_outreach_id: owner.id,
+      };
 
-    const noDiff =
-      before.assigned_bdr_email === target.assigned_bdr_email &&
-      before.assigned_bdr_outreach_id === target.assigned_bdr_outreach_id &&
-      before.assigned_bdr_name === target.assigned_bdr_name;
+      const noDiff =
+        before.assigned_bdr_email === target.assigned_bdr_email &&
+        before.assigned_bdr_outreach_id === target.assigned_bdr_outreach_id &&
+        before.assigned_bdr_name === target.assigned_bdr_name;
 
-    if (noDiff) {
-      return {
-        email: record.email,
-        status: "unchanged",
-        reason: "No diff",
-        outreachOwner: owner,
-        cioBefore: before,
-        cioAfter: before,
-      } satisfies RepairResult;
-    }
+      if (noDiff) {
+        return {
+          email: record.email,
+          status: "unchanged",
+          reason: "No diff",
+          outreachOwner: owner,
+          cioBefore: before,
+          cioAfter: before,
+        } satisfies RepairResult;
+      }
 
-    if (!options.apply) {
-      return {
-        email: record.email,
-        status: "updated",
-        reason: "Dry-run: would update",
-        outreachOwner: owner,
-        cioBefore: before,
-        cioAfter: target,
-      } satisfies RepairResult;
-    }
+      if (!options.apply) {
+        return {
+          email: record.email,
+          status: "updated",
+          reason: "Dry-run: would update",
+          outreachOwner: owner,
+          cioBefore: before,
+          cioAfter: target,
+        } satisfies RepairResult;
+      }
 
-    try {
-      await updateCioBdrAssignment({
-        customerEmail: record.email,
-        bdrEmail: target.assigned_bdr_email,
-        bdrName: target.assigned_bdr_name,
-        bdrOutreachId: target.assigned_bdr_outreach_id,
-      });
+      try {
+        await updateCioBdrAssignment({
+          customerEmail: record.email,
+          bdrEmail: target.assigned_bdr_email,
+          bdrName: target.assigned_bdr_name,
+          bdrOutreachId: target.assigned_bdr_outreach_id,
+        });
 
-      return {
-        email: record.email,
-        status: "updated",
-        reason: "CIO assignment updated",
-        outreachOwner: owner,
-        cioBefore: before,
-        cioAfter: target,
-      } satisfies RepairResult;
-    } catch (error) {
-      return {
-        email: record.email,
-        status: "error",
-        reason: "Failed to update CIO assignment",
-        outreachOwner: owner,
-        cioBefore: before,
-        cioAfter: before,
-        error: error instanceof Error ? error.message : String(error),
-      } satisfies RepairResult;
-    }
-  });
+        return {
+          email: record.email,
+          status: "updated",
+          reason: "CIO assignment updated",
+          outreachOwner: owner,
+          cioBefore: before,
+          cioAfter: target,
+        } satisfies RepairResult;
+      } catch (error) {
+        return {
+          email: record.email,
+          status: "error",
+          reason: "Failed to update CIO assignment",
+          outreachOwner: owner,
+          cioBefore: before,
+          cioAfter: before,
+          error: error instanceof Error ? error.message : String(error),
+        } satisfies RepairResult;
+      }
+    },
+  );
 
   const totals = {
     candidates: candidates.length,

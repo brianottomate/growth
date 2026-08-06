@@ -51,7 +51,7 @@ export function DatePicker({
           disabled={disabled}
           data-empty={!value}
           className={cn(
-            "border-border bg-background hover:bg-accent focus-visible:ring-ring/40 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs outline-none transition-colors focus-visible:ring-2 disabled:opacity-50 data-[empty=true]:text-muted-foreground",
+            "border-border bg-background hover:bg-accent focus-visible:ring-ring/40 data-[empty=true]:text-muted-foreground inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors outline-none focus-visible:ring-2 disabled:opacity-50",
             className,
           )}
         >

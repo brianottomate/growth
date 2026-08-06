@@ -126,16 +126,63 @@ function classifyUrl(url: string): string {
 
   // Destinations / Locations — sub-grouped by URL depth & pattern
   const US_STATES_AND_COUNTRIES = new Set([
-    "alabama","alaska","arizona","arkansas","california","colorado","connecticut",
-    "delaware","florida","georgia","hawaii","idaho","illinois","indiana","iowa",
-    "kansas","kentucky","louisiana","maine","maryland","massachusetts","michigan",
-    "minnesota","mississippi","missouri","montana","nebraska","nevada",
-    "new-hampshire","new-jersey","new-mexico","new-york","north-carolina",
-    "north-dakota","ohio","oklahoma","oregon","pennsylvania","rhode-island",
-    "south-carolina","south-dakota","tennessee","texas","utah","vermont",
-    "virginia","washington","west-virginia","wisconsin","wyoming",
-    "mexico","canada","colombia","dominican-republic","virgin-islands-us",
-    "united-states","ca",
+    "alabama",
+    "alaska",
+    "arizona",
+    "arkansas",
+    "california",
+    "colorado",
+    "connecticut",
+    "delaware",
+    "florida",
+    "georgia",
+    "hawaii",
+    "idaho",
+    "illinois",
+    "indiana",
+    "iowa",
+    "kansas",
+    "kentucky",
+    "louisiana",
+    "maine",
+    "maryland",
+    "massachusetts",
+    "michigan",
+    "minnesota",
+    "mississippi",
+    "missouri",
+    "montana",
+    "nebraska",
+    "nevada",
+    "new-hampshire",
+    "new-jersey",
+    "new-mexico",
+    "new-york",
+    "north-carolina",
+    "north-dakota",
+    "ohio",
+    "oklahoma",
+    "oregon",
+    "pennsylvania",
+    "rhode-island",
+    "south-carolina",
+    "south-dakota",
+    "tennessee",
+    "texas",
+    "utah",
+    "vermont",
+    "virginia",
+    "washington",
+    "west-virginia",
+    "wisconsin",
+    "wyoming",
+    "mexico",
+    "canada",
+    "colombia",
+    "dominican-republic",
+    "virgin-islands-us",
+    "united-states",
+    "ca",
   ]);
 
   // Themed destination landing pages (depth 1, non-state)
@@ -223,7 +270,8 @@ const GROUP_LABELS: Record<string, string> = {
   "destinations-themed": "Destinations — Themed Landing Pages",
   "destinations-states": "Destinations — States & Countries",
   "destinations-cities": "Destinations — Cities",
-  "destinations-filters": "Destinations — City Filters (pet-friendly, hot-tubs, etc.)",
+  "destinations-filters":
+    "Destinations — City Filters (pet-friendly, hot-tubs, etc.)",
   blog: "Blog",
   help: "Help Center",
   legal: "Legal",
@@ -251,7 +299,12 @@ const COLLAPSE_THRESHOLD = 8;
 const SAMPLE_COUNT = 5;
 
 /** Route groups with many dynamic pages — only fetch meta for samples */
-const BULK_GROUPS = new Set(["properties", "destinations-cities", "destinations-filters", "blog"]);
+const BULK_GROUPS = new Set([
+  "properties",
+  "destinations-cities",
+  "destinations-filters",
+  "blog",
+]);
 /** Number of sample pages to audit from bulk groups */
 const BULK_SAMPLE_COUNT = 3;
 
@@ -283,9 +336,11 @@ function extractTitle(html: string): string | null {
 }
 
 function extractCanonical(html: string): string | null {
-  const match = /<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*?)["']/i.exec(html);
+  const match =
+    /<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*?)["']/i.exec(html);
   if (match) return match[1] ?? null;
-  const match2 = /<link[^>]*href=["']([^"']*?)["'][^>]*rel=["']canonical["']/i.exec(html);
+  const match2 =
+    /<link[^>]*href=["']([^"']*?)["'][^>]*rel=["']canonical["']/i.exec(html);
   return match2?.[1] ?? null;
 }
 
@@ -348,8 +403,7 @@ function computeScore(audit: PageAudit): number {
   let score = Math.round((filled / fields.length) * 100);
   // Penalize over-length
   if (audit.meta.title && audit.meta.title.length > 60) score -= 5;
-  if (audit.meta.description && audit.meta.description.length > 160)
-    score -= 5;
+  if (audit.meta.description && audit.meta.description.length > 160) score -= 5;
   return Math.max(0, Math.min(100, score));
 }
 
@@ -715,8 +769,7 @@ async function loadAuditData(): Promise<{
   }
 
   const groups: PageGroup[] = GROUP_ORDER.filter(
-    (slug) =>
-      auditsByGroup.has(slug) || (discoveredCounts.get(slug) ?? 0) > 0,
+    (slug) => auditsByGroup.has(slug) || (discoveredCounts.get(slug) ?? 0) > 0,
   ).map((slug) => {
     const pages = (auditsByGroup.get(slug) ?? []).sort((a, b) =>
       a.path.localeCompare(b.path),
@@ -759,7 +812,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-lg border border-gray-200 px-4 py-3">
-      <div className="text-xs uppercase tracking-wide text-gray-500">
+      <div className="text-xs tracking-wide text-gray-500 uppercase">
         {label}
       </div>
       <div
@@ -829,7 +882,6 @@ function OgThumb({
   className?: string;
 }) {
   if (src) {
-
     return (
       <img
         src={src}
@@ -863,9 +915,9 @@ function FacebookCard({ page }: { page: PageAudit }) {
   return (
     <div className="w-[200px] shrink-0 overflow-hidden rounded-md border bg-white shadow-sm">
       <OgThumb src={page.meta.ogImage} alt="" className="h-[105px] w-full" />
-      <div className="space-y-0.5 px-2 pb-1.5 pt-1">
-        <div className="text-[9px] uppercase text-gray-400">{domain}</div>
-        <div className="line-clamp-2 text-[11px] font-semibold leading-tight text-[#1d2129]">
+      <div className="space-y-0.5 px-2 pt-1 pb-1.5">
+        <div className="text-[9px] text-gray-400 uppercase">{domain}</div>
+        <div className="line-clamp-2 text-[11px] leading-tight font-semibold text-[#1d2129]">
           {title ? (title.length > 50 ? title.slice(0, 50) + "…" : title) : "—"}
         </div>
         <div className="line-clamp-1 text-[10px] text-gray-500">
@@ -882,8 +934,8 @@ function LinkedInCard({ page }: { page: PageAudit }) {
   return (
     <div className="w-[200px] shrink-0 overflow-hidden rounded-md border bg-white shadow-sm">
       <OgThumb src={page.meta.ogImage} alt="" className="h-[105px] w-full" />
-      <div className="space-y-0.5 border-t px-2 pb-1.5 pt-1">
-        <div className="line-clamp-2 text-[11px] font-semibold leading-tight text-[#000000e6]">
+      <div className="space-y-0.5 border-t px-2 pt-1 pb-1.5">
+        <div className="line-clamp-2 text-[11px] leading-tight font-semibold text-[#000000e6]">
           {title ? (title.length > 50 ? title.slice(0, 50) + "…" : title) : "—"}
         </div>
         <div className="text-[9px] text-gray-500">{domain}</div>
@@ -902,8 +954,8 @@ function XCard({ page }: { page: PageAudit }) {
         alt=""
         className="h-[105px] w-full"
       />
-      <div className="px-2 pb-1.5 pt-1">
-        <div className="line-clamp-1 text-[11px] font-medium leading-tight text-white">
+      <div className="px-2 pt-1 pb-1.5">
+        <div className="line-clamp-1 text-[11px] leading-tight font-medium text-white">
           {title ? (title.length > 45 ? title.slice(0, 45) + "…" : title) : "—"}
         </div>
         <div className="mt-0.5 text-[9px] text-gray-500">{domain}</div>
@@ -918,7 +970,7 @@ function IGCard({ page }: { page: PageAudit }) {
   return (
     <div className="w-[140px] shrink-0 overflow-hidden rounded-lg border bg-white shadow-sm">
       <OgThumb src={page.meta.ogImage} alt="" className="h-[140px] w-full" />
-      <div className="px-1.5 pb-1 pt-0.5">
+      <div className="px-1.5 pt-0.5 pb-1">
         <div className="line-clamp-1 text-[10px] font-semibold text-gray-900">
           {title ? (title.length > 30 ? title.slice(0, 30) + "…" : title) : "—"}
         </div>
@@ -970,11 +1022,7 @@ function CharCount({ value, max }: { value: string | null; max: number }) {
 
 function ScoreBar({ score }: { score: number }) {
   const color =
-    score >= 80
-      ? "bg-green-500"
-      : score >= 50
-        ? "bg-yellow-500"
-        : "bg-red-500";
+    score >= 80 ? "bg-green-500" : score >= 50 ? "bg-yellow-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-2">
       <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-200">
@@ -1027,7 +1075,7 @@ function GroupSummary({ group }: { group: PageGroup }) {
       {/* Aggregate stats bar */}
       <div className="grid grid-cols-2 gap-4 border-b border-gray-100 px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-gray-400">
+          <div className="text-[10px] tracking-wide text-gray-400 uppercase">
             Pages discovered
           </div>
           <div className="text-sm font-medium text-gray-900">
@@ -1045,7 +1093,7 @@ function GroupSummary({ group }: { group: PageGroup }) {
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-gray-400">
+          <div className="text-[10px] tracking-wide text-gray-400 uppercase">
             Has title
           </div>
           <div className="text-sm">
@@ -1053,7 +1101,7 @@ function GroupSummary({ group }: { group: PageGroup }) {
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-gray-400">
+          <div className="text-[10px] tracking-wide text-gray-400 uppercase">
             Has description
           </div>
           <div className="text-sm">
@@ -1061,7 +1109,7 @@ function GroupSummary({ group }: { group: PageGroup }) {
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-gray-400">
+          <div className="text-[10px] tracking-wide text-gray-400 uppercase">
             Has og:image
           </div>
           <div className="text-sm">
@@ -1069,7 +1117,7 @@ function GroupSummary({ group }: { group: PageGroup }) {
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-gray-400">
+          <div className="text-[10px] tracking-wide text-gray-400 uppercase">
             Has twitter:card
           </div>
           <div className="text-sm">
@@ -1077,7 +1125,7 @@ function GroupSummary({ group }: { group: PageGroup }) {
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-gray-400">
+          <div className="text-[10px] tracking-wide text-gray-400 uppercase">
             Avg score
           </div>
           <div className="text-sm">
@@ -1088,7 +1136,7 @@ function GroupSummary({ group }: { group: PageGroup }) {
 
       {/* Sample pages */}
       <div className="px-4 py-3">
-        <div className="mb-2 text-[10px] uppercase tracking-wide text-gray-400">
+        <div className="mb-2 text-[10px] tracking-wide text-gray-400 uppercase">
           Sample pages ({group.samples.length} of {group.discoveredCount})
         </div>
         <div className="overflow-x-auto">
@@ -1265,9 +1313,7 @@ export default async function OgMapPage() {
   ).length;
   const avgScore =
     totalPages > 0
-      ? Math.round(
-          audits.reduce((s, a) => s + computeScore(a), 0) / totalPages,
-        )
+      ? Math.round(audits.reduce((s, a) => s + computeScore(a), 0) / totalPages)
       : 0;
 
   return (
@@ -1320,11 +1366,7 @@ export default async function OgMapPage() {
       {/* Summary Stats */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         <StatCard label="Pages scanned" value={totalPages} />
-        <StatCard
-          label="Successful"
-          value={okPages}
-          color="text-green-700"
-        />
+        <StatCard label="Successful" value={okPages} color="text-green-700" />
         <StatCard
           label="Errors"
           value={errorPages}
@@ -1423,8 +1465,8 @@ export default async function OgMapPage() {
           OG/Meta audit generated at {new Date().toISOString()} —{" "}
           {totalDiscovered} pages discovered, {totalPages} audited,{" "}
           {filteredCount} non-page URLs filtered, {elapsed}s elapsed. Source:{" "}
-          {source}. Meta tags parsed via plain fetch + regex (no
-          Firecrawl scrape credits used).
+          {source}. Meta tags parsed via plain fetch + regex (no Firecrawl
+          scrape credits used).
         </p>
       </footer>
     </div>

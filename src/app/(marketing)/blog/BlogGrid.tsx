@@ -71,7 +71,9 @@ function AuthorInfo({
         </div>
       )}
       <div className="text-sm leading-6">
-        <p className={`font-semibold ${isDark ? "text-white" : "text-primary"}`}>
+        <p
+          className={`font-semibold ${isDark ? "text-white" : "text-primary"}`}
+        >
           {author}
         </p>
         <p className={isDark ? "text-gray-300" : "text-secondary"}>Author</p>
@@ -108,7 +110,11 @@ function BlogCardSimple({
         ))}
       </div>
       <div className="group relative grow">
-        <Heading variant="headline-sm" as="h3" className="mt-3 group-hover:opacity-70">
+        <Heading
+          variant="headline-sm"
+          as="h3"
+          className="mt-3 group-hover:opacity-70"
+        >
           <Link href={`${basePath}/${post.slug}`}>
             <span className="absolute inset-0" />
             {post.h1}
@@ -201,8 +207,14 @@ export function BlogGrid({
                   <div className="absolute inset-0 -z-10 bg-linear-to-t from-neutral-900 via-neutral-900/70" />
                   <div className="absolute inset-0 -z-10 rounded-xl ring-1 ring-neutral-900/10 ring-inset" />
                   <div className="flex flex-wrap items-center gap-2 overflow-hidden text-sm leading-6 text-gray-300">
-                    <time dateTime={featuredPosts[0].publishedAt} className="mr-4">
-                      {format(parseISO(featuredPosts[0].publishedAt), "MMM dd, yyyy")}
+                    <time
+                      dateTime={featuredPosts[0].publishedAt}
+                      className="mr-4"
+                    >
+                      {format(
+                        parseISO(featuredPosts[0].publishedAt),
+                        "MMM dd, yyyy",
+                      )}
                     </time>
                     {featuredPosts[0].category && (
                       <span className="relative z-10 cursor-pointer rounded-full bg-amber-600/80 px-3 py-1.5 font-semibold text-white transition-colors hover:bg-amber-600">
@@ -226,12 +238,14 @@ export function BlogGrid({
                       {featuredPosts[0].h1}
                     </Link>
                   </h3>
-                  {(featuredPosts[0].h1Subtitle || featuredPosts[0].metaDescription) && (
+                  {(featuredPosts[0].h1Subtitle ||
+                    featuredPosts[0].metaDescription) && (
                     <Link
                       href={`${basePath}/${featuredPosts[0].slug}`}
                       className="mt-4 line-clamp-3 block text-lg leading-relaxed text-gray-300 hover:text-white"
                     >
-                      {featuredPosts[0].h1Subtitle || featuredPosts[0].metaDescription}
+                      {featuredPosts[0].h1Subtitle ||
+                        featuredPosts[0].metaDescription}
                     </Link>
                   )}
                   <AuthorInfo
@@ -322,7 +336,11 @@ export function BlogGrid({
           {posts.length > 0 ? (
             <div className="grid grid-cols-1 gap-x-8 gap-y-16 lg:grid-cols-3">
               {posts.map((post) => (
-                <BlogCardSimple key={post.slug} post={post} basePath={basePath} />
+                <BlogCardSimple
+                  key={post.slug}
+                  post={post}
+                  basePath={basePath}
+                />
               ))}
             </div>
           ) : (

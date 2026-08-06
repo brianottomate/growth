@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     console.log("📋 [Outreach Test] Prospect details:");
     sampleProspects.forEach((p, i) => {
       console.log(
-        `  ${i + 1}. ${p.name} (${p.email}) - ${p.title || "No title"} @ ${p.company || "No company"}`
+        `  ${i + 1}. ${p.name} (${p.email}) - ${p.title || "No title"} @ ${p.company || "No company"}`,
       );
     });
 

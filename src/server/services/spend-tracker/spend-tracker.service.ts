@@ -82,7 +82,11 @@ export function resolveSpendWindow(input: {
  * Fetch a connector's timeline if configured; [] otherwise or on failure
  * (per-day BigQuery fallback in the merge — same degradation as Meta).
  */
-async function fetchConnectorRows(connector: SpendConnector, startDate: string, endDate: string) {
+async function fetchConnectorRows(
+  connector: SpendConnector,
+  startDate: string,
+  endDate: string,
+) {
   if (!connector.isConfigured()) return [];
   try {
     return await connector.fetchTimeline(startDate, endDate);
@@ -527,7 +531,10 @@ function buildSummaryFromRows(
 
   return {
     period: {
-      month: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      month: now.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
       daysInMonth: days,
       daysElapsed: days,
       asOfDate: now.toISOString().split("T")[0]!,
@@ -580,7 +587,8 @@ export function buildSpendTrend(rows: ChannelMetrics[]): TrendPoint[] {
     const date = normalizeDate(row.date);
     const point = byDate.get(date) ?? { date, total: 0 };
     if (ACTIVE_CHANNELS.includes(row.channel)) {
-      point[row.channel] = ((point[row.channel] as number) ?? 0) + (row.spend ?? 0);
+      point[row.channel] =
+        ((point[row.channel] as number) ?? 0) + (row.spend ?? 0);
     }
     point.total = ((point.total as number) ?? 0) + (row.spend ?? 0);
     byDate.set(date, point);
@@ -599,7 +607,9 @@ export function buildSpendTrend(rows: ChannelMetrics[]): TrendPoint[] {
  * Stream 1: dbt north-star reads real spend; the 1.70× multiplier dies).
  * Not wired to a writer yet — pending Joao's confirmation on table/dataset.
  */
-export function computeDailySpendRows(rows: ChannelMetrics[]): DailyChannelRow[] {
+export function computeDailySpendRows(
+  rows: ChannelMetrics[],
+): DailyChannelRow[] {
   return rows
     .filter((r) => (r.spend ?? 0) > 0)
     .map((r) => ({

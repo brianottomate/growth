@@ -32,7 +32,11 @@ export async function GET(request: NextRequest) {
 
   // Check for OAuth errors
   if (error) {
-    console.error("❌ [Outreach OAuth] Authorization denied:", error, errorDescription);
+    console.error(
+      "❌ [Outreach OAuth] Authorization denied:",
+      error,
+      errorDescription,
+    );
 
     return new NextResponse(
       `

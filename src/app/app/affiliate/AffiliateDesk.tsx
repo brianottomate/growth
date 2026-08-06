@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronDown, Copy, Handshake, RotateCcw, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  Handshake,
+  RotateCcw,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
@@ -16,15 +23,46 @@ type AffiliateItem = RouterOutputs["affiliate"]["list"]["items"][number];
 // AI-scored + reply-drafted, and the team resolves them (the Slack broadcast is
 // the ping; THIS is where dispositions are recorded, per house policy).
 
-const INTENT_META: Record<string, { label: string; text: string; dot: string }> = {
-  "partner-question": { label: "Partner question", text: "text-emerald-400", dot: "bg-emerald-400" },
-  application: { label: "Application", text: "text-sky-400", dot: "bg-sky-400" },
-  "placement-offer": { label: "Placement offer", text: "text-purple-400", dot: "bg-purple-400" },
-  "recruitment-pitch": { label: "Recruitment pitch", text: "text-muted-foreground", dot: "bg-muted-foreground" },
-  "network-notice": { label: "Network notice", text: "text-amber-400", dot: "bg-amber-400" },
+const INTENT_META: Record<
+  string,
+  { label: string; text: string; dot: string }
+> = {
+  "partner-question": {
+    label: "Partner question",
+    text: "text-emerald-400",
+    dot: "bg-emerald-400",
+  },
+  application: {
+    label: "Application",
+    text: "text-sky-400",
+    dot: "bg-sky-400",
+  },
+  "placement-offer": {
+    label: "Placement offer",
+    text: "text-purple-400",
+    dot: "bg-purple-400",
+  },
+  "recruitment-pitch": {
+    label: "Recruitment pitch",
+    text: "text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
+  "network-notice": {
+    label: "Network notice",
+    text: "text-amber-400",
+    dot: "bg-amber-400",
+  },
   compliance: { label: "Compliance", text: "text-red-400", dot: "bg-red-400" },
-  "fraud-signal": { label: "Fraud signal", text: "text-red-400", dot: "bg-red-400" },
-  noise: { label: "Noise", text: "text-muted-foreground", dot: "bg-muted-foreground" },
+  "fraud-signal": {
+    label: "Fraud signal",
+    text: "text-red-400",
+    dot: "bg-red-400",
+  },
+  noise: {
+    label: "Noise",
+    text: "text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
 };
 
 function intentMeta(tag: string | null | undefined) {
@@ -54,7 +92,9 @@ export function AffiliateDesk() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery(trpc.affiliate.list.queryOptions(LIST_INPUT));
+  const { data, isLoading } = useQuery(
+    trpc.affiliate.list.queryOptions(LIST_INPUT),
+  );
 
   const setStatus = useMutation(
     trpc.affiliate.setStatus.mutationOptions({
@@ -78,10 +118,10 @@ export function AffiliateDesk() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
       <header className="flex items-center gap-3">
-        <Handshake className="size-6 text-muted-foreground" />
+        <Handshake className="text-muted-foreground size-6" />
         <div>
           <h1 className="text-lg font-semibold">Affiliate desk</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Inbound program mail, AI-triaged. Resolve here — the Slack ping is
             only the doorbell.
           </p>
@@ -89,9 +129,9 @@ export function AffiliateDesk() {
       </header>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-muted-foreground text-sm">Loading…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Nothing yet. Items appear when partner mail hits the partnerships@
           forward.
         </p>
@@ -143,9 +183,11 @@ function Section({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-left text-sm font-medium text-muted-foreground"
+        className="text-muted-foreground flex items-center gap-1 text-left text-sm font-medium"
       >
-        <ChevronDown className={cn("size-4 transition-transform", !open && "-rotate-90")} />
+        <ChevronDown
+          className={cn("size-4 transition-transform", !open && "-rotate-90")}
+        />
         {title}
       </button>
       {open &&
@@ -171,22 +213,26 @@ function ItemCard({
   const meta = intentMeta(item.intentTag);
 
   return (
-    <div className="rounded-lg border bg-card p-4 text-sm">
+    <div className="bg-card rounded-lg border p-4 text-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
             {meta && (
               <span className={cn("inline-flex items-center gap-1", meta.text)}>
                 <span className={cn("size-1.5 rounded-full", meta.dot)} />
                 {meta.label}
               </span>
             )}
-            {typeof item.relevance === "number" && <span>{item.relevance}/10</span>}
+            {typeof item.relevance === "number" && (
+              <span>{item.relevance}/10</span>
+            )}
             <span>{relTime(item.receivedAt ?? item.createdAt)}</span>
           </div>
-          <p className="mt-1 truncate font-medium">{item.title ?? "(untitled)"}</p>
+          <p className="mt-1 truncate font-medium">
+            {item.title ?? "(untitled)"}
+          </p>
           {item.fromEmail && (
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="text-muted-foreground truncate text-xs">
               {item.fromName ? `${item.fromName} · ` : ""}
               {item.fromEmail}
             </p>
@@ -223,10 +269,14 @@ function ItemCard({
       </div>
 
       {item.snippet && (
-        <p className="mt-2 line-clamp-3 text-muted-foreground">{item.snippet}</p>
+        <p className="text-muted-foreground mt-2 line-clamp-3">
+          {item.snippet}
+        </p>
       )}
       {item.rationale && (
-        <p className="mt-2 text-xs italic text-muted-foreground">{item.rationale}</p>
+        <p className="text-muted-foreground mt-2 text-xs italic">
+          {item.rationale}
+        </p>
       )}
 
       {item.suggestedReply && (
@@ -234,23 +284,30 @@ function ItemCard({
           <button
             type="button"
             onClick={() => setShowReply((v) => !v)}
-            className="flex items-center gap-1 text-xs font-medium text-muted-foreground"
+            className="text-muted-foreground flex items-center gap-1 text-xs font-medium"
           >
             <ChevronDown
-              className={cn("size-3.5 transition-transform", !showReply && "-rotate-90")}
+              className={cn(
+                "size-3.5 transition-transform",
+                !showReply && "-rotate-90",
+              )}
             />
             Suggested reply
           </button>
           {showReply && (
-            <div className="mt-1 rounded-md border bg-muted/40 p-3">
-              <p className="whitespace-pre-wrap text-sm">{item.suggestedReply}</p>
+            <div className="bg-muted/40 mt-1 rounded-md border p-3">
+              <p className="text-sm whitespace-pre-wrap">
+                {item.suggestedReply}
+              </p>
               <Button
                 size="sm"
                 variant="ghost"
                 className="mt-2"
                 onClick={() => {
                   void navigator.clipboard.writeText(item.suggestedReply ?? "");
-                  toast.success("Reply copied — send it from the partnerships inbox");
+                  toast.success(
+                    "Reply copied — send it from the partnerships inbox",
+                  );
                 }}
               >
                 <Copy className="size-3.5" /> Copy

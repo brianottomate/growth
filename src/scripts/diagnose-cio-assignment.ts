@@ -93,7 +93,9 @@ type CioCustomer = {
   assignedBdrOutreachId: string | null;
 };
 
-async function getCioCustomerByEmail(email: string): Promise<CioCustomer | null> {
+async function getCioCustomerByEmail(
+  email: string,
+): Promise<CioCustomer | null> {
   const search = await fetch(
     `https://api.customer.io/v1/customers?email=${encodeURIComponent(email)}`,
     {
@@ -103,7 +105,9 @@ async function getCioCustomerByEmail(email: string): Promise<CioCustomer | null>
   );
 
   if (!search.ok) {
-    throw new Error(`Customer.io search failed (${search.status}) for ${email}`);
+    throw new Error(
+      `Customer.io search failed (${search.status}) for ${email}`,
+    );
   }
 
   const searchJson = (await search.json()) as {
@@ -166,7 +170,9 @@ function parseArgs(argv: string[]): CliOptions {
 
   const sourceRaw = (args.get("source") ?? "outreach").toLowerCase();
   if (sourceRaw !== "outreach" && sourceRaw !== "file") {
-    throw new Error(`Invalid --source '${sourceRaw}'. Use 'outreach' or 'file'.`);
+    throw new Error(
+      `Invalid --source '${sourceRaw}'. Use 'outreach' or 'file'.`,
+    );
   }
 
   const source = sourceRaw;
@@ -181,7 +187,9 @@ function parseArgs(argv: string[]): CliOptions {
   const concurrency = toInt(args.get("concurrency"), 5, 1, 25);
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
-  const out = resolve(args.get("out") ?? `./reports/cio-assignment-diagnostic-${ts}.json`);
+  const out = resolve(
+    args.get("out") ?? `./reports/cio-assignment-diagnostic-${ts}.json`,
+  );
 
   return { source, input, limit, pageSize, concurrency, out };
 }
@@ -220,7 +228,9 @@ function parseOwnerId(relationships: unknown): string | null {
   return coercePrimitiveToString(id);
 }
 
-async function loadCandidatesFromOutreach(options: CliOptions): Promise<ProspectCandidate[]> {
+async function loadCandidatesFromOutreach(
+  options: CliOptions,
+): Promise<ProspectCandidate[]> {
   const outreach = await import("../server/clients/outreach.client");
   const seen = new Set<string>();
   const candidates: ProspectCandidate[] = [];
@@ -258,7 +268,10 @@ async function loadCandidatesFromOutreach(options: CliOptions): Promise<Prospect
   return candidates;
 }
 
-async function loadCandidatesFromFile(path: string, limit: number): Promise<ProspectCandidate[]> {
+async function loadCandidatesFromFile(
+  path: string,
+  limit: number,
+): Promise<ProspectCandidate[]> {
   const absolute = resolve(path);
   if (!existsSync(absolute)) {
     throw new Error(`Input file not found: ${absolute}`);
@@ -296,11 +309,14 @@ async function loadCandidatesFromFile(path: string, limit: number): Promise<Pros
         outreachOwnerId:
           typeof record.outreachOwnerId === "string"
             ? record.outreachOwnerId
-            : typeof (record.outreachOwner as { id?: unknown } | undefined)?.id === "string"
-              ? ((record.outreachOwner as { id: string }).id)
+            : typeof (record.outreachOwner as { id?: unknown } | undefined)
+                  ?.id === "string"
+              ? (record.outreachOwner as { id: string }).id
               : null,
         outreachUpdatedAt:
-          typeof record.outreachUpdatedAt === "string" ? record.outreachUpdatedAt : null,
+          typeof record.outreachUpdatedAt === "string"
+            ? record.outreachUpdatedAt
+            : null,
       });
 
       if (out.length >= limit) break;
@@ -314,9 +330,15 @@ async function loadCandidatesFromFile(path: string, limit: number): Promise<Pros
 
   const header = lines[0]!.split(",").map((x) => x.trim().toLowerCase());
   const emailIdx = header.findIndex((h) => h === "email");
-  const ownerIdx = header.findIndex((h) => h === "outreach_owner_id" || h === "owner_id");
-  const prospectIdx = header.findIndex((h) => h === "outreach_prospect_id" || h === "prospect_id");
-  const updatedIdx = header.findIndex((h) => h === "outreach_updated_at" || h === "updated_at");
+  const ownerIdx = header.findIndex(
+    (h) => h === "outreach_owner_id" || h === "owner_id",
+  );
+  const prospectIdx = header.findIndex(
+    (h) => h === "outreach_prospect_id" || h === "prospect_id",
+  );
+  const updatedIdx = header.findIndex(
+    (h) => h === "outreach_updated_at" || h === "updated_at",
+  );
 
   const out: ProspectCandidate[] = [];
   const seen = new Set<string>();
@@ -332,9 +354,12 @@ async function loadCandidatesFromFile(path: string, limit: number): Promise<Pros
     if (!email || seen.has(email)) continue;
     seen.add(email);
 
-    const owner = ownerIdx >= 0 ? cols[ownerIdx]?.replace(/^"|"$/g, "").trim() : "";
-    const prospectId = prospectIdx >= 0 ? cols[prospectIdx]?.replace(/^"|"$/g, "").trim() : "";
-    const updatedAt = updatedIdx >= 0 ? cols[updatedIdx]?.replace(/^"|"$/g, "").trim() : "";
+    const owner =
+      ownerIdx >= 0 ? cols[ownerIdx]?.replace(/^"|"$/g, "").trim() : "";
+    const prospectId =
+      prospectIdx >= 0 ? cols[prospectIdx]?.replace(/^"|"$/g, "").trim() : "";
+    const updatedAt =
+      updatedIdx >= 0 ? cols[updatedIdx]?.replace(/^"|"$/g, "").trim() : "";
 
     out.push({
       email,
@@ -347,7 +372,9 @@ async function loadCandidatesFromFile(path: string, limit: number): Promise<Pros
   return out;
 }
 
-async function loadOwnerDirectory(ownerIds: string[]): Promise<Map<string, OwnerInfo>> {
+async function loadOwnerDirectory(
+  ownerIds: string[],
+): Promise<Map<string, OwnerInfo>> {
   const outreach = await import("../server/clients/outreach.client");
   const target = new Set(ownerIds);
   const byId = new Map<string, OwnerInfo>();
@@ -356,7 +383,10 @@ async function loadOwnerDirectory(ownerIds: string[]): Promise<Map<string, Owner
 
   let page = 1;
   while (true) {
-    const usersResponse = await outreach.getUsers({ pageSize: 100, pageNumber: page });
+    const usersResponse = await outreach.getUsers({
+      pageSize: 100,
+      pageNumber: page,
+    });
     if (!usersResponse.data.length) break;
 
     for (const user of usersResponse.data) {
@@ -365,7 +395,9 @@ async function loadOwnerDirectory(ownerIds: string[]): Promise<Map<string, Owner
       byId.set(id, {
         id,
         name: user.attributes.name,
-        email: user.attributes.email ? normalizeEmail(user.attributes.email) : null,
+        email: user.attributes.email
+          ? normalizeEmail(user.attributes.email)
+          : null,
       });
     }
 
@@ -402,7 +434,9 @@ async function mapWithConcurrency<T, R>(
   });
 }
 
-function buildStatusCounts(records: DiagnosticRecord[]): Record<string, number> {
+function buildStatusCounts(
+  records: DiagnosticRecord[],
+): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const r of records) {
     counts[r.status] = (counts[r.status] ?? 0) + 1;
@@ -432,123 +466,131 @@ async function run(): Promise<void> {
     .filter((id): id is string => !!id);
   const ownerDirectory = await loadOwnerDirectory([...new Set(ownerIds)]);
 
-  const records = await mapWithConcurrency(candidates, options.concurrency, async (candidate) => {
-    try {
-      if (!candidate.outreachOwnerId) {
-        return {
-          email: candidate.email,
-          status: "missing_outreach_owner",
-          reason: "Outreach prospect has no owner",
-          outreachProspectId: candidate.outreachProspectId,
-          outreachUpdatedAt: candidate.outreachUpdatedAt,
-          outreachOwner: null,
-          cioAssignment: null,
-          actionable: false,
-        } satisfies DiagnosticRecord;
-      }
+  const records = await mapWithConcurrency(
+    candidates,
+    options.concurrency,
+    async (candidate) => {
+      try {
+        if (!candidate.outreachOwnerId) {
+          return {
+            email: candidate.email,
+            status: "missing_outreach_owner",
+            reason: "Outreach prospect has no owner",
+            outreachProspectId: candidate.outreachProspectId,
+            outreachUpdatedAt: candidate.outreachUpdatedAt,
+            outreachOwner: null,
+            cioAssignment: null,
+            actionable: false,
+          } satisfies DiagnosticRecord;
+        }
 
-      const owner = ownerDirectory.get(candidate.outreachOwnerId);
-      if (!owner) {
-        return {
-          email: candidate.email,
-          status: "owner_not_resolvable",
-          reason: `Outreach owner ${candidate.outreachOwnerId} not found in users directory`,
-          outreachProspectId: candidate.outreachProspectId,
-          outreachUpdatedAt: candidate.outreachUpdatedAt,
-          outreachOwner: {
-            id: candidate.outreachOwnerId,
-            name: `Outreach User ${candidate.outreachOwnerId}`,
-            email: null,
-          },
-          cioAssignment: null,
-          actionable: false,
-        } satisfies DiagnosticRecord;
-      }
-
-      const cioCustomer = await getCioCustomerByEmail(candidate.email);
-      if (!cioCustomer) {
-        return {
-          email: candidate.email,
-          status: "missing_cio_customer",
-          reason: "No Customer.io customer for this email",
-          outreachProspectId: candidate.outreachProspectId,
-          outreachUpdatedAt: candidate.outreachUpdatedAt,
-          outreachOwner: owner,
-          cioAssignment: null,
-          actionable: false,
-        } satisfies DiagnosticRecord;
-      }
-
-      const cioAssignment = {
-        assignedBdrEmail: cioCustomer.assignedBdrEmail
-          ? normalizeEmail(cioCustomer.assignedBdrEmail)
-          : null,
-        assignedBdrName: cioCustomer.assignedBdrName,
-        assignedBdrOutreachId: cioCustomer.assignedBdrOutreachId,
-      };
-
-      if (!cioAssignment.assignedBdrOutreachId && !cioAssignment.assignedBdrEmail) {
-        return {
-          email: candidate.email,
-          status: "missing_cio_assignment",
-          reason: "CIO has no BDR assignment fields",
-          outreachProspectId: candidate.outreachProspectId,
-          outreachUpdatedAt: candidate.outreachUpdatedAt,
-          outreachOwner: owner,
-          cioAssignment,
-          actionable: !!owner.email,
-        } satisfies DiagnosticRecord;
-      }
-
-      const outreachIdMismatch = cioAssignment.assignedBdrOutreachId !== owner.id;
-      const emailMismatch =
-        !!owner.email && !!cioAssignment.assignedBdrEmail
-          ? cioAssignment.assignedBdrEmail !== owner.email
-          : false;
-
-      if (outreachIdMismatch || emailMismatch) {
-        return {
-          email: candidate.email,
-          status: "mismatch",
-          reason: `CIO assignment does not match Outreach owner (${outreachIdMismatch ? "owner_id" : ""}${outreachIdMismatch && emailMismatch ? "+" : ""}${emailMismatch ? "email" : ""})`,
-          outreachProspectId: candidate.outreachProspectId,
-          outreachUpdatedAt: candidate.outreachUpdatedAt,
-          outreachOwner: owner,
-          cioAssignment,
-          actionable: !!owner.email,
-        } satisfies DiagnosticRecord;
-      }
-
-      return {
-        email: candidate.email,
-        status: "in_sync",
-        reason: "CIO assignment matches Outreach owner",
-        outreachProspectId: candidate.outreachProspectId,
-        outreachUpdatedAt: candidate.outreachUpdatedAt,
-        outreachOwner: owner,
-        cioAssignment,
-        actionable: false,
-      } satisfies DiagnosticRecord;
-    } catch (error) {
-      return {
-        email: candidate.email,
-        status: "error",
-        reason: "Unexpected error during diagnostic",
-        outreachProspectId: candidate.outreachProspectId,
-        outreachUpdatedAt: candidate.outreachUpdatedAt,
-        outreachOwner: candidate.outreachOwnerId
-          ? {
+        const owner = ownerDirectory.get(candidate.outreachOwnerId);
+        if (!owner) {
+          return {
+            email: candidate.email,
+            status: "owner_not_resolvable",
+            reason: `Outreach owner ${candidate.outreachOwnerId} not found in users directory`,
+            outreachProspectId: candidate.outreachProspectId,
+            outreachUpdatedAt: candidate.outreachUpdatedAt,
+            outreachOwner: {
               id: candidate.outreachOwnerId,
               name: `Outreach User ${candidate.outreachOwnerId}`,
               email: null,
-            }
-          : null,
-        cioAssignment: null,
-        actionable: false,
-        error: error instanceof Error ? error.message : String(error),
-      } satisfies DiagnosticRecord;
-    }
-  });
+            },
+            cioAssignment: null,
+            actionable: false,
+          } satisfies DiagnosticRecord;
+        }
+
+        const cioCustomer = await getCioCustomerByEmail(candidate.email);
+        if (!cioCustomer) {
+          return {
+            email: candidate.email,
+            status: "missing_cio_customer",
+            reason: "No Customer.io customer for this email",
+            outreachProspectId: candidate.outreachProspectId,
+            outreachUpdatedAt: candidate.outreachUpdatedAt,
+            outreachOwner: owner,
+            cioAssignment: null,
+            actionable: false,
+          } satisfies DiagnosticRecord;
+        }
+
+        const cioAssignment = {
+          assignedBdrEmail: cioCustomer.assignedBdrEmail
+            ? normalizeEmail(cioCustomer.assignedBdrEmail)
+            : null,
+          assignedBdrName: cioCustomer.assignedBdrName,
+          assignedBdrOutreachId: cioCustomer.assignedBdrOutreachId,
+        };
+
+        if (
+          !cioAssignment.assignedBdrOutreachId &&
+          !cioAssignment.assignedBdrEmail
+        ) {
+          return {
+            email: candidate.email,
+            status: "missing_cio_assignment",
+            reason: "CIO has no BDR assignment fields",
+            outreachProspectId: candidate.outreachProspectId,
+            outreachUpdatedAt: candidate.outreachUpdatedAt,
+            outreachOwner: owner,
+            cioAssignment,
+            actionable: !!owner.email,
+          } satisfies DiagnosticRecord;
+        }
+
+        const outreachIdMismatch =
+          cioAssignment.assignedBdrOutreachId !== owner.id;
+        const emailMismatch =
+          !!owner.email && !!cioAssignment.assignedBdrEmail
+            ? cioAssignment.assignedBdrEmail !== owner.email
+            : false;
+
+        if (outreachIdMismatch || emailMismatch) {
+          return {
+            email: candidate.email,
+            status: "mismatch",
+            reason: `CIO assignment does not match Outreach owner (${outreachIdMismatch ? "owner_id" : ""}${outreachIdMismatch && emailMismatch ? "+" : ""}${emailMismatch ? "email" : ""})`,
+            outreachProspectId: candidate.outreachProspectId,
+            outreachUpdatedAt: candidate.outreachUpdatedAt,
+            outreachOwner: owner,
+            cioAssignment,
+            actionable: !!owner.email,
+          } satisfies DiagnosticRecord;
+        }
+
+        return {
+          email: candidate.email,
+          status: "in_sync",
+          reason: "CIO assignment matches Outreach owner",
+          outreachProspectId: candidate.outreachProspectId,
+          outreachUpdatedAt: candidate.outreachUpdatedAt,
+          outreachOwner: owner,
+          cioAssignment,
+          actionable: false,
+        } satisfies DiagnosticRecord;
+      } catch (error) {
+        return {
+          email: candidate.email,
+          status: "error",
+          reason: "Unexpected error during diagnostic",
+          outreachProspectId: candidate.outreachProspectId,
+          outreachUpdatedAt: candidate.outreachUpdatedAt,
+          outreachOwner: candidate.outreachOwnerId
+            ? {
+                id: candidate.outreachOwnerId,
+                name: `Outreach User ${candidate.outreachOwnerId}`,
+                email: null,
+              }
+            : null,
+          cioAssignment: null,
+          actionable: false,
+          error: error instanceof Error ? error.message : String(error),
+        } satisfies DiagnosticRecord;
+      }
+    },
+  );
 
   const report: DiagnosticReport = {
     generatedAt: new Date().toISOString(),

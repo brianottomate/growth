@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getOAuthAuthorizationUrl, isOAuthConfigured } from "@/server/clients/outreach.client";
+import {
+  getOAuthAuthorizationUrl,
+  isOAuthConfigured,
+} from "@/server/clients/outreach.client";
 import { env } from "@/env";
 
 /**
@@ -16,7 +19,8 @@ export async function GET() {
       {
         success: false,
         error: "OAuth not configured",
-        message: "Set OUTREACH_OAUTH_CLIENT_ID and OUTREACH_OAUTH_CLIENT_SECRET",
+        message:
+          "Set OUTREACH_OAUTH_CLIENT_ID and OUTREACH_OAUTH_CLIENT_SECRET",
       },
       { status: 500 },
     );

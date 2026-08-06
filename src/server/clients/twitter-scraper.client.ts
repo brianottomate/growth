@@ -88,8 +88,7 @@ export async function scrapeTweets(options: {
 
 // Pick the highest-bitrate mp4 for a video; fall back to the poster image.
 function tweetMedia(tweet: ApifyTweet): MediaItem[] {
-  const raw =
-    tweet.extendedEntities?.media ?? tweet.entities?.media ?? [];
+  const raw = tweet.extendedEntities?.media ?? tweet.entities?.media ?? [];
   const items: MediaItem[] = [];
   for (const m of raw) {
     if (m.type === "photo") {
@@ -161,7 +160,11 @@ export function mapTweetToPlatformPost(
     stats,
     externalId: tweet.id,
     externalUrl: tweet.url ?? tweet.twitterUrl,
-    externalKind: tweet.isRetweet ? "retweet" : tweet.isQuote ? "quote" : "tweet",
+    externalKind: tweet.isRetweet
+      ? "retweet"
+      : tweet.isQuote
+        ? "quote"
+        : "tweet",
     publishedAt,
     scrapedAt: ctx.scrapedAt ?? new Date(),
     metadata: {

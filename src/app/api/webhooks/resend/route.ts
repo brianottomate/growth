@@ -99,7 +99,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
       console.log(`[resend-webhook] f5bot ingest:`, result);
     } catch (err) {
-      console.error(`[resend-webhook] f5bot ingest failed for ${emailId}:`, err);
+      console.error(
+        `[resend-webhook] f5bot ingest failed for ${emailId}:`,
+        err,
+      );
     }
   } else if (recipient.includes("inspo")) {
     try {
@@ -114,7 +117,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
       console.log(`[resend-webhook] inspiration ingest:`, result);
     } catch (err) {
-      console.error(`[resend-webhook] inspiration ingest failed for ${emailId}:`, err);
+      console.error(
+        `[resend-webhook] inspiration ingest failed for ${emailId}:`,
+        err,
+      );
     }
   } else if (recipient.includes("affiliate")) {
     try {
@@ -129,10 +135,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
       console.log(`[resend-webhook] affiliate ingest:`, result);
     } catch (err) {
-      console.error(`[resend-webhook] affiliate ingest failed for ${emailId}:`, err);
+      console.error(
+        `[resend-webhook] affiliate ingest failed for ${emailId}:`,
+        err,
+      );
     }
   } else {
-    console.log(`[resend-webhook] no handler for recipient "${recipient}" — ignored`);
+    console.log(
+      `[resend-webhook] no handler for recipient "${recipient}" — ignored`,
+    );
   }
 
   return NextResponse.json({ received: true });

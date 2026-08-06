@@ -119,7 +119,11 @@ export function BrandLinks({
   };
   const openEdit = (i: number) => {
     const l = links[i]!;
-    setForm({ label: l.label, url: l.url ?? "", category: l.category ?? "other" });
+    setForm({
+      label: l.label,
+      url: l.url ?? "",
+      category: l.category ?? "other",
+    });
     setEditing(i);
   };
 
@@ -131,7 +135,8 @@ export function BrandLinks({
       label,
       ...(url && { url }),
       // Auto-detect on save when the user left the category untouched.
-      category: url && form.category === "other" ? detectCategory(url) : form.category,
+      category:
+        url && form.category === "other" ? detectCategory(url) : form.category,
     };
     persist(
       editing === NEW
@@ -205,10 +210,15 @@ export function BrandLinks({
         Add link
       </button>
 
-      <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
+      <Dialog
+        open={editing !== null}
+        onOpenChange={(o) => !o && setEditing(null)}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing === NEW ? "Add link" : "Edit link"}</DialogTitle>
+            <DialogTitle>
+              {editing === NEW ? "Add link" : "Edit link"}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-2">
@@ -217,7 +227,9 @@ export function BrandLinks({
               <Input
                 autoFocus
                 value={form.label}
-                onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, label: e.target.value }))
+                }
                 placeholder="Podcast tour"
               />
             </div>
@@ -225,11 +237,14 @@ export function BrandLinks({
               <Label>URL</Label>
               <Input
                 value={form.url}
-                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, url: e.target.value }))
+                }
                 placeholder="https://docs.google.com/…"
               />
               <p className="text-muted-foreground text-xs">
-                Optional — leave blank to add it as a placeholder and fill in later.
+                Optional — leave blank to add it as a placeholder and fill in
+                later.
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -269,7 +284,11 @@ export function BrandLinks({
               <span />
             )}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setEditing(null)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditing(null)}
+              >
                 Cancel
               </Button>
               <Button size="sm" onClick={save} disabled={!form.label.trim()}>

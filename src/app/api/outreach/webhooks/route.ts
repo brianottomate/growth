@@ -24,7 +24,11 @@ export async function GET() {
 
   try {
     const webhooks = await listOutreachWebhooks();
-    return NextResponse.json({ success: true, count: webhooks.length, webhooks });
+    return NextResponse.json({
+      success: true,
+      count: webhooks.length,
+      webhooks,
+    });
   } catch (error) {
     console.error("❌ [Outreach Webhooks] List error:", error);
     if (isOutreachError(error)) {
@@ -34,7 +38,10 @@ export async function GET() {
       );
     }
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     );
   }
@@ -60,7 +67,11 @@ export async function POST(request: NextRequest) {
 
     if (!body.url || !body.resource || !body.action || !body.authorizerUserId) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields: url, resource, action, authorizerUserId" },
+        {
+          success: false,
+          error:
+            "Missing required fields: url, resource, action, authorizerUserId",
+        },
         { status: 400 },
       );
     }
@@ -88,7 +99,10 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     );
   }

@@ -97,7 +97,9 @@ export function ContentSheet({
   // Default to the current month if it has rows, else the latest workbook.
   const month =
     (picked && months.includes(picked) ? picked : null) ??
-    (months.includes(currentYm) ? currentYm : (months[months.length - 1] ?? null));
+    (months.includes(currentYm)
+      ? currentYm
+      : (months[months.length - 1] ?? null));
 
   const monthRows = useMemo(
     () => (month ? rows.filter((r) => ymOf(r.at) === month) : []),
@@ -118,8 +120,8 @@ export function ContentSheet({
           </div>
         ) : months.length === 0 ? (
           <div className="text-muted-foreground px-3 py-12 text-center text-sm">
-            No dated content yet — give an idea a plan date or schedule a spot and
-            it shows up here.
+            No dated content yet — give an idea a plan date or schedule a spot
+            and it shows up here.
           </div>
         ) : (
           <table className="border-collapse text-sm">
@@ -128,10 +130,7 @@ export function ContentSheet({
                 {COLUMNS.map((label, i) => (
                   <th
                     key={label}
-                    className={cn(
-                      headerCls,
-                      i === 0 && "left-0 z-30",
-                    )}
+                    className={cn(headerCls, i === 0 && "left-0 z-30")}
                   >
                     {label}
                   </th>
@@ -140,7 +139,12 @@ export function ContentSheet({
             </thead>
             <tbody>
               {monthRows.map((r) => (
-                <SheetRow key={r.id} row={r} onOpen={onOpen} cellCls={cellCls} />
+                <SheetRow
+                  key={r.id}
+                  row={r}
+                  onOpen={onOpen}
+                  cellCls={cellCls}
+                />
               ))}
             </tbody>
           </table>
@@ -150,14 +154,16 @@ export function ContentSheet({
       {/* Month "workbooks" — the spreadsheet tab strip. */}
       <div className="border-border bg-muted/30 flex items-center gap-1 overflow-x-auto rounded-b-xl border border-t-0 px-2 py-1.5">
         {months.length === 0 ? (
-          <span className="text-muted-foreground px-2 text-xs">No workbooks</span>
+          <span className="text-muted-foreground px-2 text-xs">
+            No workbooks
+          </span>
         ) : (
           months.map((ym) => (
             <button
               key={ym}
               onClick={() => setPicked(ym)}
               className={cn(
-                "whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                "rounded-md px-3 py-1 text-xs font-medium whitespace-nowrap transition-colors",
                 ym === month
                   ? "bg-background text-foreground border-border border shadow-sm"
                   : "text-muted-foreground hover:bg-accent",
@@ -201,7 +207,7 @@ function SheetRow({
       <td
         className={cn(
           cellCls,
-          "bg-background group-hover:bg-accent/40 sticky left-0 z-10 whitespace-nowrap font-medium tabular-nums",
+          "bg-background group-hover:bg-accent/40 sticky left-0 z-10 font-medium whitespace-nowrap tabular-nums",
         )}
       >
         {fmtDay(r.at)}
@@ -237,7 +243,10 @@ function SheetRow({
       </td>
 
       {/* Series */}
-      <td className={cn(cellCls, "max-w-[160px] truncate")} title={r.seriesName ?? ""}>
+      <td
+        className={cn(cellCls, "max-w-[160px] truncate")}
+        title={r.seriesName ?? ""}
+      >
         {r.seriesName ? (
           <span
             className="rounded-full px-2 py-0.5 text-xs font-medium"
@@ -255,10 +264,12 @@ function SheetRow({
 
       {/* Content Concept (title) */}
       <td
-        className={cn(cellCls, "min-w-[200px] max-w-[260px] font-medium")}
+        className={cn(cellCls, "max-w-[260px] min-w-[200px] font-medium")}
         title={r.title ?? ""}
       >
-        {r.title ?? <span className="text-muted-foreground font-normal">Untitled</span>}
+        {r.title ?? (
+          <span className="text-muted-foreground font-normal">Untitled</span>
+        )}
       </td>
 
       {/* Format */}
@@ -280,7 +291,7 @@ function SheetRow({
       <LongCell cellCls={cellCls} value={r.ctaText} />
 
       {/* ManyChat? — derived from a comment-trigger keyword being set */}
-      <td className={cn(cellCls, "whitespace-nowrap text-center")}>
+      <td className={cn(cellCls, "text-center whitespace-nowrap")}>
         {r.ctaKeyword ? (
           <span className="rounded px-1.5 py-0.5 text-xs font-semibold text-emerald-300">
             YES
@@ -339,9 +350,15 @@ function SheetRow({
   );
 }
 
-function LongCell({ cellCls, value }: { cellCls: string; value: string | null }) {
+function LongCell({
+  cellCls,
+  value,
+}: {
+  cellCls: string;
+  value: string | null;
+}) {
   return (
-    <td className={cn(cellCls, "min-w-[220px] max-w-[280px]")}>
+    <td className={cn(cellCls, "max-w-[280px] min-w-[220px]")}>
       {value ? (
         <span className="text-muted-foreground line-clamp-4 whitespace-pre-wrap">
           {value}
@@ -363,7 +380,10 @@ function LinkCell({
   label: string;
 }) {
   return (
-    <td className={cn(cellCls, "whitespace-nowrap")} onClick={(e) => e.stopPropagation()}>
+    <td
+      className={cn(cellCls, "whitespace-nowrap")}
+      onClick={(e) => e.stopPropagation()}
+    >
       {urls.length === 0 ? (
         <span className="text-muted-foreground">—</span>
       ) : (
@@ -381,7 +401,9 @@ function LinkCell({
             </a>
           ))}
           {urls.length > 3 && (
-            <span className="text-muted-foreground text-xs">+{urls.length - 3}</span>
+            <span className="text-muted-foreground text-xs">
+              +{urls.length - 3}
+            </span>
           )}
         </span>
       )}

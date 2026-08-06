@@ -31,13 +31,40 @@ interface StoredScan {
   states: Record<string, TweetState>;
 }
 
-const INTENT_META: Record<IntentTag, { label: string; cls: string; dot: string }> = {
-  brand: { label: "Brand mention", cls: "border-emerald-500/45 text-emerald-400", dot: "bg-emerald-400" },
-  "high-intent": { label: "High intent", cls: "border-emerald-500/45 text-emerald-400", dot: "bg-emerald-400" },
-  "medium-intent": { label: "Medium intent", cls: "border-sky-500/45 text-sky-400", dot: "bg-sky-400" },
-  positioning: { label: "Positioning", cls: "border-purple-500/45 text-purple-400", dot: "bg-purple-400" },
-  "operator-pain": { label: "Operator pain", cls: "border-amber-500/45 text-amber-400", dot: "bg-amber-400" },
-  noise: { label: "Noise", cls: "border-border text-muted-foreground", dot: "bg-muted-foreground" },
+const INTENT_META: Record<
+  IntentTag,
+  { label: string; cls: string; dot: string }
+> = {
+  brand: {
+    label: "Brand mention",
+    cls: "border-emerald-500/45 text-emerald-400",
+    dot: "bg-emerald-400",
+  },
+  "high-intent": {
+    label: "High intent",
+    cls: "border-emerald-500/45 text-emerald-400",
+    dot: "bg-emerald-400",
+  },
+  "medium-intent": {
+    label: "Medium intent",
+    cls: "border-sky-500/45 text-sky-400",
+    dot: "bg-sky-400",
+  },
+  positioning: {
+    label: "Positioning",
+    cls: "border-purple-500/45 text-purple-400",
+    dot: "bg-purple-400",
+  },
+  "operator-pain": {
+    label: "Operator pain",
+    cls: "border-amber-500/45 text-amber-400",
+    dot: "bg-amber-400",
+  },
+  noise: {
+    label: "Noise",
+    cls: "border-border text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
 };
 
 // The four disclosure/focus modifiers shown in the composer (a subset of the
@@ -54,12 +81,18 @@ type ComposerPill = (typeof COMPOSER_PILLS)[number]["id"];
 const DRAFT_CHAR_CAP = 270;
 
 const compact = (n: number) =>
-  new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(n);
 
 function dayLabel(iso: string): string {
   const d = new Date(iso);
-  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86_400_000);
+  const startOfDay = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round(
+    (startOfDay(new Date()) - startOfDay(d)) / 86_400_000,
+  );
   if (diffDays <= 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -76,16 +109,28 @@ function relTime(ts: number): string {
 
 // Engagement-per-hour read so the stream shows what's moving, not just totals.
 function velocityOf(t: ScannedTweet["tweet"]): { label: string; cls: string } {
-  const hours = Math.max(1, (Date.now() - new Date(t.createdAt).getTime()) / 3_600_000);
+  const hours = Math.max(
+    1,
+    (Date.now() - new Date(t.createdAt).getTime()) / 3_600_000,
+  );
   const score = (t.likeCount + 2 * t.retweetCount + t.replyCount) / hours;
-  if (score >= 8) return { label: "↗ rising", cls: "text-amber-400 font-medium" };
+  if (score >= 8)
+    return { label: "↗ rising", cls: "text-amber-400 font-medium" };
   if (score >= 1) return { label: "→ steady", cls: "text-muted-foreground" };
   return { label: "· quiet", cls: "text-muted-foreground" };
 }
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function HighlightedText({ text, terms, markClass }: { text: string; terms: string[]; markClass: string }) {
+function HighlightedText({
+  text,
+  terms,
+  markClass,
+}: {
+  text: string;
+  terms: string[];
+  markClass: string;
+}) {
   if (terms.length === 0) return <>{text}</>;
   const pattern = new RegExp(`(${terms.map(escapeRegExp).join("|")})`, "gi");
   const lower = new Set(terms.map((t) => t.toLowerCase()));
@@ -93,7 +138,9 @@ function HighlightedText({ text, terms, markClass }: { text: string; terms: stri
     <>
       {text.split(pattern).map((part, i) =>
         lower.has(part.toLowerCase()) ? (
-          <mark key={i} className={markClass}>{part}</mark>
+          <mark key={i} className={markClass}>
+            {part}
+          </mark>
         ) : (
           <Fragment key={i}>{part}</Fragment>
         ),
@@ -124,7 +171,7 @@ function Btn({
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         primary
           ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-          : "border-border bg-transparent text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+          : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground bg-transparent"
       }`}
     >
       {children}
@@ -200,8 +247,12 @@ export function XListening() {
       (!filter || e.match?.group.id === filter) &&
       (e.state !== "skipped" || showSkipped),
   );
-  const act = visible.filter((e) => e.scored.suggestedAction === "engage" && e.state === "queued");
-  const monitor = visible.filter((e) => e.scored.suggestedAction === "monitor" && e.state === "queued");
+  const act = visible.filter(
+    (e) => e.scored.suggestedAction === "engage" && e.state === "queued",
+  );
+  const monitor = visible.filter(
+    (e) => e.scored.suggestedAction === "monitor" && e.state === "queued",
+  );
   const handled = visible.filter((e) => e.state === "engaged");
   const skipped = visible.filter((e) => e.state === "skipped");
   const skippedTotal = enriched.filter((e) => e.state === "skipped").length;
@@ -213,7 +264,8 @@ export function XListening() {
   const matchCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const e of enriched) {
-      if (e.match) counts[e.match.group.id] = (counts[e.match.group.id] ?? 0) + 1;
+      if (e.match)
+        counts[e.match.group.id] = (counts[e.match.group.id] ?? 0) + 1;
     }
     return counts;
   }, [enriched]);
@@ -222,8 +274,10 @@ export function XListening() {
     <section className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">X — listening</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2 className="text-lg font-semibold tracking-tight">
+            X — listening
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">
             {stored
               ? `Last scan ${relTime(stored.scannedAt)} · 7-day window · ${stored.totalFetched} fetched → ${aboveNoise} above noise`
               : "No scan yet · 7-day window over the watchlist terms"}
@@ -233,29 +287,29 @@ export function XListening() {
           type="button"
           disabled={scan.isPending}
           onClick={runScan}
-          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           {scan.isPending ? "Scanning…" : "Scan now"}
         </button>
       </div>
 
-      <p className="max-w-[760px] text-sm text-pretty text-muted-foreground">
-        The X channel gets its own room: watchlist groups drive the scan, matched
-        terms highlight in the tweet, velocity shows what&rsquo;s moving, and the
-        composer enforces the 270-char cap with the disclosure pills from the
-        draft service. States persist — same queue semantics as the rest of
-        Listen.
+      <p className="text-muted-foreground max-w-[760px] text-sm text-pretty">
+        The X channel gets its own room: watchlist groups drive the scan,
+        matched terms highlight in the tweet, velocity shows what&rsquo;s
+        moving, and the composer enforces the 270-char cap with the disclosure
+        pills from the draft service. States persist — same queue semantics as
+        the rest of Listen.
       </p>
 
       {scan.isError && (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm">
           {scan.error.message}
         </p>
       )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[248px_1fr]">
         <div className="flex flex-col gap-2.5 lg:sticky lg:top-6">
-          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
             Watchlist
           </span>
           {X_WATCHLIST.map((g) => {
@@ -266,13 +320,19 @@ export function XListening() {
                 type="button"
                 onClick={() => setFilter(active ? null : g.id)}
                 className={`flex flex-col gap-1.5 rounded-[10px] border p-3 text-left transition-colors ${
-                  active ? g.activeCardClass : "bg-card hover:border-foreground/20"
+                  active
+                    ? g.activeCardClass
+                    : "bg-card hover:border-foreground/20"
                 }`}
               >
                 <span className="flex items-center gap-1.5">
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${g.dotClass}`} />
-                  <span className="text-xs font-medium text-foreground">{g.name}</span>
-                  <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${g.dotClass}`}
+                  />
+                  <span className="text-foreground text-xs font-medium">
+                    {g.name}
+                  </span>
+                  <span className="text-muted-foreground ml-auto text-[11px] tabular-nums">
                     {matchCounts[g.id] ?? 0}
                   </span>
                 </span>
@@ -280,7 +340,7 @@ export function XListening() {
                   {g.terms.map((t) => (
                     <span
                       key={t}
-                      className="rounded bg-muted px-1.5 py-px text-[11px] text-muted-foreground"
+                      className="bg-muted text-muted-foreground rounded px-1.5 py-px text-[11px]"
                     >
                       {t}
                     </span>
@@ -289,7 +349,7 @@ export function XListening() {
               </button>
             );
           })}
-          <span className="text-[11px] leading-relaxed text-muted-foreground">
+          <span className="text-muted-foreground text-[11px] leading-relaxed">
             Terms kept aligned with the Reddit filter. Click a group to filter
             the stream; click again to clear.
           </span>
@@ -297,7 +357,7 @@ export function XListening() {
             <button
               type="button"
               onClick={() => setShowSkipped((v) => !v)}
-              className="self-start text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              className="text-muted-foreground hover:text-foreground self-start text-[11px] underline-offset-2 hover:underline"
             >
               {showSkipped ? "Hide skipped" : `Show skipped (${skippedTotal})`}
             </button>
@@ -306,7 +366,7 @@ export function XListening() {
 
         <div>
           {!hydrated ? null : !stored ? (
-            <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+            <div className="bg-card text-muted-foreground rounded-xl border p-6 text-sm">
               Run a scan to pull the last 7 days of watchlist matches from X and
               score them for intent.
             </div>
@@ -327,7 +387,7 @@ export function XListening() {
                 </QueueGroup>
               )}
               {visible.length === 0 && (
-                <p className="py-6 text-sm text-muted-foreground">
+                <p className="text-muted-foreground py-6 text-sm">
                   No tweets match this filter.
                 </p>
               )}
@@ -373,9 +433,11 @@ function QueueGroup({
         >
           {label}
         </span>
-        <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {count}
+        </span>
       </div>
-      <div className="divide-y rounded-xl border bg-card">{children}</div>
+      <div className="bg-card divide-y rounded-xl border">{children}</div>
     </div>
   );
 }
@@ -414,32 +476,33 @@ function TweetCard({
   ].join("\n");
 
   return (
-    <div
-      className={`transition-opacity ${handled ? "opacity-55" : ""}`}
-    >
+    <div className={`transition-opacity ${handled ? "opacity-55" : ""}`}>
       <div
         onClick={() => setOpen((v) => !v)}
         className="flex cursor-pointer gap-2.5 p-3.5"
       >
-        <span className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
+        <span className="bg-muted text-muted-foreground inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[11px] font-medium">
           {initials}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-medium">{t.authorName}</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               @{t.authorUsername}
-              {t.authorFollowers > 0 && <> · {compact(t.authorFollowers)}</>} ·{" "}
-              {dayLabel(t.createdAt)}
+              {t.authorFollowers > 0 && (
+                <> · {compact(t.authorFollowers)}</>
+              )} · {dayLabel(t.createdAt)}
             </span>
             <span className="ml-auto inline-flex shrink-0 items-center gap-1.5">
               <span
                 className={`inline-flex items-center gap-1 rounded-full border py-px pr-2 pl-1.5 text-[10px] font-medium ${intent.cls}`}
               >
-                <span className={`h-[5px] w-[5px] rounded-full ${intent.dot}`} />
+                <span
+                  className={`h-[5px] w-[5px] rounded-full ${intent.dot}`}
+                />
                 {intent.label}
               </span>
-              <span className="text-[11px] text-muted-foreground tabular-nums">
+              <span className="text-muted-foreground text-[11px] tabular-nums">
                 {scored.relevance}/10
               </span>
             </span>
@@ -452,7 +515,7 @@ function TweetCard({
             />
           </span>
           <span className="flex flex-wrap items-center gap-x-3.5 gap-y-1">
-            <span className="text-[11px] text-muted-foreground tabular-nums">
+            <span className="text-muted-foreground text-[11px] tabular-nums">
               {t.replyCount} replies · {t.retweetCount} reposts · {t.likeCount}{" "}
               likes{t.viewCount > 0 && <> · {compact(t.viewCount)} views</>}
             </span>
@@ -468,7 +531,7 @@ function TweetCard({
 
       {open && (
         <div className="flex flex-col gap-2.5 px-3.5 pb-3.5 pl-[54px]">
-          <span className="text-xs text-muted-foreground italic">
+          <span className="text-muted-foreground text-xs italic">
             {scored.rationale}
           </span>
           <span className="flex flex-wrap items-center gap-1.5">
@@ -487,7 +550,7 @@ function TweetCard({
               target="_blank"
               rel="noreferrer noopener"
               onClick={(e) => e.stopPropagation()}
-              className="rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+              className="text-muted-foreground hover:border-foreground/30 hover:text-foreground rounded-full border px-3 py-1 text-xs font-medium transition-colors"
             >
               Open tweet ↗
             </a>
@@ -546,10 +609,10 @@ function DraftComposer({ scored }: { scored: ScannedTweet }) {
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="flex flex-col gap-2 rounded-[10px] bg-muted/60 p-3"
+      className="bg-muted/60 flex flex-col gap-2 rounded-[10px] p-3"
     >
       <span className="flex flex-wrap items-center gap-1.5">
-        <span className="shrink-0 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+        <span className="text-muted-foreground shrink-0 text-[10px] font-medium tracking-wide uppercase">
           Draft · Claude
         </span>
         {COMPOSER_PILLS.map((p) => {
@@ -562,7 +625,7 @@ function DraftComposer({ scored }: { scored: ScannedTweet }) {
               className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors ${
                 on
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-transparent text-muted-foreground hover:text-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground bg-transparent"
               }`}
             >
               {p.label}
@@ -581,7 +644,7 @@ function DraftComposer({ scored }: { scored: ScannedTweet }) {
       </span>
 
       {draft.isError && (
-        <span className="text-xs text-destructive">{draft.error.message}</span>
+        <span className="text-destructive text-xs">{draft.error.message}</span>
       )}
       {text && <span className="text-xs leading-relaxed">{text}</span>}
 
@@ -592,7 +655,11 @@ function DraftComposer({ scored }: { scored: ScannedTweet }) {
           </Btn>
         )}
         <Btn disabled={draft.isPending} onClick={generate}>
-          {draft.isPending ? "Drafting…" : text ? "Regenerate" : "Generate draft"}
+          {draft.isPending
+            ? "Drafting…"
+            : text
+              ? "Regenerate"
+              : "Generate draft"}
         </Btn>
       </span>
     </div>

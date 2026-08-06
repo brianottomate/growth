@@ -416,7 +416,11 @@ export async function GET(request: Request) {
   // -----------------------------------------------
   let leadData: LeadData;
   {
-    let dataSource: "bigquery" | "customerio" | "bigquery+customerio" | "webhook";
+    let dataSource:
+      | "bigquery"
+      | "customerio"
+      | "bigquery+customerio"
+      | "webhook";
     let filledFromCio: string[] = [];
     const filledFromMinerva: string[] = [];
     const cioLead = cioData ? buildLeadFromCio(cioData) : null;
@@ -463,7 +467,10 @@ export async function GET(request: Request) {
         leadData.country = minervaData.country;
         filledFromMinerva.push("country");
       }
-      if (!leadData.minerva_household_income && minervaData.estimatedIncomeRange) {
+      if (
+        !leadData.minerva_household_income &&
+        minervaData.estimatedIncomeRange
+      ) {
         leadData.minerva_household_income = minervaData.estimatedIncomeRange;
         filledFromMinerva.push("minerva_household_income");
       }
@@ -505,9 +512,9 @@ export async function GET(request: Request) {
           ? "bigquery/cio"
           : filledFromMinerva.includes("phone")
             ? "minerva"
-          : webhookPhone
-            ? "webhook"
-            : "none",
+            : webhookPhone
+              ? "webhook"
+              : "none",
         city: leadData.city,
         state: leadData.state,
         country: leadData.country,
@@ -624,7 +631,8 @@ export async function GET(request: Request) {
     }
   }
 
-  let outreachProspect: Awaited<ReturnType<typeof searchProspectByEmail>> = null;
+  let outreachProspect: Awaited<ReturnType<typeof searchProspectByEmail>> =
+    null;
 
   // -----------------------------------------------
   // Step 6: Outreach prospect search (real API call, read-only)
@@ -671,7 +679,8 @@ export async function GET(request: Request) {
                   : existingOwnerId
                     ? { outreachUserId: existingOwnerId, unresolved: true }
                     : null,
-                wouldPerform: "UPDATE (PATCH /prospects/" + outreachProspect.id + ")",
+                wouldPerform:
+                  "UPDATE (PATCH /prospects/" + outreachProspect.id + ")",
               }
             : {
                 exists: false,
@@ -695,18 +704,20 @@ export async function GET(request: Request) {
   {
     const stepStart = Date.now();
     const hasPhone = !!leadData.phone;
-    const cioAssignedEmail = ((leadData as Record<string, unknown>)
-      .assignedBdrEmail as string | null)?.toLowerCase() ?? null;
-    const cioAssignedOutreachId = ((leadData as Record<string, unknown>)
-      .assignedBdrOutreachId as string | null) ?? null;
+    const cioAssignedEmail =
+      (
+        (leadData as Record<string, unknown>).assignedBdrEmail as string | null
+      )?.toLowerCase() ?? null;
+    const cioAssignedOutreachId =
+      ((leadData as Record<string, unknown>).assignedBdrOutreachId as
+        | string
+        | null) ?? null;
 
-    let bdr:
-      | {
-          name: string;
-          email: string;
-          outreachUserId: string;
-        }
-      | null = null;
+    let bdr: {
+      name: string;
+      email: string;
+      outreachUserId: string;
+    } | null = null;
     let source:
       | "outreach_owner"
       | "cio_existing"
@@ -715,7 +726,9 @@ export async function GET(request: Request) {
       | "none" = "none";
     let whySelected: Record<string, unknown> | null = null;
 
-    const ownerId = outreachProspect ? getProspectOwnerId(outreachProspect) : null;
+    const ownerId = outreachProspect
+      ? getProspectOwnerId(outreachProspect)
+      : null;
     if (ownerId) {
       const owner = await getOutreachUserById(ownerId);
       bdr = {
@@ -750,7 +763,8 @@ export async function GET(request: Request) {
     }
 
     if (!bdr) {
-      const dynamicSelection = await getNextBdrFromOutreachLoadDetailed(hasPhone);
+      const dynamicSelection =
+        await getNextBdrFromOutreachLoadDetailed(hasPhone);
       if (dynamicSelection.assignedBdr) {
         bdr = {
           name: dynamicSelection.assignedBdr.name,

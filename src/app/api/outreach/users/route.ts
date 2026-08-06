@@ -71,8 +71,7 @@ export async function GET(request: Request) {
             email: u.email,
             outreachUserId: u.outreachUserId,
           })),
-        note:
-          "Use this output to decide whether to keep static BDR_ROSTER or fetch users dynamically during assignment.",
+        note: "Use this output to decide whether to keep static BDR_ROSTER or fetch users dynamically during assignment.",
       },
     });
   } catch (error) {

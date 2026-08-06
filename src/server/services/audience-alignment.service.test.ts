@@ -15,11 +15,7 @@ const target = (
 
 describe("diffAudienceTarget", () => {
   it("live when a mirrored audience exists on an intended channel", () => {
-    const a = diffAudienceTarget(
-      target(),
-      [],
-      [{ platform: "meta_ads" }],
-    );
+    const a = diffAudienceTarget(target(), [], [{ platform: "meta_ads" }]);
     expect(a.channels.find((c) => c.platform === "meta_ads")?.verdict).toBe(
       "live",
     );

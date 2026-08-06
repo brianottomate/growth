@@ -72,11 +72,21 @@ export function ListenItemActions({
         )}
         {copied ? "Copied" : "Copy context"}
       </button>
-      <a href={claudeUrl} target="_blank" rel="noreferrer noopener" className={cls}>
+      <a
+        href={claudeUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+        className={cls}
+      >
         <ExternalLink className="h-3 w-3" />
         Open in Claude
       </a>
-      <a href={chatgptUrl} target="_blank" rel="noreferrer noopener" className={cls}>
+      <a
+        href={chatgptUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+        className={cls}
+      >
         <ExternalLink className="h-3 w-3" />
         Open in ChatGPT
       </a>

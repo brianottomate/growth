@@ -145,7 +145,9 @@ export function EditLinkDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={updateExternal.isPending}>
-            {updateExternal.isPending && <Loader2 className="size-4 animate-spin" />}
+            {updateExternal.isPending && (
+              <Loader2 className="size-4 animate-spin" />
+            )}
             Save
           </Button>
         </DialogFooter>

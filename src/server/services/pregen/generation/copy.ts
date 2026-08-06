@@ -28,7 +28,8 @@ export const buildHomepageTemplate = (): TemplateSection[] => [
     version: 0,
     type: "homepage-hero",
     title: "Welcome",
-    description: "Find a comfortable place to stay and plan your next trip with ease.",
+    description:
+      "Find a comfortable place to stay and plan your next trip with ease.",
     showPropertyGallery: false,
     backgroundImageUrl: PLACEHOLDER_IMAGE_URL,
     backgroundOpacity: 35,
@@ -254,7 +255,8 @@ const toneDescription: Record<BrandKitTone, string> = {
   refined: "polished, restrained, premium, and quietly confident",
   poetic: "evocative, sensory, elegant, and emotionally resonant",
   modern: "clear, concise, confident, and contemporary",
-  existing: "preserves the existing site's voice — see the verbatim-preservation rules below",
+  existing:
+    "preserves the existing site's voice — see the verbatim-preservation rules below",
 };
 
 const NO_FABRICATION_BLOCK = `# CRITICAL: No fabrication
@@ -417,7 +419,11 @@ const buildLayout = (sections: TemplateSection[]) =>
     })
     .join("\n");
 
-const buildSourceBlock = (sourceText: string, tone: BrandKitTone, hasSource: boolean) => {
+const buildSourceBlock = (
+  sourceText: string,
+  tone: BrandKitTone,
+  hasSource: boolean,
+) => {
   if (tone !== "existing" || !hasSource) {
     return `Source content:\n${sourceText}`;
   }
@@ -450,7 +456,10 @@ export const buildHomepagePrompt = (input: {
 }): string => {
   const { tone, evaluation, sections, source } = input;
 
-  const sourceText = stripInlineImageMarkdown(source.markdown).slice(0, SOURCE_CHAR_LIMIT);
+  const sourceText = stripInlineImageMarkdown(source.markdown).slice(
+    0,
+    SOURCE_CHAR_LIMIT,
+  );
   const layout = buildLayout(sections);
   const brandFraming = buildBrandFraming(evaluation);
   const description = source.description?.trim();
@@ -462,7 +471,9 @@ export const buildHomepagePrompt = (input: {
     tone === "existing" && evaluation?.voiceBrief
       ? buildVoiceBriefBlock(evaluation.voiceBrief)
       : "";
-  const voiceBriefBlock = voiceBriefBlockBody ? `\n\n${voiceBriefBlockBody}` : "";
+  const voiceBriefBlock = voiceBriefBlockBody
+    ? `\n\n${voiceBriefBlockBody}`
+    : "";
 
   return `${brandFraming}
 
@@ -505,7 +516,11 @@ const mergeSectionCopy = (
   for (const [key, value] of Object.entries(copy)) {
     if (value === undefined || value === "") continue;
 
-    if (key === "items" && Array.isArray(value) && Array.isArray(template.items)) {
+    if (
+      key === "items" &&
+      Array.isArray(value) &&
+      Array.isArray(template.items)
+    ) {
       merged.items = (template.items as Record<string, unknown>[]).map(
         (templateItem, i) => {
           const generated = (value[i] ?? {}) as Record<string, unknown>;
@@ -573,9 +588,12 @@ export async function generateHomepageCopy(input: {
   } catch (error) {
     // Fallback keeps monolith behavior (stub copy beats a dead build), but the
     // reason must be visible — a silent fallback looks like a working build.
-    console.error("[pregen] homepage copy generation failed, using template stubs", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    console.error(
+      "[pregen] homepage copy generation failed, using template stubs",
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
     return { sections: template, usedFallback: true };
   }
 }

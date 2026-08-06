@@ -20,7 +20,8 @@ const ACTION_STYLES: Record<
 
 function commentContext(item: OrganicCommentItem): string {
   const post = (item.post.content ?? "").trim();
-  const author = item.comment.from?.name ?? item.comment.from?.username ?? "Unknown";
+  const author =
+    item.comment.from?.name ?? item.comment.from?.username ?? "Unknown";
   const body = (item.comment.message ?? "").trim();
   return [
     "Help me reply to this comment on one of Wander's owned social posts. Wander is a direct-booking platform for short-term-rental operators. Tone: warm, helpful, not salesy; disclose Wander affiliation.",
@@ -102,7 +103,7 @@ export function CommentList({ items }: { items: OrganicCommentItem[] }) {
 
   if (withId.length === 0) {
     return (
-      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+      <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
         No comments on owned posts in the window.
       </div>
     );
@@ -112,7 +113,7 @@ export function CommentList({ items }: { items: OrganicCommentItem[] }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {visible.length} comment{visible.length === 1 ? "" : "s"}
             {platform !== "all" ? ` · ${platform}` : ""}
           </p>
@@ -133,7 +134,7 @@ export function CommentList({ items }: { items: OrganicCommentItem[] }) {
           type="button"
           disabled={triage.isPending}
           onClick={runTriage}
-          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           {triage.isPending ? "Triaging…" : "Triage comments"}
         </button>
@@ -141,9 +142,11 @@ export function CommentList({ items }: { items: OrganicCommentItem[] }) {
 
       {platforms.length > 1 ? (
         <div className="flex flex-wrap gap-1.5">
-          {([["all", sorted.length] as const] as ReadonlyArray<
-            readonly [string, number]
-          >)
+          {(
+            [["all", sorted.length] as const] as ReadonlyArray<
+              readonly [string, number]
+            >
+          )
             .concat(platforms)
             .map(([p, n]) => (
               <button
@@ -163,7 +166,7 @@ export function CommentList({ items }: { items: OrganicCommentItem[] }) {
       ) : null}
 
       {triage.isError ? (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm">
           {triage.error.message}
         </p>
       ) : null}
@@ -189,17 +192,18 @@ function CommentRow({
   const trpc = useTRPC();
   const draft = useMutation(trpc.inbox.draftCommentReply.mutationOptions());
 
-  const author = item.comment.from?.name ?? item.comment.from?.username ?? "Unknown";
+  const author =
+    item.comment.from?.name ?? item.comment.from?.username ?? "Unknown";
   const body = (item.comment.message ?? "").trim();
   const post = (item.post.content ?? "").trim();
   const style = score ? ACTION_STYLES[score.suggestedAction] : null;
 
   return (
-    <article className="rounded-xl border bg-card p-4">
+    <article className="bg-card rounded-xl border p-4">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span className="text-sm font-medium text-foreground">{author}</span>
+        <span className="text-foreground text-sm font-medium">{author}</span>
         {item.comment.createdTime ? (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-muted-foreground text-xs">
             · {new Date(item.comment.createdTime).toLocaleDateString()}
           </span>
         ) : null}
@@ -210,31 +214,35 @@ function CommentRow({
         ) : null}
         {style ? (
           <>
-            <span className={`rounded px-2 py-0.5 font-mono text-xs font-semibold ${style.chip}`}>
+            <span
+              className={`rounded px-2 py-0.5 font-mono text-xs font-semibold ${style.chip}`}
+            >
               {style.label}
             </span>
-            <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+            <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 font-mono text-xs">
               {score!.relevance}/10
             </span>
-            <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+            <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 font-mono text-xs">
               {score!.intentTag}
             </span>
           </>
         ) : null}
-        <span className="ml-auto shrink-0 rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+        <span className="bg-muted text-muted-foreground ml-auto shrink-0 rounded px-2 py-0.5 font-mono text-xs">
           {item.post.platform ?? "?"}
         </span>
       </div>
 
-      <p className="mt-1.5 text-sm whitespace-pre-line text-foreground/90">
-        {body || <span className="text-muted-foreground italic">(no text)</span>}
+      <p className="text-foreground/90 mt-1.5 text-sm whitespace-pre-line">
+        {body || (
+          <span className="text-muted-foreground italic">(no text)</span>
+        )}
       </p>
 
-      <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+      <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">
         on your post: {post || "(no text)"}
       </p>
       {score?.rationale ? (
-        <p className="mt-1 text-xs text-muted-foreground">{score.rationale}</p>
+        <p className="text-muted-foreground mt-1 text-xs">{score.rationale}</p>
       ) : null}
 
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
@@ -274,12 +282,12 @@ function CommentRow({
       <ListenItemActions context={commentContext(item)} />
 
       {draft.data ? (
-        <div className="mt-3 rounded-lg border bg-background p-3">
-          <p className="text-xs font-semibold text-foreground">Draft reply</p>
-          <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+        <div className="bg-background mt-3 rounded-lg border p-3">
+          <p className="text-foreground text-xs font-semibold">Draft reply</p>
+          <p className="text-foreground/90 mt-2 text-sm leading-relaxed whitespace-pre-wrap">
             {draft.data.draft}
           </p>
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="text-muted-foreground mt-2 text-xs">
             Draft only — review and post natively.
           </p>
         </div>

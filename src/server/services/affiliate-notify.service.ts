@@ -75,18 +75,23 @@ function buildBlocks(item: AffiliateItem) {
   );
 
   const meta: string[] = [];
-  if (typeof item.relevance === "number") meta.push(`relevance ${item.relevance}/10`);
+  if (typeof item.relevance === "number")
+    meta.push(`relevance ${item.relevance}/10`);
   if (item.intentTag) meta.push(`intent: ${item.intentTag}`);
   if (meta.length) lines.push(meta.join(" · "));
 
   if (item.snippet) {
     const snippet =
-      item.snippet.length > 500 ? `${item.snippet.slice(0, 500)}…` : item.snippet;
+      item.snippet.length > 500
+        ? `${item.snippet.slice(0, 500)}…`
+        : item.snippet;
     lines.push(`> ${snippet.replace(/\n/g, "\n> ")}`);
   }
   if (item.rationale) lines.push(`_${item.rationale}_`);
 
-  lines.push(`<${env.NEXT_PUBLIC_BASE_URL}/app/affiliate|Open in Affiliate desk>`);
+  lines.push(
+    `<${env.NEXT_PUBLIC_BASE_URL}/app/affiliate|Open in Affiliate desk>`,
+  );
 
   return [
     {
@@ -193,7 +198,9 @@ export async function postConversionsToRadio(
     if (result.success) posted += 1;
   }
   if (conversions.length > 0)
-    console.log(`[affiliate-radio] posted ${posted}/${conversions.length} conversion(s)`);
+    console.log(
+      `[affiliate-radio] posted ${posted}/${conversions.length} conversion(s)`,
+    );
   return posted;
 }
 

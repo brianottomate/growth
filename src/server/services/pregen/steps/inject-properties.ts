@@ -88,4 +88,6 @@ export async function injectPropertiesStep(ctx: StepContext) {
 }
 
 const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+  Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];

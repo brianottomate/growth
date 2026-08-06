@@ -778,8 +778,8 @@ export interface OutreachListParams {
   "page[size]"?: number;
   "page[number]"?: number;
   "filter[id]"?: string | string[];
-  "sort"?: string;
-  "count"?: boolean;
+  sort?: string;
+  count?: boolean;
   [key: string]: unknown;
 }
 

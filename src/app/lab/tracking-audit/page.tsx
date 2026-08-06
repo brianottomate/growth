@@ -24,15 +24,20 @@ const SURFACE_LABELS: Record<Surface, string> = {
 };
 
 export default function TrackingAuditPage() {
-  const [workspaceFilter, setWorkspaceFilter] = useState<Workspace | "all">("all");
+  const [workspaceFilter, setWorkspaceFilter] = useState<Workspace | "all">(
+    "all",
+  );
   const [surfaceFilter, setSurfaceFilter] = useState<Surface | "all">("all");
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
     return ALL_EVENTS.filter((e) => {
-      if (workspaceFilter !== "all" && e.workspace !== workspaceFilter) return false;
-      if (surfaceFilter !== "all" && !e.surfaces.includes(surfaceFilter)) return false;
-      if (query && !e.name.toLowerCase().includes(query.toLowerCase())) return false;
+      if (workspaceFilter !== "all" && e.workspace !== workspaceFilter)
+        return false;
+      if (surfaceFilter !== "all" && !e.surfaces.includes(surfaceFilter))
+        return false;
+      if (query && !e.name.toLowerCase().includes(query.toLowerCase()))
+        return false;
       return true;
     });
   }, [workspaceFilter, surfaceFilter, query]);
@@ -53,9 +58,12 @@ export default function TrackingAuditPage() {
   return (
     <div className="min-h-screen bg-white p-6">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Tracking plan audit</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Tracking plan audit
+        </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Mirrored from <code>tracking/packages/core</code>. {ALL_EVENTS.length} events across {SURFACES.length} surfaces.
+          Mirrored from <code>tracking/packages/core</code>. {ALL_EVENTS.length}{" "}
+          events across {SURFACES.length} surfaces.
         </p>
       </header>
 
@@ -63,8 +71,12 @@ export default function TrackingAuditPage() {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {SURFACES.map((s) => (
           <div key={s} className="rounded-lg border border-gray-200 px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-gray-500">{SURFACE_LABELS[s]}</div>
-            <div className="text-xl font-semibold tabular-nums text-gray-900">{counts[s]}</div>
+            <div className="text-xs tracking-wide text-gray-500 uppercase">
+              {SURFACE_LABELS[s]}
+            </div>
+            <div className="text-xl font-semibold text-gray-900 tabular-nums">
+              {counts[s]}
+            </div>
           </div>
         ))}
       </div>
@@ -80,12 +92,16 @@ export default function TrackingAuditPage() {
         />
         <select
           value={workspaceFilter}
-          onChange={(e) => setWorkspaceFilter(e.target.value as Workspace | "all")}
+          onChange={(e) =>
+            setWorkspaceFilter(e.target.value as Workspace | "all")
+          }
           className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
         >
           <option value="all">All workspaces</option>
           {WORKSPACES.map((w) => (
-            <option key={w} value={w}>{w}</option>
+            <option key={w} value={w}>
+              {w}
+            </option>
           ))}
         </select>
         <select
@@ -95,10 +111,14 @@ export default function TrackingAuditPage() {
         >
           <option value="all">All surfaces</option>
           {SURFACES.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
-        <span className="ml-auto text-sm text-gray-500">{filtered.length} / {ALL_EVENTS.length} events</span>
+        <span className="ml-auto text-sm text-gray-500">
+          {filtered.length} / {ALL_EVENTS.length} events
+        </span>
       </div>
 
       {/* Matrix */}
@@ -106,18 +126,34 @@ export default function TrackingAuditPage() {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-left font-medium text-gray-700">Event</th>
-              <th className="px-3 py-2 text-left font-medium text-gray-700">Workspace</th>
-              <th className="px-3 py-2 text-left font-medium text-gray-700">Category</th>
+              <th className="sticky left-0 z-10 bg-gray-50 px-3 py-2 text-left font-medium text-gray-700">
+                Event
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-gray-700">
+                Workspace
+              </th>
+              <th className="px-3 py-2 text-left font-medium text-gray-700">
+                Category
+              </th>
               {SURFACES.map((s) => (
-                <th key={s} className="px-3 py-2 text-center font-medium text-gray-700">{SURFACE_LABELS[s]}</th>
+                <th
+                  key={s}
+                  className="px-3 py-2 text-center font-medium text-gray-700"
+                >
+                  {SURFACE_LABELS[s]}
+                </th>
               ))}
-              <th className="px-3 py-2 text-left font-medium text-gray-700">Notes</th>
+              <th className="px-3 py-2 text-left font-medium text-gray-700">
+                Notes
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
             {filtered.map((event) => (
-              <EventRow key={`${event.workspace}-${event.name}`} event={event} />
+              <EventRow
+                key={`${event.workspace}-${event.name}`}
+                event={event}
+              />
             ))}
           </tbody>
         </table>
@@ -132,9 +168,13 @@ function EventRow({ event }: { event: TrackedEvent }) {
 
   return (
     <tr className="hover:bg-gray-50">
-      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-mono text-xs text-gray-900">{event.name}</td>
+      <td className="sticky left-0 z-10 bg-white px-3 py-2 font-mono text-xs text-gray-900">
+        {event.name}
+      </td>
       <td className="px-3 py-2">
-        <span className={`inline-flex rounded border px-1.5 py-0.5 text-xs font-medium ${WORKSPACE_COLORS[event.workspace]}`}>
+        <span
+          className={`inline-flex rounded border px-1.5 py-0.5 text-xs font-medium ${WORKSPACE_COLORS[event.workspace]}`}
+        >
           {event.workspace}
         </span>
       </td>
@@ -146,7 +186,15 @@ function EventRow({ event }: { event: TrackedEvent }) {
         return (
           <td key={s} className={`px-3 py-2 text-center ${bg}`}>
             {fires ? (
-              <span className={clientParity && isClientCol ? "text-blue-600" : "text-green-600"}>●</span>
+              <span
+                className={
+                  clientParity && isClientCol
+                    ? "text-blue-600"
+                    : "text-green-600"
+                }
+              >
+                ●
+              </span>
             ) : (
               <span className="text-gray-200">○</span>
             )}

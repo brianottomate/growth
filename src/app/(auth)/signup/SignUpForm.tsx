@@ -14,7 +14,11 @@ import { getAuthPageHref, getCallbackURL } from "@/lib/auth-utils";
 import { InAppBrowserAlert } from "../components/InAppBrowserAlert";
 import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
-export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
+export function SignUpForm({
+  googleEnabled = false,
+}: {
+  googleEnabled?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
 

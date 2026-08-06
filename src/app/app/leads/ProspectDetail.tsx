@@ -110,8 +110,14 @@ export function ProspectDetail({ domain }: { domain: string }) {
     return <div className="p-6 text-sm">No lead record for {domain}.</div>;
   }
 
-  const { domain: row, channel, channels, preview, outreach, cohort } =
-    prospect.data;
+  const {
+    domain: row,
+    channel,
+    channels,
+    preview,
+    outreach,
+    cohort,
+  } = prospect.data;
   const context = outreach?.generationContext ?? null;
   // enrichment.leadRank.screenshotUrl — `siteScreenshotUrl` exists nowhere in
   // this table, so the earlier spelling could never have found one.
@@ -239,7 +245,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
             {rank.reengagementHook ? (
               <Row label="Hook">{rank.reengagementHook}</Row>
             ) : null}
-            {rank.copyNotes ? <Row label="Copy notes">{rank.copyNotes}</Row> : null}
+            {rank.copyNotes ? (
+              <Row label="Copy notes">{rank.copyNotes}</Row>
+            ) : null}
             {rank.concerns?.length ? (
               <Row label="Concerns">
                 <ul className="list-disc pl-4">
@@ -309,7 +317,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
         {channels.length > 0 ? (
           <p className="text-muted-foreground mt-3 text-xs">
             Captured channels:{" "}
-            {channels.map((c) => `${c.kind}${c.value ? ` (${c.value})` : ""}`).join(", ")}
+            {channels
+              .map((c) => `${c.kind}${c.value ? ` (${c.value})` : ""}`)
+              .join(", ")}
           </p>
         ) : null}
       </Section>
@@ -348,7 +358,8 @@ export function ProspectDetail({ domain }: { domain: string }) {
                   <p className="mb-1.5 font-medium text-amber-300">
                     Stand-in draft — written before a readable preview existed,
                     so it describes no real page. Publishing refuses it. Use it
-                    to iterate on copy, then regenerate against the real preview.
+                    to iterate on copy, then regenerate against the real
+                    preview.
                   </p>
                 ) : null}
                 <p className="font-medium">What the generator read</p>
@@ -417,7 +428,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
                   Touch {index + 1} · day {step.delayDays}
                   {step.subject ? ` · ${step.subject}` : " · in-thread"}
                 </p>
-                <p className="mt-1.5 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">
+                <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
                   {step.body}
                 </p>
               </div>
@@ -449,7 +460,10 @@ export function ProspectDetail({ domain }: { domain: string }) {
               calls and notes
             </p>
             {crm.data.emails.items.map((item) => (
-              <div key={item.engagementId} className="border-border rounded border p-2">
+              <div
+                key={item.engagementId}
+                className="border-border rounded border p-2"
+              >
                 <p>
                   <span className="text-foreground">{item.direction}</span> ·{" "}
                   {item.sentAt.slice(0, 10)} · {item.subject}
@@ -460,7 +474,10 @@ export function ProspectDetail({ domain }: { domain: string }) {
               </div>
             ))}
             {crm.data.activity.items.map((item) => (
-              <div key={item.engagementId} className="border-border rounded border p-2">
+              <div
+                key={item.engagementId}
+                className="border-border rounded border p-2"
+              >
                 <p>
                   <span className="text-foreground">{item.title}</span>
                   {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}

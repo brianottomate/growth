@@ -103,7 +103,9 @@ export default async function BlogWorkbenchPage({
         {view === "overview" ? (
           <OverviewView run={run} datoDraft={datoDraft} />
         ) : null}
-        {view === "brief" ? <BriefView run={run} fixtureJson={fixture} /> : null}
+        {view === "brief" ? (
+          <BriefView run={run} fixtureJson={fixture} />
+        ) : null}
         {view === "grounding" ? <GroundingView run={run} /> : null}
         {view === "prompt" ? <PromptView run={run} /> : null}
         {view === "article" ? <ArticleView run={run} /> : null}
@@ -274,7 +276,9 @@ function OverviewView({
                   DatoCMS draft (real wander.com blog)
                 </span>
                 {datoDraft ? (
-                  <Pill tone={datoDraft.dastValidation.valid ? "lime" : "amber"}>
+                  <Pill
+                    tone={datoDraft.dastValidation.valid ? "lime" : "amber"}
+                  >
                     {datoDraft.dastValidation.valid
                       ? "dast valid"
                       : "dast INVALID"}
@@ -369,9 +373,7 @@ function GroundingView({ run }: { run: BlogRunRecord | null }) {
           <SectionTitle>
             Business facts ({grounding.context.businessName})
           </SectionTitle>
-          <JsonBlock
-            value={{ ...grounding.context, properties: undefined }}
-          />
+          <JsonBlock value={{ ...grounding.context, properties: undefined }} />
         </section>
         <section>
           <SectionTitle>
@@ -537,7 +539,9 @@ function ReceiptsView({ run }: { run: BlogRunRecord | null }) {
         >
           <div className="flex items-center gap-2">
             <Pill
-              tone={evaluator.verdict === "publish_candidate" ? "lime" : "amber"}
+              tone={
+                evaluator.verdict === "publish_candidate" ? "lime" : "amber"
+              }
             >
               {evaluator.verdict.replace(/_/g, " ")}
             </Pill>

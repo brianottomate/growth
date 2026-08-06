@@ -23,46 +23,119 @@ const MAX_CHARS_PER_PROVIDER = 8000;
 
 export const LeadEnrichmentSchema = z.object({
   company: z.object({
-    legalName: z.string().nullable().describe("Registered legal entity name, if found"),
-    brandName: z.string().nullable().describe("Customer-facing brand / trading name"),
-    description: z.string().nullable().describe("1-2 sentence description of what the company does"),
+    legalName: z
+      .string()
+      .nullable()
+      .describe("Registered legal entity name, if found"),
+    brandName: z
+      .string()
+      .nullable()
+      .describe("Customer-facing brand / trading name"),
+    description: z
+      .string()
+      .nullable()
+      .describe("1-2 sentence description of what the company does"),
     tagline: z.string().nullable().describe("Short positioning line / slogan"),
-    foundedYear: z.number().int().nullable().describe("Year founded, if stated"),
-    hqLocation: z.string().nullable().describe("Headquarters city, state/country"),
-    serviceAreas: z.array(z.string()).describe("Cities/regions/markets they operate in (empty array if unknown)"),
+    foundedYear: z
+      .number()
+      .int()
+      .nullable()
+      .describe("Year founded, if stated"),
+    hqLocation: z
+      .string()
+      .nullable()
+      .describe("Headquarters city, state/country"),
+    serviceAreas: z
+      .array(z.string())
+      .describe(
+        "Cities/regions/markets they operate in (empty array if unknown)",
+      ),
   }),
   portfolio: z.object({
-    estimatedUnitCount: z.number().int().nullable().describe("Best estimate of properties/units under management"),
-    unitCountConfidence: z.enum(["stated", "estimated", "unknown"]).describe("Is the unit count explicitly stated, inferred, or unknown?"),
-    propertyTypes: z.array(z.enum(["short_term_rental", "vacation_rental", "long_term_rental", "hotel", "hoa", "commercial", "other"])).describe("Types of property they manage"),
+    estimatedUnitCount: z
+      .number()
+      .int()
+      .nullable()
+      .describe("Best estimate of properties/units under management"),
+    unitCountConfidence: z
+      .enum(["stated", "estimated", "unknown"])
+      .describe("Is the unit count explicitly stated, inferred, or unknown?"),
+    propertyTypes: z
+      .array(
+        z.enum([
+          "short_term_rental",
+          "vacation_rental",
+          "long_term_rental",
+          "hotel",
+          "hoa",
+          "commercial",
+          "other",
+        ]),
+      )
+      .describe("Types of property they manage"),
   }),
   pms: z.object({
-    detected: z.string().nullable().describe("Property management software detected (e.g. Guesty, Hostaway, Streamline)"),
-    confidence: z.enum(["high", "medium", "low", "unknown"]).describe("Confidence in the PMS detection"),
+    detected: z
+      .string()
+      .nullable()
+      .describe(
+        "Property management software detected (e.g. Guesty, Hostaway, Streamline)",
+      ),
+    confidence: z
+      .enum(["high", "medium", "low", "unknown"])
+      .describe("Confidence in the PMS detection"),
   }),
   brand: z.object({
     logoUrl: z.string().nullable().describe("URL of the company logo if found"),
-    primaryColors: z.array(z.string()).describe("Hex/named brand colors observed (empty if unknown)"),
+    primaryColors: z
+      .array(z.string())
+      .describe("Hex/named brand colors observed (empty if unknown)"),
     voice: z.string().nullable().describe("Short note on brand tone/voice"),
-    hasOnlineBooking: z.boolean().nullable().describe("Does the site offer direct online booking?"),
+    hasOnlineBooking: z
+      .boolean()
+      .nullable()
+      .describe("Does the site offer direct online booking?"),
   }),
-  contacts: z.array(
-    z.object({
-      name: z.string().nullable(),
-      role: z.string().nullable().describe("Job title / role"),
-      email: z.string().nullable(),
-      phone: z.string().nullable(),
-    }),
-  ).describe("Key people / decision-makers found (empty if none)"),
+  contacts: z
+    .array(
+      z.object({
+        name: z.string().nullable(),
+        role: z.string().nullable().describe("Job title / role"),
+        email: z.string().nullable(),
+        phone: z.string().nullable(),
+      }),
+    )
+    .describe("Key people / decision-makers found (empty if none)"),
   pregenFit: z.object({
-    score: z.number().int().min(0).max(100).describe("0-100: how strong a Wander Sites pregen-site target this is"),
-    rationale: z.string().describe("Why this score — what makes them a good/poor pregen target"),
-    signals: z.array(z.string()).describe("Concrete positive/negative signals (e.g. 'weak existing site', 'large portfolio', 'already has modern booking')"),
+    score: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .describe("0-100: how strong a Wander Sites pregen-site target this is"),
+    rationale: z
+      .string()
+      .describe("Why this score — what makes them a good/poor pregen target"),
+    signals: z
+      .array(z.string())
+      .describe(
+        "Concrete positive/negative signals (e.g. 'weak existing site', 'large portfolio', 'already has modern booking')",
+      ),
   }),
-  icpTierGuess: z.enum(["tier_1", "tier_2", "tier_3", "untiered"]).describe("Best ICP tier guess based on size/fit"),
-  redFlags: z.array(z.string()).describe("Disqualifiers: marketplace/aggregator not a real PM, dead site, not vacation rental, etc. (empty if none)"),
-  confidence: z.enum(["high", "medium", "low"]).describe("Overall confidence in this enrichment given the evidence"),
-  citations: z.array(z.string()).describe("Source URLs that informed this (empty if none)"),
+  icpTierGuess: z
+    .enum(["tier_1", "tier_2", "tier_3", "untiered"])
+    .describe("Best ICP tier guess based on size/fit"),
+  redFlags: z
+    .array(z.string())
+    .describe(
+      "Disqualifiers: marketplace/aggregator not a real PM, dead site, not vacation rental, etc. (empty if none)",
+    ),
+  confidence: z
+    .enum(["high", "medium", "low"])
+    .describe("Overall confidence in this enrichment given the evidence"),
+  citations: z
+    .array(z.string())
+    .describe("Source URLs that informed this (empty if none)"),
 });
 
 export type LeadEnrichmentExtraction = z.infer<typeof LeadEnrichmentSchema>;

@@ -46,7 +46,11 @@ export function commentTimeMs(c: AdCommentWithContext): number | null {
  * Per-platform organic calls return in ~2s each. Ads have their own section
  * (`getRecentAdComments`, via the fast ads-tree path), so scoping loses nothing.
  */
-const ORGANIC_COMMENT_PLATFORMS = ["facebook", "instagram", "linkedin"] as const;
+const ORGANIC_COMMENT_PLATFORMS = [
+  "facebook",
+  "instagram",
+  "linkedin",
+] as const;
 
 /**
  * Recent commented posts across the organic platforms — fanned out in parallel

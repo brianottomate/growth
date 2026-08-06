@@ -140,7 +140,9 @@ export function SuggestTargetsDialog({
                   <span className="flex items-center gap-1.5 text-sm font-medium">
                     <ChannelLogo platform={s.platform!} className="size-3.5" />
                     {s.archetype}
-                    <span className="text-muted-foreground text-xs">/{s.period}</span>
+                    <span className="text-muted-foreground text-xs">
+                      /{s.period}
+                    </span>
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -197,11 +199,15 @@ export function SuggestTargetsDialog({
                     </span>
                     <span className="ml-auto">
                       {isApplied ? (
-                        <span className="text-xs text-emerald-400">applied ✓</span>
+                        <span className="text-xs text-emerald-400">
+                          applied ✓
+                        </span>
                       ) : (
                         <button
                           onClick={() => void apply(s, idx)}
-                          disabled={applyCadence.isPending || applyMix.isPending}
+                          disabled={
+                            applyCadence.isPending || applyMix.isPending
+                          }
                           className="rounded-full border border-emerald-600/50 px-2.5 py-0.5 text-xs font-medium text-emerald-400 hover:bg-emerald-600/15 disabled:opacity-50"
                         >
                           Apply

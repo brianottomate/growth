@@ -51,7 +51,9 @@ function buildBrief(program: ExportProgram, steps: ExportStep[]): string {
           return [
             `### Step ${i + 1} — ${s.name}`,
             `_${meta}_`,
-            s.subject ? `**Subject:** ${s.subject}` : "**Subject:** _(none — same-thread follow-up)_",
+            s.subject
+              ? `**Subject:** ${s.subject}`
+              : "**Subject:** _(none — same-thread follow-up)_",
             "",
             s.body?.trim() ? s.body.trim() : "_(no copy written yet)_",
           ].join("\n");

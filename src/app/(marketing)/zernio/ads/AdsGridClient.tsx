@@ -142,10 +142,7 @@ function AdCard({ ad }: { ad: AdWithComments }) {
 
         <MetricsRow metrics={m} currency={currency} />
 
-        <CommentsBlock
-          comments={ad.comments}
-          commentError={ad.commentError}
-        />
+        <CommentsBlock comments={ad.comments} commentError={ad.commentError} />
       </div>
     </article>
   );
@@ -265,9 +262,7 @@ function CommentsBlock({
       : commentError.length > 80
         ? `${commentError.slice(0, 80)}…`
         : commentError;
-    return (
-      <p className="text-xs text-gray-400 italic">comments: {friendly}</p>
-    );
+    return <p className="text-xs text-gray-400 italic">comments: {friendly}</p>;
   }
   if (comments.length === 0) {
     return <p className="text-xs text-gray-400 italic">no comments</p>;
@@ -316,7 +311,9 @@ function CommentRow({ c }: { c: ZernioAdComment }) {
     <li className="text-xs">
       <span className="font-medium text-gray-900">{author}</span>
       {when ? (
-        <span className="ml-1 text-gray-400">· {when.toLocaleDateString()}</span>
+        <span className="ml-1 text-gray-400">
+          · {when.toLocaleDateString()}
+        </span>
       ) : null}
       <p className="mt-0.5 whitespace-pre-line text-gray-700">
         {short || <span className="text-gray-400 italic">(no text)</span>}

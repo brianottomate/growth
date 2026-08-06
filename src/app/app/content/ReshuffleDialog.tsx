@@ -13,7 +13,10 @@ import type { RouterOutputs } from "@/trpc/react";
 type Proposal = RouterOutputs["reschedule"]["generate"];
 
 const fmtDate = (ymd: string) =>
-  new Date(`${ymd}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" });
+  new Date(`${ymd}T12:00:00`).toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
 
 /** AI reshuffle: propose moves + slot fills, review with checkboxes, apply. */
 export function ReshuffleDialog({
@@ -60,15 +63,18 @@ export function ReshuffleDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const toggle = (sel: Set<number>, set: (s: Set<number>) => void, i: number) => {
+  const toggle = (
+    sel: Set<number>,
+    set: (s: Set<number>) => void,
+    i: number,
+  ) => {
     const n = new Set(sel);
     if (n.has(i)) n.delete(i);
     else n.add(i);
     set(n);
   };
 
-  const nothing =
-    proposal?.moves.length === 0 && proposal?.slots.length === 0;
+  const nothing = proposal?.moves.length === 0 && proposal?.slots.length === 0;
   const selectedCount = moveSel.size + slotSel.size;
 
   return (
@@ -81,7 +87,8 @@ export function ReshuffleDialog({
     >
       {generate.isPending && (
         <div className="text-muted-foreground flex items-center gap-2 py-8 text-sm">
-          <Loader2 className="size-4 animate-spin" /> Looking at spacing, key dates, and gaps…
+          <Loader2 className="size-4 animate-spin" /> Looking at spacing, key
+          dates, and gaps…
         </div>
       )}
       {generate.isError && (
@@ -100,7 +107,7 @@ export function ReshuffleDialog({
 
           {proposal.moves.length > 0 && (
             <div>
-              <h3 className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
+              <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
                 Moves · {proposal.moves.length}
               </h3>
               <div className="flex flex-col gap-1.5">
@@ -115,13 +122,18 @@ export function ReshuffleDialog({
                       onChange={() => toggle(moveSel, setMoveSel, i)}
                       className="mt-0.5"
                     />
-                    <ChannelLogo platform={m.platform} className="mt-0.5 size-4 shrink-0" />
+                    <ChannelLogo
+                      platform={m.platform}
+                      className="mt-0.5 size-4 shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">
                         {m.title ?? "Untitled"}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        <span className="tabular-nums">{fmtDate(m.fromDate)}</span>
+                        <span className="tabular-nums">
+                          {fmtDate(m.fromDate)}
+                        </span>
                         {" → "}
                         <span className="text-foreground font-medium tabular-nums">
                           {fmtDate(m.toDate)}
@@ -138,7 +150,7 @@ export function ReshuffleDialog({
 
           {proposal.slots.length > 0 && (
             <div>
-              <h3 className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
+              <h3 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
                 New slots · {proposal.slots.length}
               </h3>
               <div className="flex flex-col gap-1.5">
@@ -155,7 +167,10 @@ export function ReshuffleDialog({
                         onChange={() => toggle(slotSel, setSlotSel, i)}
                         className="mt-0.5"
                       />
-                      <ChannelLogo platform={s.platform} className="mt-0.5 size-4 shrink-0" />
+                      <ChannelLogo
+                        platform={s.platform}
+                        className="mt-0.5 size-4 shrink-0"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium">
                           {fmtDate(s.date)} · {platformLabel(s.platform)}
@@ -166,7 +181,9 @@ export function ReshuffleDialog({
                             </span>
                           )}
                         </div>
-                        <div className="text-muted-foreground text-xs">{s.rationale}</div>
+                        <div className="text-muted-foreground text-xs">
+                          {s.rationale}
+                        </div>
                       </div>
                     </label>
                   );
@@ -192,13 +209,19 @@ export function ReshuffleDialog({
                       .map((m) => ({ spotId: m.spotId, toDate: m.toDate })),
                     slots: proposal.slots
                       .filter((_, i) => slotSel.has(i))
-                      .map((s) => ({ date: s.date, platform: s.platform, pillar: s.pillar })),
+                      .map((s) => ({
+                        date: s.date,
+                        platform: s.platform,
+                        pillar: s.pillar,
+                      })),
                   })
                 }
                 disabled={selectedCount === 0 || apply.isPending}
                 className="bg-foreground text-background rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50"
               >
-                {apply.isPending ? "Applying…" : `Apply ${selectedCount} change${selectedCount === 1 ? "" : "s"}`}
+                {apply.isPending
+                  ? "Applying…"
+                  : `Apply ${selectedCount} change${selectedCount === 1 ? "" : "s"}`}
               </button>
             </div>
           )}

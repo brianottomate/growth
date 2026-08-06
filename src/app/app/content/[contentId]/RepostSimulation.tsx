@@ -15,7 +15,12 @@ export type RepostSim = {
   /** Repost comment; null = bare repost (retweet-style). */
   comment: string | null;
   embed:
-    | { kind: "quote"; authorName: string; text: string | null; thumb: string | null }
+    | {
+        kind: "quote";
+        authorName: string;
+        text: string | null;
+        thumb: string | null;
+      }
     | { kind: "article"; card: LinkCard };
 };
 
@@ -92,10 +97,13 @@ export function RepostSimulation({ sims }: { sims: RepostSim[] }) {
   return (
     <div className="mt-1.5 ml-6 flex flex-col gap-1.5">
       {sims.map((sim) => (
-        <div key={sim.linkId} className="bg-card/50 rounded-lg border px-3 py-2">
+        <div
+          key={sim.linkId}
+          className="bg-card/50 rounded-lg border px-3 py-2"
+        >
           <div className="text-muted-foreground mb-1.5 text-[10px]">
-            ↻ how it unfolds on{" "}
-            {PLATFORM_LABEL[sim.platform] ?? sim.platform} — planned repost
+            ↻ how it unfolds on {PLATFORM_LABEL[sim.platform] ?? sim.platform} —
+            planned repost
           </div>
           <div className="flex items-start gap-2">
             <Avatar name={sim.actorName} />

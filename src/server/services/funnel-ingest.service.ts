@@ -45,7 +45,10 @@ export type IngestResult =
 
 /** "Search Started" / "Purchased" / "search_started" → canonical snake_case. */
 export function normalizeFunnelEventName(raw: string): string {
-  const name = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const name = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
   // The server-side conversion event is "Order Completed"; the mobile client
   // historically also emits "Purchased". Both mean the same stage exit.
   if (name === "purchased") return "order_completed";

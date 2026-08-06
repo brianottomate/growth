@@ -11,8 +11,7 @@ export async function renderTransactionalPreview(
   templateKey: string,
   previewProps: Record<string, unknown>,
 ): Promise<
-  | { ok: true; html: string; text: string }
-  | { ok: false; error: string }
+  { ok: true; html: string; text: string } | { ok: false; error: string }
 > {
   try {
     const designSystemEmails = await import("@wandercom/design-system-emails");

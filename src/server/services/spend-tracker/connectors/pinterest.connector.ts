@@ -65,7 +65,8 @@ async function fetchTimeline(
       impressions: row.PAID_IMPRESSION ?? 0,
       clicks: row.CLICKTHROUGH_1 ?? 0,
       conversions: row.TOTAL_CHECKOUT ?? 0,
-      purchaseValue: (row.TOTAL_CHECKOUT_VALUE_IN_MICRO_DOLLAR ?? 0) / 1_000_000,
+      purchaseValue:
+        (row.TOTAL_CHECKOUT_VALUE_IN_MICRO_DOLLAR ?? 0) / 1_000_000,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 

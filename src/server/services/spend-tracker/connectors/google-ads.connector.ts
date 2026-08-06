@@ -44,10 +44,10 @@ interface GoogleAdsSearchRow {
 function isConfigured(): boolean {
   return Boolean(
     env.GOOGLE_ADS_CLIENT_ID &&
-      env.GOOGLE_ADS_CLIENT_SECRET &&
-      env.GOOGLE_ADS_DEVELOPER_TOKEN &&
-      env.GOOGLE_ADS_REFRESH_TOKEN &&
-      env.GOOGLE_ADS_CUSTOMER_ID,
+    env.GOOGLE_ADS_CLIENT_SECRET &&
+    env.GOOGLE_ADS_DEVELOPER_TOKEN &&
+    env.GOOGLE_ADS_REFRESH_TOKEN &&
+    env.GOOGLE_ADS_CUSTOMER_ID,
   );
 }
 
@@ -64,10 +64,13 @@ async function getAccessToken(): Promise<string> {
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Google OAuth token refresh failed: ${res.status} ${await res.text()}`);
+    throw new Error(
+      `Google OAuth token refresh failed: ${res.status} ${await res.text()}`,
+    );
   }
   const json = (await res.json()) as { access_token?: string };
-  if (!json.access_token) throw new Error("Google OAuth: no access_token in response");
+  if (!json.access_token)
+    throw new Error("Google OAuth: no access_token in response");
   return json.access_token;
 }
 
@@ -85,7 +88,10 @@ async function gaqlSearch(
     "Content-Type": "application/json",
   };
   if (env.GOOGLE_ADS_LOGIN_CUSTOMER_ID) {
-    headers["login-customer-id"] = env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(/-/g, "");
+    headers["login-customer-id"] = env.GOOGLE_ADS_LOGIN_CUSTOMER_ID.replace(
+      /-/g,
+      "",
+    );
   }
 
   const res = await fetch(url, {
@@ -99,7 +105,9 @@ async function gaqlSearch(
   }
 
   // searchStream returns an ARRAY of batches: [{ results: [...] }, ...]
-  const batches = (await res.json()) as Array<{ results?: GoogleAdsSearchRow[] }>;
+  const batches = (await res.json()) as Array<{
+    results?: GoogleAdsSearchRow[];
+  }>;
   return batches.flatMap((b) => b.results ?? []);
 }
 
@@ -127,7 +135,10 @@ async function fetchTimeline(
   );
 
   // Purchases per day (summed across both actions).
-  const purchasesByDate = new Map<string, { conversions: number; value: number }>();
+  const purchasesByDate = new Map<
+    string,
+    { conversions: number; value: number }
+  >();
   for (const row of purchaseRows) {
     const date = row.segments?.date;
     if (!date) continue;
@@ -138,13 +149,17 @@ async function fetchTimeline(
   }
 
   // Marketplace denylist + daily grouping (log exclusions for audit).
-  const excluded = spendRows.filter((r) => !isMarketplaceCampaign(r.campaign?.name));
+  const excluded = spendRows.filter(
+    (r) => !isMarketplaceCampaign(r.campaign?.name),
+  );
   if (excluded.length > 0) {
     const exTotal = excluded.reduce(
       (s, r) => s + Number(r.metrics?.costMicros ?? 0) / 1_000_000,
       0,
     );
-    const exNames = [...new Set(excluded.map((r) => r.campaign?.name ?? "(unnamed)"))];
+    const exNames = [
+      ...new Set(excluded.map((r) => r.campaign?.name ?? "(unnamed)")),
+    ];
     console.log(
       `[SpendTracker/GoogleAds] Excluded ${excluded.length} non-Marketplace campaign-days, $${exTotal.toFixed(0)} spend: ${exNames.join(", ")}`,
     );
@@ -174,7 +189,9 @@ async function fetchTimeline(
     existing.purchaseValue = purchases.value;
   }
 
-  const rows = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const rows = [...byDate.values()].sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
   const totalSpend = rows.reduce((s, r) => s + r.spend, 0);
   const totalConversions = rows.reduce((s, r) => s + r.conversions, 0);
   console.log(

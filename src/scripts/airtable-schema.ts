@@ -52,7 +52,9 @@ async function getBaseSchema(baseId: string): Promise<AirtableBase> {
 
 async function main() {
   if (!AIRTABLE_API_TOKEN) {
-    console.error("❌ Error: AIRTABLE_API_TOKEN environment variable is not set");
+    console.error(
+      "❌ Error: AIRTABLE_API_TOKEN environment variable is not set",
+    );
     process.exit(1);
   }
 
@@ -69,7 +71,11 @@ async function main() {
 
     for (const table of base.tables) {
       // If a specific table was requested, only show that one
-      if (tableIdOrName && table.id !== tableIdOrName && table.name !== tableIdOrName) {
+      if (
+        tableIdOrName &&
+        table.id !== tableIdOrName &&
+        table.name !== tableIdOrName
+      ) {
         continue;
       }
 

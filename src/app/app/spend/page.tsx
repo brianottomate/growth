@@ -96,7 +96,11 @@ export default async function SpendPage({
   let { startDate, endDate } = windowFor(range);
   // Power-user lagged view: ?end=YYYY-MM-DD shifts the whole window back so
   // you can look at fully-settled data (gross take restates for ~a week).
-  if (params.end && /^\d{4}-\d{2}-\d{2}$/.test(params.end) && params.end < endDate) {
+  if (
+    params.end &&
+    /^\d{4}-\d{2}-\d{2}$/.test(params.end) &&
+    params.end < endDate
+  ) {
     const days = Math.round(
       (new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000,
     );
@@ -420,7 +424,7 @@ export default async function SpendPage({
         <summary className="cursor-pointer text-sm font-medium">
           Methodology — locked decisions
         </summary>
-        <div className="text-muted-foreground mt-3 space-y-2 text-sm [&_b]:text-foreground">
+        <div className="text-muted-foreground [&_b]:text-foreground mt-3 space-y-2 text-sm">
           <p>
             <b>DCPB (primary, ${CPB_TARGET} target)</b> = total marketing spend
             / direct bookings. Direct excludes the 4 OTAs (Airbnb, Vrbo,
@@ -429,8 +433,8 @@ export default async function SpendPage({
           <p>
             <b>Marketing spend</b> = ad spend + fixed costs. No loyalty points,
             no coupons (revenue reductions, not acquisition costs — Kyle, Mar 19
-            2026). Fixed costs are effective-dated config in the repo,
-            pro-rated daily; the in-progress UTC day counts $0.
+            2026). Fixed costs are effective-dated config in the repo, pro-rated
+            daily; the in-progress UTC day counts $0.
           </p>
           <p>
             <b>ROAS</b> = (GMV × 20% blended take rate) / <i>ad</i> spend. The
@@ -456,8 +460,8 @@ export default async function SpendPage({
             2026 restated +57% within 4 days), so recent-day net take always
             reads low at first — the tile shows a settled-through-T-7 figure
             alongside, and <code>?end=YYYY-MM-DD</code> shifts any window back
-            for a fully-settled view. Spend, bookings, and GMV do NOT restate
-            — only this metric lags.
+            for a fully-settled view. Spend, bookings, and GMV do NOT restate —
+            only this metric lags.
           </p>
           <p>
             <b>Meta scope:</b> single ad account act_885632589057558, WanderOS/

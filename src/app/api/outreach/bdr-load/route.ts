@@ -118,7 +118,9 @@ export async function GET(request: Request) {
     }
 
     if (excludeUserIds.size > 0) {
-      candidates = candidates.filter((u) => !excludeUserIds.has(u.outreachUserId));
+      candidates = candidates.filter(
+        (u) => !excludeUserIds.has(u.outreachUserId),
+      );
     }
 
     if (includeEmails.size > 0) {
@@ -205,8 +207,7 @@ export async function GET(request: Request) {
           "/api/outreach/bdr-load?activeOnly=true&titleIncludes=bdr",
         excludeManagers:
           "/api/outreach/bdr-load?activeOnly=true&titleIncludes=bdr&excludeTitleContains=manager",
-        allowListById:
-          "/api/outreach/bdr-load?allowUserIds=3,32,33,37",
+        allowListById: "/api/outreach/bdr-load?allowUserIds=3,32,33,37",
         allowListByEmail:
           "/api/outreach/bdr-load?includeEmails=serrelle.baker@wander.com,catherine@wander.com,james.crawford@wander.com",
       },

@@ -6,24 +6,26 @@ import { Button } from "@wandercom/design-system-web/ui/button";
 
 // Every statically-reachable route, grouped. Dynamic routes (/blog/[slug],
 // /app/org/[orgSlug], etc.) are omitted since they need an id to resolve.
-const LINK_GROUPS: { label: string; links: { name: string; href: string }[] }[] =
-  [
-    // NOTE: the old "Prototypes" group (system maps, whiteboard, tracking
-    // audit) moved to /lab — Kristian's admin-gated private workspace. Don't
-    // link lab pages from public surfaces.
-    {
-      label: "Marketing & misc",
-      links: [
-        { name: "Brand", href: "/brand" },
-        { name: "Growth", href: "/growth" },
-        { name: "Zernio", href: "/zernio" },
-        { name: "Zernio ads", href: "/zernio/ads" },
-        { name: "Design system", href: "/design-system" },
-        { name: "Blog", href: "/blog" },
-        { name: "Contact", href: "/contact" },
-      ],
-    },
-  ];
+const LINK_GROUPS: {
+  label: string;
+  links: { name: string; href: string }[];
+}[] = [
+  // NOTE: the old "Prototypes" group (system maps, whiteboard, tracking
+  // audit) moved to /lab — Kristian's admin-gated private workspace. Don't
+  // link lab pages from public surfaces.
+  {
+    label: "Marketing & misc",
+    links: [
+      { name: "Brand", href: "/brand" },
+      { name: "Growth", href: "/growth" },
+      { name: "Zernio", href: "/zernio" },
+      { name: "Zernio ads", href: "/zernio/ads" },
+      { name: "Design system", href: "/design-system" },
+      { name: "Blog", href: "/blog" },
+      { name: "Contact", href: "/contact" },
+    ],
+  },
+];
 
 export default function IntroPage() {
   return (
@@ -76,7 +78,7 @@ export default function IntroPage() {
             variant="body-sm"
             weight="medium"
             color="secondary"
-            className="mb-8 uppercase tracking-wider"
+            className="mb-8 tracking-wider uppercase"
           >
             Jump to
           </Text>

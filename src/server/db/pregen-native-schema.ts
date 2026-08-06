@@ -10,22 +10,17 @@ import { createId } from "./utils";
  * exists and the tokened preview URL can be sent; `claimed` is terminal on
  * the growth side — post-claim lifecycle belongs to the product (monolith).
  */
-export const pregenNativeProspectStatusEnum = pgEnum("pregen_native_prospect_status", [
-  "new",
-  "building",
-  "preview_ready",
-  "claimed",
-  "failed",
-]);
+export const pregenNativeProspectStatusEnum = pgEnum(
+  "pregen_native_prospect_status",
+  ["new", "building", "preview_ready", "claimed", "failed"],
+);
 export type PregenNativeProspectStatus =
   (typeof pregenNativeProspectStatusEnum.enumValues)[number];
 
-export const pregenNativeBuildStatusEnum = pgEnum("pregen_native_build_status", [
-  "queued",
-  "running",
-  "succeeded",
-  "failed",
-]);
+export const pregenNativeBuildStatusEnum = pgEnum(
+  "pregen_native_build_status",
+  ["queued", "running", "succeeded", "failed"],
+);
 export type PregenNativeBuildStatus =
   (typeof pregenNativeBuildStatusEnum.enumValues)[number];
 
@@ -39,14 +34,13 @@ export const pregenNativeBuildStepEnum = pgEnum("pregen_native_build_step", [
   "inject_properties",
   "persist_artifact",
 ]);
-export type PregenNativeBuildStep = (typeof pregenNativeBuildStepEnum.enumValues)[number];
+export type PregenNativeBuildStep =
+  (typeof pregenNativeBuildStepEnum.enumValues)[number];
 
-export const pregenNativeCrawlPageKindEnum = pgEnum("pregen_native_crawl_page_kind", [
-  "homepage",
-  "property",
-  "property_index",
-  "other",
-]);
+export const pregenNativeCrawlPageKindEnum = pgEnum(
+  "pregen_native_crawl_page_kind",
+  ["homepage", "property", "property_index", "other"],
+);
 export type PregenNativeCrawlPageKind =
   (typeof pregenNativeCrawlPageKindEnum.enumValues)[number];
 
@@ -203,7 +197,11 @@ export const pregenNativeBuildTable = pgTable(
 
     status: pregenNativeBuildStatusEnum().default("queued").notNull(),
     currentStep: pregenNativeBuildStepEnum(),
-    stepLog: t.jsonb().$type<PregenNativeStepLogEntry[]>().default([]).notNull(),
+    stepLog: t
+      .jsonb()
+      .$type<PregenNativeStepLogEntry[]>()
+      .default([])
+      .notNull(),
     error: t.text(),
 
     /** Properties extracted during crawl, input to inject_properties. */

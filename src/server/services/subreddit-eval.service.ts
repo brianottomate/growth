@@ -4,10 +4,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { Output, generateText } from "ai";
 import { z } from "zod";
 
-import {
-  playbookContextBlock,
-  playbooksByKind,
-} from "@/server/ai/playbooks";
+import { playbookContextBlock, playbooksByKind } from "@/server/ai/playbooks";
 import {
   SUBREDDIT_STANCES,
   type SubredditProfile,
@@ -163,7 +160,8 @@ export async function evaluateSubreddit(
     model: EVAL_MODEL,
     system: EVAL_SYSTEM_PROMPT,
     prompt: `Evaluate r/${clean} as a place for Wander to engage organically.\n\nWhat we know about the subreddit:\n${
-      metaBlock || "(no metadata could be retrieved — judge from the name alone and flag the uncertainty)"
+      metaBlock ||
+      "(no metadata could be retrieved — judge from the name alone and flag the uncertainty)"
     }`,
     output: Output.object({ schema: EvalSchema }),
   });

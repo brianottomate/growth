@@ -267,7 +267,8 @@ export function LeadsClient() {
         <span className="text-muted-foreground">
           {fmt(s?.domains)} domains · {fmt(s?.contacts)} contacts ·{" "}
           {fmt(s?.withPregenSite)} previews · {fmt(s?.ranked)} ranked ·{" "}
-          {fmt(s?.integratedPms)} integrated PMS · {fmt(s?.untouched)} not in CRM
+          {fmt(s?.integratedPms)} integrated PMS · {fmt(s?.untouched)} not in
+          CRM
         </span>
         <button
           onClick={() => setShowCohortDetail(!showCohortDetail)}
@@ -335,7 +336,10 @@ export function LeadsClient() {
         ))}
         <span className="flex-1" />
         <span className="text-muted-foreground mr-1 text-xs">View</span>
-        <Pill active={view === "compact"} onClick={() => void setView("compact")}>
+        <Pill
+          active={view === "compact"}
+          onClick={() => void setView("compact")}
+        >
           Compact
         </Pill>
         <Pill active={view === "review"} onClick={() => void setView("review")}>
@@ -360,9 +364,7 @@ export function LeadsClient() {
         <select
           value={source ?? ""}
           onChange={(event) => {
-            void setSource(
-              (event.target.value || null) as typeof source,
-            );
+            void setSource((event.target.value || null) as typeof source);
             resetPage();
           }}
           className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
@@ -478,164 +480,166 @@ export function LeadsClient() {
           onInvalidate={() => void list.refetch()}
         />
       ) : (
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full border-separate border-spacing-0 text-sm">
-          <thead>
-            <tr className="text-muted-foreground text-left text-xs">
-              <th className="border-b py-2 pr-3 font-medium">Domain</th>
-              <th className="border-b px-3 py-2 font-medium">Company</th>
-              <th className="border-b px-3 py-2 font-medium">PMS</th>
-              <th className="border-b px-3 py-2 text-right font-medium">
-                Units
-              </th>
-              <th className="border-b px-3 py-2 text-right font-medium">
-                Contacts
-              </th>
-              <th className="border-b px-3 py-2 font-medium">Tier</th>
-              <th className="border-b px-3 py-2 font-medium">CRM</th>
-              <th className="border-b px-3 py-2 font-medium">Pre-Gen cohort</th>
-              <th className="border-b px-3 py-2 font-medium">Sources</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.data?.items.map((d) => (
-              <tr
-                key={d.id}
-                onClick={() => {
-                  setEnrichLead(d);
-                  void setLeadParam(d.domain);
-                }}
-                className="hover:bg-accent/30 cursor-pointer"
-              >
-                <td className="border-b py-2 pr-3 font-medium">
-                  <div className="flex items-center gap-2">
-                    {/* The prospect's current site, captured by the ranker.
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full border-separate border-spacing-0 text-sm">
+            <thead>
+              <tr className="text-muted-foreground text-left text-xs">
+                <th className="border-b py-2 pr-3 font-medium">Domain</th>
+                <th className="border-b px-3 py-2 font-medium">Company</th>
+                <th className="border-b px-3 py-2 font-medium">PMS</th>
+                <th className="border-b px-3 py-2 text-right font-medium">
+                  Units
+                </th>
+                <th className="border-b px-3 py-2 text-right font-medium">
+                  Contacts
+                </th>
+                <th className="border-b px-3 py-2 font-medium">Tier</th>
+                <th className="border-b px-3 py-2 font-medium">CRM</th>
+                <th className="border-b px-3 py-2 font-medium">
+                  Pre-Gen cohort
+                </th>
+                <th className="border-b px-3 py-2 font-medium">Sources</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.data?.items.map((d) => (
+                <tr
+                  key={d.id}
+                  onClick={() => {
+                    setEnrichLead(d);
+                    void setLeadParam(d.domain);
+                  }}
+                  className="hover:bg-accent/30 cursor-pointer"
+                >
+                  <td className="border-b py-2 pr-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      {/* The prospect's current site, captured by the ranker.
                         Only ranked domains have one. */}
-                    {d.siteScreenshotUrl && (
-                      <div className="border-border bg-muted relative h-8 w-12 shrink-0 overflow-hidden rounded border">
-                        <Image
-                          src={d.siteScreenshotUrl}
-                          alt=""
-                          fill
-                          sizes="48px"
-                          className="object-cover object-top"
-                          unoptimized
-                        />
-                      </div>
-                    )}
-                    <a
-                      href={`https://${d.domain}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 hover:underline"
-                    >
-                      {d.domain}
-                      <ExternalLink className="size-3 opacity-40" />
-                    </a>
-                    {/* Full prospect view — linkable, and what page-context
+                      {d.siteScreenshotUrl && (
+                        <div className="border-border bg-muted relative h-8 w-12 shrink-0 overflow-hidden rounded border">
+                          <Image
+                            src={d.siteScreenshotUrl}
+                            alt=""
+                            fill
+                            sizes="48px"
+                            className="object-cover object-top"
+                            unoptimized
+                          />
+                        </div>
+                      )}
+                      <a
+                        href={`https://${d.domain}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 hover:underline"
+                      >
+                        {d.domain}
+                        <ExternalLink className="size-3 opacity-40" />
+                      </a>
+                      {/* Full prospect view — linkable, and what page-context
                         resolves as "this prospect" in chat. The row click still
                         opens the drawer. */}
-                    <Link
-                      href={`/app/leads/${encodeURIComponent(d.domain)}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
-                    >
-                      open
-                    </Link>
-                  </div>
-                </td>
-                <td className="text-muted-foreground border-b px-3 py-2">
-                  <span className="line-clamp-1 max-w-[16rem]">
-                    {d.companyName ?? "—"}
-                  </span>
-                </td>
-                <td className="border-b px-3 py-2">
-                  {d.pms ? (
-                    <span className="inline-flex items-center gap-1">
-                      {d.pms}
-                      {d.isIntegratedPms && (
-                        <span
-                          className="size-1.5 rounded-full bg-emerald-400"
-                          title="Integrated PMS"
-                        />
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="border-b px-3 py-2 text-right tabular-nums">
-                  {fmt(d.unitCount)}
-                </td>
-                <td className="border-b px-3 py-2 text-right tabular-nums">
-                  <span
-                    className={
-                      d.contactCount > 0 ? "" : "text-muted-foreground"
-                    }
-                  >
-                    {d.contactCount}
-                  </span>
-                </td>
-                <td className="text-muted-foreground border-b px-3 py-2 text-xs">
-                  {d.sourceTier ?? "—"}
-                </td>
-                <td className="border-b px-3 py-2">
-                  <HsMarker
-                    inHubspot={d.inHubspot}
-                    leadStatus={d.hubspotLeadStatus}
-                  />
-                </td>
-                <td className="border-b px-3 py-2">
-                  <div className="flex flex-wrap gap-1">
-                    {d.pregenCohorts.map((cohort) => (
-                      <span
-                        key={cohort}
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                          cohort === "recycled"
-                            ? "bg-amber-500/15 text-amber-300"
-                            : "bg-sky-500/15 text-sky-300"
-                        }`}
+                      <Link
+                        href={`/app/leads/${encodeURIComponent(d.domain)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
                       >
-                        {cohort}
+                        open
+                      </Link>
+                    </div>
+                  </td>
+                  <td className="text-muted-foreground border-b px-3 py-2">
+                    <span className="line-clamp-1 max-w-[16rem]">
+                      {d.companyName ?? "—"}
+                    </span>
+                  </td>
+                  <td className="border-b px-3 py-2">
+                    {d.pms ? (
+                      <span className="inline-flex items-center gap-1">
+                        {d.pms}
+                        {d.isIntegratedPms && (
+                          <span
+                            className="size-1.5 rounded-full bg-emerald-400"
+                            title="Integrated PMS"
+                          />
+                        )}
                       </span>
-                    ))}
-                    {d.pregenCohorts.length === 0 && (
+                    ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
-                  </div>
-                </td>
-                <td className="border-b px-3 py-2">
-                  <div className="flex flex-wrap gap-1">
-                    {(["builtwith", "hubspot", "instantly"] as SourceKey[])
-                      .filter((sk) =>
-                        sk === "builtwith"
-                          ? d.inBuiltwith
-                          : sk === "hubspot"
-                            ? d.inHubspot
-                            : d.inInstantly,
-                      )
-                      .map((sk) => (
+                  </td>
+                  <td className="border-b px-3 py-2 text-right tabular-nums">
+                    {fmt(d.unitCount)}
+                  </td>
+                  <td className="border-b px-3 py-2 text-right tabular-nums">
+                    <span
+                      className={
+                        d.contactCount > 0 ? "" : "text-muted-foreground"
+                      }
+                    >
+                      {d.contactCount}
+                    </span>
+                  </td>
+                  <td className="text-muted-foreground border-b px-3 py-2 text-xs">
+                    {d.sourceTier ?? "—"}
+                  </td>
+                  <td className="border-b px-3 py-2">
+                    <HsMarker
+                      inHubspot={d.inHubspot}
+                      leadStatus={d.hubspotLeadStatus}
+                    />
+                  </td>
+                  <td className="border-b px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {d.pregenCohorts.map((cohort) => (
                         <span
-                          key={sk}
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${SOURCE_BADGE[sk]}`}
+                          key={cohort}
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                            cohort === "recycled"
+                              ? "bg-amber-500/15 text-amber-300"
+                              : "bg-sky-500/15 text-sky-300"
+                          }`}
                         >
-                          {sk.slice(0, 2).toUpperCase()}
+                          {cohort}
                         </span>
                       ))}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                      {d.pregenCohorts.length === 0 && (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="border-b px-3 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {(["builtwith", "hubspot", "instantly"] as SourceKey[])
+                        .filter((sk) =>
+                          sk === "builtwith"
+                            ? d.inBuiltwith
+                            : sk === "hubspot"
+                              ? d.inHubspot
+                              : d.inInstantly,
+                        )
+                        .map((sk) => (
+                          <span
+                            key={sk}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${SOURCE_BADGE[sk]}`}
+                          >
+                            {sk.slice(0, 2).toUpperCase()}
+                          </span>
+                        ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {list.data && list.data.items.length === 0 && (
-          <div className="text-muted-foreground py-12 text-center text-sm">
-            No domains match these filters.
-          </div>
-        )}
-      </div>
+          {list.data && list.data.items.length === 0 && (
+            <div className="text-muted-foreground py-12 text-center text-sm">
+              No domains match these filters.
+            </div>
+          )}
+        </div>
       )}
 
       {/* pagination */}
@@ -693,7 +697,8 @@ function toCardData(item: LeadRow): ProspectCardData | null {
     id: item.id,
     domain: item.domain,
     companyName: item.companyName,
-    location: [item.city, item.state, item.country].filter(Boolean).join(", ") || null,
+    location:
+      [item.city, item.state, item.country].filter(Boolean).join(", ") || null,
     pms: item.pms,
     fitScore: item.scorePregenPotential,
     unitCount: item.unitCount,
@@ -702,7 +707,9 @@ function toCardData(item: LeadRow): ProspectCardData | null {
     screenshotUrl: item.siteScreenshotUrl,
     rankOverall: item.siteRankOverall,
     pregenSiteUrl: item.pregenSiteUrl,
-    excludeReason: item.excludeFromOutreach ? (item.excludeReason ?? "excluded") : null,
+    excludeReason: item.excludeFromOutreach
+      ? (item.excludeReason ?? "excluded")
+      : null,
     channel: {
       verdict: review.channel.verdict,
       route: review.channel.route,

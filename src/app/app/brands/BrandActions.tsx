@@ -46,7 +46,9 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
   });
 
   const refresh = () => router.refresh();
-  const enrichM = useMutation(trpc.brand.enrich.mutationOptions({ onSuccess: refresh }));
+  const enrichM = useMutation(
+    trpc.brand.enrich.mutationOptions({ onSuccess: refresh }),
+  );
   const updateM = useMutation(
     trpc.brand.update.mutationOptions({
       onSuccess: () => {
@@ -55,7 +57,9 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
       },
     }),
   );
-  const deleteM = useMutation(trpc.brand.delete.mutationOptions({ onSuccess: refresh }));
+  const deleteM = useMutation(
+    trpc.brand.delete.mutationOptions({ onSuccess: refresh }),
+  );
 
   const onDelete = () => {
     if (confirm(`Delete ${brand.name}? This removes it from your brands.`)) {
@@ -106,14 +110,18 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
               <Label>Name</Label>
               <Input
                 value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Tagline</Label>
               <Input
                 value={form.tagline}
-                onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, tagline: e.target.value }))
+                }
                 placeholder="Luxury travel marketplace"
               />
             </div>
@@ -121,7 +129,9 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
               <Label>Description</Label>
               <Textarea
                 value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, description: e.target.value }))
+                }
                 rows={3}
               />
             </div>
@@ -129,7 +139,9 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
               <Label>Website</Label>
               <Input
                 value={form.website}
-                onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, website: e.target.value }))
+                }
                 placeholder="wander.com"
               />
             </div>
@@ -137,7 +149,9 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
               <Label>Logo URL</Label>
               <Input
                 value={form.logo}
-                onChange={(e) => setForm((f) => ({ ...f, logo: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, logo: e.target.value }))
+                }
               />
             </div>
           </div>

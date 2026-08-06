@@ -76,7 +76,9 @@ export function reconcileSubreddits(
   names: string[],
 ): SubredditProfile[] {
   const byName = new Map(
-    normalizeSubreddits(existing).map((s) => [s.name.toLowerCase(), s] as const),
+    normalizeSubreddits(existing).map(
+      (s) => [s.name.toLowerCase(), s] as const,
+    ),
   );
   return names.map((name) => byName.get(name.toLowerCase()) ?? { name });
 }

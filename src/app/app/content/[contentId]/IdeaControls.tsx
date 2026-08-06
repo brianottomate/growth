@@ -278,7 +278,9 @@ export function AddSpotControl({
               contentTitle,
               platform: option.platform,
               visibleText: `Cross-post "${contentTitle}" to ${option.label}. Add the spot${
-                sourcePlatform ? `, adapted from the ${sourcePlatform} version` : ""
+                sourcePlatform
+                  ? `, adapted from the ${sourcePlatform} version`
+                  : ""
               }, pick the format that fits the brief rather than defaulting, write channel-native copy, and tell me what you changed.`,
             })
           }

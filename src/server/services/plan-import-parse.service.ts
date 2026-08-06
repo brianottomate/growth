@@ -159,7 +159,10 @@ export function parsePlatforms(raw: string): string[] {
 
 /** Fallback (platform, sheet format text) → format id, when the AI's pick
  *  isn't a valid registry id. Ported from the old import script. */
-export function mapFormatFallback(platform: string, raw: string): string | null {
+export function mapFormatFallback(
+  platform: string,
+  raw: string,
+): string | null {
   const r = (raw || "").toLowerCase();
   const isCarousel = /carousel|carrousel|pins?\b|slides?/.test(r);
   const isStory = /story|stories/.test(r);
@@ -189,11 +192,24 @@ export function mapFormatFallback(platform: string, raw: string): string | null 
 }
 
 const MONTHS: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
 };
 
-function parseDayCell(raw: string): { day: number | null; monthHint: number | null } {
+function parseDayCell(raw: string): {
+  day: number | null;
+  monthHint: number | null;
+} {
   const t = raw.trim().toLowerCase();
   if (!t) return { day: null, monthHint: null };
   const dayMatch = /(\d{1,2})/.exec(t);
@@ -327,7 +343,12 @@ export type ClusterOutput = {
   unclusteredRowIndexes: number[]; // non-junk rows neither clustered nor dropped
 };
 
-const CAPTION_COLUMNS = ["instagram", "tiktok", "youtube", "direction"] as const;
+const CAPTION_COLUMNS = [
+  "instagram",
+  "tiktok",
+  "youtube",
+  "direction",
+] as const;
 
 function rowDigest(r: WorkbookRow): string {
   const caps = (["instagram", "tiktok", "youtube"] as const)
@@ -395,7 +416,9 @@ export async function clusterWorkbookRows(
       ),
     title: z
       .string()
-      .describe("Canonical concept title — clean, no platform suffixes like '— TikTok cut'."),
+      .describe(
+        "Canonical concept title — clean, no platform suffixes like '— TikTok cut'.",
+      ),
     date: z
       .string()
       .nullable()
@@ -404,32 +427,44 @@ export async function clusterWorkbookRows(
     seriesName: z
       .string()
       .nullable()
-      .describe("Series display name. Reuse a known series name when it is clearly the same series."),
+      .describe(
+        "Series display name. Reuse a known series name when it is clearly the same series.",
+      ),
     ownerName: z.string().nullable(),
     ctaKeyword: z
       .string()
       .nullable()
-      .describe("The ManyChat comment-trigger keyword — ONLY when ManyChat is YES."),
+      .describe(
+        "The ManyChat comment-trigger keyword — ONLY when ManyChat is YES.",
+      ),
     spots: z
       .array(
         z.object({
           platform: z.enum(platformEnum),
           format: z
             .string()
-            .describe("A VALID registry format id for that platform (see the list in the prompt)."),
+            .describe(
+              "A VALID registry format id for that platform (see the list in the prompt).",
+            ),
           template: z
             .string()
             .nullable()
-            .describe("Editorial structure when obvious: pov, talking_head, gallery, listicle, …"),
+            .describe(
+              "Editorial structure when obvious: pov, talking_head, gallery, listicle, …",
+            ),
           date: z
             .string()
             .nullable()
-            .describe("YYYY-MM-DD, ONLY when this platform ships on a DIFFERENT day than the idea date."),
+            .describe(
+              "YYYY-MM-DD, ONLY when this platform ships on a DIFFERENT day than the idea date.",
+            ),
           captionRowIndex: z
             .number()
             .int()
             .nullable()
-            .describe("The row whose caption cell holds this platform's caption."),
+            .describe(
+              "The row whose caption cell holds this platform's caption.",
+            ),
           captionColumn: z.enum(CAPTION_COLUMNS).nullable(),
         }),
       )
@@ -441,7 +476,9 @@ export async function clusterWorkbookRows(
     ideas: z.array(clusterIdeaSchema),
     droppedRowIndexes: z
       .array(z.number().int())
-      .describe("Junk rows to ignore: legends, blanks, stray asset filenames with no plannable concept."),
+      .describe(
+        "Junk rows to ignore: legends, blanks, stray asset filenames with no plannable concept.",
+      ),
   });
 
   const system = [
@@ -527,7 +564,10 @@ export async function clusterWorkbookRows(
     const aiSpots = ai?.spots ?? [];
     const fallbackPlatforms = [
       ...new Set(cluster.flatMap((r) => r.platforms)),
-    ].map((platform) => ({ platform, fromRow: cluster.find((r) => r.platforms.includes(platform))! }));
+    ].map((platform) => ({
+      platform,
+      fromRow: cluster.find((r) => r.platforms.includes(platform))!,
+    }));
 
     const resolveCaption = (
       platform: string,
@@ -590,7 +630,9 @@ export async function clusterWorkbookRows(
       });
     }
 
-    const realDays = cluster.map((r) => r.day).filter((d): d is number => d != null);
+    const realDays = cluster
+      .map((r) => r.day)
+      .filter((d): d is number => d != null);
     return {
       title: ai?.title ?? lead.concept ?? "Untitled",
       date:

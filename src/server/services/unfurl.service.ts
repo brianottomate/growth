@@ -25,7 +25,9 @@ export type LinkCard = {
 
 const URL_RE = /https?:\/\/[^\s<>()"']+/;
 
-export function extractFirstUrl(text: string | null | undefined): string | null {
+export function extractFirstUrl(
+  text: string | null | undefined,
+): string | null {
   if (!text) return null;
   const match = URL_RE.exec(text);
   return match ? match[0].replace(/[.,;:!?]+$/, "") : null;
@@ -77,7 +79,9 @@ function firstParagraph(markdown: string): string | null {
 async function predictedCard(url: string): Promise<LinkCard | null> {
   const spot = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.externalUrl, url),
-    with: { contentPost: { columns: { title: true, hook: true, media: true } } },
+    with: {
+      contentPost: { columns: { title: true, hook: true, media: true } },
+    },
   });
   if (!spot || spot.status === "published") return null;
   const title =
@@ -127,8 +131,7 @@ async function liveCard(url: string): Promise<LinkCard | null> {
       metaContent(html, "og:description") ??
       metaContent(html, "twitter:description") ??
       metaContent(html, "description"),
-    image:
-      metaContent(html, "og:image") ?? metaContent(html, "twitter:image"),
+    image: metaContent(html, "og:image") ?? metaContent(html, "twitter:image"),
     predicted: false,
   };
 }

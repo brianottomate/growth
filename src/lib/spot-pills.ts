@@ -5,7 +5,11 @@
  * instructions from the SAME source.
  */
 export const SPOT_PILLS = [
-  { id: "shorter", label: "Shorter", instruction: "Keep it noticeably shorter and tighter." },
+  {
+    id: "shorter",
+    label: "Shorter",
+    instruction: "Keep it noticeably shorter and tighter.",
+  },
   {
     id: "punchier",
     label: "Punchier",
@@ -24,15 +28,21 @@ export const SPOT_PILLS = [
   {
     id: "add-hashtags",
     label: "Add hashtags",
-    instruction: "Include a few relevant, natural hashtags where the platform expects them.",
+    instruction:
+      "Include a few relevant, natural hashtags where the platform expects them.",
   },
 ] as const;
 
 export type SpotPill = (typeof SPOT_PILLS)[number]["id"];
 
 // Tuple form for `z.enum(...)` on the server.
-export const SPOT_PILL_IDS = SPOT_PILLS.map((p) => p.id) as [SpotPill, ...SpotPill[]];
+export const SPOT_PILL_IDS = SPOT_PILLS.map((p) => p.id) as [
+  SpotPill,
+  ...SpotPill[],
+];
 
-export const SPOT_PILL_INSTRUCTION: Record<SpotPill, string> = Object.fromEntries(
-  SPOT_PILLS.map((p) => [p.id, p.instruction]),
-) as Record<SpotPill, string>;
+export const SPOT_PILL_INSTRUCTION: Record<SpotPill, string> =
+  Object.fromEntries(SPOT_PILLS.map((p) => [p.id, p.instruction])) as Record<
+    SpotPill,
+    string
+  >;

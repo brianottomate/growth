@@ -138,9 +138,7 @@ async function renderEmailTemplate<T extends EmailTemplateName>(
     case "password_reset": {
       const { default: PasswordResetInline } =
         await import("../../../emails/PasswordResetInline");
-      return render(
-        PasswordResetInline(variables as PasswordResetVariables),
-      );
+      return render(PasswordResetInline(variables as PasswordResetVariables));
     }
     default:
       throw new Error(`Unknown template: ${templateName}`);

@@ -151,10 +151,7 @@ type LegacyAlertColor = {
 };
 
 type LegacyAlertCategory = "success" | "danger" | "warning" | "info";
-const legacyAlertColors: Record<
-  LegacyAlertCategory,
-  LegacyAlertColor
-> = {
+const legacyAlertColors: Record<LegacyAlertCategory, LegacyAlertColor> = {
   success: {
     background: "bg-green-50",
     border: "border-green-400",

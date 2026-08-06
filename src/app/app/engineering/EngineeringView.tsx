@@ -138,7 +138,10 @@ export function EngineeringView({ health }: { health: DataHealth }) {
                 title={`${t.domain} · ${t.status}`}
               >
                 <span
-                  className={cn("size-1.5 rounded-full", STATUS_META[t.status].dot)}
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    STATUS_META[t.status].dot,
+                  )}
                 />
                 {t.name}
               </span>

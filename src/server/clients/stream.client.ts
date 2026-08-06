@@ -51,16 +51,19 @@ export async function streamCreateDirectUpload(opts: {
   creator?: string;
   name?: string;
 }): Promise<StreamDirectUpload> {
-  return cf<StreamDirectUpload>(`/accounts/${accountId()}/stream/direct_upload`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      maxDurationSeconds: opts.maxDurationSeconds ?? 3600,
-      creator: opts.creator,
-      meta: opts.name ? { name: opts.name } : undefined,
-      requireSignedURLs: false,
-    }),
-  });
+  return cf<StreamDirectUpload>(
+    `/accounts/${accountId()}/stream/direct_upload`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        maxDurationSeconds: opts.maxDurationSeconds ?? 3600,
+        creator: opts.creator,
+        meta: opts.name ? { name: opts.name } : undefined,
+        requireSignedURLs: false,
+      }),
+    },
+  );
 }
 
 export interface StreamVideo {

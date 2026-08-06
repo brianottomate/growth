@@ -11,7 +11,11 @@ function pick(
   for (const key of keys) {
     const value = meta[key];
     if (typeof value === "string" && value.trim()) return value.trim();
-    if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) {
+    if (
+      Array.isArray(value) &&
+      typeof value[0] === "string" &&
+      value[0].trim()
+    ) {
       return value[0].trim();
     }
   }
@@ -41,7 +45,12 @@ export async function enrichBrandFromWebsite(
 
   const meta = result.metadata;
   const title = pick(meta, "ogTitle", "og:title", "title");
-  const description = pick(meta, "ogDescription", "og:description", "description");
+  const description = pick(
+    meta,
+    "ogDescription",
+    "og:description",
+    "description",
+  );
   const ogImage = pick(meta, "ogImage", "og:image");
   const favicon = pick(meta, "favicon");
 

@@ -106,19 +106,36 @@ export const META_AD_ACCOUNT_ID = "act_885632589057558";
 export const DATA_SOURCE_HIERARCHY: Partial<
   Record<
     Channel,
-    { channel: Channel; dataSource: DataSourceType; attribution: AttributionMethod }
+    {
+      channel: Channel;
+      dataSource: DataSourceType;
+      attribution: AttributionMethod;
+    }
   >
 > = {
   meta: { channel: "meta", dataSource: "meta_api", attribution: "view_click" },
-  google: { channel: "google", dataSource: "google_api", attribution: "data_driven" },
-  pinterest: { channel: "pinterest", dataSource: "pinterest_api", attribution: "view_click" },
+  google: {
+    channel: "google",
+    dataSource: "google_api",
+    attribution: "data_driven",
+  },
+  pinterest: {
+    channel: "pinterest",
+    dataSource: "pinterest_api",
+    attribution: "view_click",
+  },
 };
 
 /** OTA channels — excluded from Direct CPB. mybookingpal = Amex, NOT Booking.com. */
 export const OTA_CHANNELS: Channel[] = ["airbnb", "vrbo", "booking", "amex"];
 
 /** Channels excluded from the direct-booking count (OTAs only — Kyle, Mar 5 2026). */
-export const CPB_EXCLUDED_CHANNELS: Channel[] = ["airbnb", "vrbo", "booking", "amex"];
+export const CPB_EXCLUDED_CHANNELS: Channel[] = [
+  "airbnb",
+  "vrbo",
+  "booking",
+  "amex",
+];
 
 /**
  * Marketplace-only ad-spend filter (Decision #9m, Kyle/Brooke, Jun 2026).
@@ -131,7 +148,9 @@ export const CPB_EXCLUDED_CHANNELS: Channel[] = ["airbnb", "vrbo", "booking", "a
  */
 export const NON_MARKETPLACE_CAMPAIGN_PATTERN = /wanderos|listed/i;
 
-export function isMarketplaceCampaign(name: string | null | undefined): boolean {
+export function isMarketplaceCampaign(
+  name: string | null | undefined,
+): boolean {
   if (!name) return true; // unnamed → keep (fail toward counting — pessimistic)
   return !NON_MARKETPLACE_CAMPAIGN_PATTERN.test(name);
 }
@@ -174,26 +193,146 @@ export interface ChannelConfig {
 }
 
 export const CHANNEL_CONFIG: Record<Channel, ChannelConfig> = {
-  meta: { id: "meta", name: "Meta Ads", abbreviation: "M", color: "#1877f2", sourceLabel: "Paid Social" },
-  google: { id: "google", name: "Google Ads", abbreviation: "G", color: "#34a853", sourceLabel: "Paid Search" },
-  pinterest: { id: "pinterest", name: "Pinterest Ads", abbreviation: "P", color: "#e60023", sourceLabel: "Paid Social" },
-  tiktok: { id: "tiktok", name: "TikTok Ads", abbreviation: "TT", color: "#000000", sourceLabel: "Paid Social" },
-  microsoft: { id: "microsoft", name: "Microsoft/Bing", abbreviation: "B", color: "#00897b", sourceLabel: "Paid Search" },
-  criteo: { id: "criteo", name: "Criteo", abbreviation: "CR", color: "#f97316", sourceLabel: "Display" },
-  mountain: { id: "mountain", name: "Comcast + Ad IDs", abbreviation: "TV", color: "#8b5cf6", sourceLabel: "Fixed Cost" },
-  influencer: { id: "influencer", name: "Influencers", abbreviation: "INF", color: "#ec4899", sourceLabel: "Fixed Cost" },
-  content: { id: "content", name: "Amortized Content", abbreviation: "CNT", color: "#d946ef", sourceLabel: "Fixed Cost" },
-  lifecycle: { id: "lifecycle", name: "Lifecycle", abbreviation: "CIO", color: "#10b981", sourceLabel: "Fixed Cost" },
-  demand_sales: { id: "demand_sales", name: "Demand Sales + OpenPhone", abbreviation: "BDR", color: "#f59e0b", sourceLabel: "Fixed Cost" },
-  direct_mail: { id: "direct_mail", name: "Direct Mail", abbreviation: "DM", color: "#84cc16", sourceLabel: "Fixed Cost" },
-  affiliate: { id: "affiliate", name: "Affiliate", abbreviation: "AFF", color: "#6366f1", sourceLabel: "Fixed Cost" },
-  seo: { id: "seo", name: "SEO", abbreviation: "SEO", color: "#06b6d4", sourceLabel: "Fixed Cost" },
-  organic: { id: "organic", name: "Organic/Referrals", abbreviation: "ORG", color: "#a855f7", sourceLabel: "Calculated" },
-  airbnb: { id: "airbnb", name: "Airbnb", abbreviation: "ABB", color: "#f43f5e", sourceLabel: "OTA" },
-  vrbo: { id: "vrbo", name: "Vrbo", abbreviation: "VRB", color: "#3b82f6", sourceLabel: "OTA" },
-  booking: { id: "booking", name: "Booking.com", abbreviation: "BKG", color: "#1d4ed8", sourceLabel: "OTA" },
-  amex: { id: "amex", name: "Amex (MyBookingPal)", abbreviation: "AMX", color: "#006fcf", sourceLabel: "OTA" },
-  other: { id: "other", name: "Other", abbreviation: "OTH", color: "#64748b", sourceLabel: "Various" },
+  meta: {
+    id: "meta",
+    name: "Meta Ads",
+    abbreviation: "M",
+    color: "#1877f2",
+    sourceLabel: "Paid Social",
+  },
+  google: {
+    id: "google",
+    name: "Google Ads",
+    abbreviation: "G",
+    color: "#34a853",
+    sourceLabel: "Paid Search",
+  },
+  pinterest: {
+    id: "pinterest",
+    name: "Pinterest Ads",
+    abbreviation: "P",
+    color: "#e60023",
+    sourceLabel: "Paid Social",
+  },
+  tiktok: {
+    id: "tiktok",
+    name: "TikTok Ads",
+    abbreviation: "TT",
+    color: "#000000",
+    sourceLabel: "Paid Social",
+  },
+  microsoft: {
+    id: "microsoft",
+    name: "Microsoft/Bing",
+    abbreviation: "B",
+    color: "#00897b",
+    sourceLabel: "Paid Search",
+  },
+  criteo: {
+    id: "criteo",
+    name: "Criteo",
+    abbreviation: "CR",
+    color: "#f97316",
+    sourceLabel: "Display",
+  },
+  mountain: {
+    id: "mountain",
+    name: "Comcast + Ad IDs",
+    abbreviation: "TV",
+    color: "#8b5cf6",
+    sourceLabel: "Fixed Cost",
+  },
+  influencer: {
+    id: "influencer",
+    name: "Influencers",
+    abbreviation: "INF",
+    color: "#ec4899",
+    sourceLabel: "Fixed Cost",
+  },
+  content: {
+    id: "content",
+    name: "Amortized Content",
+    abbreviation: "CNT",
+    color: "#d946ef",
+    sourceLabel: "Fixed Cost",
+  },
+  lifecycle: {
+    id: "lifecycle",
+    name: "Lifecycle",
+    abbreviation: "CIO",
+    color: "#10b981",
+    sourceLabel: "Fixed Cost",
+  },
+  demand_sales: {
+    id: "demand_sales",
+    name: "Demand Sales + OpenPhone",
+    abbreviation: "BDR",
+    color: "#f59e0b",
+    sourceLabel: "Fixed Cost",
+  },
+  direct_mail: {
+    id: "direct_mail",
+    name: "Direct Mail",
+    abbreviation: "DM",
+    color: "#84cc16",
+    sourceLabel: "Fixed Cost",
+  },
+  affiliate: {
+    id: "affiliate",
+    name: "Affiliate",
+    abbreviation: "AFF",
+    color: "#6366f1",
+    sourceLabel: "Fixed Cost",
+  },
+  seo: {
+    id: "seo",
+    name: "SEO",
+    abbreviation: "SEO",
+    color: "#06b6d4",
+    sourceLabel: "Fixed Cost",
+  },
+  organic: {
+    id: "organic",
+    name: "Organic/Referrals",
+    abbreviation: "ORG",
+    color: "#a855f7",
+    sourceLabel: "Calculated",
+  },
+  airbnb: {
+    id: "airbnb",
+    name: "Airbnb",
+    abbreviation: "ABB",
+    color: "#f43f5e",
+    sourceLabel: "OTA",
+  },
+  vrbo: {
+    id: "vrbo",
+    name: "Vrbo",
+    abbreviation: "VRB",
+    color: "#3b82f6",
+    sourceLabel: "OTA",
+  },
+  booking: {
+    id: "booking",
+    name: "Booking.com",
+    abbreviation: "BKG",
+    color: "#1d4ed8",
+    sourceLabel: "OTA",
+  },
+  amex: {
+    id: "amex",
+    name: "Amex (MyBookingPal)",
+    abbreviation: "AMX",
+    color: "#006fcf",
+    sourceLabel: "OTA",
+  },
+  other: {
+    id: "other",
+    name: "Other",
+    abbreviation: "OTH",
+    color: "#64748b",
+    sourceLabel: "Various",
+  },
 };
 
 // -----------------------------------------------------------------------------
@@ -230,29 +369,125 @@ export interface FixedCostEntry {
  */
 export const FIXED_COSTS: FixedCostEntry[] = [
   // ---- Seeds (migration 004, effective 2025-01) ----
-  { category: "tv_linear", partner: "Comcast", monthlyAmount: 10_581, effectiveMonth: "2025-01" },
-  { category: "lifecycle", partner: "Customer.io", monthlyAmount: 13_500, effectiveMonth: "2025-01" },
-  { category: "demand_sales", partner: "BDRs (4)", monthlyAmount: 36_842, effectiveMonth: "2025-01" },
-  { category: "direct_mail", partner: "PebblePost", monthlyAmount: 17_134, effectiveMonth: "2025-01" },
-  { category: "affiliate", partner: "Acceleration Partners", monthlyAmount: 8_797, effectiveMonth: "2025-01" },
-  { category: "seo", partner: "Digitaloft", monthlyAmount: 27_871, effectiveMonth: "2025-01" },
+  {
+    category: "tv_linear",
+    partner: "Comcast",
+    monthlyAmount: 10_581,
+    effectiveMonth: "2025-01",
+  },
+  {
+    category: "lifecycle",
+    partner: "Customer.io",
+    monthlyAmount: 13_500,
+    effectiveMonth: "2025-01",
+  },
+  {
+    category: "demand_sales",
+    partner: "BDRs (4)",
+    monthlyAmount: 36_842,
+    effectiveMonth: "2025-01",
+  },
+  {
+    category: "direct_mail",
+    partner: "PebblePost",
+    monthlyAmount: 17_134,
+    effectiveMonth: "2025-01",
+  },
+  {
+    category: "affiliate",
+    partner: "Acceleration Partners",
+    monthlyAmount: 8_797,
+    effectiveMonth: "2025-01",
+  },
+  {
+    category: "seo",
+    partner: "Digitaloft",
+    monthlyAmount: 27_871,
+    effectiveMonth: "2025-01",
+  },
 
   // ---- May 2026 overrides (Kyle, Decision #9a + migrations 010-013) ----
-  { category: "direct_mail", partner: "PebblePost", monthlyAmount: 0, effectiveMonth: "2026-05", note: "Kyle override May 4 2026" },
-  { category: "affiliate", partner: "Acceleration Partners", monthlyAmount: 10_000, effectiveMonth: "2026-05", note: "Decision #9a / CONTEXT §4d — was a Settings-UI edit in the tracker's Supabase, never migrated; caught reconciling against the methodology page 2026-07-10" },
-  { category: "seo", partner: "Digitaloft", monthlyAmount: 10_000, effectiveMonth: "2026-05", note: "Kyle: dropped from $20K, May 4 2026" },
-  { category: "demand_sales", partner: "BDRs (4) + OpenPhone", monthlyAmount: 35_784, effectiveMonth: "2026-05", note: "migration 011" },
-  { category: "tv_linear", partner: "Comcast + Ad IDs", monthlyAmount: 12_900, effectiveMonth: "2026-05", note: "migration 012; Kyle picked $12.5-12.9K range May 15 2026" },
-  { category: "content", partner: "Amortized Content", monthlyAmount: 6_021, effectiveMonth: "2026-05", note: "migration 013 — split from influencer" },
-  { category: "influencer", partner: "Lefty", monthlyAmount: 1_000, effectiveMonth: "2026-05", note: "migration 013; Lefty cancels Jul 2026" },
+  {
+    category: "direct_mail",
+    partner: "PebblePost",
+    monthlyAmount: 0,
+    effectiveMonth: "2026-05",
+    note: "Kyle override May 4 2026",
+  },
+  {
+    category: "affiliate",
+    partner: "Acceleration Partners",
+    monthlyAmount: 10_000,
+    effectiveMonth: "2026-05",
+    note: "Decision #9a / CONTEXT §4d — was a Settings-UI edit in the tracker's Supabase, never migrated; caught reconciling against the methodology page 2026-07-10",
+  },
+  {
+    category: "seo",
+    partner: "Digitaloft",
+    monthlyAmount: 10_000,
+    effectiveMonth: "2026-05",
+    note: "Kyle: dropped from $20K, May 4 2026",
+  },
+  {
+    category: "demand_sales",
+    partner: "BDRs (4) + OpenPhone",
+    monthlyAmount: 35_784,
+    effectiveMonth: "2026-05",
+    note: "migration 011",
+  },
+  {
+    category: "tv_linear",
+    partner: "Comcast + Ad IDs",
+    monthlyAmount: 12_900,
+    effectiveMonth: "2026-05",
+    note: "migration 012; Kyle picked $12.5-12.9K range May 15 2026",
+  },
+  {
+    category: "content",
+    partner: "Amortized Content",
+    monthlyAmount: 6_021,
+    effectiveMonth: "2026-05",
+    note: "migration 013 — split from influencer",
+  },
+  {
+    category: "influencer",
+    partner: "Lefty",
+    monthlyAmount: 1_000,
+    effectiveMonth: "2026-05",
+    note: "migration 013; Lefty cancels Jul 2026",
+  },
 
   // ---- June 2026 (migration 014) ----
-  { category: "seo", partner: "Digitaloft", monthlyAmount: 0, effectiveMonth: "2026-06", note: "SEO cut from June onward (Decision #9i)" },
+  {
+    category: "seo",
+    partner: "Digitaloft",
+    monthlyAmount: 0,
+    effectiveMonth: "2026-06",
+    note: "SEO cut from June onward (Decision #9i)",
+  },
 
   // ---- August 2026 (migration 013 + Kyle Slack 2026-07-23) ----
-  { category: "influencer", partner: null, monthlyAmount: 0, effectiveMonth: "2026-08", note: "Lefty ($1,000/mo) cancelled — no active influencer retainer. Kyle 2026-07-23, reconfirmed by Kyle in #marketing-leads 2026-08-03" },
-  { category: "affiliate", partner: null, monthlyAmount: 0, effectiveMonth: "2026-08", note: "Acceleration Partners retainer ended — AP handed the Impact.com program back to Wander 8/1/26 (docs/affiliate-program-takeover.md), so there is no agency line item left to precommit. Kyle 2026-07-23, reconfirmed in #marketing-leads 2026-08-03. NB: Kyle quoted the old amount as $6,500/mo; this config carried $10,000 from 2026-05 (Decision #9a reconciliation) — discrepancy flagged, moot from August" },
-  { category: "tv_linear", partner: "Comcast + Ad IDs", monthlyAmount: 0, effectiveMonth: "2026-08", note: "Kyle Slack 2026-07-23: Comcast paused while improving the marketplace" },
+  {
+    category: "influencer",
+    partner: null,
+    monthlyAmount: 0,
+    effectiveMonth: "2026-08",
+    note: "Lefty ($1,000/mo) cancelled — no active influencer retainer. Kyle 2026-07-23, reconfirmed by Kyle in #marketing-leads 2026-08-03",
+  },
+  {
+    category: "affiliate",
+    partner: null,
+    monthlyAmount: 0,
+    effectiveMonth: "2026-08",
+    note: "Acceleration Partners retainer ended — AP handed the Impact.com program back to Wander 8/1/26 (docs/affiliate-program-takeover.md), so there is no agency line item left to precommit. Kyle 2026-07-23, reconfirmed in #marketing-leads 2026-08-03. NB: Kyle quoted the old amount as $6,500/mo; this config carried $10,000 from 2026-05 (Decision #9a reconciliation) — discrepancy flagged, moot from August",
+  },
+  {
+    category: "tv_linear",
+    partner: "Comcast + Ad IDs",
+    monthlyAmount: 0,
+    effectiveMonth: "2026-08",
+    note: "Kyle Slack 2026-07-23: Comcast paused while improving the marketplace",
+  },
 ];
 
 /**
@@ -308,7 +543,12 @@ export const DEMAND_SALES_MONTHLY: DemandSalesMonth[] = [
   { month: "2026-04", bookings: 74, gmv: 515_437.31 },
   { month: "2026-05", bookings: 57, gmv: 559_801.51 },
   { month: "2026-06", bookings: 41, gmv: 315_875.8 },
-  { month: "2026-07", bookings: 19, gmv: 194_945.71, note: "partial — as of 2026-07-10 download" },
+  {
+    month: "2026-07",
+    bookings: 19,
+    gmv: 194_945.71,
+    note: "partial — as of 2026-07-10 download",
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -400,7 +640,12 @@ export interface NorthStarSummary {
    * days), so recent-day net take always reads low at first; this variant is
    * apples-to-apples. Null when the window has no settled days.
    */
-  settled: { through: string; grossTake: number; spend: number; netTake: number } | null;
+  settled: {
+    through: string;
+    grossTake: number;
+    spend: number;
+    netTake: number;
+  } | null;
 }
 
 export interface DashboardSummary {

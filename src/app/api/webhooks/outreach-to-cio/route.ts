@@ -166,7 +166,11 @@ export async function POST(request: NextRequest) {
     const stageChanged = newStageId !== null && newStageId !== oldStageId;
 
     if (!ownerChanged && !stageChanged) {
-      return NextResponse.json({ success: true, skipped: true, reason: "no_relevant_changes" });
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "no_relevant_changes",
+      });
     }
 
     console.log(
@@ -174,11 +178,18 @@ export async function POST(request: NextRequest) {
     );
 
     if (env.SYNC_DEBUG) {
-      console.log(`🔍 [Outreach→CIO] payload:`, JSON.stringify(payload, null, 2).slice(0, 2000));
+      console.log(
+        `🔍 [Outreach→CIO] payload:`,
+        JSON.stringify(payload, null, 2).slice(0, 2000),
+      );
     }
 
     if (!prospectId) {
-      return NextResponse.json({ success: true, skipped: true, reason: "no_prospect_id" });
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "no_prospect_id",
+      });
     }
 
     const result = await processOutreachProspectUpdate({

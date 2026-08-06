@@ -60,7 +60,12 @@ function parseArgs(argv: string[]): CliOptions {
       }
     }
   }
-  const toInt = (v: string | undefined, fallback: number, min: number, max: number) => {
+  const toInt = (
+    v: string | undefined,
+    fallback: number,
+    min: number,
+    max: number,
+  ) => {
     const n = Number.parseInt(v ?? "", 10);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(min, Math.min(max, n));
@@ -68,7 +73,10 @@ function parseArgs(argv: string[]): CliOptions {
   return {
     hours: toInt(args.get("hours"), 24, 1, 168),
     sample: toInt(args.get("sample"), 25, 1, 200),
-    events: (args.get("events") ?? "user_signed_up").split(",").map((s) => s.trim()).filter(Boolean),
+    events: (args.get("events") ?? "user_signed_up")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
     concurrency: toInt(args.get("concurrency"), 5, 1, 20),
     json,
     diagnose,
@@ -160,7 +168,9 @@ async function fetchRecentSignups(): Promise<RecentEvent[]> {
   // Distinct emails per (email, event_type) pair, most recent first.
   // Joins funnel_events to customer_profiles for email resolution —
   // matches the pattern in fetchRecentSyncCandidates.
-  const eventList = opts.events.map((e) => `'${e.replace(/'/g, "''")}'`).join(", ");
+  const eventList = opts.events
+    .map((e) => `'${e.replace(/'/g, "''")}'`)
+    .join(", ");
   const query = `
 WITH recent AS (
   SELECT
@@ -200,34 +210,39 @@ type LookupResult = {
   error?: string;
 };
 
-async function lookupOutreachBatch(events: RecentEvent[]): Promise<LookupResult[]> {
+async function lookupOutreachBatch(
+  events: RecentEvent[],
+): Promise<LookupResult[]> {
   const out = new Array<LookupResult>(events.length);
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(opts.concurrency, events.length) }, async () => {
-    while (true) {
-      const i = cursor++;
-      if (i >= events.length) return;
-      const e = events[i]!;
-      try {
-        const prospect = await searchProspectByEmail(e.email);
-        out[i] = {
-          email: e.email,
-          event_type: e.event_type,
-          ts: e.ts,
-          found: !!prospect,
-          prospectId: prospect ? String(prospect.id) : undefined,
-        };
-      } catch (err) {
-        out[i] = {
-          email: e.email,
-          event_type: e.event_type,
-          ts: e.ts,
-          found: false,
-          error: err instanceof Error ? err.message : String(err),
-        };
+  const workers = Array.from(
+    { length: Math.min(opts.concurrency, events.length) },
+    async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= events.length) return;
+        const e = events[i]!;
+        try {
+          const prospect = await searchProspectByEmail(e.email);
+          out[i] = {
+            email: e.email,
+            event_type: e.event_type,
+            ts: e.ts,
+            found: !!prospect,
+            prospectId: prospect ? String(prospect.id) : undefined,
+          };
+        } catch (err) {
+          out[i] = {
+            email: e.email,
+            event_type: e.event_type,
+            ts: e.ts,
+            found: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
       }
-    }
-  });
+    },
+  );
   await Promise.all(workers);
   return out;
 }
@@ -247,42 +262,49 @@ type CioProbe = {
 async function probeCio(emails: string[]): Promise<CioProbe[]> {
   const out = new Array<CioProbe>(emails.length);
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(opts.concurrency, emails.length) }, async () => {
-    while (true) {
-      const i = cursor++;
-      if (i >= emails.length) return;
-      const email = emails[i]!;
-      try {
-        const c = await getCustomerByEmail(email);
-        out[i] = c
-          ? {
-              email,
-              inCio: true,
-              cioId: c.id,
-              assignedBdrEmail: c.assignedBdrEmail ?? null,
-              assignedBdrOutreachId: c.assignedBdrOutreachId ?? null,
-              attributeCount: Object.keys(c.attributes).length,
-            }
-          : { email, inCio: false };
-      } catch (err) {
-        out[i] = {
-          email,
-          inCio: false,
-          error: err instanceof Error ? err.message : String(err),
-        };
+  const workers = Array.from(
+    { length: Math.min(opts.concurrency, emails.length) },
+    async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= emails.length) return;
+        const email = emails[i]!;
+        try {
+          const c = await getCustomerByEmail(email);
+          out[i] = c
+            ? {
+                email,
+                inCio: true,
+                cioId: c.id,
+                assignedBdrEmail: c.assignedBdrEmail ?? null,
+                assignedBdrOutreachId: c.assignedBdrOutreachId ?? null,
+                attributeCount: Object.keys(c.attributes).length,
+              }
+            : { email, inCio: false };
+        } catch (err) {
+          out[i] = {
+            email,
+            inCio: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
       }
-    }
-  });
+    },
+  );
   await Promise.all(workers);
   return out;
 }
 
 function printDiagnose(probes: CioProbe[]) {
   if (probes.length === 0) return;
-  console.log("\nDiagnose missing — Customer.io state for emails missing in Outreach");
+  console.log(
+    "\nDiagnose missing — Customer.io state for emails missing in Outreach",
+  );
   console.log("─".repeat(80));
   const inCio = probes.filter((p) => p.inCio).length;
-  const orphaned = probes.filter((p) => p.inCio && !p.assignedBdrOutreachId).length;
+  const orphaned = probes.filter(
+    (p) => p.inCio && !p.assignedBdrOutreachId,
+  ).length;
   const errored = probes.filter((p) => !!p.error).length;
   console.log(`  In Customer.io:               ${inCio}/${probes.length}`);
   console.log(`  In CIO but no BDR-Outreach link: ${orphaned}`);
@@ -334,12 +356,16 @@ function printPipeline(events: RecentEvent[], lookups: LookupResult[]) {
   console.log("─".repeat(60));
   console.log(`  Window:        last ${opts.hours}h`);
   console.log(`  Events:        ${opts.events.join(", ")}`);
-  console.log(`  BQ candidates: ${events.length} unique (sample cap ${opts.sample})`);
+  console.log(
+    `  BQ candidates: ${events.length} unique (sample cap ${opts.sample})`,
+  );
   console.log(`  In Outreach:   ${found}/${total}  (${rate}%)`);
   console.log(`  Missing:       ${missing}`);
   console.log(`  Errored:       ${errored}`);
 
-  const missingSample = lookups.filter((l) => !l.found && !l.error).slice(0, 10);
+  const missingSample = lookups
+    .filter((l) => !l.found && !l.error)
+    .slice(0, 10);
   if (missingSample.length) {
     console.log("\n  Sample of emails not found in Outreach:");
     for (const m of missingSample) {
@@ -376,7 +402,8 @@ async function main() {
   ]);
 
   const bqOk = connectivity.find((c) => c.name === "BigQuery")?.status === "ok";
-  const outreachOk = connectivity.find((c) => c.name === "Outreach")?.status === "ok";
+  const outreachOk =
+    connectivity.find((c) => c.name === "Outreach")?.status === "ok";
 
   let events: RecentEvent[] = [];
   let lookups: LookupResult[] = [];
@@ -400,7 +427,9 @@ async function main() {
 
   let probes: CioProbe[] = [];
   if (opts.diagnose && lookups.length > 0) {
-    const missingEmails = lookups.filter((l) => !l.found && !l.error).map((l) => l.email);
+    const missingEmails = lookups
+      .filter((l) => !l.found && !l.error)
+      .map((l) => l.email);
     if (missingEmails.length > 0) {
       probes = await probeCio(missingEmails);
     }
@@ -429,7 +458,9 @@ async function main() {
       pipelineSummary = printPipeline(events, lookups);
       if (opts.diagnose) printDiagnose(probes);
     } else {
-      console.log("\nPipeline check skipped — BigQuery or Outreach connectivity failed.");
+      console.log(
+        "\nPipeline check skipped — BigQuery or Outreach connectivity failed.",
+      );
     }
     console.log("");
   }

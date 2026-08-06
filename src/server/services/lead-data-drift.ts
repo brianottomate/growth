@@ -42,7 +42,9 @@ function extractedPms(enrichment: unknown): string | null {
     enrichment as { extraction?: { pms?: { detected?: unknown } } } | null
   )?.extraction;
   const detected = extraction?.pms?.detected;
-  return typeof detected === "string" && detected.trim() ? detected.trim() : null;
+  return typeof detected === "string" && detected.trim()
+    ? detected.trim()
+    : null;
 }
 
 /** "your pms" is a placeholder value HubSpot carries, not a real platform. */

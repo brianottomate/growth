@@ -251,10 +251,7 @@ export default async function BlogPostPage({
 
         <div className="mx-auto max-w-2xl py-16">
           <div className="text-center">
-            <Heading
-              variant={{ base: "display-sm", md: "display" }}
-              as="h1"
-            >
+            <Heading variant={{ base: "display-sm", md: "display" }} as="h1">
               {meta.h1}
             </Heading>
             {meta.h1Subtitle && (

@@ -25,8 +25,7 @@ export const conversionFunnelEnum = pgEnum("conversion_funnel", [
   "supply",
   "demand",
 ]);
-export type ConversionFunnel =
-  (typeof conversionFunnelEnum.enumValues)[number];
+export type ConversionFunnel = (typeof conversionFunnelEnum.enumValues)[number];
 
 // How often the platform conversion fires per user (Google/LinkedIn "mode").
 export const conversionModeEnum = pgEnum("conversion_mode", ["once", "every"]);
@@ -41,8 +40,7 @@ export const conversionStatusEnum = pgEnum("conversion_status", [
   "not_implemented",
   "verified",
 ]);
-export type ConversionStatus =
-  (typeof conversionStatusEnum.enumValues)[number];
+export type ConversionStatus = (typeof conversionStatusEnum.enumValues)[number];
 
 // ---- CONVERSION EVENT (canonical Wander funnel event — the intent spine) ----
 

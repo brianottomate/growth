@@ -22,7 +22,11 @@ export async function persistArtifactStep(ctx: StepContext) {
   const [build, homepage] = await Promise.all([
     db.query.pregenNativeBuildTable.findFirst({
       where: eq(pregenNativeBuildTable.id, ctx.buildId),
-      columns: { draftConfig: true, draftPages: true, extractedProperties: true },
+      columns: {
+        draftConfig: true,
+        draftPages: true,
+        extractedProperties: true,
+      },
     }),
     db.query.pregenNativeCrawlPageTable.findFirst({
       where: and(
@@ -69,4 +73,6 @@ const asString = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
 
 const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+  Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];

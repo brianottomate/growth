@@ -12,7 +12,6 @@ import { isPageImageCandidate } from "./units";
 // photo beats a gray box. The monolith's LLM slot-assignment + generation
 // pipeline can layer on later.
 
-
 export type ImageSources = {
   ogImage?: string;
   homepageImages: string[];
@@ -53,7 +52,9 @@ export function applyArtifactImages(
         return {
           ...s,
           items: (s.items as Record<string, unknown>[]).map((item) =>
-            isPlaceholder(item.imageUrl) ? { ...item, imageUrl: nextImage() } : item,
+            isPlaceholder(item.imageUrl)
+              ? { ...item, imageUrl: nextImage() }
+              : item,
           ),
         };
       }
@@ -64,7 +65,9 @@ export function applyArtifactImages(
 }
 
 const isPlaceholder = (value: unknown): boolean =>
-  typeof value !== "string" || value.length === 0 || value.includes("placehold.co");
+  typeof value !== "string" ||
+  value.length === 0 ||
+  value.includes("placehold.co");
 
 /**
  * Ordered candidate pool: og:image first (the site's own choice of hero),
@@ -85,7 +88,8 @@ export function buildImagePool(sources: ImageSources): string[] {
   add(sources.ogImage);
   for (const unit of sources.units) add(unit.imageUrls[0]);
   for (const unit of sources.units) add(unit.imageUrls[1]);
-  for (const url of sources.homepageImages.filter(isPageImageCandidate)) add(url);
+  for (const url of sources.homepageImages.filter(isPageImageCandidate))
+    add(url);
 
   return pool;
 }

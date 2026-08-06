@@ -10,9 +10,9 @@ import { assertLabAccess } from "@/server/lab-access";
 
 function parseCsvEmails(value: string | null): string[] {
   if (!value) return [];
-  return [...new Set(value.split(",").map((v) => v.trim().toLowerCase()))].filter(
-    Boolean,
-  );
+  return [
+    ...new Set(value.split(",").map((v) => v.trim().toLowerCase())),
+  ].filter(Boolean);
 }
 
 /**

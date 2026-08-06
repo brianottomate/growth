@@ -29,7 +29,13 @@ export type Lens =
   | "sales-motion"
   | "attribution";
 
-export type EdgeType = "events" | "webhook" | "api" | "sync" | "human" | "content";
+export type EdgeType =
+  | "events"
+  | "webhook"
+  | "api"
+  | "sync"
+  | "human"
+  | "content";
 
 export interface WanderNode {
   id: string;
@@ -98,7 +104,8 @@ export const NODES: WanderNode[] = [
     label: "growth.wander.com",
     type: "surface",
     lenses: ["full", "sales-motion"],
-    description: "Growth platform — CIO sync, recs pipeline, Outreach integration",
+    description:
+      "Growth platform — CIO sync, recs pipeline, Outreach integration",
     owner: "Growth Engineering",
     notes: "This app (wander/growth)",
   },
@@ -109,15 +116,18 @@ export const NODES: WanderNode[] = [
     label: "Segment",
     type: "hub",
     lenses: ["full", "data-spine", "guest-journey", "attribution"],
-    description: "Central event router — collects from all surfaces, fans out to destinations",
-    notes: "11 active sources. Order Completed fires 3x (web + mobile + backend) — dedup risk",
+    description:
+      "Central event router — collects from all surfaces, fans out to destinations",
+    notes:
+      "11 active sources. Order Completed fires 3x (web + mobile + backend) — dedup risk",
   },
   {
     id: "bigquery",
     label: "BigQuery",
     type: "storage",
     lenses: ["full", "data-spine", "sales-motion", "attribution"],
-    description: "Wander data lake — production DB dumps, booking data, enrichment",
+    description:
+      "Wander data lake — production DB dumps, booking data, enrichment",
     owner: "Data / Analytics",
   },
 
@@ -154,8 +164,10 @@ export const NODES: WanderNode[] = [
     label: "Impact.com",
     type: "destination",
     lenses: ["full", "data-spine", "attribution"],
-    description: "Affiliate / partnership attribution — commission payouts on Order Completed",
-    notes: "⚠️ 3 active instances. Only backend should route Order Completed to Impact — web/mobile routing causes triple commission",
+    description:
+      "Affiliate / partnership attribution — commission payouts on Order Completed",
+    notes:
+      "⚠️ 3 active instances. Only backend should route Order Completed to Impact — web/mobile routing causes triple commission",
   },
   {
     id: "mixpanel",
@@ -180,7 +192,8 @@ export const NODES: WanderNode[] = [
     label: "Outreach",
     type: "tool",
     lenses: ["full", "sales-motion"],
-    description: "Sales engagement platform — BDR sequences, prospect management",
+    description:
+      "Sales engagement platform — BDR sequences, prospect management",
     owner: "Sales / BDRs",
   },
   {
@@ -198,7 +211,8 @@ export const NODES: WanderNode[] = [
     label: "Marketplace Backend",
     type: "storage",
     lenses: ["full", "data-spine", "attribution"],
-    description: "Core API + Wander DB — booking logic, property data, user accounts",
+    description:
+      "Core API + Wander DB — booking logic, property data, user accounts",
     notes: "Canonical emitter for Order Completed to Impact.com",
   },
 
@@ -531,7 +545,8 @@ export function getNodesForLens(lens: Lens): WanderNode[] {
 export function getEdgesForLens(lens: Lens): WanderEdge[] {
   const nodeIds = new Set(getNodesForLens(lens).map((n) => n.id));
   return EDGES.filter(
-    (e) => e.lenses.includes(lens) && nodeIds.has(e.source) && nodeIds.has(e.target),
+    (e) =>
+      e.lenses.includes(lens) && nodeIds.has(e.source) && nodeIds.has(e.target),
   );
 }
 

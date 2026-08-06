@@ -218,7 +218,7 @@ function toPlainString(value: unknown): string | null {
 
 function unwrapTemporalValue(value: unknown): unknown {
   if (value && typeof value === "object" && "value" in value) {
-    return (value).value;
+    return value.value;
   }
   return value;
 }
@@ -253,7 +253,9 @@ export function formatDateForOutreach(value: unknown): string | null {
 
   // Validate YYYY-MM-DD format before returning
   if (!/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
-    console.warn(`⚠️ [FieldMapping] Invalid date for Outreach: "${str}" → skipping`);
+    console.warn(
+      `⚠️ [FieldMapping] Invalid date for Outreach: "${str}" → skipping`,
+    );
     return null;
   }
   return candidate;
@@ -357,8 +359,13 @@ export function getActivityTag(eventTypes: string | null): string | null {
   if (!eventTypes) return null;
   const types = eventTypes.toLowerCase();
   if (types.includes("order_completed")) return "Completed Purchase";
-  if (types.includes("payment_info_entered") || types.includes("abandoned_payment")) return "Abandoned Payment";
-  if (types.includes("checkout_started") || types.includes("abandoned_cart")) return "Abandoned Cart";
+  if (
+    types.includes("payment_info_entered") ||
+    types.includes("abandoned_payment")
+  )
+    return "Abandoned Payment";
+  if (types.includes("checkout_started") || types.includes("abandoned_cart"))
+    return "Abandoned Cart";
   if (types.includes("abandoned_wishlist")) return "Abandoned Wishlist";
   if (types.includes("abandoned_search")) return "Abandoned Search";
   if (types.includes("user_signed_up")) return "New Signup";
@@ -651,29 +658,48 @@ export function buildTags(lead: LeadData, existingTags?: string[]): string[] {
  */
 function eventContextLabel(eventType: string | null | undefined): string {
   switch (eventType) {
-    case "order_completed": return "Booking Confirmed";
-    case "payment_info_entered": return "Abandoned Payment";
-    case "abandoned_payment": return "Abandoned Payment";
-    case "product_added_to_wishlist": return "Wishlisted";
-    case "abandoned_wishlist": return "Abandoned Wishlist";
-    case "abandoned_search": return "Abandoned Search";
-    default: return "Abandoned Cart";
+    case "order_completed":
+      return "Booking Confirmed";
+    case "payment_info_entered":
+      return "Abandoned Payment";
+    case "abandoned_payment":
+      return "Abandoned Payment";
+    case "product_added_to_wishlist":
+      return "Wishlisted";
+    case "abandoned_wishlist":
+      return "Abandoned Wishlist";
+    case "abandoned_search":
+      return "Abandoned Search";
+    default:
+      return "Abandoned Cart";
   }
 }
 
 function formatCheckoutContext(lead: LeadData): string | null {
   const parts: string[] = [];
-  if (lead.webhook_property_name) parts.push(`Property: ${lead.webhook_property_name}`);
-  if (lead.webhook_search_destination) parts.push(`Destination: ${lead.webhook_search_destination}`);
-  const checkin = lead.webhook_checkin_date ? formatDateForOutreach(lead.webhook_checkin_date) : null;
+  if (lead.webhook_property_name)
+    parts.push(`Property: ${lead.webhook_property_name}`);
+  if (lead.webhook_search_destination)
+    parts.push(`Destination: ${lead.webhook_search_destination}`);
+  const checkin = lead.webhook_checkin_date
+    ? formatDateForOutreach(lead.webhook_checkin_date)
+    : null;
   if (checkin) parts.push(`Check-in: ${checkin}`);
-  const checkout = lead.webhook_checkout_date ? formatDateForOutreach(lead.webhook_checkout_date) : null;
+  const checkout = lead.webhook_checkout_date
+    ? formatDateForOutreach(lead.webhook_checkout_date)
+    : null;
   if (checkout) parts.push(`Check-out: ${checkout}`);
   if (lead.webhook_checkout_amount != null) {
-    parts.push(`Amount: $${lead.webhook_checkout_amount.toLocaleString("en-US")}`);
+    parts.push(
+      `Amount: $${lead.webhook_checkout_amount.toLocaleString("en-US")}`,
+    );
   }
   if (parts.length === 0) return null;
-  const dateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const dateStr = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
   const label = eventContextLabel(lead.webhook_event_type);
   return `${label} (${dateStr}): ${parts.join(" | ")}`;
 }

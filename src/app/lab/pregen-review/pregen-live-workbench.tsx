@@ -19,10 +19,7 @@ import {
 
 import type { PregenSourceVisualReceipt } from "@/server/services/pregen/source-visual-types";
 
-import type {
-  PregenEvaluationView,
-  PregenLiveRun,
-} from "./pregen-review-data";
+import type { PregenEvaluationView, PregenLiveRun } from "./pregen-review-data";
 
 type Viewport = "desktop" | "mobile";
 type SourceMode = "receipt" | "live";
@@ -223,7 +220,10 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
             detail={
               run.evaluations.length > 0
                 ? run.evaluations
-                    .map((receipt) => `${humanize(receipt.kind)}: ${receipt.status}`)
+                    .map(
+                      (receipt) =>
+                        `${humanize(receipt.kind)}: ${receipt.status}`,
+                    )
                     .join(" · ")
                 : "No model, deterministic, or human evaluation receipts exist for this run yet."
             }
@@ -293,8 +293,7 @@ export function PregenLiveWorkbench({ run }: { run: PregenLiveRun }) {
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold">
-                <Gavel className="size-3.5 text-lime-300" /> Evaluation
-                receipts
+                <Gavel className="size-3.5 text-lime-300" /> Evaluation receipts
               </div>
               <p className="mt-1 text-[9px] text-stone-500">
                 Independent verdicts on the persisted build. Reruns append;
@@ -808,8 +807,8 @@ function ReceiptResultSummary({ receipt }: { receipt: PregenEvaluationView }) {
         </p>
         {ungrounded.slice(0, 6).map((claim, index) => (
           <p key={index} className="text-amber-200/90">
-            {claim.severity === "hard" ? "✗" : "▲"} {claim.subject}: {claim.claim}{" "}
-            {claim.value} not found in source
+            {claim.severity === "hard" ? "✗" : "▲"} {claim.subject}:{" "}
+            {claim.claim} {claim.value} not found in source
           </p>
         ))}
         {ungrounded.length > 6 ? (
@@ -834,7 +833,10 @@ function ReceiptResultSummary({ receipt }: { receipt: PregenEvaluationView }) {
           {asCount(result.unknownProvenanceCount)} without source provenance.
         </p>
         {unknown.slice(0, 3).map((url) => (
-          <p key={url} className="truncate font-mono text-[7px] text-amber-200/80">
+          <p
+            key={url}
+            className="truncate font-mono text-[7px] text-amber-200/80"
+          >
             {url}
           </p>
         ))}

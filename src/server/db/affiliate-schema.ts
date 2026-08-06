@@ -152,7 +152,11 @@ export const AFFILIATE_ITEM_KINDS = [
 ] as const;
 export type AffiliateItemKind = (typeof AFFILIATE_ITEM_KINDS)[number];
 
-export const AFFILIATE_ITEM_STATUSES = ["open", "handled", "dismissed"] as const;
+export const AFFILIATE_ITEM_STATUSES = [
+  "open",
+  "handled",
+  "dismissed",
+] as const;
 export type AffiliateItemStatus = (typeof AFFILIATE_ITEM_STATUSES)[number];
 
 export const affiliateItemTable = pgTable(
@@ -270,6 +274,7 @@ export const affiliateMetricDailyTable = pgTable(
   ],
 );
 
-export type AffiliateMetricDaily = typeof affiliateMetricDailyTable.$inferSelect;
+export type AffiliateMetricDaily =
+  typeof affiliateMetricDailyTable.$inferSelect;
 export type AffiliateMetricDailyInsert =
   typeof affiliateMetricDailyTable.$inferInsert;

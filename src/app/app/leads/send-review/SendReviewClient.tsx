@@ -200,7 +200,7 @@ function SiteThumbnail({ row }: { row: ReviewRow }) {
   if (!src) return null;
   return (
     <div className="shrink-0">
-      <div className="border-border relative h-20 w-32 overflow-hidden rounded-md border bg-muted">
+      <div className="border-border bg-muted relative h-20 w-32 overflow-hidden rounded-md border">
         <Image
           src={src}
           alt={`Current site for ${row.domain}`}
@@ -267,7 +267,7 @@ function SequencePreview({ row }: { row: ReviewRow }) {
             {/* A signed preview URL is one long unbroken token, which
                 whitespace-pre-wrap alone will happily run past the container —
                 anywhere lets it break mid-token. */}
-            <pre className="mt-1 font-sans text-xs leading-relaxed break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
+            <pre className="mt-1 font-sans text-xs leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap">
               {step.body}
             </pre>
           </div>

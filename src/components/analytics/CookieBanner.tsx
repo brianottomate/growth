@@ -80,7 +80,12 @@ export const CookieBanner = ({
           >
             Decline
           </Button>
-          <Button onClick={handleAccept} variant="primary" size="md" className="flex-1">
+          <Button
+            onClick={handleAccept}
+            variant="primary"
+            size="md"
+            className="flex-1"
+          >
             Accept
           </Button>
         </div>

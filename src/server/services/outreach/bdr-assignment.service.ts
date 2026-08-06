@@ -169,7 +169,9 @@ function applyDynamicCandidateFilters(
   }
 
   if (options.includeEmails.length > 0) {
-    const includeSet = new Set(options.includeEmails.map((x) => x.toLowerCase()));
+    const includeSet = new Set(
+      options.includeEmails.map((x) => x.toLowerCase()),
+    );
     filtered = filtered.filter((c) => includeSet.has(c.email.toLowerCase()));
   }
 
@@ -321,8 +323,7 @@ export async function getNextBdrFromOutreachLoadDetailed(
   });
   const bestTouched = toTimestamp(ranked[0]?.lastProspectTouchedAt ?? null);
   const tiedTop = ranked.filter(
-    (candidate) =>
-      toTimestamp(candidate.lastProspectTouchedAt) === bestTouched,
+    (candidate) => toTimestamp(candidate.lastProspectTouchedAt) === bestTouched,
   );
   const selected =
     tiedTop[Math.floor(Math.random() * tiedTop.length)] ?? ranked[0];

@@ -59,7 +59,12 @@ export async function generateSpotCaption(
   const voice =
     channelVoice && channelFp?.overridesBrand
       ? channelVoice
-      : [brandVoice, channelVoice ? `For ${spot.platform} specifically: ${channelVoice}` : null]
+      : [
+          brandVoice,
+          channelVoice
+            ? `For ${spot.platform} specifically: ${channelVoice}`
+            : null,
+        ]
           .filter(Boolean)
           .join("\n\n");
 
@@ -82,12 +87,16 @@ export async function generateSpotCaption(
   const prompt = [
     idea?.title ? `Content idea: ${idea.title}` : null,
     idea?.hook ? `Hook: ${idea.hook}` : null,
-    idea?.captionDirection ? `Caption direction: ${idea.captionDirection}` : null,
+    idea?.captionDirection
+      ? `Caption direction: ${idea.captionDirection}`
+      : null,
     idea?.visualDirection ? `Visual direction: ${idea.visualDirection}` : null,
     idea?.ctaText ? `Call to action: ${idea.ctaText}` : null,
     idea?.ctaKeyword ? `Comment-trigger keyword: ${idea.ctaKeyword}` : null,
     idea?.kpi ? `Primary KPI: ${idea.kpi}` : null,
-    spot.text ? `Current caption (improve / rewrite this):\n${spot.text}` : null,
+    spot.text
+      ? `Current caption (improve / rewrite this):\n${spot.text}`
+      : null,
     pillLines.length ? `Style adjustments:\n- ${pillLines.join("\n- ")}` : null,
     input.steer?.trim() ? `Extra direction: ${input.steer.trim()}` : null,
     `Write the platform-ready caption now.`,

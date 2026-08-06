@@ -246,7 +246,8 @@ export async function scoreRedditPosts(
   const profiles = await loadSubredditProfiles();
   const channel: ScoringChannel<RedditPostSummary, IntentTag> = {
     ...SCORING_CHANNEL,
-    formatItem: (p) => formatPostForLLM(p, profiles.get(p.subreddit.toLowerCase())),
+    formatItem: (p) =>
+      formatPostForLLM(p, profiles.get(p.subreddit.toLowerCase())),
   };
   const { scored } = await scoreItems(channel, posts);
   return scored.map((s) => ({

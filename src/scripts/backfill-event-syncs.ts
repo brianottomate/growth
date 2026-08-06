@@ -55,7 +55,12 @@ function parseArgs(argv: string[]): CliOptions {
       }
     }
   }
-  const toInt = (v: string | undefined, fallback: number, min: number, max: number) => {
+  const toInt = (
+    v: string | undefined,
+    fallback: number,
+    min: number,
+    max: number,
+  ) => {
     const n = Number.parseInt(v ?? "", 10);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(min, Math.min(max, n));
@@ -75,7 +80,9 @@ function parseArgs(argv: string[]): CliOptions {
 const opts = parseArgs(process.argv.slice(2));
 
 async function fetchCandidates(): Promise<Candidate[]> {
-  const eventList = opts.events.map((e) => `'${e.replace(/'/g, "''")}'`).join(", ");
+  const eventList = opts.events
+    .map((e) => `'${e.replace(/'/g, "''")}'`)
+    .join(", ");
   // One row per email — most recent matching event wins. We pass the
   // freshest event_type into processLead so its existing logic for
   // BDR-source / stage selection (DEMAND_NEW for signups, DEMAND_BOOKED
@@ -116,7 +123,11 @@ LIMIT @limit
 }
 
 type WorkerResult =
-  | { status: "ok"; action: "created" | "updated" | "skipped" | "no_action"; ms: number }
+  | {
+      status: "ok";
+      action: "created" | "updated" | "skipped" | "no_action";
+      ms: number;
+    }
   | { status: "error"; message: string; ms: number };
 
 async function runOne(c: Candidate): Promise<WorkerResult> {
@@ -237,7 +248,8 @@ async function main() {
 
   // By-event breakdown so the user sees the mix before sync starts.
   const byEvent = new Map<string, number>();
-  for (const c of candidates) byEvent.set(c.event_type, (byEvent.get(c.event_type) ?? 0) + 1);
+  for (const c of candidates)
+    byEvent.set(c.event_type, (byEvent.get(c.event_type) ?? 0) + 1);
   console.log("\nBreakdown by latest event type:");
   for (const [ev, n] of [...byEvent.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${ev.padEnd(28)} ${n}`);

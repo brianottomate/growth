@@ -79,9 +79,10 @@ export function PreviewBlock({ block }: { block: DatoBlock }) {
   }
 
   if (known.__typename === "TableRecord") {
-    const table = known.table as
-      | { columns?: string[]; data?: Record<string, string>[] }
-      | null;
+    const table = known.table as {
+      columns?: string[];
+      data?: Record<string, string>[];
+    } | null;
     if (!table?.columns?.length) return null;
     return (
       <div className="my-8 overflow-x-auto">

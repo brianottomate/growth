@@ -49,8 +49,13 @@ const ExtractedMentionSchema = z.object({
   subreddit: z
     .string()
     .nullable()
-    .describe("Subreddit name WITHOUT the r/ prefix, e.g. 'vrbo'. null if not reddit."),
-  title: z.string().nullable().describe("Title of the post/thread, if present."),
+    .describe(
+      "Subreddit name WITHOUT the r/ prefix, e.g. 'vrbo'. null if not reddit.",
+    ),
+  title: z
+    .string()
+    .nullable()
+    .describe("Title of the post/thread, if present."),
   author: z
     .string()
     .nullable()
@@ -94,7 +99,10 @@ export async function extractMentionsFromEmail(input: {
   text: string | null;
   html: string | null;
 }): Promise<ExtractedMention[]> {
-  const body = (input.text?.trim() || input.html?.trim() || "").slice(0, 20_000);
+  const body = (input.text?.trim() || input.html?.trim() || "").slice(
+    0,
+    20_000,
+  );
   if (!body) return [];
 
   const { output } = await generateText({
@@ -191,7 +199,11 @@ export async function ingestF5BotEmail(email: {
   const extracted = await extractMentionsFromEmail(email);
   console.log(
     `[f5bot] email ${email.id} "${email.subject}" → extracted ${extracted.length} mention(s)`,
-    extracted.map((m) => ({ source: m.source, keyword: m.keyword, url: m.url })),
+    extracted.map((m) => ({
+      source: m.source,
+      keyword: m.keyword,
+      url: m.url,
+    })),
   );
   if (extracted.length === 0) return { extracted: 0, inserted: 0, scored: 0 };
 
@@ -220,13 +232,17 @@ export async function ingestF5BotEmail(email: {
   console.log(
     `[f5bot] persisted ${inserted.length}/${rows.length} mention(s) (rest were dupes)`,
   );
-  if (inserted.length === 0) return { extracted: extracted.length, inserted: 0, scored: 0 };
+  if (inserted.length === 0)
+    return { extracted: extracted.length, inserted: 0, scored: 0 };
 
   // Best-effort scoring — never fail the ingest (or the webhook) on a scoring error.
   let scored = 0;
   let scoredMentions: Mention[] = [];
   try {
-    const { scored: results } = await scoreItems(mentionScoringChannel, inserted);
+    const { scored: results } = await scoreItems(
+      mentionScoringChannel,
+      inserted,
+    );
     await Promise.all(
       results.map((r) =>
         db

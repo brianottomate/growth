@@ -120,7 +120,7 @@ export default async function PillarsPage() {
                   <Link
                     key={s.id}
                     href={`/app/series/${s.id}`}
-                    className="bg-card hover:border-neutral-500 rounded-full border px-3 py-1 text-xs transition"
+                    className="bg-card rounded-full border px-3 py-1 text-xs transition hover:border-neutral-500"
                   >
                     {s.name}
                     <span className="text-muted-foreground ml-1.5 text-[10px] capitalize">

@@ -238,6 +238,9 @@ export async function getDataHealth(): Promise<DataHealth> {
     totalRows: stats.reduce((n, t) => n + t.total, 0),
     emptyTables: stats
       .filter((t) => t.status !== "live")
-      .sort((a, b) => a.domain.localeCompare(b.domain) || a.name.localeCompare(b.name)),
+      .sort(
+        (a, b) =>
+          a.domain.localeCompare(b.domain) || a.name.localeCompare(b.name),
+      ),
   };
 }

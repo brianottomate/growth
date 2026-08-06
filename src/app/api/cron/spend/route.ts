@@ -87,7 +87,8 @@ export async function GET(request: NextRequest) {
       status: "ok",
       service: "spend-cron",
       schedule: "30 5 * * * (daily 5:30 AM UTC)",
-      usage: "GET /api/cron/spend  (Authorization: Bearer <ADMIN_TOKEN> or Vercel CRON_SECRET)",
+      usage:
+        "GET /api/cron/spend  (Authorization: Bearer <ADMIN_TOKEN> or Vercel CRON_SECRET)",
     });
   }
 

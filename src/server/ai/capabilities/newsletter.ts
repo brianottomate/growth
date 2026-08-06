@@ -24,12 +24,16 @@ export const newsletterAgent = growthTool({
       .trim()
       .min(10)
       .max(4000)
-      .describe("The full task in plain language, including any supplied copy."),
+      .describe(
+        "The full task in plain language, including any supplied copy.",
+      ),
     platformPostId: z
       .string()
       .trim()
       .optional()
-      .describe("The newsletter spot id, when the task concerns an existing issue."),
+      .describe(
+        "The newsletter spot id, when the task concerns an existing issue.",
+      ),
   }),
   execute: async (input, ctx) => {
     const result = await runNewsletterAgent({

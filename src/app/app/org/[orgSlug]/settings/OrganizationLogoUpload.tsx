@@ -96,13 +96,10 @@ export function OrganizationLogoUpload({
         searchParams.set("resourceType", "organization");
         searchParams.set("resourceId", organizationId);
 
-        const response = await fetch(
-          `/api/upload?${searchParams.toString()}`,
-          {
-            method: "POST",
-            body: file,
-          },
-        );
+        const response = await fetch(`/api/upload?${searchParams.toString()}`, {
+          method: "POST",
+          body: file,
+        });
 
         if (!response.ok) {
           const error = (await response.json()) as {

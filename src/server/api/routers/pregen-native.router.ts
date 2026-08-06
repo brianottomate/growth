@@ -71,7 +71,9 @@ export const pregenNativeRouter = createTRPCRouter({
     return ctx.db.query.pregenNativeProspectTable.findMany({
       orderBy: [desc(pregenNativeProspectTable.createdAt)],
       limit: 50,
-      with: { builds: { orderBy: [desc(pregenNativeBuildTable.createdAt)], limit: 1 } },
+      with: {
+        builds: { orderBy: [desc(pregenNativeBuildTable.createdAt)], limit: 1 },
+      },
     });
   }),
 });

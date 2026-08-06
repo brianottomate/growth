@@ -111,7 +111,7 @@ function CampaignRow({ c, spots }: { c: Campaign; spots: AdSpot[] }) {
                   className="h-full w-full object-cover"
                 />
                 {s.status && (
-                  <span className="absolute right-1 top-1 rounded-full bg-black/40 px-1.5 py-0.5 text-[8px] font-medium capitalize text-white backdrop-blur-sm">
+                  <span className="absolute top-1 right-1 rounded-full bg-black/40 px-1.5 py-0.5 text-[8px] font-medium text-white capitalize backdrop-blur-sm">
                     {s.status}
                   </span>
                 )}
@@ -208,14 +208,21 @@ export default async function BrandAdsPage({
   const chanPlatform = new Map(channels.map((c) => [c.id, c.platform]));
   const totalSpend = campaigns.reduce((n, c) => n + (c.spend ?? 0), 0);
   const channelSpend = (id: string) =>
-    campaigns.filter((c) => c.channelId === id).reduce((n, c) => n + (c.spend ?? 0), 0);
+    campaigns
+      .filter((c) => c.channelId === id)
+      .reduce((n, c) => n + (c.spend ?? 0), 0);
   const channelCampaigns = (id: string) =>
     campaigns.filter((c) => c.channelId === id).length;
 
   // Dedupe audiences by name — the cross-channel view (one row, N platform badges).
   const audGroups = new Map<
     string,
-    { name: string; type: string; sizeLabel: string | null; platforms: Set<string> }
+    {
+      name: string;
+      type: string;
+      sizeLabel: string | null;
+      platforms: Set<string>;
+    }
   >();
   for (const a of audiences) {
     const g = audGroups.get(a.name) ?? {
@@ -242,7 +249,9 @@ export default async function BrandAdsPage({
       const impl = initiativeChannels(init.id);
       const targets = init.targetChannels ?? [];
       const verify = targets
-        .map((ch) => `${platformLabel(ch)}${impl.has(ch) ? " ✓" : " ⚠ missing"}`)
+        .map(
+          (ch) => `${platformLabel(ch)}${impl.has(ch) ? " ✓" : " ⚠ missing"}`,
+        )
         .join(", ");
       return `- ${init.name} — goal: ${init.goal ?? "—"} · ${money(initiativeSpend(init.id))} of ${money(init.budget)} · channels: ${verify || "none"}`;
     }),
@@ -255,7 +264,9 @@ export default async function BrandAdsPage({
     ...campaigns.map(
       (c) =>
         `- [${platformLabel(c.platform)}] ${c.name} — ${c.status}${
-          c.startAt && c.endAt ? ` · ${fmtDate(c.startAt)}–${fmtDate(c.endAt)}` : ""
+          c.startAt && c.endAt
+            ? ` · ${fmtDate(c.startAt)}–${fmtDate(c.endAt)}`
+            : ""
         } · spend ${money(c.spend)} of ${money(c.budget)} · ${c.adSpots} ad spots`,
     ),
     `\n## Audiences (${audienceList.length})`,
@@ -298,7 +309,7 @@ export default async function BrandAdsPage({
       </div>
 
       {/* ad channels */}
-      <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold uppercase tracking-wider">
+      <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
         Ad channels · {channels.length} connected
       </h2>
       <div className="grid gap-3 md:grid-cols-3">
@@ -312,7 +323,9 @@ export default async function BrandAdsPage({
                   <div className="text-sm font-semibold">
                     {platformLabel(c.platform)}
                   </div>
-                  <div className="text-muted-foreground text-[11px]">{c.handle}</div>
+                  <div className="text-muted-foreground text-[11px]">
+                    {c.handle}
+                  </div>
                 </div>
                 <span
                   className={`mt-1 size-1.5 rounded-full ${
@@ -322,14 +335,18 @@ export default async function BrandAdsPage({
               </div>
               <div className="mt-3 flex items-end gap-6">
                 <div>
-                  <div className="text-lg font-semibold">{money(channelSpend(c.id))}</div>
-                  <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                  <div className="text-lg font-semibold">
+                    {money(channelSpend(c.id))}
+                  </div>
+                  <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
                     Spend · 30d
                   </div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold">{channelCampaigns(c.id)}</div>
-                  <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                  <div className="text-lg font-semibold">
+                    {channelCampaigns(c.id)}
+                  </div>
+                  <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
                     Campaigns
                   </div>
                 </div>
@@ -349,7 +366,9 @@ export default async function BrandAdsPage({
                     rel="noopener noreferrer"
                     className="hover:bg-accent rounded-full border px-2.5 py-1 text-xs font-medium"
                   >
-                    {connected ? `Open in ${platformLabel(c.platform)} ↗` : "Reconnect ↗"}
+                    {connected
+                      ? `Open in ${platformLabel(c.platform)} ↗`
+                      : "Reconnect ↗"}
                   </a>
                 )}
               </div>
@@ -359,8 +378,9 @@ export default async function BrandAdsPage({
       </div>
 
       {/* initiatives → per-channel campaigns */}
-      <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold uppercase tracking-wider">
-        Initiatives · {initiatives.length} · a push, verified across its channels
+      <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
+        Initiatives · {initiatives.length} · a push, verified across its
+        channels
       </h2>
       <div className="flex flex-col gap-4">
         {initiatives.map((init) => {
@@ -383,14 +403,19 @@ export default async function BrandAdsPage({
                     <span className="text-base font-semibold">{init.name}</span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
-                        INITIATIVE_STATUS[init.status] ?? INITIATIVE_STATUS.planned
+                        INITIATIVE_STATUS[init.status] ??
+                        INITIATIVE_STATUS.planned
                       }`}
                     >
                       {init.status}
                     </span>
                   </div>
                   <div className="text-muted-foreground mt-0.5 text-xs">
-                    {init.goal ? <span className="capitalize">{init.goal}</span> : "—"}
+                    {init.goal ? (
+                      <span className="capitalize">{init.goal}</span>
+                    ) : (
+                      "—"
+                    )}
                     {init.landingUrl
                       ? ` · ${init.landingUrl.replace(/^https?:\/\//, "")}`
                       : ""}
@@ -414,7 +439,7 @@ export default async function BrandAdsPage({
 
               {/* channel verify: target vs implemented */}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="text-muted-foreground mr-1 text-[10px] uppercase tracking-wide">
+                <span className="text-muted-foreground mr-1 text-[10px] tracking-wide uppercase">
                   Channels
                 </span>
                 {targets.length === 0 && (
@@ -463,7 +488,7 @@ export default async function BrandAdsPage({
 
       {ungroupedCampaigns.length > 0 && (
         <>
-          <h3 className="text-muted-foreground mt-6 mb-2 text-xs font-semibold uppercase tracking-wider">
+          <h3 className="text-muted-foreground mt-6 mb-2 text-xs font-semibold tracking-wider uppercase">
             Unlinked campaigns · {ungroupedCampaigns.length}
           </h3>
           <div className="flex flex-col gap-2">
@@ -479,7 +504,7 @@ export default async function BrandAdsPage({
       )}
 
       {/* audiences */}
-      <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold uppercase tracking-wider">
+      <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
         Audiences · {audienceList.length} · defined per platform
       </h2>
       <div className="grid gap-2.5 md:grid-cols-2">
@@ -511,9 +536,9 @@ export default async function BrandAdsPage({
       </div>
 
       <p className="text-muted-foreground mt-6 text-[11px]">
-        Campaigns &amp; audiences are created and managed in each platform&apos;s
-        portal — mirrored here read-only. The same audience on multiple platforms
-        is shown once with all its badges.
+        Campaigns &amp; audiences are created and managed in each
+        platform&apos;s portal — mirrored here read-only. The same audience on
+        multiple platforms is shown once with all its badges.
       </p>
     </div>
   );

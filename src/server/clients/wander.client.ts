@@ -19,7 +19,8 @@ import { env } from "@/env";
  * carrying that scope — a narrower key authenticates and then 403s.
  */
 
-export const isWanderApiConfigured = !!env.WANDER_API_URL && !!env.WANDER_API_KEY;
+export const isWanderApiConfigured =
+  !!env.WANDER_API_URL && !!env.WANDER_API_KEY;
 
 /** Brand-kit tone accepted by the prospect pipeline; "existing" mirrors their site. */
 export type ProspectTone = "existing" | "professional" | "friendly" | "luxury";

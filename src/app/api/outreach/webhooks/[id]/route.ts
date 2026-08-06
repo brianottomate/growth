@@ -31,7 +31,10 @@ export async function DELETE(
       );
     }
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     );
   }

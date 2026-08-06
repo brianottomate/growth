@@ -54,19 +54,16 @@ export type MirroredAudience = { platform: string };
 // ---- pure core (unit-tested) ----------------------------------------------
 
 export function diffAudienceTarget(
-  target: Pick<
-    AudienceTarget,
-    "id" | "name" | "status" | "priority"
-  > & { intendedChannels: string[] | null },
+  target: Pick<AudienceTarget, "id" | "name" | "status" | "priority"> & {
+    intendedChannels: string[] | null;
+  },
   activations: Pick<AudienceActivation, "platform" | "status">[],
   mirrored: MirroredAudience[],
 ): AudienceTargetAlignment {
   const intended = target.intendedChannels ?? [];
   const mirroredByPlatform = new Set<string>(mirrored.map((m) => m.platform));
   const activePlatforms = new Set<string>(
-    activations
-      .filter((a) => a.status !== "retired")
-      .map((a) => a.platform),
+    activations.filter((a) => a.status !== "retired").map((a) => a.platform),
   );
 
   const channels: AudienceChannelAlignment[] = intended.map((platform) => {

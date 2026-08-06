@@ -47,8 +47,7 @@ export async function GET(request: Request) {
     tokenSource,
     tokenPreview,
     adAccountId: env.META_AD_ACCOUNT_ID ?? null,
-    adAccountIdValid:
-      env.META_AD_ACCOUNT_ID?.startsWith("act_") ?? false,
+    adAccountIdValid: env.META_AD_ACCOUNT_ID?.startsWith("act_") ?? false,
   };
 
   if (mode === "config") {

@@ -49,7 +49,8 @@ function buildStreamGraph(): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  const totalHeight = HEADER_HEIGHT + STREAMS.length * (LANE_HEIGHT + LANE_GAP) + 80;
+  const totalHeight =
+    HEADER_HEIGHT + STREAMS.length * (LANE_HEIGHT + LANE_GAP) + 80;
 
   // Phase columns (background bands)
   PHASES.forEach((phase, pi) => {
@@ -98,7 +99,8 @@ function buildStreamGraph(): { nodes: Node[]; edges: Edge[] } {
 
     spans.forEach((span, spanIdx) => {
       const firstIdx = span[0] ?? 0;
-      const startX = LANE_LABEL_WIDTH + firstIdx * (PHASE_WIDTH + PHASE_GAP) + 8;
+      const startX =
+        LANE_LABEL_WIDTH + firstIdx * (PHASE_WIDTH + PHASE_GAP) + 8;
       const width = span.length * (PHASE_WIDTH + PHASE_GAP) - PHASE_GAP - 16;
       const y = laneY + (LANE_HEIGHT - BLOCK_HEIGHT) / 2;
 
@@ -129,13 +131,22 @@ function buildStreamGraph(): { nodes: Node[]; edges: Edge[] } {
     if (streamIndices.length === 0 || phaseIndices.length === 0) return;
 
     // Place conflict marker at center of affected area
-    const avgPhaseIdx = phaseIndices.reduce((a, b) => a + b, 0) / phaseIndices.length;
+    const avgPhaseIdx =
+      phaseIndices.reduce((a, b) => a + b, 0) / phaseIndices.length;
     const minStreamIdx = Math.min(...streamIndices);
     const maxStreamIdx = Math.max(...streamIndices);
     const avgStreamIdx = (minStreamIdx + maxStreamIdx) / 2;
 
-    const x = LANE_LABEL_WIDTH + avgPhaseIdx * (PHASE_WIDTH + PHASE_GAP) + PHASE_WIDTH / 2 - CONFLICT_SIZE / 2;
-    const y = HEADER_HEIGHT + avgStreamIdx * (LANE_HEIGHT + LANE_GAP) + LANE_HEIGHT / 2 - CONFLICT_SIZE / 2;
+    const x =
+      LANE_LABEL_WIDTH +
+      avgPhaseIdx * (PHASE_WIDTH + PHASE_GAP) +
+      PHASE_WIDTH / 2 -
+      CONFLICT_SIZE / 2;
+    const y =
+      HEADER_HEIGHT +
+      avgStreamIdx * (LANE_HEIGHT + LANE_GAP) +
+      LANE_HEIGHT / 2 -
+      CONFLICT_SIZE / 2;
 
     nodes.push({
       id: `conflict-${cz.id}`,
@@ -194,7 +205,14 @@ function buildStreamGraph(): { nodes: Node[]; edges: Edge[] } {
 // ─── Custom Nodes ─────────────────────────────────────────
 
 function PhaseNode({ data }: NodeProps) {
-  const d = data as unknown as { id: PhaseId; label: string; description: string; durationHint?: string; colWidth: number; colHeight: number };
+  const d = data as unknown as {
+    id: PhaseId;
+    label: string;
+    description: string;
+    durationHint?: string;
+    colWidth: number;
+    colHeight: number;
+  };
   return (
     <div
       className="flex flex-col items-center"
@@ -228,14 +246,20 @@ function LaneNode({ data }: NodeProps) {
       className="flex items-center gap-2 pr-3"
       style={{ width: LANE_LABEL_WIDTH, height: LANE_HEIGHT }}
     >
-      <div className="h-full w-1 rounded-full" style={{ background: d.color }} />
+      <div
+        className="h-full w-1 rounded-full"
+        style={{ background: d.color }}
+      />
       <div className="min-w-0">
         <div className="text-[11px] font-semibold text-white">{d.label}</div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <div className="h-1.5 w-1.5 rounded-full" style={{ background: tool.color }} />
+        <div className="mt-0.5 flex items-center gap-1">
+          <div
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: tool.color }}
+          />
           <span className="text-[9px] text-white/30">{tool.label}</span>
         </div>
-        <div className="text-[9px] text-white/25 mt-0.5">{d.owner}</div>
+        <div className="mt-0.5 text-[9px] text-white/25">{d.owner}</div>
       </div>
     </div>
   );
@@ -253,7 +277,16 @@ function StreamBlockNode({ data }: NodeProps) {
         borderColor: `${d.stream.color}40`,
       }}
     >
-      <Handle type="target" position={Position.Left} style={{ background: d.stream.color, border: "none", width: 6, height: 6 }} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          background: d.stream.color,
+          border: "none",
+          width: 6,
+          height: 6,
+        }}
+      />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[10px] font-medium text-white/70">
           {d.stream.trigger}
@@ -262,7 +295,16 @@ function StreamBlockNode({ data }: NodeProps) {
           Exit: {d.stream.exitCriteria[0]}
         </div>
       </div>
-      <Handle type="source" position={Position.Right} style={{ background: d.stream.color, border: "none", width: 6, height: 6 }} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{
+          background: d.stream.color,
+          border: "none",
+          width: 6,
+          height: 6,
+        }}
+      />
     </div>
   );
 }
@@ -276,7 +318,7 @@ function ConflictNode({ data }: NodeProps) {
   };
   return (
     <div
-      className="flex items-center justify-center rounded-full border-2 shadow-lg cursor-pointer"
+      className="flex cursor-pointer items-center justify-center rounded-full border-2 shadow-lg"
       style={{
         width: CONFLICT_SIZE,
         height: CONFLICT_SIZE,
@@ -285,7 +327,10 @@ function ConflictNode({ data }: NodeProps) {
       }}
       title={d.risk}
     >
-      <span className="text-[10px] font-bold" style={{ color: statusColors[d.status] }}>
+      <span
+        className="text-[10px] font-bold"
+        style={{ color: statusColors[d.status] }}
+      >
         !
       </span>
     </div>
@@ -301,7 +346,13 @@ const nodeTypes: NodeTypes = {
 
 // ─── Detail Panels ────────────────────────────────────────
 
-function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () => void }) {
+function StreamDetail({
+  stream,
+  onClose,
+}: {
+  stream: MessageStream;
+  onClose: () => void;
+}) {
   const tool = TOOLS[stream.tool];
   const suppressions = SUPPRESSION_RULES.filter(
     (r) => r.dominant === stream.id || r.suppressed === stream.id,
@@ -312,44 +363,68 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
     <div className="space-y-4">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-full" style={{ background: stream.color }} />
+          <div
+            className="h-3 w-3 rounded-full"
+            style={{ background: stream.color }}
+          />
           <h2 className="text-sm font-semibold text-white">{stream.label}</h2>
         </div>
-        <button onClick={onClose} className="text-white/30 hover:text-white/70 text-sm">x</button>
+        <button
+          onClick={onClose}
+          className="text-sm text-white/30 hover:text-white/70"
+        >
+          x
+        </button>
       </div>
 
       <p className="text-xs text-white/60">{stream.description}</p>
 
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded bg-white/5 p-2">
-          <div className="text-[9px] font-bold uppercase text-white/30">Tool</div>
-          <div className="flex items-center gap-1 mt-1">
-            <div className="h-2 w-2 rounded-full" style={{ background: tool.color }} />
+          <div className="text-[9px] font-bold text-white/30 uppercase">
+            Tool
+          </div>
+          <div className="mt-1 flex items-center gap-1">
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{ background: tool.color }}
+            />
             <span className="text-[11px] text-white/70">{tool.label}</span>
           </div>
         </div>
         <div className="rounded bg-white/5 p-2">
-          <div className="text-[9px] font-bold uppercase text-white/30">Type</div>
-          <div className="text-[11px] text-white/70 mt-1">{stream.type}</div>
+          <div className="text-[9px] font-bold text-white/30 uppercase">
+            Type
+          </div>
+          <div className="mt-1 text-[11px] text-white/70">{stream.type}</div>
         </div>
-        <div className="rounded bg-white/5 p-2 col-span-2">
-          <div className="text-[9px] font-bold uppercase text-white/30">Owner</div>
-          <div className="text-[11px] text-white/70 mt-1">{stream.owner}</div>
+        <div className="col-span-2 rounded bg-white/5 p-2">
+          <div className="text-[9px] font-bold text-white/30 uppercase">
+            Owner
+          </div>
+          <div className="mt-1 text-[11px] text-white/70">{stream.owner}</div>
         </div>
       </div>
 
       <div>
-        <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Trigger</div>
-        <div className="rounded bg-blue-900/20 border border-blue-500/20 p-2 text-[10px] text-blue-300">
+        <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+          Trigger
+        </div>
+        <div className="rounded border border-blue-500/20 bg-blue-900/20 p-2 text-[10px] text-blue-300">
           {stream.trigger}
         </div>
       </div>
 
       <div>
-        <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Exit Criteria</div>
+        <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+          Exit Criteria
+        </div>
         <div className="space-y-1">
           {stream.exitCriteria.map((ec, i) => (
-            <div key={i} className="flex items-center gap-1.5 text-[10px] text-white/50">
+            <div
+              key={i}
+              className="flex items-center gap-1.5 text-[10px] text-white/50"
+            >
               <span className="text-white/20">-</span> {ec}
             </div>
           ))}
@@ -357,10 +432,15 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
       </div>
 
       <div>
-        <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Active Phases</div>
+        <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+          Active Phases
+        </div>
         <div className="flex flex-wrap gap-1">
           {stream.activePhases.map((p) => (
-            <span key={p} className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/50">
+            <span
+              key={p}
+              className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/50"
+            >
               {PHASE_MAP[p].label}
             </span>
           ))}
@@ -369,10 +449,15 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
 
       {stream.messages && (
         <div>
-          <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Messages ({stream.messages.length})</div>
+          <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+            Messages ({stream.messages.length})
+          </div>
           <div className="space-y-1">
             {stream.messages.map((msg, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-[10px] text-white/50">
+              <div
+                key={i}
+                className="flex items-center gap-1.5 text-[10px] text-white/50"
+              >
                 <span className="text-white/20">{i + 1}.</span> {msg}
               </div>
             ))}
@@ -382,7 +467,9 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
 
       {suppressions.length > 0 && (
         <div>
-          <div className="text-[9px] font-bold uppercase text-white/30 mb-2">Suppression Rules</div>
+          <div className="mb-2 text-[9px] font-bold text-white/30 uppercase">
+            Suppression Rules
+          </div>
           <div className="space-y-2">
             {suppressions.map((rule) => {
               const isDominant = rule.dominant === stream.id;
@@ -397,9 +484,14 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
                 >
                   <div className="font-medium">
                     {isDominant ? "Suppresses" : "Suppressed by"}{" "}
-                    {STREAM_MAP[isDominant ? rule.suppressed : rule.dominant].label}
+                    {
+                      STREAM_MAP[isDominant ? rule.suppressed : rule.dominant]
+                        .label
+                    }
                   </div>
-                  <div className="mt-0.5 text-[9px] opacity-70">{rule.condition}</div>
+                  <div className="mt-0.5 text-[9px] opacity-70">
+                    {rule.condition}
+                  </div>
                 </div>
               );
             })}
@@ -409,7 +501,9 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
 
       {conflicts.length > 0 && (
         <div>
-          <div className="text-[9px] font-bold uppercase text-white/30 mb-2">Conflict Zones</div>
+          <div className="mb-2 text-[9px] font-bold text-white/30 uppercase">
+            Conflict Zones
+          </div>
           <div className="space-y-2">
             {conflicts.map((cz) => (
               <div
@@ -423,7 +517,9 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
                 }`}
               >
                 <div className="font-medium text-white/70">{cz.risk}</div>
-                <div className="mt-1 text-[9px] text-white/40">Resolution: {cz.resolution}</div>
+                <div className="mt-1 text-[9px] text-white/40">
+                  Resolution: {cz.resolution}
+                </div>
               </div>
             ))}
           </div>
@@ -433,40 +529,71 @@ function StreamDetail({ stream, onClose }: { stream: MessageStream; onClose: () 
   );
 }
 
-function ConflictDetail({ conflict, onClose }: { conflict: ConflictZone; onClose: () => void }) {
-  const statusLabels = { resolved: "Resolved", "needs-rules": "Needs Rules", unknown: "Unknown" };
-  const statusColors = { resolved: "#10b981", "needs-rules": "#f59e0b", unknown: "#ef4444" };
+function ConflictDetail({
+  conflict,
+  onClose,
+}: {
+  conflict: ConflictZone;
+  onClose: () => void;
+}) {
+  const statusLabels = {
+    resolved: "Resolved",
+    "needs-rules": "Needs Rules",
+    unknown: "Unknown",
+  };
+  const statusColors = {
+    resolved: "#10b981",
+    "needs-rules": "#f59e0b",
+    unknown: "#ef4444",
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between">
         <span
           className="rounded px-2 py-0.5 text-[10px] font-bold uppercase"
-          style={{ background: `${statusColors[conflict.status]}20`, color: statusColors[conflict.status] }}
+          style={{
+            background: `${statusColors[conflict.status]}20`,
+            color: statusColors[conflict.status],
+          }}
         >
           {statusLabels[conflict.status]}
         </span>
-        <button onClick={onClose} className="text-white/30 hover:text-white/70 text-sm">x</button>
+        <button
+          onClick={onClose}
+          className="text-sm text-white/30 hover:text-white/70"
+        >
+          x
+        </button>
       </div>
 
       <div>
-        <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Risk</div>
+        <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+          Risk
+        </div>
         <p className="text-xs text-red-300/80">{conflict.risk}</p>
       </div>
 
       <div>
-        <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Resolution</div>
+        <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+          Resolution
+        </div>
         <p className="text-xs text-white/60">{conflict.resolution}</p>
       </div>
 
       <div>
-        <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Involved Streams</div>
+        <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+          Involved Streams
+        </div>
         <div className="space-y-1">
           {conflict.streams.map((sid) => {
             const s = STREAM_MAP[sid];
             return (
               <div key={sid} className="flex items-center gap-2 text-[10px]">
-                <div className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+                <div
+                  className="h-2 w-2 rounded-full"
+                  style={{ background: s.color }}
+                />
                 <span className="text-white/60">{s.label}</span>
               </div>
             );
@@ -475,10 +602,15 @@ function ConflictDetail({ conflict, onClose }: { conflict: ConflictZone; onClose
       </div>
 
       <div>
-        <div className="text-[9px] font-bold uppercase text-white/30 mb-1">Affected Phases</div>
+        <div className="mb-1 text-[9px] font-bold text-white/30 uppercase">
+          Affected Phases
+        </div>
         <div className="flex flex-wrap gap-1">
           {conflict.phases.map((pid) => (
-            <span key={pid} className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/50">
+            <span
+              key={pid}
+              className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/50"
+            >
               {PHASE_MAP[pid].label}
             </span>
           ))}
@@ -491,14 +623,22 @@ function ConflictDetail({ conflict, onClose }: { conflict: ConflictZone; onClose
 // ─── Overview Panel ───────────────────────────────────────
 
 function OverviewPanel() {
-  const needsRules = CONFLICT_ZONES.filter((c) => c.status === "needs-rules").length;
-  const hardRules = SUPPRESSION_RULES.filter((r) => r.severity === "hard").length;
-  const softRules = SUPPRESSION_RULES.filter((r) => r.severity === "soft").length;
+  const needsRules = CONFLICT_ZONES.filter(
+    (c) => c.status === "needs-rules",
+  ).length;
+  const hardRules = SUPPRESSION_RULES.filter(
+    (r) => r.severity === "hard",
+  ).length;
+  const softRules = SUPPRESSION_RULES.filter(
+    (r) => r.severity === "soft",
+  ).length;
 
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-2">Summary</h3>
+        <h3 className="mb-2 text-[10px] font-bold tracking-wider text-white/40 uppercase">
+          Summary
+        </h3>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-white/5 p-2.5">
             <div className="text-lg font-bold text-white">{STREAMS.length}</div>
@@ -513,23 +653,39 @@ function OverviewPanel() {
             <div className="text-[10px] text-amber-300/60">Conflict Zones</div>
           </div>
           <div className="rounded-lg bg-white/5 p-2.5">
-            <div className="text-lg font-bold text-white">{hardRules + softRules}</div>
-            <div className="text-[10px] text-white/40">Rules ({hardRules}H / {softRules}S)</div>
+            <div className="text-lg font-bold text-white">
+              {hardRules + softRules}
+            </div>
+            <div className="text-[10px] text-white/40">
+              Rules ({hardRules}H / {softRules}S)
+            </div>
           </div>
         </div>
       </div>
 
       <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-2">Conflict Zones</h3>
+        <h3 className="mb-2 text-[10px] font-bold tracking-wider text-white/40 uppercase">
+          Conflict Zones
+        </h3>
         <div className="space-y-2">
           {CONFLICT_ZONES.map((cz) => {
-            const statusColors = { resolved: "text-green-300 bg-green-900/20", "needs-rules": "text-amber-300 bg-amber-900/20", unknown: "text-red-300 bg-red-900/20" };
+            const statusColors = {
+              resolved: "text-green-300 bg-green-900/20",
+              "needs-rules": "text-amber-300 bg-amber-900/20",
+              unknown: "text-red-300 bg-red-900/20",
+            };
             return (
-              <div key={cz.id} className={`rounded p-2 ${statusColors[cz.status]}`}>
+              <div
+                key={cz.id}
+                className={`rounded p-2 ${statusColors[cz.status]}`}
+              >
                 <div className="text-[10px] font-medium">{cz.risk}</div>
                 <div className="mt-1 flex gap-1">
                   {cz.streams.map((sid) => (
-                    <span key={sid} className="rounded bg-white/10 px-1 py-0.5 text-[8px]">
+                    <span
+                      key={sid}
+                      className="rounded bg-white/10 px-1 py-0.5 text-[8px]"
+                    >
                       {STREAM_MAP[sid].label}
                     </span>
                   ))}
@@ -541,16 +697,22 @@ function OverviewPanel() {
       </div>
 
       <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-2">Suppression Rules</h3>
+        <h3 className="mb-2 text-[10px] font-bold tracking-wider text-white/40 uppercase">
+          Suppression Rules
+        </h3>
         <div className="space-y-1.5">
           {SUPPRESSION_RULES.map((rule) => (
             <div
               key={rule.id}
               className={`flex items-center gap-2 rounded px-2 py-1.5 text-[10px] ${
-                rule.severity === "hard" ? "bg-red-900/20 text-red-300" : "bg-amber-900/20 text-amber-300"
+                rule.severity === "hard"
+                  ? "bg-red-900/20 text-red-300"
+                  : "bg-amber-900/20 text-amber-300"
               }`}
             >
-              <span className="font-bold text-[8px] uppercase">{rule.severity}</span>
+              <span className="text-[8px] font-bold uppercase">
+                {rule.severity}
+              </span>
               <span>{STREAM_MAP[rule.dominant].label}</span>
               <span className="text-white/20">-&gt;</span>
               <span>{STREAM_MAP[rule.suppressed].label}</span>
@@ -560,18 +722,29 @@ function OverviewPanel() {
       </div>
 
       <div>
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-2">Tool Ownership</h3>
+        <h3 className="mb-2 text-[10px] font-bold tracking-wider text-white/40 uppercase">
+          Tool Ownership
+        </h3>
         <div className="space-y-1.5">
           {STREAMS.map((s) => {
             const tool = TOOLS[s.tool];
             return (
-              <div key={s.id} className="flex items-center justify-between rounded bg-white/5 px-2.5 py-1.5">
+              <div
+                key={s.id}
+                className="flex items-center justify-between rounded bg-white/5 px-2.5 py-1.5"
+              >
                 <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+                  <div
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: s.color }}
+                  />
                   <span className="text-[10px] text-white/70">{s.label}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="h-1.5 w-1.5 rounded-full" style={{ background: tool.color }} />
+                  <div
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: tool.color }}
+                  />
                   <span className="text-[9px] text-white/30">{tool.label}</span>
                 </div>
               </div>
@@ -591,23 +764,29 @@ type Selection =
   | null;
 
 function MessageStreamsInner() {
-  const { nodes: initNodes, edges: initEdges } = useMemo(() => buildStreamGraph(), []);
+  const { nodes: initNodes, edges: initEdges } = useMemo(
+    () => buildStreamGraph(),
+    [],
+  );
   const [nodes, , onNodesChange] = useNodesState<Node>(initNodes);
   const [edges, , onEdgesChange] = useEdgesState<Edge>(initEdges);
   const [selection, setSelection] = useState<Selection>(null);
 
-  const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    if (node.type === "streamBlock") {
-      const d = node.data as unknown as { stream: MessageStream };
-      setSelection({ type: "stream", stream: d.stream });
-    } else if (node.type === "conflict") {
-      const d = node.data as unknown as ConflictZone;
-      setSelection({ type: "conflict", conflict: d });
-    } else if (node.type === "lane") {
-      const d = node.data as unknown as MessageStream;
-      setSelection({ type: "stream", stream: d });
-    }
-  }, []);
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (node.type === "streamBlock") {
+        const d = node.data as unknown as { stream: MessageStream };
+        setSelection({ type: "stream", stream: d.stream });
+      } else if (node.type === "conflict") {
+        const d = node.data as unknown as ConflictZone;
+        setSelection({ type: "conflict", conflict: d });
+      } else if (node.type === "lane") {
+        const d = node.data as unknown as MessageStream;
+        setSelection({ type: "stream", stream: d });
+      }
+    },
+    [],
+  );
 
   return (
     <div className="flex h-full flex-col bg-gray-950">
@@ -621,7 +800,8 @@ function MessageStreamsInner() {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 rounded bg-amber-900/30 px-2.5 py-1 text-[10px] text-amber-300">
-            {CONFLICT_ZONES.filter((c) => c.status === "needs-rules").length} conflicts need rules
+            {CONFLICT_ZONES.filter((c) => c.status === "needs-rules").length}{" "}
+            conflicts need rules
           </div>
           <div className="flex items-center gap-4 text-[9px]">
             <div className="flex items-center gap-1.5">
@@ -633,7 +813,9 @@ function MessageStreamsInner() {
               <span className="text-white/30">soft coordinate</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-400 text-[8px] font-bold text-amber-400">!</div>
+              <div className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-400 text-[8px] font-bold text-amber-400">
+                !
+              </div>
               <span className="text-white/30">conflict zone</span>
             </div>
           </div>
@@ -658,7 +840,12 @@ function MessageStreamsInner() {
             colorMode="dark"
             nodesDraggable={false}
           >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(255,255,255,0.03)" />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              color="rgba(255,255,255,0.03)"
+            />
             <Controls />
           </ReactFlow>
         </div>
@@ -668,10 +855,16 @@ function MessageStreamsInner() {
           <div className="flex-1 overflow-y-auto p-3">
             {selection === null && <OverviewPanel />}
             {selection?.type === "stream" && (
-              <StreamDetail stream={selection.stream} onClose={() => setSelection(null)} />
+              <StreamDetail
+                stream={selection.stream}
+                onClose={() => setSelection(null)}
+              />
             )}
             {selection?.type === "conflict" && (
-              <ConflictDetail conflict={selection.conflict} onClose={() => setSelection(null)} />
+              <ConflictDetail
+                conflict={selection.conflict}
+                onClose={() => setSelection(null)}
+              />
             )}
           </div>
         </div>

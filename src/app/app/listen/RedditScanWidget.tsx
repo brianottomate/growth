@@ -48,13 +48,13 @@ export function RedditScanWidget() {
   const skipped = all.length - engage.length - monitor.length;
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="bg-card rounded-lg border p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h4 className="text-sm font-semibold text-foreground">
+          <h4 className="text-foreground text-sm font-semibold">
             On-demand AI scoring
           </h4>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Fetches the latest posts across the Tier 1 STR subs and runs them
             through Claude Sonnet 4.6 to surface engagement candidates.
           </p>
@@ -63,20 +63,20 @@ export function RedditScanWidget() {
           type="button"
           disabled={scan.isPending}
           onClick={() => scan.mutate()}
-          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           {scan.isPending ? "Scanning…" : "Scan Reddit now"}
         </button>
       </div>
 
       {scan.isError && (
-        <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="bg-destructive/10 text-destructive mt-3 rounded-md px-3 py-2 text-sm">
           {scan.error.message}
         </p>
       )}
 
       {scan.data && (
-        <p className="mt-3 text-xs text-muted-foreground">
+        <p className="text-muted-foreground mt-3 text-xs">
           Scored {scan.data.totalFetched} posts · {engage.length} engage ·{" "}
           {monitor.length} monitor · {skipped} skip.
         </p>
@@ -158,26 +158,26 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
     .join("\n");
 
   return (
-    <article className="rounded-xl border bg-card p-4">
+    <article className="bg-card rounded-xl border p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={`rounded px-2 py-0.5 font-mono text-xs font-semibold ${style.chip}`}
         >
           {style.label}
         </span>
-        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+        <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 font-mono text-xs">
           {scored.relevance}/10
         </span>
-        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground">
+        <span className="bg-muted text-muted-foreground rounded px-2 py-0.5 font-mono text-xs">
           {scored.intentTag}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-muted-foreground text-xs">
           r/{scored.post.subreddit} · {ageLabel(scored.post.createdUtc)} ·{" "}
           {scored.post.ups}↑ {scored.post.numComments}c
         </span>
       </div>
 
-      <h3 className="mt-2 text-sm font-semibold text-foreground">
+      <h3 className="text-foreground mt-2 text-sm font-semibold">
         <a
           href={scored.post.url}
           target="_blank"
@@ -188,10 +188,10 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
         </a>
       </h3>
 
-      <p className="mt-2 text-sm text-muted-foreground">{scored.rationale}</p>
+      <p className="text-muted-foreground mt-2 text-sm">{scored.rationale}</p>
 
-      <div className="mt-4 rounded-lg border border-dashed bg-muted/40 p-3">
-        <p className="text-xs font-semibold text-foreground">Draft options</p>
+      <div className="bg-muted/40 mt-4 rounded-lg border border-dashed p-3">
+        <p className="text-foreground text-xs font-semibold">Draft options</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {PILLS.map((p) => {
             const on = pills.has(p.id);
@@ -216,7 +216,7 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
           onChange={(e) => setCustomInstructions(e.target.value.slice(0, 500))}
           placeholder="Optional: extra instructions (e.g. 'mention I'm a fellow operator in Florida')"
           rows={2}
-          className="mt-2 w-full rounded-md border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none"
+          className="bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring mt-2 w-full rounded-md border px-2.5 py-1.5 text-xs focus:ring-1 focus:outline-none"
         />
       </div>
 
@@ -233,7 +233,7 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
               customInstructions: customInstructions.trim() || undefined,
             })
           }
-          className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-background text-foreground hover:bg-accent rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           {draft.isPending
             ? "Drafting…"
@@ -245,7 +245,7 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
           href={scored.post.url}
           target="_blank"
           rel="noreferrer noopener"
-          className="text-xs text-muted-foreground hover:text-primary"
+          className="text-muted-foreground hover:text-primary text-xs"
         >
           Open on Reddit ↗
         </a>
@@ -254,7 +254,7 @@ function ScoredPostCard({ scored }: { scored: ScannedPost }) {
       <ListenItemActions context={context} />
 
       {draft.isError && (
-        <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="bg-destructive/10 text-destructive mt-3 rounded-md px-3 py-2 text-xs">
           {draft.error.message}
         </p>
       )}
@@ -268,9 +268,9 @@ function DraftReplyBlock({ draft }: { draft: string }) {
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="mt-3 rounded-lg border bg-muted/40 p-3">
+    <div className="bg-muted/40 mt-3 rounded-lg border p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-foreground">Draft reply</p>
+        <p className="text-foreground text-xs font-semibold">Draft reply</p>
         <button
           type="button"
           onClick={() => {
@@ -279,15 +279,15 @@ function DraftReplyBlock({ draft }: { draft: string }) {
               setTimeout(() => setCopied(false), 1500);
             });
           }}
-          className="text-xs text-muted-foreground hover:text-primary"
+          className="text-muted-foreground hover:text-primary text-xs"
         >
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+      <p className="text-foreground/90 mt-2 text-sm leading-relaxed whitespace-pre-wrap">
         {draft}
       </p>
-      <p className="mt-3 text-xs text-muted-foreground">
+      <p className="text-muted-foreground mt-3 text-xs">
         Draft only — review and edit before posting. Disclosure of Wander
         affiliation is intentional; do not remove.
       </p>

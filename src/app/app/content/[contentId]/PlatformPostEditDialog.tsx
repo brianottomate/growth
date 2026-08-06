@@ -266,11 +266,14 @@ export function PlatformPostEditDialog({
       <Button
         type="button"
         loading={save.isPending}
-        disabled={!dirty || stale || invalid || uploading > 0}
+        disabled={!dirty || invalid || uploading > 0}
         onClick={() =>
           save.mutate({
             rootPlatformPostId: platformPostId,
-            expectedUpdatedAt: openedVersion,
+            // When chat has moved the post underneath an open editor, the
+            // person typing wins. Send the version we are knowingly replacing
+            // so the concurrency guard still catches a genuine race.
+            expectedUpdatedAt: stale ? updatedAtISO : openedVersion,
             items: items.map((item) => ({
               id: item.id,
               text: item.text.trim() ? item.text : null,
@@ -316,11 +319,22 @@ export function PlatformPostEditDialog({
         {stale && (
           <div className="mb-4 flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
             <CircleAlert className="mt-0.5 size-4 shrink-0" />
-            <p>
-              This post changed in chat while the editor was open. Close and
-              reopen the editor to load the latest version. Your draft has not
-              been overwritten.
-            </p>
+            <div className="min-w-0 space-y-2">
+              <p>
+                Chat changed this post while you had the editor open. Saving
+                keeps what you have written here and replaces the chat version.
+              </p>
+              {text?.trim() && text.trim() !== items[0]?.text.trim() && (
+                <details className="text-amber-200/80">
+                  <summary className="cursor-pointer text-xs">
+                    What chat wrote
+                  </summary>
+                  <p className="mt-1 text-xs whitespace-pre-wrap">
+                    {text.trim()}
+                  </p>
+                </details>
+              )}
+            </div>
           </div>
         )}
 

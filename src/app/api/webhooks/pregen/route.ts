@@ -110,7 +110,10 @@ export async function POST(request: NextRequest) {
     const host = hostFromUrl(payload.sourceUrl);
     if (host) {
       const lead = await db.query.leadDomainTable.findFirst({
-        where: and(eq(leadDomainTable.domain, host), isNull(leadDomainTable.deletedAt)),
+        where: and(
+          eq(leadDomainTable.domain, host),
+          isNull(leadDomainTable.deletedAt),
+        ),
         columns: { id: true },
       });
       domainId = lead?.id ?? null;
@@ -139,7 +142,9 @@ export async function POST(request: NextRequest) {
         errorMessage: payload.errorMessage ?? null,
         lastEventAt: occurredAt,
         settledAt: settled ? occurredAt : existing.settledAt,
-        claimedAt: claimed ? (existing.claimedAt ?? occurredAt) : existing.claimedAt,
+        claimedAt: claimed
+          ? (existing.claimedAt ?? occurredAt)
+          : existing.claimedAt,
       })
       .where(eq(pregenBuildTable.id, existing.id));
   } else {

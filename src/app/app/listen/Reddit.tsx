@@ -28,21 +28,52 @@ const LIST_INPUT = {
 };
 
 // Intent taxonomy → colour. Tolerant: unknown tags render muted.
-const INTENT_META: Record<string, { label: string; text: string; dot: string }> = {
+const INTENT_META: Record<
+  string,
+  { label: string; text: string; dot: string }
+> = {
   brand: { label: "Brand", text: "text-emerald-400", dot: "bg-emerald-400" },
-  "brand-critical": { label: "Brand critical", text: "text-red-400", dot: "bg-red-400" },
-  "high-intent": { label: "High intent", text: "text-emerald-400", dot: "bg-emerald-400" },
-  "medium-intent": { label: "Medium intent", text: "text-sky-400", dot: "bg-sky-400" },
-  positioning: { label: "Positioning", text: "text-purple-400", dot: "bg-purple-400" },
-  "operator-pain": { label: "Operator pain", text: "text-amber-400", dot: "bg-amber-400" },
-  noise: { label: "Noise", text: "text-muted-foreground", dot: "bg-muted-foreground" },
+  "brand-critical": {
+    label: "Brand critical",
+    text: "text-red-400",
+    dot: "bg-red-400",
+  },
+  "high-intent": {
+    label: "High intent",
+    text: "text-emerald-400",
+    dot: "bg-emerald-400",
+  },
+  "medium-intent": {
+    label: "Medium intent",
+    text: "text-sky-400",
+    dot: "bg-sky-400",
+  },
+  positioning: {
+    label: "Positioning",
+    text: "text-purple-400",
+    dot: "bg-purple-400",
+  },
+  "operator-pain": {
+    label: "Operator pain",
+    text: "text-amber-400",
+    dot: "bg-amber-400",
+  },
+  noise: {
+    label: "Noise",
+    text: "text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
 };
 
 function intentMeta(tag: string | null | undefined) {
   if (!tag) return null;
   const key = tag.toLowerCase().replace(/\s+/g, "-");
   return (
-    INTENT_META[key] ?? { label: tag, text: "text-muted-foreground", dot: "bg-muted-foreground" }
+    INTENT_META[key] ?? {
+      label: tag,
+      text: "text-muted-foreground",
+      dot: "bg-muted-foreground",
+    }
   );
 }
 
@@ -123,7 +154,9 @@ export function Reddit() {
 
   const matches = (m: Mention) =>
     !filter ||
-    (filter.type === "sub" ? m.subreddit === filter.value : m.keyword === filter.value);
+    (filter.type === "sub"
+      ? m.subreddit === filter.value
+      : m.keyword === filter.value);
 
   // A just-engaged item stays in its original Act/Monitor bucket (so you can
   // paste the reply link right where you were); it falls into Handled only on
@@ -178,7 +211,9 @@ export function Reddit() {
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Reddit — listening</h2>
+          <h2 className="text-lg font-semibold tracking-tight">
+            Reddit — listening
+          </h2>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
             One persisted queue of Reddit signal. F5Bot forwards keyword matches
             (posts <em>and</em> comments) — they&apos;re scored, deduped, and
@@ -222,28 +257,63 @@ export function Reddit() {
               onClick={() => setFilter(null)}
               className="text-muted-foreground hover:text-foreground text-xs"
             >
-              Filtered by {filter.type === "sub" ? `r/${filter.value}` : `“${filter.value}”`} — clear ✕
+              Filtered by{" "}
+              {filter.type === "sub"
+                ? `r/${filter.value}`
+                : `“${filter.value}”`}{" "}
+              — clear ✕
             </button>
           )}
 
           {act.length > 0 && (
             <QueueGroup label="Act today" count={act.length} tone="emerald">
               {act.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                <RedditCard
+                  key={m.id}
+                  m={m}
+                  onState={onState}
+                  pending={setStatus.isPending}
+                  members={members}
+                  currentUserId={currentUserId}
+                  onAssign={onAssign}
+                  onRefetch={refetch}
+                />
               ))}
             </QueueGroup>
           )}
           {monitor.length > 0 && (
-            <QueueGroup label="Monitor — revisit" count={monitor.length} tone="amber">
+            <QueueGroup
+              label="Monitor — revisit"
+              count={monitor.length}
+              tone="amber"
+            >
               {monitor.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                <RedditCard
+                  key={m.id}
+                  m={m}
+                  onState={onState}
+                  pending={setStatus.isPending}
+                  members={members}
+                  currentUserId={currentUserId}
+                  onAssign={onAssign}
+                  onRefetch={refetch}
+                />
               ))}
             </QueueGroup>
           )}
           {handled.length > 0 && (
             <QueueGroup label="Handled" count={handled.length} tone="muted">
               {handled.map((m) => (
-                <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                <RedditCard
+                  key={m.id}
+                  m={m}
+                  onState={onState}
+                  pending={setStatus.isPending}
+                  members={members}
+                  currentUserId={currentUserId}
+                  onAssign={onAssign}
+                  onRefetch={refetch}
+                />
               ))}
             </QueueGroup>
           )}
@@ -258,9 +328,22 @@ export function Reddit() {
               </button>
               {showSkipped && (
                 <div className="mt-3">
-                  <QueueGroup label="Skipped" count={skipped.length} tone="muted">
+                  <QueueGroup
+                    label="Skipped"
+                    count={skipped.length}
+                    tone="muted"
+                  >
                     {skipped.map((m) => (
-                      <RedditCard key={m.id} m={m} onState={onState} pending={setStatus.isPending} members={members} currentUserId={currentUserId} onAssign={onAssign} onRefetch={refetch} />
+                      <RedditCard
+                        key={m.id}
+                        m={m}
+                        onState={onState}
+                        pending={setStatus.isPending}
+                        members={members}
+                        currentUserId={currentUserId}
+                        onAssign={onAssign}
+                        onRefetch={refetch}
+                      />
                     ))}
                   </QueueGroup>
                 </div>
@@ -348,10 +431,17 @@ function QueueGroup({
   return (
     <div>
       <div className="mb-2 flex items-baseline gap-2">
-        <span className={cn("text-xs font-semibold tracking-wide uppercase", toneCls)}>
+        <span
+          className={cn(
+            "text-xs font-semibold tracking-wide uppercase",
+            toneCls,
+          )}
+        >
           {label}
         </span>
-        <span className="text-muted-foreground text-xs tabular-nums">{count}</span>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {count}
+        </span>
       </div>
       <div className="bg-card divide-y overflow-hidden rounded-xl border">
         {children}
@@ -413,7 +503,7 @@ function RedditCard({
   const provLabel = PROVIDER_LABEL[m.provider] ?? m.provider;
   const provDetail = m.keyword
     ? `“${m.keyword}”${m.sourceType ? ` in ${m.sourceType}` : ""}`
-    : m.sourceType ?? null;
+    : (m.sourceType ?? null);
 
   const meta = [
     m.subreddit ? `r/${m.subreddit}` : null,
@@ -430,7 +520,9 @@ function RedditCard({
     m.keyword ? `Matched keyword: ${m.keyword}` : null,
     m.title ? `Title: ${m.title}` : null,
     m.author ? `Author: ${m.author}` : null,
-    m.relevance != null ? `Intent: ${m.intentTag} · relevance ${m.relevance}/10` : null,
+    m.relevance != null
+      ? `Intent: ${m.intentTag} · relevance ${m.relevance}/10`
+      : null,
     m.rationale ? `Why: ${m.rationale}` : null,
     `Text: ${m.snippet ?? "(none)"}`,
     `Link: ${m.url}`,
@@ -494,13 +586,17 @@ function RedditCard({
             {m.snippet}
           </span>
         )}
-        <span className="text-muted-foreground/80 font-mono text-[11px]">{meta}</span>
+        <span className="text-muted-foreground/80 font-mono text-[11px]">
+          {meta}
+        </span>
       </button>
 
       {open && (
         <div className="flex flex-col gap-2.5 px-4 pb-3">
           {m.rationale && (
-            <p className="text-muted-foreground text-xs italic">{m.rationale}</p>
+            <p className="text-muted-foreground text-xs italic">
+              {m.rationale}
+            </p>
           )}
           {handled && (
             <p className="text-muted-foreground text-[11px]">

@@ -180,10 +180,7 @@ function listItemChildren(item: Tokens.ListItem): DastNode[] {
     : [{ type: "paragraph", children: [{ type: "span", value: "" }] }];
 }
 
-function inlineTokensToDast(
-  tokens: Token[],
-  marks: string[] = [],
-): DastNode[] {
+function inlineTokensToDast(tokens: Token[], marks: string[] = []): DastNode[] {
   const nodes: DastNode[] = [];
   for (const token of tokens) {
     switch (token.type) {

@@ -35,7 +35,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Dropzone } from "@/components/ui/dropzone";
-import { createImageThumbnail, THUMBNAIL_MIME } from "@/lib/image-thumbnail";
+import {
+  createImageThumbnail,
+  createVideoThumbnail,
+  THUMBNAIL_MIME,
+} from "@/lib/image-thumbnail";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
@@ -258,8 +262,12 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
 
       setUploadingCount((c) => c + 1);
       try {
-        // Images decode once for both dimensions and a downscaled grid tile.
-        const decoded = isImage ? await createImageThumbnail(file) : null;
+        // Images decode once for both dimensions and a downscaled grid tile;
+        // video seeks once for a poster frame. Both degrade to null rather
+        // than blocking the upload.
+        const decoded = isImage
+          ? await createImageThumbnail(file)
+          : await createVideoThumbnail(file);
         const { mediaId, uploadUrl, publicUrl, pathname, thumbnailUploadUrl } =
           await createUploadUrl.mutateAsync({
             brandId,

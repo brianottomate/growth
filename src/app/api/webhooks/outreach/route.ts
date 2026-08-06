@@ -60,14 +60,20 @@ function parseWebhookPayload(raw: string): OutreachWebhookPayload {
       };
     }
 
-    if (isRecord(parsed.data.relationships) && isRecord(parsed.data.relationships.org)) {
+    if (
+      isRecord(parsed.data.relationships) &&
+      isRecord(parsed.data.relationships.org)
+    ) {
       const orgData = isRecord(parsed.data.relationships.org.data)
         ? parsed.data.relationships.org.data
         : undefined;
       data.relationships = {
         org: {
           data: {
-            id: orgData && typeof orgData.id === "string" ? orgData.id : undefined,
+            id:
+              orgData && typeof orgData.id === "string"
+                ? orgData.id
+                : undefined,
           },
         },
       };

@@ -55,7 +55,9 @@ export async function crawlStep(ctx: StepContext) {
 
   // Derive a business name early so downstream steps never see a bare domain.
   const title =
-    typeof homepage.metadata?.title === "string" ? homepage.metadata.title : null;
+    typeof homepage.metadata?.title === "string"
+      ? homepage.metadata.title
+      : null;
   if (title) {
     await db
       .update(pregenNativeProspectTable)
@@ -194,7 +196,8 @@ function normalizeToOrigin(input: string): string {
   return new URL(withScheme).origin;
 }
 
-const NON_PAGE_PATH = /\.(xml|pdf|jpe?g|png|webp|gif|svg|css|js|ico|txt)(\?|#|$)/i;
+const NON_PAGE_PATH =
+  /\.(xml|pdf|jpe?g|png|webp|gif|svg|css|js|ico|txt)(\?|#|$)/i;
 
 /**
  * Same site, www-insensitive: prospects' sites routinely redirect apex ↔ www,
@@ -203,7 +206,9 @@ const NON_PAGE_PATH = /\.(xml|pdf|jpe?g|png|webp|gif|svg|css|js|ico|txt)(\?|#|$)
  */
 function sameSite(url: string, origin: string): boolean {
   try {
-    return stripWww(new URL(url).hostname) === stripWww(new URL(origin).hostname);
+    return (
+      stripWww(new URL(url).hostname) === stripWww(new URL(origin).hostname)
+    );
   } catch {
     return false;
   }

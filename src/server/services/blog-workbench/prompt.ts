@@ -83,8 +83,8 @@ export const buildContentBriefPagePrompt = (
     `  reads as genuine operator knowledge, not a search-engine-first roundup.`,
     ``,
     `# Voice`,
-    (context.voice ??
-      `Warm, plain-spoken, and specific. Earn trust with concrete detail, never superlatives.`),
+    context.voice ??
+      `Warm, plain-spoken, and specific. Earn trust with concrete detail, never superlatives.`,
     COPY_VOICE_RULES,
     ``,
     COPY_EXEMPLARS,
@@ -95,7 +95,9 @@ export const buildContentBriefPagePrompt = (
  */
 const renderOutline = (brief: ContentBriefInput): string =>
   brief.outline
-    .map((s, i) => `${i + 1}. ${s.heading}\n   - ${s.keyPoints.join("\n   - ")}`)
+    .map(
+      (s, i) => `${i + 1}. ${s.heading}\n   - ${s.keyPoints.join("\n   - ")}`,
+    )
     .join("\n");
 
 /**

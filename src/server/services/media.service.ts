@@ -138,11 +138,13 @@ export async function createR2Upload(input: {
 
   const uploadUrl = await R2.presignPut(key, input.mimeType);
 
-  // Images also get a presigned slot for a browser-downscaled tile. The grid
-  // renders that instead of a multi-megabyte original; callers that skip it
-  // just leave `thumbnailUrl` null and fall back to the full image.
+  // Images and video both get a presigned slot for a browser-generated tile.
+  // The grid renders that instead of a multi-megabyte original; callers that
+  // skip it just leave `thumbnailUrl` null. Video has no sane fallback at all
+  // (an <img> pointed at a .mov is a blank square), so its poster matters more
+  // than the image one does.
   const thumbnail =
-    kind === "image"
+    kind === "image" || kind === "video"
       ? await (async () => {
           const thumbnailKey = R2.buildThumbnailKey(key);
           return {

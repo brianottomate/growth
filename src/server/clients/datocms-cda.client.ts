@@ -36,7 +36,9 @@ export async function datoQuery<T>(
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`DatoCMS CDA ${res.status}: ${(await res.text()).slice(0, 400)}`);
+    throw new Error(
+      `DatoCMS CDA ${res.status}: ${(await res.text()).slice(0, 400)}`,
+    );
   }
   const payload = (await res.json()) as {
     data?: T;

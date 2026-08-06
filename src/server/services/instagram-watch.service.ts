@@ -84,7 +84,10 @@ type Candidate = {
 };
 
 /** Resolve a watched account to a scrapeable profile URL + a clean handle. */
-export function normalizeAccount(a: WatchedAccount): { url: string; handle: string } {
+export function normalizeAccount(a: WatchedAccount): {
+  url: string;
+  handle: string;
+} {
   let handle = a.handle?.replace(/^@/, "").trim() || undefined;
   let url = a.url?.trim() || undefined;
   if (url && !/^https?:\/\//i.test(url)) {
@@ -98,7 +101,9 @@ export function normalizeAccount(a: WatchedAccount): { url: string; handle: stri
 }
 
 /** Pull an account's recent posts from the IG-profile dataset (nested posts[]). */
-async function fetchAccountPosts(account: WatchedAccount): Promise<Candidate[]> {
+async function fetchAccountPosts(
+  account: WatchedAccount,
+): Promise<Candidate[]> {
   const { url, handle } = normalizeAccount(account);
   if (!url) return [];
   const records = (await runScrape("instagramProfile", [{ url }])) as Raw[];
@@ -130,7 +135,10 @@ async function fetchAccountPosts(account: WatchedAccount): Promise<Candidate[]> 
   return out;
 }
 
-type BrandCtx = { brandVoice: string | null; story: BrandListeningStory | null };
+type BrandCtx = {
+  brandVoice: string | null;
+  story: BrandListeningStory | null;
+};
 
 async function loadBrand(brandId: string): Promise<BrandCtx> {
   const b = await db.query.brandTable.findFirst({
@@ -284,7 +292,9 @@ export async function scanAccountWatchSources(opts?: {
     }
 
     // 2) freshness + dedup vs already-persisted mentions (unique url)
-    const recent = candidates.filter((c) => !c.postedAt || c.postedAt >= cutoff);
+    const recent = candidates.filter(
+      (c) => !c.postedAt || c.postedAt >= cutoff,
+    );
     const urls = recent.map((c) => c.url);
     const existing = urls.length
       ? await db

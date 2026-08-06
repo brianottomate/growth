@@ -261,8 +261,8 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
       {outreach.pretend && (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200">
           Written against a stand-in preview, so anything it says about the page
-          itself is invented. Not publishable — regenerate once a real preview is
-          assigned.
+          itself is invented. Not publishable — regenerate once a real preview
+          is assigned.
         </div>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -301,7 +301,7 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
             {/* A signed preview URL is one long unbroken token, which
                 whitespace-pre-wrap alone will happily run past the container —
                 anywhere lets it break mid-token. */}
-            <pre className="mt-1 font-sans text-xs leading-relaxed break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
+            <pre className="mt-1 font-sans text-xs leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap">
               {step.body}
             </pre>
           </div>
@@ -498,7 +498,9 @@ export function ProspectReviewCard({
                     <tr>
                       <th className="py-1 pr-3 font-medium">Candidate</th>
                       <th className="px-3 py-1 font-medium">Source</th>
-                      <th className="px-3 py-1 text-right font-medium">Score</th>
+                      <th className="px-3 py-1 text-right font-medium">
+                        Score
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

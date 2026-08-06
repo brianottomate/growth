@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         success: false,
         error: "Outreach is not configured",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         error: "Missing email parameter",
         usage: "GET /api/outreach/search?email=example@email.com",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -48,7 +48,9 @@ export async function GET(request: NextRequest) {
     const matchingProspects = prospectsResponse.data;
 
     if (matchingProspects.length === 0) {
-      console.log(`❌ [Outreach Search] No prospects found with email: ${email}`);
+      console.log(
+        `❌ [Outreach Search] No prospects found with email: ${email}`,
+      );
       return NextResponse.json({
         success: false,
         message: `No prospects found with email: ${email}`,
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(
-      `✅ [Outreach Search] Found ${matchingProspects.length} prospect(s) with email: ${email}`
+      `✅ [Outreach Search] Found ${matchingProspects.length} prospect(s) with email: ${email}`,
     );
 
     // Format results
@@ -78,7 +80,7 @@ export async function GET(request: NextRequest) {
     console.log("📋 [Outreach Search] Results:");
     results.forEach((p, i) => {
       console.log(
-        `  ${i + 1}. ${p.name} (${p.emails.join(", ")}) - ${p.title || "No title"} @ ${p.company || "No company"}`
+        `  ${i + 1}. ${p.name} (${p.emails.join(", ")}) - ${p.title || "No title"} @ ${p.company || "No company"}`,
       );
       console.log(`     Created: ${p.createdAt}, Updated: ${p.updatedAt}`);
     });
@@ -99,7 +101,7 @@ export async function GET(request: NextRequest) {
           error: "Outreach API error",
           message: error.message,
         },
-        { status: error.statusCode ?? 500 }
+        { status: error.statusCode ?? 500 },
       );
     }
 
@@ -109,7 +111,7 @@ export async function GET(request: NextRequest) {
         error: "Search failed",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

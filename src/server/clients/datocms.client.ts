@@ -26,7 +26,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { ...init, headers: headers() });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`DatoCMS ${init?.method ?? "GET"} ${path} → ${res.status}: ${body.slice(0, 500)}`);
+    throw new Error(
+      `DatoCMS ${init?.method ?? "GET"} ${path} → ${res.status}: ${body.slice(0, 500)}`,
+    );
   }
   return (await res.json()) as T;
 }
@@ -34,9 +36,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 type JsonApi<T> = { data: T };
 
 export async function resolveItemTypeId(apiKey: string): Promise<string> {
-  const { data } = await request<
-    JsonApi<Array<{ id: string; attributes: { api_key: string } }>>
-  >("/item-types");
+  const { data } =
+    await request<
+      JsonApi<Array<{ id: string; attributes: { api_key: string } }>>
+    >("/item-types");
   const match = data.find((type) => type.attributes.api_key === apiKey);
   if (!match) throw new Error(`DatoCMS model not found: ${apiKey}`);
   return match.id;
@@ -45,9 +48,10 @@ export async function resolveItemTypeId(apiKey: string): Promise<string> {
 /** The project's admin domain, for deep links into the editor. */
 export async function resolveAdminDomain(): Promise<string | null> {
   try {
-    const { data } = await request<
-      JsonApi<{ attributes: { internal_domain: string | null } }>
-    >("/site");
+    const { data } =
+      await request<
+        JsonApi<{ attributes: { internal_domain: string | null } }>
+      >("/site");
     return data.attributes.internal_domain;
   } catch {
     return null;
@@ -93,7 +97,8 @@ export async function createUploadFromUrl(
     },
     body: bytes,
   });
-  if (!putRes.ok) throw new Error(`S3 PUT for Dato upload failed: ${putRes.status}`);
+  if (!putRes.ok)
+    throw new Error(`S3 PUT for Dato upload failed: ${putRes.status}`);
 
   const job = await request<JsonApi<{ id: string; type: string }>>("/uploads", {
     method: "POST",
@@ -115,7 +120,9 @@ export async function createUploadFromUrl(
     if (res.status === 404) continue; // still processing
     if (!res.ok) throw new Error(`DatoCMS job poll → ${res.status}`);
     const payload = (await res.json()) as {
-      data: { attributes: { status: number; payload?: { data?: { id?: string } } } };
+      data: {
+        attributes: { status: number; payload?: { data?: { id?: string } } };
+      };
     };
     const { status, payload: result } = payload.data.attributes;
     if (status >= 200 && status < 300 && result?.data?.id) {
@@ -146,9 +153,10 @@ export async function getItem(itemId: string): Promise<{
 /** Map of item_type id → api_key, so a preview can render blocks by model
  * name (`video_embed`, `blog_image`, …) instead of opaque ids. */
 export async function getItemTypeMap(): Promise<Record<string, string>> {
-  const { data } = await request<
-    JsonApi<Array<{ id: string; attributes: { api_key: string } }>>
-  >("/item-types");
+  const { data } =
+    await request<
+      JsonApi<Array<{ id: string; attributes: { api_key: string } }>>
+    >("/item-types");
   return Object.fromEntries(data.map((t) => [t.id, t.attributes.api_key]));
 }
 

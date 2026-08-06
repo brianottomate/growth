@@ -143,7 +143,10 @@ async function fetchImageBytes(
       headers: { "user-agent": "WanderGrowth/1.0 (lead ranking)" },
     });
     if (!response.ok) return null;
-    const mediaType = response.headers.get("content-type")?.split(";")[0]?.trim();
+    const mediaType = response.headers
+      .get("content-type")
+      ?.split(";")[0]
+      ?.trim();
     if (!mediaType?.startsWith("image/")) return null;
     const buffer = await response.arrayBuffer();
     // Skip tracking pixels and anything large enough to be wasteful.
@@ -258,10 +261,9 @@ export async function rankLeadDomain(
   // on the prospect's own infrastructure and may not be.
   const attachments = (
     await Promise.all(
-      [
-        ...(scrape.screenshot ? [scrape.screenshot] : []),
-        ...sampledImages,
-      ].map(fetchImageBytes),
+      [...(scrape.screenshot ? [scrape.screenshot] : []), ...sampledImages].map(
+        fetchImageBytes,
+      ),
     )
   ).filter((image): image is { data: Uint8Array; mediaType: string } =>
     Boolean(image),

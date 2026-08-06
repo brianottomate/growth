@@ -71,10 +71,8 @@ function RecentPostsSection() {
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             All posts on connected accounts in the last 30 days via{" "}
-            <code className="font-mono">
-              GET /v1/analytics?platform=…
-            </code>
-            . Includes posts published outside of Zernio.
+            <code className="font-mono">GET /v1/analytics?platform=…</code>.
+            Includes posts published outside of Zernio.
           </p>
         </div>
       </div>

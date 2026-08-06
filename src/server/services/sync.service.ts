@@ -67,7 +67,11 @@ function dataSourcesSummary(
   const minervaStr = minervaData
     ? `Minerva✅${minervaBackfilled.length ? `(${minervaBackfilled.join(",")})` : ""}`
     : "Minerva❌";
-  return [bqData ? "BQ✅" : "BQ❌", cioData ? "CIO✅" : "CIO❌", minervaStr].join("  ");
+  return [
+    bqData ? "BQ✅" : "BQ❌",
+    cioData ? "CIO✅" : "CIO❌",
+    minervaStr,
+  ].join("  ");
 }
 
 /** Human-readable stage name for the outcome log line. */
@@ -128,32 +132,29 @@ export async function processLead(params: {
       isMinervaConfigured ? enrichFromMinerva(email) : Promise.resolve(null),
     ]);
 
-    const bqData =
-      bqResult.status === "fulfilled"
-        ? bqResult.value
-        : null;
+    const bqData = bqResult.status === "fulfilled" ? bqResult.value : null;
     if (bqResult.status === "rejected") {
       console.warn("⚠️ [Sync] BigQuery fetch failed", bqResult.reason);
     }
 
     const cioCustomer =
-      cioResult.status === "fulfilled"
-        ? cioResult.value
-        : null;
+      cioResult.status === "fulfilled" ? cioResult.value : null;
     if (cioResult.status === "rejected") {
       console.warn("⚠️ [Sync] Customer.io fetch failed", cioResult.reason);
     }
 
     const minervaData =
-      minervaResult.status === "fulfilled"
-        ? minervaResult.value
-        : null;
+      minervaResult.status === "fulfilled" ? minervaResult.value : null;
     if (minervaResult.status === "rejected") {
       console.warn("⚠️ [Sync] Minerva fetch failed", minervaResult.reason);
     }
 
     if (bqData && cioCustomer) {
-      const cioLead = transformCioToLeadFormat(cioCustomer, eventType, eventData);
+      const cioLead = transformCioToLeadFormat(
+        cioCustomer,
+        eventType,
+        eventData,
+      );
       leadData = mergeLeadData(bqData, cioLead);
       dataSource = "bigquery+customerio";
     } else if (bqData) {
@@ -188,15 +189,17 @@ export async function processLead(params: {
     // Keep last-event filters fresh even when CIO templates omit/format timestamp inconsistently.
     const rawTimestamp = eventData?.timestamp;
     const nowIso = new Date().toISOString();
-    if (rawTimestamp != null && rawTimestamp !== "" && (typeof rawTimestamp === "string" || typeof rawTimestamp === "number")) {
+    if (
+      rawTimestamp != null &&
+      rawTimestamp !== "" &&
+      (typeof rawTimestamp === "string" || typeof rawTimestamp === "number")
+    ) {
       const parsed = new Date(rawTimestamp);
       if (!isNaN(parsed.getTime())) {
         const ageMs = Date.now() - parsed.getTime();
         const maxAgeMs = 1000 * 60 * 60 * 24 * 7; // 7 days
         leadData.last_activity_ts =
-          ageMs >= 0 && ageMs <= maxAgeMs
-            ? parsed.toISOString()
-            : nowIso;
+          ageMs >= 0 && ageMs <= maxAgeMs ? parsed.toISOString() : nowIso;
       } else {
         leadData.last_activity_ts = nowIso;
       }
@@ -218,18 +221,31 @@ export async function processLead(params: {
     if (typeof rawLastSearch === "string" && rawLastSearch) {
       leadData.webhook_last_search_date = rawLastSearch;
     }
-        const rawCheckin = eventData?.checkin;
-    if (rawCheckin != null && rawCheckin !== false && rawCheckin !== "false" && rawCheckin !== "" && (typeof rawCheckin === "string" || typeof rawCheckin === "number")) {
+    const rawCheckin = eventData?.checkin;
+    if (
+      rawCheckin != null &&
+      rawCheckin !== false &&
+      rawCheckin !== "false" &&
+      rawCheckin !== "" &&
+      (typeof rawCheckin === "string" || typeof rawCheckin === "number")
+    ) {
       leadData.webhook_checkin_date = String(rawCheckin);
     }
     const rawCheckout = eventData?.checkout;
-    if (rawCheckout != null && rawCheckout !== false && rawCheckout !== "false" && rawCheckout !== "" && (typeof rawCheckout === "string" || typeof rawCheckout === "number")) {
+    if (
+      rawCheckout != null &&
+      rawCheckout !== false &&
+      rawCheckout !== "false" &&
+      rawCheckout !== "" &&
+      (typeof rawCheckout === "string" || typeof rawCheckout === "number")
+    ) {
       leadData.webhook_checkout_date = String(rawCheckout);
     }
     const rawAmount = eventData?.checkout_amount;
     if (rawAmount != null && rawAmount !== "") {
       const amount = Number(rawAmount);
-      if (!isNaN(amount) && amount > 0) leadData.webhook_checkout_amount = amount;
+      if (!isNaN(amount) && amount > 0)
+        leadData.webhook_checkout_amount = amount;
     }
 
     // -----------------------------------------------
@@ -253,7 +269,10 @@ export async function processLead(params: {
         leadData.country = minervaData.country;
         minervaBackfilled.push("country");
       }
-      if (!leadData.minerva_household_income && minervaData.estimatedIncomeRange) {
+      if (
+        !leadData.minerva_household_income &&
+        minervaData.estimatedIncomeRange
+      ) {
         leadData.minerva_household_income = minervaData.estimatedIncomeRange;
         minervaBackfilled.push("minerva_household_income");
       }
@@ -282,7 +301,12 @@ export async function processLead(params: {
     // Step 4: Determine BDR assignment (Outreach owner is source of truth)
     // -----------------------------------------------
     let assignedBdr: BdrConfig | null = null;
-    let assignmentSource: "outreach_owner" | "outreach_load" | "static_round_robin" | "cio_existing" | "none" = "none";
+    let assignmentSource:
+      | "outreach_owner"
+      | "outreach_load"
+      | "static_round_robin"
+      | "cio_existing"
+      | "none" = "none";
 
     if (existingProspect) {
       const existingOwnerId = getProspectOwnerId(existingProspect);
@@ -300,10 +324,14 @@ export async function processLead(params: {
     }
 
     if (!assignedBdr) {
-      const existingBdrOutreachId = ((leadData as Record<string, unknown>)
-        .assignedBdrOutreachId as string | null) ?? null;
-      const existingBdrEmail = ((leadData as Record<string, unknown>)
-        .assignedBdrEmail as string | null) ?? null;
+      const existingBdrOutreachId =
+        ((leadData as Record<string, unknown>).assignedBdrOutreachId as
+          | string
+          | null) ?? null;
+      const existingBdrEmail =
+        ((leadData as Record<string, unknown>).assignedBdrEmail as
+          | string
+          | null) ?? null;
       const cioAssignee = await resolveCioAssignedOutreachUser(
         existingBdrOutreachId,
         existingBdrEmail,
@@ -341,8 +369,7 @@ export async function processLead(params: {
     if (existingProspect) {
       // Carry forward existing sync count
       leadData.existing_sync_count =
-        parseInt((existingProspect.attributes.custom51!) ?? "0", 10) ||
-        0;
+        parseInt(existingProspect.attributes.custom51! ?? "0", 10) || 0;
 
       const { attributes, stageId } = buildUpdatePayload(
         leadData,
@@ -386,10 +413,14 @@ export async function processLead(params: {
     // -----------------------------------------------
     // Step 6: Update CIO with BDR assignment (parity with Outreach owner)
     // -----------------------------------------------
-    const cioAssignedEmail = ((leadData as Record<string, unknown>)
-      .assignedBdrEmail as string | null)?.toLowerCase() ?? null;
-    const cioAssignedOutreachId = ((leadData as Record<string, unknown>)
-      .assignedBdrOutreachId as string | null) ?? null;
+    const cioAssignedEmail =
+      (
+        (leadData as Record<string, unknown>).assignedBdrEmail as string | null
+      )?.toLowerCase() ?? null;
+    const cioAssignedOutreachId =
+      ((leadData as Record<string, unknown>).assignedBdrOutreachId as
+        | string
+        | null) ?? null;
     const shouldWriteCioAssignment =
       !!assignedBdr &&
       (cioAssignedOutreachId !== assignedBdr.outreachUserId ||
@@ -401,17 +432,20 @@ export async function processLead(params: {
           `⚠️ [Sync] Skipping CIO parity write-back for ${assignedBdr.outreachUserId}: owner email not available`,
         );
       } else {
-      try {
-        await updateBdrAssignment({
-          customerEmail: email,
-          bdrEmail: assignedBdr.email,
-          bdrName: assignedBdr.name,
-          bdrOutreachId: assignedBdr.outreachUserId,
-        });
-      } catch (error) {
-        // Non-fatal — log and continue
-        console.error("⚠️ [Sync] Failed to update CIO BDR assignment:", error);
-      }
+        try {
+          await updateBdrAssignment({
+            customerEmail: email,
+            bdrEmail: assignedBdr.email,
+            bdrName: assignedBdr.name,
+            bdrOutreachId: assignedBdr.outreachUserId,
+          });
+        } catch (error) {
+          // Non-fatal — log and continue
+          console.error(
+            "⚠️ [Sync] Failed to update CIO BDR assignment:",
+            error,
+          );
+        }
       }
     }
 

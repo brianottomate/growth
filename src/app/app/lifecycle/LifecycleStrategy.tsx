@@ -414,9 +414,7 @@ export function LifecycleStrategy({
                           <div
                             key={s.id}
                             style={
-                              depth > 0
-                                ? { marginLeft: depth * 24 }
-                                : undefined
+                              depth > 0 ? { marginLeft: depth * 24 } : undefined
                             }
                           >
                             <div className="bg-background/50 group flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5">
@@ -525,7 +523,9 @@ export function LifecycleStrategy({
                                   size="icon"
                                   variant="ghost"
                                   className="size-6"
-                                  onClick={() => removeStep.mutate({ id: s.id })}
+                                  onClick={() =>
+                                    removeStep.mutate({ id: s.id })
+                                  }
                                 >
                                   <Trash2 className="size-3" />
                                 </Button>

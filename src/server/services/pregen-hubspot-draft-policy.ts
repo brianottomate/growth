@@ -36,15 +36,19 @@ const LIMP_PHRASES: Array<{ pattern: RegExp; label: string }> = [
     label: "a specific meeting length in touch 1",
   },
   {
-    pattern: /\bwould you be open to\b|\bopen to (?:a |an )?(?:quick )?(?:chat|call|look|conversation)\b/i,
+    pattern:
+      /\bwould you be open to\b|\bopen to (?:a |an )?(?:quick )?(?:chat|call|look|conversation)\b/i,
     label: '"would you be open to"',
   },
   {
-    pattern: /\bhappy to\b|\bfeel free to\b|\bdon'?t hesitate\b|\bat your convenience\b/i,
-    label: 'service-desk filler ("happy to", "feel free to", "don\'t hesitate")',
+    pattern:
+      /\bhappy to\b|\bfeel free to\b|\bdon'?t hesitate\b|\bat your convenience\b/i,
+    label:
+      'service-desk filler ("happy to", "feel free to", "don\'t hesitate")',
   },
   {
-    pattern: /\b(?:circle back|touch base|reach out|follow up with you|hope this (?:email )?finds you)\b/i,
+    pattern:
+      /\b(?:circle back|touch base|reach out|follow up with you|hope this (?:email )?finds you)\b/i,
     label: "sales-cliche connective tissue",
   },
   {
@@ -161,7 +165,9 @@ export function findPregenHubspotDraftViolations(
 
     for (const { pattern, label: phrase } of LIMP_PHRASES) {
       if (pattern.test(text)) {
-        violations.push(`${label} uses ${phrase}; rewrite it in plainer language.`);
+        violations.push(
+          `${label} uses ${phrase}; rewrite it in plainer language.`,
+        );
       }
     }
     if (/\battach(?:ed|ment|ments)?\b/i.test(text)) {
@@ -290,7 +296,9 @@ export function findPregenHubspotDraftViolations(
   const WANDEROS_SCALE =
     /\b10[,.]?000\+?\s+(?:properties|homes|listings)\b|\b1[,.]?000\+?\s+(?:property managers|managers|operators)\b|\b11\+?\s+pms\b/i;
   for (const [index, touch] of draft.touches.entries()) {
-    const sentences = `${touch.opening} ${touch.closing}`.split(/(?<=[.!?])\s+/);
+    const sentences = `${touch.opening} ${touch.closing}`.split(
+      /(?<=[.!?])\s+/,
+    );
     if (
       sentences.some(
         (sentence) =>

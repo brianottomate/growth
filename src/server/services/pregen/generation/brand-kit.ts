@@ -78,7 +78,9 @@ const BusinessContextOutput = z.object({
     ),
   propertyType: z
     .string()
-    .describe("The type of property/properties, e.g. beachhouse, villa, apartment etc"),
+    .describe(
+      "The type of property/properties, e.g. beachhouse, villa, apartment etc",
+    ),
   inventoryMode: BrandKitInventoryModeSchema.describe(
     "The inventory mode of the business, e.g. single property, multi-home regional, multi-home global",
   ),
@@ -108,7 +110,10 @@ export async function evaluateHomepage(
     messages: [{ role: "user", content: buildUserMessage(source) }],
   });
 
-  const locationContext = normalizeLocationContext(output.locationContext, source);
+  const locationContext = normalizeLocationContext(
+    output.locationContext,
+    source,
+  );
 
   return EvaluatedBrandKitSchema.parse({
     businessName: output.businessName,
@@ -279,10 +284,14 @@ const normalizeOptionalLocation = (location: string | undefined) => {
 };
 
 const hasSupportedLocationTokens = (location: string, sourceText: string) => {
-  const sourceTokens = new Set(normalizeComparableText(sourceText).split(/\s+/));
+  const sourceTokens = new Set(
+    normalizeComparableText(sourceText).split(/\s+/),
+  );
   const tokens = normalizeComparableText(location)
     .split(/\s+/)
-    .filter((token) => token.length >= 3 && !LOCATION_TOKEN_STOP_WORDS.has(token));
+    .filter(
+      (token) => token.length >= 3 && !LOCATION_TOKEN_STOP_WORDS.has(token),
+    );
 
   return tokens.length > 0 && tokens.every((token) => sourceTokens.has(token));
 };

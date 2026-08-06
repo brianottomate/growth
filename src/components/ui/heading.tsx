@@ -31,7 +31,9 @@ function responsiveClasses(variant: ResponsiveVariant | undefined) {
   return Object.entries(variant)
     .map(([breakpoint, value]) => {
       if (!value) return "";
-      return breakpoint === "base" ? classes[value] : `${breakpoint}:${classes[value]}`;
+      return breakpoint === "base"
+        ? classes[value]
+        : `${breakpoint}:${classes[value]}`;
     })
     .join(" ");
 }

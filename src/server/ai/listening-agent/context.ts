@@ -44,7 +44,11 @@ export async function loadMentionSparContext(
       ) ?? null;
   }
 
-  return { mention, subreddit, contextText: buildContextText(mention, subreddit) };
+  return {
+    mention,
+    subreddit,
+    contextText: buildContextText(mention, subreddit),
+  };
 }
 
 function buildContextText(m: Mention, sub: SubredditProfile | null): string {
@@ -69,7 +73,8 @@ function buildContextText(m: Mention, sub: SubredditProfile | null): string {
     lines.push("", `# Subreddit profile — r/${sub.name}`);
     if (sub.stance) lines.push(`Stance: ${sub.stance}`);
     if (sub.riskFlags?.length) lines.push(`Risks: ${sub.riskFlags.join(", ")}`);
-    if (sub.sanctionedPath) lines.push(`Sanctioned path: ${sub.sanctionedPath}`);
+    if (sub.sanctionedPath)
+      lines.push(`Sanctioned path: ${sub.sanctionedPath}`);
     if (sub.cultureSummary) lines.push(`Culture: ${sub.cultureSummary}`);
     if (sub.voiceNotes) lines.push(`Voice here: ${sub.voiceNotes}`);
     if (sub.signalNotes) lines.push(`Signal here: ${sub.signalNotes}`);

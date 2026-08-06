@@ -78,9 +78,13 @@ async function impactFetchAllPages(
   let nextPath = path;
   let nextParams = params;
   for (let page = 0; page < 100; page++) {
-    const data = await impactFetch<Record<string, unknown>>(nextPath, nextParams);
+    const data = await impactFetch<Record<string, unknown>>(
+      nextPath,
+      nextParams,
+    );
     const rows = data[arrayKey];
-    if (Array.isArray(rows)) all.push(...(rows as Array<Record<string, unknown>>));
+    if (Array.isArray(rows))
+      all.push(...(rows as Array<Record<string, unknown>>));
     const nextUri = data["@nextpageuri"];
     if (typeof nextUri !== "string" || nextUri.length === 0) break;
     nextPath = nextUri;
@@ -264,15 +268,16 @@ export async function listInvoices(): Promise<ImpactInvoice[]> {
     CreatedDate: i.CreatedDate as string | undefined,
     MediaName: i.MediaName as string | undefined,
     TotalAmount: i.TotalAmount as string | undefined,
-    LineItems: (Array.isArray(i.LineItems) ? (i.LineItems as Array<Record<string, unknown>>) : []).map(
-      (l) => ({
-        Status: l.Status as string | undefined,
-        DueDate: l.DueDate as string | undefined,
-        TotalItemAmount: l.TotalItemAmount as string | undefined,
-        CampaignName: l.CampaignName as string | undefined,
-        raw: l,
-      }),
-    ),
+    LineItems: (Array.isArray(i.LineItems)
+      ? (i.LineItems as Array<Record<string, unknown>>)
+      : []
+    ).map((l) => ({
+      Status: l.Status as string | undefined,
+      DueDate: l.DueDate as string | undefined,
+      TotalItemAmount: l.TotalItemAmount as string | undefined,
+      CampaignName: l.CampaignName as string | undefined,
+      raw: l,
+    })),
     raw: i,
   }));
 }

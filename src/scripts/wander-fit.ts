@@ -64,7 +64,13 @@ type WanderFitAnalysis = {
   companyName: string;
   location: string;
   propertyCount: number | null;
-  propertyQuality: "luxury" | "premium" | "mid-range" | "budget" | "mixed" | "unknown";
+  propertyQuality:
+    | "luxury"
+    | "premium"
+    | "mid-range"
+    | "budget"
+    | "mixed"
+    | "unknown";
   hasHotelGradeAmenities: boolean;
   fitScore: number;
   reasoning: string;
@@ -95,7 +101,8 @@ async function writeToAirtable(
       [AIRTABLE_FIELDS.hotelGradeAmenities]: analysis.hasHotelGradeAmenities,
       [AIRTABLE_FIELDS.fitScore]: analysis.fitScore,
       [AIRTABLE_FIELDS.reasoning]: analysis.reasoning,
-      [AIRTABLE_FIELDS.recommendation]: recommendationMap[analysis.recommendation],
+      [AIRTABLE_FIELDS.recommendation]:
+        recommendationMap[analysis.recommendation],
     };
 
     const response = await fetch(
@@ -126,7 +133,9 @@ async function writeToAirtable(
 }
 
 const wanderFitAnalysisSchema = z.object({
-  companyName: z.string().describe("The name of the property management company"),
+  companyName: z
+    .string()
+    .describe("The name of the property management company"),
   location: z.string().describe("Primary location(s) they operate in"),
   propertyCount: z
     .number()
@@ -179,7 +188,10 @@ async function main() {
   console.log("\n--- Wander Fit Analysis ---\n");
 
   // Process each result with AI
-  for (const result of response.organic_results.slice(0, MAX_SITES_TO_PROCESS)) {
+  for (const result of response.organic_results.slice(
+    0,
+    MAX_SITES_TO_PROCESS,
+  )) {
     console.log(`\n${"=".repeat(80)}`);
     console.log(`${result.position}. ${result.title}`);
     console.log(`Link: ${result.link}`);

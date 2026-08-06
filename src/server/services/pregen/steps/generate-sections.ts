@@ -50,7 +50,10 @@ export async function generateSectionsStep(ctx: StepContext) {
   });
 
   const businessName =
-    brandKit?.businessName ?? build?.prospect.name ?? build?.prospect.domain ?? "";
+    brandKit?.businessName ??
+    build?.prospect.name ??
+    build?.prospect.domain ??
+    "";
   const hero = sections.find((s) => s.type === "homepage-hero");
 
   const homepageDraft: PregenNativePage = {

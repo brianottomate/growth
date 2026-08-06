@@ -1,7 +1,13 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, CircleSlash, Link2, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleSlash,
+  Link2,
+  Loader2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -10,7 +16,11 @@ import { useTRPC } from "@/trpc/react";
 
 const VERDICT_META = {
   ok: { icon: CheckCircle2, cls: "text-emerald-600", label: "Live" },
-  inactive: { icon: CircleSlash, cls: "text-amber-600", label: "Linked but not live" },
+  inactive: {
+    icon: CircleSlash,
+    cls: "text-amber-600",
+    label: "Linked but not live",
+  },
   missing: { icon: AlertTriangle, cls: "text-red-600", label: "No campaign" },
 } as const;
 
@@ -80,8 +90,8 @@ export function AlignmentPanel({
 
       {!hasIntent && (
         <p className="text-muted-foreground mt-4 text-sm">
-          No intended channels or budget set on this initiative — add
-          target channels to compare strategy against what&apos;s running.
+          No intended channels or budget set on this initiative — add target
+          channels to compare strategy against what&apos;s running.
         </p>
       )}
 

@@ -111,7 +111,10 @@ function buildSourceRows(
   ours: OursView,
   hubspot: HubspotView,
   web: LeadEnrichmentExtraction | null,
-): Record<MergeableField, { ours: string | null; hubspot: string | null; web: string | null }> {
+): Record<
+  MergeableField,
+  { ours: string | null; hubspot: string | null; web: string | null }
+> {
   return {
     companyName: {
       ours: str(ours.companyName),
@@ -128,7 +131,11 @@ function buildSourceRows(
       hubspot: str(hubspot?.pms_ai_identified),
       web: str(web?.pms.detected),
     },
-    country: { ours: str(ours.country), hubspot: str(hubspot?.country), web: null },
+    country: {
+      ours: str(ours.country),
+      hubspot: str(hubspot?.country),
+      web: null,
+    },
     state: { ours: str(ours.state), hubspot: str(hubspot?.state), web: null },
     city: {
       ours: str(ours.city),

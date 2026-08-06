@@ -54,7 +54,9 @@ export function buildSparTools(ctx: SparToolContext): ToolSet {
         pills: z
           .array(z.enum(DRAFT_PILLS))
           .optional()
-          .describe("Optional style modifiers (e.g. short, no-pitch, focus-wanderos)."),
+          .describe(
+            "Optional style modifiers (e.g. short, no-pitch, focus-wanderos).",
+          ),
         customInstructions: z
           .string()
           .optional()
@@ -91,7 +93,9 @@ export function buildSparTools(ctx: SparToolContext): ToolSet {
         decisionNote: z
           .string()
           .min(1)
-          .describe("The reasoning behind the disposition — especially important for a pass."),
+          .describe(
+            "The reasoning behind the disposition — especially important for a pass.",
+          ),
         replyUrl: z
           .string()
           .optional()

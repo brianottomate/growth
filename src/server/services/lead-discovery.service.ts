@@ -103,7 +103,8 @@ export async function discoverDomain(
     {
       source: "exa",
       enabled: isExaConfigured,
-      run: () => exaSearch(`${domain} property management vacation rental company`),
+      run: () =>
+        exaSearch(`${domain} property management vacation rental company`),
     },
   ];
 

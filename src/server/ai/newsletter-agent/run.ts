@@ -8,10 +8,7 @@ import {
   isClaudeConfigured,
 } from "@/server/clients/claude.client";
 import { NEWSLETTER_AGENT_PERSONA } from "./persona";
-import {
-  buildNewsletterTools,
-  type NewsletterToolTrailEntry,
-} from "./tools";
+import { buildNewsletterTools, type NewsletterToolTrailEntry } from "./tools";
 
 /**
  * Run the newsletter sub-agent for one task. Same contract as the blog agent:

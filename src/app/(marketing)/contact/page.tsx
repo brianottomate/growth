@@ -94,9 +94,9 @@ export default function ContactPage() {
             <figure className="mt-10">
               <blockquote className="text-lg/8 font-semibold text-gray-900">
                 <p>
-                  &quot;Wander Growth helped me achieve my goals and provided valuable
-                  insights. The platform is intuitive and the team was super
-                  helpful!&quot;
+                  &quot;Wander Growth helped me achieve my goals and provided
+                  valuable insights. The platform is intuitive and the team was
+                  super helpful!&quot;
                 </p>
               </blockquote>
               <figcaption className="mt-10 flex gap-x-6">
@@ -140,8 +140,8 @@ export default function ContactPage() {
                     Partnership inquiries
                   </dt>
                   <dd className="mt-1 text-sm text-gray-600">
-                    For partnership or business inquiries, mention your goals
-                    in your email.
+                    For partnership or business inquiries, mention your goals in
+                    your email.
                   </dd>
                 </div>
               </div>

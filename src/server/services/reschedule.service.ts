@@ -17,9 +17,13 @@ const RescheduleSchema = z.object({
   moves: z
     .array(
       z.object({
-        spotId: z.string().describe("id of a spot from the provided list to move"),
+        spotId: z
+          .string()
+          .describe("id of a spot from the provided list to move"),
         toDate: z.string().describe("new ship date as YYYY-MM-DD"),
-        reason: z.string().describe("one short sentence on why this day is better"),
+        reason: z
+          .string()
+          .describe("one short sentence on why this day is better"),
       }),
     )
     .describe(
@@ -28,19 +32,27 @@ const RescheduleSchema = z.object({
   slots: z
     .array(
       z.object({
-        date: z.string().describe("YYYY-MM-DD for a new empty placeholder slot"),
+        date: z
+          .string()
+          .describe("YYYY-MM-DD for a new empty placeholder slot"),
         platform: z
           .string()
-          .describe("channel slug: instagram | tiktok | pinterest | youtube | facebook"),
+          .describe(
+            "channel slug: instagram | tiktok | pinterest | youtube | facebook",
+          ),
         pillar: z
           .string()
           .describe(
             "pillar slug: timely-travel | travel-discovery | entertainment | brand-trust | insider-community",
           ),
-        rationale: z.string().describe("why fill this gap (cadence gap, key date, spacing)"),
+        rationale: z
+          .string()
+          .describe("why fill this gap (cadence gap, key date, spacing)"),
       }),
     )
-    .describe("A few empty slots to inject where there are multi-day gaps in cadence."),
+    .describe(
+      "A few empty slots to inject where there are multi-day gaps in cadence.",
+    ),
 });
 
 export type ReschedulePlan = z.infer<typeof RescheduleSchema>;
@@ -53,20 +65,30 @@ export type RescheduleSpot = {
 };
 
 /** The brand's dated, owned spots — the calendar the AI reasons over. */
-export async function loadReschedulableSpots(brandId: string): Promise<RescheduleSpot[]> {
+export async function loadReschedulableSpots(
+  brandId: string,
+): Promise<RescheduleSpot[]> {
   const spots = await db.query.platformPostTable.findMany({
     where: and(
       eq(platformPostTable.brandId, brandId),
       eq(platformPostTable.source, "owned"),
     ),
     with: {
-      contentPost: { columns: { title: true, pillar: true, plannedAt: true, deletedAt: true } },
+      contentPost: {
+        columns: {
+          title: true,
+          pillar: true,
+          plannedAt: true,
+          deletedAt: true,
+        },
+      },
     },
   });
   return spots
     .filter((p) => p.contentPost && !p.contentPost.deletedAt)
     .map((p): RescheduleSpot | null => {
-      const at = p.scheduledAt ?? p.publishedAt ?? p.contentPost?.plannedAt ?? null;
+      const at =
+        p.scheduledAt ?? p.publishedAt ?? p.contentPost?.plannedAt ?? null;
       return at
         ? {
             id: p.id,
@@ -87,10 +109,16 @@ export async function generateReschedule(
 ): Promise<{ plan: ReschedulePlan; spots: RescheduleSpot[] }> {
   const spots = await loadReschedulableSpots(brandId);
   const keyDates = keyDatesForYear(year)
-    .map(({ keyDate, date }) => `${date.toISOString().slice(0, 10)} ${keyDate.emoji} ${keyDate.name}`)
+    .map(
+      ({ keyDate, date }) =>
+        `${date.toISOString().slice(0, 10)} ${keyDate.emoji} ${keyDate.name}`,
+    )
     .join("\n");
   const spotList = spots
-    .map((s) => `- [${s.id}] ${s.date} · ${s.platform} · ${s.pillar ?? "no pillar"} · ${s.title ?? "Untitled"}`)
+    .map(
+      (s) =>
+        `- [${s.id}] ${s.date} · ${s.platform} · ${s.pillar ?? "no pillar"} · ${s.title ?? "Untitled"}`,
+    )
     .join("\n");
 
   const { output } = await generateText({

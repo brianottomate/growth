@@ -53,7 +53,12 @@ describe("computeChannelPacing — fixed-cost channels", () => {
   it("returns null on the 1st (only the in-progress $0 day)", () => {
     expect(
       computeChannelPacing(
-        { dataSource: "fixed_cost", spend: 0, spendThroughYesterday: 0, completedFixedDays: 0 },
+        {
+          dataSource: "fixed_cost",
+          spend: 0,
+          spendThroughYesterday: 0,
+          completedFixedDays: 0,
+        },
         { currentDayOfMonth: 1, calendarDaysInMonth: 30 },
       ),
     ).toBeNull();
@@ -62,7 +67,12 @@ describe("computeChannelPacing — fixed-cost channels", () => {
   it("returns null for a channel zeroed all month (SEO June, #9i)", () => {
     expect(
       computeChannelPacing(
-        { dataSource: "fixed_cost", spend: 0, spendThroughYesterday: 0, completedFixedDays: 0 },
+        {
+          dataSource: "fixed_cost",
+          spend: 0,
+          spendThroughYesterday: 0,
+          completedFixedDays: 0,
+        },
         JUNE,
       ),
     ).toBeNull();
@@ -88,7 +98,12 @@ describe("computeChannelPacing — ad (variable) channels", () => {
   it("returns null on the 1st of the month", () => {
     expect(
       computeChannelPacing(
-        { dataSource: "meta_api", spend: 848, spendThroughYesterday: 0, completedFixedDays: 0 },
+        {
+          dataSource: "meta_api",
+          spend: 848,
+          spendThroughYesterday: 0,
+          completedFixedDays: 0,
+        },
         { currentDayOfMonth: 1, calendarDaysInMonth: 30 },
       ),
     ).toBeNull();
@@ -110,7 +125,12 @@ describe("computeChannelPacing — ad (variable) channels", () => {
   it("returns null when an ad channel has no completed-day spend", () => {
     expect(
       computeChannelPacing(
-        { dataSource: "meta_api", spend: 848, spendThroughYesterday: 0, completedFixedDays: 0 },
+        {
+          dataSource: "meta_api",
+          spend: 848,
+          spendThroughYesterday: 0,
+          completedFixedDays: 0,
+        },
         JUNE,
       ),
     ).toBeNull();
@@ -124,8 +144,12 @@ describe("computeChannelPacing — ad (variable) channels", () => {
 
 describe("isMarketplaceCampaign", () => {
   it("excludes real WanderOS / Listed campaign names", () => {
-    expect(isMarketplaceCampaign("WanderOS_MetaLeadForm_Conversions")).toBe(false);
-    expect(isMarketplaceCampaign("Prospecting_Listed_Test_June2026")).toBe(false);
+    expect(isMarketplaceCampaign("WanderOS_MetaLeadForm_Conversions")).toBe(
+      false,
+    );
+    expect(isMarketplaceCampaign("Prospecting_Listed_Test_June2026")).toBe(
+      false,
+    );
   });
 
   it("keeps real Marketplace campaigns", () => {
@@ -134,7 +158,9 @@ describe("isMarketplaceCampaign", () => {
         "Wander_CatalogSales_DynamicRetargeting_NewCustomFeed_Purchase_CBO_BOF_Evergreen_June2026",
       ),
     ).toBe(true);
-    expect(isMarketplaceCampaign("Search_Demand_PROPERTY-OPERATED_Exact")).toBe(true);
+    expect(isMarketplaceCampaign("Search_Demand_PROPERTY-OPERATED_Exact")).toBe(
+      true,
+    );
   });
 
   it("is case-insensitive", () => {
@@ -222,23 +248,37 @@ describe("resolveFixedCostsForMonth", () => {
 
     const july = resolveFixedCostsForMonth("2026-07");
     expect(july.find((f) => f.category === "seo")?.monthlyAmount).toBe(0); // carries forward
-    expect(july.find((f) => f.category === "influencer")?.monthlyAmount).toBe(1_000);
+    expect(july.find((f) => f.category === "influencer")?.monthlyAmount).toBe(
+      1_000,
+    );
 
     const august = resolveFixedCostsForMonth("2026-08");
-    expect(august.find((f) => f.category === "influencer")?.monthlyAmount).toBe(0);
+    expect(august.find((f) => f.category === "influencer")?.monthlyAmount).toBe(
+      0,
+    );
 
     // Kyle Slack 2026-07-23: AP affiliate + Comcast paused from August.
-    expect(august.find((f) => f.category === "affiliate")?.monthlyAmount).toBe(0);
-    expect(august.find((f) => f.category === "tv_linear")?.monthlyAmount).toBe(0);
+    expect(august.find((f) => f.category === "affiliate")?.monthlyAmount).toBe(
+      0,
+    );
+    expect(august.find((f) => f.category === "tv_linear")?.monthlyAmount).toBe(
+      0,
+    );
     // July untouched by the August overrides.
-    expect(july.find((f) => f.category === "affiliate")?.monthlyAmount).toBe(10_000);
-    expect(july.find((f) => f.category === "tv_linear")?.monthlyAmount).toBe(12_900);
+    expect(july.find((f) => f.category === "affiliate")?.monthlyAmount).toBe(
+      10_000,
+    );
+    expect(july.find((f) => f.category === "tv_linear")?.monthlyAmount).toBe(
+      12_900,
+    );
   });
 
   it("returns seed values for pre-override months", () => {
     const feb = resolveFixedCostsForMonth("2026-02");
     expect(feb.find((f) => f.category === "seo")?.monthlyAmount).toBe(27_871);
-    expect(feb.find((f) => f.category === "direct_mail")?.monthlyAmount).toBe(17_134);
+    expect(feb.find((f) => f.category === "direct_mail")?.monthlyAmount).toBe(
+      17_134,
+    );
     expect(feb.find((f) => f.category === "content")).toBeUndefined(); // starts May 2026
   });
 });
@@ -287,8 +327,20 @@ describe("mergeSpendBookingsAndFunnel", () => {
     };
     const merged = mergeSpendBookingsAndFunnel(
       [
-        { date: "2026-06-01", platform: "Meta", spend: 9999, clicks: 1, impressions: 1 }, // must be skipped
-        { date: "2026-06-01", platform: "Google", spend: 450, clicks: 500, impressions: 2000 },
+        {
+          date: "2026-06-01",
+          platform: "Meta",
+          spend: 9999,
+          clicks: 1,
+          impressions: 1,
+        }, // must be skipped
+        {
+          date: "2026-06-01",
+          platform: "Google",
+          spend: 450,
+          clicks: 500,
+          impressions: 2000,
+        },
       ],
       [
         {
@@ -347,7 +399,15 @@ describe("mergeSpendBookingsAndFunnel", () => {
 
   it("skips BQ ad-network spend for fixed-cost channels (no double count)", () => {
     const merged = mergeSpendBookingsAndFunnel(
-      [{ date: "2026-06-01", platform: "Influencer", spend: 1293, clicks: 0, impressions: 0 }],
+      [
+        {
+          date: "2026-06-01",
+          platform: "Influencer",
+          spend: 1293,
+          clicks: 0,
+          impressions: 0,
+        },
+      ],
       [
         {
           date: "2026-06-01",
@@ -372,8 +432,20 @@ describe("mergeSpendBookingsAndFunnel", () => {
   it("applies Google connector overrides per day (data-driven)", () => {
     const merged = mergeSpendBookingsAndFunnel(
       [
-        { date: "2026-06-01", platform: "Google", spend: 450, clicks: 500, impressions: 2000 },
-        { date: "2026-06-02", platform: "Google", spend: 470, clicks: 480, impressions: 2100 },
+        {
+          date: "2026-06-01",
+          platform: "Google",
+          spend: 450,
+          clicks: 500,
+          impressions: 2000,
+        },
+        {
+          date: "2026-06-02",
+          platform: "Google",
+          spend: 470,
+          clicks: 480,
+          impressions: 2100,
+        },
       ],
       [],
       [],
@@ -390,8 +462,12 @@ describe("mergeSpendBookingsAndFunnel", () => {
         },
       ],
     );
-    const jun1 = merged.find((r) => r.channel === "google" && r.date === "2026-06-01");
-    const jun2 = merged.find((r) => r.channel === "google" && r.date === "2026-06-02");
+    const jun1 = merged.find(
+      (r) => r.channel === "google" && r.date === "2026-06-01",
+    );
+    const jun2 = merged.find(
+      (r) => r.channel === "google" && r.date === "2026-06-02",
+    );
     expect(jun1?.spend).toBe(430); // API override
     expect(jun1?.bookings).toBe(3);
     expect(jun1?.gmv).toBe(12000);
@@ -403,7 +479,15 @@ describe("mergeSpendBookingsAndFunnel", () => {
 
   it("Pinterest override replaces spend but keeps BQ bookings unless pixel conversions exist", () => {
     const merged = mergeSpendBookingsAndFunnel(
-      [{ date: "2026-06-01", platform: "Pinterest", spend: 99, clicks: 5, impressions: 50 }],
+      [
+        {
+          date: "2026-06-01",
+          platform: "Pinterest",
+          spend: 99,
+          clicks: 5,
+          impressions: 50,
+        },
+      ],
       [
         {
           date: "2026-06-01",
