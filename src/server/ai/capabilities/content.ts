@@ -68,6 +68,38 @@ async function requireContentWorkItem(
   return content;
 }
 
+/**
+ * A guard rejecting a caller-supplied platformPostId leaves the same question
+ * unanswered if it only says no: which ids WOULD have worked. Three actions
+ * reject ids this way (edit a draft, thread a root, build a carousel), so they
+ * answer it the same way and grade the same.
+ *
+ * This is `invalid_input`, not a dead end. The failure that prompted it was a
+ * model that had promised the operator a TikTok spot the work item never had,
+ * then edited the id it wished existed; a bare rejection graded `tool_failed`,
+ * which told it to stop, so it abandoned the edit and went to scheduling.
+ */
+function rejectUnusableDraft(input: {
+  rejectedId: string;
+  eligible: { id: string; platform: string }[];
+  eligibleLabel: string;
+  hint: string;
+}) {
+  const { rejectedId, eligible, eligibleLabel, hint } = input;
+  const inventory = eligible.length
+    ? `This work item's ${eligibleLabel}: ${eligible
+        .map((post) => `${post.id} (${post.platform})`)
+        .join(", ")}.`
+    : `This work item has no ${eligibleLabel}.`;
+  return new GrowthActionError(
+    "invalid_input",
+    `Platform draft ${rejectedId} is not usable here. ${inventory} ${hint}`,
+  );
+}
+
+const ADD_A_SPOT_HINT =
+  "To post on a platform this work item has no spot for, add one with contentWrite.createPlatformPost or contentWrite.addCrossPost rather than editing a draft that does not exist.";
+
 export const getContentWorkItem = growthAction({
   description:
     "Read one canonical content work item with its brief, media pool, platform drafts, schedule, and deterministic production-readiness checklist. Call this FIRST when the active conversation is about finishing or refining a content item.",
@@ -293,21 +325,12 @@ export const updateContentWorkItem = growthAction({
     for (const draft of input.platformDrafts ?? []) {
       const owned = ownedById.get(draft.platformPostId);
       if (!owned) {
-        // Name the spots that DO exist. The failure this replaces was a model
-        // that had promised the operator a TikTok spot the work item never had,
-        // then edited the id it wished existed; a bare rejection gave it nothing
-        // to correct with, so it moved on to scheduling instead.
-        const available = [...ownedById.values()]
-          .map((post) => `${post.id} (${post.platform})`)
-          .join(", ");
-        throw new GrowthActionError(
-          "invalid_input",
-          `Platform draft ${draft.platformPostId} is not part of this work item. ` +
-            (available
-              ? `Its owned drafts are: ${available}.`
-              : "It has no owned platform drafts.") +
-            " To post on a platform this work item has no spot for, add one with contentWrite.createPlatformPost or contentWrite.addCrossPost rather than editing a draft that does not exist.",
-        );
+        throw rejectUnusableDraft({
+          rejectedId: draft.platformPostId,
+          eligible: [...ownedById.values()],
+          eligibleLabel: "owned drafts",
+          hint: ADD_A_SPOT_HINT,
+        });
       }
       // A format change must stay on the same platform, and must be a real
       // product for it — otherwise a spot can be re-pointed at nonsense.
@@ -425,13 +448,24 @@ export const setPlatformPostThread = growthAction({
         !post.parentPlatformPostId,
     );
     if (!root) {
-      throw new Error(
-        "That root platform draft is not part of this content work item.",
-      );
+      // A thread needs an owned ROOT, so a child spot is rejected here too. Say
+      // which posts qualify rather than leaving the model to guess why its id
+      // was refused when the id may well exist on the work item.
+      throw rejectUnusableDraft({
+        rejectedId: input.platformPostId,
+        eligible: content.platformPosts.filter(
+          (post) => post.source === "owned" && !post.parentPlatformPostId,
+        ),
+        eligibleLabel: "threadable owned roots",
+        hint: "Thread from one of those, or add a spot with contentWrite.createPlatformPost.",
+      });
     }
     if (root.platform !== "x" && root.platform !== "threads") {
-      throw new Error(
-        "Native post threads are currently supported on X and Threads.",
+      // Adjacent to the guard above and in the same validation preamble, so it
+      // gets the same treatment: the message already names the correction.
+      throw new GrowthActionError(
+        "invalid_input",
+        `Native post threads are supported on X and Threads, not ${root.platform}. Use contentWrite.setFirstComment for a single follow-up, or thread an X or Threads spot instead.`,
       );
     }
 
@@ -689,9 +723,12 @@ export const makeCarouselFromPool = growthAction({
       seenTargets.add(target.platformPostId);
       const post = ownedById.get(target.platformPostId);
       if (!post) {
-        throw new Error(
-          "A selected platform post is not an owned draft on this work item.",
-        );
+        throw rejectUnusableDraft({
+          rejectedId: target.platformPostId,
+          eligible: [...ownedById.values()],
+          eligibleLabel: "owned drafts",
+          hint: ADD_A_SPOT_HINT,
+        });
       }
       const format = platformFormatsFor(post.platform).find(
         (candidate) => candidate.archetype === "carousel",

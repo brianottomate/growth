@@ -104,7 +104,13 @@ const actions: Record<GrowthErrorCode, string> = {
   conflict: "Read the current state before deciding whether to retry.",
   provider_unavailable:
     "Retry once; if it fails again, report the provider issue.",
-  tool_failed: "Do not retry blindly; explain what could not be completed.",
+  // The fallback code, so this sentence is read by every guard whose message
+  // `codeFor` could not classify. It used to say "Do not retry blindly" full
+  // stop, which is wrong for the common case: a guard that already told the
+  // model what to fix, wrapped in an instruction to stop trying. Still no blind
+  // retries, but a named correction is now permitted to be acted on.
+  tool_failed:
+    "Explain what could not be completed. Retry only if the message names a concrete correction, and never with the same arguments.",
 };
 
 export function compactGrowthError(error: unknown): GrowthCompactError {

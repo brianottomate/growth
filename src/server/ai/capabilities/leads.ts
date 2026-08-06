@@ -12,7 +12,7 @@ import {
 } from "@/server/db/leads-schema";
 import { PLACEHOLDER_EMAIL_DOMAINS_SQL } from "@/server/services/lead-channel.service";
 import { generatePregenHubspotDraft } from "@/server/services/pregen-hubspot-outreach.service";
-import { growthAction } from "./types";
+import { growthAction, GrowthActionError } from "./types";
 
 /**
  * Leads headline numbers. NOTE: the `leads` schema is single-tenant / global in
@@ -216,7 +216,11 @@ export const leadsRewriteSequence = growthAction({
       .limit(1);
     const existing = current?.steps ?? [];
     if (touch && !existing.length) {
-      throw new Error(
+      // `conflict`: the sequence the model assumed exists does not, and the
+      // message names the two-step recovery. Untyped it graded `tool_failed`,
+      // whose guidance contradicted the instruction in the sentence itself.
+      throw new GrowthActionError(
+        "conflict",
         `${row.domain} has no sequence yet, so there is no touch ${touch} to change. Generate one first, then steer it.`,
       );
     }

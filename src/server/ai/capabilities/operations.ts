@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { growthAction } from "./types";
+import { growthAction, GrowthActionError } from "./types";
 import { requireOwnedBrand, requireVisibleBrand } from "./brand-access";
 import { discoverAndSaveSuggestions } from "@/server/services/social-discovery.service";
 import {
@@ -496,7 +496,13 @@ async function saveChannelCadence(
     );
   }
   if (mode === "update" && existing.length === 0) {
-    throw new Error(
+    // `conflict`, matching the "already exists" guard above, which only grades
+    // that way because its message happens to contain the word "already". The
+    // state disagrees with the action the model chose, and the message names the
+    // action that fits, so "read the current state and decide" is the right
+    // steer. Left untyped this graded `tool_failed` and told it to stop.
+    throw new GrowthActionError(
+      "conflict",
       `${brand.name}'s ${platform} channel has no cadence yet. Use createChannelCadence to establish it.`,
     );
   }
@@ -566,7 +572,10 @@ async function saveBrandMix(
     );
   }
   if (mode === "update" && existing.length === 0) {
-    throw new Error(
+    // Same asymmetry as the cadence pair: the "already exists" branch above is
+    // graded by accident, this one was not graded at all.
+    throw new GrowthActionError(
+      "conflict",
       `${brand.name} has no content mix yet. Use createBrandMix to establish it.`,
     );
   }
