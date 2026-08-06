@@ -1086,13 +1086,13 @@ function renderToolPart(
       </div>
     );
   }
+  // The envelope also carries `suggestedAction`, which is recovery guidance
+  // addressed to the model ("Do not retry blindly…"). It stays in the tool
+  // result the model reads and out of this card: an operator seeing it reads
+  // like the app is talking to itself. Deliberately not in the type below.
   const envelope = part.output as
     | { ok: true; action: string; data: unknown }
-    | {
-        ok: false;
-        action?: string;
-        error: { message: string; suggestedAction?: string };
-      };
+    | { ok: false; action?: string; error: { message: string } };
   if (!envelope.ok) {
     return (
       <div
@@ -1100,11 +1100,6 @@ function renderToolPart(
         className="border-destructive/30 bg-destructive/5 rounded-lg border px-3 py-2 text-xs"
       >
         <p className="text-destructive">{envelope.error.message}</p>
-        {envelope.error.suggestedAction && (
-          <p className="text-muted-foreground mt-1">
-            {envelope.error.suggestedAction}
-          </p>
-        )}
       </div>
     );
   }

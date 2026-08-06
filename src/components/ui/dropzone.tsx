@@ -36,6 +36,7 @@ function acceptsFile(file: File, accept?: Accept) {
 export function Dropzone({
   onFiles,
   uploading = 0,
+  progress,
   accept = IMAGE_ACCEPT,
   multiple = true,
   folders = multiple,
@@ -49,6 +50,8 @@ export function Dropzone({
   onFiles: (files: File[]) => void;
   /** Count of uploads in flight — shows the spinner + disables the zone. */
   uploading?: number;
+  /** Per-file progress for those uploads, 0 to 1 each. */
+  progress?: { key: string; name: string; fraction: number }[];
   accept?: Accept;
   multiple?: boolean;
   /**
@@ -145,9 +148,29 @@ export function Dropzone({
         )}
       </div>
       {busy ? (
-        <p className="text-muted-foreground text-sm font-medium">
-          Uploading{uploading > 1 ? ` ${uploading}` : ""}…
-        </p>
+        <div className="w-full max-w-sm space-y-2">
+          <p className="text-muted-foreground text-sm font-medium">
+            Uploading{uploading > 1 ? ` ${uploading}` : ""}…
+          </p>
+          {/* Per-file bars, because "is this stuck?" is the only question an
+              operator has while a large video is in flight. */}
+          {progress?.map((item) => (
+            <div key={item.key} className="space-y-1 text-left">
+              <div className="text-muted-foreground flex justify-between gap-2 text-[11px]">
+                <span className="truncate">{item.name}</span>
+                <span className="shrink-0 tabular-nums">
+                  {Math.round(item.fraction * 100)}%
+                </span>
+              </div>
+              <div className="bg-muted h-1 overflow-hidden rounded-full">
+                <div
+                  className="bg-primary h-full transition-[width] duration-200"
+                  style={{ width: `${Math.round(item.fraction * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : isDragActive ? (
         <p className="text-primary text-sm font-semibold">Drop to upload</p>
       ) : (

@@ -40,6 +40,7 @@ import {
   createVideoThumbnail,
   THUMBNAIL_MIME,
 } from "@/lib/image-thumbnail";
+import { putWithProgress } from "@/lib/upload-with-progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
@@ -152,6 +153,11 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   );
   const [previewAsset, setPreviewAsset] = useState<LibraryAsset | null>(null);
   const [uploadingCount, setUploadingCount] = useState(0);
+  // Per-file progress. A count alone cannot distinguish "still going" from
+  // "stuck", which is exactly the doubt a big video upload creates.
+  const [uploads, setUploads] = useState<
+    { key: string; name: string; size: number; fraction: number }[]
+  >([]);
   // Assigned by the Dropzone so the header "Upload" button opens the same picker.
   const openPicker = useRef<(() => void) | null>(null);
 
@@ -260,7 +266,12 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         return;
       }
 
+      const uploadKey = `${file.name}-${file.size}-${file.lastModified}`;
       setUploadingCount((c) => c + 1);
+      setUploads((current) => [
+        ...current,
+        { key: uploadKey, name: file.name, size: file.size, fraction: 0 },
+      ]);
       try {
         // Images decode once for both dimensions and a downscaled grid tile;
         // video seeks once for a poster frame. Both degrade to null rather
@@ -275,22 +286,28 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
             mimeType: file.type,
             size: file.size,
           });
-        const put = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
+        await putWithProgress(uploadUrl, file, {
+          contentType: file.type,
+          onProgress: (fraction) =>
+            setUploads((current) =>
+              current.map((upload) =>
+                upload.key === uploadKey ? { ...upload, fraction } : upload,
+              ),
+            ),
         });
-        if (!put.ok) throw new Error(`Upload failed (${put.status})`);
 
         // Best-effort — a missing tile only means the grid uses the original.
         let hasThumbnail = false;
         if (decoded?.thumbnail && thumbnailUploadUrl) {
-          const putThumbnail = await fetch(thumbnailUploadUrl, {
-            method: "PUT",
-            headers: { "Content-Type": THUMBNAIL_MIME },
-            body: decoded.thumbnail,
-          }).catch(() => null);
-          hasThumbnail = Boolean(putThumbnail?.ok);
+          const putThumbnail = await putWithProgress(
+            thumbnailUploadUrl,
+            decoded.thumbnail,
+            { contentType: THUMBNAIL_MIME },
+          ).then(
+            () => true,
+            () => false,
+          );
+          hasThumbnail = putThumbnail;
         }
 
         await finalizeUpload.mutateAsync({
@@ -306,6 +323,9 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         toast.error(err instanceof Error ? err.message : "Upload failed");
       } finally {
         setUploadingCount((c) => c - 1);
+        setUploads((current) =>
+          current.filter((upload) => upload.key !== uploadKey),
+        );
         void invalidate();
       }
     },
@@ -504,6 +524,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
       <Dropzone
         accept={ACCEPT}
         uploading={uploadingCount}
+        progress={uploads}
         openRef={openPicker}
         onFiles={(files) => void handleFiles(files)}
         title="Drop images or video here"
@@ -569,6 +590,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           key={organizingAsset.id}
           asset={organizingAsset}
           taxonomy={taxonomy}
+          brands={brands}
           open
           onOpenChange={(open) => !open && setOrganizingAsset(null)}
         />

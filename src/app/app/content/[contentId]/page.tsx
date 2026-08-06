@@ -6,8 +6,10 @@ import { db } from "@/server/db";
 import {
   channelTable,
   contentPostTable,
+  mediaAssetTable,
   memberTable,
   platformPostLinkTable,
+  type MediaItem,
 } from "@/server/db/schema";
 import {
   extractFirstUrl,
@@ -155,6 +157,42 @@ export default async function ContentDetailPage({
         ),
       })
     : [];
+
+  // A MediaItem is a SNAPSHOT taken when the asset was attached, so a poster
+  // generated afterwards never reaches it — the pool kept showing a broken
+  // tile for a video whose library row had a perfectly good thumbnail. Re-read
+  // the current tile for anything that points at a library asset.
+  const freshTiles = await (async () => {
+    const assetIds = [
+      ...new Set(
+        [
+          ...(content.media ?? []),
+          ...content.platformPosts.flatMap((post) => post.media ?? []),
+        ]
+          .map((item) => item.assetId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (!assetIds.length) return new Map<string, string>();
+    const rows = await db.query.mediaAssetTable.findMany({
+      where: inArray(mediaAssetTable.id, assetIds),
+      columns: { id: true, thumbnailUrl: true },
+    });
+    return new Map(
+      rows
+        .filter((row) => row.thumbnailUrl)
+        .map((row) => [row.id, row.thumbnailUrl!] as const),
+    );
+  })();
+  const withFreshTiles = (items: MediaItem[] | null): MediaItem[] =>
+    (items ?? []).map((item) => {
+      const tile = item.assetId ? freshTiles.get(item.assetId) : undefined;
+      return tile ? { ...item, thumbnail: tile } : item;
+    });
+  content.media = withFreshTiles(content.media);
+  for (const post of content.platformPosts) {
+    post.media = withFreshTiles(post.media);
+  }
 
   // Order the renderings by ship time.
   const posts = [...content.platformPosts].sort((a, b) => {

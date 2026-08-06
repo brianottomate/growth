@@ -8,6 +8,7 @@ import {
   brandInspirationTable,
   channelTable,
   mediaAssetTable,
+  mediaAssetTagTable,
   mediaFolderTable,
   mediaKindEnum,
   mediaTagTable,
@@ -21,7 +22,7 @@ import {
   refreshInstagramPostMedia,
   refreshInstagramProfileMedia,
 } from "@/server/services/peer-scrape.service";
-import { type db } from "@/server/db";
+import { type db, withTransaction } from "@/server/db";
 import {
   completeVideoAnalysis,
   getVideoAnalysis,
@@ -297,6 +298,43 @@ export const mediaRouter = createTRPCRouter({
         })
         .returning();
       return folder;
+    }),
+
+  /**
+   * Re-point an asset at another brand in the same organization.
+   *
+   * Uploading to the wrong brand is a two-click mistake with no warning, and
+   * the picker is brand-scoped, so the asset simply does not appear where the
+   * operator expects it. Until this existed the only remedy was a hand-written
+   * UPDATE against production.
+   *
+   * Folder and tags are brand-scoped, so both are dropped rather than left
+   * pointing across a brand boundary. `r2Key` deliberately keeps the original
+   * prefix: it is an opaque object location, not a claim of ownership, and
+   * rewriting it would mean copying the bytes for no functional gain.
+   */
+  moveToBrand: protectedProcedure
+    .input(z.object({ mediaId: z.string(), brandId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const asset = await assertMediaAccess(ctx, input.mediaId);
+      if (asset.brandId === input.brandId) return asset;
+      await assertBrandAccess(ctx, input.brandId);
+
+      return withTransaction(async (tx) => {
+        await tx
+          .delete(mediaAssetTagTable)
+          .where(eq(mediaAssetTagTable.mediaAssetId, input.mediaId));
+        const [moved] = await tx
+          .update(mediaAssetTable)
+          .set({
+            brandId: input.brandId,
+            folderId: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(mediaAssetTable.id, input.mediaId))
+          .returning();
+        return moved;
+      });
     }),
 
   updateFolder: protectedProcedure

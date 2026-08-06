@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { ImageOff, Loader2 } from "lucide-react";
+import { Film, ImageOff, Loader2 } from "lucide-react";
 
 import { cn } from "@/components/ui/lib/utils";
 
@@ -31,6 +31,7 @@ function cacheBusted(src: string) {
 export function MediaThumbnail({
   src,
   thumbnail,
+  kind,
   alt = "",
   className,
   sizes = "(max-width: 640px) 33vw, 200px",
@@ -38,16 +39,24 @@ export function MediaThumbnail({
   src: string;
   /** Downscaled tile, when the asset has one. */
   thumbnail?: string | null;
+  /** Video needs its poster or nothing; `src` is a .mov, not an image. */
+  kind?: "image" | "video" | "carousel";
   alt?: string;
   className?: string;
   sizes?: string;
 }) {
+  const isVideo = kind === "video";
   const candidates = useMemo(() => {
-    const ordered = [thumbnail, src, cacheBusted(src)].filter(
-      (candidate): candidate is string => Boolean(candidate),
-    );
-    return [...new Set(ordered)];
-  }, [src, thumbnail]);
+    // Falling back to `src` for a video hands next/image a .mov: it fails
+    // every candidate and lands on the broken-image glyph, having tried to
+    // pull the whole file down on the way. A video has its poster or nothing.
+    const ordered = isVideo ? [thumbnail] : [thumbnail, src, cacheBusted(src)];
+    return [
+      ...new Set(
+        ordered.filter((candidate): candidate is string => Boolean(candidate)),
+      ),
+    ];
+  }, [src, thumbnail, isVideo]);
 
   const [index, setIndex] = useState(0);
   const [state, setState] = useState<"loading" | "loaded" | "failed">(
@@ -59,6 +68,23 @@ export function MediaThumbnail({
     setState("loading");
   }, [candidates]);
 
+  // A video with no poster is a known state, not a failure: say "video"
+  // rather than showing the same broken glyph a dead image gets.
+  if (!candidates.length) {
+    return (
+      <span className="bg-muted absolute inset-0 flex flex-col items-center justify-center gap-1">
+        {isVideo ? (
+          <Film className="text-muted-foreground size-4" />
+        ) : (
+          <ImageOff className="text-muted-foreground size-4" />
+        )}
+        {isVideo && (
+          <span className="text-muted-foreground text-[9px]">Video</span>
+        )}
+      </span>
+    );
+  }
+
   const current = candidates[Math.min(index, candidates.length - 1)] ?? src;
   const exhausted = index >= candidates.length - 1;
 
@@ -67,7 +93,11 @@ export function MediaThumbnail({
       {state !== "loaded" && (
         <span className="bg-muted absolute inset-0 flex items-center justify-center">
           {state === "failed" ? (
-            <ImageOff className="text-muted-foreground size-4" />
+            isVideo ? (
+              <Film className="text-muted-foreground size-4" />
+            ) : (
+              <ImageOff className="text-muted-foreground size-4" />
+            )
           ) : (
             <Loader2 className="text-muted-foreground size-4 animate-spin" />
           )}

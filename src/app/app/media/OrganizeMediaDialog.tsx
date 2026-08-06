@@ -39,16 +39,29 @@ function readAnalysis(metadata: unknown) {
 export function OrganizeMediaDialog({
   asset,
   taxonomy,
+  brands = [],
   open,
   onOpenChange,
 }: {
   asset: LibraryAsset;
   taxonomy: Taxonomy;
+  /** Brands the operator can move this asset to. Omitted hides the control. */
+  brands?: { id: string; name: string }[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const moveToBrand = useMutation(
+    trpc.media.moveToBrand.mutationOptions({
+      onSuccess: () => {
+        toast.success("Moved to the other brand's library");
+        void queryClient.invalidateQueries(trpc.media.list.queryFilter());
+        onOpenChange(false);
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
   const [title, setTitle] = useState(asset.title ?? asset.filename ?? "");
   const [alt, setAlt] = useState(asset.alt ?? "");
   const [folderId, setFolderId] = useState(asset.folderId ?? "unfiled");
@@ -132,6 +145,42 @@ export function OrganizeMediaDialog({
               aria-label="Folder"
             />
           </div>
+          {brands.length > 1 && (
+            <div className="grid gap-1.5">
+              <Label>Brand</Label>
+              <SimpleSelect
+                value={asset.brandId}
+                onValueChange={(nextBrandId) => {
+                  if (nextBrandId === asset.brandId) return;
+                  const target = brands.find(
+                    (brand) => brand.id === nextBrandId,
+                  );
+                  if (
+                    !window.confirm(
+                      `Move "${asset.title ?? asset.filename ?? "this asset"}" to ${target?.name ?? "that brand"}? Its folder and tags are brand-specific and will be cleared.`,
+                    )
+                  )
+                    return;
+                  moveToBrand.mutate({
+                    mediaId: asset.id,
+                    brandId: nextBrandId,
+                  });
+                }}
+                options={brands.map((brand) => ({
+                  value: brand.id,
+                  label: brand.name,
+                }))}
+                disabled={moveToBrand.isPending}
+                aria-label="Brand"
+              />
+              {/* Uploading to the wrong brand is a two-click mistake, and the
+                  pickers are brand-scoped, so the asset just seems to vanish. */}
+              <p className="text-muted-foreground text-xs">
+                Moving clears the folder and tags, which belong to the old
+                brand. The file itself is not re-uploaded.
+              </p>
+            </div>
+          )}
           <div className="grid gap-2">
             <Label>Tags</Label>
             {taxonomy.tags.length ? (

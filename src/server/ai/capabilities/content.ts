@@ -43,7 +43,7 @@ import {
   validateSpot,
 } from "@/server/content/formats";
 import { groupPlatformThreads } from "@/lib/platform-thread";
-import { growthAction } from "./types";
+import { growthAction, GrowthActionError } from "./types";
 import type { CapabilityContext } from "./types";
 import { orgBrandIds } from "./brands";
 
@@ -293,8 +293,20 @@ export const updateContentWorkItem = growthAction({
     for (const draft of input.platformDrafts ?? []) {
       const owned = ownedById.get(draft.platformPostId);
       if (!owned) {
-        throw new Error(
-          "A selected platform draft is not part of this work item.",
+        // Name the spots that DO exist. The failure this replaces was a model
+        // that had promised the operator a TikTok spot the work item never had,
+        // then edited the id it wished existed; a bare rejection gave it nothing
+        // to correct with, so it moved on to scheduling instead.
+        const available = [...ownedById.values()]
+          .map((post) => `${post.id} (${post.platform})`)
+          .join(", ");
+        throw new GrowthActionError(
+          "invalid_input",
+          `Platform draft ${draft.platformPostId} is not part of this work item. ` +
+            (available
+              ? `Its owned drafts are: ${available}.`
+              : "It has no owned platform drafts.") +
+            " To post on a platform this work item has no spot for, add one with contentWrite.createPlatformPost or contentWrite.addCrossPost rather than editing a draft that does not exist.",
         );
       }
       // A format change must stay on the same platform, and must be a real
@@ -305,7 +317,8 @@ export const updateContentWorkItem = growthAction({
           format: draft.format,
         });
         if (!validation.ok) {
-          throw new Error(
+          throw new GrowthActionError(
+            "invalid_input",
             `Cannot set format ${draft.format} on a ${owned.platform} spot: ${validation.errors.join("; ")}`,
           );
         }

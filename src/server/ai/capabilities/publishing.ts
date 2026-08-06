@@ -12,15 +12,25 @@ import {
   updateQueuedSocialFirstComment,
 } from "@/server/services/content-publishing.service";
 import { ContentService } from "@/server/services/content.service";
-import { growthAction } from "./types";
+import { growthAction, GrowthActionError } from "./types";
 
 async function requireOwnedSocialPost(platformPostId: string, orgId: string) {
   const post = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, platformPostId),
     with: { brand: true },
   });
-  if (post?.source !== "owned" || post?.brand?.organizationId !== orgId) {
-    throw new Error(
+  // Split these: a made-up id is not an access problem. Folded together they
+  // both read as "organization", which the classifier grades `forbidden` and
+  // the model then reports to the operator as missing workspace permissions.
+  if (!post) {
+    throw new GrowthActionError(
+      "not_found",
+      `No platform post ${platformPostId} exists. Re-read the work item instead of scheduling an id that was never returned by a read.`,
+    );
+  }
+  if (post.source !== "owned" || post.brand?.organizationId !== orgId) {
+    throw new GrowthActionError(
+      "forbidden",
       "That owned social post is not available in this organization",
     );
   }

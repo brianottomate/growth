@@ -99,6 +99,7 @@ export function ContentPool({
                 <MediaThumbnail
                   src={m.url}
                   thumbnail={m.thumbnail}
+                  kind={m.type}
                   className="size-full object-cover"
                 />
                 {onPool && (

@@ -439,6 +439,7 @@ export function PlatformPostEditDialog({
                         <MediaThumbnail
                           src={mediaItem.url}
                           thumbnail={mediaItem.thumbnail}
+                          kind={mediaItem.type}
                           className="size-full object-cover"
                         />
                         <button

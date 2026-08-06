@@ -20,6 +20,26 @@ export interface GrowthCompactError {
   suggestedAction: string;
 }
 
+/**
+ * Throw this from an action guard that already knows why it failed.
+ *
+ * Everything else falls back to `codeFor`'s message sniffing, which is fine for
+ * third-party errors we don't control but silently mis-grades our own guards:
+ * a message with none of the trigger words lands on `tool_failed`, which is
+ * non-retryable and tells the model to give up. A guard rejecting a bad id is
+ * `invalid_input` — the model can fix the id and call again — so say so instead
+ * of hoping the sentence happens to contain the word "invalid".
+ */
+export class GrowthActionError extends Error {
+  constructor(
+    readonly code: GrowthErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "GrowthActionError";
+  }
+}
+
 const secretPatterns = [
   /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi,
   /\b(?:api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+/gi,
@@ -34,6 +54,7 @@ function sanitize(message: string): string {
 }
 
 function codeFor(error: unknown): GrowthErrorCode {
+  if (error instanceof GrowthActionError) return error.code;
   if (error instanceof TRPCError) {
     if (error.code === "BAD_REQUEST") return "invalid_input";
     if (error.code === "FORBIDDEN" || error.code === "UNAUTHORIZED")

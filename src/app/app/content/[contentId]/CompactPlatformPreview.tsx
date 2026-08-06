@@ -94,6 +94,7 @@ function PreviewMedia({
         <MediaThumbnail
           src={firstMedia.url}
           thumbnail={firstMedia.thumbnail}
+          kind={firstMedia.type}
           alt={`${platformLabel(platform)} preview for ${contentTitle}`}
           className="object-cover"
           sizes="256px"

@@ -549,6 +549,7 @@ export function SpotCard({
                                 <MediaThumbnail
                                   src={item.url}
                                   thumbnail={item.thumbnail}
+                                  kind={item.type}
                                   alt={`${platformLabel(spot.platform)} post ${threadIndex + 1} media ${mediaIndex + 1}`}
                                   className="object-contain"
                                   sizes="180px"
