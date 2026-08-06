@@ -231,11 +231,12 @@ export function SpotStatusControl({
 /**
  * Fan the idea out to another channel (the "break into cross-posts" action).
  *
- * Creating the spot is only half the job: an empty draft on a new channel is
- * work, not progress. So the spot is created (it is the visible placeholder the
- * rest of the page hangs off) and the assistant is immediately handed the
- * cross-post with its root context, rather than leaving the operator to
- * re-explain what they just clicked.
+ * The chip asks the assistant for the cross-post; it does not write one. An
+ * empty draft on a new channel is work, not progress, and creating it here
+ * committed to a hardcoded format before anyone had looked at the brief, which
+ * is how a video idea acquired an Instagram feed-image spot. The assistant sees
+ * the root spot and the brief, picks the right product (Reel, not still), and
+ * writes the adaptation in the same move.
  */
 export function AddSpotControl({
   contentPostId,
@@ -253,11 +254,6 @@ export function AddSpotControl({
   /** The spot this cross-post should be adapted from, when there is one. */
   sourcePlatform?: string | null;
 }) {
-  const trpc = useTRPC();
-  const router = useRouter();
-  const add = useMutation(
-    trpc.content.addSpot.mutationOptions({ onSettled: () => router.refresh() }),
-  );
   const existing = new Set(existingTargets);
   const available = PLATFORM_OPTIONS.filter(
     (option) =>
@@ -273,31 +269,18 @@ export function AddSpotControl({
       {available.map((option) => (
         <button
           key={`${option.platform}|${option.format}`}
-          disabled={add.isPending}
           onClick={() =>
-            add.mutate(
-              {
-                contentPostId,
-                platform: option.platform,
-                format: option.format,
-              },
-              {
-                onSuccess: (spot) => {
-                  sendAssistantIntent({
-                    type: "work_content_post",
-                    brandId,
-                    brandName,
-                    contentPostId,
-                    contentTitle,
-                    platformPostId: spot.id,
-                    platform: option.platform,
-                    visibleText: `Cross-post "${contentTitle}" to ${option.label}. Adapt it${
-                      sourcePlatform ? ` from the ${sourcePlatform} version` : ""
-                    } for ${option.label} rather than copying it across, and tell me what you changed.`,
-                  });
-                },
-              },
-            )
+            sendAssistantIntent({
+              type: "work_content_post",
+              brandId,
+              brandName,
+              contentPostId,
+              contentTitle,
+              platform: option.platform,
+              visibleText: `Cross-post "${contentTitle}" to ${option.label}. Add the spot${
+                sourcePlatform ? `, adapted from the ${sourcePlatform} version` : ""
+              }, pick the format that fits the brief rather than defaulting, write channel-native copy, and tell me what you changed.`,
+            })
           }
           className="border-border hover:bg-accent flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50"
         >

@@ -460,12 +460,15 @@ export const setPlatformPostThread = growthAction({
 
 export const addContentCrossPost = growthAction({
   description:
-    "Add one or more agreed channel renderings to an existing canonical content work item. Creates empty owned drafts for the selected platforms; use updateContentWorkItem afterward to write channel-native copy.",
+    "Add one or more agreed channel renderings to an existing canonical content work item. Creates empty owned drafts for the selected platforms; use updateContentWorkItem afterward to write channel-native copy. Read the brief first and pass contentType, so a video idea gets a Reel rather than a feed image.",
   inputSchema: z.object({
     contentPostId: z.string(),
     platforms: z.array(z.enum(channelPlatformEnum.enumValues)).min(1).max(8),
+    contentType: z
+      .enum(["image", "video", "carousel"])
+      .optional(),
   }),
-  execute: async ({ contentPostId, platforms }, ctx) => {
+  execute: async ({ contentPostId, platforms, contentType }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
     const existing = new Set(
       content.platformPosts.map((post) => post.platform),
@@ -473,7 +476,18 @@ export const addContentCrossPost = growthAction({
     const additions = [...new Set(platforms)].filter(
       (platform) => !existing.has(platform),
     );
-    await ContentService.addSpots(content.id, content.brandId, additions);
+    await ContentService.addSpotTargets(
+      content.id,
+      content.brandId,
+      additions.map((platform) => ({
+        platform,
+        format: contentType
+          ? (classifyFormatFromFields(platform, {
+              content_type: contentType,
+            }).format ?? null)
+          : null,
+      })),
+    );
     return {
       ok: true as const,
       contentPostId: content.id,
