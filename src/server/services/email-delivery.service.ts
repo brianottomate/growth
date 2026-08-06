@@ -208,11 +208,27 @@ export async function approveMessageSend(input: {
   return messageSendSummary(approved!);
 }
 
+/**
+ * Provider delivery is OFF while the email authoring experience is being built.
+ *
+ * Everything up to here — documents, revisions, previews, prepare, approve — is
+ * safe and reversible. This one function is the only thing that reaches a real
+ * mailing list, so it is closed at the door rather than left one confirm away
+ * from firing at a live segment. Re-open it deliberately, with the scheduling
+ * rail in place, not as a side effect of some other change.
+ */
+const EMAIL_SENDING_ENABLED = false;
+
 export async function sendApprovedMessage(input: {
   messageSendId: string;
   organizationId: string;
   userId: string;
 }) {
+  if (!EMAIL_SENDING_ENABLED) {
+    throw new Error(
+      "Email sending is disabled in Growth right now. Drafting, previewing, preparing and approving all work; the Customer.io broadcast trigger is intentionally closed until the scheduling rail lands. Flip EMAIL_SENDING_ENABLED in email-delivery.service.ts to re-open it.",
+    );
+  }
   const send = await requireOwnedMessageSend(
     input.messageSendId,
     input.organizationId,

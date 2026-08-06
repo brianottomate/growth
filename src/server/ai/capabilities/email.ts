@@ -9,6 +9,11 @@ import {
   productUpdateEmailDraftSchema,
 } from "@/lib/email-document";
 import {
+  DIGEST_TEMPLATE_KEY,
+  parseDigestRow,
+  splitPastedRow,
+} from "@/lib/listings-digest";
+import {
   createEmailSlot as createEmailSlotService,
   createProductUpdateDraft as createProductUpdateDraftService,
   getEmailWorkspace,
@@ -64,6 +69,107 @@ export const createEmailSlot = growthAction({
     }),
 });
 
+export const createDigestFromRow = growthAction({
+  description:
+    "Turn ONE pasted row of the property-digest planning sheet into a newsletter issue: parses the regions, homes, guest counts, nightly rates and links, creates the email slot, and saves a digest document that previews as the real email. Use this the moment an operator pastes a block that looks like region headings followed by `*` operated and `-` listed property lines. Paste the row verbatim, tabs and all; do not re-type or summarize it. One row per call.",
+  inputSchema: z.object({
+    brandId: z
+      .string()
+      .describe("The brand to create under (id from listBrands)."),
+    row: z
+      .string()
+      .min(20)
+      .max(50_000)
+      .describe(
+        "The pasted row, verbatim. Either the whole tab-delimited row or just the properties block.",
+      ),
+    title: z
+      .string()
+      .trim()
+      .max(160)
+      .optional()
+      .describe("Overrides the sheet's Theme as the slot title."),
+    subject: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe("Email subject line. Defaults to the theme; refine it after."),
+    plannedAt: z
+      .string()
+      .datetime()
+      .optional()
+      .describe("Growth content-calendar time for the send."),
+    format: z.enum(EMAIL_DOCUMENT_FORMATS).default("newsletter.broadcast"),
+  }),
+  execute: async (input, ctx) => {
+    const parsedRow = splitPastedRow(input.row);
+    const { digest, unparsedLines } = parseDigestRow(parsedRow);
+    if (!digest) {
+      return {
+        error:
+          "That paste did not contain any recognizable property lines. Expected an ALL-CAPS region heading followed by lines starting with `*` (operated) or `-` (listed), each like: Name (City) | sleeps 8 | $584/nt.",
+      };
+    }
+
+    const theme = digest.theme ?? "Property digest";
+    const slot = await createEmailSlotService({
+      brandId: input.brandId,
+      title: input.title ?? theme,
+      format: input.format,
+      purpose: digest.rationale ?? undefined,
+      plannedAt: input.plannedAt,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    });
+    if (!slot?.platformPostId) {
+      return { error: "Could not create the email slot for this digest." };
+    }
+
+    await saveEmailDocument({
+      platformPostId: slot.platformPostId,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+      draft: emailDocumentDraftSchema.parse({
+        subject: input.subject ?? theme,
+        preheader: digest.rationale ?? null,
+        // Intro copy is left to the operator rather than invented here: the
+        // sheet supplies homes and a rationale, not a voice.
+        bodyMarkdown: "",
+        templateKey: DIGEST_TEMPLATE_KEY,
+        digest,
+      }),
+      note: "Imported from a planning-sheet row",
+    });
+
+    const homes = digest.sections.reduce(
+      (count, section) => count + section.properties.length,
+      0,
+    );
+    const missingLinks = digest.sections.flatMap((section) =>
+      section.properties
+        .filter((property) => !property.href)
+        .map((p) => p.name),
+    );
+    return {
+      ok: true as const,
+      platformPostId: slot.platformPostId,
+      contentPostId: slot.contentPostId,
+      title: input.title ?? theme,
+      regions: digest.sections.map((section) => ({
+        heading: section.heading,
+        homes: section.properties.length,
+      })),
+      homes,
+      // Surface the gaps rather than letting them be discovered at send time.
+      missingLinks,
+      missingImages: homes,
+      unparsedLines,
+      url: `/app/newsletters/${slot.platformPostId}`,
+    };
+  },
+});
+
 export const updateEmailDraft = growthAction({
   description:
     "Save an agreed conversational refinement to one email's canonical document and create a revision checkpoint. Pass only the fields that changed.",
@@ -87,6 +193,9 @@ export const updateEmailDraft = growthAction({
       templateKey: workspace.document.templateKey,
       handoffTargetRepo: workspace.document.handoffTargetRepo,
       productUpdate: workspace.document.productUpdate,
+      // Carry the digest forward. Without it, any conversational tweak to the
+      // subject line would silently drop nine parsed homes on the next save.
+      digest: workspace.document.digest,
       ...changes,
     });
     const saved = await saveEmailDocument({
@@ -156,6 +265,7 @@ export const generateEmailDraft = growthAction({
 export const EMAIL_TOOLS = {
   getEmailDraft,
   createEmailSlot,
+  createDigestFromRow,
   createProductUpdateDraft,
   updateEmailDraft,
   generateEmailDraft,

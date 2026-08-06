@@ -64,6 +64,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   emailRead: ["get"],
   emailWrite: [
     "createSlot",
+    "createDigestFromRow",
     "createProductUpdate",
     "updateDraft",
     "generateDraft",

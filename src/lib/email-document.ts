@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { listingsDigestSchema } from "./listings-digest";
+
 export const EMAIL_DOCUMENT_FORMATS = [
   "newsletter.broadcast",
   "newsletter.blast",
@@ -62,6 +64,14 @@ export const emailDocumentDraftSchema = z.object({
   templateKey: z.string().trim().min(1).max(80).default("editorial"),
   handoffTargetRepo: z.string().trim().max(120).nullable().optional(),
   productUpdate: productUpdateContextSchema.nullable().optional(),
+  /**
+   * Structured payload for the property digest, when templateKey says so.
+   *
+   * Nine homes with locations, guest counts and nightly rates are a table, not
+   * prose, so flattening them into bodyMarkdown would throw away the structure
+   * the template lays out. `bodyMarkdown` stays the intro copy above the grid.
+   */
+  digest: listingsDigestSchema.nullable().optional(),
 });
 
 export type EmailDocumentDraft = z.infer<typeof emailDocumentDraftSchema>;

@@ -14,6 +14,7 @@ import type {
   MessageSendSnapshot,
 } from "@/lib/email-delivery";
 import type { ProductUpdateContext } from "@/lib/email-document";
+import type { ListingsDigest } from "@/lib/listings-digest";
 
 export type EmailDocumentSnapshot = {
   subject: string;
@@ -24,6 +25,8 @@ export type EmailDocumentSnapshot = {
   templateKey: string;
   handoffTargetRepo: string | null;
   productUpdate?: ProductUpdateContext | null;
+  /** Structured property-digest payload; see lib/listings-digest.ts. */
+  digest?: ListingsDigest | null;
 };
 
 export const emailDocumentVersionSourceEnum = pgEnum(
@@ -73,6 +76,9 @@ export const emailDocumentTable = pgTable(
     templateKey: t.text().default("editorial").notNull(),
     handoffTargetRepo: t.text(),
     productUpdate: jsonb().$type<ProductUpdateContext>(),
+    // The digest is a grid of homes, not prose, so it rides alongside
+    // bodyMarkdown rather than being flattened into it.
+    digest: jsonb().$type<ListingsDigest>(),
     currentRevision: t.integer().default(0).notNull(),
     createdBy: t.text().references(() => userTable.id, {
       onDelete: "set null",

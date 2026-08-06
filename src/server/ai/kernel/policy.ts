@@ -150,6 +150,7 @@ export const growthActionPolicies = {
   emailRead: { get: read() },
   emailWrite: {
     createSlot: write(),
+    createDigestFromRow: write(),
     createProductUpdate: write(),
     updateDraft: write({ idempotent: true }),
     generateDraft: write({ consequence: "background-run" }),

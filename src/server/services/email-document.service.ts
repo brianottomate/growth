@@ -61,6 +61,7 @@ function snapshotOf(document: EmailDocumentDraft): EmailDocumentSnapshot {
     templateKey: document.templateKey,
     handoffTargetRepo: document.handoffTargetRepo ?? null,
     productUpdate: document.productUpdate ?? null,
+    digest: document.digest ?? null,
   };
 }
 

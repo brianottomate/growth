@@ -213,6 +213,7 @@ export const emailWrite = growthDomainTool({
   description: "Create, revise, or deliberately generate an email draft.",
   actions: {
     createSlot: EMAIL_TOOLS.createEmailSlot,
+    createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,
     createProductUpdate: EMAIL_TOOLS.createProductUpdateDraft,
     updateDraft: EMAIL_TOOLS.updateEmailDraft,
     generateDraft: EMAIL_TOOLS.generateEmailDraft,
