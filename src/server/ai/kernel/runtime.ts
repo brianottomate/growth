@@ -80,7 +80,6 @@ function failureOutput(error: unknown, action?: string): JsonValue {
     error: {
       code: compact.code,
       message: compact.error,
-      retryable: compact.retryable,
       suggestedAction: compact.suggestedAction,
     },
   });

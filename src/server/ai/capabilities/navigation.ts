@@ -47,7 +47,6 @@ export const navigateWorkspace = growthTool({
           error: {
             code: "invalid_input",
             message: "A workspace path must start with /app.",
-            retryable: false,
             suggestedAction:
               "Use a named surface or pass a real internal /app path.",
           },
@@ -76,7 +75,6 @@ export const navigateWorkspace = growthTool({
           error: {
             code: "not_found",
             message: "That brand is not available in this organization.",
-            retryable: false,
             suggestedAction:
               "Open the brand index and choose an available brand.",
           },
@@ -131,7 +129,6 @@ export const navigateWorkspace = growthTool({
         error: {
           code: "not_found",
           message: "That brand is not available in this organization.",
-          retryable: false,
           suggestedAction:
             "Open the brand index and choose an available brand.",
         },

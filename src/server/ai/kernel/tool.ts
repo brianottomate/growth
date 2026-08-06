@@ -159,7 +159,6 @@ export function growthDomainTool<
       error: {
         code: GrowthErrorCode;
         message: string;
-        retryable: boolean;
         suggestedAction: string;
       };
     }
@@ -205,7 +204,6 @@ export function growthDomainTool<
           error: {
             code: error.code,
             message: error.error,
-            retryable: error.retryable,
             suggestedAction: error.suggestedAction,
           },
         };

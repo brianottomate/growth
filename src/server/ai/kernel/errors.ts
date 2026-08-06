@@ -13,10 +13,17 @@ export type GrowthErrorCode =
   | "provider_unavailable"
   | "tool_failed";
 
+/**
+ * `suggestedAction` is derived from `code` and carries the retry policy in the
+ * one form a reader can act on. There is deliberately no `retryable` boolean
+ * beside it: nothing ever branched on one, `code` already implies it, and it
+ * disagreed with its own sibling (`invalid_input` shipped `retryable: false`
+ * next to "call the tool again"). A duplicate signal that contradicts the
+ * accurate one is worse than no signal.
+ */
 export interface GrowthCompactError {
   error: string;
   code: GrowthErrorCode;
-  retryable: boolean;
   suggestedAction: string;
 }
 
@@ -25,10 +32,10 @@ export interface GrowthCompactError {
  *
  * Everything else falls back to `codeFor`'s message sniffing, which is fine for
  * third-party errors we don't control but silently mis-grades our own guards:
- * a message with none of the trigger words lands on `tool_failed`, which is
- * non-retryable and tells the model to give up. A guard rejecting a bad id is
- * `invalid_input` — the model can fix the id and call again — so say so instead
- * of hoping the sentence happens to contain the word "invalid".
+ * a message with none of the trigger words lands on `tool_failed`, the most
+ * discouraging code we have. A guard rejecting a bad id is `invalid_input` — the
+ * model can fix the id and call again — so say so instead of hoping the sentence
+ * happens to contain the word "invalid".
  */
 export class GrowthActionError extends Error {
   constructor(
@@ -89,12 +96,15 @@ function codeFor(error: unknown): GrowthErrorCode {
   return "tool_failed";
 }
 
-const retryable = new Set<GrowthErrorCode>([
-  "rate_limited",
-  "timeout",
-  "provider_unavailable",
-]);
-
+/**
+ * One sentence per code, and the only place the retry policy is stated.
+ *
+ * The three transient codes are why this map still exists rather than being
+ * folded into the guard messages: they are the cases where no message can name
+ * the recovery ("Zernio returned 429" does not tell you to wait, and does not
+ * bound you to one attempt). For the deterministic codes the guard message is
+ * the better carrier, so those sentences aim to be a floor, not the answer.
+ */
 const actions: Record<GrowthErrorCode, string> = {
   invalid_input: "Correct the input and call the tool again.",
   forbidden: "Explain that this action needs different workspace access.",
@@ -119,7 +129,6 @@ export function compactGrowthError(error: unknown): GrowthCompactError {
     error !== null &&
     "error" in error &&
     "code" in error &&
-    "retryable" in error &&
     "suggestedAction" in error
   ) {
     const value = error as GrowthCompactError;
@@ -136,7 +145,6 @@ export function compactGrowthError(error: unknown): GrowthCompactError {
   return {
     error: sanitize(raw),
     code,
-    retryable: retryable.has(code),
     suggestedAction: actions[code],
   };
 }

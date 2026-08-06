@@ -25,7 +25,6 @@ describe("compactGrowthError", () => {
       new Error("A selected platform draft is not part of this work item."),
     );
     expect(compact.code).toBe("tool_failed");
-    expect(compact.retryable).toBe(false);
   });
 
   test("the fallback lets the model act on a correction the message names", () => {

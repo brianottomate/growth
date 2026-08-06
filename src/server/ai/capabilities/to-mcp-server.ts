@@ -68,7 +68,6 @@ function capabilityFailure(error: unknown, action?: string) {
     error: {
       code: compact.code,
       message: compact.error,
-      retryable: compact.retryable,
       suggestedAction: compact.suggestedAction,
     },
   };
