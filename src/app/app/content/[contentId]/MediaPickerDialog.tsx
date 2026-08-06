@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Image as ImageIcon } from "lucide-react";
+import { Film, Image as ImageIcon } from "lucide-react";
 
 import { useTRPC } from "@/trpc/react";
 import { SimpleDialog } from "@/components/ui/dialog";
@@ -57,7 +57,11 @@ export function MediaPickerDialog({
       ) : (
         <div className="grid grid-cols-3 gap-2 py-2 sm:grid-cols-4">
           {visible.map((a) => {
-            const thumb = a.thumbnailUrl ?? a.url ?? null;
+            const isVideo = a.kind === "video";
+            // Only an image URL may reach <img>. Video assets have no generated
+            // tile yet, and falling back to `a.url` pointed the tag at the raw
+            // .mov — a blank square that also pulled the whole file down.
+            const thumb = isVideo ? a.thumbnailUrl : (a.thumbnailUrl ?? a.url);
             const already = picked.has(a.id);
             return (
               <button
@@ -92,7 +96,16 @@ export function MediaPickerDialog({
                   />
                 ) : (
                   <span className="text-muted-foreground flex size-full items-center justify-center">
-                    <ImageIcon className="size-5" />
+                    {isVideo ? (
+                      <Film className="size-5" />
+                    ) : (
+                      <ImageIcon className="size-5" />
+                    )}
+                  </span>
+                )}
+                {isVideo && (
+                  <span className="absolute top-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                    Video
                   </span>
                 )}
                 {already && (

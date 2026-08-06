@@ -37,7 +37,11 @@ import {
   type ChatImageReference,
 } from "@/lib/chat-attachment";
 import { getContentReadiness } from "@/lib/content-readiness";
-import { platformFormatsFor } from "@/server/content/formats";
+import {
+  classifyFormatFromFields,
+  platformFormatsFor,
+  validateSpot,
+} from "@/server/content/formats";
 import { groupPlatformThreads } from "@/lib/platform-thread";
 import { growthAction } from "./types";
 import type { CapabilityContext } from "./types";
@@ -187,7 +191,10 @@ export const searchContentWorkItems = growthAction({
           eq(platformPostTable.source, "owned"),
           or(
             ilike(platformPostTable.text, pattern),
-            ilike(platformPostTable.platform, pattern),
+            // platform is the channel_platform enum, and Postgres has no
+            // ilike operator for an enum — the whole search 42883'd on it.
+            // format is plain text ("instagram.reel"), so it needs no cast.
+            sql`${platformPostTable.platform}::text ilike ${pattern}`,
             ilike(platformPostTable.format, pattern),
           ),
         ),
@@ -265,6 +272,12 @@ export const updateContentWorkItem = growthAction({
           text: z.string().max(10_000).nullable().optional(),
           status: contentStatus.optional(),
           scheduledAt: z.string().datetime().nullable().optional(),
+          format: z
+            .string()
+            .optional()
+            .describe(
+              "Re-point this spot at a different product on the SAME platform, e.g. 'instagram.reel' instead of 'instagram.image'. Use this when the brief is a video but the spot was created as a still; do not create a second spot for that.",
+            ),
         }),
       )
       .max(12)
@@ -278,10 +291,24 @@ export const updateContentWorkItem = growthAction({
         .map((post) => [post.id, post]),
     );
     for (const draft of input.platformDrafts ?? []) {
-      if (!ownedById.has(draft.platformPostId)) {
+      const owned = ownedById.get(draft.platformPostId);
+      if (!owned) {
         throw new Error(
           "A selected platform draft is not part of this work item.",
         );
+      }
+      // A format change must stay on the same platform, and must be a real
+      // product for it — otherwise a spot can be re-pointed at nonsense.
+      if (draft.format !== undefined) {
+        const validation = validateSpot({
+          platform: owned.platform,
+          format: draft.format,
+        });
+        if (!validation.ok) {
+          throw new Error(
+            `Cannot set format ${draft.format} on a ${owned.platform} spot: ${validation.errors.join("; ")}`,
+          );
+        }
       }
     }
     if (input.brief) {
@@ -1365,7 +1392,13 @@ export const createIdea = growthAction({
       .string()
       .optional()
       .describe(
-        "Caption / copy direction for the spots — a brief, not the final caption.",
+        "Direction for the WORDS only — what the caption/copy should say and how it should read. A brief, not the final caption. Anything about footage, shots, pacing, edit, or audio belongs in visualDirection instead.",
+      ),
+    visualDirection: z
+      .string()
+      .optional()
+      .describe(
+        "Direction for what gets SHOT or MADE — footage, shots, pacing, edit, on-screen text, audio. Use this for creative/production direction; do not put it in captionDirection.",
       ),
     ctaText: z.string().optional().describe("The call to action."),
     pillar: z.string().optional().describe("Content pillar slug, if known."),
@@ -1376,7 +1409,15 @@ export const createIdea = growthAction({
     platforms: z
       .array(z.enum(channelPlatformEnum.enumValues))
       .optional()
-      .describe("Channels to fan the idea out to as spots."),
+      .describe(
+        "Channels to fan the idea out to as spots. Each gets that platform's PRIMARY format (Instagram becomes a feed image), so pass contentType when the idea is video or a carousel.",
+      ),
+    contentType: z
+      .enum(["image", "video", "carousel"])
+      .optional()
+      .describe(
+        "What this idea physically is. Drives each spot's format — 'video' makes the Instagram spot a Reel rather than a feed image. If the title or brief says reel, short, clip, or B-roll, this is 'video'.",
+      ),
   }),
   execute: async (input, ctx) => {
     // Auth at the edge: the brand must belong to the caller's org.
@@ -1413,16 +1454,32 @@ export const createIdea = growthAction({
       };
     }
 
+    // Without a contentType every spot lands on its platform's primary format,
+    // which makes an Instagram Reel come out as a feed image. Reuse the scrape
+    // classifier so "video" resolves per-platform (instagram.reel, tiktok.video)
+    // instead of duplicating that mapping here.
+    const spots = input.platforms?.length
+      ? input.platforms.map((platform) => ({
+          platform,
+          format: input.contentType
+            ? (classifyFormatFromFields(platform, {
+                content_type: input.contentType,
+              }).format ?? null)
+            : null,
+        }))
+      : undefined;
+
     const { id } = await ContentService.createIdea({
       brandId: brand.id,
       title: input.title,
       hook: input.hook,
       captionDirection: input.captionDirection,
+      visualDirection: input.visualDirection,
       ctaText: input.ctaText,
       seriesId: series?.id,
       pillar: series?.pillar ?? input.pillar,
       plannedAt: input.plannedAt,
-      platforms: input.platforms,
+      spots,
       ownerId: ctx.userId,
       createdById: ctx.userId,
     });

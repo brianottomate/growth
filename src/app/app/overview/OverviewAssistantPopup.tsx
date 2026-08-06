@@ -324,6 +324,7 @@ export function OverviewAssistantPopup({
               brandId={activeBrand?.id}
               brandName={activeBrand?.name}
               intent={searchParams.get("intent") ?? undefined}
+              seedPrompt={searchParams.get("prompt") ?? undefined}
               workContext={workContext ?? undefined}
             />
           ) : (

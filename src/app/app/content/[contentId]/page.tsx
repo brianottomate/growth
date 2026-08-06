@@ -482,6 +482,10 @@ export default async function ContentDetailPage({
         existingTargets={postGroups.map(
           (group) => `${group.root.platform}|${group.root.format ?? ""}`,
         )}
+        brandId={content.brandId}
+        brandName={content.brand?.name ?? "this brand"}
+        contentTitle={content.title ?? "Untitled idea"}
+        sourcePlatform={postGroups[0]?.root.platform ?? null}
       />
 
       {/* series siblings */}

@@ -10,6 +10,7 @@ import { SimpleSelect } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ChannelLogo } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
+import { sendAssistantIntent } from "@/lib/assistant-events";
 
 // The team-facing pipeline (a deliberate subset of the 9-value enum).
 export const STATUS_OPTIONS = [
@@ -227,13 +228,30 @@ export function SpotStatusControl({
   );
 }
 
-/** Fan the idea out to another channel (the "break into cross-posts" action). */
+/**
+ * Fan the idea out to another channel (the "break into cross-posts" action).
+ *
+ * Creating the spot is only half the job: an empty draft on a new channel is
+ * work, not progress. So the spot is created (it is the visible placeholder the
+ * rest of the page hangs off) and the assistant is immediately handed the
+ * cross-post with its root context, rather than leaving the operator to
+ * re-explain what they just clicked.
+ */
 export function AddSpotControl({
   contentPostId,
   existingTargets,
+  brandId,
+  brandName,
+  contentTitle,
+  sourcePlatform,
 }: {
   contentPostId: string;
   existingTargets: string[];
+  brandId: string;
+  brandName: string;
+  contentTitle: string;
+  /** The spot this cross-post should be adapted from, when there is one. */
+  sourcePlatform?: string | null;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -257,11 +275,29 @@ export function AddSpotControl({
           key={`${option.platform}|${option.format}`}
           disabled={add.isPending}
           onClick={() =>
-            add.mutate({
-              contentPostId,
-              platform: option.platform,
-              format: option.format,
-            })
+            add.mutate(
+              {
+                contentPostId,
+                platform: option.platform,
+                format: option.format,
+              },
+              {
+                onSuccess: (spot) => {
+                  sendAssistantIntent({
+                    type: "work_content_post",
+                    brandId,
+                    brandName,
+                    contentPostId,
+                    contentTitle,
+                    platformPostId: spot.id,
+                    platform: option.platform,
+                    visibleText: `Cross-post "${contentTitle}" to ${option.label}. Adapt it${
+                      sourcePlatform ? ` from the ${sourcePlatform} version` : ""
+                    } for ${option.label} rather than copying it across, and tell me what you changed.`,
+                  });
+                },
+              },
+            )
           }
           className="border-border hover:bg-accent flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50"
         >

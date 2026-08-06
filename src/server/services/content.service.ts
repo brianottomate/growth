@@ -712,6 +712,8 @@ async function updatePlatformDraft(input: {
   status?: (typeof contentPostTable.$inferSelect)["status"];
   scheduledAt?: string | null;
   markScheduled?: boolean;
+  /** Re-point a spot at a different product on the same platform (image -> reel). */
+  format?: string | null;
 }): Promise<{ id: string }> {
   const current = await db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, input.platformPostId),
@@ -719,6 +721,12 @@ async function updatePlatformDraft(input: {
   });
   const patch: Record<string, unknown> = {};
   if (input.text !== undefined) patch.text = input.text?.trim() || null;
+  if (input.format !== undefined) {
+    patch.format = input.format;
+    // archetype is derived from format everywhere else it is set; leaving the
+    // old one behind would describe the spot as a still after it became a reel.
+    patch.archetype = input.format ? archetypeForFormat(input.format) : null;
+  }
   if (input.status !== undefined) patch.status = input.status;
   if (input.scheduledAt !== undefined) {
     patch.scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;

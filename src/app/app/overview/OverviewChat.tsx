@@ -184,6 +184,7 @@ export function OverviewChat({
   brandId,
   brandName,
   intent,
+  seedPrompt,
   workContext,
 }: {
   threadId: string;
@@ -197,12 +198,25 @@ export function OverviewChat({
   brandId?: string;
   brandName?: string;
   intent?: string;
+  /**
+   * A composer prefill handed over by a deep link (the media library's
+   * "Launch this" rocket). Seeded, never auto-sent: the operator should read
+   * and edit it before anything runs.
+   */
+  seedPrompt?: string;
   workContext?: ContentWorkContext;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(seedPrompt ?? "");
+  // Seed once per deep link. Without the ref, editing the prefill and then
+  // any re-render would stomp the operator's edits back to the URL's text.
+  const seededRef = useRef(seedPrompt);
+  if (seedPrompt && seedPrompt !== seededRef.current) {
+    seededRef.current = seedPrompt;
+    setInput(seedPrompt);
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [atBottom, setAtBottom] = useState(true);
