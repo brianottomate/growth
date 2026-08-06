@@ -151,6 +151,7 @@ export const growthActionPolicies = {
   emailWrite: {
     createSlot: write(),
     createDigestFromRow: write(),
+    setDigestImage: write({ idempotent: true }),
     createProductUpdate: write(),
     updateDraft: write({ idempotent: true }),
     generateDraft: write({ consequence: "background-run" }),

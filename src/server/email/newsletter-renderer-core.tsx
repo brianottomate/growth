@@ -36,6 +36,20 @@ async function composeGenericEmail(props: GenericHtmlProps) {
 }
 
 /**
+ * A self-contained "image needed" tile for a home with no chosen photo.
+ *
+ * A data URI rather than a hosted asset: email clients need an absolute URL,
+ * and this has to work in the preview before anything has been uploaded
+ * anywhere. It is deliberately obvious — a digest must never go out with these
+ * still in it.
+ */
+function digestImagePlaceholder(name: string): string {
+  const label = name.replace(/[<>&]/g, "").slice(0, 28).toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="#e8e4dd"/><rect x="12" y="12" width="576" height="376" fill="none" stroke="#b9b1a4" stroke-width="3" stroke-dasharray="14 10"/><text x="300" y="186" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="bold" fill="#6f6659">IMAGE NEEDED</text><text x="300" y="222" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="17" fill="#8a8175">${label}</text></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+/**
  * Render the property digest as HTML.
  *
  * The digest is a grid of homes, so it cannot go through the markdown body of
@@ -93,7 +107,16 @@ async function renderListingsDigest(input: {
         ]
           .filter(Boolean)
           .join(" · "),
-        image: { src: property.imageUrl ?? "", alt: property.name },
+        // An empty src makes the browser refetch the whole page, and renders
+        // as a broken card in the preview. A visible placeholder says "an
+        // image goes here and nobody has chosen one yet", which is the true
+        // state, and names the home so the operator knows what to source.
+        image: {
+          src: property.imageUrl ?? digestImagePlaceholder(property.name),
+          alt: property.imageUrl
+            ? property.name
+            : `${property.name} — image needed`,
+        },
         href: property.href ?? "",
       });
       return {

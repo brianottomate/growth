@@ -65,6 +65,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   emailWrite: [
     "createSlot",
     "createDigestFromRow",
+    "setDigestImage",
     "createProductUpdate",
     "updateDraft",
     "generateDraft",

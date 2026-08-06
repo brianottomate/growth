@@ -163,9 +163,114 @@ export const createDigestFromRow = growthAction({
       homes,
       // Surface the gaps rather than letting them be discovered at send time.
       missingLinks,
-      missingImages: homes,
+      // Not a count: a worklist. Which home, in which region, and the page to
+      // grab the photo from. Naming the source page is the whole point — it
+      // turns "nine images missing" into nine copy-pastes.
+      imagesNeeded: digest.sections.flatMap((section) =>
+        section.properties
+          .filter((property) => !property.imageUrl)
+          .map((property) => ({
+            region: section.heading,
+            home: property.name,
+            hero: property.operated,
+            sourceUrl: property.href,
+          })),
+      ),
       unparsedLines,
       url: `/app/newsletters/${slot.platformPostId}`,
+      nextStep:
+        "Every home needs a photo. List them for the operator with their source URLs so each one can be sourced, then call emailWrite.setDigestImage as each image URL comes back.",
+    };
+  },
+});
+
+export const setDigestImage = growthAction({
+  description:
+    "Attach a photo to one home in a property digest. Use this when the operator pastes back an image URL for a specific home, or picks one from the media library. Match on the home's name as it appears in the digest; case and surrounding whitespace do not matter. Report which homes are still without a photo afterwards.",
+  inputSchema: z.object({
+    platformPostId: z.string(),
+    images: z
+      .array(
+        z.object({
+          home: z
+            .string()
+            .trim()
+            .min(1)
+            .describe("The home's name as it appears in the digest."),
+          imageUrl: z.string().trim().url().max(2_000),
+        }),
+      )
+      .min(1)
+      .max(20),
+  }),
+  execute: async ({ platformPostId, images }, ctx) => {
+    const workspace = await getEmailWorkspace({
+      platformPostId,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    });
+    const digest = workspace.document.digest;
+    if (!digest) {
+      return { error: "That email is not a property digest." };
+    }
+
+    const wanted = new Map(
+      images.map((image) => [image.home.trim().toLowerCase(), image.imageUrl]),
+    );
+    const matched: string[] = [];
+    const next = {
+      ...digest,
+      sections: digest.sections.map((section) => ({
+        ...section,
+        properties: section.properties.map((property) => {
+          const imageUrl = wanted.get(property.name.trim().toLowerCase());
+          if (!imageUrl) return property;
+          matched.push(property.name);
+          return { ...property, imageUrl };
+        }),
+      })),
+    };
+
+    // A name that matched nothing means the operator and the digest disagree
+    // about what a home is called. Say so rather than reporting success.
+    const unmatched = images
+      .map((image) => image.home)
+      .filter(
+        (home) =>
+          !matched.some(
+            (name) => name.trim().toLowerCase() === home.trim().toLowerCase(),
+          ),
+      );
+
+    await saveEmailDocument({
+      platformPostId,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+      draft: emailDocumentDraftSchema.parse({
+        subject: workspace.document.subject,
+        preheader: workspace.document.preheader,
+        bodyMarkdown: workspace.document.bodyMarkdown,
+        ctaLabel: workspace.document.ctaLabel,
+        ctaUrl: workspace.document.ctaUrl,
+        templateKey: workspace.document.templateKey,
+        handoffTargetRepo: workspace.document.handoffTargetRepo,
+        productUpdate: workspace.document.productUpdate,
+        digest: next,
+      }),
+      note: `Attached ${matched.length} digest image${matched.length === 1 ? "" : "s"}`,
+    });
+
+    const stillNeeded = next.sections.flatMap((section) =>
+      section.properties
+        .filter((property) => !property.imageUrl)
+        .map((property) => ({ home: property.name, sourceUrl: property.href })),
+    );
+    return {
+      ok: true as const,
+      attached: matched,
+      unmatched,
+      stillNeeded,
+      url: `/app/newsletters/${platformPostId}`,
     };
   },
 });
@@ -266,6 +371,7 @@ export const EMAIL_TOOLS = {
   getEmailDraft,
   createEmailSlot,
   createDigestFromRow,
+  setDigestImage,
   createProductUpdateDraft,
   updateEmailDraft,
   generateEmailDraft,

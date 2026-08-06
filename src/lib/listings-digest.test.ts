@@ -114,6 +114,43 @@ https://www.wander.com/property/wander-destin-palms`,
     expect(unparsedLines).toEqual(["* [OPERATED]"]);
   });
 
+  test("handles a continuation row whose leading columns are empty", () => {
+    // The sheet's last row has no date, day, theme or rationale — just four
+    // empty cells. Trimming those leading tabs used to collapse the row and
+    // silently parse the links block as more homes.
+    const row = `\t\t\t\t"COLORADO HIGH COUNTRY
+  * [OPERATED (Joel photos)] Wander Crested Butte Mountain (Mount Crested Butte) | sleeps 11 | $600/nt = ~$55/person
+  - [Listed] The Bear's Den (Breckenridge) | sleeps 20 | $2,819/nt = ~$141/person"\t"COLORADO HIGH COUNTRY
+https://www.wander.com/property/wander-crested-butte-mountain
+https://www.wander.com/property/wander-breckenridge-bears"\t`;
+    const { digest } = parseDigestRow(splitPastedRow(row));
+    expect(digest!.sections).toHaveLength(1);
+    expect(digest!.sections[0]!.heading).toBe("COLORADO HIGH COUNTRY");
+    expect(digest!.sections[0]!.properties).toHaveLength(2);
+    expect(digest!.sections[0]!.properties[0]!.href).toBe(
+      "https://www.wander.com/property/wander-crested-butte-mountain",
+    );
+  });
+
+  test("never turns a bare URL into a property", () => {
+    // A paste that loses its tab structure puts the links block in with the
+    // homes. Homes named after URLs is worse than no links at all.
+    const { digest } = parseDigestRow({
+      properties: `TAHOE + TRUCKEE, CA
+  * [OPERATED] Wander Truckee Woods (Truckee) | sleeps 12 | $722/nt
+
+TAHOE + TRUCKEE, CA
+https://www.wander.com/property/wander-truckee-woods`,
+    });
+    const homes = digest!.sections.flatMap((section) => section.properties);
+    expect(homes).toHaveLength(1);
+    expect(homes[0]!.name).toBe("Wander Truckee Woods");
+    // The stray URL is recovered as the link rather than discarded.
+    expect(homes[0]!.href).toBe(
+      "https://www.wander.com/property/wander-truckee-woods",
+    );
+  });
+
   test("returns no digest when nothing parsed, rather than an empty shell", () => {
     const { digest } = parseDigestRow({ properties: "just some prose" });
     expect(digest).toBeNull();

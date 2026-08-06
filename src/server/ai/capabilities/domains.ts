@@ -214,6 +214,7 @@ export const emailWrite = growthDomainTool({
   actions: {
     createSlot: EMAIL_TOOLS.createEmailSlot,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,
+    setDigestImage: EMAIL_TOOLS.setDigestImage,
     createProductUpdate: EMAIL_TOOLS.createProductUpdateDraft,
     updateDraft: EMAIL_TOOLS.updateEmailDraft,
     generateDraft: EMAIL_TOOLS.generateEmailDraft,

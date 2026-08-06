@@ -171,6 +171,23 @@ function attachLinks(sections: DigestSection[], linksColumn: string): void {
   }
 }
 
+/**
+ * Recover a links block from a paste whose columns collapsed.
+ *
+ * When the tab structure is lost, the links section still follows its own copy
+ * of the region headings, so the heading/URL sequence is intact even though the
+ * cell boundary is gone. Keep only the lines that matter to `attachLinks`.
+ */
+function rebuildLinksBlock(properties: string): string {
+  const lines: string[] = [];
+  for (const raw of properties.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^https?:\/\/\S+$/i.test(line) || isHeading(line)) lines.push(line);
+  }
+  return lines.join("\n");
+}
+
 export type DigestRowInput = {
   /** The big properties cell. */
   properties: string;
@@ -194,9 +211,18 @@ export function parseDigestRow(input: DigestRowInput): {
   const unparsedLines: string[] = [];
   let current: DigestSection | null = null;
 
+  // A links block that ends up in the properties cell (a paste that lost its
+  // tabs, say) must not become a list of homes named after URLs. Route bare
+  // URLs to the links side instead of inventing properties from them.
+  const strayLinks: string[] = [];
+
   for (const raw of input.properties.split("\n")) {
     const line = raw.replace(/\s+$/, "");
     if (!line.trim()) continue;
+    if (/^https?:\/\/\S+$/i.test(line.trim())) {
+      strayLinks.push(line.trim());
+      continue;
+    }
     if (isHeading(line)) {
       current = { heading: line.trim(), properties: [] };
       sections.push(current);
@@ -213,7 +239,12 @@ export function parseDigestRow(input: DigestRowInput): {
   const populated = sections.filter((section) => section.properties.length > 0);
   if (!populated.length) return { digest: null, unparsedLines };
 
-  if (input.links?.trim()) attachLinks(populated, input.links);
+  // Prefer the real links cell; fall back to any URLs that arrived inline with
+  // the properties, rebuilt with the headings they followed.
+  const linksBlock =
+    input.links?.trim() ||
+    (strayLinks.length ? rebuildLinksBlock(input.properties) : null);
+  if (linksBlock) attachLinks(populated, linksBlock);
 
   return {
     digest: {
@@ -236,7 +267,11 @@ export function parseDigestRow(input: DigestRowInput): {
  * way.
  */
 export function splitPastedRow(pasted: string): DigestRowInput {
-  const text = pasted.replace(/\r\n/g, "\n").trim();
+  // Trim newlines only. A plain .trim() eats LEADING TABS, and the sheet's
+  // continuation rows have four empty columns before the properties cell — so
+  // trimming collapsed a seven-cell row to two, missed the structured path,
+  // and silently parsed the links block as if it were more properties.
+  const text = pasted.replace(/\r\n/g, "\n").replace(/^\n+|\s+$/g, "");
 
   // Tab-delimited, honouring quoted cells that contain newlines and tabs.
   const cells: string[] = [];
