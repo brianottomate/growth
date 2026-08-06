@@ -8,11 +8,8 @@ import {
   emailDocumentDraftSchema,
   productUpdateEmailDraftSchema,
 } from "@/lib/email-document";
-import {
-  DIGEST_TEMPLATE_KEY,
-  parseDigestRow,
-  splitPastedRow,
-} from "@/lib/listings-digest";
+import { DIGEST_TEMPLATE_KEY } from "@/lib/listings-digest";
+import { extractDigest } from "@/server/services/digest-extract.service";
 import {
   createEmailSlot as createEmailSlotService,
   createProductUpdateDraft as createProductUpdateDraftService,
@@ -71,7 +68,7 @@ export const createEmailSlot = growthAction({
 
 export const createDigestFromRow = growthAction({
   description:
-    "Turn ONE pasted row of the property-digest planning sheet into a newsletter issue: parses the regions, homes, guest counts, nightly rates and links, creates the email slot, and saves a digest document that previews as the real email. Use this the moment an operator pastes a block that looks like region headings followed by `*` operated and `-` listed property lines. Paste the row verbatim, tabs and all; do not re-type or summarize it. One row per call.",
+    "Turn a pasted block of property listings into a newsletter issue: reads the homes, their locations, guest counts, nightly rates and links, creates the email slot, and saves a digest document that previews as the real email. Use this whenever an operator pastes something that lists Wander homes for a send, in any shape — a spreadsheet row, a list from an email, a few typed lines. Pass what they pasted VERBATIM; do not re-type, reorder or summarize it, and do not fill in prices or links yourself. One digest per call.",
   inputSchema: z.object({
     brandId: z
       .string()
@@ -80,9 +77,7 @@ export const createDigestFromRow = growthAction({
       .string()
       .min(20)
       .max(50_000)
-      .describe(
-        "The pasted row, verbatim. Either the whole tab-delimited row or just the properties block.",
-      ),
+      .describe("Exactly what the operator pasted, unmodified."),
     title: z
       .string()
       .trim()
@@ -103,12 +98,11 @@ export const createDigestFromRow = growthAction({
     format: z.enum(EMAIL_DOCUMENT_FORMATS).default("newsletter.broadcast"),
   }),
   execute: async (input, ctx) => {
-    const parsedRow = splitPastedRow(input.row);
-    const { digest, unparsedLines } = parseDigestRow(parsedRow);
+    const { digest, notes } = await extractDigest(input.row);
     if (!digest) {
       return {
-        error:
-          "That paste did not contain any recognizable property lines. Expected an ALL-CAPS region heading followed by lines starting with `*` (operated) or `-` (listed), each like: Name (City) | sleeps 8 | $584/nt.",
+        error: "That paste did not contain any property listings I could read.",
+        notes,
       };
     }
 
@@ -176,7 +170,7 @@ export const createDigestFromRow = growthAction({
             sourceUrl: property.href,
           })),
       ),
-      unparsedLines,
+      notes,
       url: `/app/newsletters/${slot.platformPostId}`,
       nextStep:
         "Every home needs a photo. List them for the operator with their source URLs so each one can be sourced, then call emailWrite.setDigestImage as each image URL comes back.",
