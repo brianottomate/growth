@@ -20,6 +20,7 @@ import {
 
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
+import { DigestImageBoard } from "./DigestImageBoard";
 
 type Workspace = RouterOutputs["newsletter"]["workspace"];
 type Draft = Pick<
@@ -32,6 +33,9 @@ type Draft = Pick<
   | "templateKey"
   | "handoffTargetRepo"
   | "productUpdate"
+  // Part of the draft so photo choices save with the subject and body, rather
+  // than through a separate write that could disagree with what is on screen.
+  | "digest"
 >;
 
 const controlClass =
@@ -52,6 +56,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
     templateKey: workspace.document.templateKey,
     handoffTargetRepo: workspace.document.handoffTargetRepo,
     productUpdate: workspace.document.productUpdate,
+    digest: workspace.document.digest,
   });
   const [brief, setBrief] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
@@ -319,6 +324,14 @@ function Editor({ workspace }: { workspace: Workspace }) {
               </p>
             )}
           </section>
+
+          {draft.digest && (
+            <DigestImageBoard
+              digest={draft.digest}
+              brandId={workspace.brand.id}
+              onChange={(digest) => setDraft({ ...draft, digest })}
+            />
+          )}
 
           {draft.productUpdate && (
             <section className="bg-card rounded-xl border p-4">
