@@ -144,7 +144,7 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
 
     saveIssue: tool({
       description:
-        "Save changed fields to an issue's document and create a revision checkpoint. Pass only what changed — unspecified fields keep their current value. Read the issue first.",
+        'Save changed fields to an issue\'s document and create a revision checkpoint. Pass only what changed — unspecified fields keep their current value — but pass each changed field WHOLE: read the issue first, rewrite the entire field with the change worked in, and send the full replacement. Never surgical partial edits. Liquid tokens like {{ customer.first_name | default: "there" }} are allowed; Customer.io expands them per recipient.',
       inputSchema: z.object({
         platformPostId: z.string(),
         changes: emailDocumentDraftSchema.partial(),
@@ -171,6 +171,9 @@ export function buildNewsletterTools(ctx: NewsletterToolContext): ToolSet {
             templateKey: d.templateKey,
             handoffTargetRepo: d.handoffTargetRepo,
             productUpdate: d.productUpdate,
+            // Carry the digest forward, or a subject tweak would silently drop
+            // every parsed home and chosen photo on the next save.
+            digest: d.digest,
             ...changes,
           });
           const saved = await saveEmailDocument({

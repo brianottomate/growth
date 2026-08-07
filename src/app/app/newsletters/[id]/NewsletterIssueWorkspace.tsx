@@ -60,6 +60,13 @@ function Editor({ workspace }: { workspace: Workspace }) {
   });
   const [brief, setBrief] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
+  const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
+  // template = raw liquid as CIO receives it; the personas simulate CIO's
+  // per-recipient expansion. "sparse" is the fallback-shaker: a recipient with
+  // no attributes at all.
+  const [viewAs, setViewAs] = useState<"template" | "full" | "sparse">(
+    "template",
+  );
   const [copied, setCopied] = useState(false);
   const [providerBroadcastId, setProviderBroadcastId] = useState("");
   const [segmentId, setSegmentId] = useState("");
@@ -88,7 +95,10 @@ function Editor({ workspace }: { workspace: Workspace }) {
   );
   const preview = useMutation(
     trpc.newsletter.renderPreview.mutationOptions({
-      onSuccess: ({ html }) => setPreviewHtml(html),
+      onSuccess: ({ html, warnings }) => {
+        setPreviewHtml(html);
+        setPreviewWarnings(warnings ?? []);
+      },
     }),
   );
   const prepareSend = useMutation(
@@ -110,11 +120,11 @@ function Editor({ workspace }: { workspace: Workspace }) {
     }),
   );
 
-  const renderPreview = () =>
-    preview.mutate({ platformPostId: workspace.spot.id, draft });
+  const renderPreview = (as: "template" | "full" | "sparse" = viewAs) =>
+    preview.mutate({ platformPostId: workspace.spot.id, draft, viewAs: as });
 
   useEffect(() => {
-    preview.mutate({ platformPostId: workspace.spot.id, draft });
+    preview.mutate({ platformPostId: workspace.spot.id, draft, viewAs });
     // Generate the initial projection once per persisted revision. Subsequent
     // unsaved changes are rendered explicitly so typing never causes requests.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,9 +209,9 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 visibleText: `Help me work through the ${formatLabel.toLowerCase()} “${workspace.content?.title || draft.subject || "Untitled"}”. Read the email draft first, then help me refine it.`,
               })
             }
-            className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
+            className="bg-primary text-primary-foreground flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium hover:opacity-90"
           >
-            <MessageSquare className="size-4" /> Discuss in chat
+            <MessageSquare className="size-4" /> Work in chat
           </button>
           <Link
             href={
@@ -220,78 +230,20 @@ function Editor({ workspace }: { workspace: Workspace }) {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
         <div className="space-y-4">
+          {/* Chat-first: the conversation is the write path for words (subject,
+              intro, CTA); the one clicky exception is photos, because picking
+              an image is a recognition task a grid does better than prose. The
+              form fields survive below as a collapsed escape hatch. */}
+          {draft.digest && (
+            <DigestImageBoard
+              digest={draft.digest}
+              brandId={workspace.brand.id}
+              onChange={(digest) => setDraft({ ...draft, digest })}
+            />
+          )}
+
           <section className="bg-card rounded-xl border p-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium">Subject</span>
-                <input
-                  value={draft.subject}
-                  onChange={(event) =>
-                    setDraft({ ...draft, subject: event.target.value })
-                  }
-                  className={controlClass}
-                />
-              </label>
-              <label className="sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium">
-                  Preheader
-                </span>
-                <input
-                  value={draft.preheader ?? ""}
-                  onChange={(event) =>
-                    setDraft({
-                      ...draft,
-                      preheader: event.target.value || null,
-                    })
-                  }
-                  className={controlClass}
-                  placeholder="Optional inbox preview text"
-                />
-              </label>
-              <label className="sm:col-span-2">
-                <span className="mb-1 block text-xs font-medium">
-                  {draft.digest
-                    ? "Intro copy · shown above the homes"
-                    : "Email body · Markdown"}
-                </span>
-                <textarea
-                  value={draft.bodyMarkdown}
-                  onChange={(event) =>
-                    setDraft({ ...draft, bodyMarkdown: event.target.value })
-                  }
-                  className={`${controlClass} ${draft.digest ? "min-h-[160px]" : "min-h-[420px]"} font-mono text-[13px] leading-6`}
-                  placeholder={
-                    draft.digest
-                      ? "A short greeting and one or two paragraphs. The homes below render from the digest, not from this text. Supports **bold** and [links](https://…)."
-                      : "Write the email here, or generate this selected slot from its brief."
-                  }
-                />
-              </label>
-              <label>
-                <span className="mb-1 block text-xs font-medium">
-                  CTA label
-                </span>
-                <input
-                  value={draft.ctaLabel ?? ""}
-                  onChange={(event) =>
-                    setDraft({ ...draft, ctaLabel: event.target.value || null })
-                  }
-                  className={controlClass}
-                />
-              </label>
-              <label>
-                <span className="mb-1 block text-xs font-medium">CTA URL</span>
-                <input
-                  value={draft.ctaUrl ?? ""}
-                  onChange={(event) =>
-                    setDraft({ ...draft, ctaUrl: event.target.value || null })
-                  }
-                  className={controlClass}
-                  placeholder="https://…"
-                />
-              </label>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() =>
@@ -313,7 +265,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
               </button>
               <button
                 type="button"
-                onClick={renderPreview}
+                onClick={() => renderPreview()}
                 disabled={preview.isPending}
                 className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50"
               >
@@ -333,13 +285,90 @@ function Editor({ workspace }: { workspace: Workspace }) {
             )}
           </section>
 
-          {draft.digest && (
-            <DigestImageBoard
-              digest={draft.digest}
-              brandId={workspace.brand.id}
-              onChange={(digest) => setDraft({ ...draft, digest })}
-            />
-          )}
+          <details className="bg-card rounded-xl border">
+            <summary className="text-muted-foreground hover:text-foreground cursor-pointer px-4 py-3 text-sm font-medium select-none">
+              Edit fields manually
+            </summary>
+            <div className="border-t p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium">
+                    Subject
+                  </span>
+                  <input
+                    value={draft.subject}
+                    onChange={(event) =>
+                      setDraft({ ...draft, subject: event.target.value })
+                    }
+                    className={controlClass}
+                  />
+                </label>
+                <label className="sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium">
+                    Preheader
+                  </span>
+                  <input
+                    value={draft.preheader ?? ""}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        preheader: event.target.value || null,
+                      })
+                    }
+                    className={controlClass}
+                    placeholder="Optional inbox preview text"
+                  />
+                </label>
+                <label className="sm:col-span-2">
+                  <span className="mb-1 block text-xs font-medium">
+                    {draft.digest
+                      ? "Intro copy · shown above the homes"
+                      : "Email body · Markdown"}
+                  </span>
+                  <textarea
+                    value={draft.bodyMarkdown}
+                    onChange={(event) =>
+                      setDraft({ ...draft, bodyMarkdown: event.target.value })
+                    }
+                    className={`${controlClass} ${draft.digest ? "min-h-[160px]" : "min-h-[420px]"} font-mono text-[13px] leading-6`}
+                    placeholder={
+                      draft.digest
+                        ? "A short greeting and one or two paragraphs. The homes below render from the digest, not from this text. Supports **bold** and [links](https://…)."
+                        : "Write the email here, or generate this selected slot from its brief."
+                    }
+                  />
+                </label>
+                <label>
+                  <span className="mb-1 block text-xs font-medium">
+                    CTA label
+                  </span>
+                  <input
+                    value={draft.ctaLabel ?? ""}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        ctaLabel: event.target.value || null,
+                      })
+                    }
+                    className={controlClass}
+                  />
+                </label>
+                <label>
+                  <span className="mb-1 block text-xs font-medium">
+                    CTA URL
+                  </span>
+                  <input
+                    value={draft.ctaUrl ?? ""}
+                    onChange={(event) =>
+                      setDraft({ ...draft, ctaUrl: event.target.value || null })
+                    }
+                    className={controlClass}
+                    placeholder="https://…"
+                  />
+                </label>
+              </div>
+            </div>
+          </details>
 
           {draft.productUpdate && (
             <section className="bg-card rounded-xl border p-4">
@@ -738,9 +767,46 @@ function Editor({ workspace }: { workspace: Workspace }) {
 
         <div className="xl:sticky xl:top-4 xl:self-start">
           <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-            <div className="border-b bg-slate-50 px-4 py-3 text-xs font-medium text-slate-600">
-              Wander email design-system preview · responsive HTML
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-600">
+              <span>Wander email preview</span>
+              {/* Liquid stays raw in the stored document; CIO expands it per
+                  recipient. These views simulate that expansion locally — the
+                  seed-segment test send in CIO remains the real check. */}
+              <div className="flex overflow-hidden rounded-md border border-slate-200">
+                {(
+                  [
+                    ["template", "Template"],
+                    ["full", "As Jane (Austin)"],
+                    ["sparse", "No attributes"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setViewAs(value);
+                      renderPreview(value);
+                    }}
+                    className={`px-2 py-1 text-[11px] font-medium ${
+                      viewAs === value
+                        ? "bg-slate-800 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
+            {previewWarnings.length > 0 && (
+              <div className="space-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2">
+                {previewWarnings.map((warning) => (
+                  <p key={warning} className="text-xs text-amber-800">
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            )}
             {previewHtml ? (
               <iframe
                 srcDoc={previewHtml}

@@ -207,6 +207,9 @@ export const newsletterRouter = createTRPCRouter({
       z.object({
         platformPostId: z.string(),
         draft: emailDocumentDraftSchema.optional(),
+        // template = raw liquid as CIO receives it; full/sparse simulate the
+        // per-recipient expansion locally (seed sends stay the real check).
+        viewAs: z.enum(["template", "full", "sparse"]).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -214,12 +217,11 @@ export const newsletterRouter = createTRPCRouter({
         ctx.db,
         ctx.session.user.id,
       );
-      const html = await renderEmailPreview({
+      return renderEmailPreview({
         ...input,
         organizationId,
         userId: ctx.session.user.id,
       });
-      return { html };
     }),
 
   exportHandoff: protectedProcedure

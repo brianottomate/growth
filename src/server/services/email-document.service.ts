@@ -30,6 +30,10 @@ import {
   type EmailDocumentSnapshot,
 } from "@/server/db/schema";
 import { renderDesignSystemNewsletter } from "@/server/email/design-system-newsletter-renderer";
+import {
+  simulateLiquid,
+  type LiquidPersona,
+} from "@/server/email/liquid-preview";
 
 export const EMAIL_GENERATION_MODEL = "claude-sonnet-5";
 
@@ -607,6 +611,13 @@ export async function renderEmailPreview(input: {
   organizationId: string;
   userId: string;
   draft?: EmailDocumentDraft;
+  /**
+   * "template" shows the raw liquid as stored (what CIO receives); the persona
+   * views simulate CIO's per-recipient expansion — "full" as a fully-attributed
+   * recipient, "sparse" as one CIO knows nothing about, which is what shakes
+   * out missing `| default:` fallbacks.
+   */
+  viewAs?: "template" | LiquidPersona;
 }) {
   const { document, spot } = await ensureEmailDocument(input);
   const draft = emailDocumentDraftSchema.parse(input.draft ?? document);
@@ -615,7 +626,10 @@ export async function renderEmailPreview(input: {
     brandName: spot.brand.name,
     logo: spot.brand.brandIdentity?.logo ?? spot.brand.logo,
   });
-  return rendered.html;
+  if (!input.viewAs || input.viewAs === "template") {
+    return { html: rendered.html, warnings: [] as string[] };
+  }
+  return simulateLiquid(rendered.html, input.viewAs);
 }
 
 export async function exportEmailHandoff(input: {

@@ -271,7 +271,7 @@ export const setDigestImage = growthAction({
 
 export const updateEmailDraft = growthAction({
   description:
-    "Save an agreed conversational refinement to one email's canonical document and create a revision checkpoint. Pass only the fields that changed.",
+    'Save an agreed conversational refinement to one email\'s canonical document and create a revision checkpoint. Pass only the fields that changed — but pass each changed field WHOLE: read the current value with getEmailDraft, rewrite the entire field with the change incorporated, and send the full replacement. Never attempt surgical partial edits or describe a diff; a field is replaced in its entirety. Liquid personalization tokens like {{ customer.first_name | default: "there" }} are allowed in subject and body — Customer.io expands them per recipient at delivery, and the workspace preview can simulate them.',
   inputSchema: z.object({
     platformPostId: z.string(),
     changes: emailDocumentDraftSchema.partial(),
