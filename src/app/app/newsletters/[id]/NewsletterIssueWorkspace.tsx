@@ -10,6 +10,7 @@ import {
   Loader2,
   MailCheck,
   MessageSquare,
+  Pencil,
   RefreshCw,
   RotateCcw,
   Save,
@@ -18,6 +19,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { SimpleDialog } from "@/components/ui/dialog";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 import { DigestImageBoard } from "./DigestImageBoard";
@@ -60,6 +62,7 @@ function Editor({ workspace }: { workspace: Workspace }) {
   });
   const [brief, setBrief] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
+  const [fieldsOpen, setFieldsOpen] = useState(false);
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   // template = raw liquid as CIO receives it; the personas simulate CIO's
   // per-recipient expansion. "sparse" is the fallback-shaker: a recipient with
@@ -274,6 +277,13 @@ function Editor({ workspace }: { workspace: Workspace }) {
                 />
                 Refresh preview
               </button>
+              <button
+                type="button"
+                onClick={() => setFieldsOpen(true)}
+                className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
+              >
+                <Pencil className="size-4" /> Edit fields manually
+              </button>
               <span className="text-muted-foreground text-xs">
                 Revision {workspace.document.currentRevision}
               </span>
@@ -285,90 +295,32 @@ function Editor({ workspace }: { workspace: Workspace }) {
             )}
           </section>
 
-          <details className="bg-card rounded-xl border">
-            <summary className="text-muted-foreground hover:text-foreground cursor-pointer px-4 py-3 text-sm font-medium select-none">
-              Edit fields manually
-            </summary>
-            <div className="border-t p-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="sm:col-span-2">
-                  <span className="mb-1 block text-xs font-medium">
-                    Subject
-                  </span>
-                  <input
-                    value={draft.subject}
-                    onChange={(event) =>
-                      setDraft({ ...draft, subject: event.target.value })
-                    }
-                    className={controlClass}
-                  />
-                </label>
-                <label className="sm:col-span-2">
-                  <span className="mb-1 block text-xs font-medium">
-                    Preheader
-                  </span>
-                  <input
-                    value={draft.preheader ?? ""}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        preheader: event.target.value || null,
-                      })
-                    }
-                    className={controlClass}
-                    placeholder="Optional inbox preview text"
-                  />
-                </label>
-                <label className="sm:col-span-2">
-                  <span className="mb-1 block text-xs font-medium">
-                    {draft.digest
-                      ? "Intro copy · shown above the homes"
-                      : "Email body · Markdown"}
-                  </span>
-                  <textarea
-                    value={draft.bodyMarkdown}
-                    onChange={(event) =>
-                      setDraft({ ...draft, bodyMarkdown: event.target.value })
-                    }
-                    className={`${controlClass} ${draft.digest ? "min-h-[160px]" : "min-h-[420px]"} font-mono text-[13px] leading-6`}
-                    placeholder={
-                      draft.digest
-                        ? "A short greeting and one or two paragraphs. The homes below render from the digest, not from this text. Supports **bold** and [links](https://…)."
-                        : "Write the email here, or generate this selected slot from its brief."
-                    }
-                  />
-                </label>
-                <label>
-                  <span className="mb-1 block text-xs font-medium">
-                    CTA label
-                  </span>
-                  <input
-                    value={draft.ctaLabel ?? ""}
-                    onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        ctaLabel: event.target.value || null,
-                      })
-                    }
-                    className={controlClass}
-                  />
-                </label>
-                <label>
-                  <span className="mb-1 block text-xs font-medium">
-                    CTA URL
-                  </span>
-                  <input
-                    value={draft.ctaUrl ?? ""}
-                    onChange={(event) =>
-                      setDraft({ ...draft, ctaUrl: event.target.value || null })
-                    }
-                    className={controlClass}
-                    placeholder="https://…"
-                  />
-                </label>
-              </div>
-            </div>
-          </details>
+          {fieldsOpen && (
+            <ManualFieldsDialog
+              initial={{
+                subject: draft.subject,
+                preheader: draft.preheader,
+                bodyMarkdown: draft.bodyMarkdown,
+                ctaLabel: draft.ctaLabel,
+                ctaUrl: draft.ctaUrl,
+              }}
+              isDigest={Boolean(draft.digest)}
+              saving={save.isPending}
+              onSave={(fields) => {
+                const next = { ...draft, ...fields };
+                setDraft(next);
+                save.mutate(
+                  {
+                    platformPostId: workspace.spot.id,
+                    draft: next,
+                    note: "Edited fields manually",
+                  },
+                  { onSuccess: () => setFieldsOpen(false) },
+                );
+              }}
+              onOpenChange={setFieldsOpen}
+            />
+          )}
 
           {draft.productUpdate && (
             <section className="bg-card rounded-xl border p-4">
@@ -825,6 +777,144 @@ function Editor({ workspace }: { workspace: Workspace }) {
         </div>
       </div>
     </div>
+  );
+}
+
+type ManualFields = Pick<
+  Draft,
+  "subject" | "preheader" | "bodyMarkdown" | "ctaLabel" | "ctaUrl"
+>;
+
+/**
+ * Manual field editing lives in a modal on purpose. As an inline form it was a
+ * second writer racing the chat, and the content-post editor taught us how
+ * that ends: chat moves the document under the form and someone's work loses.
+ * The dialog makes the mode explicit. While it is open you are editing a local
+ * copy, chat is out of reach, and nothing exists until Save.
+ */
+function ManualFieldsDialog({
+  initial,
+  isDigest,
+  saving,
+  onSave,
+  onOpenChange,
+}: {
+  initial: ManualFields;
+  isDigest: boolean;
+  saving: boolean;
+  onSave: (fields: ManualFields) => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [fields, setFields] = useState<ManualFields>(initial);
+  const dirty = JSON.stringify(fields) !== JSON.stringify(initial);
+  const close = (next: boolean) => {
+    if (next) return;
+    if (
+      dirty &&
+      !saving &&
+      !window.confirm("Discard your unsaved field edits?")
+    )
+      return;
+    onOpenChange(false);
+  };
+
+  return (
+    <SimpleDialog
+      open
+      onOpenChange={close}
+      title="Edit fields manually"
+      description="You are editing a local copy. Nothing applies until you save, and chat edits wait until you close this."
+      size="lg"
+      scrollable
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => close(false)}
+            className="border-border hover:bg-accent rounded-lg border px-3 py-2 text-sm font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!dirty || saving}
+            onClick={() => onSave(fields)}
+            className="bg-primary text-primary-foreground flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {saving ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
+            )}
+            Save revision
+          </button>
+        </div>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium">Subject</span>
+          <input
+            value={fields.subject}
+            onChange={(event) =>
+              setFields({ ...fields, subject: event.target.value })
+            }
+            className={controlClass}
+          />
+        </label>
+        <label className="sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium">Preheader</span>
+          <input
+            value={fields.preheader ?? ""}
+            onChange={(event) =>
+              setFields({ ...fields, preheader: event.target.value || null })
+            }
+            className={controlClass}
+            placeholder="Optional inbox preview text"
+          />
+        </label>
+        <label className="sm:col-span-2">
+          <span className="mb-1 block text-xs font-medium">
+            {isDigest
+              ? "Intro copy · shown above the homes"
+              : "Email body · Markdown"}
+          </span>
+          <textarea
+            value={fields.bodyMarkdown}
+            onChange={(event) =>
+              setFields({ ...fields, bodyMarkdown: event.target.value })
+            }
+            className={`${controlClass} ${isDigest ? "min-h-[160px]" : "min-h-[380px]"} font-mono text-[13px] leading-6`}
+            placeholder={
+              isDigest
+                ? "A short greeting and one or two paragraphs. The homes below render from the digest, not from this text. Supports **bold** and [links](https://…)."
+                : "Write the email here, or generate this selected slot from its brief."
+            }
+          />
+        </label>
+        <label>
+          <span className="mb-1 block text-xs font-medium">CTA label</span>
+          <input
+            value={fields.ctaLabel ?? ""}
+            onChange={(event) =>
+              setFields({ ...fields, ctaLabel: event.target.value || null })
+            }
+            className={controlClass}
+          />
+        </label>
+        <label>
+          <span className="mb-1 block text-xs font-medium">CTA URL</span>
+          <input
+            value={fields.ctaUrl ?? ""}
+            onChange={(event) =>
+              setFields({ ...fields, ctaUrl: event.target.value || null })
+            }
+            className={controlClass}
+            placeholder="https://…"
+          />
+        </label>
+      </div>
+    </SimpleDialog>
   );
 }
 
