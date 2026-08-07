@@ -206,7 +206,9 @@ function Editor({ workspace }: { workspace: Workspace }) {
           <Link
             href={
               workspace.content
-                ? `/app/content/${workspace.content.id}`
+                ? // ?card=1 bypasses the email-only redirect on the content
+                  // page, or this link would bounce straight back here.
+                  `/app/content/${workspace.content.id}?card=1`
                 : "/app/content"
             }
             className="border-border hover:bg-accent flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
@@ -248,15 +250,21 @@ function Editor({ workspace }: { workspace: Workspace }) {
               </label>
               <label className="sm:col-span-2">
                 <span className="mb-1 block text-xs font-medium">
-                  Email body · Markdown
+                  {draft.digest
+                    ? "Intro copy · shown above the homes"
+                    : "Email body · Markdown"}
                 </span>
                 <textarea
                   value={draft.bodyMarkdown}
                   onChange={(event) =>
                     setDraft({ ...draft, bodyMarkdown: event.target.value })
                   }
-                  className={`${controlClass} min-h-[420px] font-mono text-[13px] leading-6`}
-                  placeholder="Write the email here, or generate this selected slot from its brief."
+                  className={`${controlClass} ${draft.digest ? "min-h-[160px]" : "min-h-[420px]"} font-mono text-[13px] leading-6`}
+                  placeholder={
+                    draft.digest
+                      ? "A short greeting and one or two paragraphs. The homes below render from the digest, not from this text. Supports **bold** and [links](https://…)."
+                      : "Write the email here, or generate this selected slot from its brief."
+                  }
                 />
               </label>
               <label>

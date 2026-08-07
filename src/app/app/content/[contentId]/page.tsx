@@ -73,10 +73,13 @@ function StatusBadge({ status }: { status: string }) {
 
 export default async function ContentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ contentId: string }>;
+  searchParams?: Promise<{ card?: string }>;
 }) {
   const { contentId } = await params;
+  const resolvedSearchParams = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -110,6 +113,22 @@ export default async function ContentDetailPage({
       owner: { columns: memberCols },
     },
   });
+  // An email-only piece: its real workbench is the newsletter workspace, and
+  // the content card is one hop of indirection in the way of every visit. Send
+  // the operator straight there. `?card=1` (used by the workspace's own
+  // "Content item" link) still opens the card for calendar/premise edits.
+  const ownedSpots = (content?.platformPosts ?? []).filter(
+    (post) => post.source === "owned",
+  );
+  const onlyEmail =
+    ownedSpots.length === 1 &&
+    ownedSpots[0]!.platform === "newsletter" &&
+    (ownedSpots[0]!.format === "newsletter.broadcast" ||
+      ownedSpots[0]!.format === "newsletter.blast");
+  if (content && onlyEmail && resolvedSearchParams?.card !== "1") {
+    redirect(`/app/newsletters/${ownedSpots[0]!.id}`);
+  }
+
   if (
     !content ||
     content.brand?.organizationId !== org.id ||
