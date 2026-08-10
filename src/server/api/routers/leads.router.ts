@@ -927,6 +927,13 @@ export const leadsRouter = createTRPCRouter({
         sourceUrl,
       });
 
+      // The in-flight check above is a read-then-write, so it cannot hold under
+      // concurrency: two calls 197ms apart both read "nothing in flight", both
+      // asked WanderOS (which is idempotent per source URL and handed back the
+      // SAME prospect), and the second insert died on the unique prospect_id
+      // index — a raw Postgres error surfaced to the operator for a build that
+      // had in fact started. That index is the only real serialization point, so
+      // treat a collision as what it is: this prospect already has a build row.
       const [build] = await ctx.db
         .insert(pregenBuildTable)
         .values({
@@ -940,9 +947,40 @@ export const leadsRouter = createTRPCRouter({
           status: prospect.status,
           previewUrl: prospect.previewUrl ?? null,
         })
+        .onConflictDoNothing({ target: pregenBuildTable.prospectId })
         .returning();
-      return build ?? null;
+      if (build) return build;
+
+      const [existing] = await ctx.db
+        .select()
+        .from(pregenBuildTable)
+        .where(eq(pregenBuildTable.prospectId, prospect.id))
+        .limit(1);
+      return existing ?? null;
     }),
+
+  /**
+   * Builds that have been asked for and have not settled.
+   *
+   * A build takes ~18 minutes on the monolith and the only delivery path is a
+   * webhook, so without this the operator asks for one, the card goes quiet, and
+   * nothing on the page says work is happening. Cheap enough to poll: one
+   * indexed read over a table that holds tens of rows.
+   */
+  pregenBuildsInFlight: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db
+      .select({
+        id: pregenBuildTable.id,
+        domain: pregenBuildTable.domain,
+        status: pregenBuildTable.status,
+        requestedAt: pregenBuildTable.requestedAt,
+        previewUrl: pregenBuildTable.previewUrl,
+      })
+      .from(pregenBuildTable)
+      .where(isNull(pregenBuildTable.settledAt))
+      .orderBy(desc(pregenBuildTable.requestedAt))
+      .limit(25);
+  }),
 
   /**
    * Pull current state for this prospect's latest build.

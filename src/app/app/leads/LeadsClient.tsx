@@ -24,6 +24,7 @@ import {
   ProspectReviewCard,
   type ProspectCardData,
 } from "./ProspectReviewCard";
+import { PregenBuildsBanner } from "./PregenBuildsBanner";
 
 const SOURCE_BADGE: Record<string, string> = {
   builtwith: "bg-slate-500/15 text-slate-300",
@@ -270,6 +271,13 @@ export function LeadsClient() {
         Domain-centric prospecting universe · BuiltWith + HubSpot + Instantly,
         deduped on domain
       </p>
+
+      {/* Above the filters, because an in-flight build is true of the workspace
+          rather than of whatever population happens to be selected. Renders
+          nothing when nothing is building. */}
+      <div className="mt-4">
+        <PregenBuildsBanner />
+      </div>
 
       {/* One quiet line for the universe. These are reference numbers looked at
           occasionally, and as six tiles they cost more attention than they earn —
