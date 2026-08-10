@@ -28,7 +28,10 @@ import {
   mediaAssetTable,
 } from "@/server/db/schema";
 import { publishBlogDraft as publishBlogDraftToDato } from "@/server/services/blog-publish.service";
-import { ContentService } from "@/server/services/content.service";
+import {
+  ContentService,
+  deliveryBlockReason,
+} from "@/server/services/content.service";
 import { saveSocialFirstComment } from "@/server/services/content-publishing.service";
 import { MediaService } from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
@@ -1690,6 +1693,33 @@ export const promotePlatformPost = growthAction({
       ok: true as const,
       ...result,
       url: `/app/content/${result.id}`,
+    };
+  },
+});
+
+export const deleteContentWorkItem = growthAction({
+  description:
+    "Permanently delete one content idea and the owned drafts under it, including any email document. This is a real delete and cannot be undone; prefer setting status to archived when the work might still matter. Scraped posts are never deleted, they detach and stay as published history. A draft that already has a delivery record is refused.",
+  inputSchema: z.object({ contentPostId: z.string() }),
+  execute: async (input, ctx) => {
+    const content = await requireContentWorkItem(input.contentPostId, ctx);
+    const blocked = await deliveryBlockReason(
+      content.platformPosts
+        .filter((post) => post.source === "owned")
+        .map((post) => post.id),
+    );
+    if (blocked) throw new GrowthActionError("invalid_input", blocked);
+    const result = await ContentService.purgeIdea({
+      contentPostId: content.id,
+    });
+    return {
+      ok: true as const,
+      action: "deleted" as const,
+      idea: { id: result.id, title: result.title },
+      spotsDeleted: result.spotsDeleted,
+      scrapedDetached: result.scrapedDetached,
+      url: "/app/content",
+      next: "Say what was removed. Do not recreate it unless the operator asks.",
     };
   },
 });

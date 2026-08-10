@@ -4,6 +4,7 @@ import { and, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
+import { DeleteSeriesButton } from "../DeleteSeriesButton";
 import { getSeriesRunway } from "@/lib/series-runway";
 import { db } from "@/server/db";
 import {
@@ -16,10 +17,11 @@ import {
 import { getSession } from "@/server/better-auth/server";
 import { listBrandPillars } from "@/server/services/content-strategy.service";
 
-// The series lens: a read-only view over data owned by other surfaces. All
-// edits happen through the side-panel chat (contentStrategyWrite /
-// strategyWrite) or the content board — this page just renders the series in
-// context, so it stays cheap and can't drift from the calendar.
+// The series lens: a read view over data owned by other surfaces. Edits happen
+// through the side-panel chat (contentStrategyWrite / strategyWrite) or the
+// content board, so this page stays cheap and can't drift from the calendar.
+// The one mutation it owns is deletion, which needs no editor and shouldn't
+// require asking the assistant to remove structure you can see is wrong.
 
 const STATUS: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-300",
@@ -347,6 +349,11 @@ export default async function SeriesDetailPage({
             · {target.platform}
           </span>
         ))}
+        <DeleteSeriesButton
+          seriesId={series.id}
+          name={series.name}
+          ideas={installments.length}
+        />
       </div>
 
       {series.description ? (

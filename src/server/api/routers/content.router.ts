@@ -21,7 +21,10 @@ import {
   platformFormatsFor,
   validateSpot,
 } from "@/server/content/formats";
-import { ContentService } from "@/server/services/content.service";
+import {
+  ContentService,
+  deliveryBlockReason,
+} from "@/server/services/content.service";
 import { generateSpotCaption } from "@/server/services/spot-generate.service";
 import { SPOT_PILL_IDS } from "@/lib/spot-pills";
 import { displayPoster } from "@/lib/utils/media";
@@ -1282,6 +1285,58 @@ export const contentRouter = createTRPCRouter({
         .delete(platformPostTable)
         .where(eq(platformPostTable.id, input.platformPostId));
       return { id: input.platformPostId };
+    }),
+
+  /**
+   * Delete an idea outright, with the owned spots and email documents under it.
+   * Distinct from `removeSpot`, which undoes one cross-post and leaves the idea
+   * standing. Scraped spots detach and survive as published history.
+   */
+  purgeWorkItem: protectedProcedure
+    .input(z.object({ contentPostId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const content = await ctx.db.query.contentPostTable.findFirst({
+        where: eq(contentPostTable.id, input.contentPostId),
+        columns: { id: true },
+        with: {
+          brand: { columns: { organizationId: true } },
+          platformPosts: { columns: { id: true, source: true } },
+        },
+      });
+      if (!content) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, content.brand?.organizationId);
+
+      const blocked = await deliveryBlockReason(
+        content.platformPosts
+          .filter((spot) => spot.source === "owned")
+          .map((spot) => spot.id),
+      );
+      if (blocked) throw new TRPCError({ code: "FORBIDDEN", message: blocked });
+
+      return ContentService.purgeIdea({ contentPostId: content.id });
+    }),
+
+  /** Delete one draft (newsletter issue, platform spot) and any shell it leaves. */
+  purgeSpot: protectedProcedure
+    .input(z.object({ platformPostId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const spot = await ctx.db.query.platformPostTable.findFirst({
+        where: eq(platformPostTable.id, input.platformPostId),
+        columns: { id: true, source: true },
+        with: { brand: { columns: { organizationId: true } } },
+      });
+      if (!spot) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertOrgMember(ctx, spot.brand?.organizationId);
+      if (spot.source !== "owned") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Can't delete a scraped post",
+        });
+      }
+      const blocked = await deliveryBlockReason([spot.id]);
+      if (blocked) throw new TRPCError({ code: "FORBIDDEN", message: blocked });
+
+      return ContentService.purgeSpot({ platformPostId: spot.id });
     }),
 
   /**

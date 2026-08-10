@@ -21,6 +21,7 @@ import {
   contentPipelineSummary,
   createIdea,
   createPlatformPost,
+  deleteContentWorkItem,
   finishContentMediaUploads,
   getContentWorkItem,
   importRemoteImagesToContent,
@@ -186,6 +187,7 @@ export const contentWrite = growthDomainTool({
     createPlatformPost,
     promotePlatformPost,
     publishBlogDraft,
+    deleteWorkItem: deleteContentWorkItem,
   },
 });
 
@@ -210,7 +212,8 @@ export const emailRead = growthDomainTool({
 });
 
 export const emailWrite = growthDomainTool({
-  description: "Create, revise, or deliberately generate an email draft.",
+  description:
+    "Create, revise, deliberately generate, or permanently delete an email draft.",
   actions: {
     createSlot: EMAIL_TOOLS.createEmailSlot,
     createDigestFromRow: EMAIL_TOOLS.createDigestFromRow,
@@ -218,6 +221,7 @@ export const emailWrite = growthDomainTool({
     createProductUpdate: EMAIL_TOOLS.createProductUpdateDraft,
     updateDraft: EMAIL_TOOLS.updateEmailDraft,
     generateDraft: EMAIL_TOOLS.generateEmailDraft,
+    deleteDraft: EMAIL_TOOLS.deleteEmailDraft,
   },
 });
 
@@ -227,10 +231,13 @@ export const contentStrategyRead = growthDomainTool({
 });
 
 export const contentStrategyWrite = growthDomainTool({
-  description: "Save and organize one brand's content strategy structure.",
+  description:
+    "Save, organize, or permanently delete one brand's content strategy structure.",
   actions: {
     savePillar: CONTENT_STRATEGY_TOOLS.saveContentPillar,
     saveSeries: CONTENT_STRATEGY_TOOLS.saveContentSeries,
+    deleteSeries: CONTENT_STRATEGY_TOOLS.deleteContentSeries,
+    clearSeries: CONTENT_STRATEGY_TOOLS.clearContentSeries,
     organizeIdeas: CONTENT_STRATEGY_TOOLS.organizeContentIdeas,
     proposeGroupings: proposeContentGroupings,
     resolveGrouping: CONTENT_STRATEGY_TOOLS.resolveContentGrouping,

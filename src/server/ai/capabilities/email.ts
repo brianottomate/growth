@@ -18,6 +18,10 @@ import {
   saveEmailDocument,
   startEmailGeneration,
 } from "@/server/services/email-document.service";
+import {
+  ContentService,
+  deliveryBlockReason,
+} from "@/server/services/content.service";
 import { growthAction } from "./types";
 
 export const getEmailDraft = growthAction({
@@ -361,6 +365,32 @@ export const generateEmailDraft = growthAction({
   },
 });
 
+export const deleteEmailDraft = growthAction({
+  description:
+    "Permanently delete one email draft: the spot, its canonical document, and its revisions. This is a real delete and cannot be undone. If the draft was the only thing rendered for its content idea, that idea goes too, so the pipeline does not keep counting an empty shell. An email with a delivery record is refused, because a sent message stays in the send ledger.",
+  inputSchema: z.object({ platformPostId: z.string() }),
+  execute: async ({ platformPostId }, ctx) => {
+    // Resolves org access and 404s on anything outside it before we delete.
+    const workspace = await getEmailWorkspace({
+      platformPostId,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    });
+    const subject = workspace.document.subject;
+    const blocked = await deliveryBlockReason([platformPostId]);
+    if (blocked) throw new Error(blocked);
+    const result = await ContentService.purgeSpot({ platformPostId });
+    return {
+      ok: true as const,
+      action: "deleted" as const,
+      email: { id: result.id, subject },
+      ideaDeleted: Boolean(result.ideaDeleted),
+      url: "/app/newsletters",
+      next: "Confirm what was deleted by subject and date. Do not regenerate it unless asked.",
+    };
+  },
+});
+
 export const EMAIL_TOOLS = {
   getEmailDraft,
   createEmailSlot,
@@ -369,4 +399,5 @@ export const EMAIL_TOOLS = {
   createProductUpdateDraft,
   updateEmailDraft,
   generateEmailDraft,
+  deleteEmailDraft,
 } as const;

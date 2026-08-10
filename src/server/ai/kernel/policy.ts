@@ -136,6 +136,11 @@ export const growthActionPolicies = {
     promotePlatformPost: write({ reversible: false }),
     // Creates a DRAFT in the external CMS; deletable there, never auto-published.
     publishBlogDraft: write({ consequence: "provider-write" }),
+    // Real delete, no trash to restore from. Deliberate: drafts are cheap to
+    // create here, so they should be cheap to remove, and an archive-only
+    // workspace left the assistant reasoning about rows nobody would send.
+    // Anything with a delivery record is refused in purge.service.
+    deleteWorkItem: write({ reversible: false }),
   },
   contentMediaWrite: {
     attachChatImage: write({ idempotent: true }),
@@ -155,11 +160,16 @@ export const growthActionPolicies = {
     createProductUpdate: write(),
     updateDraft: write({ idempotent: true }),
     generateDraft: write({ consequence: "background-run" }),
+    deleteDraft: write({ reversible: false }),
   },
   contentStrategyRead: { get: read() },
   contentStrategyWrite: {
     savePillar: write({ idempotent: true }),
     saveSeries: write({ idempotent: true }),
+    deleteSeries: write({ reversible: false }),
+    // One series is cheap to rebuild; a whole shelf is not, so the bulk clear is
+    // the one purge that stops for an explicit yes.
+    clearSeries: write({ approval: "user", reversible: false }),
     organizeIdeas: write({ idempotent: true }),
     proposeGroupings: write({ consequence: "model-write" }),
     resolveGrouping: write({ idempotent: true }),

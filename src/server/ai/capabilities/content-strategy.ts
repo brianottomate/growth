@@ -13,7 +13,9 @@ import {
   seriesTable,
 } from "@/server/db/schema";
 import {
+  clearBrandSeries,
   listBrandPillars,
+  purgeSeries,
   requireBrandPillar,
   saveBrandPillar,
 } from "@/server/services/content-strategy.service";
@@ -543,10 +545,62 @@ export const resolveContentGrouping = growthAction({
   },
 });
 
+export const deleteContentSeries = growthAction({
+  description:
+    "Permanently delete one content series. This is a real delete, not an archive: the series row is gone and cannot be restored. Ideas that sat in the series survive and simply lose their series, so use this to remove editorial structure that was never right, not to remove the work underneath it.",
+  inputSchema: z.object({ brandId: z.string(), seriesId: z.string() }),
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    const existing = await db.query.seriesTable.findFirst({
+      where: and(
+        eq(seriesTable.id, input.seriesId),
+        eq(seriesTable.brandId, brand.id),
+      ),
+      columns: { id: true },
+    });
+    if (!existing) throw new Error("Series not found for this brand.");
+    const result = await purgeSeries({ seriesId: existing.id });
+    return {
+      ok: true as const,
+      action: "deleted" as const,
+      series: { id: result.id, name: result.name },
+      brand: brand.name,
+      detachedIdeas: result.detachedIdeas,
+      url: "/app/series",
+      next:
+        result.detachedIdeas > 0
+          ? `${result.detachedIdeas} idea(s) now have no series. Tell the operator, and offer to place them somewhere or delete them too.`
+          : "Report the deletion plainly and ask what should exist in its place.",
+    };
+  },
+});
+
+export const clearContentSeries = growthAction({
+  description:
+    "Permanently delete EVERY content series for one owned brand, for a clean slate. Irreversible. Ideas survive and detach. Only run this when the operator has asked to clear or reset the series shelf for that brand; to remove one series use deleteSeries.",
+  inputSchema: z.object({ brandId: z.string() }),
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    const result = await clearBrandSeries({ brandId: brand.id });
+    return {
+      ok: true as const,
+      action: "cleared" as const,
+      brand: brand.name,
+      deleted: result.deleted,
+      detachedIdeas: result.detachedIdeas,
+      names: result.names,
+      url: "/app/series",
+      next: "Name what was removed, then ask which series the brand actually wants going forward before creating anything new.",
+    };
+  },
+});
+
 export const CONTENT_STRATEGY_TOOLS = {
   getContentStrategy,
   saveContentPillar,
   saveContentSeries,
+  deleteContentSeries,
+  clearContentSeries,
   organizeContentIdeas,
   resolveContentGrouping,
 } as const;

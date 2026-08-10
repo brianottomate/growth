@@ -1,10 +1,14 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { PILLARS } from "@/lib/pillars";
 import { db } from "@/server/db";
-import { contentPillarTable } from "@/server/db/schema";
+import {
+  contentPillarTable,
+  contentPostTable,
+  seriesTable,
+} from "@/server/db/schema";
 
 export async function listBrandPillars(input: {
   brandId: string;
@@ -104,4 +108,50 @@ export async function requireBrandPillar(input: {
     );
   }
   return pillar;
+}
+
+/**
+ * Hard-delete one series. Its ideas survive and detach
+ * (`content_post.series_id` is SET NULL); its cadence targets go with it
+ * (CASCADE). Auth is the caller's job, as everywhere else in this file.
+ */
+export async function purgeSeries(input: { seriesId: string }) {
+  const row = await db.query.seriesTable.findFirst({
+    where: eq(seriesTable.id, input.seriesId),
+    columns: { id: true, name: true },
+  });
+  if (!row) throw new Error("That series no longer exists.");
+
+  const ideas = await db.query.contentPostTable.findMany({
+    where: eq(contentPostTable.seriesId, row.id),
+    columns: { id: true },
+  });
+  await db.delete(seriesTable).where(eq(seriesTable.id, row.id));
+
+  return { id: row.id, name: row.name, detachedIdeas: ideas.length };
+}
+
+/** Clear one brand's series shelf. The ideas detach, they are not deleted. */
+export async function clearBrandSeries(input: { brandId: string }) {
+  const rows = await db.query.seriesTable.findMany({
+    where: eq(seriesTable.brandId, input.brandId),
+    columns: { id: true, name: true },
+  });
+  if (!rows.length)
+    return { deleted: 0, detachedIdeas: 0, names: [] as string[] };
+
+  const ideas = await db.query.contentPostTable.findMany({
+    where: inArray(
+      contentPostTable.seriesId,
+      rows.map((row) => row.id),
+    ),
+    columns: { id: true },
+  });
+  await db.delete(seriesTable).where(eq(seriesTable.brandId, input.brandId));
+
+  return {
+    deleted: rows.length,
+    detachedIdeas: ideas.length,
+    names: rows.map((row) => row.name),
+  };
 }

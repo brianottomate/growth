@@ -50,6 +50,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "createPlatformPost",
     "promotePlatformPost",
     "publishBlogDraft",
+    "deleteWorkItem",
   ],
   contentMediaWrite: [
     "attachChatImage",
@@ -69,11 +70,14 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "createProductUpdate",
     "updateDraft",
     "generateDraft",
+    "deleteDraft",
   ],
   contentStrategyRead: ["get"],
   contentStrategyWrite: [
     "savePillar",
     "saveSeries",
+    "deleteSeries",
+    "clearSeries",
     "organizeIdeas",
     "proposeGroupings",
     "resolveGrouping",

@@ -16,6 +16,7 @@ import {
   channelTable,
   contentPostTable,
   type MediaItem,
+  messageSendTable,
   platformPostLinkTable,
   platformPostTable,
 } from "../db/schema";
@@ -758,6 +759,90 @@ async function setContentStatus(input: {
   return { id: input.contentPostId };
 }
 
+/**
+ * Why these spots cannot be hard-deleted, or null when they can.
+ *
+ * A delivered email is ledger. `message_send` references `platform_post` with no
+ * ON DELETE, so Postgres refuses the delete anyway; this exists so each edge can
+ * raise its own error type with a readable sentence instead of surfacing a
+ * constraint violation.
+ */
+export async function deliveryBlockReason(platformPostIds: string[]) {
+  if (!platformPostIds.length) return null;
+  const sends = await db.query.messageSendTable.findMany({
+    where: inArray(messageSendTable.platformPostId, platformPostIds),
+    columns: { id: true },
+  });
+  if (!sends.length) return null;
+  return `This has ${sends.length} delivery record${sends.length === 1 ? "" : "s"} against it. A sent message stays in the send ledger; archive it instead of deleting.`;
+}
+
+/**
+ * Hard-delete one spot, plus the parent idea when that spot was the last thing
+ * rendered under it. Otherwise deleting a draft would leave a titled shell still
+ * counting toward the pipeline. The spot's email document goes with it (CASCADE).
+ */
+async function purgeSpot(input: { platformPostId: string }) {
+  const spot = await db.query.platformPostTable.findFirst({
+    where: eq(platformPostTable.id, input.platformPostId),
+    columns: { id: true, platform: true, contentPostId: true },
+  });
+  if (!spot) throw new Error("That draft no longer exists.");
+
+  await db.delete(platformPostTable).where(eq(platformPostTable.id, spot.id));
+
+  let ideaDeleted: string | null = null;
+  if (spot.contentPostId) {
+    const remaining = await db.query.platformPostTable.findMany({
+      where: eq(platformPostTable.contentPostId, spot.contentPostId),
+      columns: { id: true },
+    });
+    if (!remaining.length) {
+      await db
+        .delete(contentPostTable)
+        .where(eq(contentPostTable.id, spot.contentPostId));
+      ideaDeleted = spot.contentPostId;
+    }
+  }
+  return { id: spot.id, platform: spot.platform, ideaDeleted };
+}
+
+/**
+ * Hard-delete one idea and the owned spots under it. Scraped spots are
+ * historical record rather than editable plan, so they survive and detach
+ * (`platform_post.content_post_id` is SET NULL), which keeps a purge from
+ * rewriting what a brand actually published.
+ */
+async function purgeIdea(input: { contentPostId: string }) {
+  const idea = await db.query.contentPostTable.findFirst({
+    where: eq(contentPostTable.id, input.contentPostId),
+    columns: { id: true, title: true },
+  });
+  if (!idea) throw new Error("That content idea no longer exists.");
+
+  const spots = await db.query.platformPostTable.findMany({
+    where: eq(platformPostTable.contentPostId, idea.id),
+    columns: { id: true, source: true },
+  });
+  const owned = spots.filter((spot) => spot.source === "owned");
+  if (owned.length) {
+    await db.delete(platformPostTable).where(
+      inArray(
+        platformPostTable.id,
+        owned.map((spot) => spot.id),
+      ),
+    );
+  }
+  await db.delete(contentPostTable).where(eq(contentPostTable.id, idea.id));
+
+  return {
+    id: idea.id,
+    title: idea.title,
+    spotsDeleted: owned.length,
+    scrapedDetached: spots.length - owned.length,
+  };
+}
+
 export const ContentService = {
   createIdea,
   createPlatformPost,
@@ -775,4 +860,6 @@ export const ContentService = {
   setSpotCarousel,
   updatePlatformDraft,
   setContentStatus,
+  purgeSpot,
+  purgeIdea,
 } as const;

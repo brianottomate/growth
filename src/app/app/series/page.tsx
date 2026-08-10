@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
+import { ClearSeriesButton } from "./ClearSeriesButton";
 import { db } from "@/server/db";
 import {
   brandTable,
@@ -235,6 +236,11 @@ export default async function SeriesPage() {
                   · {brandSeries.length} series
                 </span>
                 <span className="flex-1" />
+                <ClearSeriesButton
+                  brandId={brand.id}
+                  brandName={brand.name}
+                  count={brandSeries.length}
+                />
                 <ContentStructureAssistantButton
                   brandId={brand.id}
                   brandName={brand.name}
