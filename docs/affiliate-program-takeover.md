@@ -53,11 +53,12 @@ From the transition plan, tiered by AP's own key:
   Reason=ORDER_UPDATE` → email to `2763eadb-d052-4910-ab2e-0e2c37f572e3@batch.impact.com`
   → propagates in 1–2h.
 - Merchant contact becomes `partnerships@wander.com` (AP updates it in Impact by 7/29).
-- Wander-side owners: **Micaela** is tagged first on affiliate matters as of
-  2026-08-10, with **Ornella Nuñez** (Social Media Manager) cc'd. Radio posts
-  follow this order via `AFFILIATE_OWNER_SLACK_ID` / `AFFILIATE_CC_SLACK_ID` in
-  `affiliate-notify.service.ts`. (AP's doc lists "Ornella, Micaela, and
-  Partnerships@" as the transition-notification set.)
+- Wander-side owner: **Micaela**, sole owner as of 2026-08-10. Ornella Nuñez
+  previously led the program and has left Wander, so the cc slot in
+  `affiliate-notify.service.ts` (`AFFILIATE_CC_SLACK_ID`) is empty until someone
+  names a second owner. AP's transition-notification set still lists "Ornella,
+  Micaela, and Partnerships@", so **AP needs telling** that Ornella is gone,
+  otherwise program mail keeps going to a dead address.
 - Known gaps in the doc itself: commission rates are literally `Base/Content: x,
   Loyalty: x, Coupon: x` (unfilled), and the goodbye newsletter has `X` / `email
   address` placeholders needing Wander's named contact + approval before the 7/27 send.
@@ -162,7 +163,7 @@ New pieces, following house conventions (thin client, orchestration in services,
 - `src/server/services/affiliate-inbound.service.ts`, `affiliate-monitor.service.ts`,
   `affiliate-notify.service.ts`; `affiliate.router.ts` (list/setStatus/assign/approve).
 - Slack: create `#radio-affiliate`, invite the wandercom bot (same manual step as
-  #radio-social-listening), owner TBD (partnerships owner — Micaela?).
+  #radio-social-listening), owner Micaela (sole owner since 2026-08-10).
 
 Email plumbing detail: wander.com MX is Google, so partnerships@ can't point at Resend
 directly. The Google group simply gets the Resend address added as a member (or a
@@ -176,7 +177,7 @@ prettier inbound address later, delegate MX on a dedicated subdomain (e.g.
 
 **Phase 0 — this week (before the 7/22 AP call)**
 1. Get Impact API credentials: Settings → API Access in the Wander Impact account
-   (or ask AP/Ornella to enable). Doppler `IMPACT_*` in dev/stg/prd.
+   (or ask AP/Micaela to enable; Ornella has left). Doppler `IMPACT_*` in dev/stg/prd.
 2. Build `impact.client.ts` read-only + a behind-a-flag daily snapshot cron. Seeing
    real Actions data before the call makes the questions concrete.
 3. Create `#radio-affiliate`, invite the bot.

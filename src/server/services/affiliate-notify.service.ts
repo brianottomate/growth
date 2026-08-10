@@ -20,12 +20,13 @@ import {
 // postOnSlack's envSelect guard.
 const RADIO_AFFILIATE_CHANNEL = "C0BH31P8W3S";
 
-// Who owns the program day-to-day. Micaela is tagged first on all
-// impact/affiliate items as of 2026-08-10 (swapped with Ornella Nuñez, who stays
-// cc'd rather than dropped). NOTE: #marketing-affiliates itself is Slack Connect
-// with Acceleration Partners members — never point this feed there; internal only.
+// Who owns the program day-to-day. Micaela took this over on 2026-08-10 from
+// Ornella Nuñez, who has left Wander; there is no second owner to cc until
+// somebody names one, so the cc slot stays empty rather than pointing at a
+// departed account. NOTE: #marketing-affiliates itself is Slack Connect with
+// Acceleration Partners members — never point this feed there; internal only.
 const AFFILIATE_OWNER_SLACK_ID: string | null = "U0574R1RCD9"; // Micaela
-const AFFILIATE_CC_SLACK_ID: string | null = "U08LV4ZNRF1"; // Ornella
+const AFFILIATE_CC_SLACK_ID: string | null = null;
 
 const KIND_LABEL: Record<AffiliateItem["kind"], string> = {
   email: "Partner email",
