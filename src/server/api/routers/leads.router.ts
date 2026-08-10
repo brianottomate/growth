@@ -31,6 +31,7 @@ import {
   SETTLED_PROSPECT_STATUSES,
 } from "@/server/clients/wander.client";
 import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
+import { capturePreviewVisual } from "@/server/services/pregen/preview-visual";
 import { discoverDomain } from "@/server/services/lead-discovery.service";
 import {
   extractFromDiscovery,
@@ -314,6 +315,19 @@ export const leadsRouter = createTRPCRouter({
          */
         withReview: z.boolean().optional(),
         /**
+         * The three review facets send-review used to own. `hasDraft` is a real
+         * SQL predicate, so the pager stays exact. `verdict` and `route` come out
+         * of `scoreLeadChannel`, which is application logic over contacts and the
+         * captured channel — there is no SQL to count them by, so setting either
+         * switches this query to send-review's proven shape: over-fetch a wider
+         * window, filter it, and report `hasMore` instead of a total. A count that
+         * disagreed with the rows on screen is the one outcome to avoid on a
+         * surface people make send decisions from.
+         */
+        verdict: z.enum(["send", "review", "form", "skip"]).optional(),
+        route: z.enum(["instantly", "form", "none"]).optional(),
+        hasDraft: z.boolean().optional(),
+        /**
          * Include companies flagged excludeFromOutreach. Off by default: 342 of
          * the 903 target-list domains are excluded, they average roughly five
          * times the units of the addressable ones, and the default sort is
@@ -428,6 +442,15 @@ export const leadsRouter = createTRPCRouter({
             and lower(split_part(enrollable_contact.email, '@', 2)) <> all(${PLACEHOLDER_EMAIL_DOMAINS_SQL})
         )`);
 
+      // Draft presence is a plain exists, so it narrows the count too.
+      if (input.hasDraft != null) {
+        const hasDraft = sql`exists (
+          select 1 from leads.outreach as draft
+          where draft.domain_id = ${leadDomainTable.id}
+        )`;
+        conds.push(input.hasDraft ? hasDraft : sql`not ${hasDraft}`);
+      }
+
       const workableOnly = !input.includeExcluded;
       const where = and(
         ...conds,
@@ -435,6 +458,9 @@ export const leadsRouter = createTRPCRouter({
           ? [eq(leadDomainTable.excludeFromOutreach, false)]
           : []),
       );
+      // Verdict and route are only knowable after `scoreLeadChannel` runs over
+      // the fetched page, which is what makes the pager inexact for them.
+      const scoredFacet = input.verdict != null || input.route != null;
       const orderCol = SORTS[input.sort];
       // NULLs last for numeric sorts so scored/sized rows surface first.
       const orderBy =
@@ -481,7 +507,10 @@ export const leadsRouter = createTRPCRouter({
         .from(leadDomainTable)
         .where(where)
         .orderBy(...orderBy)
-        .limit(input.limit)
+        // A computed facet is applied after the scorer runs, so fetch a wider
+        // window to filter down from. Same 4×-capped-at-200 window send-review
+        // used, so consolidating does not change which rows a reviewer sees.
+        .limit(scoredFacet ? Math.min(input.limit * 4, 200) : input.limit)
         .offset(input.offset);
 
       const [totalRow] = await ctx.db
@@ -643,16 +672,32 @@ export const leadsRouter = createTRPCRouter({
           })()
         : null;
 
+      const rows = items.map((i) => ({
+        ...i,
+        contactCount: countMap.get(i.id) ?? 0,
+        pregenCohorts: [...(cohortsByDomain.get(i.id) ?? [])].sort(),
+        review: review?.get(i.id) ?? null,
+      }));
+
+      // Scored facets narrow the fetched window rather than the query, so they
+      // are applied here and the window is then cut back to the asked-for page.
+      const filtered = scoredFacet
+        ? rows.filter(
+            (row) =>
+              (!input.verdict || row.review?.channel.verdict === input.verdict) &&
+              (!input.route || row.review?.channel.route === input.route),
+          )
+        : rows;
+
       return {
-        items: items.map((i) => ({
-          ...i,
-          contactCount: countMap.get(i.id) ?? 0,
-          pregenCohorts: [...(cohortsByDomain.get(i.id) ?? [])].sort(),
-          review: review?.get(i.id) ?? null,
-        })),
-        total,
+        items: scoredFacet ? filtered.slice(0, input.limit) : filtered,
+        // Null rather than a number the list cannot account for: with a scored
+        // facet on, the only honest count is the one the UI can see.
+        total: scoredFacet ? null : total,
         excludedHeld: excludedRow?.count ?? 0,
-        hasMore: input.offset + items.length < total,
+        hasMore: scoredFacet
+          ? items.length === Math.min(input.limit * 4, 200)
+          : input.offset + items.length < total,
       };
     }),
 
@@ -983,6 +1028,23 @@ export const leadsRouter = createTRPCRouter({
         return await rankLeadDomain(input.domain.toLowerCase(), {
           persist: input.persist,
         });
+      } catch (error) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }),
+
+  // Shoot the preview WE built, so the review surface can show its before/after
+  // side by side instead of a badge next to a link. Manual rather than automatic:
+  // a capture costs two Firecrawl scrapes, and the answer only matters when a
+  // human is about to look at this prospect.
+  capturePreview: protectedProcedure
+    .input(z.object({ domain: z.string().trim().min(3) }))
+    .mutation(async ({ input }) => {
+      try {
+        return await capturePreviewVisual(input.domain.toLowerCase());
       } catch (error) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
@@ -1440,213 +1502,6 @@ export const leadsRouter = createTRPCRouter({
       }
 
       return result;
-    }),
-
-  // Narrow operator queue for the first real send: enriched, net-new domains
-  // with channel evidence + latest generated sequence side-by-side.
-  sendReview: protectedProcedure
-    .input(
-      z.object({
-        q: z.string().trim().optional(),
-        // Which population to review. "netnew" is the original cold-outbound
-        // list: not in the CRM at all. "pregen" is the opposite population —
-        // companies that ARE in HubSpot, as members of a pregen cohort — so the
-        // two cannot share a base filter.
-        mode: z.enum(["netnew", "pregen"]).default("pregen"),
-        verdict: z.enum(["send", "review", "form", "skip"]).optional(),
-        route: z.enum(["instantly", "form", "none"]).optional(),
-        hasDraft: z.boolean().optional(),
-        owner: z.string().trim().min(1).optional(),
-        limit: z.number().int().min(1).max(100).default(50),
-        offset: z.number().int().nonnegative().default(0),
-      }),
-    )
-    .query(async ({ ctx, input }) => {
-      // Suppression and deletion apply to both populations; everything else
-      // differs, because "never touched the CRM" and "is a CRM cohort member"
-      // are mutually exclusive.
-      const conds = [
-        eq(leadDomainTable.excludeFromOutreach, false),
-        isNull(leadDomainTable.deletedAt),
-      ];
-
-      if (input.mode === "pregen") {
-        conds.push(
-          exists(
-            ctx.db
-              .select({ one: sql`1` })
-              .from(hubspotListMembershipTable)
-              .where(
-                and(
-                  eq(hubspotListMembershipTable.domainId, leadDomainTable.id),
-                  eq(hubspotListMembershipTable.objectType, "company"),
-                ),
-              ),
-          ),
-        );
-      } else {
-        conds.push(
-          eq(leadDomainTable.inHubspot, false),
-          eq(leadDomainTable.hasHubspotDeal, false),
-          eq(leadDomainTable.isExistingCustomer, false),
-          sql`${leadDomainTable.scorePregenPotential} is not null`,
-        );
-      }
-
-      if (input.owner) {
-        conds.push(eq(leadDomainTable.hubspotOwner, input.owner));
-      }
-
-      if (input.q) {
-        conds.push(
-          or(
-            ilike(leadDomainTable.domain, `%${input.q}%`),
-            ilike(leadDomainTable.companyName, `%${input.q}%`),
-          )!,
-        );
-      }
-
-      const where = and(...conds);
-      const domains = await ctx.db
-        .select({
-          id: leadDomainTable.id,
-          domain: leadDomainTable.domain,
-          companyName: leadDomainTable.companyName,
-          country: leadDomainTable.country,
-          state: leadDomainTable.state,
-          city: leadDomainTable.city,
-          pms: leadDomainTable.pms,
-          unitEstimate: leadDomainTable.unitEstimate,
-          unitConfidence: leadDomainTable.unitConfidence,
-          scorePregenPotential: leadDomainTable.scorePregenPotential,
-          scoreLeadQuality: leadDomainTable.scoreLeadQuality,
-          sourceTier: leadDomainTable.sourceTier,
-          enrichment: leadDomainTable.enrichment,
-          hubspotOwner: leadDomainTable.hubspotOwner,
-          pregenSiteUrl: leadDomainTable.pregenSiteUrl,
-        })
-        .from(leadDomainTable)
-        .where(where)
-        .orderBy(
-          sql`${leadDomainTable.scorePregenPotential} desc nulls last`,
-          sql`${leadDomainTable.unitEstimate} desc nulls last`,
-          asc(leadDomainTable.domain),
-        )
-        // Fetch a wider candidate window so computed route/verdict filters still
-        // have room without turning this into an all-table application scan.
-        .limit(Math.min(input.limit * 4, 200))
-        .offset(input.offset);
-
-      const ids = domains.map((d) => d.id);
-      const contacts = ids.length
-        ? await ctx.db
-            .select({
-              id: leadContactTable.id,
-              domainId: leadContactTable.domainId,
-              email: leadContactTable.email,
-              firstName: leadContactTable.firstName,
-              lastName: leadContactTable.lastName,
-              jobTitle: leadContactTable.jobTitle,
-              verificationStatus: leadContactTable.verificationStatus,
-              verification: leadContactTable.verification,
-            })
-            .from(leadContactTable)
-            .where(
-              and(
-                inArray(leadContactTable.domainId, ids),
-                isNull(leadContactTable.deletedAt),
-              ),
-            )
-        : [];
-      const contactsByDomain = new Map<string, StoredLeadContact[]>();
-      for (const contact of contacts) {
-        const list = contactsByDomain.get(contact.domainId) ?? [];
-        list.push(contact);
-        contactsByDomain.set(contact.domainId, list);
-      }
-
-      const outreachRows = ids.length
-        ? await ctx.db
-            .select()
-            .from(leadOutreachTable)
-            .where(inArray(leadOutreachTable.domainId, ids))
-            .orderBy(desc(leadOutreachTable.createdAt))
-        : [];
-      const latestOutreach = new Map<string, (typeof outreachRows)[number]>();
-      for (const outreach of outreachRows) {
-        if (!latestOutreach.has(outreach.domainId)) {
-          latestOutreach.set(outreach.domainId, outreach);
-        }
-      }
-
-      // Captured reachability channels (one grouped query, same pattern as
-      // contacts/outreach above) — surfaced as badges in the send-review UI.
-      const channelRows = ids.length
-        ? await ctx.db
-            .select({
-              id: leadChannelTable.id,
-              domainId: leadChannelTable.domainId,
-              kind: leadChannelTable.kind,
-              value: leadChannelTable.value,
-              vendor: leadChannelTable.vendor,
-              deliveryState: leadChannelTable.deliveryState,
-            })
-            .from(leadChannelTable)
-            .where(
-              and(
-                inArray(leadChannelTable.domainId, ids),
-                isNull(leadChannelTable.deletedAt),
-              ),
-            )
-            .orderBy(asc(leadChannelTable.kind))
-        : [];
-      const channelsByDomain = new Map<string, typeof channelRows>();
-      for (const channel of channelRows) {
-        const list = channelsByDomain.get(channel.domainId) ?? [];
-        list.push(channel);
-        channelsByDomain.set(channel.domainId, list);
-      }
-
-      let items = domains.map((domain) => {
-        const contactChannel = parseContactChannel(
-          (domain.enrichment as { contactChannel?: unknown } | null)
-            ?.contactChannel,
-        );
-        const scored = scoreLeadChannel({
-          domain: domain.domain,
-          contactChannel,
-          contacts: contactsByDomain.get(domain.id) ?? [],
-        });
-        const outreach = latestOutreach.get(domain.id) ?? null;
-        return {
-          ...domain,
-          enrichment: undefined,
-          contactChannel,
-          channelScore: scored,
-          contactCount: contactsByDomain.get(domain.id)?.length ?? 0,
-          channels: channelsByDomain.get(domain.id) ?? [],
-          outreach,
-        };
-      });
-
-      if (input.verdict) {
-        items = items.filter(
-          (item) => item.channelScore.verdict === input.verdict,
-        );
-      }
-      if (input.route) {
-        items = items.filter((item) => item.channelScore.route === input.route);
-      }
-      if (input.hasDraft != null) {
-        items = items.filter(
-          (item) => Boolean(item.outreach) === input.hasDraft,
-        );
-      }
-
-      return {
-        items: items.slice(0, input.limit),
-        hasMore: domains.length === Math.min(input.limit * 4, 200),
-      };
     }),
 
   // Capture ALL ways to reach a domain by crawling its own website (emails,

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2 } from "lucide-react";
@@ -92,6 +93,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
       onSuccess: invalidate,
     }),
   );
+  const capture = useMutation(
+    trpc.leads.capturePreview.mutationOptions({ onSuccess: invalidate }),
+  );
 
   // Live HubSpot correspondence is a provider read, so it waits to be asked for.
   // The draft's own snapshot below is what the copy was written from.
@@ -121,19 +125,31 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const context = outreach?.generationContext ?? null;
   // enrichment.leadRank.screenshotUrl — `siteScreenshotUrl` exists nowhere in
   // this table, so the earlier spelling could never have found one.
-  const rank = (
-    row.enrichment as {
-      leadRank?: {
-        screenshotUrl?: string;
-        overall?: number;
-        relationshipSummary?: string;
-        reengagementHook?: string;
-        concerns?: string[];
-        copyNotes?: string;
-      };
-    } | null
-  )?.leadRank;
-  const screenshot = rank?.screenshotUrl;
+  const enrichment = row.enrichment as {
+    leadRank?: {
+      screenshotUrl?: string;
+      overall?: number;
+      relationshipSummary?: string;
+      reengagementHook?: string;
+      concerns?: string[];
+      copyNotes?: string;
+    };
+    previewVisual?: {
+      capturedAt?: string;
+      theirs?: Array<{ viewport?: string; screenshotUrl?: string }>;
+      ours?: Array<{ viewport?: string; screenshotUrl?: string }>;
+    };
+  } | null;
+  const rank = enrichment?.leadRank;
+  const visual = enrichment?.previewVisual;
+  const desktop = (shots?: Array<{ viewport?: string; screenshotUrl?: string }>) =>
+    shots?.find((shot) => shot.viewport === "desktop")?.screenshotUrl;
+  // Prefer our own rehosted shot of their site. The ranker's URL is a presigned
+  // Firecrawl link that expires about a week after scoring, so on any older
+  // domain it renders as a broken image.
+  const screenshot = desktop(visual?.theirs) ?? rank?.screenshotUrl;
+  const previewShot = desktop(visual?.ours);
+  const previewShotAt = visual?.capturedAt;
 
   return (
     <div className="space-y-4">
@@ -217,6 +233,51 @@ export function ProspectDetail({ domain }: { domain: string }) {
               </a>
             ) : null}
           </div>
+          {/* The picture, so the comparison this grid promises is actually
+              visible. Same frame as their site on the left, and the capture is
+              shot at the same viewport, so the two are honestly comparable. */}
+          {previewShot ? (
+            <div className="border-border bg-muted relative mt-3 aspect-[4/3] w-full overflow-hidden rounded border">
+              <Image
+                src={previewShot}
+                alt={`Preview built for ${row.domain}`}
+                fill
+                sizes="(min-width: 1024px) 40vw, 90vw"
+                unoptimized
+                className="object-cover object-top"
+              />
+            </div>
+          ) : (
+            <p className="text-muted-foreground mt-3 text-sm">
+              No capture yet.{" "}
+              {preview.url
+                ? "Capture one to see it beside their site."
+                : "There is no preview assigned to capture."}
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!preview.url || capture.isPending}
+              onClick={() => capture.mutate({ domain: row.domain })}
+            >
+              {capture.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              {previewShot ? "Recapture" : "Capture preview"}
+            </Button>
+            {previewShotAt ? (
+              <span className="text-muted-foreground text-xs">
+                shot {previewShotAt.slice(0, 10)}
+              </span>
+            ) : null}
+          </div>
+          {capture.error ? (
+            <p className="mt-2 text-xs text-red-300">
+              {capture.error.message}
+            </p>
+          ) : null}
           {preview.url ? (
             <p className="text-muted-foreground mt-2 text-xs break-all">
               {preview.url}
@@ -339,6 +400,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
           </p>
         ) : (
           <div className="space-y-3">
+            {/* The same steps without the review chrome, for showing someone. */}
+            <Link
+              href={`/app/leads/${encodeURIComponent(row.domain)}/sequence`}
+              className="text-muted-foreground hover:text-foreground inline-block text-xs underline underline-offset-2"
+            >
+              Open as a presentation →
+            </Link>
             {outreach.angle ? (
               <p className="text-sm">
                 <span className="text-muted-foreground">Angle: </span>

@@ -126,8 +126,12 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { label: "Leads", href: "/app/leads", icon: Database, exact: true },
       {
+        // Send review is no longer its own route: it was the same table, the same
+        // scorer and a drifting copy of the same card. Its default view survives
+        // as a URL — the target population in the review density — which is what
+        // nuqs-backed filters bought us.
         label: "Send review",
-        href: "/app/leads/send-review",
+        href: "/app/leads?pop=target&view=review",
         icon: ClipboardCheck,
       },
       { label: "Lifecycle", href: "/app/lifecycle", icon: Repeat },

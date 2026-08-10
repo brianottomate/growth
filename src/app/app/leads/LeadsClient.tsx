@@ -3,12 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import {
   parseAsBoolean,
   parseAsInteger,
@@ -166,6 +161,17 @@ export function LeadsClient() {
       "updated",
     ] as const).withDefault("units"),
   );
+  // The review facets send-review used to own. Only meaningful with the review
+  // density, which is what computes the scored channel they filter on.
+  const [verdict, setVerdict] = useQueryState(
+    "verdict",
+    parseAsStringLiteral(["send", "review", "form", "skip"] as const),
+  );
+  const [route, setRoute] = useQueryState(
+    "route",
+    parseAsStringLiteral(["instantly", "form", "none"] as const),
+  );
+  const [hasDraft, setHasDraft] = useQueryState("draft", parseAsBoolean);
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(0));
   const [showCohortDetail, setShowCohortDetail] = useState(false);
   const [enrichLead, setEnrichLead] = useState<LeadRow | null>(null);
@@ -198,6 +204,12 @@ export function LeadsClient() {
         // The review card needs the scored channel and latest draft; the compact
         // row does not, so it does not pay for them.
         withReview: view === "review" || undefined,
+        // Scored facets need the scorer, so they only apply in the review
+        // density; sending them from the compact list would filter on a payload
+        // that was never computed.
+        verdict: (view === "review" && verdict) || undefined,
+        route: (view === "review" && route) || undefined,
+        hasDraft: hasDraft ?? undefined,
         sort,
         dir: sort === "domain" ? "asc" : "desc",
         limit,
@@ -444,6 +456,60 @@ export function LeadsClient() {
             ? "Hide excluded"
             : `Show excluded${list.data?.excludedHeld ? ` · ${fmt(list.data.excludedHeld)}` : ""}`}
         </Pill>
+        <Pill
+          active={hasDraft === true}
+          onClick={() => {
+            void setHasDraft(hasDraft === true ? null : true);
+            resetPage();
+          }}
+        >
+          Has draft
+        </Pill>
+        <Pill
+          active={hasDraft === false}
+          onClick={() => {
+            void setHasDraft(hasDraft === false ? null : false);
+            resetPage();
+          }}
+        >
+          Needs draft
+        </Pill>
+        {/* Verdict and route come out of the scorer, which only the review
+            density pays for — offering them over compact rows would filter on a
+            payload that was never computed. */}
+        {view === "review" ? (
+          <>
+            <select
+              value={verdict ?? ""}
+              onChange={(e) => {
+                void setVerdict(
+                  (e.target.value || null) as typeof verdict,
+                );
+                resetPage();
+              }}
+              className="border-border bg-background rounded-md border px-2 py-1 text-xs"
+            >
+              <option value="">Any verdict</option>
+              <option value="send">send</option>
+              <option value="review">review</option>
+              <option value="form">form</option>
+              <option value="skip">skip</option>
+            </select>
+            <select
+              value={route ?? ""}
+              onChange={(e) => {
+                void setRoute((e.target.value || null) as typeof route);
+                resetPage();
+              }}
+              className="border-border bg-background rounded-md border px-2 py-1 text-xs"
+            >
+              <option value="">Any route</option>
+              <option value="instantly">instantly</option>
+              <option value="form">form</option>
+              <option value="none">none</option>
+            </select>
+          </>
+        ) : null}
         <span className="flex-1" />
         <select
           value={sort}
@@ -460,10 +526,16 @@ export function LeadsClient() {
         </select>
       </div>
 
-      {/* result count */}
+      {/* result count. A scored facet (verdict/route) is applied per page after
+          the scorer runs, so there is no total to quote — say what is on screen
+          instead of printing a number the rows cannot account for. */}
       <div className="text-muted-foreground mt-3 text-xs">
         {list.data
-          ? `${fmt(list.data.total)} matching domains${
+          ? `${
+              list.data.total == null
+                ? `${list.data.items.length} matching on this page`
+                : `${fmt(list.data.total)} matching domains`
+            }${
               list.data.excludedHeld
                 ? ` · ${fmt(list.data.excludedHeld)} excluded and hidden`
                 : ""
@@ -642,12 +714,25 @@ export function LeadsClient() {
         </div>
       )}
 
-      {/* pagination */}
-      {list.data && list.data.total > limit && (
+      {/* pagination. `total` is null when a scored facet (verdict/route) is on:
+          those are computed per page, so the only count we can stand behind is
+          what is on screen. Say that rather than print a number the rows below
+          cannot account for. */}
+      {list.data && (list.data.total == null || list.data.total > limit) && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <span className="text-muted-foreground text-xs">
-            {page * limit + 1}–{Math.min((page + 1) * limit, list.data.total)}{" "}
-            of {fmt(list.data.total)}
+            {list.data.total == null ? (
+              <>
+                {list.data.items.length} on this page
+                {list.data.hasMore ? ", more behind the filter" : ""}
+              </>
+            ) : (
+              <>
+                {page * limit + 1}–
+                {Math.min((page + 1) * limit, list.data.total)} of{" "}
+                {fmt(list.data.total)}
+              </>
+            )}
           </span>
           <div className="flex gap-2">
             <button
@@ -760,15 +845,29 @@ function ReviewCardList({
   onInvalidate: () => void;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const [pending, setPending] = useState<{ id: string; kind: string } | null>(
     null,
   );
 
+  /**
+   * Refetch the list only.
+   *
+   * This used to call `queryClient.invalidateQueries()` with no key, so clicking
+   * Resolve channel on one card refetched every query on the page — stats, PMS
+   * and owner options, the deep-link lookup — none of which any of these
+   * mutations can change. `onInvalidate` already refetches the list, which is
+   * the one thing that does.
+   *
+   * ⚠️ Known gap, deliberately not fixed here because it changes an interaction:
+   * a refetch re-applies the filter, so a row that no longer matches (generate a
+   * draft under "Needs draft") leaves the page and shifts every later row up by
+   * one. With offset paging that means page 2 skips a prospect, silently. Two
+   * ways out, both a product call: keyset paging, or treat a queue filter as a
+   * queue — always read page 0 and let handled rows drain out.
+   */
   const settle = () => {
     setPending(null);
     onInvalidate();
-    void queryClient.invalidateQueries();
   };
 
   const resolve = useMutation(
