@@ -62,6 +62,7 @@ export async function notifyAmplificationTarget(input: {
     draftText: target.draftText,
     notes: target.notes,
     plannedAt: target.plannedAt,
+    sourceUrl: target.platformPost.externalUrl,
     workUrl: target.platformPost.contentPostId
       ? `${env.NEXT_PUBLIC_BASE_URL}/app/content/${target.platformPost.contentPostId}`
       : `${env.NEXT_PUBLIC_BASE_URL}/app/content`,

@@ -32,6 +32,7 @@ export function buildAmplificationSlackMessage(input: {
   draftText?: string | null;
   notes?: string | null;
   plannedAt?: Date | null;
+  sourceUrl?: string | null;
   workUrl: string;
 }) {
   const request = `${ACTION_LABELS[input.actionKind]} this ${slackText(input.platform)} post for ${slackText(input.brandName)}`;
@@ -48,6 +49,7 @@ export function buildAmplificationSlackMessage(input: {
       ? `*Suggested copy:*\n>${slackText(input.draftText).replace(/\n/g, "\n>")}`
       : null,
     input.notes ? `*Context:* ${slackText(input.notes)}` : null,
+    input.sourceUrl ? `<${input.sourceUrl}|Open the live post>` : null,
     `<${input.workUrl}|Open the Growth work item>`,
   ].filter((line): line is string => Boolean(line));
 

@@ -179,6 +179,9 @@ export const requestAmplification = growthAction({
                 status: "draft",
                 origin: "ai",
                 ownerId: ctx.userId,
+                text: [input.draftText, post.externalUrl]
+                  .filter(Boolean)
+                  .join("\n\n"),
                 scheduledAt: plannedAt,
               })
               .returning({ id: platformPostTable.id });
@@ -188,7 +191,7 @@ export const requestAmplification = growthAction({
                 fromPlatformPostId: draft.id,
                 toPlatformPostId: post.id,
                 kind: input.actionKind,
-                injectUrlAtPublish: true,
+                injectUrlAtPublish: !post.externalUrl,
                 metadata: { role: "amplifier", amplifierId: amplifier.id },
               });
             }

@@ -7,6 +7,7 @@ import {
   verifyZernioWebhookSignature,
 } from "@/lib/zernio-webhook";
 import { reconcileZernioPostDelivery } from "@/server/services/content-publishing.service";
+import { activatePublishedSourcePost } from "@/server/services/source-publication-activation.service";
 
 export const runtime = "nodejs";
 
@@ -46,7 +47,17 @@ export async function POST(request: NextRequest) {
   const providerPostId = payload.post.id;
   after(async () => {
     try {
-      await reconcileZernioPostDelivery(providerPostId);
+      const result = await reconcileZernioPostDelivery(providerPostId);
+      const activation =
+        result.matched && result.delivery.deliveryStatus === "published"
+          ? await activatePublishedSourcePost(result.rootPlatformPostId)
+          : null;
+      console.log("[zernio-webhook] reconciliation complete", {
+        eventId: payload.id,
+        providerPostId,
+        matched: result.matched,
+        activation,
+      });
     } catch (error) {
       console.error("[zernio-webhook] reconciliation failed", {
         eventId: payload.id,

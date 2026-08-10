@@ -21,6 +21,7 @@ describe("amplification Slack handoff", () => {
       platform: "linkedin",
       title: "Summer launch",
       draftText: "A useful launch. <!channel>",
+      sourceUrl: "https://www.linkedin.com/feed/update/example",
       workUrl: "https://growth.example/app/content/post_1",
     });
 
@@ -29,6 +30,7 @@ describe("amplification Slack handoff", () => {
     expect(message.text).toContain("ask The CEO");
     expect(message.text).toContain("Summer launch");
     expect(message.text).not.toContain("<!channel>");
+    expect(message.text).toContain("Open the live post");
     expect(message.text).toContain("Open the Growth work item");
   });
 });
