@@ -2,7 +2,7 @@
 
 Wander Growth is the internal growth command center and lead/outreach operations app for Wander.
 
-It started from the Jetpack/T3 SaaS starter, but the center of gravity is now Wander-specific: brand and content operations, campaign planning, lifecycle programs, social listening, media management, lead enrichment, and Customer.io/Outreach/Instantly workflows.
+It started from a T3 SaaS starter, but the center of gravity is now Wander-specific: brand and content operations, campaign planning, lifecycle programs, social listening, media management, lead enrichment, and Customer.io/Outreach/Instantly workflows.
 
 ## What This App Does
 
@@ -167,7 +167,7 @@ Useful planning and architecture docs:
 
 ## Starter Heritage
 
-This repo still uses the Jetpack/T3 foundation:
+This repo still uses the T3 starter foundation:
 
 - Better Auth user/session/account/organization tables
 - Drizzle with Neon Postgres

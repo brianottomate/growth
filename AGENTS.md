@@ -6,9 +6,9 @@ This file provides repository-specific guidance to coding agents.
 
 The Wander **Growth team back-office** app — an internal tool that unifies brand/content
 operations, lead prospecting, lifecycle/outreach automation, and social listening. It
-started from a T3 "Jetpack" SaaS template (hence leftover scaffolding like the org/team
+started from a T3 SaaS starter template (hence leftover scaffolding like the org/team
 auth model), but the live product is the growth tooling. Treat the README and any
-"Jetpack starter template" language as historical — the demos and example `post` router
+starter-template language as historical — the demos and example `post` router
 have been removed.
 
 > Sibling repos and the wandercom monorepo layout are documented in `../CLAUDE.md`.
