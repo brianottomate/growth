@@ -430,7 +430,7 @@ export async function getNextBdrFromOutreachLoadDetailed(
     )
     .join(", ");
   console.log(
-    `👤 [BDR] Selected ${selected.name} via Outreach load (pool: ${pool}, index: ${index}/${ranked.length}, count=${selected.prospectCount}, touchedAt=${selected.lastProspectTouchedAt ?? "null"})${alternatives ? ` | next: ${alternatives}` : ""}`,
+    `👤 [BDR] Selected ${selected.name} via Outreach load (pool: ${pool}, tied ${tiedTop.length}/${ranked.length}, count=${selected.prospectCount}, touchedAt=${selected.lastProspectTouchedAt ?? "null"})${alternatives ? ` | next: ${alternatives}` : ""}`,
   );
 
   return {
