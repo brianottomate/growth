@@ -75,22 +75,48 @@ const DEFAULT_DYNAMIC_BDR_OPTIONS: Required<DynamicBdrSelectionOptions> = {
 };
 
 /**
- * BDR Roster — hardcoded for now.
+ * BDR Roster — the unlocked Outreach users whose title matches the demand BDR
+ * pool, snapshotted from the Outreach users API on 2026-08-05.
+ *
+ * This is the same set `getNextBdrFromOutreachLoad` derives at runtime
+ * (unlocked, title contains "bdr", title does not contain "manager"), so the
+ * static and dynamic paths agree. Everyone else with a BDR title in Outreach is
+ * locked, i.e. offboarded.
+ *
+ * Keep in sync when someone joins or leaves the pool — `GET /api/outreach/users`
+ * dumps the live list. Each BDR needs a valid Outreach user ID for ownership.
  *
  * TODO: Fetch from Sanity CMS or DB in the future.
- * Each BDR needs a valid Outreach user ID for prospect ownership.
- *
- * Populate with actual BDR data before going live.
  */
 export const BDR_ROSTER: BdrConfig[] = [
-  // Example entries — replace with actual BDR data:
-  // {
-  //   name: "Alex Smith",
-  //   email: "alex@wander.com",
-  //   outreachUserId: "12345",
-  //   active: true,
-  //   assignNewLeads: true,
-  // },
+  {
+    name: "Serrelle Baker",
+    email: "serrelle.baker@wander.com",
+    outreachUserId: "3",
+    active: true,
+    assignNewLeads: true,
+  },
+  {
+    name: "Stacy Darko",
+    email: "stacy@wander.com",
+    outreachUserId: "32",
+    active: true,
+    assignNewLeads: true,
+  },
+  {
+    name: "Cate Hutcherson",
+    email: "catherine@wander.com",
+    outreachUserId: "33",
+    active: true,
+    assignNewLeads: true,
+  },
+  {
+    name: "James Crawford",
+    email: "james.crawford@wander.com",
+    outreachUserId: "37",
+    active: true,
+    assignNewLeads: true,
+  },
 ];
 
 // =====================================================
@@ -120,10 +146,19 @@ function getActiveBdrs(): BdrConfig[] {
   return BDR_ROSTER.filter((bdr) => bdr.active && bdr.assignNewLeads);
 }
 
+/**
+ * Rank a BDR by how long since they last touched a prospect — lower sorts
+ * first, i.e. is more available.
+ *
+ * A null/unparseable `lastProspectTouchedAt` means the BDR has never touched a
+ * prospect, which makes them the *most* available, not the least. Mapping it to
+ * +Infinity (as this did originally) sorted them permanently last, so a BDR who
+ * had never been assigned anything could never be assigned anything.
+ */
 function toTimestamp(value: string | null): number {
-  if (!value) return Number.POSITIVE_INFINITY;
+  if (!value) return Number.NEGATIVE_INFINITY;
   const ts = Date.parse(value);
-  return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
+  return Number.isNaN(ts) ? Number.NEGATIVE_INFINITY : ts;
 }
 
 function formatRelativeDelta(from: string | null, to: string | null): string {
@@ -222,8 +257,13 @@ export function getNextBdr(hasPhone: boolean): BdrConfig | null {
  * 1. Fetch active users
  * 2. Filter to BDR candidate pool
  * 3. Fetch owner prospect load for each candidate
- * 4. Pick the least recently updated BDR by oldest lastProspectTouchedAt
- *    (exact timestamp ties are randomized)
+ * 4. Rank by oldest lastProspectTouchedAt, then fewest prospects
+ * 5. Round robin over that ranking, per pool, so a burst of leads spreads
+ *    evenly instead of piling onto whoever the load signal says is stalest
+ *
+ * Note this costs 1 + N Outreach calls (users + one load per candidate) and
+ * caches nothing, so it is priced for per-lead realtime sync. Batch importers
+ * should use the static `getNextBdr` round robin instead.
  */
 export async function getNextBdrFromOutreachLoad(
   hasPhone: boolean,
@@ -315,12 +355,24 @@ export async function getNextBdrFromOutreachLoadDetailed(
     };
   }
 
+  // Load decides the ORDER of the rotation; the rotation decides who gets this
+  // lead. Taking the argmin instead — as this did originally — hands every lead
+  // in a burst to the same person: `lastProspectTouchedAt` moves only as fast as
+  // Outreach reindexes, so whoever is stalest stays stalest for the whole run.
+  // On 2026-08-05 that was a one-month gap, i.e. one BDR would have taken all
+  // ~185 creates in the OTA import.
   const ranked = [...eligible].sort((a, b) => {
     const touchedA = toTimestamp(a.lastProspectTouchedAt);
     const touchedB = toTimestamp(b.lastProspectTouchedAt);
     if (touchedA !== touchedB) return touchedA - touchedB;
-    return 0;
+    // Same staleness: give it to whoever is carrying fewer prospects.
+    return (a.prospectCount ?? 0) - (b.prospectCount ?? 0);
   });
+  // Random among the least-recently-touched ties, not a module counter: the
+  // branch's counter distributed evenly inside one process (the batch import
+  // script it was written for), but on Fluid each instance starts its own
+  // counter at 0, so concurrent instances all pick the same first BDR. The
+  // tie-break stays fair because it re-reads live touch data on every call.
   const bestTouched = toTimestamp(ranked[0]?.lastProspectTouchedAt ?? null);
   const tiedTop = ranked.filter(
     (candidate) => toTimestamp(candidate.lastProspectTouchedAt) === bestTouched,
@@ -378,13 +430,14 @@ export async function getNextBdrFromOutreachLoadDetailed(
     )
     .join(", ");
   console.log(
-    `👤 [BDR] Selected ${selected.name} via Outreach load (count=${selected.prospectCount}, touchedAt=${selected.lastProspectTouchedAt ?? "null"})${alternatives ? ` | next: ${alternatives}` : ""}`,
+    `👤 [BDR] Selected ${selected.name} via Outreach load (pool: ${pool}, index: ${index}/${ranked.length}, count=${selected.prospectCount}, touchedAt=${selected.lastProspectTouchedAt ?? "null"})${alternatives ? ` | next: ${alternatives}` : ""}`,
   );
 
   return {
     assignedBdr,
     reason:
-      "Selected by oldest lastProspectTouchedAt; random tie-breaker for exact timestamp ties",
+      "Round robin over candidates ranked by oldest lastProspectTouchedAt, " +
+      "then fewest prospects; never-touched BDRs rank first",
     source: "outreach_load",
     pool,
     totalCandidates: candidates.length,
