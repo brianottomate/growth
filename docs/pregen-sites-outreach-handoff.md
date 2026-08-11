@@ -4,6 +4,15 @@
 **Last verified:** July 29, 2026  
 **Owners:** Growth Engineering + Sales
 
+> **2026-08-11 update:** the infrastructure blockers this doc lists are gone.
+> Preview hosting is `wanderforoperators.com` (purchased, wildcard, production);
+> the growth→monolith build path is live in prod (see
+> `pregen-prospect-integration.md`); the claim flow is in production on
+> app.wander.com. What remains before broad enrollment is outreach-side:
+> cohort review, copy gates, and the enrollment decision itself. Cohort counts
+> and preview-reachability numbers below are July-era — re-measure before
+> quoting them.
+
 ## Executive summary
 
 The pre-generated-sites motion now has a working path from HubSpot target lists

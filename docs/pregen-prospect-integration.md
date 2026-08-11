@@ -2,7 +2,7 @@
 
 **Audience:** whoever is working on `wandercom/wander` PR #20939 (`feature/wos-4563-prospect-pipeline-properties-claim`) and the WanderOS prospect pipeline.
 
-**Status:** the growth side is **built and merged to `main`, dormant**. Revised after the backend response of 2026-07-31 — status vocabulary, expiry and `evalOverall` corrected, and the reconciliation section rewritten now that both sides have settled on best-effort delivery. Nothing calls WanderOS until `WANDER_API_URL` / `WANDER_API_KEY` are set, and the webhook returns 503 until `PREGEN_WEBHOOK_SECRET` is set. We are not blocked on you and you are not blocked on us — but there are three asks at the bottom, one of which is load-bearing.
+**Status: LIVE IN PRODUCTION since 2026-08-11.** Growth prod calls `api.wander.com` directly (`WANDER_API_URL`/`WANDER_API_KEY`/`PREGEN_WEBHOOK_SECRET` set in Doppler `wander-growth/prd`); the monolith's `wander-os/prd` env carries the webhook + encryption vars. First three production prospects went GENERATING→READY in 8–10 minutes each, previews serving on `*.wanderforoperators.com`, and the app.wander.com claim flow (app#1519) is in production. The open questions in §6 are answered inline below. The rest of this doc still describes the contract accurately.
 
 Everything below was read off the PR branch, not assumed. Where we guessed wrong we have already corrected our side; those corrections are listed so you can sanity-check that we read your intent right.
 
@@ -152,13 +152,26 @@ Still open: if you can add **`convertedOrgId`** to that event we'll take it. It 
 
 ---
 
-## 6. Open questions
+## 6. Open questions — resolved 2026-08-11 except where noted
 
-1. **API key scope.** The route is `authenticate: 'api-key-or-wander-os'` and then separately `canUser({ organizationId: wanderOrganizationId, resource: 'all', action: 'manage' })`. So a key that authenticates fine will still 403 without org-manage. Who issues that key, and is a service key with `manage` on the Wander org actually available to us?
-2. **Preview hosting.** `previewUrl` is documented as *"Absent when no public preview host is configured."* This is the thing that has blocked the whole motion for weeks — we currently have 33 preview URLs spread across six ad-hoc hosts and almost none resolve. **Is a public preview host configured in staging and production, and what's the URL shape?** If `previewUrl` comes back absent, none of this integration does anything useful.
+1. ~~**API key scope.**~~ Resolved — a service key with org-manage on the Wander org is provisioned in both envs (staging validated 2026-08-06, prod 2026-08-11).
+2. ~~**Preview hosting.**~~ Resolved — `wanderforoperators.com` is the purchased production zone; the monolith mints `https://<internalDomain-label>.<zone>/?t=<token>` for staging- and prod-created prospects alike (tokens are per-env credentials, one zone by design).
 3. ~~**Expiry.**~~ Resolved — removed entirely, see §3a.
-4. **Status vocabulary stability.** See §3a. Adding a state is safe; adding a *terminal* state is not, so tell us.
-5. **Rate/volume.** Is there a sane ceiling on builds? Our workable cohort is 561 domains and we'd likely ramp in batches of ~20, but we'd rather know your limit than discover it.
+4. **Status vocabulary stability.** See §3a. Adding a state is safe; adding a *terminal* state is not, so tell us. (Still the standing agreement.)
+5. **Rate/volume.** Still unconfirmed by the backend; we ramp in batches of ~20 and the first production batch of 3 settled in ~10 minutes each.
+6. **`convertedOrgId` on the CLAIMED webhook** (from §5) — still open, still wanted: it is the join from cold domain to paying customer.
+
+## 6b. The artifact API also serves monolith prospects (2026-08-11)
+
+`GET /api/pregen/preview/<token>` resolves growth-native artifacts (full
+renderable JSON) *and*, as a fallback, monolith-mirrored `pregen_build` rows by
+`previewToken` — returning metadata only: `prospect`, `config`, the CANONICAL
+monolith-minted `previewUrl`, and `claim: { websiteId, token }`. Status gate
+mirrors the monolith's preview availability (GENERATING | READY answer;
+CLAIMED | FAILED are indistinguishable 404s). Consumer: wander.com's
+`/os/<slug>` pitch wrapper (wander.com#3307). Rule that drove it: never
+re-derive a preview label locally — the monolith mints labels from
+`internalDomain`, and domain-derived labels 404 every multi-word operator.
 
 ---
 

@@ -3,6 +3,15 @@
 > Extracted 2026-08-03 from wandercom/wander (read-only). This is the reference
 > for implementing `src/server/services/pregen/steps/*`. Paths are monolith paths.
 > V0 scope: HOMEPAGE only + build-time property grid (no property pages, no search).
+>
+> **Status 2026-08-11:** V0 shipped and E2E-proven 2026-08-03 (growth pipeline +
+> standalone renderer). Production outreach currently runs on the MONOLITH build
+> path (`POST /internal/prospects` → `siteEditorOnboarding`); this native
+> pipeline is the generation-quality lab. The direction this doc serves long
+> term: keep porting the builder into growth until the monolith's prospect job
+> can take the finished artifact as INPUT (persist, preview, claim, post-claim
+> lifecycle) instead of building. The `persist_artifact` divergence row below is
+> the main contract to settle when that inversion happens.
 
 ## What V0 ports (and what it skips)
 
