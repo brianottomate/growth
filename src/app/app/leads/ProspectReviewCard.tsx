@@ -385,7 +385,11 @@ export function ProspectReviewCard({
     });
 
   return (
-    <section className="bg-card mb-3.5 flex overflow-hidden rounded-xl border">
+    // @container: the card lays itself out by ITS OWN width, not the viewport.
+    // Viewport breakpoints lied whenever something beside the list (the
+    // assistant panel, a drawer) squeezed the container while the window stayed
+    // xl — the two-column grids below held on and overlapped into soup.
+    <section className="bg-card @container mb-3.5 flex overflow-hidden rounded-xl border">
       <span className={`w-1 shrink-0 ${theme.rail}`} aria-hidden />
       <div className="min-w-0 flex-1 space-y-5 p-5">
         {/* decision header — the verdict is the hero */}
@@ -452,9 +456,9 @@ export function ProspectReviewCard({
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(24rem,1.15fr)]">
+        <div className="grid gap-6 @4xl:grid-cols-[minmax(0,1fr)_minmax(24rem,1.15fr)]">
           <div className="min-w-0 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 @lg:grid-cols-2">
               <div>
                 <div className="text-muted-foreground text-[11px] font-medium">
                   Selected channel
