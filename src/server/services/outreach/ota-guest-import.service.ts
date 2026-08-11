@@ -166,8 +166,35 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PLACEHOLDER_EMAILS = new Set(["blocks@wander.com", "n/a", "none", "null"]);
 
 /**
- * Rows we must never push to Outreach: no real contact, internal staff, or the
- * `wander_blocks` placeholder Airbnb reservations sync under.
+ * Airbnb/Booking.com write `deleted@gdpr.com` (and similar) into the guest
+ * record once a guest exercises their right to erasure. Every erased guest in
+ * the export therefore shares one address, so without this skip they collapse
+ * into a single composite prospect stitched from several different people —
+ * and it would push erased data subjects straight back into a CRM.
+ */
+const ERASURE_DOMAINS = ["gdpr.com", "privacy.airbnb.com"];
+
+/**
+ * OTA staff and contractor addresses. A guest booking on a corporate address is
+ * an OTA employee; sending them a "win the next stay direct" play is a partner
+ * relationship risk, not a lead.
+ */
+const OTA_CORPORATE_DOMAINS = [
+  "airbnb.com",
+  "vrbo.com",
+  "booking.com",
+  "expedia.com",
+  "homeaway.com",
+];
+
+function domainOf(email: string): string {
+  return email.slice(email.lastIndexOf("@") + 1);
+}
+
+/**
+ * Rows we must never push to Outreach: no real contact, internal staff, the
+ * `wander_blocks` placeholder Airbnb reservations sync under, guests who have
+ * already been erased, or OTA staff.
  */
 export function skipReason(row: OtaGuestRow): string | null {
   const email = row.guestEmail;
@@ -178,13 +205,42 @@ export function skipReason(row: OtaGuestRow): string | null {
   if (email.endsWith("@example.com") || email.endsWith("@test.com")) {
     return "test address";
   }
+  const domain = domainOf(email);
+  if (ERASURE_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))) {
+    return "GDPR-erased guest";
+  }
+  if (
+    OTA_CORPORATE_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
+  ) {
+    return "OTA staff address";
+  }
   return null;
 }
+
+/**
+ * Apple "Hide My Email" relays are scoped to the sender that minted them (the
+ * OTA), so mail from Wander is rejected rather than forwarded. Import them —
+ * they may have a usable phone — but tag them so the campaign can hold them out
+ * of the email step instead of eating the bounces.
+ */
+export function isRelayEmail(email: string): boolean {
+  return domainOf(email) === "privaterelay.appleid.com";
+}
+
+/** Tag applied to guests whose only address is a non-deliverable OTA relay. */
+export const RELAY_EMAIL_TAG = "OTA Relay Email";
+
+/**
+ * Unicode bidi/format controls. iOS wraps a copied phone number in
+ * LRE…PDF (U+202A…U+202C), which survives the warehouse export invisibly and
+ * would otherwise fail the digit check and silently drop a usable number.
+ */
+const INVISIBLE_RE = /[​-‏‪-‮⁦-⁩﻿]/g;
 
 /** Strip formatting; keep a leading + so Outreach stores E.164 cleanly. */
 export function cleanPhone(phone: string): string | null {
   if (!phone) return null;
-  const trimmed = phone.trim();
+  const trimmed = phone.replace(INVISIBLE_RE, "").trim();
   if (!trimmed || trimmed.toUpperCase() === "N/A") return null;
   const cleaned = trimmed.replace(/[\s\-().]/g, "");
   return /^\+?\d{7,15}$/.test(cleaned) ? cleaned : null;
@@ -257,6 +313,16 @@ export function dedupeByEmail(rows: OtaGuestRow[]): {
   return { guests: Array.from(byEmail.values()), skipped };
 }
 
+/**
+ * A guest whose latest confirmed stay is still ahead of them has a live OTA
+ * booking. Pitching them "win the next stay direct" is an off-platform
+ * diversion of a booking the OTA has not yet been paid for — squarely against
+ * Airbnb/Vrbo partner terms — so the campaign should wait until they check out.
+ */
+export function hasUpcomingStay(guest: OtaGuest, today: string): boolean {
+  return !!guest.lastCheckin && guest.lastCheckin > today;
+}
+
 export function splitName(fullName: string): {
   firstName: string | null;
   lastName: string | null;
@@ -290,6 +356,7 @@ export function buildTags(
   const tags = new Set(options.existingTags ?? []);
   tags.add(campaignTag);
   tags.add(OTA_GUEST_TAG);
+  if (isRelayEmail(guest.email)) tags.add(RELAY_EMAIL_TAG);
   if (options.channelTags) {
     for (const channel of guest.channels) {
       tags.add(`OTA-${channelLabel(channel)}`);

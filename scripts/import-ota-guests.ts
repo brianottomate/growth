@@ -9,6 +9,10 @@
  * Behaviour:
  *   - parses the CSV by header name, skips no-contact / @wander.com /
  *     placeholder rows, dedupes by email (see ota-guest-import.service.ts)
+ *   - holds back guests whose stay has not happened yet (--include-upcoming to
+ *     override): a future check-in means a live OTA booking, and pitching a
+ *     direct rebook there is off-platform diversion of a reservation the OTA
+ *     has not been paid for
  *   - existing prospect  -> union tags only; owner, stage and existing notes
  *     are left alone (writes personalNote2 only when it is blank)
  *   - new prospect       -> DEMAND_NEW stage (or --stage=booked), booking-guest
@@ -38,15 +42,13 @@ import {
   OUTREACH_STAGES,
   PERSONA_BOOKING_GUEST_ID,
 } from "@/server/services/outreach/field-mapping";
-import {
-  getNextBdr,
-  getNextBdrFromOutreachLoad,
-} from "@/server/services/outreach/bdr-assignment.service";
+import { getNextBdr } from "@/server/services/outreach/bdr-assignment.service";
 import {
   buildCustomFields,
   buildNote,
   buildTags,
   dedupeByEmail,
+  hasUpcomingStay,
   parseOtaGuestCsv,
   splitName,
   type OtaGuest,
@@ -76,7 +78,7 @@ if (!csvPath) {
   throw new Error(
     "usage: bun run scripts/import-ota-guests.ts <csv-path> [--execute] [--tag <tag>] " +
       "[--limit <n>] [--stage new|booked] [--channel-tags] [--no-assign] [--include-opted-out] " +
-      "[--rps <n>] [--state <path>]",
+      "[--include-upcoming] [--rps <n>] [--state <path>]",
   );
 }
 
@@ -84,6 +86,10 @@ const execute = flag("execute");
 const channelTags = flag("channel-tags");
 const assignBdr = !flag("no-assign");
 const includeOptedOut = flag("include-opted-out");
+// Guests whose stay hasn't happened yet are held back by default (Serrelle,
+// 2026-08-05: "lets exclude that list and just tag the ones who have OTA stays
+// that have already happened").
+const includeUpcoming = flag("include-upcoming");
 const campaignTag = option("tag", DEFAULT_TAG);
 const limit = Number.parseInt(option("limit", "0"), 10) || 0;
 const requestsPerSecond = Number.parseFloat(option("rps", "4")) || 4;
@@ -136,8 +142,8 @@ function recordDone(email: string, action: string, prospectId?: string | number)
 }
 
 /** Outreach reports opt-out as e.g. "opted_out"; never add those to a campaign. */
-function isOptedOut(status: unknown): boolean {
-  return /out/i.test(String(status ?? ""));
+function isOptedOut(status: string | null | undefined): boolean {
+  return /out/i.test(status ?? "");
 }
 
 async function syncGuest(guest: OtaGuest): Promise<string> {
@@ -167,9 +173,9 @@ async function syncGuest(guest: OtaGuest): Promise<string> {
   }
 
   const { firstName, lastName } = splitName(guest.name);
-  const bdr = assignBdr
-    ? ((await getNextBdrFromOutreachLoad(!!guest.phone)) ?? getNextBdr(!!guest.phone))
-    : null;
+  // Static round robin, not getNextBdrFromOutreachLoad: see the note on
+  // assignBdr in main(). Zero API calls and an actually even split.
+  const bdr = assignBdr ? getNextBdr(!!guest.phone) : null;
 
   const created = await withRetry(`create ${guest.email}`, () =>
     createProspect({
@@ -193,15 +199,29 @@ async function syncGuest(guest: OtaGuest): Promise<string> {
 
 async function main() {
   const rows = parseOtaGuestCsv(readFileSync(csvPath!, "utf8"));
-  const { guests, skipped } = dedupeByEmail(rows);
+  const { guests: allGuests, skipped } = dedupeByEmail(rows);
 
   const skipCounts = new Map<string, number>();
   for (const { reason } of skipped) {
     skipCounts.set(reason, (skipCounts.get(reason) ?? 0) + 1);
   }
 
+  // A stay that hasn't happened yet is a live OTA booking, not a past one.
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = allGuests.filter((guest) => hasUpcomingStay(guest, today));
+  const guests = includeUpcoming
+    ? allGuests
+    : allGuests.filter((guest) => !hasUpcomingStay(guest, today));
+
   console.log(`📄 ${rows.length} rows in CSV`);
   for (const [reason, count] of skipCounts) console.log(`⏭️  ${count} skipped — ${reason}`);
+  if (upcoming.length > 0) {
+    console.log(
+      includeUpcoming
+        ? `⚠️  ${upcoming.length} guests with an UPCOMING stay INCLUDED (--include-upcoming)`
+        : `⏭️  ${upcoming.length} skipped — stay still upcoming (live OTA booking)`,
+    );
+  }
   console.log(`🎯 ${guests.length} distinct guests`);
   console.log(`🏷️  tag: ${campaignTag}${channelTags ? " (+ per-channel tags)" : ""}`);
 
