@@ -75,6 +75,25 @@ export function hostFromUrl(value: string): string | null {
   }
 }
 
+/**
+ * The preview's bearer token, extracted from the monolith's canonical
+ * `previewUrl` (`https://<label>.<zone>/?t=<token>`). The payload carries no
+ * separate token field, but `/api/pregen/preview/[token]` resolves monolith
+ * prospects by `preview_token` — wander.com's /os/<slug> pitch wrapper depends
+ * on it — so a mirror row without the token is invisible to that page.
+ *
+ * Exported for test: this is the join between the webhook and the artifact
+ * API's monolith branch; losing the token silently 404s every pitch page.
+ */
+export function tokenFromPreviewUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).searchParams.get("t") || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   if (!env.PREGEN_WEBHOOK_SECRET) {
     // Unconfigured is not "reject quietly": if WanderOS starts sending before
@@ -139,6 +158,8 @@ export async function POST(request: NextRequest) {
         websiteId: payload.websiteId,
         status: payload.status,
         previewUrl: payload.previewUrl ?? existing.previewUrl,
+        previewToken:
+          tokenFromPreviewUrl(payload.previewUrl) ?? existing.previewToken,
         errorMessage: payload.errorMessage ?? null,
         lastEventAt: occurredAt,
         settledAt: settled ? occurredAt : existing.settledAt,
@@ -157,6 +178,7 @@ export async function POST(request: NextRequest) {
       sourceUrl: payload.sourceUrl,
       status: payload.status,
       previewUrl: payload.previewUrl ?? null,
+      previewToken: tokenFromPreviewUrl(payload.previewUrl),
       errorMessage: payload.errorMessage ?? null,
       lastEventAt: occurredAt,
       settledAt: settled ? occurredAt : null,
