@@ -18,6 +18,7 @@ import {
   hubspotListUrl,
   type HubspotPregenCohort,
 } from "@/lib/hubspot-pregen-lists";
+import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
 import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
 import {
@@ -219,6 +220,44 @@ export function LeadsClient() {
       { placeholderData: keepPreviousData },
     ),
   );
+
+  // A search that misses inside a narrow population is the single most common
+  // dead end on this page (a domain lives in Whole universe but not in the
+  // cohort you happen to be on, and the empty state used to just shrug). When
+  // that happens, ask the widest population whether the query matches ANYTHING
+  // so the empty state can offer the switch instead of leaving you to guess.
+  const emptyWithQuery =
+    !!q && population !== "all" && list.data?.items.length === 0;
+  const elsewhere = useQuery(
+    trpc.leads.listDomains.queryOptions(
+      { q, limit: 1 },
+      { enabled: emptyWithQuery },
+    ),
+  );
+  const filtersActive =
+    !!q ||
+    !!source ||
+    !!pms ||
+    integratedOnly ||
+    hasPregen ||
+    enrollableOnly ||
+    !!owner ||
+    hasDraft != null ||
+    !!verdict ||
+    !!route;
+  const clearFilters = () => {
+    void setQ("");
+    void setSource(null);
+    void setPms(null);
+    void setIntegratedOnly(false);
+    void setHasPregen(false);
+    void setEnrollableOnly(false);
+    void setOwner(null);
+    void setHasDraft(null);
+    void setVerdict(null);
+    void setRoute(null);
+    resetPage();
+  };
 
   // Resolve a deep-linked lead (?lead=domain) that isn't already open — search
   // for it so the drawer opens even when the lead is outside the current filter.
@@ -550,6 +589,39 @@ export function LeadsClient() {
             } · click a row to inspect & enrich`
           : "Loading…"}
       </div>
+
+      {/* An empty result with filters on gets escape hatches, because
+          "0 matching" over a cohort reads as "we don't have this domain" when
+          the truth is usually "wrong population" or "a filter you forgot". */}
+      {list.data?.items.length === 0 && filtersActive && (
+        <div className="border-border mt-3 flex flex-wrap items-center gap-3 rounded-md border border-dashed p-3 text-sm">
+          {emptyWithQuery && (elsewhere.data?.total ?? 0) > 0 ? (
+            <>
+              <span className="text-muted-foreground">
+                “{q}” matches {fmt(elsewhere.data!.total)} in Whole universe —
+                this population just doesn’t contain it.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void setPopulation("all");
+                  resetPage();
+                }}
+              >
+                Search Whole universe
+              </Button>
+            </>
+          ) : (
+            <span className="text-muted-foreground">
+              Nothing matches the current filters.
+            </span>
+          )}
+          <Button size="sm" variant="ghost" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        </div>
+      )}
 
       {/* Review cards — the send-review surface as a density level over the same
           filtered set, so the two cannot show different facts about one company
