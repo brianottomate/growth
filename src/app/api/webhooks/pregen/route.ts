@@ -169,20 +169,39 @@ export async function POST(request: NextRequest) {
   // and the publish guard requires — so nothing downstream needs to know the
   // build table exists.
   if (payload.previewUrl && !stale) {
-    await db
-      .update(leadDomainTable)
-      .set({ pregenSiteUrl: payload.previewUrl })
-      .where(
-        and(
-          eq(leadDomainTable.id, domainId),
-          // Never clobber a newer preview with a late event for an older build.
-          or(
-            isNull(leadDomainTable.pregenSiteUrl),
+    if (payload.status === "FAILED") {
+      // A failed build's preview is dead by definition — the monolith only
+      // serves GENERATING/READY prospects — but the URL was promoted
+      // optimistically at creation. Left in place it points the probe, the copy
+      // generator and the card's link at a 404, and (worse) it suppresses the
+      // card's Build button, so the one lead that NEEDS a rebuild is the one
+      // that cannot ask for it. Clear it, but only when it is this build's own
+      // URL: a late FAILED event must not erase a newer build's preview.
+      await db
+        .update(leadDomainTable)
+        .set({ pregenSiteUrl: null })
+        .where(
+          and(
+            eq(leadDomainTable.id, domainId),
             eq(leadDomainTable.pregenSiteUrl, payload.previewUrl),
-            eq(leadDomainTable.pregenSiteUrl, ""),
           ),
-        ),
-      );
+        );
+    } else {
+      await db
+        .update(leadDomainTable)
+        .set({ pregenSiteUrl: payload.previewUrl })
+        .where(
+          and(
+            eq(leadDomainTable.id, domainId),
+            // Never clobber a newer preview with a late event for an older build.
+            or(
+              isNull(leadDomainTable.pregenSiteUrl),
+              eq(leadDomainTable.pregenSiteUrl, payload.previewUrl),
+              eq(leadDomainTable.pregenSiteUrl, ""),
+            ),
+          ),
+        );
+    }
   }
 
   return NextResponse.json({ ok: true, matched: true, settled, claimed });
