@@ -51,11 +51,13 @@ async function assertToolCatalog(client: Client) {
 describe("Growth MCP protocol compatibility", () => {
   test("advertises OAuth resource discovery to unauthenticated clients", async () => {
     const { GET } = await import("@/app/api/mcp/route");
+    const { GROWTH_MCP_RESOURCE_METADATA } =
+      await import("@/server/mcp/config");
     const response = await GET(new Request(endpoint));
     expect(response.status).toBe(401);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("www-authenticate")).toContain(
-      'resource_metadata="https://growth-red.vercel.app/.well-known/oauth-protected-resource"',
+      `resource_metadata="${GROWTH_MCP_RESOURCE_METADATA}"`,
     );
     expect(response.headers.get("www-authenticate")).toContain(
       'scope="growth:all"',
