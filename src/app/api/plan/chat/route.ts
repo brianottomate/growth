@@ -20,6 +20,7 @@ import {
   startAssistantRun,
 } from "@/server/ai/kernel/journal";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
+import { runtimeClockSection } from "@/server/ai/kernel/runtime-clock";
 
 /**
  * /plan is a deterministic product-surface projection of the same canonical
@@ -30,6 +31,7 @@ export const maxDuration = 60;
 
 const MODEL = "claude-sonnet-5";
 export async function POST(req: Request): Promise<Response> {
+  const requestNow = new Date();
   const session = await getSession();
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
 
@@ -59,6 +61,13 @@ export async function POST(req: Request): Promise<Response> {
     maximumCharacters: 24_000,
     sections: [
       { id: "persona", content: PLAN_AGENT_PERSONA, cache: "session" },
+      {
+        id: "runtime-clock",
+        content: runtimeClockSection({
+          now: requestNow,
+          timeZone: session.user.timeZone,
+        }),
+      },
       { id: "selected-brand", content: selectedBrand },
     ],
   });

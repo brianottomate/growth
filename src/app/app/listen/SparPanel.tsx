@@ -8,6 +8,7 @@ import { Streamdown } from "streamdown";
 
 import { Button } from "@/components/ui/button";
 import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
+import { isApprovalSuperseded } from "@/lib/chat-approval-state";
 import {
   Sheet,
   SheetContent,
@@ -176,6 +177,7 @@ export function SparPanel({
                         <ToolCard
                           key={i}
                           part={part}
+                          superseded={isApprovalSuperseded(messages, mi)}
                           onApprove={(approved) =>
                             part.approval &&
                             void addToolApprovalResponse({
@@ -229,9 +231,11 @@ export function SparPanel({
 
 function ToolCard({
   part,
+  superseded,
   onApprove,
 }: {
   part: ToolPart;
+  superseded: boolean;
   onApprove: (approved: boolean) => void;
 }) {
   const name = part.type.replace(/^tool-/, "");
@@ -256,16 +260,26 @@ function ToolCard({
             </span>
           ) : null}
         </p>
-        <div className="mt-2 flex gap-2">
-          <Button size="sm" onClick={() => onApprove(true)}>
-            <Check className="size-3.5" />
-            Record it
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => onApprove(false)}>
-            <X className="size-3.5" />
-            Not yet
-          </Button>
-        </div>
+        {superseded ? (
+          <p className="text-muted-foreground mt-2 text-xs">
+            Superseded by a later message. Ask for a fresh approval.
+          </p>
+        ) : (
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" onClick={() => onApprove(true)}>
+              <Check className="size-3.5" />
+              Record it
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onApprove(false)}
+            >
+              <X className="size-3.5" />
+              Not yet
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

@@ -41,6 +41,8 @@ import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
 import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
+import { isApprovalSuperseded } from "@/lib/chat-approval-state";
+import { formatResolvedPublishingTime } from "@/lib/scheduling-time";
 import { cn } from "@/lib/utils";
 import {
   GROWTH_CAPABILITY_LABELS,
@@ -759,6 +761,7 @@ export function OverviewChat({
                           return renderToolPart(
                             part,
                             key,
+                            isApprovalSuperseded(messages, messageIdx),
                             (approved) => {
                               const approval = (
                                 part as { approval?: { id: string } }
@@ -1033,6 +1036,7 @@ function UserMessage({ message }: { message: UIMessage }) {
 function renderToolPart(
   part: ToolUIPart,
   key: string,
+  approvalSuperseded: boolean,
   onApprove: (approved: boolean) => void,
   onPrompt: (prompt: string) => void,
   onIntent: (intent: AssistantIntent) => void,
@@ -1050,6 +1054,7 @@ function renderToolPart(
         key={key}
         toolName={presentationName}
         input={loose.input}
+        superseded={approvalSuperseded}
         onApprove={onApprove}
       />
     );
@@ -1266,10 +1271,12 @@ function renderToolPart(
 function ApprovalCard({
   toolName,
   input,
+  superseded,
   onApprove,
 }: {
   toolName: string;
   input: unknown;
+  superseded: boolean;
   onApprove: (approved: boolean) => void;
 }) {
   const inp = input as
@@ -1278,7 +1285,9 @@ function ApprovalCard({
         hook?: string;
         platforms?: string[];
         platform?: string;
+        localDateTime?: string;
         scheduledAt?: string;
+        timeZone?: string;
         name?: string;
         description?: string | null;
         pillarSlug?: string | null;
@@ -1293,78 +1302,91 @@ function ApprovalCard({
   const isAudienceWrite =
     toolName === "audienceWrite.createTarget" ||
     toolName === "audienceWrite.updateTarget";
-  const heading =
-    toolName === "contentStrategyWrite.savePillar"
-      ? "Save this content pillar?"
-      : toolName === "contentStrategyWrite.saveSeries"
-        ? "Save this content series?"
-        : toolName === "contentStrategyWrite.organizeIdeas"
-          ? "Apply this content structure?"
-          : toolName === "contentStrategyWrite.resolveGrouping"
-            ? inp?.decision === "reject"
-              ? "Dismiss this grouping proposal?"
-              : "Accept this grouping proposal?"
-            : toolName === "contentWrite.createPlatformPost"
-              ? "Create this channel draft?"
-              : toolName === "contentWrite.setThread"
-                ? `Save this ${inp?.posts?.length ?? ""}-post thread?`
-                : toolName === "contentWrite.promotePlatformPost"
-                  ? "Turn this post into a content idea?"
-                  : toolName === "contentWrite.createIdea"
-                    ? "Create this idea?"
-                    : toolName === "audienceWrite.createTarget"
-                      ? "Create this audience target?"
-                      : toolName === "audienceWrite.updateTarget"
-                        ? "Save these audience changes?"
-                        : toolName === "strategyWrite.updateCadence"
-                          ? "Save these cadence changes?"
-                          : toolName === "strategyWrite.updateBrandMix"
-                            ? "Save these content mix changes?"
-                            : toolName ===
-                                "contentMediaWrite.attachLibraryMedia"
-                              ? "Attach this library asset?"
-                              : toolName === "contentMediaWrite.makeCarousel"
-                                ? "Turn these images into platform carousels?"
-                                : toolName ===
-                                    "contentMediaWrite.recoverArchiveMedia"
-                                  ? "Recover and attach this archive media?"
-                                  : "Confirm this action?";
-  const primaryLabel =
-    toolName === "contentStrategyWrite.savePillar"
-      ? "Save pillar"
-      : toolName === "contentStrategyWrite.saveSeries"
-        ? "Save series"
-        : toolName === "contentStrategyWrite.organizeIdeas"
-          ? "Apply structure"
-          : toolName === "contentStrategyWrite.resolveGrouping"
-            ? inp?.decision === "reject"
-              ? "Dismiss"
-              : "Accept grouping"
-            : toolName === "contentWrite.createPlatformPost"
-              ? "Create draft"
-              : toolName === "contentWrite.setThread"
-                ? "Save thread"
-                : toolName === "contentWrite.promotePlatformPost"
-                  ? "Promote post"
-                  : toolName === "contentWrite.createIdea"
-                    ? "Create it"
-                    : toolName === "audienceWrite.createTarget"
-                      ? "Create target"
-                      : toolName === "audienceWrite.updateTarget"
-                        ? "Save changes"
-                        : toolName === "strategyWrite.updateCadence"
-                          ? "Save cadence"
-                          : toolName === "strategyWrite.updateBrandMix"
-                            ? "Save content mix"
-                            : toolName ===
-                                "contentMediaWrite.attachLibraryMedia"
-                              ? "Attach asset"
-                              : toolName === "contentMediaWrite.makeCarousel"
-                                ? "Make carousels"
-                                : toolName ===
-                                    "contentMediaWrite.recoverArchiveMedia"
-                                  ? "Recover & attach"
-                                  : "Confirm";
+  const isPublishingSchedule = toolName === "publishingWrite.schedule";
+  const isPublishingReschedule = toolName === "publishingWrite.reschedule";
+  const isSchedulingApproval = isPublishingSchedule || isPublishingReschedule;
+  const legacySchedulingApproval = Boolean(
+    isSchedulingApproval && !inp?.localDateTime,
+  );
+  const approvalUnavailable = superseded || legacySchedulingApproval;
+  const heading = isPublishingSchedule
+    ? "Approve and schedule this post in Zernio?"
+    : isPublishingReschedule
+      ? "Move this scheduled Zernio post?"
+      : toolName === "contentStrategyWrite.savePillar"
+        ? "Save this content pillar?"
+        : toolName === "contentStrategyWrite.saveSeries"
+          ? "Save this content series?"
+          : toolName === "contentStrategyWrite.organizeIdeas"
+            ? "Apply this content structure?"
+            : toolName === "contentStrategyWrite.resolveGrouping"
+              ? inp?.decision === "reject"
+                ? "Dismiss this grouping proposal?"
+                : "Accept this grouping proposal?"
+              : toolName === "contentWrite.createPlatformPost"
+                ? "Create this channel draft?"
+                : toolName === "contentWrite.setThread"
+                  ? `Save this ${inp?.posts?.length ?? ""}-post thread?`
+                  : toolName === "contentWrite.promotePlatformPost"
+                    ? "Turn this post into a content idea?"
+                    : toolName === "contentWrite.createIdea"
+                      ? "Create this idea?"
+                      : toolName === "audienceWrite.createTarget"
+                        ? "Create this audience target?"
+                        : toolName === "audienceWrite.updateTarget"
+                          ? "Save these audience changes?"
+                          : toolName === "strategyWrite.updateCadence"
+                            ? "Save these cadence changes?"
+                            : toolName === "strategyWrite.updateBrandMix"
+                              ? "Save these content mix changes?"
+                              : toolName ===
+                                  "contentMediaWrite.attachLibraryMedia"
+                                ? "Attach this library asset?"
+                                : toolName === "contentMediaWrite.makeCarousel"
+                                  ? "Turn these images into platform carousels?"
+                                  : toolName ===
+                                      "contentMediaWrite.recoverArchiveMedia"
+                                    ? "Recover and attach this archive media?"
+                                    : "Confirm this action?";
+  const primaryLabel = isPublishingSchedule
+    ? "Approve & schedule"
+    : isPublishingReschedule
+      ? "Reschedule post"
+      : toolName === "contentStrategyWrite.savePillar"
+        ? "Save pillar"
+        : toolName === "contentStrategyWrite.saveSeries"
+          ? "Save series"
+          : toolName === "contentStrategyWrite.organizeIdeas"
+            ? "Apply structure"
+            : toolName === "contentStrategyWrite.resolveGrouping"
+              ? inp?.decision === "reject"
+                ? "Dismiss"
+                : "Accept grouping"
+              : toolName === "contentWrite.createPlatformPost"
+                ? "Create draft"
+                : toolName === "contentWrite.setThread"
+                  ? "Save thread"
+                  : toolName === "contentWrite.promotePlatformPost"
+                    ? "Promote post"
+                    : toolName === "contentWrite.createIdea"
+                      ? "Create it"
+                      : toolName === "audienceWrite.createTarget"
+                        ? "Create target"
+                        : toolName === "audienceWrite.updateTarget"
+                          ? "Save changes"
+                          : toolName === "strategyWrite.updateCadence"
+                            ? "Save cadence"
+                            : toolName === "strategyWrite.updateBrandMix"
+                              ? "Save content mix"
+                              : toolName ===
+                                  "contentMediaWrite.attachLibraryMedia"
+                                ? "Attach asset"
+                                : toolName === "contentMediaWrite.makeCarousel"
+                                  ? "Make carousels"
+                                  : toolName ===
+                                      "contentMediaWrite.recoverArchiveMedia"
+                                    ? "Recover & attach"
+                                    : "Confirm";
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">
@@ -1396,7 +1418,14 @@ function ApprovalCard({
           Priority: {inp.priority.replaceAll("_", " ")}
         </p>
       )}
-      {inp?.platform ? (
+      {isSchedulingApproval && inp?.localDateTime && inp.timeZone ? (
+        <p className="text-muted-foreground mt-1 text-xs">
+          {formatResolvedPublishingTime({
+            localDateTime: inp.localDateTime,
+            timeZone: inp.timeZone,
+          })}
+        </p>
+      ) : inp?.platform ? (
         <p className="text-muted-foreground mt-1 text-xs">
           Channel: {inp.platform}
           {inp.scheduledAt
@@ -1408,16 +1437,24 @@ function ApprovalCard({
           Channels: {(inp.platforms ?? inp.intendedChannels)?.join(", ")}
         </p>
       ) : null}
-      <div className="mt-2 flex gap-2">
-        <Button size="sm" onClick={() => onApprove(true)}>
-          <Check className="h-3.5 w-3.5" />
-          {primaryLabel}
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => onApprove(false)}>
-          <X className="h-3.5 w-3.5" />
-          Not yet
-        </Button>
-      </div>
+      {approvalUnavailable ? (
+        <p className="text-muted-foreground mt-2 text-xs">
+          {superseded
+            ? "Superseded by a later message. Ask for a fresh approval."
+            : "This older scheduling approval must be regenerated."}
+        </p>
+      ) : (
+        <div className="mt-2 flex gap-2">
+          <Button size="sm" onClick={() => onApprove(true)}>
+            <Check className="h-3.5 w-3.5" />
+            {primaryLabel}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onApprove(false)}>
+            <X className="h-3.5 w-3.5" />
+            Not yet
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

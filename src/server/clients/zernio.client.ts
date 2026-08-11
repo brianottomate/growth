@@ -139,6 +139,9 @@ export type ZernioPostPlatform = {
   platformPostId?: string;
   platformPostUrl?: string; // published posts only
   error?: string;
+  errorCategory?: string;
+  errorMessage?: string;
+  errorSource?: string;
   customContent?: string;
   platformSpecificData?: Record<string, unknown>;
   [key: string]: unknown;

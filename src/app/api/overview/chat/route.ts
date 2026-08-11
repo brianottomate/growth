@@ -29,6 +29,11 @@ import {
   startAssistantRun,
 } from "@/server/ai/kernel/journal";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
+import {
+  approvalHasExpired,
+  validateApprovalContinuation,
+} from "@/server/ai/kernel/approval-continuation";
+import { runtimeClockSection } from "@/server/ai/kernel/runtime-clock";
 import type {
   AssistantIntent,
   ContentWorkContext,
@@ -70,6 +75,7 @@ function sanitizeForModel(history: UIMessage[]) {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  const requestNow = new Date();
   const session = await getSession();
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
 
@@ -105,6 +111,8 @@ export async function POST(req: Request): Promise<Response> {
     chatAttachments,
     threadId,
     pagePath,
+    trigger,
+    messageId,
   } = (await req.json()) as {
     messages: UIMessage[];
     surface?: "overview" | "create" | "next";
@@ -116,6 +124,8 @@ export async function POST(req: Request): Promise<Response> {
     chatAttachments?: { url?: string; mediaType?: string }[];
     threadId?: string;
     pagePath?: string;
+    trigger?: "submit-message" | "regenerate-message";
+    messageId?: string;
   };
   if (!threadId || messages.length === 0) {
     return Response.json(
@@ -256,6 +266,38 @@ export async function POST(req: Request): Promise<Response> {
   const incomingIdx = persisted.findIndex(
     (row) => row.clientMessageId === incoming.id,
   );
+  if (incoming.role === "assistant") {
+    if (
+      trigger !== "submit-message" ||
+      messageId !== incoming.id ||
+      incomingIdx !== persisted.length - 1
+    ) {
+      return Response.json(
+        {
+          error:
+            "This approval was superseded by a later message. Request a fresh approval.",
+        },
+        { status: 409 },
+      );
+    }
+    const stored = persisted[incomingIdx];
+    if (
+      !stored ||
+      approvalHasExpired({ createdAt: stored.createdAt, now: requestNow })
+    ) {
+      return Response.json(
+        { error: "This approval expired. Request a fresh approval." },
+        { status: 409 },
+      );
+    }
+    const continuationError = validateApprovalContinuation(
+      stored.message,
+      incoming,
+    );
+    if (continuationError) {
+      return Response.json({ error: continuationError }, { status: 409 });
+    }
+  }
   let history: UIMessage[];
   let staleTailIds: string[] = [];
   if (incomingIdx === -1) {
@@ -299,6 +341,13 @@ export async function POST(req: Request): Promise<Response> {
     maximumCharacters: 80_000,
     sections: [
       { id: "persona", content: OVERVIEW_AGENT_PERSONA, cache: "session" },
+      {
+        id: "runtime-clock",
+        content: runtimeClockSection({
+          now: requestNow,
+          timeZone: session.user.timeZone,
+        }),
+      },
       { id: "surface", content: surfaceContext },
       { id: "page", content: pageContextPrompt },
       { id: "intent", content: intentContext },

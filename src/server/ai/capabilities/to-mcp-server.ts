@@ -10,7 +10,10 @@ import {
   type ToolSet,
 } from "ai";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 
+import { db } from "@/server/db";
+import { userTable } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { composeGrowthContext } from "../kernel/context";
 import { compactGrowthError } from "../kernel/errors";
@@ -21,6 +24,7 @@ import {
 } from "../kernel/journal";
 import { growthActionPolicies } from "../kernel/policy";
 import { buildGrowthToolRuntime } from "../kernel/runtime";
+import { runtimeClockSection } from "../kernel/runtime-clock";
 import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
 
 type ToolContext = { http?: { authInfo?: AuthInfo } };
@@ -106,7 +110,12 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
     async (input, extra) => {
       let runId: string | undefined;
       try {
+        const requestNow = new Date();
         const identity = identityFromMcpContext(extra);
+        const user = await db.query.userTable.findFirst({
+          where: eq(userTable.id, identity.userId),
+          columns: { timeZone: true },
+        });
         const context = composeGrowthContext({
           surface: "invoke-growth",
           maximumCharacters: 40_000,
@@ -115,6 +124,13 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
               id: "persona",
               content: INVOKE_GROWTH_PERSONA,
               cache: "session",
+            },
+            {
+              id: "runtime-clock",
+              content: runtimeClockSection({
+                now: requestNow,
+                timeZone: user?.timeZone,
+              }),
             },
           ],
         });

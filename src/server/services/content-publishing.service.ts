@@ -6,6 +6,7 @@ import {
   createZernioPost,
   getZernioPost,
   isZernioConfigured,
+  listZernioAccounts,
   mapZernioPlatform,
   retryZernioPost,
   updateZernioPost,
@@ -79,6 +80,37 @@ function platformResult(
     post.platforms?.find(
       (target) => mapZernioPlatform(target.platform) === platform,
     )
+  );
+}
+
+async function requireActiveZernioAccount(input: {
+  channelId: string;
+  accountId: string;
+  platform: SocialPublishingPlatform;
+}) {
+  const accounts = await listZernioAccounts();
+  const account = accounts.find(
+    (candidate) => (candidate._id ?? candidate.id) === input.accountId,
+  );
+  const unavailable =
+    !account ||
+    account.isActive === false ||
+    account.enabled === false ||
+    account.platformStatus?.toLowerCase() === "error";
+  if (!unavailable) return;
+
+  await db
+    .update(channelTable)
+    .set({ connectionStatus: "disconnected", isActive: false })
+    .where(eq(channelTable.id, input.channelId));
+  const label: Record<SocialPublishingPlatform, string> = {
+    facebook: "Facebook",
+    instagram: "Instagram",
+    linkedin: "LinkedIn",
+    x: "X",
+  };
+  throw new Error(
+    `Reconnect the ${label[input.platform]} account in Zernio before publishing or scheduling. The live provider account is inactive.`,
   );
 }
 
@@ -374,6 +406,14 @@ async function persistDelivery(
     zernioPost.status === "partial";
   const cancelled =
     deliveryStatus === "cancelled" || zernioPost.status === "cancelled";
+  const deliveryError =
+    target?.errorMessage ??
+    target?.error ??
+    (target?.errorCategory
+      ? `${target.errorCategory}${target.errorSource ? ` (${target.errorSource})` : ""}`
+      : failed
+        ? "Publishing failed"
+        : null);
 
   await db
     .update(platformPostTable)
@@ -381,7 +421,7 @@ async function persistDelivery(
       provider: "zernio",
       deliveryExternalId: zernioPost._id,
       deliveryStatus,
-      deliveryError: target?.error ?? (failed ? "Publishing failed" : null),
+      deliveryError,
       deliveryUpdatedAt: new Date(),
       firstCommentStatus: spot.firstCommentText
         ? published
@@ -392,7 +432,7 @@ async function persistDelivery(
         : undefined,
       firstCommentError:
         spot.firstCommentText && (failed || cancelled)
-          ? (target?.error ?? "First comment was not delivered")
+          ? (deliveryError ?? "First comment was not delivered")
           : spot.firstCommentText
             ? null
             : undefined,
@@ -427,10 +467,18 @@ async function persistDelivery(
 export async function deliverSocialPost(input: {
   platformPostId: string;
   mode: SocialDeliveryMode;
+  accountValidated?: boolean;
 }) {
   const loaded = await loadSocialSpot(input.platformPostId);
   const { spot, channel, platform, connectedAccountId, items, payload, story } =
     loaded;
+  if (!input.accountValidated) {
+    await requireActiveZernioAccount({
+      channelId: channel.id,
+      accountId: connectedAccountId,
+      platform,
+    });
+  }
   const handedOffCount = items.filter((item) => item.deliveryExternalId).length;
   if (spot.status !== "approved" && !(story && handedOffCount > 0)) {
     throw new Error(
@@ -632,7 +680,7 @@ export async function updateQueuedSocialFirstComment(input: {
   platformPostId: string;
   firstComment: string;
 }) {
-  const { spot, platform, connectedAccountId, items, story } =
+  const { spot, channel, platform, connectedAccountId, items, story } =
     await loadSocialSpot(input.platformPostId);
   if (story || (platform !== "instagram" && platform !== "linkedin")) {
     throw new Error("This platform format does not support a first comment");
@@ -647,6 +695,11 @@ export async function updateQueuedSocialFirstComment(input: {
   }
   const firstComment = input.firstComment.trim();
   if (!firstComment) throw new Error("Write the first comment before updating");
+  await requireActiveZernioAccount({
+    channelId: channel.id,
+    accountId: connectedAccountId,
+    platform,
+  });
   const payload = deliveryPayload({
     platform,
     format: spot.format,
@@ -719,9 +772,16 @@ export async function approveAndScheduleSocialPost(input: {
   ) {
     throw new Error("Choose a future publish time");
   }
-  const { spot, channel, items, story } = await loadSocialSpot(
-    input.platformPostId,
-  );
+  const { spot, channel, connectedAccountId, items, platform, story } =
+    await loadSocialSpot(input.platformPostId);
+  if (!story && spot.deliveryExternalId) {
+    throw new Error("This post has already been handed to Zernio");
+  }
+  await requireActiveZernioAccount({
+    channelId: channel.id,
+    accountId: connectedAccountId,
+    platform,
+  });
   await Promise.all(
     items.map((item, index) =>
       db
@@ -737,7 +797,11 @@ export async function approveAndScheduleSocialPost(input: {
         .where(eq(platformPostTable.id, item.id)),
     ),
   );
-  return deliverSocialPost({ platformPostId: spot.id, mode: "schedule" });
+  return deliverSocialPost({
+    platformPostId: spot.id,
+    mode: "schedule",
+    accountValidated: true,
+  });
 }
 
 /** Move an existing provider job using its receipt as the payload source. */
@@ -752,11 +816,16 @@ export async function rescheduleQueuedSocialPost(input: {
   ) {
     throw new Error("Choose a future publish time");
   }
-  const { spot, connectedAccountId, items, platform, story } =
+  const { spot, channel, connectedAccountId, items, platform, story } =
     await loadSocialSpot(input.platformPostId);
   if (spot.status === "published" || spot.deliveryStatus === "published") {
     throw new Error("This post is already published");
   }
+  await requireActiveZernioAccount({
+    channelId: channel.id,
+    accountId: connectedAccountId,
+    platform,
+  });
 
   if (story) {
     if (items.some((item) => !item.deliveryExternalId)) {
@@ -895,8 +964,13 @@ export async function reconcileZernioPostDelivery(providerPostId: string) {
 }
 
 export async function retrySocialDelivery(platformPostId: string) {
-  const { spot, connectedAccountId, items, platform, story } =
+  const { spot, channel, connectedAccountId, items, platform, story } =
     await loadSocialSpot(platformPostId);
+  await requireActiveZernioAccount({
+    channelId: channel.id,
+    accountId: connectedAccountId,
+    platform,
+  });
   if (story) {
     const retryable = items.filter(
       (item) =>

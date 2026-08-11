@@ -12,6 +12,7 @@ import {
   updateQueuedSocialFirstComment,
 } from "@/server/services/content-publishing.service";
 import { ContentService } from "@/server/services/content.service";
+import { resolveZonedDateTime } from "@/lib/scheduling-time";
 import { growthAction, GrowthActionError } from "./types";
 
 async function requireOwnedSocialPost(platformPostId: string, orgId: string) {
@@ -42,11 +43,23 @@ export const scheduleSocialPost = growthAction({
     "Approve one complete social publishing unit and schedule it in Zernio. This creates an external provider job and requires explicit approval. A successful Zernio receipt, not the local calendar update, advances the post to scheduled.",
   inputSchema: z.object({
     platformPostId: z.string(),
-    scheduledAt: z.string().datetime(),
+    timeZone: z
+      .string()
+      .min(1)
+      .describe("IANA timezone used to agree the operator wall-clock time."),
+    localDateTime: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/)
+      .describe(
+        "Agreed operator wall-clock time as YYYY-MM-DDTHH:mm[:ss], without an offset. The server resolves UTC from timeZone.",
+      ),
   }),
   execute: async (input, ctx) => {
     await requireOwnedSocialPost(input.platformPostId, ctx.orgId);
-    return approveAndScheduleSocialPost(input);
+    return approveAndScheduleSocialPost({
+      platformPostId: input.platformPostId,
+      scheduledAt: resolveZonedDateTime(input),
+    });
   },
 });
 
@@ -69,11 +82,17 @@ export const rescheduleSocialPost = growthAction({
     "Move an existing scheduled Zernio job to a new future time without publishing newer local draft copy or media. Requires explicit approval.",
   inputSchema: z.object({
     platformPostId: z.string(),
-    scheduledAt: z.string().datetime(),
+    timeZone: z.string().min(1),
+    localDateTime: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/),
   }),
   execute: async (input, ctx) => {
     await requireOwnedSocialPost(input.platformPostId, ctx.orgId);
-    return rescheduleQueuedSocialPost(input);
+    return rescheduleQueuedSocialPost({
+      platformPostId: input.platformPostId,
+      scheduledAt: resolveZonedDateTime(input),
+    });
   },
 });
 
