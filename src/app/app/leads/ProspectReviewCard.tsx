@@ -110,7 +110,6 @@ type VerdictTheme = {
   rail: string;
   border: string;
   text: string;
-  badge: string;
   verb: string;
   Icon: LucideIcon;
 };
@@ -120,7 +119,6 @@ export const verdictTheme: Record<ProspectVerdict, VerdictTheme> = {
     rail: "bg-emerald-500",
     border: "border-emerald-500",
     text: "text-emerald-400",
-    badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
     verb: "Send now",
     Icon: CheckCircle2,
   },
@@ -128,7 +126,6 @@ export const verdictTheme: Record<ProspectVerdict, VerdictTheme> = {
     rail: "bg-amber-500",
     border: "border-amber-500",
     text: "text-amber-400",
-    badge: "border-amber-500/30 bg-amber-500/10 text-amber-300",
     verb: "Needs a look",
     Icon: Mail,
   },
@@ -136,7 +133,6 @@ export const verdictTheme: Record<ProspectVerdict, VerdictTheme> = {
     rail: "bg-sky-500",
     border: "border-sky-500",
     text: "text-sky-400",
-    badge: "border-sky-500/30 bg-sky-500/10 text-sky-300",
     verb: "Use contact form",
     Icon: FileText,
   },
@@ -144,7 +140,6 @@ export const verdictTheme: Record<ProspectVerdict, VerdictTheme> = {
     rail: "bg-muted-foreground/40",
     border: "border-muted-foreground/50",
     text: "text-muted-foreground",
-    badge: "border-border bg-muted text-muted-foreground",
     verb: "Skip",
     Icon: ShieldAlert,
   },
@@ -405,14 +400,16 @@ export function ProspectReviewCard({
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`text-sm font-medium ${theme.text}`}>
-                  {theme.verb}
-                </span>
+                {/* One verdict, one voice: the verb IS the verdict ("Send now"
+                    = send), so the enum chip that used to sit beside it said
+                    the same thing twice. The icon carries the verdict's shape
+                    for scanning; the score circle to the left carries the
+                    number. */}
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${theme.badge}`}
+                  className={`inline-flex items-center gap-1.5 text-sm font-medium ${theme.text}`}
                 >
-                  <theme.Icon className="size-3" />
-                  {data.channel.verdict}
+                  <theme.Icon className="size-3.5" />
+                  {theme.verb}
                 </span>
                 {data.excludeReason && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-300">
