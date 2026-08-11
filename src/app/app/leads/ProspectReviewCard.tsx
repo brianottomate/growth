@@ -361,6 +361,21 @@ export function ProspectReviewCard({
   href?: string;
 }) {
   const theme = verdictTheme[data.channel.verdict];
+  // The verdict answers ONE question — can we reach this company — and "Send
+  // now" over a card with no preview and no sequence read as a lie (nothing
+  // sendable exists, and every send path would refuse: generation requires a
+  // readable preview, Instantly requires steps, the HubSpot draft requires the
+  // preview URL inside touch 1). Compose readiness into the headline: the
+  // channel being green means the next step is DRAFTING, and only a card that
+  // actually holds copy may claim "Send now". A stand-in draft counts as
+  // drafting-still-needed — publishing refuses it anyway.
+  const readyToSend =
+    data.channel.verdict !== "send" ||
+    ((data.outreach?.steps.length ?? 0) > 0 && !data.outreach?.pretend);
+  const verb =
+    data.channel.verdict === "send" && !readyToSend
+      ? "Ready to draft"
+      : theme.verb;
   const bestEmail = data.channel.bestEmail;
 
   /**
@@ -409,7 +424,7 @@ export function ProspectReviewCard({
                   className={`inline-flex items-center gap-1.5 text-sm font-medium ${theme.text}`}
                 >
                   <theme.Icon className="size-3.5" />
-                  {theme.verb}
+                  {verb}
                 </span>
                 {data.excludeReason && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-300">
