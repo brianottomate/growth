@@ -25,7 +25,7 @@ import {
   ProspectReviewCard,
   type ProspectCardData,
 } from "./ProspectReviewCard";
-import { PregenBuildsBanner } from "./PregenBuildsBanner";
+import { PregenBuildsBanner, type InFlightBuild } from "./PregenBuildsBanner";
 
 const SOURCE_BADGE: Record<string, string> = {
   builtwith: "bg-slate-500/15 text-slate-300",
@@ -75,6 +75,11 @@ const POPULATIONS = {
     hint: "Stamped into a pre-gen send batch",
     input: { sendBatch: true },
   },
+  previews: {
+    label: "Has preview",
+    hint: "A pregenerated site exists — the pool sequences get drafted against",
+    input: { hasPregenSite: true },
+  },
   all: {
     label: "Whole universe",
     hint: "Every deduped domain, cohort or not",
@@ -88,6 +93,7 @@ const POPULATION_KEYS = [
   "untouched",
   "netnew",
   "send20",
+  "previews",
   "all",
 ] as const;
 
@@ -183,6 +189,14 @@ export function LeadsClient() {
   const limit = 50;
 
   const stats = useQuery(trpc.leads.stats.queryOptions());
+  // One poll for everything build-shaped on this page: the strip up top and the
+  // per-card status both read it, so neither runs its own interval.
+  const buildsInFlight = useQuery(
+    trpc.leads.pregenBuildsInFlight.queryOptions(undefined, {
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+    }),
+  );
   const pmsOptions = useQuery(trpc.leads.pmsOptions.queryOptions());
   // Scoped to the pregen cohorts so the list reads as "reps with target
   // companies", not "reps who happen to own enrichment records".
@@ -193,8 +207,6 @@ export function LeadsClient() {
   const list = useQuery(
     trpc.leads.listDomains.queryOptions(
       {
-        // Exactly one population, then facets on top of it.
-        ...POPULATIONS[population].input,
         q: q || undefined,
         source: source ?? undefined,
         pms: pms ?? undefined,
@@ -216,6 +228,11 @@ export function LeadsClient() {
         dir: sort === "domain" ? "asc" : "desc",
         limit,
         offset: page * limit,
+        // Exactly one population, spread LAST so it always wins: the previews
+        // population sets hasPregenSite, and with the spread first the facet
+        // key's explicit `undefined` silently erased it — pop=previews showed
+        // the whole universe.
+        ...POPULATIONS[population].input,
       },
       { placeholderData: keepPreviousData },
     ),
@@ -294,6 +311,7 @@ export function LeadsClient() {
     if (!s) return null;
     if (key === "netnew") return fmt(s.netNew);
     if (key === "send20") return fmt(s.sendBatch);
+    if (key === "previews") return fmt(s.withPregenSite);
     if (key === "all") return fmt(s.domains);
     if (key === "recycled" || key === "untouched")
       return fmt(enrollableCount(key)?.enrollable);
@@ -315,7 +333,7 @@ export function LeadsClient() {
           rather than of whatever population happens to be selected. Renders
           nothing when nothing is building. */}
       <div className="mt-4">
-        <PregenBuildsBanner />
+        <PregenBuildsBanner builds={buildsInFlight.data ?? []} />
       </div>
 
       {/* One quiet line for the universe. These are reference numbers looked at
@@ -629,7 +647,11 @@ export function LeadsClient() {
       {view === "review" ? (
         <ReviewCardList
           items={list.data?.items ?? []}
-          onInvalidate={() => void list.refetch()}
+          builds={buildsInFlight.data ?? []}
+          onInvalidate={() => {
+            void list.refetch();
+            void buildsInFlight.refetch();
+          }}
         />
       ) : (
         <div className="mt-2 overflow-x-auto">
@@ -919,9 +941,11 @@ function toCardData(item: LeadRow): ProspectCardData | null {
  */
 function ReviewCardList({
   items,
+  builds,
   onInvalidate,
 }: {
   items: LeadRow[];
+  builds: InFlightBuild[];
   onInvalidate: () => void;
 }) {
   const trpc = useTRPC();
@@ -977,6 +1001,7 @@ function ReviewCardList({
           <ProspectReviewCard
             key={item.id}
             data={data}
+            build={builds.find((b) => b.domain === item.domain) ?? null}
             href={`/app/leads?lead=${encodeURIComponent(item.domain)}`}
             actions={{
               onResolve: (id) => {

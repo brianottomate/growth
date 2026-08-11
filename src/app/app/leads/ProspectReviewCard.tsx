@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { elapsedLabel, isStuck, type InFlightBuild } from "./PregenBuildsBanner";
 
 /**
  * The one prospect review card.
@@ -288,9 +289,12 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
             {/* A signed preview URL is one long unbroken token, which
                 whitespace-pre-wrap alone will happily run past the container —
                 anywhere lets it break mid-token. */}
+            {/* Two lines by default: enough to recognise the touch's opening
+                move, small enough that four touches read as a summary rather
+                than a wall. The toggle above is the review mode. */}
             <pre
               className={`mt-1.5 font-sans text-xs leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap ${
-                fullCopy ? "" : "line-clamp-5"
+                fullCopy ? "" : "line-clamp-2"
               }`}
             >
               {step.body}
@@ -349,11 +353,14 @@ export interface ProspectCardActions {
 export function ProspectReviewCard({
   data,
   actions = {},
+  /** WanderOS build currently running for this domain, when one is. */
+  build = null,
   /** Link the domain name at something useful for the host surface. */
   href,
 }: {
   data: ProspectCardData;
   actions?: ProspectCardActions;
+  build?: InFlightBuild | null;
   href?: string;
 }) {
   const theme = verdictTheme[data.channel.verdict];
@@ -372,6 +379,10 @@ export function ProspectReviewCard({
   // one hue no verdict uses. Sharing emerald with "Send now" made the two
   // states read as one from across the room, and the whole point of the verb
   // split is that they are not.
+  // Both drafting stages are violet, but they name different work: no copy at
+  // all means "Ready to draft", while a stand-in draft means copy EXISTS and
+  // saying "Ready to draft" above four visible touches read as a contradiction
+  // — that card's next step is regenerating against the real preview.
   const stageTheme =
     data.channel.verdict === "send" && !readyToSend
       ? {
@@ -379,7 +390,9 @@ export function ProspectReviewCard({
           rail: "bg-violet-500",
           border: "border-violet-500",
           text: "text-violet-400",
-          verb: "Ready to draft",
+          verb: data.outreach?.steps.length
+            ? "Needs regenerate"
+            : "Ready to draft",
           Icon: Sparkles,
         }
       : theme;
@@ -407,7 +420,7 @@ export function ProspectReviewCard({
     // assistant panel, a drawer) squeezed the container while the window stayed
     // xl — the two-column grids below held on and overlapped into soup.
     <section className="bg-card @container mb-3.5 flex overflow-hidden rounded-xl border">
-      <span className={`w-1 shrink-0 ${theme.rail}`} aria-hidden />
+      <span className={`w-1 shrink-0 ${stageTheme.rail}`} aria-hidden />
       <div className="min-w-0 flex-1 space-y-5 p-5">
         {/* decision header — verdict left, the two everyday actions right, the
             rest folded into an overflow menu so the card stops ending in a
@@ -464,6 +477,38 @@ export function ProspectReviewCard({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <div className="flex items-center gap-2">
+              {build ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/40 bg-violet-500/10 px-2.5 py-1.5 text-xs font-medium text-violet-300">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Building preview · {elapsedLabel(build.requestedAt)}
+                  {build.previewUrl && (
+                    <a
+                      href={build.previewUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Opens the page as it is right now — the gallery fills in last"
+                      className="underline underline-offset-2"
+                    >
+                      peek
+                    </a>
+                  )}
+                  {isStuck(build) && (
+                    <span className="text-amber-300">may be stuck</span>
+                  )}
+                </span>
+              ) : (
+                actions.onBuildPreview &&
+                !data.pregenSiteUrl && (
+                  <ActionButton
+                    onClick={() => actions.onBuildPreview!(data.id)}
+                    busy={actions.building}
+                    Icon={Globe}
+                    title="Ask WanderOS to build a preview site from their current site"
+                  >
+                    Build preview
+                  </ActionButton>
+                )
+              )}
               {actions.onResolve && (
                 <ActionButton
                   onClick={() => actions.onResolve!(data.id)}
@@ -497,14 +542,6 @@ export function ProspectReviewCard({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {actions.onBuildPreview && !data.pregenSiteUrl && (
-                    <DropdownMenuItem
-                      onClick={() => actions.onBuildPreview!(data.id)}
-                      disabled={actions.building}
-                    >
-                      <Globe className="size-3.5" /> Build preview
-                    </DropdownMenuItem>
-                  )}
                   {actions.onRank && (
                     <DropdownMenuItem
                       onClick={() => actions.onRank!(data.id)}
