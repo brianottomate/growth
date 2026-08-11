@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import {
   ArrowUpRight,
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
   Mail,
   MessageCircle,
   MessagesSquare,
+  MoreHorizontal,
   Phone,
   RefreshCw,
   ShieldAlert,
@@ -20,6 +21,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 
 /**
@@ -208,48 +215,32 @@ function EvidenceList({ data }: { data: ProspectCardData }) {
   );
 }
 
-/**
- * The prospect's current site, as captured by the lead ranker.
- *
- * Standing in for the finished pregen preview thumbnail we actually want here.
- * Silent when a domain has not been ranked — which is still most of them, so the
- * card must read correctly with no image at all.
- */
-function SiteThumbnail({ data }: { data: ProspectCardData }) {
-  if (!data.screenshotUrl) return null;
+/** The uppercase micro-heading the card's sections share. */
+function MicroLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="shrink-0">
-      <div className="border-border bg-muted relative h-20 w-32 overflow-hidden rounded-md border">
-        <Image
-          src={data.screenshotUrl}
-          alt={`Current site for ${data.domain}`}
-          fill
-          sizes="128px"
-          className="object-cover object-top"
-          unoptimized
-        />
-      </div>
-      {typeof data.rankOverall === "number" && (
-        <div className="text-muted-foreground mt-1 text-center text-[10px] tabular-nums">
-          rank {data.rankOverall}
-        </div>
-      )}
-    </div>
+    <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+      {children}
+    </span>
   );
 }
 
 function SequencePreview({ data }: { data: ProspectCardData }) {
+  // The 2-up grid clamps bodies to keep eight touches scannable, but approving
+  // copy that goes out as a named person means READING it — so the clamp is a
+  // scan mode with a one-click exit, not the only view. (An earlier iteration
+  // banned the grid outright for this reason; the toggle is the compromise.)
+  const [fullCopy, setFullCopy] = useState(false);
   const outreach = data.outreach;
   if (!outreach?.steps.length) {
     return (
-      <div className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
+      <div className="text-muted-foreground rounded-md border border-dashed p-4 text-center text-xs">
         No sequence draft yet.
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {/* A pretend draft describes a page that does not exist. Publishing
           refuses it, but a reviewer reading four polished touches needs to know
           that before they form an opinion of the copy — not after. */}
@@ -260,43 +251,48 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
           is assigned.
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span>
-          <span className="text-muted-foreground">Angle:</span>{" "}
-          {outreach.angle ?? "-"}
-        </span>
+      <div className="text-xs">
+        <span className="text-muted-foreground">Angle:</span>{" "}
+        {outreach.angle ?? "-"}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {data.pregenSiteUrl && (
           <a
             href={data.pregenSiteUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] underline"
+            className="inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
           >
             Open the preview they will see ↗
           </a>
         )}
+        <button
+          onClick={() => setFullCopy((v) => !v)}
+          className="text-muted-foreground hover:text-foreground text-[11px] underline underline-offset-2"
+        >
+          {fullCopy ? "Collapse copy" : "Show full copy"}
+        </button>
       </div>
-      {/* A vertical stack, not a grid: touches are read in order, and a 2-up
-          grid left every card as tall as its neighbour with dead space beside
-          the short ones. Full bodies stay unclamped — approving copy that goes
-          out as a named person is the whole job, so a truncated body is not a
-          review. */}
-      <div className="space-y-2">
+      <div className="grid gap-2.5 @lg:grid-cols-2">
         {outreach.steps.slice(0, 4).map((step, index) => (
-          <div key={index} className="rounded-md border p-2">
+          <div key={index} className="rounded-md border p-3">
             <div className="text-muted-foreground flex items-center justify-between gap-2 text-[10px] font-medium">
-              <span>
+              <span className="truncate">
                 Touch {index + 1}
                 {step.subject ? ` · ${step.subject}` : " · in-thread reply"}
               </span>
-              <span className="tabular-nums">
+              <span className="shrink-0 tabular-nums">
                 {step.delayDays === 0 ? "day 0" : `day ${step.delayDays}`}
               </span>
             </div>
             {/* A signed preview URL is one long unbroken token, which
                 whitespace-pre-wrap alone will happily run past the container —
                 anywhere lets it break mid-token. */}
-            <pre className="mt-1 font-sans text-xs leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap">
+            <pre
+              className={`mt-1.5 font-sans text-xs leading-relaxed [overflow-wrap:anywhere] break-words whitespace-pre-wrap ${
+                fullCopy ? "" : "line-clamp-5"
+              }`}
+            >
               {step.body}
             </pre>
           </div>
@@ -372,10 +368,21 @@ export function ProspectReviewCard({
   const readyToSend =
     data.channel.verdict !== "send" ||
     ((data.outreach?.steps.length ?? 0) > 0 && !data.outreach?.pretend);
-  const verb =
+  // Drafting is its own pipeline stage, so it gets its own color — violet, the
+  // one hue no verdict uses. Sharing emerald with "Send now" made the two
+  // states read as one from across the room, and the whole point of the verb
+  // split is that they are not.
+  const stageTheme =
     data.channel.verdict === "send" && !readyToSend
-      ? "Ready to draft"
-      : theme.verb;
+      ? {
+          ...theme,
+          rail: "bg-violet-500",
+          border: "border-violet-500",
+          text: "text-violet-400",
+          verb: "Ready to draft",
+          Icon: Sparkles,
+        }
+      : theme;
   const bestEmail = data.channel.bestEmail;
 
   /**
@@ -402,12 +409,13 @@ export function ProspectReviewCard({
     <section className="bg-card @container mb-3.5 flex overflow-hidden rounded-xl border">
       <span className={`w-1 shrink-0 ${theme.rail}`} aria-hidden />
       <div className="min-w-0 flex-1 space-y-5 p-5">
-        {/* decision header — the verdict is the hero */}
+        {/* decision header — verdict left, the two everyday actions right, the
+            rest folded into an overflow menu so the card stops ending in a
+            six-button strip nobody could rank. */}
         <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
           <div className="flex min-w-0 gap-3.5">
-            <SiteThumbnail data={data} />
             <div
-              className={`grid size-11 shrink-0 place-items-center rounded-full border-2 ${theme.border}`}
+              className={`grid size-11 shrink-0 place-items-center rounded-full border-2 ${stageTheme.border}`}
             >
               <span className="text-foreground text-base font-medium tabular-nums">
                 {data.channel.score}
@@ -415,16 +423,11 @@ export function ProspectReviewCard({
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                {/* One verdict, one voice: the verb IS the verdict ("Send now"
-                    = send), so the enum chip that used to sit beside it said
-                    the same thing twice. The icon carries the verdict's shape
-                    for scanning; the score circle to the left carries the
-                    number. */}
                 <span
-                  className={`inline-flex items-center gap-1.5 text-sm font-medium ${theme.text}`}
+                  className={`inline-flex items-center gap-1.5 text-sm font-medium ${stageTheme.text}`}
                 >
-                  <theme.Icon className="size-3.5" />
-                  {verb}
+                  <stageTheme.Icon className="size-3.5" />
+                  {stageTheme.verb}
                 </span>
                 {data.excludeReason && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-300">
@@ -459,98 +462,8 @@ export function ProspectReviewCard({
               </div>
             </div>
           </div>
-          <div className="text-muted-foreground shrink-0 text-right text-xs tabular-nums">
-            <div>fit {fmt(data.fitScore)}</div>
-            <div>
-              units {fmt(data.unitCount)}
-              {data.unitConfidence ? ` · ${data.unitConfidence}` : ""}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-6 @4xl:grid-cols-[minmax(0,1fr)_minmax(24rem,1.15fr)]">
-          <div className="min-w-0 space-y-4">
-            <div className="grid gap-3 @lg:grid-cols-2">
-              <div>
-                <div className="text-muted-foreground text-[11px] font-medium">
-                  Selected channel
-                </div>
-                <div className="mt-1 text-sm">
-                  {bestEmail ? (
-                    <span className="font-medium">{bestEmail}</span>
-                  ) : data.channel.route === "form" ? (
-                    <span className="font-medium">Contact form</span>
-                  ) : (
-                    <span className="text-muted-foreground">Not resolved</span>
-                  )}
-                </div>
-                <div className="text-muted-foreground mt-0.5 text-[11px]">
-                  {data.channel.route} · {data.contactCount} stored contacts
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-[11px] font-medium">
-                  Evidence
-                </div>
-                <div className="mt-1">
-                  <EvidenceList data={data} />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="text-muted-foreground text-[11px] font-medium">
-                Reachability
-              </div>
-              <div className="mt-1">
-                <ChannelBadges channels={data.channels} />
-              </div>
-            </div>
-
-            {data.channel.candidates.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="text-muted-foreground text-left">
-                    <tr>
-                      <th className="py-1 pr-3 font-medium">Candidate</th>
-                      <th className="px-3 py-1 font-medium">Source</th>
-                      <th className="px-3 py-1 text-right font-medium">
-                        Score
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.channel.candidates.slice(0, 4).map((candidate) => (
-                      <tr key={`${candidate.kind}-${candidate.email}`}>
-                        <td className="border-t py-1 pr-3">
-                          <div className="font-medium">{candidate.email}</div>
-                          {(candidate.name || candidate.title) && (
-                            <div className="text-muted-foreground">
-                              {[candidate.name, candidate.title]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </div>
-                          )}
-                          {candidate.risks.length > 0 && (
-                            <div className="text-red-300/80">
-                              {candidate.risks[0]}
-                            </div>
-                          )}
-                        </td>
-                        <td className="text-muted-foreground border-t px-3 py-1">
-                          {candidate.kind}
-                        </td>
-                        <td className="border-t px-3 py-1 text-right tabular-nums">
-                          {candidate.score}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
               {actions.onResolve && (
                 <ActionButton
                   onClick={() => actions.onResolve!(data.id)}
@@ -560,73 +473,178 @@ export function ProspectReviewCard({
                   Resolve channel
                 </ActionButton>
               )}
-              {actions.onBuildPreview && !data.pregenSiteUrl && (
-                <ActionButton
-                  onClick={() => actions.onBuildPreview!(data.id)}
-                  busy={actions.building}
-                  Icon={Globe}
-                  title="Ask WanderOS to build a preview site from their current site"
-                >
-                  Build preview
-                </ActionButton>
-              )}
-              {actions.onRank && (
-                <ActionButton
-                  onClick={() => actions.onRank!(data.id)}
-                  busy={actions.ranking}
-                  Icon={Gauge}
-                  title="Score the site with the lead ranker and capture a screenshot"
-                >
-                  {data.rankOverall == null ? "Rank site" : "Re-rank site"}
-                </ActionButton>
-              )}
               {actions.onGenerate && (
-                <ActionButton
+                <button
                   onClick={() => actions.onGenerate!(data.id)}
-                  busy={actions.generating}
-                  Icon={Sparkles}
+                  disabled={actions.generating}
+                  className="bg-primary text-primary-foreground inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                 >
+                  {actions.generating ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-3.5" />
+                  )}
                   {data.outreach ? "Regenerate sequence" : "Generate sequence"}
-                </ActionButton>
+                </button>
               )}
-              {actions.onVerify && (
-                <ActionButton
-                  onClick={() => actions.onVerify!(data.id)}
-                  busy={actions.verifying}
-                  Icon={ShieldCheck}
-                  title="Minerva geo + LinkedIn check on freemail contacts"
-                >
-                  Verify people
-                </ActionButton>
-              )}
-              <ActionButton
-                onClick={() =>
-                  ask(
-                    data.outreach
-                      ? `Review the outreach sequence for ${data.domain} and tell me what you would change before it goes out.`
-                      : `Work ${data.domain} for me — check what we know, what is missing, and what the next step should be.`,
-                  )
-                }
-                Icon={MessagesSquare}
-                title="Hand this prospect to the assistant"
-              >
-                Ask about this
-              </ActionButton>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    aria-label="More actions"
+                    className="border-border inline-flex size-8 items-center justify-center rounded-md border"
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {actions.onBuildPreview && !data.pregenSiteUrl && (
+                    <DropdownMenuItem
+                      onClick={() => actions.onBuildPreview!(data.id)}
+                      disabled={actions.building}
+                    >
+                      <Globe className="size-3.5" /> Build preview
+                    </DropdownMenuItem>
+                  )}
+                  {actions.onRank && (
+                    <DropdownMenuItem
+                      onClick={() => actions.onRank!(data.id)}
+                      disabled={actions.ranking}
+                    >
+                      <Gauge className="size-3.5" />{" "}
+                      {data.rankOverall == null ? "Rank site" : "Re-rank site"}
+                    </DropdownMenuItem>
+                  )}
+                  {actions.onVerify && (
+                    <DropdownMenuItem
+                      onClick={() => actions.onVerify!(data.id)}
+                      disabled={actions.verifying}
+                    >
+                      <ShieldCheck className="size-3.5" /> Verify people
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={() =>
+                      ask(
+                        data.outreach
+                          ? `Review the outreach sequence for ${data.domain} and tell me what you would change before it goes out.`
+                          : `Work ${data.domain} for me — check what we know, what is missing, and what the next step should be.`,
+                      )
+                    }
+                  >
+                    <MessagesSquare className="size-3.5" /> Ask about this
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="text-muted-foreground text-xs tabular-nums">
+              fit {fmt(data.fitScore)} · units {fmt(data.unitCount)}
+              {data.unitConfidence ? ` · ${data.unitConfidence}` : ""}
             </div>
           </div>
+        </div>
 
-          <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <FileText className="size-4" />
-              Sequence
-              {data.outreach?.status && (
-                <span className="text-muted-foreground text-xs font-normal">
-                  {data.outreach.status}
-                </span>
+        {/* channel + evidence, then the full-width candidate table, then the
+            sequence full-width underneath — one reading order at every size,
+            instead of the old info/sequence split that made narrow containers
+            interleave the two. */}
+        <div className="grid gap-x-6 gap-y-1 @lg:grid-cols-2">
+          <div>
+            <MicroLabel>Selected channel</MicroLabel>
+            <div className="mt-1 text-sm">
+              {bestEmail ? (
+                <span className="font-medium">{bestEmail}</span>
+              ) : data.channel.route === "form" ? (
+                <span className="font-medium">Contact form</span>
+              ) : (
+                <span className="text-muted-foreground">Not resolved</span>
               )}
             </div>
-            <SequencePreview data={data} />
+            <div className="text-muted-foreground mt-0.5 text-[11px]">
+              {data.channel.route} · {data.contactCount} stored contacts
+            </div>
+            <div className="mt-1.5">
+              <ChannelBadges channels={data.channels} />
+            </div>
           </div>
+          <div>
+            <MicroLabel>Evidence</MicroLabel>
+            <div className="mt-1.5">
+              <EvidenceList data={data} />
+            </div>
+          </div>
+        </div>
+
+        {data.channel.candidates.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr>
+                  <th className="py-1.5 pr-3 text-left">
+                    <MicroLabel>Candidate</MicroLabel>
+                  </th>
+                  <th className="px-3 py-1.5 text-left">
+                    <MicroLabel>Source</MicroLabel>
+                  </th>
+                  <th className="px-3 py-1.5 text-right">
+                    <MicroLabel>Score</MicroLabel>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.channel.candidates.slice(0, 4).map((candidate) => {
+                  const selected = candidate.email === bestEmail;
+                  return (
+                    <tr
+                      key={`${candidate.kind}-${candidate.email}`}
+                      className={selected ? "bg-muted/60" : undefined}
+                    >
+                      <td className="rounded-l-md border-t py-1.5 pr-3 pl-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{candidate.email}</span>
+                          {selected && (
+                            <span className="border-border text-muted-foreground rounded-full border px-1.5 py-px text-[10px]">
+                              selected
+                            </span>
+                          )}
+                        </div>
+                        {(candidate.name || candidate.title) && (
+                          <div className="text-muted-foreground">
+                            {[candidate.name, candidate.title]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        )}
+                        {candidate.risks.length > 0 && (
+                          <div className="text-red-300/80">
+                            {candidate.risks[0]}
+                          </div>
+                        )}
+                      </td>
+                      <td className="text-muted-foreground border-t px-3 py-1.5">
+                        {candidate.kind}
+                      </td>
+                      <td className="rounded-r-md border-t px-3 py-1.5 text-right tabular-nums">
+                        {candidate.score}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="border-t pt-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+            <FileText className="size-4" />
+            Sequence
+            {data.outreach?.status && (
+              <span className="text-muted-foreground text-xs font-normal">
+                {data.outreach.status}
+              </span>
+            )}
+          </div>
+          <SequencePreview data={data} />
         </div>
       </div>
     </section>
