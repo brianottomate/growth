@@ -126,11 +126,12 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     items: [
       { label: "Leads", href: "/app/leads", icon: Database, exact: true },
       {
-        // Send review is no longer its own route: it was the same table, the same
-        // scorer and a drifting copy of the same card. Its default view survives
-        // as a URL — the target population in the review density — which is what
-        // nuqs-backed filters bought us.
-        label: "Send review",
+        // Not a route of its own — send-review was deleted (same table, same
+        // scorer, a drifting copy of the same card) and its default view lives
+        // on as this URL into the leads review density. Named for what it opens,
+        // not for the dead route: keeping "Send review" here made the deletion
+        // look like it never happened.
+        label: "Review queue",
         href: "/app/leads?pop=target&view=review",
         icon: ClipboardCheck,
       },
