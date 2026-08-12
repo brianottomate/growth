@@ -18,6 +18,7 @@ import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.
 import { suggestTargets } from "@/server/services/cadence-suggest.service";
 import { db } from "@/server/db";
 import {
+  assistantMessageTable,
   cadenceTargetTable,
   channelKindEnum,
   channelPlatformEnum,
@@ -29,6 +30,8 @@ import {
   seriesTable,
 } from "@/server/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { findLatestOwnedChatImages } from "@/lib/chat-attachment";
+import { MediaService } from "@/server/services/media.service";
 import {
   replaceBrandMixTargets,
   replaceChannelCadence,
@@ -246,6 +249,96 @@ export const analyzeMediaAsset = growthAction({
     if (!asset) throw new Error("Media asset not found.");
     const brand = await requireOwnedBrand(asset.brandId, ctx);
     return analyzeStoredMediaAsset({ mediaId, brandName: brand.name, steer });
+  },
+});
+
+export const saveChatMediaToLibrary = growthAction({
+  description:
+    "Save pasted chat media (images or GIFs) into an owned brand's durable media library without needing a content work item, then auto-analyze each image against the brand's managed tag vocabulary so it arrives tagged. Use only when the operator explicitly asks to save, upload, or keep pasted media in the library or media pool. Pass the complete media array for the current turn; when the operator refers to pastes from an earlier turn, omit media and the server resolves the newest owned attachments in this conversation.",
+  inputSchema: z.object({
+    brandId: z.string(),
+    media: z
+      .array(
+        z.object({
+          url: z.string().url(),
+          mimeType: z.string().min(1),
+          title: z.string().trim().min(1).max(300).optional(),
+        }),
+      )
+      .min(1)
+      .max(10)
+      .optional(),
+    autoAnalyze: z
+      .boolean()
+      .default(true)
+      .describe(
+        "Run managed-tag analysis on each saved image (videos and GIFs are stored untagged).",
+      ),
+  }),
+  execute: async (input, ctx) => {
+    const brand = await requireOwnedBrand(input.brandId, ctx);
+    let media: Array<{ url: string; mediaType: string; title?: string }> =
+      input.media?.map((item) => ({
+        url: item.url,
+        mediaType: item.mimeType,
+        title: item.title,
+      })) ?? [];
+    if (media.length === 0 && ctx.threadId) {
+      const rows = await db.query.assistantMessageTable.findMany({
+        where: eq(assistantMessageTable.threadId, ctx.threadId),
+        columns: { message: true },
+        orderBy: [desc(assistantMessageTable.createdAt)],
+        limit: 30,
+      });
+      media = findLatestOwnedChatImages(
+        rows.map((row) => row.message).reverse(),
+        ctx.userId,
+      );
+    }
+    const seen = new Set<string>();
+    media = media.filter((item) => {
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
+      return true;
+    });
+    if (media.length === 0) {
+      throw new Error(
+        "No user-owned media attachments are available in this conversation.",
+      );
+    }
+    const saved = [];
+    for (const item of media) {
+      const asset = await MediaService.promoteChatMedia({
+        brandId: brand.id,
+        userId: ctx.userId,
+        url: item.url,
+        mimeType: item.mediaType,
+        title: item.title,
+      });
+      // Tagging is best-effort — a failed analysis must not lose the save.
+      let suggestedTags: string[] = [];
+      let analyzed = false;
+      if (input.autoAnalyze && asset.kind === "image") {
+        try {
+          const analysis = await analyzeStoredMediaAsset({
+            mediaId: asset.id,
+            brandName: brand.name,
+          });
+          suggestedTags = analysis.tags;
+          analyzed = true;
+        } catch {
+          analyzed = false;
+        }
+      }
+      saved.push({
+        mediaAssetId: asset.id,
+        kind: asset.kind,
+        url: asset.url,
+        analyzed,
+        suggestedTags,
+      });
+    }
+    return { ok: true as const, brandId: brand.id, saved, url: "/app/media" };
   },
 });
 

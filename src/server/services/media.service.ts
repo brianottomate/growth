@@ -912,20 +912,21 @@ export async function createChatR2Upload(input: {
   };
 }
 
-/** Promote a transient chat image into the durable media library without
+/** Promote a transient chat upload into the durable media library without
  * copying bytes: chat uploads already live in our public R2 bucket. */
-export async function promoteChatImage(input: {
+export async function promoteChatMedia(input: {
   brandId: string;
   userId: string;
   url: string;
   mimeType: string;
   title?: string;
 }) {
-  if (!input.mimeType.startsWith("image/")) {
-    throw new Error("Only chat images can be promoted");
+  const kind = kindForMime(input.mimeType);
+  if (kind !== "image" && kind !== "gif" && kind !== "video") {
+    throw new Error("Only chat images, GIFs, and videos can be promoted");
   }
   if (!isOwnedChatImageUrl(input.url, input.userId)) {
-    throw new Error("Chat image does not belong to this operator");
+    throw new Error("Chat attachment does not belong to this operator");
   }
   const parsed = new URL(input.url);
 
@@ -947,7 +948,7 @@ export async function promoteChatImage(input: {
       brandId: input.brandId,
       uploadedBy: input.userId,
       provider: "r2",
-      kind: "image",
+      kind,
       status: "ready",
       title: input.title?.trim() || null,
       filename,
@@ -959,6 +960,20 @@ export async function promoteChatImage(input: {
     .returning();
   if (!asset) throw new Error("Could not save the chat image");
   return asset;
+}
+
+/** Image-only wrapper kept for existing callers. */
+export async function promoteChatImage(input: {
+  brandId: string;
+  userId: string;
+  url: string;
+  mimeType: string;
+  title?: string;
+}) {
+  if (!input.mimeType.startsWith("image/")) {
+    throw new Error("Only chat images can be promoted");
+  }
+  return promoteChatMedia(input);
 }
 
 export const MediaService = {
@@ -982,4 +997,5 @@ export const MediaService = {
   kindForMime,
   createChatR2Upload,
   promoteChatImage,
+  promoteChatMedia,
 } as const;

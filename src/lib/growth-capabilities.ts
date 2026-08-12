@@ -100,6 +100,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   ],
   mediaAnalysisRead: ["list", "get"],
   mediaAnalysisWrite: ["analyzeImage", "prepareVideo"],
+  mediaLibraryWrite: ["saveChatMedia"],
   strategyRead: ["getTargets", "proposeTargets"],
   strategyWrite: [
     "createCadence",
@@ -158,6 +159,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   sourceSyncWrite: "Synchronizing sources",
   mediaAnalysisRead: "Reading media analysis",
   mediaAnalysisWrite: "Analyzing media",
+  mediaLibraryWrite: "Saving chat media to the library",
   strategyRead: "Reading strategy",
   strategyWrite: "Updating strategy",
   planningRead: "Reading plan",

@@ -61,6 +61,7 @@ import {
   proposeContentGroupings,
   proposeStrategyTargets,
   registerBrandChannel,
+  saveChatMediaToLibrary,
   scrapeBrandPosts,
   setSeriesCadence,
   syncBrandBlog,
@@ -300,6 +301,12 @@ export const mediaAnalysisWrite = growthDomainTool({
   },
 });
 
+export const mediaLibraryWrite = growthDomainTool({
+  description:
+    "Save operator-pasted chat media into an owned brand's durable media library, tagged on arrival — no content work item required.",
+  actions: { saveChatMedia: saveChatMediaToLibrary },
+});
+
 export const strategyRead = growthDomainTool({
   description:
     "Read current targets or propose evidence-backed target changes.",
@@ -391,6 +398,7 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   sourceSyncWrite,
   mediaAnalysisRead,
   mediaAnalysisWrite,
+  mediaLibraryWrite,
   strategyRead,
   strategyWrite,
   planningRead,

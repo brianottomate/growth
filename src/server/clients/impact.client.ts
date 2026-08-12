@@ -192,6 +192,79 @@ export function aggregateActions(actions: ImpactAction[]): {
   };
 }
 
+// ---- Performance by Day (report) -------------------------------------------
+
+/** One "Performance by Day" report row, coerced to numbers. */
+export interface ImpactDayPerformance {
+  date: string; // YYYY-MM-DD
+  clicks: number;
+  actions: number;
+  revenue: number;
+}
+
+const MONTH_NUM: Record<string, string> = {
+  Jan: "01",
+  Feb: "02",
+  Mar: "03",
+  Apr: "04",
+  May: "05",
+  Jun: "06",
+  Jul: "07",
+  Aug: "08",
+  Sep: "09",
+  Oct: "10",
+  Nov: "11",
+  Dec: "12",
+};
+
+/** The report's date_sort field comes back empty — parse "Aug 12, 2026". */
+function parseDisplayDate(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const m = /^([A-Z][a-z]{2}) (\d{1,2}), (\d{4})$/.exec(v.trim());
+  if (!m) return null;
+  const month = MONTH_NUM[m[1]!];
+  if (!month) return null;
+  return `${m[3]}-${month}-${m[2]!.padStart(2, "0")}`;
+}
+
+/**
+ * Daily clicks/actions/revenue from the account's "Performance by Day" report
+ * (att_adv_performance_by_day_pm_only, live-verified 2026-08-12). SUBAID scopes
+ * it to one program — without it every value comes back as an empty string.
+ * Both dates are inclusive calendar days; rows arrive newest-first, one per
+ * day. Clicks are the tracking-liveness signal the Actions list can't provide
+ * (~40–65/day on the live program vs ~1 action/day).
+ */
+export async function listPerformanceByDay(input: {
+  campaignId: string;
+  startDay: string; // YYYY-MM-DD
+  endDay: string;
+}): Promise<ImpactDayPerformance[]> {
+  const data = await impactFetch<Record<string, unknown>>(
+    "/Reports/att_adv_performance_by_day_pm_only.json",
+    {
+      START_DATE: input.startDay,
+      END_DATE: input.endDay,
+      SUBAID: input.campaignId,
+    },
+  );
+  const rows = Array.isArray(data.Records)
+    ? (data.Records as Array<Record<string, unknown>>)
+    : [];
+  const days: ImpactDayPerformance[] = [];
+  for (const r of rows) {
+    const date = parseDisplayDate(r.date_display);
+    if (!date) continue;
+    days.push({
+      date,
+      clicks: num(r.Clicks),
+      actions: num(r.Actions),
+      revenue: num(r.Revenue),
+    });
+  }
+  return days.sort((a, b) => b.date.localeCompare(a.date));
+}
+
 // ---- Campaigns (programs) ---------------------------------------------------
 
 export interface ImpactCampaign {

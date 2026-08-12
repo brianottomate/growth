@@ -689,7 +689,7 @@ export const attachChatImageToContent = growthAction({
 
 export const makeCarouselFromPool = growthAction({
   description:
-    "Turn ordered images already in a content work item's media pool into one or more owned platform carousels. Call getWorkItem first, preserve the operator's requested image order (or the pool order when they say all/these images), and provide the asset IDs separately for each target platform post so platform limits can differ.",
+    "Turn ordered media (images, GIFs, or mini videos) already in a content work item's media pool into one or more owned platform carousels. Call getWorkItem first, preserve the operator's requested order (or the pool order when they say all/these), and provide the asset IDs separately for each target platform post so platform limits can differ. Per-platform media rules are enforced at publish time.",
   inputSchema: z.object({
     contentPostId: z.string(),
     targets: z
@@ -746,8 +746,8 @@ export const makeCarouselFromPool = growthAction({
             `Media asset ${assetId} is not in this content item's media pool.`,
           );
         }
-        if (item.type !== "image") {
-          throw new Error(`Media asset ${assetId} is not an image.`);
+        if (item.type !== "image" && item.type !== "video") {
+          throw new Error(`Media asset ${assetId} is not an image or video.`);
         }
         return item;
       });

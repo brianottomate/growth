@@ -225,6 +225,11 @@ export const growthActionPolicies = {
     analyzeImage: write({ consequence: "model-write" }),
     prepareVideo: write({ consequence: "model-write" }),
   },
+  mediaLibraryWrite: {
+    // Promotion dedups by URL, so re-saving the same paste is a no-op; the
+    // model-write consequence covers the auto-tag analysis pass.
+    saveChatMedia: write({ idempotent: true, consequence: "model-write" }),
+  },
   strategyRead: { getTargets: read(), proposeTargets: read("model-read") },
   strategyWrite: {
     createCadence: write(),

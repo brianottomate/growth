@@ -1,14 +1,16 @@
 import "server-only";
 
-import { and, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import {
   aggregateActions,
+  type ImpactDayPerformance,
   isImpactConfigured,
   listActionInquiries,
   listActions,
   listInvoices,
   listMediaPartners,
+  listPerformanceByDay,
 } from "@/server/clients/impact.client";
 import { db } from "@/server/db";
 import {
@@ -28,10 +30,11 @@ import {
 // Daily affiliate monitor (Vercel cron → /api/cron/affiliate). Replaces the
 // agency's "Daily Performance & Balance" + "Applications" playbook rows
 // (docs/affiliate-program-takeover.md §4):
-//   1. snapshot yesterday's actions into affiliate_metric_daily
+//   1. snapshot yesterday's actions + clicks into affiliate_metric_daily
 //   2. sync the network partner list into affiliate_partner
 //   3. queue PENDING partners as application items (+ Slack ping)
-//   4. tracking-health alert: zero actions against a non-zero trailing baseline
+//   4. tracking-health alert: zero clicks (break) or an improbable run of
+//      zero-action days (drought) — see evaluateTrackingHealth
 // Everything is per active impact program; without credentials or an
 // externalProgramId the run logs a skip and exits cleanly.
 
@@ -39,6 +42,7 @@ export interface ProgramMonitorResult {
   programId: string;
   skipped?: string;
   actions?: number;
+  clicks?: number;
   revenue?: number;
   partnersSynced?: number;
   applicationsQueued?: number;
@@ -58,6 +62,7 @@ function yesterdayUtc(): { start: Date; end: Date; day: string } {
 async function snapshotMetrics(
   program: PartnerProgram,
   campaignId: string,
+  clicks?: number,
 ): Promise<{ actions: number; revenue: number }> {
   const { start, end, day } = yesterdayUtc();
   const actions = await listActions({
@@ -83,6 +88,7 @@ async function snapshotMetrics(
 
   const values = {
     actions: agg.count,
+    clicks: clicks ?? null,
     revenue: agg.revenue,
     commission: agg.commission,
     raw: { actionIds: actions.map((a) => a.Id).slice(0, 500) },
@@ -193,51 +199,109 @@ async function queueApplications(
   return fresh.length;
 }
 
+// Tracking-health thresholds. The retired check ("zero actions yesterday while
+// the trailing average is ≥1") sat right on top of the program's real run rate
+// (~1.1 actions/day), where a Poisson zero day happens ~1 day in 3 — it paged
+// on arithmetic, not on signal (4 pages in the first 9 days of Aug 2026). Two
+// signals replace it, both read live from the Performance by Day report so
+// late-posting actions are already reflected:
+//   - tracking break: zero CLICKS. Clicks run ~40–65/day on the live program,
+//     so even one zero-click day means the tracking layer is dead, not quiet.
+//   - conversion drought: a run of zero-ACTION days long enough to be
+//     improbable against the baseline (run × λ ≥ 4 ⇒ P < e⁻⁴ ≈ 2%).
+const CLICK_BASELINE_MIN = 10; // clicks/day before the zero-click signal arms
+const DROUGHT_MIN_DAYS = 2;
+const DROUGHT_MIN_EXPECTED = 4; // zero-run length × baseline actions/day
+
+export interface TrackingHealthFinding {
+  kind: "tracking-break" | "conversion-drought";
+  runStart: string; // first day of the zero run — the episode's dedup anchor
+  title: string;
+  snippet: string;
+  rationale: string;
+}
+
 /**
- * Tracking-health check: zero actions yesterday while the trailing 7 days
- * averaged ≥1/day smells like broken tracking, not a slow day. One finding per
- * calendar day (dedup key), broadcast as engage.
+ * Decide whether the by-day series warrants a page. `days` is newest-first,
+ * one row per calendar day, ending at `yesterday`. Pure — exported for tests.
+ */
+export function evaluateTrackingHealth(
+  days: ImpactDayPerformance[],
+  yesterday: string,
+): TrackingHealthFinding | null {
+  if (days[0]?.date !== yesterday) return null; // report gap — say nothing
+
+  // Zero-click run ending yesterday → the tracking layer itself looks dead.
+  if (days[0].clicks === 0) {
+    let run = 1;
+    while (run < days.length && days[run]!.clicks === 0) run++;
+    const prior = days.slice(run, run + 7);
+    const clickAvg =
+      prior.length > 0
+        ? prior.reduce((s, d) => s + d.clicks, 0) / prior.length
+        : 0;
+    if (clickAvg >= CLICK_BASELINE_MIN) {
+      const runStart = days[run - 1]!.date;
+      return {
+        kind: "tracking-break",
+        runStart,
+        title: "Tracking break — zero affiliate clicks",
+        snippet: `0 clicks since ${runStart} against ~${Math.round(clickAvg)}/day. The tracking layer looks dead, not quiet — check the Impact tracking status and partner links now.`,
+        rationale:
+          "Clicks are high-volume, so a zero-click day is a hard failure signal — unlike a zero-action day.",
+      };
+    }
+  }
+
+  // Zero-action run ending yesterday, long enough to be improbable.
+  let run = 0;
+  while (run < days.length && days[run]!.actions === 0) run++;
+  if (run < DROUGHT_MIN_DAYS || run >= days.length) return null;
+  const prior = days.slice(run, run + 14);
+  if (prior.length < 3) return null; // not enough baseline yet
+  const lambda = prior.reduce((s, d) => s + d.actions, 0) / prior.length;
+  if (run * lambda < DROUGHT_MIN_EXPECTED) return null;
+
+  const runStart = days[run - 1]!.date;
+  const pct = Math.exp(-run * lambda) * 100;
+  const clicksNote =
+    days[0].clicks > 0
+      ? ` Clicks are still flowing (${days[0].clicks} yesterday), so suspect the funnel or attribution rather than the tracking layer.`
+      : "";
+  return {
+    kind: "conversion-drought",
+    runStart,
+    title: `Conversion drought — ${run} zero-action days`,
+    snippet: `No actions since ${runStart} against a baseline of ${lambda.toFixed(1)}/day (~${pct < 0.1 ? "<0.1" : pct.toFixed(1)}% odds of a quiet streak this long).${clicksNote}`,
+    rationale:
+      "A zero-action run this long is improbable at the program's baseline rate.",
+  };
+}
+
+/**
+ * Tracking-health check over the live by-day series. One finding per episode:
+ * the dedup key anchors on the zero-run's first day, so an ongoing break or
+ * drought pages once and then stays quiet while it persists.
  */
 async function checkTrackingHealth(
   program: PartnerProgram,
-  yesterdayActions: number,
+  byDay: ImpactDayPerformance[] | null,
 ): Promise<boolean> {
-  if (yesterdayActions > 0) return false;
-
+  if (!byDay) return false;
   const { day } = yesterdayUtc();
-  const trailingStart = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-  const trailing = await db
-    .select({
-      actions: affiliateMetricDailyTable.actions,
-      date: affiliateMetricDailyTable.date,
-    })
-    .from(affiliateMetricDailyTable)
-    .where(
-      and(
-        eq(affiliateMetricDailyTable.programId, program.id),
-        isNull(affiliateMetricDailyTable.partnerId),
-        gte(affiliateMetricDailyTable.date, trailingStart),
-      ),
-    )
-    .orderBy(desc(affiliateMetricDailyTable.date));
-
-  const prior = trailing.filter((r) => r.date !== day);
-  if (prior.length === 0) return false; // no baseline yet — first days of data
-  const avg = prior.reduce((s, r) => s + (r.actions ?? 0), 0) / prior.length;
-  if (avg < 1) return false; // program is just quiet
+  const finding = evaluateTrackingHealth(byDay, day);
+  if (!finding) return false;
 
   const inserted = await db
     .insert(affiliateItemTable)
     .values({
       programId: program.id,
       kind: "finding",
-      dedupKey: `tracking-health:${day}`,
-      title: "Possible tracking break — zero affiliate actions yesterday",
-      snippet: `0 actions on ${day} against a trailing average of ${avg.toFixed(1)}/day. Check the Impact tracking status and the Order Completed emitter before partners notice.`,
+      dedupKey: `${finding.kind}:${finding.runStart}`,
+      title: finding.title,
+      snippet: finding.snippet,
       suggestedAction: "engage",
-      rationale: "Zero-action day against a non-zero baseline.",
+      rationale: finding.rationale,
       receivedAt: new Date(),
     })
     .onConflictDoNothing({
@@ -365,13 +429,39 @@ export async function runDailyAffiliateMonitor(): Promise<
     }
 
     try {
-      const metrics = await snapshotMetrics(program, program.externalProgramId);
+      // By-day report: clicks for the snapshot + the health check's series.
+      // Trailing ~3 weeks gives the drought check its 14-day baseline even
+      // after a multi-day zero run. A report failure must not kill the run —
+      // log it and continue; the health check just stays silent that day.
+      const { day } = yesterdayUtc();
+      let byDay: ImpactDayPerformance[] | null = null;
+      try {
+        byDay = await listPerformanceByDay({
+          campaignId: program.externalProgramId,
+          startDay: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10),
+          endDay: day,
+        });
+      } catch (error) {
+        console.error(
+          `[affiliate-monitor] ${program.id}: by-day report failed — tracking-health check skipped:`,
+          error,
+        );
+      }
+      const clicksYesterday = byDay?.find((r) => r.date === day)?.clicks;
+
+      const metrics = await snapshotMetrics(
+        program,
+        program.externalProgramId,
+        clicksYesterday,
+      );
       const { synced, pending } = await syncPartners(
         program,
         program.externalProgramId,
       );
       const applicationsQueued = await queueApplications(program, pending);
-      const trackingAlert = await checkTrackingHealth(program, metrics.actions);
+      const trackingAlert = await checkTrackingHealth(program, byDay);
       const inquiriesQueued = await checkInquiries(
         program,
         program.externalProgramId,
@@ -380,6 +470,7 @@ export async function runDailyAffiliateMonitor(): Promise<
       results.push({
         programId: program.id,
         actions: metrics.actions,
+        clicks: clicksYesterday,
         revenue: metrics.revenue,
         partnersSynced: synced,
         applicationsQueued,
