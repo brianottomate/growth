@@ -1306,7 +1306,9 @@ function DayGroupBlock({ g, assign }: { g: DayGroup; assign: CalAssign }) {
       <div className="mb-1.5 flex items-center gap-2">
         {g.contentPostId ? (
           <Link
-            href={`/app/content/${g.contentPostId}`}
+            // ?card=1 bypasses the email-only redirect: from the calendar the
+            // content card is the landing page, the workspace one click deeper.
+            href={`/app/content/${g.contentPostId}?card=1`}
             className="min-w-0 truncate text-sm font-medium hover:underline"
           >
             {g.title ?? "Untitled"}
