@@ -33,8 +33,8 @@ import {
 //   1. snapshot yesterday's actions + clicks into affiliate_metric_daily
 //   2. sync the network partner list into affiliate_partner
 //   3. queue PENDING partners as application items (+ Slack ping)
-//   4. tracking-health alert: zero clicks (break) or an improbable run of
-//      zero-action days (drought) — see evaluateTrackingHealth
+//   4. tracking-break alert: zero clicks against a healthy click baseline —
+//      see evaluateTrackingHealth
 // Everything is per active impact program; without credentials or an
 // externalProgramId the run logs a skip and exits cleanly.
 
@@ -199,23 +199,20 @@ async function queueApplications(
   return fresh.length;
 }
 
-// Tracking-health thresholds. The retired check ("zero actions yesterday while
-// the trailing average is ≥1") sat right on top of the program's real run rate
+// Tracking-break alarm. The retired check ("zero actions yesterday while the
+// trailing average is ≥1") sat right on top of the program's real run rate
 // (~1.1 actions/day), where a Poisson zero day happens ~1 day in 3 — it paged
-// on arithmetic, not on signal (4 pages in the first 9 days of Aug 2026). Two
-// signals replace it, both read live from the Performance by Day report so
-// late-posting actions are already reflected:
-//   - tracking break: zero CLICKS. Clicks run ~40–65/day on the live program,
-//     so even one zero-click day means the tracking layer is dead, not quiet.
-//   - conversion drought: a run of zero-ACTION days long enough to be
-//     improbable against the baseline (run × λ ≥ 4 ⇒ P < e⁻⁴ ≈ 2%).
-const CLICK_BASELINE_MIN = 10; // clicks/day before the zero-click signal arms
-const DROUGHT_MIN_DAYS = 2;
-const DROUGHT_MIN_EXPECTED = 4; // zero-run length × baseline actions/day
+// on arithmetic, not on signal (4 pages in the first 9 days of Aug 2026).
+// Clicks are the signal that can't false-alarm: they run ~40–65/day on the
+// live program and never touch anything Wander owns (partner link → Impact's
+// sjv.io redirect → wander.com), so a zero-click day means the Impact-side
+// tracking layer is dead — program suspended, top partner pulled links, or
+// redirect breakage. Actions alone never page: slow conversion weeks belong to
+// the weekly report, not an alert.
+const CLICK_BASELINE_MIN = 10; // clicks/day before the zero-click alarm arms
 
 export interface TrackingHealthFinding {
-  kind: "tracking-break" | "conversion-drought";
-  runStart: string; // first day of the zero run — the episode's dedup anchor
+  runStart: string; // first day of the zero-click run — the episode's dedup anchor
   title: string;
   snippet: string;
   rationale: string;
@@ -230,58 +227,31 @@ export function evaluateTrackingHealth(
   yesterday: string,
 ): TrackingHealthFinding | null {
   if (days[0]?.date !== yesterday) return null; // report gap — say nothing
+  if (days[0].clicks > 0) return null;
 
-  // Zero-click run ending yesterday → the tracking layer itself looks dead.
-  if (days[0].clicks === 0) {
-    let run = 1;
-    while (run < days.length && days[run]!.clicks === 0) run++;
-    const prior = days.slice(run, run + 7);
-    const clickAvg =
-      prior.length > 0
-        ? prior.reduce((s, d) => s + d.clicks, 0) / prior.length
-        : 0;
-    if (clickAvg >= CLICK_BASELINE_MIN) {
-      const runStart = days[run - 1]!.date;
-      return {
-        kind: "tracking-break",
-        runStart,
-        title: "Tracking break — zero affiliate clicks",
-        snippet: `0 clicks since ${runStart} against ~${Math.round(clickAvg)}/day. The tracking layer looks dead, not quiet — check the Impact tracking status and partner links now.`,
-        rationale:
-          "Clicks are high-volume, so a zero-click day is a hard failure signal — unlike a zero-action day.",
-      };
-    }
-  }
-
-  // Zero-action run ending yesterday, long enough to be improbable.
-  let run = 0;
-  while (run < days.length && days[run]!.actions === 0) run++;
-  if (run < DROUGHT_MIN_DAYS || run >= days.length) return null;
-  const prior = days.slice(run, run + 14);
-  if (prior.length < 3) return null; // not enough baseline yet
-  const lambda = prior.reduce((s, d) => s + d.actions, 0) / prior.length;
-  if (run * lambda < DROUGHT_MIN_EXPECTED) return null;
+  let run = 1;
+  while (run < days.length && days[run]!.clicks === 0) run++;
+  const prior = days.slice(run, run + 7);
+  const clickAvg =
+    prior.length > 0
+      ? prior.reduce((s, d) => s + d.clicks, 0) / prior.length
+      : 0;
+  if (clickAvg < CLICK_BASELINE_MIN) return null; // low-click program — no signal
 
   const runStart = days[run - 1]!.date;
-  const pct = Math.exp(-run * lambda) * 100;
-  const clicksNote =
-    days[0].clicks > 0
-      ? ` Clicks are still flowing (${days[0].clicks} yesterday), so suspect the funnel or attribution rather than the tracking layer.`
-      : "";
   return {
-    kind: "conversion-drought",
     runStart,
-    title: `Conversion drought — ${run} zero-action days`,
-    snippet: `No actions since ${runStart} against a baseline of ${lambda.toFixed(1)}/day (~${pct < 0.1 ? "<0.1" : pct.toFixed(1)}% odds of a quiet streak this long).${clicksNote}`,
+    title: "Tracking break — zero affiliate clicks",
+    snippet: `0 clicks since ${runStart} against ~${Math.round(clickAvg)}/day. The tracking layer looks dead, not quiet — check the Impact tracking status and partner links now.`,
     rationale:
-      "A zero-action run this long is improbable at the program's baseline rate.",
+      "Clicks are high-volume and live on Impact's infrastructure, so a zero-click day is a hard failure signal — unlike a zero-action day.",
   };
 }
 
 /**
- * Tracking-health check over the live by-day series. One finding per episode:
- * the dedup key anchors on the zero-run's first day, so an ongoing break or
- * drought pages once and then stays quiet while it persists.
+ * Tracking-break check over the live by-day series. One finding per episode:
+ * the dedup key anchors on the zero-run's first day, so an ongoing break
+ * pages once and then stays quiet while it persists.
  */
 async function checkTrackingHealth(
   program: PartnerProgram,
@@ -297,7 +267,7 @@ async function checkTrackingHealth(
     .values({
       programId: program.id,
       kind: "finding",
-      dedupKey: `${finding.kind}:${finding.runStart}`,
+      dedupKey: `tracking-break:${finding.runStart}`,
       title: finding.title,
       snippet: finding.snippet,
       suggestedAction: "engage",
@@ -429,16 +399,16 @@ export async function runDailyAffiliateMonitor(): Promise<
     }
 
     try {
-      // By-day report: clicks for the snapshot + the health check's series.
-      // Trailing ~3 weeks gives the drought check its 14-day baseline even
-      // after a multi-day zero run. A report failure must not kill the run —
-      // log it and continue; the health check just stays silent that day.
+      // By-day report: clicks for the snapshot + the break check's series
+      // (yesterday + a 7-day click baseline, with slack for a short zero run).
+      // A report failure must not kill the run — log it and continue; the
+      // break check just stays silent that day.
       const { day } = yesterdayUtc();
       let byDay: ImpactDayPerformance[] | null = null;
       try {
         byDay = await listPerformanceByDay({
           campaignId: program.externalProgramId,
-          startDay: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000)
+          startDay: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000)
             .toISOString()
             .slice(0, 10),
           endDay: day,
