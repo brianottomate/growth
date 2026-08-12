@@ -517,8 +517,8 @@ export type PregenGenerationContext = {
   } | null;
 };
 
-export const leadOutreachTable = leadsSchema.table(
-  "outreach",
+export const leadSequenceTable = leadsSchema.table(
+  "sequence",
   (t) => ({
     id: t
       .text()
@@ -559,8 +559,8 @@ export const leadOutreachTable = leadsSchema.table(
     index("lead_outreach_status_idx").on(table.status),
   ],
 );
-export type LeadOutreach = typeof leadOutreachTable.$inferSelect;
-export type LeadOutreachInsert = typeof leadOutreachTable.$inferInsert;
+export type LeadOutreach = typeof leadSequenceTable.$inferSelect;
+export type LeadOutreachInsert = typeof leadSequenceTable.$inferInsert;
 
 // ---- LEAD CHANNEL (reachability + multi-channel delivery) ----------
 //
@@ -610,7 +610,7 @@ export const leadChannelTable = leadsSchema.table(
     // Which generated sequence was dispatched through this channel.
     outreachId: t
       .text()
-      .references(() => leadOutreachTable.id, { onDelete: "set null" }),
+      .references(() => leadSequenceTable.id, { onDelete: "set null" }),
     // The plus-addressed reply-to we stamped (form/chat sends leave our address);
     // `replyToken` is the opaque key the inbound webhook resolves back to this row.
     replyToAlias: t.text(),
@@ -671,9 +671,9 @@ export const leadChannelRelations = relations(leadChannelTable, ({ one }) => ({
     fields: [leadChannelTable.domainId],
     references: [leadDomainTable.id],
   }),
-  outreach: one(leadOutreachTable, {
+  outreach: one(leadSequenceTable, {
     fields: [leadChannelTable.outreachId],
-    references: [leadOutreachTable.id],
+    references: [leadSequenceTable.id],
   }),
 }));
 

@@ -22,7 +22,7 @@ import {
   updateContact,
 } from "@/server/clients/hubspot.client";
 import { db } from "@/server/db";
-import { leadDomainTable, leadOutreachTable } from "@/server/db/leads-schema";
+import { leadDomainTable, leadSequenceTable } from "@/server/db/leads-schema";
 import {
   generatePregenHubspotDraft,
   PregenMotionSchema,
@@ -92,7 +92,7 @@ if (apply) {
     .update(leadDomainTable)
     .set({ pregenSiteUrl: previewUrl })
     .where(eq(leadDomainTable.id, result.domainId));
-  await db.insert(leadOutreachTable).values({
+  await db.insert(leadSequenceTable).values({
     domainId: result.domainId,
     domain,
     contactId: null,

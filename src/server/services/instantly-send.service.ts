@@ -2,7 +2,7 @@ import "server-only";
 import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { leadOutreachTable } from "@/server/db/leads-schema";
+import { leadSequenceTable } from "@/server/db/leads-schema";
 import {
   activateCampaign,
   addLeadsBulk,
@@ -103,9 +103,9 @@ export async function queueInstantlyLead(
 ): Promise<QueueResult> {
   const [row] = await db
     .select()
-    .from(leadOutreachTable)
-    .where(eq(leadOutreachTable.domainId, domainId))
-    .orderBy(desc(leadOutreachTable.createdAt))
+    .from(leadSequenceTable)
+    .where(eq(leadSequenceTable.domainId, domainId))
+    .orderBy(desc(leadSequenceTable.createdAt))
     .limit(1);
   if (!row?.steps?.length)
     throw new Error("No outreach draft to queue for this domain");
@@ -131,13 +131,13 @@ export async function queueInstantlyLead(
   const leadId = res.created_leads?.[0]?.id ?? null;
 
   await db
-    .update(leadOutreachTable)
+    .update(leadSequenceTable)
     .set({
       status: "queued",
       instantlyCampaignId: campaignId,
       instantlyLeadId: leadId,
     })
-    .where(eq(leadOutreachTable.id, row.id));
+    .where(eq(leadSequenceTable.id, row.id));
 
   return { campaignId, leadId, recipient: recipientEmail };
 }

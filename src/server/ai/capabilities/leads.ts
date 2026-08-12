@@ -8,7 +8,7 @@ import {
   hubspotListMembershipTable,
   leadContactTable,
   leadDomainTable,
-  leadOutreachTable,
+  leadSequenceTable,
 } from "@/server/db/leads-schema";
 import { PLACEHOLDER_EMAIL_DOMAINS_SQL } from "@/server/services/lead-channel.service";
 import { generatePregenHubspotDraft } from "@/server/services/pregen-hubspot-outreach.service";
@@ -110,9 +110,9 @@ export const leadsSequence = growthAction({
 
     const [draft] = await db
       .select()
-      .from(leadOutreachTable)
-      .where(eq(leadOutreachTable.domainId, row.id))
-      .orderBy(desc(leadOutreachTable.createdAt))
+      .from(leadSequenceTable)
+      .where(eq(leadSequenceTable.domainId, row.id))
+      .orderBy(desc(leadSequenceTable.createdAt))
       .limit(1);
 
     if (!draft) {
@@ -209,10 +209,10 @@ export const leadsRewriteSequence = growthAction({
     // others verbatim to preserve, so the draft the gate sees is still a whole
     // sequence written in one pass.
     const [current] = await db
-      .select({ steps: leadOutreachTable.steps })
-      .from(leadOutreachTable)
-      .where(eq(leadOutreachTable.domainId, row.id))
-      .orderBy(desc(leadOutreachTable.createdAt))
+      .select({ steps: leadSequenceTable.steps })
+      .from(leadSequenceTable)
+      .where(eq(leadSequenceTable.domainId, row.id))
+      .orderBy(desc(leadSequenceTable.createdAt))
       .limit(1);
     const existing = current?.steps ?? [];
     if (touch && !existing.length) {
@@ -250,15 +250,15 @@ export const leadsRewriteSequence = growthAction({
     });
 
     await db
-      .delete(leadOutreachTable)
+      .delete(leadSequenceTable)
       .where(
         and(
-          eq(leadOutreachTable.domainId, row.id),
-          eq(leadOutreachTable.status, "draft"),
+          eq(leadSequenceTable.domainId, row.id),
+          eq(leadSequenceTable.status, "draft"),
         ),
       );
     const [created] = await db
-      .insert(leadOutreachTable)
+      .insert(leadSequenceTable)
       .values({
         domainId: row.id,
         domain: row.domain,

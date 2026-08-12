@@ -26,7 +26,7 @@ import { db } from "@/server/db";
 import {
   leadContactTable,
   leadDomainTable,
-  leadOutreachTable,
+  leadSequenceTable,
 } from "@/server/db/leads-schema";
 import { PregenHubspotDraftSchema } from "@/server/services/pregen-hubspot-outreach.service";
 import { hubspotPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
@@ -89,7 +89,7 @@ if (apply) {
     .update(leadDomainTable)
     .set({ pregenSiteUrl: review.previewUrl })
     .where(eq(leadDomainTable.id, domainRow.id));
-  await db.insert(leadOutreachTable).values({
+  await db.insert(leadSequenceTable).values({
     domainId: domainRow.id,
     domain,
     contactId: dbContact?.id ?? null,

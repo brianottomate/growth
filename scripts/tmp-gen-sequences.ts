@@ -17,7 +17,7 @@ import { db } from "@/server/db";
 import {
   hubspotListMembershipTable,
   leadDomainTable,
-  leadOutreachTable,
+  leadSequenceTable,
 } from "@/server/db/leads-schema";
 import { generatePregenHubspotDraft } from "@/server/services/pregen-hubspot-outreach.service";
 
@@ -93,14 +93,14 @@ for (const domain of DOMAINS) {
       console.log(JSON.stringify(r.generationContext, null, 2));
     } else {
       await db
-        .delete(leadOutreachTable)
+        .delete(leadSequenceTable)
         .where(
           and(
-            eq(leadOutreachTable.domainId, row.id),
-            eq(leadOutreachTable.status, "draft"),
+            eq(leadSequenceTable.domainId, row.id),
+            eq(leadSequenceTable.status, "draft"),
           ),
         );
-      await db.insert(leadOutreachTable).values({
+      await db.insert(leadSequenceTable).values({
         domainId: row.id,
         domain: row.domain,
         status: "draft",

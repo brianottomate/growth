@@ -21,7 +21,7 @@ import {
   leadDomainTable,
   hubspotListMembershipTable,
   leadImportTable,
-  leadOutreachTable,
+  leadSequenceTable,
   pregenBuildTable,
 } from "@/server/db/leads-schema";
 import {
@@ -445,7 +445,7 @@ export const leadsRouter = createTRPCRouter({
       // Draft presence is a plain exists, so it narrows the count too.
       if (input.hasDraft != null) {
         const hasDraft = sql`exists (
-          select 1 from leads.outreach as draft
+          select 1 from leads.sequence as draft
           where draft.domain_id = ${leadDomainTable.id}
         )`;
         conds.push(input.hasDraft ? hasDraft : sql`not ${hasDraft}`);
@@ -602,9 +602,9 @@ export const leadsRouter = createTRPCRouter({
                 ),
               ctx.db
                 .select()
-                .from(leadOutreachTable)
-                .where(inArray(leadOutreachTable.domainId, ids))
-                .orderBy(desc(leadOutreachTable.createdAt)),
+                .from(leadSequenceTable)
+                .where(inArray(leadSequenceTable.domainId, ids))
+                .orderBy(desc(leadSequenceTable.createdAt)),
               ctx.db
                 .select({
                   domainId: leadChannelTable.domainId,
@@ -717,9 +717,9 @@ export const leadsRouter = createTRPCRouter({
         .limit(200);
       const [outreach] = await ctx.db
         .select()
-        .from(leadOutreachTable)
-        .where(eq(leadOutreachTable.domainId, input.id))
-        .orderBy(desc(leadOutreachTable.createdAt))
+        .from(leadSequenceTable)
+        .where(eq(leadSequenceTable.domainId, input.id))
+        .orderBy(desc(leadSequenceTable.createdAt))
         .limit(1);
       const channels = await ctx.db
         .select()
@@ -786,9 +786,9 @@ export const leadsRouter = createTRPCRouter({
             .orderBy(asc(leadChannelTable.kind)),
           ctx.db
             .select()
-            .from(leadOutreachTable)
-            .where(eq(leadOutreachTable.domainId, domain.id))
-            .orderBy(desc(leadOutreachTable.createdAt))
+            .from(leadSequenceTable)
+            .where(eq(leadSequenceTable.domainId, domain.id))
+            .orderBy(desc(leadSequenceTable.createdAt))
             .limit(5),
           ctx.db
             .select({ cohort: hubspotListMembershipTable.cohort })
@@ -1214,15 +1214,15 @@ export const leadsRouter = createTRPCRouter({
         throw error;
       });
       await ctx.db
-        .delete(leadOutreachTable)
+        .delete(leadSequenceTable)
         .where(
           and(
-            eq(leadOutreachTable.domainId, input.domainId),
-            eq(leadOutreachTable.status, "draft"),
+            eq(leadSequenceTable.domainId, input.domainId),
+            eq(leadSequenceTable.status, "draft"),
           ),
         );
       const [created] = await ctx.db
-        .insert(leadOutreachTable)
+        .insert(leadSequenceTable)
         .values({
           domainId: row.id,
           domain: row.domain,
@@ -1275,14 +1275,14 @@ export const leadsRouter = createTRPCRouter({
       }
       const [outreach] = await ctx.db
         .select()
-        .from(leadOutreachTable)
+        .from(leadSequenceTable)
         .where(
           and(
-            eq(leadOutreachTable.domainId, input.domainId),
-            eq(leadOutreachTable.status, "draft"),
+            eq(leadSequenceTable.domainId, input.domainId),
+            eq(leadSequenceTable.status, "draft"),
           ),
         )
-        .orderBy(desc(leadOutreachTable.createdAt))
+        .orderBy(desc(leadSequenceTable.createdAt))
         .limit(1);
       if (!outreach?.steps?.length) {
         throw new TRPCError({
@@ -1307,9 +1307,9 @@ export const leadsRouter = createTRPCRouter({
       );
       await updateContact(contact.hubspotContactId, properties);
       await ctx.db
-        .update(leadOutreachTable)
+        .update(leadSequenceTable)
         .set({ status: "approved" })
-        .where(eq(leadOutreachTable.id, outreach.id));
+        .where(eq(leadSequenceTable.id, outreach.id));
       return {
         outreachId: outreach.id,
         contactId: contact.id,
