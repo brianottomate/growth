@@ -5,8 +5,10 @@ import { useState } from "react";
 import {
   ArrowUpRight,
   CheckCircle2,
+  ExternalLink,
   FileText,
   Gauge,
+  Gift,
   Globe,
   Loader2,
   Mail,
@@ -507,6 +509,35 @@ export function ProspectReviewCard({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <div className="flex items-center gap-2">
+              {/* One artifact seen two ways: the bare preview the prospect
+                  lands on, and the wander.com page that wraps it in the pitch.
+                  Icon-only because they are lookups, not the action the card is
+                  asking for — and they sit here rather than inside the sequence
+                  block because you want to look before a draft exists. */}
+              {data.pregenSiteUrl && (
+                <a
+                  href={data.pregenSiteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open the pregen preview they will see"
+                  aria-label="Open the pregen preview"
+                  className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+                >
+                  <ExternalLink className="size-3.5" />
+                </a>
+              )}
+              {data.pregenSiteUrl && osPitchUrl(data.pregenSiteUrl) && (
+                <a
+                  href={osPitchUrl(data.pregenSiteUrl) ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open the wander.com pitch wrapper"
+                  aria-label="Open the wander.com pitch wrapper"
+                  className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+                >
+                  <Gift className="size-3.5" />
+                </a>
+              )}
               {build ? (
                 <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/40 bg-violet-500/10 px-2.5 py-1.5 text-xs font-medium text-violet-300">
                   <Loader2 className="size-3.5 animate-spin" />
