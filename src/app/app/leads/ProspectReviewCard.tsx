@@ -228,6 +228,23 @@ function MicroLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The wander.com pitch wrapper is a mechanical transform of the preview URL:
+ * https://<label>.<zone>/?t=<token> → https://www.wander.com/os/<label>?t=<token>.
+ * Same label, same token — never minted or stored separately.
+ */
+function osPitchUrl(previewUrl: string): string | null {
+  try {
+    const parsed = new URL(previewUrl);
+    const label = parsed.hostname.split(".")[0];
+    const token = parsed.searchParams.get("t");
+    if (!label || !token) return null;
+    return `https://www.wander.com/os/${label}?t=${encodeURIComponent(token)}`;
+  } catch {
+    return null;
+  }
+}
+
 function SequencePreview({ data }: { data: ProspectCardData }) {
   // The 2-up grid clamps bodies to keep eight touches scannable, but approving
   // copy that goes out as a named person means READING it — so the clamp is a
@@ -268,6 +285,16 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
             className="inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
           >
             Open the preview they will see ↗
+          </a>
+        )}
+        {data.pregenSiteUrl && osPitchUrl(data.pregenSiteUrl) && (
+          <a
+            href={osPitchUrl(data.pregenSiteUrl) ?? undefined}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
+          >
+            wander.com pitch page ↗
           </a>
         )}
         <button
