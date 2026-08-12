@@ -492,6 +492,15 @@ export const leadsRouter = createTRPCRouter({
           siteRankOverall: sql<
             number | null
           >`(${leadDomainTable.enrichment} -> 'leadRank' ->> 'overall')::int`,
+          // The durable before/after pair (R2-rehosted, capture[0] is the
+          // desktop shot) — the ranker's own screenshotUrl above is a presigned
+          // Firecrawl link that expires ~a week after scoring.
+          captureTheirsUrl: sql<
+            string | null
+          >`${leadDomainTable.enrichment} -> 'previewVisual' -> 'theirs' -> 0 ->> 'screenshotUrl'`,
+          captureOursUrl: sql<
+            string | null
+          >`${leadDomainTable.enrichment} -> 'previewVisual' -> 'ours' -> 0 ->> 'screenshotUrl'`,
           pregenStatus: leadDomainTable.pregenStatus,
           hubspotLeadStatus: leadDomainTable.hubspotLeadStatus,
           // The send-review surface filtered these out entirely. Carrying them

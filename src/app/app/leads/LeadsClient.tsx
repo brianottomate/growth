@@ -892,6 +892,8 @@ function toCardData(item: LeadRow): ProspectCardData | null {
     unitConfidence: null,
     contactCount: item.contactCount,
     screenshotUrl: item.siteScreenshotUrl,
+    captureTheirsUrl: item.captureTheirsUrl,
+    captureOursUrl: item.captureOursUrl,
     rankOverall: item.siteRankOverall,
     pregenSiteUrl: item.pregenSiteUrl,
     excludeReason: item.excludeFromOutreach

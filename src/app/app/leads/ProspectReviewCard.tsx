@@ -75,6 +75,9 @@ export interface ProspectCardData {
   contactCount: number;
   screenshotUrl: string | null;
   rankOverall: number | null;
+  /** Durable R2 desktop captures from the before/after service, when taken. */
+  captureTheirsUrl?: string | null;
+  captureOursUrl?: string | null;
   pregenSiteUrl: string | null;
   excludeReason: string | null;
   channel: {
@@ -610,6 +613,43 @@ export function ProspectReviewCard({
             </div>
           </div>
         </div>
+
+        {(data.captureTheirsUrl ?? data.captureOursUrl) && (
+          <div className="flex flex-wrap items-end gap-4">
+            {data.captureTheirsUrl && (
+              <figure>
+                <div className="border-border bg-muted h-[72px] w-32 overflow-hidden rounded-md border">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- fixed-size R2 thumb */}
+                  <img
+                    src={data.captureTheirsUrl}
+                    alt={`${data.domain} today`}
+                    className="h-full w-full object-cover object-top"
+                    loading="lazy"
+                  />
+                </div>
+                <figcaption className="text-muted-foreground mt-1 text-[10px]">
+                  Their site
+                </figcaption>
+              </figure>
+            )}
+            {data.captureOursUrl && (
+              <figure>
+                <div className="h-[72px] w-32 overflow-hidden rounded-md border border-emerald-500/40">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- fixed-size R2 thumb */}
+                  <img
+                    src={data.captureOursUrl}
+                    alt={`Preview built for ${data.domain}`}
+                    className="h-full w-full object-cover object-top"
+                    loading="lazy"
+                  />
+                </div>
+                <figcaption className="text-muted-foreground mt-1 text-[10px]">
+                  Our preview
+                </figcaption>
+              </figure>
+            )}
+          </div>
+        )}
 
         {data.channel.candidates.length > 0 && (
           <div className="overflow-x-auto">
