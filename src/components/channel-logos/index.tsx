@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import { Mail, Send } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { FacebookLogo } from "./facebook";
@@ -73,6 +74,12 @@ export function platformLabel(platform: string) {
  * Renders a platform's brand logo, or a code-badge fallback. Size via `className`
  * (default `size-7`); the SVG fills its box.
  */
+/** Platforms without a brand mark that still deserve a glyph over a code badge. */
+const CHANNEL_ICONS: Partial<Record<string, LogoComponent>> = {
+  newsletter: Mail,
+  blast: Send,
+};
+
 export function ChannelLogo({
   platform,
   className = "size-7",
@@ -83,6 +90,20 @@ export function ChannelLogo({
   const Logo = CHANNEL_LOGOS[platform];
   if (Logo) {
     return <Logo className={cn("shrink-0 rounded-md", className)} />;
+  }
+  const Icon = CHANNEL_ICONS[platform];
+  if (Icon) {
+    return (
+      <span
+        className={cn(
+          "bg-muted text-muted-foreground flex shrink-0 items-center justify-center rounded-md",
+          className,
+        )}
+        title={PLATFORM_META[platform]?.name}
+      >
+        <Icon className="size-[62%]" />
+      </span>
+    );
   }
   return (
     <span

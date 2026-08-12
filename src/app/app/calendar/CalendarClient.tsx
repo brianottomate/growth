@@ -807,9 +807,23 @@ function MonthGrid({
   );
 }
 
+/** Compact brand badge — the two primary brands get a short code and their own
+ * hue so a mixed month reads at a glance ("Wander…" would truncate to the same
+ * "W…" for both). Order matters: WanderOS before Wander. */
+function brandBadge(name: string | undefined | null) {
+  if (!name) return null;
+  if (/wanderos/i.test(name)) return { code: "OS", className: "text-emerald-400" };
+  if (/^wander$/i.test(name)) return { code: "W", className: "text-sky-400" };
+  return {
+    code: name.slice(0, 2).toUpperCase(),
+    className: "text-muted-foreground",
+  };
+}
+
 function ContentChip({ g }: { g: DayGroup }) {
   const pillar = g.pillarSlug ? PILLAR_BY_SLUG[g.pillarSlug] : null;
   const status = g.entries[0]?.status ?? "draft";
+  const brand = brandBadge(g.entries[0]?.brandName);
   const platform = g.entries[0]?.platform ?? "";
   const iconPlatform =
     g.entries[0]?.format === "newsletter.blast" ? "blast" : platform;
@@ -843,9 +857,20 @@ function ContentChip({ g }: { g: DayGroup }) {
               STATUS_DOT[status] ?? "bg-slate-400",
             )}
           />
-          <span className="text-muted-foreground truncate text-[10px] capitalize">
+          <span className="text-muted-foreground shrink-0 text-[10px] capitalize">
             {status}
           </span>
+          {brand && (
+            <span
+              className={cn(
+                "shrink-0 text-[10px] font-semibold",
+                brand.className,
+              )}
+              title={g.entries[0]?.brandName ?? undefined}
+            >
+              {brand.code}
+            </span>
+          )}
           {g.entries.length > 1 && (
             <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
               ×{g.entries.length}
