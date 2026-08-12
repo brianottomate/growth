@@ -75,7 +75,9 @@ export function platformLabel(platform: string) {
  * (default `size-7`); the SVG fills its box.
  */
 /** Platforms without a brand mark that still deserve a glyph over a code badge. */
-const CHANNEL_ICONS: Partial<Record<string, LogoComponent>> = {
+const CHANNEL_ICONS: Partial<
+  Record<string, React.ComponentType<{ className?: string }>>
+> = {
   newsletter: Mail,
   blast: Send,
 };
