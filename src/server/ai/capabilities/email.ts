@@ -130,7 +130,10 @@ export const createDigestFromRow = growthAction({
       userId: ctx.userId,
       draft: emailDocumentDraftSchema.parse({
         subject: input.subject ?? theme,
-        preheader: digest.rationale ?? null,
+        // The extracted rationale is advisory preview text — clamp it to the
+        // document's 300-char preheader cap instead of failing the whole save
+        // after the extraction already ran (Silvina hit this 4× on 08-07).
+        preheader: digest.rationale?.trim().slice(0, 300) || null,
         // Intro copy is left to the operator rather than invented here: the
         // sheet supplies homes and a rationale, not a voice.
         bodyMarkdown: "",

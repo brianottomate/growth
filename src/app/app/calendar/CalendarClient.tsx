@@ -830,6 +830,15 @@ function ContentChip({ g }: { g: DayGroup }) {
   const media = g.entries.find((e) => e.mediaUrl)?.mediaUrl ?? null;
   const label = g.title ?? g.entries[0]?.text ?? platformLabel(platform);
   const storyCount = g.entries.filter(isStoryEntry).length;
+  // A cross-posted piece (IG + TikTok + YouTube…) shows its channel logos as a
+  // strip; ×N stays for multiples on one platform (e.g. story frames).
+  const platforms = [
+    ...new Set(
+      g.entries.map((e) =>
+        e.format === "newsletter.blast" ? "blast" : e.platform,
+      ),
+    ),
+  ];
   return (
     <span
       // Narrow day cells (side-by-side windows, Year · Detailed) stack the
@@ -871,10 +880,23 @@ function ContentChip({ g }: { g: DayGroup }) {
               {brand.code}
             </span>
           )}
-          {g.entries.length > 1 && (
-            <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
-              ×{g.entries.length}
+          {platforms.length > 1 ? (
+            <span className="flex shrink-0 items-center gap-0.5">
+              {platforms.slice(0, 4).map((p) => (
+                <ChannelLogo key={p} platform={p} className="size-3" />
+              ))}
+              {platforms.length > 4 && (
+                <span className="text-muted-foreground text-[10px] tabular-nums">
+                  +{platforms.length - 4}
+                </span>
+              )}
             </span>
+          ) : (
+            g.entries.length > 1 && (
+              <span className="text-muted-foreground shrink-0 text-[10px] tabular-nums">
+                ×{g.entries.length}
+              </span>
+            )
           )}
           {storyCount > 0 && (
             <span className="shrink-0 text-[10px] font-medium text-violet-400 tabular-nums">
