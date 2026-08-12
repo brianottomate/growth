@@ -762,7 +762,7 @@ function MonthGrid({
               key={k}
               onClick={() => onDayClick(date)}
               className={cn(
-                "group hover:bg-accent/30 @container flex min-h-28 flex-col gap-1 border-r border-b p-1.5 text-left transition-colors [&:nth-child(7n)]:border-r-0",
+                "group hover:bg-accent/30 flex min-h-28 flex-col gap-1 border-r border-b p-1.5 text-left transition-colors [&:nth-child(7n)]:border-r-0",
                 !inMonth && "bg-muted/20 opacity-50",
               )}
             >
@@ -841,13 +841,13 @@ function ContentChip({ g }: { g: DayGroup }) {
   ];
   return (
     <span
-      // Narrow day cells (side-by-side windows, Year · Detailed) stack the
-      // thumbnail on top; wide cells keep it inline on the left.
-      className="bg-card @min-[8rem]:flex-row @min-[8rem]:items-center flex flex-col gap-1.5 overflow-hidden rounded-md border p-1 text-xs"
+      // Below lg (side-by-side windows, tablets) the thumbnail stacks on top so
+      // the title still gets usable width; desktop keeps it inline on the left.
+      className="bg-card flex flex-col gap-1.5 overflow-hidden rounded-md border p-1 text-xs lg:flex-row lg:items-center"
       style={pillar ? { borderLeft: `2px solid ${pillar.color}` } : undefined}
       title={label}
     >
-      <span className="bg-muted @min-[8rem]:h-8 @min-[8rem]:w-8 relative h-12 w-full shrink-0 overflow-hidden rounded">
+      <span className="bg-muted relative h-12 w-full shrink-0 overflow-hidden rounded lg:h-8 lg:w-8">
         {media ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={media} alt="" className="size-full object-cover" />
