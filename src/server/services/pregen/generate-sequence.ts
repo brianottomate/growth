@@ -28,10 +28,10 @@ export type GenerateSequenceOptions = {
 /**
  * Generate one pregen sequence draft and store it.
  *
- * Lifted out of the `leads.generatePregenOutreach` mutation so the overnight
- * batch pass and the per-row button cannot drift: the motion derivation, the
- * preview resolution and the exclusion refusal are the parts that decide
- * whether copy is publishable, and two copies of that is two answers.
+ * Lifted out of the `leads.generatePregenOutreach` mutation so the batch job
+ * and the per-row button cannot drift. The motion derivation, the preview
+ * resolution and the exclusion refusal are the parts that decide whether copy
+ * is publishable, and two copies of that logic is two answers.
  *
  * Throws `PregenPreconditionError` for the operator-actionable refusals
  * (excluded, no preview assigned, preview unreadable) so callers can surface
@@ -79,7 +79,9 @@ export async function generateAndStoreSequence(
   const previewUrl =
     options.previewUrl ??
     row.pregenSiteUrl ??
-    (options.pretend ? `https://preview.wander.com/pretend/${row.domain}` : null);
+    (options.pretend
+      ? `https://preview.wander.com/pretend/${row.domain}`
+      : null);
   if (!previewUrl) {
     throw new PregenPreconditionError(
       row.domain,

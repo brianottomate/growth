@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm";
 
 import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
+import { generateAndStoreSequence } from "@/server/services/pregen/generate-sequence";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   leadChannelTable,
@@ -39,7 +40,6 @@ import {
   LeadEnrichmentSchema,
 } from "@/server/services/lead-extraction.service";
 import {
-  generatePregenHubspotDraft,
   PregenPreconditionError,
   PregenMotionSchema,
 } from "@/server/services/pregen-hubspot-outreach.service";
@@ -1256,69 +1256,19 @@ export const leadsRouter = createTRPCRouter({
         pretend: z.boolean().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.leadDomainTable.findFirst({
-        where: eq(leadDomainTable.id, input.domainId),
-      });
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Domain not in DB" });
-      }
-
-      // The enrich/merge passes already mark existing customers and rep-owned
-      // live conversations. Prospecting copy is never right for those, and a
-      // draft sitting in Send Review reads as cleared to send, so refuse at
-      // generation rather than filtering it out downstream. 17 of the 33
-      // domains that currently carry a preview are excluded this way.
-      if (row.excludeFromOutreach) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `${row.domain} is excluded from outreach (${row.excludeReason ?? "no reason recorded"})`,
+    .mutation(async ({ input }) => {
+      // Every guard that decides whether copy is publishable lives in the
+      // service, so the batch job and this button cannot answer differently.
+      try {
+        return await generateAndStoreSequence(input.domainId, {
+          motion: input.motion,
+          previewUrl: input.previewUrl,
+          steer: input.steer,
+          pretend: input.pretend,
         });
-      }
-
-      // Cohort membership is the source of truth for motion: a recycled company
-      // has prior Wander outreach to acknowledge, an untouched one does not.
-      // Deriving it here keeps every review surface from having to pick, and
-      // stops the two from ever disagreeing.
-      let motion = input.motion;
-      if (!motion) {
-        const [membership] = await ctx.db
-          .select({ cohort: hubspotListMembershipTable.cohort })
-          .from(hubspotListMembershipTable)
-          .where(
-            and(
-              eq(hubspotListMembershipTable.domainId, input.domainId),
-              eq(hubspotListMembershipTable.objectType, "company"),
-            ),
-          )
-          .limit(1);
-        motion = membership?.cohort === "recycled" ? "reengagement" : "fresh";
-      }
-      // In pretend mode a company with no preview at all still gets a draft —
-      // that is the point, since only 33 of 218K domains have one. The stand-in
-      // is deliberately self-describing so it is obvious in a rendered body.
-      const previewUrl =
-        input.previewUrl ??
-        row.pregenSiteUrl ??
-        (input.pretend
-          ? `https://preview.wander.com/pretend/${row.domain}`
-          : null);
-      if (!previewUrl) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message:
-            "Assign a real pregen preview before generating HubSpot copy, or generate in pretend mode to iterate on the copy first",
-        });
-      }
-
-      // Exclusion and an unreadable preview are operator-actionable refusals,
-      // not faults — surface the reason on the button rather than a 500.
-      const result = await generatePregenHubspotDraft(row.domain, {
-        motion,
-        previewUrl,
-        steer: input.steer,
-        previewMode: input.pretend ? "pretend" : "require-live",
-      }).catch((error) => {
+      } catch (error) {
+        // Exclusion and an unreadable preview are operator-actionable refusals,
+        // not faults — surface the reason on the button rather than a 500.
         if (error instanceof PregenPreconditionError) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
@@ -1326,34 +1276,8 @@ export const leadsRouter = createTRPCRouter({
           });
         }
         throw error;
-      });
-      await ctx.db
-        .delete(leadSequenceTable)
-        .where(
-          and(
-            eq(leadSequenceTable.domainId, input.domainId),
-            eq(leadSequenceTable.status, "draft"),
-          ),
-        );
-      const [created] = await ctx.db
-        .insert(leadSequenceTable)
-        .values({
-          domainId: row.id,
-          domain: row.domain,
-          status: "draft",
-          angle: result.draft.angle,
-          personalizedOn: [
-            ...result.draft.personalizedOn,
-            ...result.draft.historyUsed.map((value) => `History: ${value}`),
-          ],
-          steps: result.renderedSteps,
-          generationContext: result.generationContext,
-          model: result.model,
-        })
-        .returning();
-      return created!;
+      }
     }),
-
   // Human approval boundary: copy the latest reviewed pregen draft into one
   // associated HubSpot contact. This does not enroll the contact.
   publishPregenOutreach: protectedProcedure
