@@ -54,6 +54,7 @@ export type CalEntry = {
   mediaUrl: string | null;
   handle: string | null;
   at: string; // ISO — effective day (published ?? scheduled ?? planned ?? created)
+  dated?: boolean; // false when `at` fell back to created_at (no real date)
   ideaOwner: Member | null; // content_post owner (the piece's DRI)
   spotOwner: Member | null; // platform_post owner (this channel spot)
 };
@@ -241,6 +242,10 @@ export function CalendarClient({
 }) {
   const now = useMemo(() => new Date(nowISO), [nowISO]);
   const todayKey = keyOf(now);
+  const todayStart = useMemo(
+    () => new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(),
+    [now],
+  );
   const router = useRouter();
   const trpc = useTRPC();
 
@@ -255,6 +260,9 @@ export function CalendarClient({
   const [mineOnly, setMineOnly] = useState(false);
   // Tracked/competitor posts are opt-in — the default view is our own content.
   const [trackedVisible, setTrackedVisible] = useState(false);
+  // Never-scheduled drafts sitting in the past are opt-in too: they have no
+  // date of their own, so they only landed on that day by way of created_at.
+  const [unscheduledVisible, setUnscheduledVisible] = useState(false);
   const [dayDetail, setDayDetail] = useState<{
     key: string;
     date: Date;
@@ -346,6 +354,12 @@ export function CalendarClient({
     () =>
       entries.filter((e) => {
         if (!trackedVisible && e.tracked) return false;
+        if (
+          !unscheduledVisible &&
+          e.dated === false &&
+          new Date(e.at).getTime() < todayStart
+        )
+          return false;
         if (brandFilter !== "all" && e.brandId !== brandFilter) return false;
         if (pillarFilter !== "all" && e.pillar !== pillarFilter) return false;
         if (
@@ -362,6 +376,8 @@ export function CalendarClient({
       pillarFilter,
       mineOnly,
       trackedVisible,
+      unscheduledVisible,
+      todayStart,
       assign,
       currentUserId,
     ],
@@ -486,6 +502,19 @@ export function CalendarClient({
             )}
           >
             Tracked
+          </button>
+
+          <button
+            onClick={() => setUnscheduledVisible((v) => !v)}
+            title="Drafts that were never given a date. They sit on their creation day, so past ones are hidden by default."
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              unscheduledVisible
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:bg-accent",
+            )}
+          >
+            Unscheduled
           </button>
 
           <button

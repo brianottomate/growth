@@ -98,7 +98,14 @@ export default async function CalendarPage({
   const entries: CalEntry[] = posts.map((p) => {
     const at =
       p.publishedAt ?? p.scheduledAt ?? p.contentPost?.plannedAt ?? p.createdAt;
+    // Whether `at` is a real calendar intent or just the row's creation date.
+    // The CIO mirror carries hundreds of never-sent drafts with no date of any
+    // kind; those land on whatever day they were imported, which is noise.
+    const dated = Boolean(
+      p.publishedAt ?? p.scheduledAt ?? p.contentPost?.plannedAt,
+    );
     return {
+      dated,
       id: p.id,
       brandId: p.brandId,
       brandName: brandName.get(p.brandId) ?? "—",
