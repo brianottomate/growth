@@ -36,8 +36,18 @@ import { PregenPreconditionError } from "@/server/services/pregen-hubspot-outrea
  */
 export const maxDuration = 300;
 
-// Leave room to finish the pass in flight and still serialize a response.
-const DEADLINE_MS = 240_000;
+/**
+ * Stop STARTING domains here. One domain costs ~65s across its three passes, so
+ * a deadline close to the 300s budget lets a domain start at 239s and get the
+ * whole function killed at 300s with nothing serialized — which is exactly what
+ * happened on the first run. The gap has to be wider than the slowest domain,
+ * not wider than a rounding error.
+ *
+ * Prefer `?domain=` and fan out instead: the passes are independent per domain,
+ * so ten concurrent invocations finish in the time one domain takes rather than
+ * ten times that.
+ */
+const DEADLINE_MS = 180_000;
 
 function isAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
@@ -69,6 +79,10 @@ async function handle(request: NextRequest) {
   const batch =
     request.nextUrl.searchParams.get("batch")?.trim() || CURRENT_PREGEN_BATCH;
   const limit = intParam(request, "limit", 10);
+  // Narrow to one domain so callers can fan out: the passes share no state
+  // across domains, so N invocations of one domain each cost what the slowest
+  // single domain costs, instead of the sum.
+  const only = request.nextUrl.searchParams.get("domain")?.trim().toLowerCase();
 
   const rows = await db
     .select({
@@ -92,9 +106,10 @@ async function handle(request: NextRequest) {
       and(
         eq(leadDomainTable.pregenBatch, batch),
         isNull(leadDomainTable.deletedAt),
+        ...(only ? [eq(leadDomainTable.domain, only)] : []),
       ),
     )
-    .limit(limit);
+    .limit(only ? 1 : limit);
 
   const results: Record<string, unknown>[] = [];
   let ranOut = false;
