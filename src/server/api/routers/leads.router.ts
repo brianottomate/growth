@@ -14,6 +14,7 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   leadChannelTable,
@@ -169,6 +170,10 @@ export const leadsRouter = createTRPCRouter({
         untouched: sql<number>`count(*) filter (where ${leadDomainTable.inBuiltwith} and not ${leadDomainTable.inHubspot})::int`,
         ranked: sql<number>`count(*) filter (where ${leadDomainTable.scorePregenPotential} is not null)::int`,
         sendBatch: sql<number>`count(*) filter (where ${leadDomainTable.pregenBatch} is not null)::int`,
+        // The batch being worked right now, counted on its own. Send-20 is
+        // "any batch ever stamped", so it only grows; this is the one that
+        // answers "what am I looking at today".
+        currentBatch: sql<number>`count(*) filter (where ${leadDomainTable.pregenBatch} = ${CURRENT_PREGEN_BATCH})::int`,
       })
       .from(leadDomainTable);
 
@@ -302,6 +307,9 @@ export const leadsRouter = createTRPCRouter({
         netNew: z.boolean().optional(),
         // the first cold-outbound test cohort (SEND_BATCH_1).
         sendBatch: z.boolean().optional(),
+        // One named batch rather than "any batch" — what the current-batch pill
+        // filters on, so its rows match its badge.
+        pregenBatch: z.string().trim().min(1).optional(),
         // only companies with a live, emailable, HubSpot-enrollable contact.
         enrollableOnly: z.boolean().optional(),
         // owning BDR (resolved rep name as stored on the domain).
@@ -423,6 +431,8 @@ export const leadsRouter = createTRPCRouter({
       // domain array, which the comment there always said should be a column.
       if (input.sendBatch)
         conds.push(sql`${leadDomainTable.pregenBatch} is not null`);
+      if (input.pregenBatch)
+        conds.push(eq(leadDomainTable.pregenBatch, input.pregenBatch));
       if (input.minUnits != null)
         conds.push(gte(leadDomainTable.unitCount, input.minUnits));
       if (input.owner)

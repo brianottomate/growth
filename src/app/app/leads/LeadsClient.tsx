@@ -18,6 +18,7 @@ import {
   hubspotListUrl,
   type HubspotPregenCohort,
 } from "@/lib/hubspot-pregen-lists";
+import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
 import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
@@ -50,6 +51,11 @@ const fmt = (n: number | null | undefined) =>
  * because they narrow *within* a population instead of redefining it.
  */
 const POPULATIONS = {
+  newbatch: {
+    label: "New",
+    hint: "The batch being worked right now — pre-gen sites just requested",
+    input: { pregenBatch: CURRENT_PREGEN_BATCH },
+  },
   target: {
     label: "Target list",
     hint: "Members of either pre-gen cohort — the active motion",
@@ -88,6 +94,7 @@ const POPULATIONS = {
 } as const;
 
 const POPULATION_KEYS = [
+  "newbatch",
   "target",
   "recycled",
   "untouched",
@@ -129,11 +136,11 @@ export function LeadsClient() {
   // were useState and nothing about a filtered list was shareable.
   const [population, setPopulation] = useQueryState(
     "pop",
-    parseAsStringLiteral(POPULATION_KEYS).withDefault("target"),
+    parseAsStringLiteral(POPULATION_KEYS).withDefault("newbatch"),
   );
   const [view, setView] = useQueryState(
     "view",
-    parseAsStringLiteral(["compact", "review"] as const).withDefault("compact"),
+    parseAsStringLiteral(["compact", "review"] as const).withDefault("review"),
   );
   const [q, setQ] = useQueryState("q", parseAsString.withDefault(""));
   const [source, setSource] = useQueryState(
@@ -314,6 +321,7 @@ export function LeadsClient() {
   // carry them are no longer needed above the list.
   const populationCount = (key: (typeof POPULATION_KEYS)[number]) => {
     if (!s) return null;
+    if (key === "newbatch") return fmt(s.currentBatch);
     if (key === "netnew") return fmt(s.netNew);
     if (key === "send20") return fmt(s.sendBatch);
     if (key === "previews") return fmt(s.withPregenSite);
