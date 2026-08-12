@@ -244,17 +244,17 @@ export function CalendarClient({
   const router = useRouter();
   const trpc = useTRPC();
 
-  // Default to the Year · Detailed view; a Studio-wheel deep-link that targets a
-  // specific month still opens the focused Month zoom.
-  const [zoom, setZoom] = useState<Zoom>(
-    initial?.month != null ? "month" : "year",
-  );
+  // Default to the focused Month zoom — the full-fidelity grid the content team
+  // reviews. Year · Detailed stays one toggle away.
+  const [zoom, setZoom] = useState<Zoom>("month");
   const [yearMode, setYearMode] = useState<YearMode>("detailed");
   const [year, setYear] = useState(initial?.year ?? now.getFullYear());
   const [month, setMonth] = useState(initial?.month ?? now.getMonth());
   const [brandFilter, setBrandFilter] = useState(initial?.brandId ?? "all");
   const [pillarFilter, setPillarFilter] = useState(initial?.pillar ?? "all");
   const [mineOnly, setMineOnly] = useState(false);
+  // Tracked/competitor posts are opt-in — the default view is our own content.
+  const [trackedVisible, setTrackedVisible] = useState(false);
   const [dayDetail, setDayDetail] = useState<{
     key: string;
     date: Date;
@@ -345,6 +345,7 @@ export function CalendarClient({
   const filtered = useMemo(
     () =>
       entries.filter((e) => {
+        if (!trackedVisible && e.tracked) return false;
         if (brandFilter !== "all" && e.brandId !== brandFilter) return false;
         if (pillarFilter !== "all" && e.pillar !== pillarFilter) return false;
         if (
@@ -355,7 +356,15 @@ export function CalendarClient({
           return false;
         return true;
       }),
-    [entries, brandFilter, pillarFilter, mineOnly, assign, currentUserId],
+    [
+      entries,
+      brandFilter,
+      pillarFilter,
+      mineOnly,
+      trackedVisible,
+      assign,
+      currentUserId,
+    ],
   );
 
   // Day-keyed index — the single source both views read from.
@@ -465,6 +474,18 @@ export function CalendarClient({
             )}
           >
             Mine
+          </button>
+
+          <button
+            onClick={() => setTrackedVisible((v) => !v)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              trackedVisible
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:bg-accent",
+            )}
+          >
+            Tracked
           </button>
 
           <button
@@ -812,7 +833,7 @@ function ContentChip({ g }: { g: DayGroup }) {
         )}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate leading-tight">{label}</span>
+        <span className="line-clamp-2 leading-tight break-words">{label}</span>
         <span className="flex items-center gap-1 leading-none">
           <span
             className={cn(
