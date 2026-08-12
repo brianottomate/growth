@@ -363,6 +363,11 @@ export function OverviewChat({
   const trpc = useTRPC();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentCountRef = useRef(0);
+  // Files the composer refused (videos, oversize) — reported with the next
+  // send so the assistant can route the operator to the media library.
+  const skippedAttachmentsRef = useRef<
+    Array<{ name: string; sizeMb: number; reason: "video" | "unsupported" | "too_large" }>
+  >([]);
   const previewUrlsRef = useRef(new Set<string>());
   const [pendingAttachments, setPendingAttachments] = useState<
     PendingAttachment[]
@@ -406,14 +411,34 @@ export function OverviewChat({
       }
 
       const valid: File[] = [];
+      const recordSkip = (
+        file: File,
+        reason: "video" | "unsupported" | "too_large",
+      ) => {
+        if (skippedAttachmentsRef.current.length >= 10) return;
+        skippedAttachmentsRef.current.push({
+          name: file.name,
+          sizeMb: Math.round((file.size / 1024 / 1024) * 10) / 10,
+          reason,
+        });
+      };
       for (const file of files) {
+        if (file.type.startsWith("video/")) {
+          recordSkip(file, "video");
+          toast.error(`Couldn't attach ${file.name}`, {
+            description: "Videos upload via the media library — ask me below",
+          });
+          continue;
+        }
         if (!file.type.startsWith("image/")) {
+          recordSkip(file, "unsupported");
           toast.error(`Couldn't attach ${file.name}`, {
             description: "Only images can be attached",
           });
           continue;
         }
         if (file.size > MAX_CHAT_IMAGE_BYTES) {
+          recordSkip(file, "too_large");
           toast.error(`Couldn't attach ${file.name}`, {
             description: "Image is too large (max 10MB)",
           });
@@ -580,6 +605,8 @@ export function OverviewChat({
       url: attachment.hostedUrl,
       mediaType: attachment.mediaType,
     }));
+    const skippedAttachments = skippedAttachmentsRef.current;
+    skippedAttachmentsRef.current = [];
     void sendMessage(
       {
         text: input.trim(),
@@ -593,7 +620,14 @@ export function OverviewChat({
             }
           : {}),
       },
-      chatAttachments.length > 0 ? { body: { chatAttachments } } : undefined,
+      chatAttachments.length > 0 || skippedAttachments.length > 0
+        ? {
+            body: {
+              ...(chatAttachments.length > 0 ? { chatAttachments } : {}),
+              ...(skippedAttachments.length > 0 ? { skippedAttachments } : {}),
+            },
+          }
+        : undefined,
     );
     setInput("");
     for (const attachment of pendingAttachments) {

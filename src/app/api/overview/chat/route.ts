@@ -109,6 +109,7 @@ export async function POST(req: Request): Promise<Response> {
     workContext,
     chatAttachment,
     chatAttachments,
+    skippedAttachments,
     threadId,
     pagePath,
     trigger,
@@ -122,6 +123,7 @@ export async function POST(req: Request): Promise<Response> {
     workContext?: ContentWorkContext;
     chatAttachment?: { url?: string; mediaType?: string };
     chatAttachments?: { url?: string; mediaType?: string }[];
+    skippedAttachments?: { name?: string; sizeMb?: number; reason?: string }[];
     threadId?: string;
     pagePath?: string;
     trigger?: "submit-message" | "regenerate-message";
@@ -248,6 +250,28 @@ export async function POST(req: Request): Promise<Response> {
       : activeWorkContext
         ? `\n\n# Persisted image continuity\nIf the operator refers to images pasted earlier in this conversation, call contentMediaWrite action attachChatImage without inventing URLs or MIME types. The action resolves the complete image set from the newest user message with owned attachments in the durable thread.`
         : "";
+  const SKIP_REASONS: Record<string, string> = {
+    video: "video — the chat composer only takes images",
+    unsupported: "unsupported file type",
+    too_large: "over the 10 MB chat image limit",
+  };
+  const safeSkipped = (Array.isArray(skippedAttachments) ? skippedAttachments : [])
+    .filter(
+      (item): item is { name: string; sizeMb?: number; reason?: string } =>
+        typeof item?.name === "string",
+    )
+    .slice(0, 10);
+  const skippedPrompt =
+    safeSkipped.length > 0
+      ? `\n\n# Attachments the composer had to skip\nThe operator just tried to attach ${safeSkipped.length} file${safeSkipped.length === 1 ? "" : "s"} the chat cannot take:\n${safeSkipped
+          .map(
+            (item, index) =>
+              `${index + 1}. ${item.name.slice(0, 120)}${typeof item.sizeMb === "number" ? ` (${item.sizeMb} MB)` : ""} — ${SKIP_REASONS[item.reason ?? ""] ?? "not attachable in chat"}`,
+          )
+          .join(
+            "\n",
+          )}\nThe media library at /app/media takes these directly (browser upload handles video and large files, including reels). Acknowledge the skip in one short sentence and take the operator there by calling navigateWorkspace action navigate with surface "media" so they can drop the files in; once uploaded, you can attach them to work items and build carousels from chat. Do not pretend the skipped files are visible to you.`
+      : "";
   const pageContextPrompt = await composePageContextSection({
     pagePath,
     organizationId: membership.organizationId,
@@ -353,6 +377,7 @@ export async function POST(req: Request): Promise<Response> {
       { id: "intent", content: intentContext },
       { id: "work-item", content: workContextPrompt },
       { id: "attachment", content: attachmentPrompt },
+      { id: "skipped-attachment", content: skippedPrompt },
     ],
   });
   const runId = await startAssistantRun({
