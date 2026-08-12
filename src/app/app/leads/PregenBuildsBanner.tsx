@@ -46,7 +46,16 @@ export function isStuck(build: InFlightBuild): boolean {
   );
 }
 
-export function PregenBuildsBanner({ builds }: { builds: InFlightBuild[] }) {
+export function PregenBuildsBanner({
+  builds,
+  onRefresh,
+  refreshing,
+}: {
+  builds: InFlightBuild[];
+  /** Re-read WanderOS for one build — the recovery for a lost webhook. */
+  onRefresh?: (buildId: string) => void;
+  refreshing?: string | null;
+}) {
   if (!builds.length) return null;
   const anyStuck = builds.some(isStuck);
 
@@ -78,7 +87,18 @@ export function PregenBuildsBanner({ builds }: { builds: InFlightBuild[] }) {
             </a>
           )}
           {isStuck(build) && (
-            <span className="text-amber-300">may be stuck</span>
+            <>
+              <span className="text-amber-300">may be stuck</span>
+              {onRefresh && (
+                <button
+                  onClick={() => onRefresh(build.id)}
+                  disabled={refreshing === build.id}
+                  className="underline underline-offset-2 disabled:opacity-50"
+                >
+                  {refreshing === build.id ? "refreshing…" : "refresh"}
+                </button>
+              )}
+            </>
           )}
         </span>
       ))}
@@ -86,8 +106,7 @@ export function PregenBuildsBanner({ builds }: { builds: InFlightBuild[] }) {
       {anyStuck && (
         <span className="text-muted-foreground text-[11px]">
           Builds settle over a webhook — one stuck past {STUCK_AFTER_MINUTES}m
-          likely lost its event; Refresh on that prospect&apos;s card re-reads
-          WanderOS.
+          likely lost its event; refresh re-reads WanderOS directly.
         </span>
       )}
     </div>

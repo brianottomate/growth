@@ -204,6 +204,11 @@ export function LeadsClient() {
     trpc.leads.ownerOptions.queryOptions({ pregenOnly: true }),
   );
 
+  const refreshBuild = useMutation(
+    trpc.leads.refreshPregenBuild.mutationOptions({
+      onSettled: () => void buildsInFlight.refetch(),
+    }),
+  );
   const list = useQuery(
     trpc.leads.listDomains.queryOptions(
       {
@@ -333,7 +338,15 @@ export function LeadsClient() {
           rather than of whatever population happens to be selected. Renders
           nothing when nothing is building. */}
       <div className="mt-4">
-        <PregenBuildsBanner builds={buildsInFlight.data ?? []} />
+        <PregenBuildsBanner
+          builds={buildsInFlight.data ?? []}
+          onRefresh={(buildId) => refreshBuild.mutate({ buildId })}
+          refreshing={
+            refreshBuild.isPending
+              ? (refreshBuild.variables?.buildId ?? null)
+              : null
+          }
+        />
       </div>
 
       {/* One quiet line for the universe. These are reference numbers looked at

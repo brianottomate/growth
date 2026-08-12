@@ -1100,6 +1100,101 @@ export const leadsRouter = createTRPCRouter({
       }
     }),
 
+  // The reconcile the webhook contract always assumed. Delivery is
+  // fire-and-forget with no retry by agreement, so a lost event strands a
+  // build row in GENERATING forever — benchmark30a sat "Building" for 23h
+  // while staging had settled it READY within twenty minutes. This re-reads
+  // WanderOS and settles the row from the source of truth. A prospect the
+  // configured WanderOS has never heard of is an orphan (typically: created
+  // against staging before the prod cutover) and settles FAILED so the Build
+  // button comes back.
+  refreshPregenBuild: protectedProcedure
+    .input(z.object({ buildId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const build = await ctx.db.query.pregenBuildTable.findFirst({
+        where: eq(pregenBuildTable.id, input.buildId),
+      });
+      if (!build?.prospectId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No build to refresh" });
+      }
+      if (!isWanderApiConfigured) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "The WanderOS API is not configured.",
+        });
+      }
+
+      const { prospects } = await listWebsiteProspects({ take: 100 });
+      const current = prospects.find((p) => p.id === build.prospectId);
+      const now = new Date();
+
+      if (!current) {
+        await ctx.db
+          .update(pregenBuildTable)
+          .set({
+            status: "FAILED",
+            errorMessage:
+              "Orphaned: the configured WanderOS has no such prospect (likely built on staging before the prod cutover).",
+            lastEventAt: now,
+            settledAt: now,
+          })
+          .where(eq(pregenBuildTable.id, build.id));
+        if (build.previewUrl) {
+          await ctx.db
+            .update(leadDomainTable)
+            .set({ pregenSiteUrl: null })
+            .where(
+              and(
+                eq(leadDomainTable.id, build.domainId),
+                eq(leadDomainTable.pregenSiteUrl, build.previewUrl),
+              ),
+            );
+        }
+        return { outcome: "orphaned" as const };
+      }
+
+      const settled = SETTLED_PROSPECT_STATUSES.includes(current.status);
+      await ctx.db
+        .update(pregenBuildTable)
+        .set({
+          status: current.status,
+          previewUrl: current.previewUrl ?? build.previewUrl,
+          errorMessage: current.errorMessage ?? null,
+          lastEventAt: now,
+          settledAt: settled ? (build.settledAt ?? now) : build.settledAt,
+        })
+        .where(eq(pregenBuildTable.id, build.id));
+
+      // Mirror the webhook's promotion rules: READY fills the lead's preview,
+      // FAILED clears a dead one.
+      if (current.status === "READY" && current.previewUrl) {
+        await ctx.db
+          .update(leadDomainTable)
+          .set({ pregenSiteUrl: current.previewUrl })
+          .where(
+            and(
+              eq(leadDomainTable.id, build.domainId),
+              or(
+                isNull(leadDomainTable.pregenSiteUrl),
+                eq(leadDomainTable.pregenSiteUrl, current.previewUrl),
+                eq(leadDomainTable.pregenSiteUrl, ""),
+              ),
+            ),
+          );
+      } else if (current.status === "FAILED" && build.previewUrl) {
+        await ctx.db
+          .update(leadDomainTable)
+          .set({ pregenSiteUrl: null })
+          .where(
+            and(
+              eq(leadDomainTable.id, build.domainId),
+              eq(leadDomainTable.pregenSiteUrl, build.previewUrl),
+            ),
+          );
+      }
+      return { outcome: "updated" as const, status: current.status };
+    }),
+
   // ---- Manual enrichment (inspect-only; no DB write yet) ----
 
   // Discovery only — raw, fault-tolerant fan-out across search/scrape providers.
