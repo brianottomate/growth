@@ -1025,7 +1025,12 @@ function ReviewCardList({
             key={item.id}
             data={data}
             build={builds.find((b) => b.domain === item.domain) ?? null}
-            href={`/app/leads?lead=${encodeURIComponent(item.domain)}`}
+            // The full prospect route, not the `?lead=` drawer the compact rows
+            // open. A card already shows everything the drawer would, so the
+            // useful destination from here is the linkable page — and with
+            // review cards now the default view, routing this at the drawer
+            // left that page with no way in.
+            href={`/app/leads/${encodeURIComponent(item.domain)}`}
             actions={{
               onResolve: (id) => {
                 setPending({ id, kind: "resolve" });
