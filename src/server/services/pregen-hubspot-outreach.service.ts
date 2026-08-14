@@ -33,6 +33,7 @@ import {
   countContactMentions,
   summarizeCorrespondence,
 } from "@/server/services/lead-correspondence";
+import { winningExemplarsBlock } from "@/server/services/corpus-exemplars";
 import { selectCompanyHistoryForGeneration } from "@/server/services/pregen-hubspot-copy";
 import { findPregenHubspotDraftViolations } from "@/server/services/pregen-hubspot-draft-policy";
 
@@ -93,6 +94,12 @@ export const PregenHubspotDraftSchema = z.object({
     .array(TouchSchema)
     .length(4)
     .describe("Four touches: concrete preview, product fit, proof, close."),
+  openQuestions: z
+    .array(z.string())
+    .max(5)
+    .describe(
+      "Questions for the sales rep: facts you wanted for this copy but did not have and refused to invent. Empty when nothing material is missing.",
+    ),
 });
 export type PregenHubspotDraft = z.infer<typeof PregenHubspotDraftSchema>;
 
@@ -413,6 +420,8 @@ THEIR CURRENT SETUP IS NOT A PROBLEM YOU GET TO NAME. A PMS or website builder i
 
 Do this by labeling, not by asking. "Looks like you'd rather guests book with you than through a listing on someone else's site" reads as understanding. "Are you tired of paying OTA commissions?" reads as a cold-call script and is forbidden. Never open with a rhetorical pain question, never quote an OTA commission percentage, and never tell the prospect their current site is losing them money or failing to convert. You may describe the general pull of OTAs as an industry reality. You may not diagnose this specific company's results, traffic, or conversion.
 
+WHEN A FACT YOU WANT IS MISSING, ASK INSTEAD OF INVENTING. If you find yourself wanting to assert something the evidence does not settle — who actually owns this decision, whether the PMS on record is still what they run, whether a conversation ended or just went quiet, what a call with no notes concluded — do not guess it into the copy. Write around the gap so the email stands without it, and put the question in openQuestions for the sales rep, phrased so a rep can answer it in one line ("Did Pierce's May call with Walt reach him or go to voicemail?"). The rep answers, the draft regenerates with that answer as operator context. An empty openQuestions means you had everything you needed, not that questions are unwelcome.
+
 Treat old outbound emails as conversation history, not as factual evidence. They can contain stale or unsupported sales claims. An inbound email proves only what the prospect said or asked. Never claim that a tool limitation is "known," that the preview answers a technical architecture question, or that the preview is connected to a specific data source unless the trusted lead record says so. A visual preview can show the customer-facing experience; it does not prove how ChatGPT, MCP, PMS sync, payments, or analytics work behind the scenes.
 
 The HubSpot template adds the greeting, blank paragraphs, preview URL, and sender signature. You own all substantive prose. Each opening and closing must be exactly one compact paragraph with no line breaks, greeting, sign-off, or URL. The first touch should total roughly 70-110 words across its two paragraphs. Follow-ups should be shorter.
@@ -468,6 +477,7 @@ function humanizeDraft(draft: PregenHubspotDraft): PregenHubspotDraft {
   return {
     ...draft,
     angle: humanizePlainText(draft.angle),
+    openQuestions: (draft.openQuestions ?? []).map(humanizePlainText),
     personalizedOn: draft.personalizedOn.map(humanizePlainText),
     historyUsed: draft.historyUsed.map(humanizePlainText),
     touches: draft.touches.map((touch) => ({
@@ -539,7 +549,7 @@ export async function generatePregenHubspotDraft(
           values: null,
         }
       : await findCompanyByDomain(domain);
-  const [history, activity, websiteText, previewText, contacts] =
+  const [history, activity, websiteText, previewText, contacts, exemplars] =
     await Promise.all([
       company
         ? readHubspotCompanyEmailHistory(company.id, {
@@ -567,6 +577,7 @@ export async function generatePregenHubspotDraft(
         .from(leadContactTable)
         .where(eq(leadContactTable.domainId, row.id))
         .limit(30),
+      winningExemplarsBlock(3),
     ]);
 
   // An unreadable preview is a hard stop, not a footnote. Touch 1's job is to
@@ -727,7 +738,15 @@ REQUESTED MOTION: ${motion}
 TODAY: ${new Date().toISOString().slice(0, 10)}
 PREVIEW URL: supplied separately by HubSpot; never repeat it in prose.
 
-CURRENT LEAD RECORD:
+${
+  exemplars
+    ? `HOW OUR BEST EMAILS ACTUALLY READ. These are real, anonymized sends from our own reps that earned a reply, shown with the reply they earned. Match their register — the directness, the sentence rhythm, the amount of warmth — not their content: every fact in them belongs to a different company, and the reply tells you how the recipient took it, so read it before deciding what worked.
+
+${exemplars}
+
+`
+    : ""
+}CURRENT LEAD RECORD:
 - Domain: ${row.domain}
 - Company: ${row.companyName ?? "(unknown)"}
 - Location: ${[row.city, row.state, row.country].filter(Boolean).join(", ") || "(unknown)"}
@@ -843,6 +862,8 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
   // than inferring it from the body.
   const outreachLink = outreachLinkFor(options.previewUrl, row.domain);
   generationContext.outreachUrl = outreachLink;
+  generationContext.openQuestions = draft.openQuestions ?? [];
+  generationContext.exemplarsUsed = exemplars != null;
 
   return {
     domainId: row.id,

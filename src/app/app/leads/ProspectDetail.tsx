@@ -411,7 +411,26 @@ export function ProspectDetail({ domain }: { domain: string }) {
               <p className="text-sm">
                 <span className="text-muted-foreground">Angle: </span>
                 {outreach.angle}
+                {context?.recipient?.name ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · written to {context.recipient.name}
+                  </span>
+                ) : null}
               </p>
+            ) : null}
+
+            {/* The model's queue for the rep: facts it wanted and refused to
+                invent. Answer one as steer and regenerate. */}
+            {(context?.openQuestions?.length ?? 0) > 0 ? (
+              <div className="rounded border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">
+                <div className="mb-1 font-medium">Questions for the rep</div>
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {context!.openQuestions!.map((question, index) => (
+                    <li key={index}>{question}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             {context ? (

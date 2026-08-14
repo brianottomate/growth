@@ -41,12 +41,16 @@ export function osPitchUrl(previewUrl: string): string | null {
  * already carries a token, and returns the original untouched if it will not
  * parse — an unattributed link beats a corrupted signed one.
  */
-export function trackedUrl(url: string, domain: string): string {
+export function trackedUrl(
+  url: string,
+  domain: string,
+  campaign = "pregen_sites",
+): string {
   try {
     const parsed = new URL(url);
     parsed.searchParams.set("utm_source", "hubspot_sequence");
     parsed.searchParams.set("utm_medium", "outbound");
-    parsed.searchParams.set("utm_campaign", "pregen_sites");
+    parsed.searchParams.set("utm_campaign", campaign);
     parsed.searchParams.set("utm_content", domain);
     return parsed.toString();
   } catch {
@@ -65,6 +69,22 @@ export function trackedUrl(url: string, domain: string): string {
  * Falls back to the tracked preview when no wrapper can be derived, so a
  * malformed stored URL costs attribution rather than the whole email.
  */
-export function outreachLinkFor(previewUrl: string, domain: string): string {
-  return trackedUrl(osPitchUrl(previewUrl) ?? previewUrl, domain);
+export function outreachLinkFor(
+  previewUrl: string,
+  domain: string,
+  options: {
+    /**
+     * `pregen_sites` is the bespoke-sequence arm; `pregen_blast` is the
+     * one-template arm. Distinct on purpose, so when both run, clicks and
+     * replies separate by arm in analytics and the comparison is a
+     * measurement rather than an argument.
+     */
+    campaign?: string;
+  } = {},
+): string {
+  return trackedUrl(
+    osPitchUrl(previewUrl) ?? previewUrl,
+    domain,
+    options.campaign ?? "pregen_sites",
+  );
 }

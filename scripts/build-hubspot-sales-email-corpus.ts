@@ -1,34 +1,43 @@
 /**
- * Build a private writing corpus from recent outbound HubSpot sales emails.
- * HubSpot is read-only; output stays under gitignored reports/private/.
+ * Build the sales-email corpus: every recent one-to-one email our reps sent
+ * and every reply that came back, anonymized, labelled by outcome, and written
+ * to `leads.sales_email_corpus` where the sequence generator can read it.
+ *
+ * v1 kept outbound only and wrote a gitignored file that one person read once.
+ * The point of the corpus was always "what does an email that works look
+ * like", and that question is unanswerable without the inbound half: the reply
+ * IS the outcome label. So v2 scans both directions, matches each outbound to
+ * the first inbound from the same counterpart within 45 days, and persists to
+ * the database so generation can inject real winning exchanges instead of
+ * hand-transcribed impressions of them.
  *
  * Required private-app scope: sales-email-read
  *
  *   bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts
  *   bun --conditions=react-server scripts/build-hubspot-sales-email-corpus.ts \
- *     --limit 2000 --scan-limit 10000 --days 365
+ *     --limit 3000 --scan-limit 12000 --days 365
  *
- * The corpus intentionally preserves the names, companies, and prospect-specific
- * language that make the messages useful for personalization. It omits raw
- * HTML, raw headers, addresses, phone numbers, tracking URLs, quoted reply
- * history, and signature blocks.
+ * Bodies are anonymized before insert — emails, phones and URLs become tokens,
+ * quoted history and signatures are stripped — and the leak check refuses to
+ * write a row that still contains a direct address. Names, companies and the
+ * prospect-specific language stay, because they are what makes an exemplar
+ * worth reading.
  */
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 
 import he from "he";
 import sanitizeHtml from "sanitize-html";
 
 import { env } from "@/env";
+import { HS_OWNER_NAMES } from "@/server/clients/hubspot.client";
+import { db } from "@/server/db";
+import { salesEmailCorpusTable } from "@/server/db/leads-schema";
 
 const TOKEN = env.HUBSPOT_ACCESS_TOKEN_OPERATED;
 if (!TOKEN) throw new Error("HUBSPOT_ACCESS_TOKEN_OPERATED not set");
 
-const DEFAULT_OUT = "reports/private/hubspot-sales-email-corpus/corpus.jsonl";
-const DEFAULT_SUMMARY =
-  "reports/private/hubspot-sales-email-corpus/summary.json";
 const PAGE_SIZE = 200;
+const REPLY_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
 
 type Address = {
   email?: string;
@@ -66,16 +75,15 @@ type SearchPage = {
 
 type CorpusRow = {
   engagementId: string;
-  sentAt: string;
-  repId: string;
-  threadId: string;
-  isReply: boolean;
+  direction: "outbound" | "inbound";
+  sentAt: Date;
+  rep: string | null;
+  counterpartEmails: string[];
+  counterpartDomain: string | null;
   subject: string;
   body: string;
   wordCount: number;
-  paragraphCount: number;
-  questionCount: number;
-  linkTokens: string[];
+  isReply: boolean;
 };
 
 function arg(name: string, fallback: string): string {
@@ -91,11 +99,9 @@ function positiveInteger(name: string, fallback: number): number {
   return value;
 }
 
-const limit = positiveInteger("limit", 1000);
-const scanLimit = positiveInteger("scan-limit", Math.max(limit * 5, 5000));
+const limit = positiveInteger("limit", 2000);
+const scanLimit = positiveInteger("scan-limit", Math.max(limit * 5, 8000));
 const days = positiveInteger("days", 365);
-const outPath = resolve(arg("out", DEFAULT_OUT));
-const summaryPath = resolve(arg("summary", DEFAULT_SUMMARY));
 const senderDomains = arg("sender-domains", "wander.com")
   .split(",")
   .map((domain) => domain.trim().toLowerCase())
@@ -162,8 +168,10 @@ function stripLegalFooter(text: string): string {
   return match?.index == null ? text : text.slice(0, match.index);
 }
 
-function stripRepSignature(text: string, from: Address): string {
-  const fullName = [from.firstName, from.lastName].filter(Boolean).join(" ");
+function stripSignature(text: string, sender: Address): string {
+  const fullName = [sender.firstName, sender.lastName]
+    .filter(Boolean)
+    .join(" ");
   if (!fullName) return text;
   const lines = text.split("\n");
   const exactName = fullName.toLowerCase();
@@ -182,40 +190,30 @@ function stripRepSignature(text: string, from: Address): string {
   return text;
 }
 
-function replaceLiteral(
-  text: string,
-  value: string | undefined,
-  token: string,
-): string {
-  const needle = value?.trim();
-  if (!needle || needle.length < 2) return text;
-  return text.replaceAll(needle, token);
-}
-
+/**
+ * Anonymize one message body. Direction decides which side the sender's
+ * address tokens map to: on an inbound message the sender is the prospect,
+ * and v1's fixed mapping would have tagged their address [REP_EMAIL].
+ */
 function redactText(
   input: string,
-  from: Address,
-  recipients: Address[],
+  sender: Address,
+  direction: "outbound" | "inbound",
 ): string {
   let text = input
     .replaceAll("\r\n", "\n")
     .replaceAll("\r", "\n")
-    .replaceAll("\u00a0", " ")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "");
+    .replaceAll(" ", " ")
+    .replace(/[​-‍﻿]/g, "");
 
   text = stripQuotedHistory(text);
   text = stripLegalFooter(text);
-  text = stripRepSignature(text, from);
-
-  text = replaceLiteral(text, from.email, "[REP_EMAIL]");
-
-  for (const recipient of recipients) {
-    text = replaceLiteral(text, recipient.email, "[RECIPIENT_EMAIL]");
-  }
+  text = stripSignature(text, sender);
 
   text = text.replace(/https?:\/\/[^\s<>"')\]]+/gi, (url) => {
     const lower = url.toLowerCase();
     if (
+      lower.includes("wanderforoperators") ||
       lower.includes("wanderos-previews") ||
       lower.includes("pregen-sites") ||
       lower.includes("/preview")
@@ -238,6 +236,7 @@ function redactText(
     /(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)/g,
     "[PHONE]",
   );
+  void direction;
 
   return text
     .split("\n")
@@ -248,8 +247,24 @@ function redactText(
     .trim();
 }
 
-async function hubspotSearch(after?: string): Promise<SearchPage> {
+async function hubspotSearch(
+  direction: "outbound" | "inbound",
+  after?: string,
+): Promise<SearchPage> {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const filters =
+    direction === "outbound"
+      ? [
+          { propertyName: "hs_email_direction", operator: "EQ", value: "EMAIL" },
+          { propertyName: "hs_email_status", operator: "EQ", value: "SENT" },
+        ]
+      : [
+          {
+            propertyName: "hs_email_direction",
+            operator: "EQ",
+            value: "INCOMING_EMAIL",
+          },
+        ];
   const response = await fetch(
     "https://api.hubapi.com/crm/v3/objects/emails/search",
     {
@@ -262,16 +277,7 @@ async function hubspotSearch(after?: string): Promise<SearchPage> {
         filterGroups: [
           {
             filters: [
-              {
-                propertyName: "hs_email_direction",
-                operator: "EQ",
-                value: "EMAIL",
-              },
-              {
-                propertyName: "hs_email_status",
-                operator: "EQ",
-                value: "SENT",
-              },
+              ...filters,
               {
                 propertyName: "hs_timestamp",
                 operator: "GTE",
@@ -310,224 +316,204 @@ async function hubspotSearch(after?: string): Promise<SearchPage> {
   return (await response.json()) as SearchPage;
 }
 
-function median(values: number[]): number {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? (sorted[middle] ?? 0)
-    : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
-}
+function toRow(
+  email: HubSpotEmail,
+  direction: "outbound" | "inbound",
+): CorpusRow | null {
+  const props = email.properties ?? {};
+  const headers = parseHeaders(props.hs_email_headers);
+  if (!headers?.from?.email) return null;
 
-function assertNoDirectContactLeaks(rows: CorpusRow[]): void {
-  const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
-  const urlPattern = /https?:\/\//i;
-  const phonePattern =
-    /(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)/;
+  const fromInternal = isInternal(headers.from.email);
+  // Direction property and headers must agree, or the counterpart is wrong.
+  if (direction === "outbound" && !fromInternal) return null;
+  if (direction === "inbound" && fromInternal) return null;
 
-  const leaks = rows.flatMap((row) => {
-    const text = `${row.subject}\n${row.body}`;
-    return [
-      emailPattern.test(text) ? `${row.engagementId}:email` : null,
-      urlPattern.test(text) ? `${row.engagementId}:url` : null,
-      phonePattern.test(text) ? `${row.engagementId}:phone` : null,
-    ].filter((value): value is string => Boolean(value));
-  });
+  const recipients = [
+    ...(headers.to ?? []),
+    ...(headers.cc ?? []),
+    ...(headers.bcc ?? []),
+  ];
+  const counterparts =
+    direction === "outbound"
+      ? recipients
+          .map((recipient) => recipient.email?.trim().toLowerCase())
+          .filter((value): value is string => Boolean(value))
+          .filter((value) => !isInternal(value))
+      : [headers.from.email.trim().toLowerCase()];
+  if (!counterparts.length) return null;
 
-  if (leaks.length) {
-    throw new Error(
-      `Refusing to write corpus: direct contact-data redaction failed for ${leaks
-        .slice(0, 10)
-        .join(", ")}`,
-    );
-  }
-}
+  const rawBody =
+    props.hs_email_text?.trim() ||
+    (props.hs_email_html ? textFromHtml(props.hs_email_html) : "");
+  if (!rawBody) return null;
 
-async function main() {
-  const rows: CorpusRow[] = [];
-  const rejectionCounts = {
-    missingHeaders: 0,
-    nonWanderSender: 0,
-    internalOnly: 0,
-    emptyBody: 0,
-    tooShort: 0,
+  const subject = redactText(
+    props.hs_email_subject ?? "",
+    headers.from,
+    direction,
+  );
+  const body = redactText(rawBody, headers.from, direction);
+  const wordCount = body.split(/\s+/).filter(Boolean).length;
+  // Inbound floor is lower on purpose: "Sure, send it over" is four words and
+  // it is the most valuable sentence in the table.
+  if (wordCount < (direction === "outbound" ? 8 : 2)) return null;
+
+  const sentAtMs = Date.parse(props.hs_timestamp ?? "");
+  if (!Number.isFinite(sentAtMs)) return null;
+
+  const ownerId = props.hubspot_owner_id ?? "";
+  const rep =
+    direction === "outbound"
+      ? (HS_OWNER_NAMES[ownerId] ??
+        hash(headers.from.email, "rep"))
+      : null;
+
+  return {
+    engagementId: email.id,
+    direction,
+    sentAt: new Date(sentAtMs),
+    rep,
+    counterpartEmails: [...new Set(counterparts)],
+    counterpartDomain: emailDomain(counterparts[0]) ?? null,
+    subject,
+    body,
+    wordCount,
+    isReply: /^re:/i.test(props.hs_email_subject ?? ""),
   };
-  let scanned = 0;
-  let available = 0;
-  let after: string | undefined;
+}
 
+async function scan(direction: "outbound" | "inbound"): Promise<CorpusRow[]> {
+  const rows: CorpusRow[] = [];
+  let scanned = 0;
+  let after: string | undefined;
   while (rows.length < limit && scanned < scanLimit) {
-    const page = await hubspotSearch(after);
-    available ||= page.total ?? 0;
+    const page = await hubspotSearch(direction, after);
     const results = page.results ?? [];
     if (!results.length) break;
-
     for (const email of results) {
       if (rows.length >= limit || scanned >= scanLimit) break;
       scanned += 1;
-
-      const props = email.properties ?? {};
-      const headers = parseHeaders(props.hs_email_headers);
-      if (!headers?.from?.email) {
-        rejectionCounts.missingHeaders += 1;
-        continue;
-      }
-      if (!isInternal(headers.from.email)) {
-        rejectionCounts.nonWanderSender += 1;
-        continue;
-      }
-
-      const recipients = [
-        ...(headers.to ?? []),
-        ...(headers.cc ?? []),
-        ...(headers.bcc ?? []),
-      ];
-      const externalRecipients = recipients.filter(
-        (recipient) => recipient.email && !isInternal(recipient.email),
-      );
-      if (!externalRecipients.length) {
-        rejectionCounts.internalOnly += 1;
-        continue;
-      }
-
-      const rawBody =
-        props.hs_email_text?.trim() ||
-        (props.hs_email_html ? textFromHtml(props.hs_email_html) : "");
-      if (!rawBody) {
-        rejectionCounts.emptyBody += 1;
-        continue;
-      }
-
-      const subject = redactText(
-        props.hs_email_subject ?? "",
-        headers.from,
-        externalRecipients,
-      );
-      const body = redactText(rawBody, headers.from, externalRecipients);
-      const wordCount = body.split(/\s+/).filter(Boolean).length;
-      if (wordCount < 8) {
-        rejectionCounts.tooShort += 1;
-        continue;
-      }
-
-      const recipientKey = externalRecipients
-        .map((recipient) => recipient.email?.toLowerCase() ?? "")
-        .filter(Boolean)
-        .sort()
-        .join("|");
-      const linkTokens =
-        body.match(/\[(?:PREVIEW_LINK|MEETING_LINK|WANDEROS_LINK|LINK)\]/g) ??
-        [];
-
-      rows.push({
-        engagementId: email.id,
-        sentAt: props.hs_timestamp ?? "",
-        repId: hash(headers.from.email, "rep"),
-        threadId: hash(recipientKey, "thread"),
-        isReply: /^re:/i.test(props.hs_email_subject ?? ""),
-        subject,
-        body,
-        wordCount,
-        paragraphCount: body.split(/\n{2,}/).filter(Boolean).length,
-        questionCount: (body.match(/\?/g) ?? []).length,
-        linkTokens: [...new Set(linkTokens)],
-      });
+      const row = toRow(email, direction);
+      if (row) rows.push(row);
     }
-
     after = page.paging?.next?.after;
     if (!after) break;
     await Bun.sleep(220);
   }
+  console.log(`${direction}: scanned ${scanned}, retained ${rows.length}`);
+  return rows;
+}
 
-  assertNoDirectContactLeaks(rows);
-
-  mkdirSync(dirname(outPath), { recursive: true });
-  mkdirSync(dirname(summaryPath), { recursive: true });
-  writeFileSync(
-    outPath,
-    `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`,
-    { mode: 0o600 },
-  );
-
-  const repIds = new Set(rows.map((row) => row.repId));
-  const summary = {
-    generatedAt: new Date().toISOString(),
-    source: "HubSpot CRM email engagements",
-    senderDomains,
-    days,
-    requestedRows: limit,
-    scanLimit,
-    availableOutboundSentEmailsInWindow: available,
-    scanned,
-    retained: rows.length,
-    repCount: repIds.size,
-    rejectionCounts,
-    bodyWords: {
-      median: median(rows.map((row) => row.wordCount)),
-      average:
-        rows.length === 0
-          ? 0
-          : Math.round(
-              rows.reduce((sum, row) => sum + row.wordCount, 0) / rows.length,
-            ),
-    },
-    bodyParagraphsMedian: median(rows.map((row) => row.paragraphCount)),
-    subjectCharactersMedian: median(
-      rows.map((row) => row.subject.length).filter(Boolean),
-    ),
-    replyShare:
-      rows.length === 0
-        ? 0
-        : Number(
-            (rows.filter((row) => row.isReply).length / rows.length).toFixed(3),
-          ),
-    questionShare:
-      rows.length === 0
-        ? 0
-        : Number(
-            (
-              rows.filter((row) => row.questionCount > 0).length / rows.length
-            ).toFixed(3),
-          ),
-    linkShare:
-      rows.length === 0
-        ? 0
-        : Number(
-            (
-              rows.filter((row) => row.linkTokens.length > 0).length /
-              rows.length
-            ).toFixed(3),
-          ),
-    privacyChecks: {
-      directEmails: 0,
-      directUrls: 0,
-      northAmericanPhoneNumbers: 0,
-    },
-    corpusPath: outPath,
-  };
-  writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, {
-    mode: 0o600,
+/**
+ * Drop any row the redaction did not fully clean, rather than refusing the
+ * whole write. One oddly-formatted address out of thousands of rows is a row
+ * we can live without; losing the entire corpus to it is how v1's file went
+ * stale.
+ */
+function dropLeakyRows<T extends CorpusRow>(rows: T[]): T[] {
+  const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+  const urlPattern = /https?:\/\//i;
+  const clean = rows.filter((row) => {
+    const text = `${row.subject}\n${row.body}`;
+    return !emailPattern.test(text) && !urlPattern.test(text);
   });
+  if (clean.length < rows.length) {
+    console.warn(
+      `dropped ${rows.length - clean.length} row(s) that failed redaction`,
+    );
+  }
+  return clean;
+}
+
+async function main() {
+  const [outbound, inbound] = await Promise.all([
+    scan("outbound"),
+    scan("inbound"),
+  ]);
+
+  // The outcome label. An outbound "got a reply" when the same counterpart
+  // wrote back within the window. Matched on address, not thread id, because
+  // prospects reply from the address we wrote to and HubSpot's thread ids are
+  // unreliable across mailboxes.
+  const inboundByEmail = new Map<string, { at: number; id: string }[]>();
+  for (const row of inbound) {
+    for (const email of row.counterpartEmails) {
+      const list = inboundByEmail.get(email) ?? [];
+      list.push({ at: row.sentAt.getTime(), id: row.engagementId });
+      inboundByEmail.set(email, list);
+    }
+  }
+  for (const list of inboundByEmail.values()) list.sort((a, b) => a.at - b.at);
+
+  let winners = 0;
+  const labelled = outbound.map((row) => {
+    const sent = row.sentAt.getTime();
+    let reply: { at: number; id: string } | null = null;
+    for (const email of row.counterpartEmails) {
+      for (const candidate of inboundByEmail.get(email) ?? []) {
+        if (candidate.at <= sent) continue;
+        if (candidate.at - sent > REPLY_WINDOW_MS) break;
+        if (!reply || candidate.at < reply.at) reply = candidate;
+        break;
+      }
+    }
+    if (reply) winners += 1;
+    return { ...row, reply };
+  });
+
+  const all = dropLeakyRows([
+    ...labelled,
+    ...inbound.map((row) => ({ ...row, reply: null })),
+  ]);
+
+  let written = 0;
+  for (const row of all) {
+    await db
+      .insert(salesEmailCorpusTable)
+      .values({
+        engagementId: row.engagementId,
+        direction: row.direction,
+        sentAt: row.sentAt,
+        rep: row.rep,
+        counterpartDomain: row.counterpartDomain,
+        subject: row.subject,
+        body: row.body,
+        wordCount: row.wordCount,
+        isReply: row.isReply,
+        gotReply: row.reply != null,
+        replyAt: row.reply ? new Date(row.reply.at) : null,
+        replyEngagementId: row.reply?.id ?? null,
+      })
+      .onConflictDoUpdate({
+        target: salesEmailCorpusTable.engagementId,
+        set: {
+          gotReply: row.reply != null,
+          replyAt: row.reply ? new Date(row.reply.at) : null,
+          replyEngagementId: row.reply?.id ?? null,
+          updatedAt: new Date(),
+        },
+      });
+    written += 1;
+  }
 
   console.log(
     JSON.stringify(
       {
-        retained: summary.retained,
-        scanned: summary.scanned,
-        repCount: summary.repCount,
-        bodyWords: summary.bodyWords,
-        bodyParagraphsMedian: summary.bodyParagraphsMedian,
-        subjectCharactersMedian: summary.subjectCharactersMedian,
-        replyShare: summary.replyShare,
-        questionShare: summary.questionShare,
-        linkShare: summary.linkShare,
-        corpusPath: outPath,
-        summaryPath,
+        outbound: labelled.length,
+        inbound: inbound.length,
+        outboundThatEarnedReplies: winners,
+        replyRate:
+          labelled.length === 0
+            ? 0
+            : Number((winners / labelled.length).toFixed(3)),
+        written,
       },
       null,
       2,
     ),
   );
+  process.exit(0);
 }
 
 await main();

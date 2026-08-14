@@ -946,6 +946,8 @@ function toCardData(item: LeadRow): ProspectCardData | null {
           status: outreach.status,
           angle: outreach.angle,
           pretend: outreach.generationContext?.preview.pretend === true,
+          recipientName: outreach.generationContext?.recipient?.name ?? null,
+          openQuestions: outreach.generationContext?.openQuestions ?? [],
           steps: (outreach.steps ?? []).map((step) => ({
             subject: step.subject,
             body: step.body,

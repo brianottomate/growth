@@ -98,6 +98,10 @@ export interface ProspectCardData {
     angle: string | null;
     /** True when the draft was written against a stand-in preview. */
     pretend: boolean;
+    /** Who the copy is written to; null on company-level drafts. */
+    recipientName?: string | null;
+    /** What the model wanted to know and refused to invent. */
+    openQuestions?: string[];
     steps: Array<{
       subject: string | null;
       body: string;
@@ -258,9 +262,31 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
           is assigned.
         </div>
       )}
+      {/* The model's queue for the rep. It refused to guess these into the
+          copy; a one-line answer through the sidebar chat's steer plus a
+          regenerate resolves each. Rendered above the touches because an open
+          question changes how the copy should be read. */}
+      {(outreach.openQuestions?.length ?? 0) > 0 && (
+        <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2.5 py-2 text-[11px] text-sky-200">
+          <div className="mb-1 font-medium">
+            Questions for the rep — answer via chat steer, then regenerate
+          </div>
+          <ul className="list-disc space-y-0.5 pl-4">
+            {outreach.openQuestions!.map((question, index) => (
+              <li key={index}>{question}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="text-xs">
         <span className="text-muted-foreground">Angle:</span>{" "}
         {outreach.angle ?? "-"}
+        {outreach.recipientName ? (
+          <span className="text-muted-foreground">
+            {" "}
+            · written to {outreach.recipientName}
+          </span>
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {/* Ordered by what the reviewer is deciding about. Touch 1 carries the

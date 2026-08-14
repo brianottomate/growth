@@ -527,6 +527,13 @@ export type PregenGenerationContext = {
    * wrapper was adopted, which carried the tracked renderer address instead.
    */
   outreachUrl?: string;
+  /**
+   * What the model wanted to know and refused to invent — the rep's queue.
+   * Answer one through the sidebar chat's steer and regenerate.
+   */
+  openQuestions?: string[];
+  /** Whether reply-winning exemplars were available at generation time. */
+  exemplarsUsed?: boolean;
   preview: {
     readable: boolean;
     detail: string;
@@ -790,6 +797,57 @@ export const hubspotWebhookEventTable = leadsSchema.table(
 export type HubspotWebhookEvent = typeof hubspotWebhookEventTable.$inferSelect;
 export type HubspotWebhookEventInsert =
   typeof hubspotWebhookEventTable.$inferInsert;
+
+/**
+ * One-to-one sales emails our reps have sent and received, anonymized, with
+ * the one label the retired file corpus never had: whether the send earned a
+ * reply.
+ *
+ * The July corpus kept outbound only, wrote to a gitignored file, and was read
+ * once by a human. This is the same redaction pipeline landing somewhere the
+ * generator can reach at runtime, so drafts can be steered by exchanges that
+ * actually worked instead of by hand-transcribed impressions of them. Bodies
+ * are anonymized before insert (emails, phones and URLs are tokens), and the
+ * builder refuses to write a row that fails its leak check.
+ */
+export const salesEmailCorpusTable = leadsSchema.table(
+  "sales_email_corpus",
+  (t) => ({
+    /** HubSpot engagement id — the natural key, so re-runs refresh in place. */
+    engagementId: t.text().primaryKey(),
+    direction: t.text().notNull(), // outbound | inbound
+    sentAt: t.timestamp().notNull(),
+    /** Rep display name when the owner id maps to one, else a stable hash. */
+    rep: t.text(),
+    /** The external party's email domain — the join key back to lead_domain. */
+    counterpartDomain: t.text(),
+    subject: t.text().notNull(),
+    body: t.text().notNull(),
+    wordCount: t.integer().notNull(),
+    /** Subject starts with re: — an in-thread send, not a cold opener. */
+    isReply: t.boolean().default(false).notNull(),
+    /** Outbound only: an inbound from the same counterpart landed within 45d. */
+    gotReply: t.boolean().default(false).notNull(),
+    replyAt: t.timestamp(),
+    replyEngagementId: t.text(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("sales_email_corpus_winners_idx").on(
+      table.direction,
+      table.gotReply,
+      table.sentAt,
+    ),
+  ],
+);
+export type SalesEmailCorpusRow = typeof salesEmailCorpusTable.$inferSelect;
 
 /**
  * Pregen site build lifecycle — one row per build we asked WanderOS for.
