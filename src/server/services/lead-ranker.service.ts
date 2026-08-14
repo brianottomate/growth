@@ -10,8 +10,12 @@ import {
   HS_OWNER_NAMES,
 } from "@/server/clients/hubspot.client";
 import { scrapeForEnrichment } from "@/server/clients/firecrawl.client";
+import { summarizeCorrespondence } from "@/server/services/lead-correspondence";
 import { db } from "@/server/db";
-import { leadDomainTable } from "@/server/db/leads-schema";
+import {
+  leadContactTable,
+  leadDomainTable,
+} from "@/server/db/leads-schema";
 import { detectLeadDataDrift } from "@/server/services/lead-data-drift";
 import {
   formatCompanyActivityHistoryForModel,
@@ -347,6 +351,21 @@ Score every dimension. Ground assetQuality and designQuality in the screenshot a
     overall,
   };
 
+  const correspondence = summarizeCorrespondence({
+    hubspotCompanyId: company?.id ?? null,
+    history: emails,
+    activity,
+    contacts: await db
+      .select({
+        email: leadContactTable.email,
+        firstName: leadContactTable.firstName,
+        lastName: leadContactTable.lastName,
+      })
+      .from(leadContactTable)
+      .where(eq(leadContactTable.domainId, row.id))
+      .limit(60),
+  });
+
   if (options.persist !== false) {
     await db
       .update(leadDomainTable)
@@ -373,6 +392,11 @@ Score every dimension. Ground assetQuality and designQuality in the screenshot a
               drift,
               ...rank,
             },
+            // The same two histories the ranker just read, kept as counts and
+            // dates. Reading them costs two HubSpot calls, which the leads list
+            // cannot pay per row, so without this the card ranks contacts blind
+            // to who we have actually spoken to. Bodies stay in HubSpot.
+            correspondence,
           },
         )}::jsonb`,
         updatedAt: new Date(),

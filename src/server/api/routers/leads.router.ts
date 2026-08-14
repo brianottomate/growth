@@ -43,6 +43,7 @@ import {
   PregenPreconditionError,
   PregenMotionSchema,
 } from "@/server/services/pregen-hubspot-outreach.service";
+import { storedContactMentions } from "@/server/services/lead-correspondence";
 import { hubspotPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
 import {
   readHubspotCompanyActivityHistory,
@@ -682,6 +683,12 @@ export const leadsRouter = createTRPCRouter({
                     domain: items.find((i) => i.id === id)!.domain,
                     contactChannel: parseContactChannel(enrichmentById.get(id)),
                     contacts: contactsByDomain.get(id) ?? [],
+                    // Already on the row. Reading it live would be two HubSpot
+                    // calls per lead, which is why the card used to rank blind
+                    // to who we have actually spoken to.
+                    historyMentions: storedContactMentions(
+                      enrichmentById.get(id),
+                    ),
                   }),
                   channels: channelsByDomain.get(id) ?? [],
                   outreach: latestOutreach.get(id) ?? null,
@@ -826,6 +833,7 @@ export const leadsRouter = createTRPCRouter({
         domain: domain.domain,
         contactChannel: parseContactChannel(domain.enrichment),
         contacts,
+        historyMentions: storedContactMentions(domain.enrichment),
       });
 
       return {
@@ -1638,6 +1646,7 @@ export const leadsRouter = createTRPCRouter({
           domain: row.domain,
           contactChannel,
           contacts,
+          historyMentions: storedContactMentions(row.enrichment),
         }),
       };
     }),
@@ -1724,6 +1733,7 @@ export const leadsRouter = createTRPCRouter({
           domain: row.domain,
           contactChannel,
           contacts: [...byId.values()],
+          historyMentions: storedContactMentions(row.enrichment),
         }),
       };
     }),

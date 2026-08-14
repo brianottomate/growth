@@ -2,7 +2,7 @@ import { generateText, Output } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import he from "he";
 import sanitizeHtml from "sanitize-html";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { outreachLinkFor } from "@/lib/pregen-urls";
@@ -28,6 +28,10 @@ import {
   isRoleInbox,
   scoreStoredContact,
 } from "@/server/services/lead-channel.service";
+import {
+  countContactMentions,
+  summarizeCorrespondence,
+} from "@/server/services/lead-correspondence";
 import { selectCompanyHistoryForGeneration } from "@/server/services/pregen-hubspot-copy";
 import { findPregenHubspotDraftViolations } from "@/server/services/pregen-hubspot-draft-policy";
 
@@ -221,36 +225,6 @@ export type PregenRecipient = {
 };
 
 /**
- * How often each contact is named in the logged HubSpot history, keyed by
- * lowercased email, for `scoreStoredContact`.
- *
- * Titles carry the counterpart's name ("Call with Walt Kubiak") and bodies
- * carry whoever was addressed or signed off, so both are searched. A first
- * name shorter than three characters is skipped rather than matched loosely.
- */
-export function countHistoryMentions(
-  contacts: PregenRecipient[],
-  historyBlob: string,
-): Map<string, number> {
-  const haystack = historyBlob.toLowerCase();
-  const counts = new Map<string, number>();
-  for (const contact of contacts) {
-    const first = contact.firstName?.trim().toLowerCase();
-    const last = contact.lastName?.trim().toLowerCase();
-    if (!first || first.length < 3) continue;
-    const needle = last ? `${first} ${last}` : first;
-    let count = 0;
-    let at = haystack.indexOf(needle);
-    while (at !== -1 && count < 99) {
-      count += 1;
-      at = haystack.indexOf(needle, at + needle.length);
-    }
-    if (count > 0) counts.set(contact.email.toLowerCase(), count);
-  }
-  return counts;
-}
-
-/**
  * The person this sequence is written to: the top-ranked contact, by the same
  * scorer the leads UI ranks candidates with.
  *
@@ -278,7 +252,9 @@ export function pickRecipient(
     if (match) return match;
   }
 
-  const mentions = countHistoryMentions(contacts, historyBlob);
+  const mentions = new Map(
+    Object.entries(countContactMentions(contacts, historyBlob)),
+  );
   const addressable = contacts.filter(
     (contact) =>
       contact.hubspotContactId != null &&
@@ -584,6 +560,26 @@ export async function generatePregenHubspotDraft(
     ...(activity?.items ?? []).map((item) => `${item.title} ${item.body}`),
     ...(history?.items ?? []).map((item) => `${item.subject} ${item.body}`),
   ].join("\n");
+
+  // Refresh the stored summary while we have the history open. The generator
+  // reads a wider window than the ranker does and reads it later, so the leads
+  // card ends up ranking on the freshest view of who we have spoken to without
+  // ever paying for the calls itself.
+  const correspondence = summarizeCorrespondence({
+    hubspotCompanyId: company?.id ?? null,
+    history,
+    activity,
+    contacts,
+  });
+  await db
+    .update(leadDomainTable)
+    .set({
+      enrichment: sql`coalesce(${leadDomainTable.enrichment}, '{}'::jsonb) || ${JSON.stringify(
+        { correspondence },
+      )}::jsonb`,
+      updatedAt: new Date(),
+    })
+    .where(eq(leadDomainTable.id, row.id));
 
   const recipient = pickRecipient(
     contacts.filter(
