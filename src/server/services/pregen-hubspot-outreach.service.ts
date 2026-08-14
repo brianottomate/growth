@@ -5,6 +5,7 @@ import sanitizeHtml from "sanitize-html";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { outreachLinkFor } from "@/lib/pregen-urls";
 import { classifyFetchUrl } from "@/server/ai/url-safety";
 import {
   findCompanyByDomain,
@@ -25,7 +26,22 @@ import {
 import { selectCompanyHistoryForGeneration } from "@/server/services/pregen-hubspot-copy";
 import { findPregenHubspotDraftViolations } from "@/server/services/pregen-hubspot-draft-policy";
 
-const MODEL = "claude-sonnet-5";
+/**
+ * Opus, not Sonnet. This prompt is mostly a list of ways to get the email
+ * wrong — claims that must not be merged, a decision that must be labeled and
+ * not quantified, a site that must never be criticised, correspondence that has
+ * to be attributed to the right side of a call. Sonnet drafts read well and
+ * still miss a constraint often enough that the policy pass has to send them
+ * back, and the failure mode of a near-miss here is a named rep sending a
+ * plausible sentence that is false about the recipient's own company.
+ *
+ * The volume is a handful of companies at a time, reviewed by a person before
+ * anything sends, so the model is not the cost that matters.
+ *
+ * The stored draft records which model wrote it, so mixed-model batches stay
+ * legible.
+ */
+const MODEL = "claude-opus-5";
 
 /**
  * A refusal the operator can act on — excluded company, unreadable preview —
@@ -87,29 +103,6 @@ type LeadEnrichmentContext = {
 function compact(value: unknown, maxCharacters = 8_000): string {
   if (!value) return "(none)";
   return JSON.stringify(value, null, 2).slice(0, maxCharacters);
-}
-
-/**
- * Per-company attribution on the preview link, carried over from the retired
- * Instantly generator. Without this the preview URL reaches Amplitude with no
- * way to tell which company opened it, which is the only conversion signal this
- * motion produces before a reply.
- *
- * Preview URLs are signed and already carry a token, so this edits the query
- * rather than concatenating, and returns the original untouched if it will not
- * parse — an unattributed link beats a corrupted signed one.
- */
-export function trackedPreviewUrl(previewUrl: string, domain: string): string {
-  try {
-    const url = new URL(previewUrl);
-    url.searchParams.set("utm_source", "hubspot_sequence");
-    url.searchParams.set("utm_medium", "outbound");
-    url.searchParams.set("utm_campaign", "pregen_sites");
-    url.searchParams.set("utm_content", domain);
-    return url.toString();
-  } catch {
-    return previewUrl;
-  }
 }
 
 // The prose slots must never contain a URL — HubSpot renders the preview link on
@@ -292,10 +285,10 @@ async function readUrlText(target: string, label: string): Promise<UrlRead> {
 function renderTouchBody(
   touch: z.infer<typeof TouchSchema>,
   index: number,
-  previewUrl: string,
+  linkUrl: string,
 ): string {
   return index === 0
-    ? `${touch.opening}\n\n${previewUrl}\n\n${touch.closing}`
+    ? `${touch.opening}\n\n${linkUrl}\n\n${touch.closing}`
     : `${touch.opening}\n\n${touch.closing}`;
 }
 
@@ -496,13 +489,32 @@ export async function generatePregenHubspotDraft(
     ? selectCompanyHistoryForGeneration(history)
     : null;
 
+  // The record outranks the requested motion.
+  //
+  // The caller derives motion from HubSpot list cohort membership, and a company
+  // with no membership row defaults to "fresh". That produced a first-touch
+  // sequence for a company our team had emailed fourteen times and called six,
+  // closing with "this is the last note I'll send" as its opening move. A
+  // logged call is not something the recipient will have forgotten because our
+  // list has no row for them.
+  //
+  // Calls and meetings only. A note is often our own desk research ("PMS
+  // identified: Streamline") and does not mean anyone spoke to them.
+  const spokenTo =
+    activity?.items.some(
+      (item) => item.kind === "call" || item.kind === "meeting",
+    ) ?? false;
+  const wroteTo = (selectedHistory?.retained ?? 0) > 0;
+  const motion: PregenMotion =
+    spokenTo || wroteTo ? "reengagement" : options.motion;
+
   // Snapshot of the inputs, so a reviewer can check the copy against what the
   // model actually saw rather than against HubSpot as it stands later. Excerpts
   // only — the point is to answer "who is this person it named and which side of
   // the call were they on", not to mirror the CRM.
   const generationContext: PregenGenerationContext = {
     generatedAt: new Date().toISOString(),
-    motion: options.motion,
+    motion,
     pms: row.pms ?? null,
     steer: options.steer?.trim() || null,
     hubspotCompanyId: company?.id ?? null,
@@ -553,7 +565,7 @@ export async function generatePregenHubspotDraft(
 
   const basePrompt = `${STRATEGY}
 
-REQUESTED MOTION: ${options.motion}
+REQUESTED MOTION: ${motion}
 TODAY: ${new Date().toISOString().slice(0, 10)}
 PREVIEW URL: supplied separately by HubSpot; never repeat it in prose.
 
@@ -602,7 +614,7 @@ FINAL NON-NEGOTIABLE OUTPUT CHECK:
 - Do not say the preview answers a technical, ChatGPT, MCP, or architecture question.
 - Do not connect the preview to the named PMS unless OPERATOR CONTEXT explicitly confirms that data source.
 
-Write the four-touch sequence now. Prioritize actual inbound questions over assumptions based on unanswered sends. Do not describe the age or timing of a message imprecisely; use a date only when it matters. Use simple sentences and specific facts. Do not use em dashes, en dashes, promotional superlatives, forced groups of three, or phrases such as "the real question," "not just," "in your position," and "the main question." Use only claims supported above. Return motion "${options.motion}".`;
+Write the four-touch sequence now. Prioritize actual inbound questions over assumptions based on unanswered sends. Do not describe the age or timing of a message imprecisely; use a date only when it matters. Use simple sentences and specific facts. Do not use em dashes, en dashes, promotional superlatives, forced groups of three, or phrases such as "the real question," "not just," "in your position," and "the main question." Use only claims supported above. Return motion "${motion}".`;
   let draft: PregenHubspotDraft | null = null;
   let correction = "";
   let lastViolations: string[] = [];
@@ -619,7 +631,7 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
     });
     const candidate = humanizeDraft(generated.output);
     const violations = findPregenHubspotDraftViolations(candidate, {
-      motion: options.motion,
+      motion,
       pms: row.pms,
     });
     lastViolations = violations;
@@ -639,11 +651,18 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
     );
   }
   const cadence =
-    options.motion === "reengagement" ? [0, 4, 8, 14] : [0, 3, 7, 12];
+    motion === "reengagement" ? [0, 4, 8, 14] : [0, 3, 7, 12];
   draft.touches = draft.touches.map((touch, index) => ({
     ...touch,
     delayDays: cadence[index] ?? touch.delayDays,
   }));
+  // What the recipient actually clicks: the wander.com wrapper around this
+  // preview, attributed to this company. Recorded on the context too, so a
+  // reviewer can see which of the two addresses the copy shipped with rather
+  // than inferring it from the body.
+  const outreachLink = outreachLinkFor(options.previewUrl, row.domain);
+  generationContext.outreachUrl = outreachLink;
+
   return {
     domainId: row.id,
     hubspotCompanyId: company?.id ?? null,
@@ -651,11 +670,7 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
     draft,
     renderedSteps: draft.touches.map((touch, index) => ({
       subject: touch.subject,
-      body: renderTouchBody(
-        touch,
-        index,
-        trackedPreviewUrl(options.previewUrl, row.domain),
-      ),
+      body: renderTouchBody(touch, index, outreachLink),
       delayDays: touch.delayDays,
     })),
     generationContext,

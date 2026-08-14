@@ -1339,10 +1339,10 @@ export const leadsRouter = createTRPCRouter({
       const writtenFromPretendPreview =
         outreach.generationContext?.preview.pretend === true;
 
-      const properties = hubspotPropertiesFromRenderedSteps(
-        outreach.steps,
-        outreach.generationContext?.previewUrl ?? row.pregenSiteUrl ?? "",
-      );
+      // The link comes off the rendered body, which is the copy a rep will
+      // actually send. Passing one in from the draft context meant the property
+      // could disagree with the email.
+      const properties = hubspotPropertiesFromRenderedSteps(outreach.steps);
       await updateContact(contact.hubspotContactId, properties);
       await ctx.db
         .update(leadSequenceTable)

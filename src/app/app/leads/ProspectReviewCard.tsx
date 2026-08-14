@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { osPitchUrl } from "@/lib/pregen-urls";
 import { elapsedLabel, isStuck, type InFlightBuild } from "./PregenBuildsBanner";
 
 /**
@@ -230,23 +231,6 @@ function MicroLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * The wander.com pitch wrapper is a mechanical transform of the preview URL:
- * https://<label>.<zone>/?t=<token> → https://www.wander.com/os/<label>?t=<token>.
- * Same label, same token — never minted or stored separately.
- */
-function osPitchUrl(previewUrl: string): string | null {
-  try {
-    const parsed = new URL(previewUrl);
-    const label = parsed.hostname.split(".")[0];
-    const token = parsed.searchParams.get("t");
-    if (!label || !token) return null;
-    return `https://www.wander.com/os/${label}?t=${encodeURIComponent(token)}`;
-  } catch {
-    return null;
-  }
-}
-
 function SequencePreview({ data }: { data: ProspectCardData }) {
   // The 2-up grid clamps bodies to keep eight touches scannable, but approving
   // copy that goes out as a named person means READING it — so the clamp is a
@@ -279,16 +263,10 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
         {outreach.angle ?? "-"}
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {data.pregenSiteUrl && (
-          <a
-            href={data.pregenSiteUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
-          >
-            Open the preview they will see ↗
-          </a>
-        )}
+        {/* Ordered by what the reviewer is deciding about. Touch 1 carries the
+            wander.com wrapper, so that is the page to open first; the bare
+            renderer address is the same site without the pitch around it, kept
+            because it is what the build actually produced. */}
         {data.pregenSiteUrl && osPitchUrl(data.pregenSiteUrl) && (
           <a
             href={osPitchUrl(data.pregenSiteUrl) ?? undefined}
@@ -296,7 +274,17 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
           >
-            wander.com pitch page ↗
+            The link this copy sends ↗
+          </a>
+        )}
+        {data.pregenSiteUrl && (
+          <a
+            href={data.pregenSiteUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
+          >
+            Preview without the wrapper ↗
           </a>
         )}
         <button

@@ -477,7 +477,14 @@ export type PregenGenerationContext = {
   pms: string | null;
   steer: string | null;
   hubspotCompanyId: string | null;
+  /** The renderer address the generator read and wrote copy about. */
   previewUrl: string;
+  /**
+   * The link the copy actually carries: the wander.com wrapper around
+   * `previewUrl`, with attribution. Absent on drafts generated before the
+   * wrapper was adopted, which carried the tracked renderer address instead.
+   */
+  outreachUrl?: string;
   preview: {
     readable: boolean;
     detail: string;

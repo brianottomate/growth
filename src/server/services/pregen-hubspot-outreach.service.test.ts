@@ -119,21 +119,18 @@ describe("selectCompanyHistoryForGeneration", () => {
 describe("hubspotPropertiesFromRenderedSteps", () => {
   test("maps model-owned prose into HubSpot-owned paragraph slots", () => {
     const previewUrl = "https://preview.example/p/123";
-    const properties = hubspotPropertiesFromRenderedSteps(
-      [
-        {
-          subject: "A Cascadia preview",
-          body: `Company-specific opening.\n\n${previewUrl}\n\nCompany-specific CTA.`,
-          delayDays: 0,
-        },
-        {
-          subject: null,
-          body: "Product explanation.\n\nCompany-specific fit and CTA.",
-          delayDays: 4,
-        },
-      ],
-      previewUrl,
-    );
+    const properties = hubspotPropertiesFromRenderedSteps([
+      {
+        subject: "A Cascadia preview",
+        body: `Company-specific opening.\n\n${previewUrl}\n\nCompany-specific CTA.`,
+        delayDays: 0,
+      },
+      {
+        subject: null,
+        body: "Product explanation.\n\nCompany-specific fit and CTA.",
+        delayDays: 4,
+      },
+    ]);
 
     expect(properties).toEqual({
       growth_pregen_preview_url: previewUrl,
@@ -144,5 +141,25 @@ describe("hubspotPropertiesFromRenderedSteps", () => {
       growth_pregen_touch_2_body: "Product explanation.",
       growth_pregen_touch_2_fit: "Company-specific fit and CTA.",
     });
+  });
+
+  // Publishing used to locate this line by comparing it against a URL the
+  // caller passed in. The caller had the bare renderer address, the body had
+  // the attributed wander.com wrapper, and every real draft threw here.
+  test("locates the link line when it carries attribution", () => {
+    const link =
+      "https://www.wander.com/os/maui-westside-properties?t=abc&utm_source=hubspot_sequence&utm_content=mauiwestside.com";
+    const properties = hubspotPropertiesFromRenderedSteps([
+      {
+        subject: "Maui Westside on WanderOS",
+        body: `Opening.\n\n${link}\n\nCTA.`,
+        delayDays: 0,
+      },
+      { subject: null, body: "Two opening.\n\nTwo closing.", delayDays: 3 },
+    ]);
+
+    expect(properties.growth_pregen_preview_url).toBe(link);
+    expect(properties.growth_pregen_touch_1_body).toBe("Opening.");
+    expect(properties.growth_pregen_touch_1_observation).toBe("CTA.");
   });
 });

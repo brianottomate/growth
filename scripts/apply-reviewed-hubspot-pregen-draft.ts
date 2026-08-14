@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { outreachLinkFor } from "@/lib/pregen-urls";
 import {
   findContactByEmail,
   updateContact,
@@ -70,18 +71,18 @@ const dbContact = await db.query.leadContactTable.findFirst({
   ),
 });
 
+// Same link the generator renders: the wander.com wrapper, attributed. A
+// reviewed draft applied by hand should not go out pointing somewhere else.
+const outreachLink = outreachLinkFor(review.previewUrl, domain);
 const renderedSteps = review.draft.touches.map((touch, index) => ({
   subject: touch.subject,
   body:
     index === 0
-      ? `${touch.opening}\n\n${review.previewUrl}\n\n${touch.closing}`
+      ? `${touch.opening}\n\n${outreachLink}\n\n${touch.closing}`
       : `${touch.opening}\n\n${touch.closing}`,
   delayDays: touch.delayDays,
 }));
-const properties = hubspotPropertiesFromRenderedSteps(
-  renderedSteps,
-  review.previewUrl,
-);
+const properties = hubspotPropertiesFromRenderedSteps(renderedSteps);
 
 if (apply) {
   await updateContact(hubspotContact.id, properties);

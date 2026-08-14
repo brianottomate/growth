@@ -47,10 +47,12 @@ type RenderedStep = {
   delayDays: number;
 };
 
-export function hubspotPropertiesFromRenderedSteps(
-  steps: RenderedStep[],
-  previewUrl: string,
-) {
+/** A paragraph that is nothing but a URL — the link line the renderer emits. */
+function isLinkParagraph(part: string): boolean {
+  return /^https?:\/\/\S+$/.test(part);
+}
+
+export function hubspotPropertiesFromRenderedSteps(steps: RenderedStep[]) {
   const touch1 = steps[0];
   const touch2 = steps[1];
   if (!touch1 || !touch2) {
@@ -58,8 +60,12 @@ export function hubspotPropertiesFromRenderedSteps(
   }
 
   const touch1Parts = touch1.body.split(/\n{2,}/).map((part) => part.trim());
-  const previewIndex = touch1Parts.indexOf(previewUrl);
-  if (previewIndex < 1 || previewIndex === touch1Parts.length - 1) {
+  // Located by shape rather than by comparing against a URL the caller supplies.
+  // The caller's copy was the bare renderer address while the body carried the
+  // attributed one, so an exact match failed on every draft generated after
+  // attribution was added and publishing threw here instead of writing.
+  const linkIndex = touch1Parts.findIndex(isLinkParagraph);
+  if (linkIndex < 1 || linkIndex === touch1Parts.length - 1) {
     throw new Error("Touch 1 must contain opening, preview URL, and closing");
   }
   const touch2Parts = touch2.body.split(/\n{2,}/).map((part) => part.trim());
@@ -68,11 +74,11 @@ export function hubspotPropertiesFromRenderedSteps(
   }
 
   return {
-    growth_pregen_preview_url: previewUrl,
+    growth_pregen_preview_url: touch1Parts[linkIndex]!,
     growth_pregen_touch_1_subject: touch1.subject ?? "",
-    growth_pregen_touch_1_body: touch1Parts.slice(0, previewIndex).join(" "),
+    growth_pregen_touch_1_body: touch1Parts.slice(0, linkIndex).join(" "),
     growth_pregen_touch_1_observation: touch1Parts
-      .slice(previewIndex + 1)
+      .slice(linkIndex + 1)
       .join(" "),
     growth_pregen_touch_2_subject: touch2.subject ?? "",
     growth_pregen_touch_2_body: touch2Parts[0] ?? "",

@@ -60,7 +60,6 @@ if (!touch1 || !touch2)
   throw new Error("Generator returned fewer than 2 touches");
 const hubspotProperties = hubspotPropertiesFromRenderedSteps(
   result.renderedSteps,
-  previewUrl,
 );
 
 const outPath = resolve(
