@@ -67,6 +67,13 @@ function toBoolean(value: string | null | undefined): boolean | null {
   return null;
 }
 
+/** HubSpot sends timestamps as ISO strings; anything unparseable stays null. */
+function toDate(value: string | null | undefined): Date | null {
+  if (!value?.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export type MirrorStats = {
   /** Contacts written or refreshed. */
   mirrored: number;
@@ -155,6 +162,7 @@ function toInsert(
     phone: clean(contact.values.phone),
     state: clean(contact.values.state),
     emailOptOut: toBoolean(contact.values.hs_email_optout),
+    lastContactedAt: toDate(contact.values.notes_last_contacted),
     hubspotContactId: contact.id,
     source: "hubspot",
   };
@@ -212,6 +220,10 @@ export async function mirrorContacts(
         phone: sql`coalesce(excluded.phone, ${leadContactTable.phone})`,
         state: sql`coalesce(excluded.state, ${leadContactTable.state})`,
         emailOptOut: sql`coalesce(excluded.email_opt_out, ${leadContactTable.emailOptOut})`,
+        // Newest wins rather than HubSpot always winning. Instantly writes this
+        // column too, and a HubSpot contact with no logged activity must not
+        // erase a send Instantly recorded yesterday.
+        lastContactedAt: sql`greatest(excluded.last_contacted_at, ${leadContactTable.lastContactedAt})`,
         // The linkage itself is never optional — without it we cannot enroll.
         hubspotContactId: sql`excluded.hubspot_contact_id`,
         domainId: sql`excluded.domain_id`,
@@ -283,6 +295,7 @@ const CONTACT_PROPERTY_COLUMNS = {
   phone: { column: "phone", parse: clean },
   state: { column: "state", parse: clean },
   hs_email_optout: { column: "emailOptOut", parse: toBoolean },
+  notes_last_contacted: { column: "lastContactedAt", parse: toDate },
 } as const;
 
 export type MirroredContactProperty = keyof typeof CONTACT_PROPERTY_COLUMNS;

@@ -979,6 +979,10 @@ export async function getCompanyContacts(
 //   it). It reads fine over the API, so the backfill captures it, but a fresh
 //   unsubscribe will NOT reach Growth on its own. Re-run the backfill, or
 //   re-hydrate, before treating opt-out state as current.
+// - `notes_last_contacted` — calculated by HubSpot from activity, so it churns
+//   on every logged call and email and would be a noisy subscription. The
+//   backfill and re-hydration keep it current enough for ranking, which is all
+//   it feeds.
 export const CONTACT_MIRROR_PROPERTIES = [
   "email",
   "firstname",
@@ -988,6 +992,12 @@ export const CONTACT_MIRROR_PROPERTIES = [
   "state",
   "associatedcompanyid",
   "hs_email_optout",
+  // HubSpot computes last-activity per contact and hands it over in the read we
+  // already make. It is the only field that separates two people at one company
+  // by recency, which is what "who did we speak to last" needs. Its sibling
+  // `num_contacted_notes` rolls up at the association and reads the same for
+  // every contact on a company, so it is not worth mirroring.
+  "notes_last_contacted",
 ] as const;
 
 export type ContactMirrorProperty = (typeof CONTACT_MIRROR_PROPERTIES)[number];

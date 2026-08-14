@@ -207,6 +207,21 @@ export const leadDomainTable = leadsSchema.table(
     // Lossless raw provider rows.
     enrichment: t.jsonb().$type<LeadEnrichment>(),
 
+    /**
+     * The whole Firecrawl response for the company's homepage.
+     *
+     * Its own column rather than a key on `enrichment`, because the leads list
+     * selects `enrichment` for every row it renders and a homepage's markdown
+     * and html would ride along on all of them. Nothing selects this except the
+     * code that wants the page.
+     *
+     * Stored unstripped. The ranker used to keep the screenshot URL and the
+     * image list and drop the copy, and the sequence generator then fetched the
+     * same homepage again to get it back, so every pass scraped each site twice
+     * and kept neither result.
+     */
+    siteScrape: t.jsonb().$type<LeadSiteScrape>(),
+
     createdAt: t
       .timestamp()
       .$defaultFn(() => new Date())
@@ -471,6 +486,23 @@ export type OutreachStep = {
  *
  * Kept deliberately small: counts plus short excerpts, not the full bodies.
  */
+/**
+ * A stored Firecrawl scrape. `raw` is the untouched response; the named fields
+ * are the ones consumers reach for, lifted so they do not each re-guess the
+ * SDK's shape.
+ */
+export type LeadSiteScrape = {
+  url: string;
+  fetchedAt: string;
+  markdown?: string;
+  html?: string;
+  links?: string[];
+  images?: string[];
+  screenshot?: string;
+  metadata?: Record<string, unknown>;
+  raw?: Record<string, unknown>;
+};
+
 export type PregenGenerationContext = {
   generatedAt: string;
   motion: "fresh" | "reengagement";
@@ -507,7 +539,11 @@ export type PregenGenerationContext = {
      */
     pretend: boolean;
   };
-  website: { characters: number };
+  website: {
+    characters: number;
+    /** Whether the copy read the stored Firecrawl scrape or fetched live. */
+    source?: "scrape" | "live";
+  };
   emails: {
     available: number;
     retained: number;

@@ -25,29 +25,47 @@ export const firecrawl = isFirecrawlConfigured
  * a full-page screenshot URL. Throws on failure (the discovery service wraps
  * each provider in its own try/catch envelope).
  */
+/**
+ * Scrape a prospect's site for ranking and copy.
+ *
+ * Nothing is thrown away. The whole Firecrawl response comes back on `raw` and
+ * gets stored, because every consumer so far has wanted a field the previous
+ * version had already dropped, and a re-scrape costs a credit and a fresh page
+ * that no longer matches what a stored judgement was made against.
+ *
+ * `onlyMainContent` is off for the same reason. It strips the hero, which is
+ * usually an operator's best asset, along with the nav and footer where the
+ * markets, phone number and license line live.
+ */
 export async function scrapeForEnrichment(url: string): Promise<{
   markdown?: string;
+  html?: string;
+  links?: string[];
   metadata?: Record<string, unknown>;
   screenshot?: string;
   images?: string[];
+  raw?: Record<string, unknown>;
 }> {
   if (!isFirecrawlConfigured) return {};
   const result = await firecrawl.scrape(url, {
     // `images` is a first-class format in the SDK and returns the page's image
     // URLs, which is what lets us judge whether an operator has real photography
-    // or placeholder stock. Not derived from the markdown: onlyMainContent
-    // strips the hero, which is usually their best asset.
-    formats: ["markdown", "screenshot", "images"],
-    onlyMainContent: true,
+    // or placeholder stock.
+    formats: ["markdown", "html", "links", "screenshot", "images"],
+    onlyMainContent: false,
   });
+  const loose = result as Record<string, unknown>;
   return {
     markdown: result.markdown,
+    html: loose.html as string | undefined,
+    links: loose.links as string[] | undefined,
     metadata: result.metadata,
     // v4 returns the screenshot as a hosted URL on `screenshot`.
     screenshot:
-      (result as { screenshot?: string }).screenshot ??
-      (result as { screenshotUrl?: string }).screenshotUrl,
-    images: (result as { images?: string[] }).images,
+      (loose.screenshot as string | undefined) ??
+      (loose.screenshotUrl as string | undefined),
+    images: loose.images as string[] | undefined,
+    raw: loose,
   };
 }
 

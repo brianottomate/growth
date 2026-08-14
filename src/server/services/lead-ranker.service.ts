@@ -370,6 +370,22 @@ Score every dimension. Ground assetQuality and designQuality in the screenshot a
     await db
       .update(leadDomainTable)
       .set({
+        // Whole response, kept. Re-scraping is a credit and a page that may no
+        // longer match the judgement that was stored against it, and every
+        // consumer so far has wanted a field the last version dropped.
+        siteScrape: scrape.raw
+          ? {
+              url: `https://${normalized}`,
+              fetchedAt: new Date().toISOString(),
+              markdown: scrape.markdown,
+              html: scrape.html,
+              links: scrape.links,
+              images: scrape.images,
+              screenshot: scrape.screenshot,
+              metadata: scrape.metadata,
+              raw: scrape.raw,
+            }
+          : undefined,
         scorePregenPotential: overall,
         scoreVersion: RANKER_VERSION,
         scoredAt: new Date(),
