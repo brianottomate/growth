@@ -781,18 +781,33 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
   let draft: PregenHubspotDraft | null = null;
   let correction = "";
   let lastViolations: string[] = [];
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const generated = await generateText({
-      model: anthropic(MODEL),
-      output: Output.object({
-        name: "PregenHubspotDraft",
-        description:
-          "A four-touch WanderOS sequence whose prose is personalized to one property manager.",
-        schema: PregenHubspotDraftSchema,
-      }),
-      prompt: `${basePrompt}${correction}`,
-    });
-    const candidate = humanizeDraft(generated.output);
+  let lastFailure = "";
+  // Four attempts, covering two different ways to come back unusable. The loop
+  // used to retry only copy-policy violations, so a run where the model simply
+  // failed to produce a conforming object threw straight out of the function
+  // and lost the whole company: two of ten in one batch died on "response did
+  // not match schema" with nothing retried.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    let candidate: PregenHubspotDraft;
+    try {
+      const generated = await generateText({
+        model: anthropic(MODEL),
+        output: Output.object({
+          name: "PregenHubspotDraft",
+          description:
+            "A four-touch WanderOS sequence whose prose is personalized to one property manager.",
+          schema: PregenHubspotDraftSchema,
+        }),
+        prompt: `${basePrompt}${correction}`,
+      });
+      candidate = humanizeDraft(generated.output);
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error);
+      // Structural, not editorial, so the nudge is about shape rather than
+      // about the copy. Exactly four touches is the constraint models miss.
+      correction = `\n\nThe previous attempt did not return a valid object (${lastFailure}). Return exactly four touches, each with subject, opening, closing and delayDays, and populate motion, angle, personalizedOn and historyUsed. Touch 1 has a subject; touches 2 to 4 have subject null.`;
+      continue;
+    }
     const violations = findPregenHubspotDraftViolations(candidate, {
       motion,
       pms: row.pms,
@@ -809,9 +824,9 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
   }
   if (!draft) {
     throw new Error(
-      `Pregen HubSpot draft failed copy-policy review after 3 attempts: ${lastViolations.join(
-        "; ",
-      )}`,
+      lastViolations.length
+        ? `Pregen HubSpot draft failed copy-policy review after 4 attempts: ${lastViolations.join("; ")}`
+        : `Pregen HubSpot draft never returned a valid object after 4 attempts: ${lastFailure}`,
     );
   }
   const cadence =
