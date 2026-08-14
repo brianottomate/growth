@@ -259,9 +259,33 @@ export function parseContactChannel(
   };
 }
 
+/**
+ * Whether an address is a shared inbox rather than a person. Exported because
+ * "who do we write to" and "which mailbox do we send to" are different
+ * questions: a role inbox is a fine destination for a form-fill or a cold
+ * send, and a poor one to address by name about a call they were on.
+ */
+export function isRoleInbox(email: string): boolean {
+  return ROLE.test(email.trim());
+}
+
 export function scoreStoredContact(
   contact: StoredLeadContact,
   domain: string,
+  options: {
+    /**
+     * How many times this person is named in the logged HubSpot history.
+     *
+     * The strongest ranking signal we have, and it was missing. Everything else
+     * here reasons about whether an address is deliverable and whether the
+     * person looks senior. Whether our own team has actually spoken to them is
+     * better evidence than either, and it is the difference between two
+     * contacts at one company who are otherwise identical on paper.
+     *
+     * Zero when history was not loaded, which leaves scoring exactly as it was.
+     */
+    historyMentions?: number;
+  } = {},
 ): ContactCandidateScore {
   let score = 20;
   const reasons: string[] = [];
@@ -312,6 +336,19 @@ export function scoreStoredContact(
   }
   if (contact.verificationStatus) {
     reasons.push(`verification: ${contact.verificationStatus}`);
+  }
+
+  // Capped, because the count is a proxy for "this is who the conversation is
+  // with" and not a quantity worth maximising. Five mentions and fifty mean the
+  // same thing next to a contact with none.
+  const mentions = Math.max(0, options.historyMentions ?? 0);
+  if (mentions > 0) {
+    score += 20 + Math.min(mentions, 5) * 4;
+    reasons.push(
+      mentions === 1
+        ? "named once in our logged calls and emails"
+        : `named ${mentions} times in our logged calls and emails`,
+    );
   }
 
   // Trust layer: person-verification evidence (Minerva geo + LinkedIn).
@@ -390,13 +427,19 @@ export function scoreLeadChannel(input: {
   domain: string;
   contactChannel: ResolvedContactChannel | null;
   contacts: StoredLeadContact[];
+  /** Mentions in logged HubSpot history, keyed by lowercased email. */
+  historyMentions?: Map<string, number>;
 }): ChannelScore {
   const candidates = [
     ...(input.contactChannel?.emails ?? []).map((email) =>
       scoreSiteEmail(email, input.domain),
     ),
     ...input.contacts.map((contact) =>
-      scoreStoredContact(contact, input.domain),
+      scoreStoredContact(contact, input.domain, {
+        historyMentions: input.historyMentions?.get(
+          contact.email.toLowerCase(),
+        ),
+      }),
     ),
   ].sort((a, b) => b.score - a.score);
 

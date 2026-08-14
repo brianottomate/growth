@@ -23,6 +23,11 @@ import {
   readHubspotCompanyActivityHistory,
   readHubspotCompanyEmailHistory,
 } from "@/server/services/hubspot-company-email-context.service";
+import {
+  isPlaceholderEmail,
+  isRoleInbox,
+  scoreStoredContact,
+} from "@/server/services/lead-channel.service";
 import { selectCompanyHistoryForGeneration } from "@/server/services/pregen-hubspot-copy";
 import { findPregenHubspotDraftViolations } from "@/server/services/pregen-hubspot-draft-policy";
 
@@ -206,29 +211,8 @@ function rankerBrief(enrichment: LeadEnrichmentContext): string {
   return lines.length ? lines.join("\n") : "(ranked, but nothing notable)";
 }
 
-/**
- * Shared inboxes. Named for what they are rather than inferred from the absence
- * of a job title, because plenty of real people have no title on record.
- */
-const GENERIC_MAILBOXES = new Set([
-  "admin",
-  "bookings",
-  "contact",
-  "hello",
-  "help",
-  "info",
-  "inquiries",
-  "mail",
-  "office",
-  "reservations",
-  "rentals",
-  "sales",
-  "stay",
-  "support",
-  "team",
-]);
-
 export type PregenRecipient = {
+  id: string;
   firstName: string | null;
   lastName: string | null;
   jobTitle: string | null;
@@ -237,21 +221,50 @@ export type PregenRecipient = {
 };
 
 /**
- * The person this sequence will most likely be enrolled as.
+ * How often each contact is named in the logged HubSpot history, keyed by
+ * lowercased email, for `scoreStoredContact`.
  *
- * The draft used to be written for nobody: generation ran at company level,
- * enrolment picked a contact later, and the prompt therefore banned naming
- * anyone. That ban was doing real damage. It forced "Ryan asked about the
- * calendar" even when Ryan was the recipient, which reads like a message about
- * someone else, and it threw away the strongest thing we have on a re-engaged
- * account: their own words back to them.
+ * Titles carry the counterpart's name ("Call with Walt Kubiak") and bodies
+ * carry whoever was addressed or signed off, so both are searched. A first
+ * name shorter than three characters is skipped rather than matched loosely.
+ */
+export function countHistoryMentions(
+  contacts: PregenRecipient[],
+  historyBlob: string,
+): Map<string, number> {
+  const haystack = historyBlob.toLowerCase();
+  const counts = new Map<string, number>();
+  for (const contact of contacts) {
+    const first = contact.firstName?.trim().toLowerCase();
+    const last = contact.lastName?.trim().toLowerCase();
+    if (!first || first.length < 3) continue;
+    const needle = last ? `${first} ${last}` : first;
+    let count = 0;
+    let at = haystack.indexOf(needle);
+    while (at !== -1 && count < 99) {
+      count += 1;
+      at = haystack.indexOf(needle, at + needle.length);
+    }
+    if (count > 0) counts.set(contact.email.toLowerCase(), count);
+  }
+  return counts;
+}
+
+/**
+ * The person this sequence is written to: the top-ranked contact, by the same
+ * scorer the leads UI ranks candidates with.
  *
- * So resolve the likely recipient up front and write to them. If enrolment
- * lands on someone else, the copy is still safe — it never re-greets by name,
- * and the caller can pass `recipientEmail` to be certain.
+ * The draft used to be written for nobody. Generation ran at company level,
+ * enrolment picked a contact afterwards, and the prompt therefore banned naming
+ * anyone. That ban forced "Ryan asked about the calendar" even when Ryan was
+ * the recipient, and it threw away the best material on a re-engaged account.
  *
- * Linked to HubSpot first (an unlinked row cannot be enrolled at all), then a
- * real first name, then a role address over a freemail one.
+ * Ranking is `scoreStoredContact`, unchanged and shared, so the person the copy
+ * addresses is the person the card ranks first. The only extra conditions are
+ * the ones that make someone addressable at all: a HubSpot link, because an
+ * unlinked row cannot be enrolled; a first name, because there is otherwise
+ * nobody to write to; and not a shared inbox, since "you asked back in May" is
+ * wrong sent to info@ however well that address ranks as a destination.
  */
 export function pickRecipient(
   contacts: PregenRecipient[],
@@ -264,49 +277,26 @@ export function pickRecipient(
     const match = contacts.find((c) => c.email.toLowerCase() === wanted);
     if (match) return match;
   }
-  // A shared mailbox is not a person. It routinely wins on mentions — every
-  // thread copies it — and writing "you asked back in May" to info@ is the
-  // exact failure the recipient block is meant to prevent.
-  const people = contacts.filter((contact) => {
-    const local = contact.email.split("@")[0]?.toLowerCase() ?? "";
-    if (GENERIC_MAILBOXES.has(local)) return false;
-    return Boolean(contact.firstName?.trim());
-  });
-  const haystack = historyBlob.toLowerCase();
-  // Being the person our team actually spoke to outranks every static
-  // attribute. Two contacts at the same company are otherwise indistinguishable
-  // — Barb and Walt Kubiak score identically on name, role and address — and
-  // picking the one with six logged calls is the whole point of writing to a
-  // person rather than to a company.
-  // Counted, not just detected. Two contacts at one company are routinely both
-  // present — Barb and Walt Kubiak are named in the same threads — and a
-  // boolean leaves the pick to whatever order the rows came back in. How often
-  // the record talks about someone is the closest thing we have to who the
-  // conversation is actually with.
-  const mentions = (contact: PregenRecipient): number => {
-    const first = contact.firstName?.trim().toLowerCase();
-    const last = contact.lastName?.trim().toLowerCase();
-    if (!first || first.length < 3) return 0;
-    const needle = last ? `${first} ${last}` : first;
-    let count = 0;
-    let at = haystack.indexOf(needle);
-    while (at !== -1 && count < 99) {
-      count += 1;
-      at = haystack.indexOf(needle, at + needle.length);
-    }
-    return count;
-  };
-  const score = (contact: PregenRecipient): number =>
-    Math.min(mentions(contact), 40) * 16 +
-    (contact.hubspotContactId ? 8 : 0) +
-    (contact.firstName?.trim() ? 4 : 0) +
-    (contact.email.toLowerCase().endsWith(`@${domain}`) ? 2 : 0) +
-    (contact.jobTitle?.trim() ? 1 : 0);
-  const ranked = [...people].sort((left, right) => score(right) - score(left));
-  const best = ranked[0];
-  // A row with neither a HubSpot link nor a name is not a person we can write
-  // to; fall back to company-level copy rather than guessing.
-  return best && score(best) >= 8 ? best : null;
+
+  const mentions = countHistoryMentions(contacts, historyBlob);
+  const addressable = contacts.filter(
+    (contact) =>
+      contact.hubspotContactId != null &&
+      Boolean(contact.firstName?.trim()) &&
+      !isRoleInbox(contact.email) &&
+      !isPlaceholderEmail(contact.email),
+  );
+
+  const ranked = addressable
+    .map((contact) => ({
+      contact,
+      score: scoreStoredContact(contact, domain, {
+        historyMentions: mentions.get(contact.email.toLowerCase()),
+      }).score,
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  return ranked[0]?.contact ?? null;
 }
 
 async function readWebsiteText(domain: string): Promise<string> {
@@ -563,6 +553,7 @@ export async function generatePregenHubspotDraft(
       readPreviewText(options.previewUrl),
       db
         .select({
+          id: leadContactTable.id,
           firstName: leadContactTable.firstName,
           lastName: leadContactTable.lastName,
           jobTitle: leadContactTable.jobTitle,

@@ -6,6 +6,7 @@ import {
 } from "@/server/services/pregen-hubspot-outreach.service";
 
 const contact = (over: Partial<PregenRecipient>): PregenRecipient => ({
+  id: over.email ?? "ctc_1",
   firstName: null,
   lastName: null,
   jobTitle: null,
@@ -45,20 +46,6 @@ describe("pickRecipient", () => {
       .toMatchObject({ email: "walt@mauiwestside.com" });
   });
 
-  // The shared inbox is copied on every thread, so mention-counting hands it
-  // the win unless it is excluded outright.
-  test("never picks a shared mailbox, however often it appears", () => {
-    const history = [
-      "Maui Westside Properties - Mainline",
-      "Maui Westside Properties - Mainline",
-      "Maui Westside Properties - Mainline",
-      "Call with Walt Kubiak.",
-    ].join(" ");
-    expect(
-      pickRecipient([mainline, walt], undefined, "mauiwestside.com", history),
-    ).toMatchObject({ email: "walt@mauiwestside.com" });
-  });
-
   test("an explicit request wins over the scoring", () => {
     expect(
       pickRecipient(
@@ -73,7 +60,19 @@ describe("pickRecipient", () => {
   // Company-level copy is the correct output when there is nobody to write to,
   // rather than a guess that gets addressed as "you".
   test("returns null when no contact is linked to HubSpot", () => {
-    const unlinked = contact({ firstName: "Sam", email: "sam@example.com" });
-    expect(pickRecipient([unlinked], undefined, "example.com", "")).toBeNull();
+    const unlinked = contact({ firstName: "Sam", email: "sam@notreal.com" });
+    expect(pickRecipient([unlinked], undefined, "notreal.com", "")).toBeNull();
+  });
+
+  // The shared inbox is copied on every thread, so it outranks people on
+  // correspondence and is the wrong thing to address by name about a call.
+  test("skips a role inbox however often the history names it", () => {
+    const history = Array(6)
+      .fill("Maui Westside Properties - Mainline")
+      .concat("Call with Walt Kubiak.")
+      .join(" ");
+    expect(
+      pickRecipient([mainline, walt], undefined, "mauiwestside.com", history),
+    ).toMatchObject({ email: "walt@mauiwestside.com" });
   });
 });
