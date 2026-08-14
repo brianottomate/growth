@@ -335,12 +335,28 @@ reviews AS (
 
 SELECT
   c.*,
-  f.* EXCEPT(id_user),
+  f.* EXCEPT(id_user, last_abandoned_cart_date),
   b.* EXCEPT(id_user),
   m.* EXCEPT(id_user),
   mi.* EXCEPT(id_user),
   wl.* EXCEPT(id_user),
   rv.* EXCEPT(id_user),
+  -- An abandoned cart stops being abandoned once they book. The funnel CTE can
+  -- only see checkout_started, so the purchase side of that test has to happen
+  -- here, against the bookings CTE. Same rule the abandonment sweep already
+  -- applies as notAfter(lastPurchaseTs, cartAnchor) in funnel-sweep.service.ts:
+  -- keep the cart only when no confirmed booking followed it.
+  --
+  -- Without this the field outlives the conversion it describes, and anything
+  -- filtering on it (the BDR daily view, Outreach custom62) re-surfaces guests
+  -- who already paid. Measured at ~16% of a 7-day cart cohort.
+  IF(
+    b.last_booking_date IS NULL
+      OR SAFE_CAST(b.last_booking_date AS TIMESTAMP)
+         < SAFE_CAST(f.last_abandoned_cart_date AS TIMESTAMP),
+    f.last_abandoned_cart_date,
+    NULL
+  ) AS last_abandoned_cart_date,
   @event_type AS webhook_event_type,
   @property_name AS webhook_property_name,
   CURRENT_TIMESTAMP() AS webhook_received_at
