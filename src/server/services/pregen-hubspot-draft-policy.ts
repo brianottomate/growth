@@ -18,9 +18,6 @@ export const SUPPORTED_PROOF_ANCHORS = [
   "11+ PMS integrations",
 ] as const;
 
-const PROOF_ANCHOR_PATTERN =
-  /\$\s?75\s?m(?:illion)?\b|\b70[,.]?000\+?\s+nights\b|\b70k\+?\s+nights\b|\b10[,.]?000\+?\s+(?:properties|homes|listings)\b|\b1[,.]?000\+?\s+(?:property managers|managers|operators)\b|\b11\+?\s+pms\b/i;
-
 /**
  * Register bans. Each of these is a phrase the corpus shows reps never use and
  * that makes a one-to-one email read like a template. Banning shapes keeps the
@@ -128,14 +125,16 @@ export function findPregenHubspotDraftViolations(
   const touch1Text = `${opening}\n${touch1.closing}`.trim();
   const violations: string[] = [];
 
-  if (!opening.toLowerCase().includes("wanderos")) {
-    violations.push("Touch 1 must introduce or re-introduce WanderOS.");
-  }
-  if (!PROOF_ANCHOR_PATTERN.test(touch1Text)) {
-    violations.push(
-      `Touch 1 must establish WanderOS with one concrete number rather than lineage alone, because the recipient has never heard of Wander.com. Use one of: ${SUPPORTED_PROOF_ANCHORS.join("; ")}.`,
-    );
-  }
+  // Naming WanderOS and carrying a proof number used to be enforced here, and
+  // enforcement is what produced nine near-identical emails: the cheapest way
+  // to satisfy a regex is the same sentence every time. Both are still asked
+  // for in the prompt, where the model can vary how it earns the credibility
+  // instead of reaching for one shape that passes.
+  //
+  // What stays in this gate is claims that are FALSE, not claims that are
+  // weak. A draft with no number is a worse email; a draft crediting Wander.com
+  // with a WanderOS number is a fabrication, and only one of those is a gate's
+  // job.
   // The URL renders on its own line immediately above the closing, so the
   // recipient can already see it. Narrating its position in either direction is
   // mechanical filler occupying the strongest line in the email.

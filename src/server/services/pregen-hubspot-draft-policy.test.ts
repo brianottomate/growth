@@ -11,9 +11,6 @@ const draft = (opening: string, closing: string) => ({
   ],
 });
 
-const PROOF_VIOLATION =
-  "Touch 1 must establish WanderOS with one concrete number rather than lineage alone";
-
 describe("findPregenHubspotDraftViolations", () => {
   test("accepts a grounded fresh opening carrying a supported number", () => {
     expect(
@@ -27,16 +24,21 @@ describe("findPregenHubspotDraftViolations", () => {
     ).toEqual([]);
   });
 
-  test("rejects lineage-only credibility with no supported number", () => {
+  // Carrying a proof number is asked for in the prompt and no longer enforced
+  // here. Enforcing it meant the cheapest way to pass was the same sentence for
+  // every company, and nine drafts in one batch came out near-identical because
+  // of it. A draft without a number is a weaker email; the gate is for claims
+  // that are false.
+  test("accepts a draft that earns credibility without a number", () => {
     expect(
       findPregenHubspotDraftViolations(
         draft(
-          "I was looking through Maui Kai's site and noticed how clearly you explain the direct-booking benefits. I'm with WanderOS, the direct-booking platform from the team behind Wander.com, and our team prepared a private concept using Maui Kai's actual inventory.",
+          "I was looking through Maui Kai's site and noticed how clearly you explain the direct-booking benefits. I'm with WanderOS, and our team prepared a private concept using Maui Kai's actual inventory.",
           "Nothing in this private preview can be booked. Would you be against a look?",
         ),
         { motion: "fresh", pms: null },
-      ).join(" "),
-    ).toContain(PROOF_VIOLATION);
+      ),
+    ).toEqual([]);
   });
 
   test("rejects the limp corporate register in touch 1", () => {

@@ -397,7 +397,9 @@ Supported proof, in two sets that must never be merged into one claim:
 
 Never credit Wander.com with a WanderOS number or the reverse. "Wander.com has 70,000+ nights booked across 10,000+ properties" is a fabricated claim, because the property count belongs to WanderOS. Keep each number attached to the product that earned it, in its own sentence if necessary.
 
-CREDIBILITY COMES FROM NUMBERS, NOT LINEAGE. The recipient has never heard of Wander.com, so "from the team behind Wander.com" tells them nothing on its own. Whenever you identify WanderOS, attach one of the supported numbers above. "WanderOS is the direct-booking platform 1,000+ property managers run on" earns attention; "WanderOS, from the team behind Wander.com" does not. You may still mention Wander.com, but only alongside a number that makes it mean something. Use one number in touch 1 and save a different one for touch 3.
+CREDIBILITY COMES FROM SUBSTANCE, NOT LINEAGE. The recipient has never heard of Wander.com, so "from the team behind Wander.com" tells them nothing on its own. Give them a reason to believe WanderOS is real, usually one of the numbers above, and spend a different one later rather than repeating the first.
+
+SAY IT IN YOUR OWN WORDS EACH TIME. "WanderOS is the direct-booking platform 1,000+ property managers run on" is a correct sentence and it is not the only one. Nine of these went out reading almost identically because that phrasing is the safest way to satisfy the requirement, and a reader looking at more than one immediately sees the template. Introduce the product the way it fits THIS company's situation: a manager weighing a DIY build cares that it is already built and running; a manager whose direct bookings are all repeat guests cares what it does for the ones who are not; a manager who told us no in May needs the fewest words possible before the link. Vary the number, vary the sentence, vary where it sits in the paragraph, and let some drafts carry the proof in a clause rather than a standalone claim.
 
 Do not claim guaranteed conversion or search gains. Do not say the product is free or "essentially free." Do not invent percentages, customer results, product features, or problems with the prospect's current site.
 
@@ -766,7 +768,7 @@ This is our own team's record of what actually happened, so it outranks unanswer
 
 FINAL NON-NEGOTIABLE OUTPUT CHECK:
 - Include this exact standalone sentence in the touch 1 closing: "Nothing in this private preview can be booked."
-- Touch 1 must carry one supported number ($75M+ bookings, 70,000+ nights, 10,000+ properties, 1,000+ property managers, or 11+ PMS integrations). Identifying WanderOS only as "from the team behind Wander.com" fails review.
+- Touch 1 should give a concrete reason to believe WanderOS is real, normally one supported number ($75M+ bookings, 70,000+ nights, 10,000+ properties, 1,000+ property managers, 11+ PMS integrations). Phrase it for this company. Do not reuse the sentence you would write for anyone else, and never identify WanderOS by lineage alone.
 - End the touch 1 closing with one question the recipient could answer "no" to without ending the conversation.
 - Do not name a meeting length anywhere in touch 1.
 - Do not ask a rhetorical pain question about OTA fees or commissions, and do not quote a commission percentage.
