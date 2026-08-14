@@ -90,11 +90,15 @@ for (const row of domains) {
     );
 
   const mentions = storedContactMentions(row.enrichment);
-  const reachable = contacts.filter(
-    (contact) =>
-      contact.hubspotContactId != null && !isPlaceholderEmail(contact.email),
-  );
-  const ranked = reachable
+  // EVERY reachable contact, not just the top-ranked one. The humans running
+  // the blast choose who to enrol inside HubSpot, and a contact they pick that
+  // we did not stamp renders the template's unsendable fallback. The link is
+  // identical for everyone at the company, so over-stamping costs nothing.
+  const reachable = contacts
+    .filter(
+      (contact) =>
+        contact.hubspotContactId != null && !isPlaceholderEmail(contact.email),
+    )
     .map((contact) => ({
       contact,
       score: scoreStoredContact(contact, row.domain, {
@@ -103,8 +107,7 @@ for (const row of domains) {
     }))
     .sort((left, right) => right.score - left.score);
 
-  const top = ranked[0];
-  if (!top) {
+  if (!reachable.length) {
     console.log(`skip  ${row.domain}: no HubSpot-linked contact to stamp`);
     skipped += 1;
     continue;
@@ -113,17 +116,17 @@ for (const row of domains) {
   const link = outreachLinkFor(row.pregenSiteUrl!, row.domain, {
     campaign: "pregen_blast",
   });
-  console.log(
-    `stamp ${row.domain} → ${top.contact.email} (score ${top.score})`,
-  );
+  console.log(`stamp ${row.domain}`);
   console.log(`      ${link}`);
-
-  if (apply) {
-    await updateContact(top.contact.hubspotContactId!, {
-      growth_pregen_preview_url: link,
-    });
+  for (const { contact, score } of reachable) {
+    console.log(`      → ${contact.email} (score ${score})`);
+    if (apply) {
+      await updateContact(contact.hubspotContactId!, {
+        growth_pregen_preview_url: link,
+      });
+    }
+    stamped += 1;
   }
-  stamped += 1;
 }
 
 console.log(
