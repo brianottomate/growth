@@ -1339,6 +1339,16 @@ export const leadsRouter = createTRPCRouter({
       const writtenFromPretendPreview =
         outreach.generationContext?.preview.pretend === true;
 
+      // The copy is written to one person now: it addresses their own replies
+      // and calls as "you" and may use their first name. Enrolling someone else
+      // ships those sentences at the wrong reader. Publishing still goes ahead,
+      // because overriding the pick is a legitimate call, but it cannot go
+      // ahead silently.
+      const draftRecipient = outreach.generationContext?.recipient ?? null;
+      const recipientMismatch =
+        draftRecipient != null &&
+        draftRecipient.email.toLowerCase() !== contact.email.toLowerCase();
+
       // The link comes off the rendered body, which is the copy a rep will
       // actually send. Passing one in from the draft context meant the property
       // could disagree with the email.
@@ -1354,9 +1364,12 @@ export const leadsRouter = createTRPCRouter({
         hubspotContactId: contact.hubspotContactId,
         propertyNames: Object.keys(properties),
         writtenFromPretendPreview,
+        recipientMismatch,
         warning: writtenFromPretendPreview
           ? `This copy was written against a stand-in preview, so anything it says about the page itself is invented. It is now on the HubSpot contact — regenerate and re-publish once ${row.domain} has a real preview.`
-          : null,
+          : recipientMismatch
+            ? `This copy was written to ${draftRecipient?.name ?? draftRecipient?.email} and addresses their own replies and calls as "you". You published it to ${contact.email}. Read touch 1 and touch 4 before enrolling, or regenerate for this contact.`
+            : null,
       };
     }),
 

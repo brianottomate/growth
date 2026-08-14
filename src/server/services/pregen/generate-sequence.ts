@@ -23,6 +23,12 @@ export type GenerateSequenceOptions = {
    * publishing refuses it.
    */
   pretend?: boolean;
+  /**
+   * Write to this person specifically. Left unset the generator resolves the
+   * likeliest contact from the record, preferring whoever our team actually
+   * spoke to.
+   */
+  recipientEmail?: string;
 };
 
 /**
@@ -93,6 +99,7 @@ export async function generateAndStoreSequence(
     motion,
     previewUrl,
     steer: options.steer,
+    recipientEmail: options.recipientEmail,
     previewMode: options.pretend ? "pretend" : "require-live",
   });
 

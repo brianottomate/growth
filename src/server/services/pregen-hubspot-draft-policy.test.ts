@@ -63,7 +63,10 @@ describe("findPregenHubspotDraftViolations", () => {
     );
 
     expect(violations).toContain(
-      "The draft is company-level; do not address a correspondent or attribute company history to the eventual recipient.",
+      'HubSpot renders "Hi [First name]," above the opening; do not begin the opening with the recipient\'s name as a greeting.',
+    );
+    expect(violations).toContain(
+      'No recipient was resolved, so this draft is company-level; attribute each message to the person who sent it rather than to "you".',
     );
     // Claim and register violations now name the touch they came from, because
     // the gate reads all four.
@@ -79,6 +82,48 @@ describe("findPregenHubspotDraftViolations", () => {
     expect(violations).toContain(
       "Touch 1 must make clear that nothing in the private preview can be booked.",
     );
+  });
+
+  // The generator resolves who this is being sent as. When it knows, writing
+  // that person's own reply back to them is the strongest material available,
+  // and forbidding it produced copy that discussed the recipient in the third
+  // person as though they were a stranger to their own conversation.
+  test("allows addressing the resolved recipient's own history as you", () => {
+    expect(
+      findPregenHubspotDraftViolations(
+        draft(
+          "You asked back in May whether this would carry the resort names over. WanderOS runs direct booking for 1,000+ property managers, and our team built something from Maui Kai's own inventory to answer that properly.",
+          "Nothing in this private preview can be booked. Is this still worth chasing for you?",
+        ),
+        { motion: "reengagement", pms: null, recipientKnown: true },
+      ),
+    ).toEqual([]);
+  });
+
+  // The label always said "in touch 1" and the loop applied it to all four. A
+  // concrete ask in the last touch is the point of the last touch.
+  test("allows a meeting length outside touch 1", () => {
+    const violations = findPregenHubspotDraftViolations(
+      {
+        touches: [
+          {
+            opening:
+              "Maui Kai names its resorts on the site. WanderOS runs direct booking for 1,000+ property managers.",
+            closing:
+              "Nothing in this private preview can be booked. Bad time to look?",
+          },
+          { opening: "Product fit.", closing: "Still worth it?" },
+          { opening: "Proof point.", closing: "Worth a look?" },
+          {
+            opening: "Last note on this.",
+            closing: "Would 15 minutes next week be easier than more email?",
+          },
+        ],
+      },
+      { motion: "fresh", pms: null },
+    );
+
+    expect(violations).toEqual([]);
   });
 
   test("allows an explicit disclaimer that the preview does not answer technical questions", () => {

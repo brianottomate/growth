@@ -26,7 +26,17 @@ const PROOF_ANCHOR_PATTERN =
  * that makes a one-to-one email read like a template. Banning shapes keeps the
  * copy varied; requiring one exact shape would not.
  */
-const LIMP_PHRASES: Array<{ pattern: RegExp; label: string }> = [
+const LIMP_PHRASES: Array<{
+  pattern: RegExp;
+  label: string;
+  /**
+   * Some of these are only wrong in the first touch. Naming a meeting length
+   * cold is presumptuous; naming one in touch 4, to someone who has read three
+   * emails and not replied, is the concrete ask that gets a yes or a no. The
+   * rule text always said "in touch 1" and the loop applied it to all four.
+   */
+  touch1Only?: boolean;
+}> = [
   {
     pattern: /\bwould it be (?:worth|useful|helpful)\b/i,
     label: '"would it be worth/useful/helpful"',
@@ -34,6 +44,7 @@ const LIMP_PHRASES: Array<{ pattern: RegExp; label: string }> = [
   {
     pattern: /\b\d{1,3}\s*(?:-\s*)?minutes?\b/i,
     label: "a specific meeting length in touch 1",
+    touch1Only: true,
   },
   {
     pattern:
@@ -102,6 +113,12 @@ export function findPregenHubspotDraftViolations(
   options: {
     motion: "fresh" | "reengagement";
     pms: string | null;
+    /**
+     * True when the generator was told who this is being sent as. Addressing
+     * that person's own history as "you" is then correct and is the strongest
+     * material available, so the misattribution check below stands down.
+     */
+    recipientKnown?: boolean;
   },
 ): string[] {
   const touch1 = draft.touches[0];
@@ -127,12 +144,22 @@ export function findPregenHubspotDraftViolations(
       "The preview URL renders before the touch 1 closing; do not describe where the link sits from the closing, in either direction.",
     );
   }
+  // A name used as a salutation duplicates HubSpot's own greeting, whether or
+  // not we know the recipient.
+  if (/^(?:[A-Z][a-z]{1,30}),\s+/.test(opening)) {
+    violations.push(
+      "HubSpot renders \"Hi [First name],\" above the opening; do not begin the opening with the recipient's name as a greeting.",
+    );
+  }
+  // Attributing history to "you" is only wrong when we do not know who "you"
+  // is. When the recipient is resolved, their own reply or call is the best
+  // thing in the email and this used to forbid it.
   if (
-    /^(?:[A-Z][a-z]{1,30}),\s+(?:you|your)\b/.test(opening) ||
+    !options.recipientKnown &&
     /\byou\s+(?:replied|asked|said|mentioned|wanted|flagged)\b/i.test(opening)
   ) {
     violations.push(
-      "The draft is company-level; do not address a correspondent or attribute company history to the eventual recipient.",
+      "No recipient was resolved, so this draft is company-level; attribute each message to the person who sent it rather than to \"you\".",
     );
   }
   if (
@@ -163,7 +190,8 @@ export function findPregenHubspotDraftViolations(
     const text = `${touch.opening}\n${touch.closing}`.trim();
     const sentences = text.split(/(?<=[.!?])\s+/);
 
-    for (const { pattern, label: phrase } of LIMP_PHRASES) {
+    for (const { pattern, label: phrase, touch1Only } of LIMP_PHRASES) {
+      if (touch1Only && index > 0) continue;
       if (pattern.test(text)) {
         violations.push(
           `${label} uses ${phrase}; rewrite it in plainer language.`,
@@ -175,7 +203,11 @@ export function findPregenHubspotDraftViolations(
         `${label}: the preview is linked in the email, not attached; do not describe an attachment.`,
       );
     }
-    if (/\bcheckout\b/i.test(text)) {
+    // Touch 1 only. Touch 1 is about this specific preview, which has booking
+    // disabled, so the word invites a claim we cannot support. Later touches
+    // describe the product, where checkout is a real capability and refusing to
+    // name it costs an honest answer.
+    if (index === 0 && /\bcheckout\b/i.test(text)) {
       violations.push(
         `${label}: do not claim the private preview includes or demonstrates checkout.`,
       );

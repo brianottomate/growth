@@ -477,6 +477,16 @@ export type PregenGenerationContext = {
   pms: string | null;
   steer: string | null;
   hubspotCompanyId: string | null;
+  /**
+   * The person the copy was written to, when one could be resolved. The draft
+   * addresses their own history as "you", so a reviewer needs to know who that
+   * was before enrolling someone else. Absent on company-level drafts.
+   */
+  recipient?: {
+    name: string | null;
+    email: string;
+    hubspotContactId: string | null;
+  } | null;
   /** The renderer address the generator read and wrote copy about. */
   previewUrl: string;
   /**

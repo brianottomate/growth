@@ -206,6 +206,109 @@ function rankerBrief(enrichment: LeadEnrichmentContext): string {
   return lines.length ? lines.join("\n") : "(ranked, but nothing notable)";
 }
 
+/**
+ * Shared inboxes. Named for what they are rather than inferred from the absence
+ * of a job title, because plenty of real people have no title on record.
+ */
+const GENERIC_MAILBOXES = new Set([
+  "admin",
+  "bookings",
+  "contact",
+  "hello",
+  "help",
+  "info",
+  "inquiries",
+  "mail",
+  "office",
+  "reservations",
+  "rentals",
+  "sales",
+  "stay",
+  "support",
+  "team",
+]);
+
+export type PregenRecipient = {
+  firstName: string | null;
+  lastName: string | null;
+  jobTitle: string | null;
+  email: string;
+  hubspotContactId: string | null;
+};
+
+/**
+ * The person this sequence will most likely be enrolled as.
+ *
+ * The draft used to be written for nobody: generation ran at company level,
+ * enrolment picked a contact later, and the prompt therefore banned naming
+ * anyone. That ban was doing real damage. It forced "Ryan asked about the
+ * calendar" even when Ryan was the recipient, which reads like a message about
+ * someone else, and it threw away the strongest thing we have on a re-engaged
+ * account: their own words back to them.
+ *
+ * So resolve the likely recipient up front and write to them. If enrolment
+ * lands on someone else, the copy is still safe — it never re-greets by name,
+ * and the caller can pass `recipientEmail` to be certain.
+ *
+ * Linked to HubSpot first (an unlinked row cannot be enrolled at all), then a
+ * real first name, then a role address over a freemail one.
+ */
+export function pickRecipient(
+  contacts: PregenRecipient[],
+  requestedEmail: string | undefined,
+  domain: string,
+  historyBlob: string,
+): PregenRecipient | null {
+  if (requestedEmail) {
+    const wanted = requestedEmail.trim().toLowerCase();
+    const match = contacts.find((c) => c.email.toLowerCase() === wanted);
+    if (match) return match;
+  }
+  // A shared mailbox is not a person. It routinely wins on mentions — every
+  // thread copies it — and writing "you asked back in May" to info@ is the
+  // exact failure the recipient block is meant to prevent.
+  const people = contacts.filter((contact) => {
+    const local = contact.email.split("@")[0]?.toLowerCase() ?? "";
+    if (GENERIC_MAILBOXES.has(local)) return false;
+    return Boolean(contact.firstName?.trim());
+  });
+  const haystack = historyBlob.toLowerCase();
+  // Being the person our team actually spoke to outranks every static
+  // attribute. Two contacts at the same company are otherwise indistinguishable
+  // — Barb and Walt Kubiak score identically on name, role and address — and
+  // picking the one with six logged calls is the whole point of writing to a
+  // person rather than to a company.
+  // Counted, not just detected. Two contacts at one company are routinely both
+  // present — Barb and Walt Kubiak are named in the same threads — and a
+  // boolean leaves the pick to whatever order the rows came back in. How often
+  // the record talks about someone is the closest thing we have to who the
+  // conversation is actually with.
+  const mentions = (contact: PregenRecipient): number => {
+    const first = contact.firstName?.trim().toLowerCase();
+    const last = contact.lastName?.trim().toLowerCase();
+    if (!first || first.length < 3) return 0;
+    const needle = last ? `${first} ${last}` : first;
+    let count = 0;
+    let at = haystack.indexOf(needle);
+    while (at !== -1 && count < 99) {
+      count += 1;
+      at = haystack.indexOf(needle, at + needle.length);
+    }
+    return count;
+  };
+  const score = (contact: PregenRecipient): number =>
+    Math.min(mentions(contact), 40) * 16 +
+    (contact.hubspotContactId ? 8 : 0) +
+    (contact.firstName?.trim() ? 4 : 0) +
+    (contact.email.toLowerCase().endsWith(`@${domain}`) ? 2 : 0) +
+    (contact.jobTitle?.trim() ? 1 : 0);
+  const ranked = [...people].sort((left, right) => score(right) - score(left));
+  const best = ranked[0];
+  // A row with neither a HubSpot link nor a name is not a person we can write
+  // to; fall back to company-level copy rather than guessing.
+  return best && score(best) >= 8 ? best : null;
+}
+
 async function readWebsiteText(domain: string): Promise<string> {
   return (await readUrlText(`https://${domain}`, "Website")).text;
 }
@@ -320,7 +423,9 @@ Treat old outbound emails as conversation history, not as factual evidence. They
 
 The HubSpot template adds the greeting, blank paragraphs, preview URL, and sender signature. You own all substantive prose. Each opening and closing must be exactly one compact paragraph with no line breaks, greeting, sign-off, or URL. The first touch should total roughly 70-110 words across its two paragraphs. Follow-ups should be shorter.
 
-The draft is generated at company level before an operator selects the enrolled contact. Never address a person by name inside the prose, and never assume the eventual recipient personally wrote a message found in company history. If Ryan asked a question, write "Ryan asked..." rather than "you asked..." or "Ryan, you asked...." The separate HubSpot greeting handles the recipient's first name.
+WHO YOU ARE WRITING TO. The RECIPIENT block below names the person this will be sent as, when we know them. Write to that person. If the history shows they replied, asked something, or took the call, that is "you" and it is the best material in the email — use it. Everyone else in the record stays in the third person by first name: a colleague of theirs, a teammate of ours, either way "Chris said" and never "you said". If the block says the recipient is unknown, keep the whole draft company-level and attribute every message to the person who sent it.
+
+Do not open with a greeting or write the recipient's name as a salutation. HubSpot adds "Hi [First name]," above your first paragraph, so a name at the top of the opening produces it twice. Using their name once inside a sentence is fine and often good.
 
 A PMS named in the lead record is valid product-fit context only. It is not evidence that the private preview currently pulls from, syncs with, or was generated from that PMS. Unless authoritative operator context explicitly confirms the preview's data source, say that the preview uses the company's actual inventory, not that it pulls live from Guesty, Hostaway, or another PMS.
 
@@ -398,6 +503,12 @@ export async function generatePregenHubspotDraft(
      * "require-live" is the default and is what a real send path uses.
      */
     previewMode?: "require-live" | "pretend";
+    /**
+     * Who this will be enrolled as. Optional, and when it is missing the
+     * generator picks the likeliest contact rather than writing blind — see
+     * `pickRecipient`.
+     */
+    recipientEmail?: string;
   },
 ): Promise<{
   domainId: string;
@@ -456,6 +567,7 @@ export async function generatePregenHubspotDraft(
           lastName: leadContactTable.lastName,
           jobTitle: leadContactTable.jobTitle,
           email: leadContactTable.email,
+          hubspotContactId: leadContactTable.hubspotContactId,
         })
         .from(leadContactTable)
         .where(eq(leadContactTable.domainId, row.id))
@@ -474,6 +586,24 @@ export async function generatePregenHubspotDraft(
       `${row.domain}: preview is not readable (${previewText.detail}) at ${options.previewUrl} — refusing to generate copy that cannot describe it. Assign a reachable preview, or generate in pretend mode to iterate on copy.`,
     );
   }
+
+  // Titles carry the counterpart's name ("Call with Walt Kubiak"); bodies carry
+  // whoever was addressed or signed. Both are worth searching.
+  const historyBlob = [
+    ...(activity?.items ?? []).map((item) => `${item.title} ${item.body}`),
+    ...(history?.items ?? []).map((item) => `${item.subject} ${item.body}`),
+  ].join("\n");
+
+  const recipient = pickRecipient(
+    contacts.filter(
+      (contact) =>
+        contact.email.toLowerCase() !== "kristian.e.boe@gmail.com" &&
+        !contact.email.toLowerCase().endsWith("@wander.com"),
+    ),
+    options.recipientEmail,
+    row.domain,
+    historyBlob,
+  );
 
   const prospectContacts = contacts.filter(
     (contact) =>
@@ -518,6 +648,16 @@ export async function generatePregenHubspotDraft(
     pms: row.pms ?? null,
     steer: options.steer?.trim() || null,
     hubspotCompanyId: company?.id ?? null,
+    recipient: recipient
+      ? {
+          name:
+            [recipient.firstName, recipient.lastName]
+              .filter(Boolean)
+              .join(" ") || null,
+          email: recipient.email,
+          hubspotContactId: recipient.hubspotContactId,
+        }
+      : null,
     previewUrl: options.previewUrl,
     preview: {
       readable: previewText.ok,
@@ -577,6 +717,13 @@ CURRENT LEAD RECORD:
 - Unit estimate: ${row.unitEstimate ?? "(unknown)"}
 - Contacts: ${compact(prospectContacts, 3_000)}
 
+RECIPIENT:
+${
+  recipient
+    ? `${[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || recipient.email}${recipient.jobTitle ? `, ${recipient.jobTitle}` : ""}. Anything in the history below that this person said, asked or was on a call for is "you". Anything anyone else said stays in their name.`
+    : `Unknown. No contact on this domain is confidently the one who will be enrolled, so keep the draft company-level and attribute every message in the history to the person who sent it.`
+}
+
 WHAT WE KNOW ABOUT THEM (from enrichment):
 ${labelledEnrichment(enrichment)}
 
@@ -610,7 +757,7 @@ FINAL NON-NEGOTIABLE OUTPUT CHECK:
 - Do not use the word "checkout" anywhere in touch 1.
 - The preview URL renders between the opening and closing. Do not describe its
   position from the closing at all, in either direction. Never call it attached.
-- Do not address a correspondent by name or attribute a company-history message to "you."
+- Do not attribute someone else's message or question to the recipient, and do not start the opening with their name as a greeting.
 - Do not say the preview answers a technical, ChatGPT, MCP, or architecture question.
 - Do not connect the preview to the named PMS unless OPERATOR CONTEXT explicitly confirms that data source.
 
@@ -633,6 +780,7 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
     const violations = findPregenHubspotDraftViolations(candidate, {
       motion,
       pms: row.pms,
+      recipientKnown: recipient != null,
     });
     lastViolations = violations;
     if (violations.length === 0) {
