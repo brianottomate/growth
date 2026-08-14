@@ -38,30 +38,10 @@ export async function winningExemplarsBlock(
         ),
       )
       .orderBy(desc(salesEmailCorpusTable.sentAt))
-      .limit(24);
+      .limit(60);
     if (!winners.length) return null;
 
-    // One per rep, so three exemplars show three voices rather than the most
-    // recent rep three times.
-    const picked: typeof winners = [];
-    const seenReps = new Set<string>();
-    for (const row of winners) {
-      const rep = row.rep ?? "unknown";
-      if (seenReps.has(rep) && picked.length + (winners.length - picked.length) > count) {
-        continue;
-      }
-      seenReps.add(rep);
-      picked.push(row);
-      if (picked.length >= count) break;
-    }
-    if (picked.length < count) {
-      for (const row of winners) {
-        if (picked.length >= count) break;
-        if (!picked.includes(row)) picked.push(row);
-      }
-    }
-
-    const replyIds = picked
+    const replyIds = winners
       .map((row) => row.replyEngagementId)
       .filter((value): value is string => Boolean(value));
     const replies = replyIds.length
@@ -72,13 +52,48 @@ export async function winningExemplarsBlock(
       : [];
     const replyById = new Map(replies.map((row) => [row.engagementId, row]));
 
-    const blocks = picked.map((row, index) => {
+    // The reply label is mechanical — "an inbound landed within 45 days" — so
+    // out-of-office bounces and departure notices count as wins. They are not.
+    // An exemplar exists to show what earned a human answer, and "I am
+    // experiencing a higher-than-usual volume of emails" earned nothing.
+    const AUTO_REPLY =
+      /out of (?:the )?office|auto(?:matic|mated)?[- ]?repl|no longer with|higher.than.usual volume|response times? may be (?:longer|delayed)|currently (?:away|traveling|travelling)|i(?:'| wi)ll be (?:away|out)|limited access to (?:my )?email|unsubscribe|remove me from|stop email|please allow us time|thank you for contacting|email disclaimer|we will (?:get back|respond) to you/i;
+
+    // The corpus holds every one-to-one sales mail — onboarding welcomes,
+    // scheduling, invoices — and those are the wrong register for prospecting
+    // however many replies they earn. A welcome email to a signed customer
+    // gets a reply because they are a customer, not because the writing works.
+    const NOT_PROSPECTING_SUBJECT =
+      /welcome|onboarding|kick[- ]?off|invoice|agreement|contract|launch|next steps|intro call|recap/i;
+
+    const qualified = winners.filter((row) => {
+      if (NOT_PROSPECTING_SUBJECT.test(row.subject)) return false;
       const reply = row.replyEngagementId
         ? replyById.get(row.replyEngagementId)
         : null;
-      const replyText = reply
-        ? reply.body.replace(/\s+/g, " ").trim().slice(0, 400)
-        : "(reply body not retained)";
+      return reply != null && !AUTO_REPLY.test(reply.body);
+    });
+    if (!qualified.length) return null;
+
+    // One per rep, so three exemplars show three voices rather than the most
+    // recent rep three times.
+    const picked: typeof qualified = [];
+    const seenReps = new Set<string>();
+    for (const row of qualified) {
+      const rep = row.rep ?? "unknown";
+      if (seenReps.has(rep)) continue;
+      seenReps.add(rep);
+      picked.push(row);
+      if (picked.length >= count) break;
+    }
+    for (const row of qualified) {
+      if (picked.length >= count) break;
+      if (!picked.includes(row)) picked.push(row);
+    }
+
+    const blocks = picked.map((row, index) => {
+      const reply = replyById.get(row.replyEngagementId!)!;
+      const replyText = reply.body.replace(/\s+/g, " ").trim().slice(0, 400);
       return `EXCHANGE ${index + 1} — a real send from ${row.rep ?? "a rep"} that earned a reply:
 Subject: ${row.subject || "(no subject)"}
 ${row.body}
