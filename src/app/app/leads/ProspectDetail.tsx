@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2 } from "lucide-react";
@@ -40,6 +39,62 @@ function Row({
       </span>
       <span className="min-w-0 flex-1 break-words">{children}</span>
     </div>
+  );
+}
+
+/** When a touch lands, relative to enrolment. Carried over from the retired
+    presentation page: "+3d" reads as a cadence where "day 3" reads as a date. */
+function DayRail({ day, label }: { day: number; label: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-4 pb-1">
+      <span className="text-muted-foreground w-14 shrink-0 text-right text-xs tabular-nums">
+        {day === 0 ? "Day 0" : `+${day}d`}
+      </span>
+      <span className="bg-border h-px flex-1" />
+      <span className="text-muted-foreground shrink-0 text-xs">{label}</span>
+    </div>
+  );
+}
+
+/** One touch, in the shape the recipient sees it: subject as a heading, or an
+    explicit note that it lands as a reply in the same thread. */
+function TouchCard({
+  arm,
+  step,
+  tone,
+}: {
+  arm: string;
+  step: { delayDays: number; subject?: string | null; body: string };
+  tone: "template" | "bespoke";
+}) {
+  return (
+    <article
+      className={
+        tone === "template"
+          ? "rounded-lg border border-amber-500/25 bg-amber-500/5 p-4"
+          : "border-border bg-card rounded-lg border p-4"
+      }
+    >
+      <p
+        className={`text-xs font-medium ${
+          tone === "template" ? "text-amber-300" : "text-emerald-300"
+        }`}
+      >
+        {arm}
+      </p>
+      {step.subject ? (
+        <p className="mt-1 text-base font-semibold [overflow-wrap:anywhere]">
+          {step.subject}
+        </p>
+      ) : (
+        <p className="text-muted-foreground mt-1 text-xs italic">
+          Reply in the same thread — no new subject
+        </p>
+      )}
+      <div className="mt-3 text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
+        {step.body}
+      </div>
+    </article>
   );
 }
 
@@ -369,13 +424,6 @@ export function ProspectDetail({ domain }: { domain: string }) {
         <div className="space-y-3">
           {outreach ? (
             <>
-              {/* The same steps without the review chrome, for showing someone. */}
-              <Link
-                href={`/app/leads/${encodeURIComponent(row.domain)}/sequence`}
-                className="text-muted-foreground hover:text-foreground inline-block text-xs underline underline-offset-2"
-              >
-                Open as a presentation →
-              </Link>
               {outreach.angle ? (
                 <p className="text-sm">
                   <span className="text-muted-foreground">Angle: </span>
@@ -483,52 +531,36 @@ export function ProspectDetail({ domain }: { domain: string }) {
           }).map((_, index) => {
             const blast = blastSteps[index];
             const bespoke = bespokeSteps[index];
+            // The two arms can space the same touch differently, so the rail
+            // shows the bespoke timing when they disagree and names the gap
+            // rather than quietly picking one.
+            const days = [blast?.delayDays, bespoke?.delayDays].filter(
+              (value): value is number => value != null,
+            );
+            const rail = bespoke?.delayDays ?? blast?.delayDays ?? 0;
+            const drift =
+              days.length === 2 && days[0] !== days[1]
+                ? `Touch ${index + 1} · template sends day ${blast!.delayDays}`
+                : `Touch ${index + 1}`;
             return (
-              <div key={index} className="grid gap-3 lg:grid-cols-2">
-                {blast ? (
-                  <div className="rounded border border-amber-500/25 bg-amber-500/5 p-3">
-                    <p className="text-xs">
-                      <span className="font-medium text-amber-300">
-                        Template
-                      </span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · Touch {index + 1} · day {blast.delayDays}
-                        {blast.subject ? ` · ${blast.subject}` : " · in-thread"}
-                      </span>
-                    </p>
-                    <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
-                      {blast.body}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-muted-foreground hidden items-center rounded border border-dashed p-3 text-xs lg:flex">
-                    The template has no touch {index + 1}.
-                  </div>
-                )}
-                {bespoke ? (
-                  <div className="border-border rounded border p-3">
-                    <p className="text-xs">
-                      <span className="font-medium text-emerald-300">
-                        Bespoke
-                      </span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · Touch {index + 1} · day {bespoke.delayDays}
-                        {bespoke.subject
-                          ? ` · ${bespoke.subject}`
-                          : " · in-thread"}
-                      </span>
-                    </p>
-                    <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
-                      {bespoke.body}
-                    </p>
-                  </div>
-                ) : bespokeSteps.length ? (
-                  <div className="text-muted-foreground hidden items-center rounded border border-dashed p-3 text-xs lg:flex">
-                    The bespoke draft has no touch {index + 1}.
-                  </div>
-                ) : null}
+              <div key={index}>
+                <DayRail day={rail} label={drift} />
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {blast ? (
+                    <TouchCard arm="Template" step={blast} tone="template" />
+                  ) : (
+                    <div className="text-muted-foreground hidden items-center rounded-lg border border-dashed p-4 text-xs lg:flex">
+                      The template has no touch {index + 1}.
+                    </div>
+                  )}
+                  {bespoke ? (
+                    <TouchCard arm="Bespoke" step={bespoke} tone="bespoke" />
+                  ) : bespokeSteps.length ? (
+                    <div className="text-muted-foreground hidden items-center rounded-lg border border-dashed p-4 text-xs lg:flex">
+                      The bespoke draft has no touch {index + 1}.
+                    </div>
+                  ) : null}
+                </div>
               </div>
             );
           })}
