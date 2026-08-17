@@ -8,7 +8,10 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { blastSequenceFor } from "@/lib/pregen-blast-template";
+import {
+  blastSequenceFor,
+  type TemplatePart,
+} from "@/lib/pregen-blast-template";
 
 /**
  * Everything about one prospect on a single surface, addressed by domain.
@@ -56,16 +59,61 @@ function DayRail({ day, label }: { day: number; label: string }) {
   );
 }
 
+/**
+ * Template copy with its variables marked.
+ *
+ * The mark is always on, in both modes: the question "what varies here" has a
+ * different answer from "what does this lead receive", and a reviewer needs
+ * both. `filled` only decides what sits inside the mark.
+ */
+function Merged({ parts, filled }: { parts: TemplatePart[]; filled: boolean }) {
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part.kind === "text") return <span key={index}>{part.value}</span>;
+        if (part.kind === "merge") {
+          return (
+            <span
+              key={index}
+              className="rounded bg-sky-500/20 px-1 text-sky-200"
+              title={filled ? `merge field: ${part.field}` : part.value}
+            >
+              {filled ? part.value : `[${part.field}]`}
+            </span>
+          );
+        }
+        return (
+          <span key={index}>
+            <span className="rounded bg-sky-500/20 px-1 text-sky-200 underline underline-offset-2">
+              {part.text}
+            </span>
+            {filled ? (
+              <span className="text-muted-foreground block text-xs">
+                {part.url}
+              </span>
+            ) : null}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 /** One touch, in the shape the recipient sees it: subject as a heading, or an
     explicit note that it lands as a reply in the same thread. */
 function TouchCard({
   arm,
-  step,
+  subjects,
+  body,
   tone,
+  filled,
 }: {
   arm: string;
-  step: { delayDays: number; subject?: string | null; body: string };
+  /** More than one means the arm A/B tests the subject line. */
+  subjects: TemplatePart[][];
+  body: TemplatePart[];
   tone: "template" | "bespoke";
+  filled: boolean;
 }) {
   return (
     <article
@@ -82,17 +130,27 @@ function TouchCard({
       >
         {arm}
       </p>
-      {step.subject ? (
-        <p className="mt-1 text-base font-semibold [overflow-wrap:anywhere]">
-          {step.subject}
-        </p>
+      {subjects.length ? (
+        subjects.map((subject, index) => (
+          <p
+            key={index}
+            className="mt-1 text-base font-semibold [overflow-wrap:anywhere]"
+          >
+            {subjects.length > 1 ? (
+              <span className="text-muted-foreground text-xs font-normal">
+                {String.fromCharCode(65 + index)}{" "}
+              </span>
+            ) : null}
+            <Merged parts={subject} filled={filled} />
+          </p>
+        ))
       ) : (
         <p className="text-muted-foreground mt-1 text-xs italic">
           Reply in the same thread — no new subject
         </p>
       )}
       <div className="mt-3 text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
-        {step.body}
+        <Merged parts={body} filled={filled} />
       </div>
     </article>
   );
@@ -152,6 +210,9 @@ const VERDICT_TONE: Record<string, string> = {
 export function ProspectDetail({ domain }: { domain: string }) {
   const trpc = useTRPC();
   const [showCrm, setShowCrm] = useState(false);
+  // Filled by default: the reviewer's question is almost always "what does this
+  // lead receive", and the template reading is one click away.
+  const [filled, setFilled] = useState(true);
 
   const queryClient = useQueryClient();
   const prospect = useQuery(trpc.leads.prospect.queryOptions({ domain }));
@@ -507,19 +568,34 @@ export function ProspectDetail({ domain }: { domain: string }) {
           {/* The internal debate, made lookable touch by touch: the template
               every lead gets and the copy written for this one share a row, so
               the comparison is same-touch against same-touch. */}
-          <p className="text-xs">
-            <span className="font-medium text-amber-300">Template</span>
-            <span className="text-muted-foreground">
-              {" "}
-              is identical for every lead; only name, company and link merge
-              in.{" "}
-            </span>
-            <span className="font-medium text-emerald-300">Bespoke</span>
-            <span className="text-muted-foreground">
-              {" "}
-              is written from this lead&apos;s own record.
-            </span>
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs">
+              <span className="font-medium text-amber-300">Template</span>
+              <span className="text-muted-foreground">
+                {" "}
+                is Kyle&apos;s copy, identical for every lead;{" "}
+              </span>
+              <span className="rounded bg-sky-500/20 px-1 text-sky-200">
+                highlighted
+              </span>
+              <span className="text-muted-foreground">
+                {" "}
+                spans are the only parts that vary.{" "}
+              </span>
+              <span className="font-medium text-emerald-300">Bespoke</span>
+              <span className="text-muted-foreground">
+                {" "}
+                is written from this lead&apos;s own record, so all of it does.
+              </span>
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setFilled((value) => !value)}
+            >
+              {filled ? "Show merge fields" : "Show filled in"}
+            </Button>
+          </div>
           {!bespokeSteps.length ? (
             <p className="text-muted-foreground text-sm">
               Nothing generated for this company yet. The template touches below
@@ -547,14 +623,30 @@ export function ProspectDetail({ domain }: { domain: string }) {
                 <DayRail day={rail} label={drift} />
                 <div className="grid gap-3 lg:grid-cols-2">
                   {blast ? (
-                    <TouchCard arm="Template" step={blast} tone="template" />
+                    <TouchCard
+                      arm="Template"
+                      subjects={blast.subjects}
+                      body={blast.body}
+                      tone="template"
+                      filled={filled}
+                    />
                   ) : (
                     <div className="text-muted-foreground hidden items-center rounded-lg border border-dashed p-4 text-xs lg:flex">
                       The template has no touch {index + 1}.
                     </div>
                   )}
                   {bespoke ? (
-                    <TouchCard arm="Bespoke" step={bespoke} tone="bespoke" />
+                    <TouchCard
+                      arm="Bespoke"
+                      subjects={
+                        bespoke.subject
+                          ? [[{ kind: "text", value: bespoke.subject }]]
+                          : []
+                      }
+                      body={[{ kind: "text", value: bespoke.body }]}
+                      tone="bespoke"
+                      filled={filled}
+                    />
                   ) : bespokeSteps.length ? (
                     <div className="text-muted-foreground hidden items-center rounded-lg border border-dashed p-4 text-xs lg:flex">
                       The bespoke draft has no touch {index + 1}.

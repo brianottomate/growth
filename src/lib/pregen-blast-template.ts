@@ -1,28 +1,66 @@
 /**
- * The one-size-fits-all blast sequence, hardcoded.
+ * The one-size-fits-all blast sequence, authored by Kyle.
  *
  * This is the other side of the internal debate: one template every prospect
- * gets, with only the name, company, and preview link merged in. It exists so
- * the debate can happen over two real sequences on one screen instead of over
- * adjectives — the lead page renders this beside the bespoke draft, per lead.
+ * gets, with only merge fields varying. It exists so the debate happens over
+ * two real sequences on one screen rather than over adjectives, and so the
+ * template is inspectable before anyone enrols a contact.
  *
- * Deliberately plain template literals, no model anywhere. When the real blast
- * copy lands from sales, replace the strings here and the comparison view
- * updates everywhere at once. Until then this is a faithful stand-in: the
- * register HubSpot one-template sequences are usually written in, four touches
- * on the same day spacing the bespoke generator uses.
+ * Email 1 is Kyle's copy verbatim, punctuation included. Emails 2 to 4 are
+ * drafted to his register: one idea each, short lines, the proof point stated
+ * plainly, signed with a first name. Send-day spacing is a placeholder, since
+ * he specified copy and not cadence.
  *
- * Client-safe on purpose, same as pregen-urls: the detail page computes it in
- * the browser from data it already has, no round trip.
+ * Bodies are parts rather than one string so the UI can mark what actually
+ * varies. A reviewer asking "what does this lead receive" and a reviewer asking
+ * "what does the template say" want different renderings of the same thing,
+ * and a plain string can only answer one of them.
+ *
+ * Client-safe on purpose: the lead page computes it in the browser from data it
+ * already holds.
  */
 import { outreachLinkFor } from "@/lib/pregen-urls";
 
+export type TemplatePart =
+  | { kind: "text"; value: string }
+  /** A HubSpot merge field: `field` is what the template shows, `value` what
+      this lead resolves it to. */
+  | { kind: "merge"; field: string; value: string }
+  /** A hyperlink whose anchor text is fixed and whose target varies. */
+  | { kind: "link"; text: string; url: string };
+
 export type BlastStep = {
   delayDays: number;
-  /** Absent means in-thread — a reply to the previous touch. */
-  subject?: string;
-  body: string;
+  /** Kyle wrote two subject lines for touch 1; later touches reply in-thread. */
+  subjects: TemplatePart[][];
+  body: TemplatePart[];
 };
+
+/** The template as authored: merge fields shown by name, links by anchor text. */
+export function renderTemplate(parts: TemplatePart[]): string {
+  return parts
+    .map((part) =>
+      part.kind === "text"
+        ? part.value
+        : part.kind === "merge"
+          ? `[${part.field}]`
+          : part.text,
+    )
+    .join("");
+}
+
+/** What this lead actually receives. */
+export function renderFilled(parts: TemplatePart[]): string {
+  return parts
+    .map((part) =>
+      part.kind === "text"
+        ? part.value
+        : part.kind === "merge"
+          ? part.value
+          : `${part.text}\n${part.url}`,
+    )
+    .join("");
+}
 
 export function blastSequenceFor(input: {
   firstName?: string | null;
@@ -30,57 +68,108 @@ export function blastSequenceFor(input: {
   domain: string;
   previewUrl: string | null;
 }): BlastStep[] {
-  const name = input.firstName?.trim() || "there";
-  const company = input.companyName?.trim() || input.domain;
-  const link = input.previewUrl
-    ? outreachLinkFor(input.previewUrl, input.domain, {
-        campaign: "pregen_blast",
-      })
-    : "[preview link]";
+  const text = (value: string): TemplatePart => ({ kind: "text", value });
+  const firstName: TemplatePart = {
+    kind: "merge",
+    field: "first name",
+    value: input.firstName?.trim() || "there",
+  };
+  const domain: TemplatePart = {
+    kind: "merge",
+    field: "website",
+    value: input.domain,
+  };
+  const link: TemplatePart = {
+    kind: "link",
+    text: "See your preview →",
+    url: input.previewUrl
+      ? outreachLinkFor(input.previewUrl, input.domain, {
+          campaign: "pregen_blast",
+        })
+      : "(no preview built for this lead)",
+  };
 
   return [
     {
       delayDays: 0,
-      subject: `We built ${company} a direct booking site`,
-      body: `Hi ${name},
+      subjects: [
+        [text("We rebuilt "), domain, text(" for you")],
+        [domain, text(", rebuilt")],
+      ],
+      body: [
+        text("Hi "),
+        firstName,
+        text(`,
 
-We went ahead and built a direct booking website for ${company}. It's live now, with your properties already on it:
+We built a live preview of your direct booking site on WanderOS — no work on your end, just wanted you to see it.
 
-${link}
+`),
+        link,
+        text(`
 
-It runs on WanderOS, the platform we use to power direct bookings for vacation rental managers. The preview is yours to look at either way, and if you like it, making it real takes about 15 minutes.
+WanderOS customers are also seeing a 66% average lift in visibility across AI search platforms (ChatGPT, Perplexity, etc.) after switching.
 
-Worth a look?`,
+If it's useful I can show you what else WanderOS unlocks to grow your business.
+
+Kyle`),
+      ],
     },
     {
       delayDays: 3,
-      body: `Hi ${name},
+      subjects: [],
+      body: [
+        text("Hi "),
+        firstName,
+        text(`,
 
-Floating this back up. The site we built for ${company} is still live if you haven't had a chance to open it:
+Bumping this in case it got buried. Your preview is still up:
 
-${link}
+`),
+        link,
+        text(`
 
-Happy to answer anything, or to tweak it if something looks off.`,
+Nothing to rebuild on your side. WanderOS pulls listings, photos and rates from the PMS you already run.
+
+Kyle`),
+      ],
     },
     {
       delayDays: 7,
-      body: `Hi ${name},
+      subjects: [],
+      body: [
+        text("Hi "),
+        firstName,
+        text(`,
 
-One number worth knowing: every booking that comes through your own site instead of an OTA keeps 15 to 20% that would otherwise go to commission. That's what the site we built is for.
+The reason we build these before asking for a call: every booking that comes through your own site is one you keep the commission on.
 
-${link}
+`),
+        link,
+        text(`
 
-If direct booking isn't a priority for ${company} right now, no problem. Just say so and I'll close this out.`,
+Happy to walk you through what switching looks like, or to leave it with you.
+
+Kyle`),
+      ],
     },
     {
       delayDays: 12,
-      body: `Hi ${name},
+      subjects: [],
+      body: [
+        text("Hi "),
+        firstName,
+        text(`,
 
-Last note from me. The preview for ${company} stays up a little while longer if you want to look later:
+Last one from me. Your preview stays up either way:
 
-${link}
+`),
+        link,
+        text(`
 
-If the timing's wrong, I'll leave you alone. And if it's ever right, you know where to find me.`,
+If direct booking isn't a priority this year, just say so and I'll leave it there. If it ever is, you know where to find me.
+
+Kyle`),
+      ],
     },
   ];
 }
