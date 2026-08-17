@@ -1,0 +1,47 @@
+[
+  {
+    "id": "cover-large-group-beach-house",
+    "placement": "cover",
+    "purpose": "Set the guide in a real large-group Emerald Coast stay and establish the private-pool decision at a glance.",
+    "direction": "Choose one approved Wander property image with a visible pool, a clear sense of house scale, and no people. Favor a wide exterior composition that still reads when cropped to 3:2.",
+    "constraints": [
+      "Use an approved Wander inventory image",
+      "Verify that the pictured home appears in the article",
+      "Keep the crop usable at 1600 by 1067",
+      "Do not add generated architecture or amenities"
+    ],
+    "fulfillmentOwner": "human",
+    "status": "direction",
+    "assetPath": null
+  },
+  {
+    "id": "sleeping-layout-comparison",
+    "placement": "What 'sleeps 14' actually means in a Destin beach house",
+    "purpose": "Make bedroom, bunk-room, and sleeper-sofa tradeoffs legible before the reader compares headline capacity.",
+    "direction": "Create a compact comparison card from verified property facts. Show named sleeping surfaces and ground-floor bedroom availability only where the source record supplies them.",
+    "constraints": [
+      "Use the grounding fixture as the only factual source",
+      "Leave unknown bathroom and bed counts blank",
+      "Link every displayed property to its recorded href",
+      "Label the artifact as a comparison, not a ranking"
+    ],
+    "fulfillmentOwner": "local-agent",
+    "status": "direction",
+    "assetPath": null
+  },
+  {
+    "id": "destin-30a-orientation-map",
+    "placement": "Destin vs 30A / Santa Rosa Beach for a big group",
+    "purpose": "Help a group understand the coastline and activity split without inventing a precise traffic promise.",
+    "direction": "Produce a simple orientation map showing Destin, Miramar Beach, Santa Rosa Beach, and the 30A corridor. Add broad activity labels and a visible note that drive time changes with seasonal traffic.",
+    "constraints": [
+      "Use verified place names and relative geography",
+      "Do not show a drive-time number without a cited routing source",
+      "Keep the Wander brand treatment quiet and editorial",
+      "Export an accessible text description with the image"
+    ],
+    "fulfillmentOwner": "local-agent",
+    "status": "direction",
+    "assetPath": null
+  }
+]

@@ -45,7 +45,10 @@
     "test:mcp:protocol": "bun test src/server/mcp/server.protocol.test.ts",
     "smoke:mcp:modern": "node scripts/smoke-mcp-modern.mjs",
     "lab:motion-original": "bun scripts/lab/run-original-property-motion.ts",
-    "lab:export-pregen-fixture": "bun --conditions=react-server scripts/lab/export-pregen-run-fixture.ts"
+    "lab:export-pregen-fixture": "bun --conditions=react-server scripts/lab/export-pregen-run-fixture.ts",
+    "lab:blog-run": "bun --conditions=react-server scripts/lab/run-blog-golden.ts",
+    "lab:blog-agent-brief": "bun --conditions=react-server scripts/lab/print-blog-agent-brief.ts",
+    "lab:blog-export-dato": "bun --conditions=react-server scripts/lab/export-blog-dato-draft.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.15",

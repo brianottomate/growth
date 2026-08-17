@@ -3,19 +3,11 @@ import type {
   ContentBriefInput,
 } from "./contract";
 
-// Vendored verbatim for the workbench so a run records exactly which prompt
-// produced it. Two sources:
-//
-//   1. buildContentBriefPagePrompt — Cam's first draft, supplied as a loose
-//      file on 2026-08-04. It exists in no pushed monolith branch; treat it
-//      as a draft. PROMPT_VERSION pins runs to this text.
-//   2. COPY_VOICE_RULES / COPY_EXEMPLARS — the monolith's shared copy voice,
-//      from wander/src/wos-saas/module/src/logic/website/site-editor/shared/
-//      copy-voice.ts (verbatim).
-//
-// Do not "improve" this file; a changed prompt is a new PROMPT_VERSION.
+// Versioned workbench copy of the site-editor prompt and shared copy voice.
+// The lab records its exact prompt text with each immutable run. Production
+// evolves independently, so every workbench prompt change needs a new version.
 
-export const PROMPT_VERSION = "content-brief-page/cam-draft-2026-08-04";
+export const PROMPT_VERSION = "content-brief-page/workbench-v2-2026-08-17";
 
 /**
  * Builds the system prompt for generating a page from a content brief.

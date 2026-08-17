@@ -8,6 +8,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { buildDatoDraftExport, type DatoDraftExport } from "./datocms";
+import { loadBlogVisualDirections, loadLatestBlogRun } from "./artifacts";
 import { runDeterministicChecks, type CheckReceipt } from "./checks";
 import type { GeneratedArticle } from "./checks";
 import {
@@ -25,14 +26,24 @@ import {
   type GroundingContextRecord,
 } from "./grounding";
 import { buildContentBriefPagePrompt, PROMPT_VERSION } from "./prompt";
+import {
+  evaluatorCommentsToWorkbench,
+  generatedStoryboardSchema,
+  normalizeStoryboardVisualPlacements,
+  WORKBENCH_VERSION,
+  type GeneratedStoryboard,
+  type VisualDirection,
+  type WorkbenchComment,
+} from "./workflow";
 
 // The executable golden run: one complete content-generation run, persisted
 // as an immutable record the workbench renders. Successful runs are never
 // edited; a rerun writes a new directory and latest.json moves.
 
-export const RUN_SCHEMA_VERSION = "blog-golden-run/v1";
+export const RUN_SCHEMA_VERSION = "blog-golden-run/v2";
 
 const WRITER_MODEL = "claude-opus-5";
+const STORYBOARD_MODEL = "claude-sonnet-5";
 
 // Assumed per-MTok USD rates for the cost estimate. Estimates only; verify
 // against current pricing before quoting anywhere that matters.
@@ -51,7 +62,7 @@ export type UsageEntry = {
 };
 
 export type BlogRunRecord = {
-  schemaVersion: typeof RUN_SCHEMA_VERSION;
+  schemaVersion: typeof RUN_SCHEMA_VERSION | "blog-golden-run/v1";
   runId: string;
   createdAt: string;
   fixturePath: string;
@@ -65,6 +76,7 @@ export type BlogRunRecord = {
     normalizedBrief: ContentBriefInput;
     grounding: GroundingContextRecord;
     prompt: { version: string; text: string };
+    draftArticle?: GeneratedArticle;
     article: GeneratedArticle;
   };
   storyboard: Array<{
@@ -73,7 +85,21 @@ export type BlogRunRecord = {
     keyPoints: string[];
     generatedHeading: string | null;
     wordCount: number;
+    id?: string;
+    purpose?: string;
+    visualDirectionIds?: string[];
+    promotion?: {
+      decision: "none" | "property-links" | "comparison";
+      rationale: string;
+    };
   }>;
+  workflow?: {
+    version: typeof WORKBENCH_VERSION;
+    previousRunId: string | null;
+    sourceCommentIds: string[];
+  };
+  visualDirections?: VisualDirection[];
+  comments?: WorkbenchComment[];
   receipts: {
     deterministic: CheckReceipt[];
     evaluator: EvaluatorReceipt;
@@ -100,6 +126,14 @@ const MetadataOutput = z.object({
 });
 
 export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
+  const previousRun = await loadLatestBlogRun();
+  const previousComments = previousRun
+    ? (
+        previousRun.comments ??
+        evaluatorCommentsToWorkbench(previousRun.receipts.evaluator)
+      ).filter((comment) => comment.status === "open")
+    : [];
+  const visualDirections = await loadBlogVisualDirections();
   const raw = seoEngineResponseSchema.parse(
     JSON.parse(await readFile(FIXTURE_RESPONSE, "utf8")),
   );
@@ -132,8 +166,46 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
   const usage: UsageEntry[] = [];
   const transportAdjustments: string[] = [];
 
+  const storyboardStart = Date.now();
+  const { output: storyboardOutput, usage: storyboardUsage } =
+    await generateText({
+      model: anthropic(STORYBOARD_MODEL),
+      output: Output.object({ schema: generatedStoryboardSchema }),
+      maxOutputTokens: 8_000,
+      system: [
+        "Plan the editorial structure for a grounded vacation-rental guide.",
+        "Keep one section for every supplied outline heading, in the same order.",
+        "Give each section one job. Assign a visual only when it helps the reader make a decision.",
+        "Use only registered visual IDs. Promotion must serve the section rather than interrupt it.",
+      ].join("\n"),
+      prompt: [
+        "# Brief",
+        JSON.stringify(brief, null, 2),
+        "",
+        "# Grounding context",
+        JSON.stringify(grounding.context, null, 2),
+        "",
+        "# Registered visual directions",
+        JSON.stringify(visualDirections, null, 2),
+        "",
+        "# Comments from the previous immutable run",
+        JSON.stringify(previousComments, null, 2),
+      ].join("\n"),
+    });
+  assertStoryboardMatchesBrief(storyboardOutput, brief, visualDirections);
+  const generatedStoryboard =
+    normalizeStoryboardVisualPlacements(storyboardOutput);
+  usage.push(
+    usageEntry(
+      "storyboard",
+      STORYBOARD_MODEL,
+      storyboardUsage,
+      Date.now() - storyboardStart,
+    ),
+  );
+
   const writerStart = Date.now();
-  const { text: articleMarkdown, usage: writerUsage } = await generateText({
+  const { text: draftMarkdown, usage: writerUsage } = await generateText({
     model: anthropic(WRITER_MODEL),
     maxOutputTokens: 32_000,
     system: promptText,
@@ -142,13 +214,55 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
       "exactly: one `## ` heading per outline heading, verbatim, in order.",
       "No title line before the first heading, no closing sign-off after",
       "the last section.",
+      "",
+      "# Editorial storyboard",
+      JSON.stringify(generatedStoryboard, null, 2),
+      "",
+      "# Previous review comments to address",
+      JSON.stringify(previousComments, null, 2),
+      "",
+      "Visual directions belong to separate fulfillment owners. Do not claim an image exists or describe an unseen asset as proof.",
     ].join("\n"),
   });
   usage.push(
     usageEntry("writer", WRITER_MODEL, writerUsage, Date.now() - writerStart),
   );
 
-  const sections = splitMarkdownSections(articleMarkdown, transportAdjustments);
+  const draftSections = splitMarkdownSections(
+    draftMarkdown,
+    transportAdjustments,
+  );
+
+  const revisionStart = Date.now();
+  const { text: revisedMarkdown, usage: revisionUsage } = await generateText({
+    model: anthropic(WRITER_MODEL),
+    maxOutputTokens: 32_000,
+    system: promptText,
+    prompt: [
+      "Edit this complete draft once before independent evaluation.",
+      "Preserve the exact section headings and order. Remove unsupported claims, generic filler, manufactured punchlines, repeated conclusions, and unearned promotion.",
+      "Address every applicable previous comment. Preserve a visual direction only where its placement helps the surrounding decision.",
+      "Return the complete markdown article with one `## ` heading per storyboard section. Return no commentary around it.",
+      "",
+      "# Storyboard",
+      JSON.stringify(generatedStoryboard, null, 2),
+      "",
+      "# Previous review comments",
+      JSON.stringify(previousComments, null, 2),
+      "",
+      "# Draft",
+      draftMarkdown,
+    ].join("\n"),
+  });
+  usage.push(
+    usageEntry(
+      "editorial-revision",
+      WRITER_MODEL,
+      revisionUsage,
+      Date.now() - revisionStart,
+    ),
+  );
+  const sections = splitMarkdownSections(revisedMarkdown, transportAdjustments);
 
   const metadataStart = Date.now();
   const { output: metadata, usage: metadataUsage } = await generateText({
@@ -163,7 +277,7 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
       `Working title: ${brief.workingTitle}`,
       `Target query: ${brief.targetQuery}`,
       "",
-      articleMarkdown.slice(0, 8_000),
+      revisedMarkdown.slice(0, 8_000),
     ].join("\n"),
   });
   usage.push(
@@ -236,15 +350,31 @@ export async function executeBlogGoldenRun(): Promise<BlogRunRecord> {
       normalizedBrief: brief,
       grounding,
       prompt: { version: PROMPT_VERSION, text: promptText },
+      draftArticle: {
+        metaTitle: article.metaTitle,
+        metaDescription: article.metaDescription,
+        sections: draftSections,
+      },
       article,
     },
-    storyboard: brief.outline.map((section, index) => ({
+    storyboard: generatedStoryboard.sections.map((section, index) => ({
       index: index + 1,
       heading: section.heading,
       keyPoints: section.keyPoints,
       generatedHeading: article.sections[index]?.heading ?? null,
       wordCount: countWords(article.sections[index]?.markdown ?? ""),
+      id: section.id,
+      purpose: section.purpose,
+      visualDirectionIds: section.visualDirectionIds,
+      promotion: section.promotion,
     })),
+    workflow: {
+      version: WORKBENCH_VERSION,
+      previousRunId: previousRun?.runId ?? null,
+      sourceCommentIds: previousComments.map((comment) => comment.id),
+    },
+    visualDirections,
+    comments: evaluatorCommentsToWorkbench(evaluator),
     receipts: { deterministic, evaluator },
     usage,
     totals: {
@@ -314,43 +444,6 @@ export async function exportDatoDraftForRun(
   );
   await writeFile(exportPath, `${JSON.stringify(draft, null, 2)}\n`, "utf8");
   return { runId: resolvedRunId, export: draft, path: exportPath };
-}
-
-export async function loadDatoDraft(
-  runId: string,
-): Promise<DatoDraftExport | null> {
-  try {
-    return JSON.parse(
-      await readFile(
-        path.join(FIXTURE_DIR, "runs", runId, "datocms-draft.json"),
-        "utf8",
-      ),
-    ) as DatoDraftExport;
-  } catch {
-    return null;
-  }
-}
-
-export async function loadLatestBlogRun(): Promise<BlogRunRecord | null> {
-  try {
-    const pointer = JSON.parse(
-      await readFile(path.join(FIXTURE_DIR, "runs", "latest.json"), "utf8"),
-    ) as { runId: string };
-    return JSON.parse(
-      await readFile(
-        path.join(FIXTURE_DIR, "runs", pointer.runId, "run.json"),
-        "utf8",
-      ),
-    ) as BlogRunRecord;
-  } catch {
-    return null;
-  }
-}
-
-export async function loadRawFixture(): Promise<SeoEngineResponse> {
-  return seoEngineResponseSchema.parse(
-    JSON.parse(await readFile(FIXTURE_RESPONSE, "utf8")),
-  );
 }
 
 /**
@@ -478,4 +571,34 @@ function sumCosts(entries: UsageEntry[]): number | null {
 
 function countWords(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
+}
+
+function assertStoryboardMatchesBrief(
+  storyboard: GeneratedStoryboard,
+  brief: ContentBriefInput,
+  visualDirections: VisualDirection[],
+): void {
+  const plannedHeadings = storyboard.sections.map((section) => section.heading);
+  const expectedHeadings = brief.outline.map((section) => section.heading);
+  if (
+    plannedHeadings.length !== expectedHeadings.length ||
+    plannedHeadings.some(
+      (heading, index) => heading !== expectedHeadings[index],
+    )
+  ) {
+    throw new Error(
+      "Generated storyboard changed the supplied outline headings or order",
+    );
+  }
+  const registeredVisualIds = new Set(
+    visualDirections.map((visual) => visual.id),
+  );
+  const unknownVisualIds = storyboard.sections
+    .flatMap((section) => section.visualDirectionIds)
+    .filter((visualId) => !registeredVisualIds.has(visualId));
+  if (unknownVisualIds.length > 0) {
+    throw new Error(
+      `Generated storyboard referenced unknown visuals: ${[...new Set(unknownVisualIds)].join(", ")}`,
+    );
+  }
 }

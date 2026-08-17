@@ -2,13 +2,22 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 
 import {
+  loadBlogVisualDirections,
   loadDatoDraft,
   loadLatestBlogRun,
   loadRawFixture,
-  type BlogRunRecord,
-} from "@/server/services/blog-workbench/run";
+} from "@/server/services/blog-workbench/artifacts";
+import { type BlogRunRecord } from "@/server/services/blog-workbench/run";
 import type { CheckReceipt } from "@/server/services/blog-workbench/checks";
 import type { DatoDraftExport } from "@/server/services/blog-workbench/datocms";
+import { MISSING_INPUTS } from "@/server/services/blog-workbench/contract";
+import { buildWorkbenchSnapshot } from "@/server/services/blog-workbench/workflow";
+import {
+  AgentWorkbenchView,
+  ReviewWorkbenchView,
+  StoryboardWorkbenchView,
+  VisualsWorkbenchView,
+} from "./workbench-sections";
 
 // The Growth Blog Workbench: one complete content-generation run, every
 // transformation inspectable. Fixture-backed golden run, not a production
@@ -17,14 +26,18 @@ import type { DatoDraftExport } from "@/server/services/blog-workbench/datocms";
 export const dynamic = "force-dynamic";
 
 const VIEWS = [
-  "overview",
-  "brief",
-  "grounding",
-  "prompt",
-  "article",
-  "receipts",
+  { id: "overview", label: "Pipeline" },
+  { id: "brief", label: "Brief" },
+  { id: "grounding", label: "Grounding" },
+  { id: "storyboard", label: "Storyboard" },
+  { id: "prompt", label: "Prompt" },
+  { id: "article", label: "Article" },
+  { id: "review", label: "Review" },
+  { id: "visuals", label: "Visuals" },
+  { id: "receipts", label: "Receipts" },
+  { id: "agent", label: "Agent handoff" },
 ] as const;
-type View = (typeof VIEWS)[number];
+type View = (typeof VIEWS)[number]["id"];
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -34,15 +47,18 @@ export default async function BlogWorkbenchPage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
-  const view: View = VIEWS.includes(params.view as View)
+  const viewIds = VIEWS.map((candidate) => candidate.id);
+  const view: View = viewIds.includes(params.view as View)
     ? (params.view as View)
     : "overview";
 
-  const [run, fixture] = await Promise.all([
+  const [run, fixture, visuals] = await Promise.all([
     loadLatestBlogRun(),
     loadRawFixture(),
+    loadBlogVisualDirections(),
   ]);
   const datoDraft = run ? await loadDatoDraft(run.runId) : null;
+  const workbench = run ? buildWorkbenchSnapshot(run, visuals) : null;
 
   return (
     <main className="min-h-screen bg-[#0b0b0a] text-stone-100">
@@ -85,15 +101,15 @@ export default async function BlogWorkbenchPage({
         <nav className="mt-4 flex flex-wrap gap-1">
           {VIEWS.map((candidate) => (
             <Link
-              key={candidate}
-              href={`/lab/blog-workbench?view=${candidate}`}
+              key={candidate.id}
+              href={`/lab/blog-workbench?view=${candidate.id}`}
               className={`rounded-lg px-3 py-1.5 text-[10px] font-medium capitalize transition ${
-                view === candidate
+                view === candidate.id
                   ? "bg-white text-stone-950"
                   : "text-stone-400 hover:bg-white/10 hover:text-white"
               }`}
             >
-              {candidate}
+              {candidate.label}
             </Link>
           ))}
         </nav>
@@ -101,15 +117,27 @@ export default async function BlogWorkbenchPage({
 
       <div className="p-5">
         {view === "overview" ? (
-          <OverviewView run={run} datoDraft={datoDraft} />
+          <OverviewView run={run} datoDraft={datoDraft} workbench={workbench} />
         ) : null}
         {view === "brief" ? (
           <BriefView run={run} fixtureJson={fixture} />
         ) : null}
         {view === "grounding" ? <GroundingView run={run} /> : null}
+        {view === "storyboard" && run && workbench ? (
+          <StoryboardWorkbenchView run={run} workbench={workbench} />
+        ) : null}
         {view === "prompt" ? <PromptView run={run} /> : null}
         {view === "article" ? <ArticleView run={run} /> : null}
+        {view === "review" && workbench ? (
+          <ReviewWorkbenchView workbench={workbench} />
+        ) : null}
+        {view === "visuals" && workbench ? (
+          <VisualsWorkbenchView workbench={workbench} />
+        ) : null}
         {view === "receipts" ? <ReceiptsView run={run} /> : null}
+        {view === "agent" && workbench ? (
+          <AgentWorkbenchView workbench={workbench} />
+        ) : null}
       </div>
     </main>
   );
@@ -120,78 +148,43 @@ export default async function BlogWorkbenchPage({
 function OverviewView({
   run,
   datoDraft,
+  workbench,
 }: {
   run: BlogRunRecord | null;
   datoDraft: DatoDraftExport | null;
+  workbench: ReturnType<typeof buildWorkbenchSnapshot> | null;
 }) {
-  const stages: Array<{ title: string; detail: string; done: boolean }> = [
-    {
-      title: "Raw SEO Engine response",
-      detail: "fixtures/blog/seo-engine-response.json, preserved verbatim",
-      done: true,
-    },
-    {
-      title: "Normalized writer brief",
-      detail: run
-        ? `adapter ${run.adapterVersion}`
-        : "snake_case wire → camelCase ContentBriefInput",
-      done: Boolean(run),
-    },
-    {
-      title: "Grounding context",
-      detail: run
-        ? `${run.stages.grounding.version} · ${run.stages.grounding.context.properties.length} properties from ${run.stages.grounding.crawledUrls.length} crawled pages`
-        : "crawl-derived stand-in (production context is a missing input)",
-      done: Boolean(run),
-    },
-    {
-      title: "Versioned prompt",
-      detail: run
-        ? run.promptVersion
-        : "Cam's draft buildContentBriefPagePrompt, vendored verbatim",
-      done: Boolean(run),
-    },
-    {
-      title: "Generated article",
-      detail: run
-        ? `${run.stages.article.sections.length} sections · ${run.totals.wordCount} words · ${run.writerModel}`
-        : "not generated",
-      done: Boolean(run),
-    },
-    {
-      title: "Receipts",
-      detail: run
-        ? `${run.receipts.deterministic.length} deterministic checks · evaluator verdict ${run.receipts.evaluator.verdict}`
-        : "deterministic checks + independent evaluator",
-      done: Boolean(run),
-    },
-  ];
+  const stages = workbench?.stages ?? [];
 
   return (
     <div className="space-y-6">
       <section>
         <SectionTitle>Pipeline</SectionTitle>
-        <div className="grid gap-2 md:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {stages.map((stage, index) => (
             <div
-              key={stage.title}
+              key={stage.id}
               className={`rounded-xl border p-3 ${
-                stage.done
+                stage.status === "complete"
                   ? "border-lime-300/25 bg-lime-300/[0.05]"
-                  : "border-white/10 bg-white/[0.02]"
+                  : stage.status === "attention"
+                    ? "border-amber-300/30 bg-amber-300/[0.05]"
+                    : "border-white/10 bg-white/[0.02]"
               }`}
             >
               <div className="flex items-center gap-2 text-[10px] font-semibold text-white">
                 <span
                   className={`grid size-5 place-items-center rounded-full text-[9px] font-bold ${
-                    stage.done
+                    stage.status === "complete"
                       ? "bg-lime-300 text-stone-950"
-                      : "bg-white/10 text-stone-500"
+                      : stage.status === "attention"
+                        ? "bg-amber-300 text-stone-950"
+                        : "bg-white/10 text-stone-500"
                   }`}
                 >
                   {index + 1}
                 </span>
-                {stage.title}
+                {stage.label}
               </div>
               <p className="mt-2 text-[9px] leading-relaxed text-stone-500">
                 {stage.detail}
@@ -300,7 +293,7 @@ function OverviewView({
       <section>
         <SectionTitle>Missing inputs (modeled, never fabricated)</SectionTitle>
         <div className="space-y-2">
-          {(run?.missingInputs ?? []).map((input) => (
+          {(run ? MISSING_INPUTS : []).map((input) => (
             <div
               key={input.id}
               className="rounded-xl border border-white/10 bg-white/[0.02] p-3"

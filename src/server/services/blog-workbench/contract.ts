@@ -1,11 +1,10 @@
 import { z } from "zod";
 
 // The two sides of the pipeline seam this workbench exists to inspect:
-// SEO Engine emits a snake_case brief with run metadata; Cam's draft writer
+// SEO Engine emits a snake_case brief with run metadata; the site editor
 // accepts a camelCase ContentBriefInput plus a separate grounding context.
-// The official adapter between them has not been written, so the one here is
-// an explicitly versioned draft (see ADAPTER_VERSION) that the workbench
-// surfaces rather than hides.
+// The workbench keeps its adapter explicit and versioned because it runs from
+// a frozen fixture instead of importing the production service runtime.
 
 // ---- SEO ENGINE RESPONSE (wire format, snake_case) -------------------
 
@@ -39,11 +38,10 @@ export const seoEngineResponseSchema = z.object({
 
 export type SeoEngineResponse = z.infer<typeof seoEngineResponseSchema>;
 
-// ---- WRITER CONTRACT (Cam's draft, camelCase) -------------------------
-// Mirrors the `ContentBriefInput` / `ContentBriefGroundingContext` types the
-// draft `buildContentBriefPagePrompt` imports from `./types` in the monolith.
-// Those types are not in any pushed branch; this is a faithful reconstruction
-// from the prompt's property accesses.
+// ---- WRITER CONTRACT (site editor, camelCase) -------------------------
+// Mirrors the production `ContentBriefInput` and
+// `ContentBriefGroundingContext` seam without coupling this fixture-backed lab
+// to the monolith package graph.
 
 export type ContentBriefInput = {
   targetQuery: string;
@@ -81,10 +79,10 @@ export type ContentBriefGroundingContext = {
 export const ADAPTER_VERSION = "seo-response-to-writer/v1-draft";
 
 /**
- * Normalizes the SEO Engine wire response into Cam's writer input. Pure
+ * Normalizes the SEO Engine wire response into the site-editor writer input. Pure
  * field mapping, no enrichment: run metadata stays behind, and nothing is
- * invented. The production adapter (unwritten) may enrich or reshape; when
- * it lands, this version string is how runs made with the draft stay honest.
+ * invented. The version keeps fixture runs comparable as the production
+ * ingestion path evolves independently.
  */
 export function normalizeSeoResponseToBrief(
   response: SeoEngineResponse,
@@ -117,27 +115,21 @@ export type MissingInput = {
 export const MISSING_INPUTS: MissingInput[] = [
   {
     id: "production-grounding-context",
-    what: "The real ContentBriefGroundingContext the monolith writer would build from first-party property data",
+    what: "The live ContentBriefGroundingContext built from first-party property data",
     status: "substituted",
     substitute:
       "A grounding fixture: crawl-derived/v1 when the target site is real, or a hand-authored synthetic-fixture/v1 when it is not (the example brief's domain is a parked page). Each file states its own provenance.",
   },
   {
-    id: "cam-opus-article",
-    what: "Cam's Opus-generated article for this exact brief",
+    id: "production-writer-execution",
+    what: "A production site-editor execution for this exact frozen brief",
     status: "substituted",
     substitute:
-      "A workbench-generated article using the same draft prompt; it is NOT Cam's output and comparisons must say so",
+      "An independent workbench run using the same contract shape. Its receipts describe only the workbench run.",
   },
   {
-    id: "cam-evaluator-scorecard",
-    what: "Cam's evaluator results / scorecard from the model evaluation that favored Opus",
-    status: "missing",
-    substitute: null,
-  },
-  {
-    id: "production-writer-branch",
-    what: "The branch or PR containing the production writer (buildContentBriefPagePrompt is a draft file, present in no pushed branch)",
+    id: "live-brief-ingestion",
+    what: "A current brief fetched from the production SEO pipeline",
     status: "missing",
     substitute: null,
   },
