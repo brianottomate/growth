@@ -375,6 +375,99 @@ export function ProspectDetail({ domain }: { domain: string }) {
           <Stat label="Fit">{fmt(row.scorePregenPotential)}</Stat>
           <Stat label="Score version">{row.scoreVersion ?? "—"}</Stat>
         </div>
+
+        {/* Addresses and verbs, in the card that names the prospect. Both used
+            to sit at the far end of a long page: the links inside the preview
+            section and the buttons below the correspondence dump, so acting on
+            a lead meant scrolling past everything you had just read. */}
+        <div className="border-border mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
+          {preview.url ? (
+            <a
+              href={preview.url}
+              target="_blank"
+              rel="noreferrer"
+              title="Open the pregen preview they will see"
+              aria-label="Open the pregen preview"
+              className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+            >
+              <ExternalLink className="size-3.5" />
+            </a>
+          ) : null}
+          {wrapperUrl ? (
+            <a
+              href={wrapperUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Open the wander.com wrapper, the page this copy sends"
+              aria-label="Open the wander.com wrapper"
+              className="border-border text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md border"
+            >
+              <Gift className="size-3.5" />
+            </a>
+          ) : null}
+          <span className="bg-border mx-1 h-6 w-px" />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={rank_.isPending}
+            onClick={() => rank_.mutate({ domain, persist: true })}
+          >
+            {rank_.isPending ? "Ranking…" : "Rank"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={generate.isPending}
+            onClick={() =>
+              generate.mutate({ domainId: row.id, pretend: false })
+            }
+          >
+            {generate.isPending ? "Generating…" : "Generate sequence"}
+          </Button>
+          {/* The preview does not exist for most of the universe, so copy has
+              to be workable before it does. Marked, and publishing refuses it. */}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={generate.isPending}
+            onClick={() => generate.mutate({ domainId: row.id, pretend: true })}
+          >
+            Draft against a stand-in
+          </Button>
+          {/* Hand off to the assistant rather than growing a button per action */}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              sendAssistantIntent({
+                type: "work_prospect",
+                domain: row.domain,
+                companyName: row.companyName,
+                visibleText: `Work ${row.domain} with me. Preview is ${preview.state} (${preview.detail}), selected channel ${channel.bestEmail ?? "none"}. Tell me what you'd do next and why before doing it.`,
+              })
+            }
+          >
+            Work in chat
+          </Button>
+        </div>
+        <p className="text-muted-foreground mt-2 text-xs">
+          Ranking scores the site and writes back. Generating saves a draft. It
+          never publishes or enrols.
+          {preview.state !== "live"
+            ? ` Preview is ${preview.state}, so a real generation will refuse; the stand-in is for iterating on copy.`
+            : ""}
+        </p>
+        {rank_.error ? (
+          <p className="mt-2 text-xs text-red-300">{rank_.error.message}</p>
+        ) : null}
+        {generate.error ? (
+          <p className="mt-2 text-xs text-red-300">{generate.error.message}</p>
+        ) : null}
+        {rank_.data ? (
+          <p className="mt-2 text-xs text-emerald-300">
+            Ranked. Reload to see the new assessment.
+          </p>
+        ) : null}
       </header>
 
       {/* Their site, then our preview — the comparison the pitch rests on */}
@@ -407,34 +500,6 @@ export function ProspectDetail({ domain }: { domain: string }) {
             >
               {preview.state} · {preview.detail}
             </span>
-            {/* One artifact seen two ways, same pairing as the review card:
-                the bare renderer address the build produced, and the
-                wander.com page that wraps it in the pitch. The wrapper is what
-                the copy actually sends, so it is worth opening first. */}
-            {preview.url ? (
-              <a
-                href={preview.url}
-                target="_blank"
-                rel="noreferrer"
-                title="Open the pregen preview they will see"
-                aria-label="Open the pregen preview"
-                className="border-border text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-md border"
-              >
-                <ExternalLink className="size-3.5" />
-              </a>
-            ) : null}
-            {wrapperUrl ? (
-              <a
-                href={wrapperUrl}
-                target="_blank"
-                rel="noreferrer"
-                title="Open the wander.com pitch wrapper"
-                aria-label="Open the wander.com pitch wrapper"
-                className="border-border text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-md border"
-              >
-                <Gift className="size-3.5" />
-              </a>
-            ) : null}
           </div>
           {/* The picture, so the comparison this grid promises is actually
               visible. Same frame as their site on the left, and the capture is
@@ -481,8 +546,24 @@ export function ProspectDetail({ domain }: { domain: string }) {
           ) : null}
           {preview.url ? (
             <div className="text-muted-foreground mt-2 space-y-1 text-xs break-all">
-              {wrapperUrl ? <p>{wrapperUrl}</p> : null}
-              <p>{preview.url}</p>
+              {wrapperUrl ? (
+                <a
+                  href={wrapperUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-foreground block"
+                >
+                  {wrapperUrl}
+                </a>
+              ) : null}
+              <a
+                href={preview.url}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-foreground block"
+              >
+                {preview.url}
+              </a>
             </div>
           ) : null}
           {preview.state === "dead" ? (
@@ -900,79 +981,6 @@ export function ProspectDetail({ domain }: { domain: string }) {
           )}
         </div>
       </Section>
-
-      {/* The two workflows, in one place. Ranking was script-only until now, so
-          scoring a prospect and writing its copy lived in different tools. */}
-      <Section
-        title="Run"
-        note="Ranking scores the site and writes back. Generating saves a draft — it never publishes or enrolls."
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={rank_.isPending}
-            onClick={() => rank_.mutate({ domain, persist: true })}
-          >
-            {rank_.isPending ? "Ranking…" : "Rank this prospect"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={generate.isPending}
-            onClick={() =>
-              generate.mutate({ domainId: row.id, pretend: false })
-            }
-          >
-            {generate.isPending ? "Generating…" : "Generate sequence"}
-          </Button>
-          {/* The preview does not exist for most of the universe, so copy has to
-              be workable before it does. Marked, and publishing refuses it. */}
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={generate.isPending}
-            onClick={() => generate.mutate({ domainId: row.id, pretend: true })}
-          >
-            Draft against a stand-in
-          </Button>
-          {preview.state !== "live" && (
-            <span className="text-muted-foreground text-xs">
-              Preview is {preview.state} — a real generation will refuse; the
-              stand-in draft is for iterating on copy.
-            </span>
-          )}
-        </div>
-        {rank_.error ? (
-          <p className="mt-2 text-xs text-red-300">{rank_.error.message}</p>
-        ) : null}
-        {generate.error ? (
-          <p className="mt-2 text-xs text-red-300">{generate.error.message}</p>
-        ) : null}
-        {rank_.data ? (
-          <p className="mt-2 text-xs text-emerald-300">
-            Ranked — reload to see the new assessment.
-          </p>
-        ) : null}
-      </Section>
-
-      {/* Hand off to the assistant rather than growing a button per action */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            sendAssistantIntent({
-              type: "work_prospect",
-              domain: row.domain,
-              companyName: row.companyName,
-              visibleText: `Work ${row.domain} with me. Preview is ${preview.state} (${preview.detail}), selected channel ${channel.bestEmail ?? "none"}. Tell me what you'd do next and why before doing it.`,
-            })
-          }
-        >
-          Work this prospect in chat
-        </Button>
-      </div>
     </div>
   );
 }
