@@ -9,6 +9,7 @@ import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
 import { sendAssistantIntent } from "@/lib/assistant-events";
+import { blastSequenceFor } from "@/lib/pregen-blast-template";
 
 /**
  * Everything about one prospect on a single surface, addressed by domain.
@@ -118,10 +119,24 @@ export function ProspectDetail({ domain }: { domain: string }) {
     domain: row,
     channel,
     channels,
+    contacts,
     preview,
     outreach,
     cohort,
   } = prospect.data;
+  // The other side of the blast-vs-bespoke debate, computed right here so the
+  // two sequences this lead could receive sit on one screen. Merges in exactly
+  // what a HubSpot template would: the selected contact's first name, the
+  // company, and the blast-arm link.
+  const selectedContact = contacts.find(
+    (contact) => contact.email === channel.bestEmail,
+  );
+  const blastSteps = blastSequenceFor({
+    firstName: selectedContact?.firstName,
+    companyName: row.companyName,
+    domain: row.domain,
+    previewUrl: row.pregenSiteUrl,
+  });
   const context = outreach?.generationContext ?? null;
   // enrichment.leadRank.screenshotUrl — `siteScreenshotUrl` exists nowhere in
   // this table, so the earlier spelling could never have found one.
@@ -142,8 +157,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
   } | null;
   const rank = enrichment?.leadRank;
   const visual = enrichment?.previewVisual;
-  const desktop = (shots?: Array<{ viewport?: string; screenshotUrl?: string }>) =>
-    shots?.find((shot) => shot.viewport === "desktop")?.screenshotUrl;
+  const desktop = (
+    shots?: Array<{ viewport?: string; screenshotUrl?: string }>,
+  ) => shots?.find((shot) => shot.viewport === "desktop")?.screenshotUrl;
   // Prefer our own rehosted shot of their site. The ranker's URL is a presigned
   // Firecrawl link that expires about a week after scoring, so on any older
   // domain it renders as a broken image.
@@ -274,9 +290,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
             ) : null}
           </div>
           {capture.error ? (
-            <p className="mt-2 text-xs text-red-300">
-              {capture.error.message}
-            </p>
+            <p className="mt-2 text-xs text-red-300">{capture.error.message}</p>
           ) : null}
           {preview.url ? (
             <p className="text-muted-foreground mt-2 text-xs break-all">
@@ -394,134 +408,171 @@ export function ProspectDetail({ domain }: { domain: string }) {
             : "No draft yet"
         }
       >
-        {!outreach ? (
-          <p className="text-muted-foreground text-sm">
-            Nothing generated for this company.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {/* The same steps without the review chrome, for showing someone. */}
-            <Link
-              href={`/app/leads/${encodeURIComponent(row.domain)}/sequence`}
-              className="text-muted-foreground hover:text-foreground inline-block text-xs underline underline-offset-2"
-            >
-              Open as a presentation →
-            </Link>
-            {outreach.angle ? (
-              <p className="text-sm">
-                <span className="text-muted-foreground">Angle: </span>
-                {outreach.angle}
-                {context?.recipient?.name ? (
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · written to {context.recipient.name}
-                  </span>
-                ) : null}
-              </p>
-            ) : null}
-
-            {/* The model's queue for the rep: facts it wanted and refused to
-                invent. Answer one as steer and regenerate. */}
-            {(context?.openQuestions?.length ?? 0) > 0 ? (
-              <div className="rounded border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">
-                <div className="mb-1 font-medium">Questions for the rep</div>
-                <ul className="list-disc space-y-0.5 pl-4">
-                  {context!.openQuestions!.map((question, index) => (
-                    <li key={index}>{question}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {context ? (
-              <div
-                className={`rounded border p-3 text-xs ${
-                  context.preview.pretend
-                    ? "border-amber-500/40 bg-amber-500/5"
-                    : "border-border bg-muted/30"
-                }`}
+        <div className="space-y-3">
+          {outreach ? (
+            <>
+              {/* The same steps without the review chrome, for showing someone. */}
+              <Link
+                href={`/app/leads/${encodeURIComponent(row.domain)}/sequence`}
+                className="text-muted-foreground hover:text-foreground inline-block text-xs underline underline-offset-2"
               >
-                {context.preview.pretend ? (
-                  <p className="mb-1.5 font-medium text-amber-300">
-                    Stand-in draft — written before a readable preview existed,
-                    so it describes no real page. Publishing refuses it. Use it
-                    to iterate on copy, then regenerate against the real
-                    preview.
-                  </p>
-                ) : null}
-                <p className="font-medium">What the generator read</p>
-                <div className="mt-1.5 space-y-0.5">
-                  <div>
-                    Preview at generation:{" "}
-                    <span
-                      className={
-                        context.preview.readable
-                          ? "text-emerald-300"
-                          : "text-red-300"
-                      }
-                    >
-                      {context.preview.readable
-                        ? `readable, ${context.preview.characters} chars`
-                        : `NOT readable — ${context.preview.detail}`}
+                Open as a presentation →
+              </Link>
+              {outreach.angle ? (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Angle: </span>
+                  {outreach.angle}
+                  {context?.recipient?.name ? (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · written to {context.recipient.name}
                     </span>
-                  </div>
-                  <div>Their site: {context.website.characters} chars</div>
-                  <div>
-                    HubSpot emails: {context.emails?.retained ?? 0} of{" "}
-                    {context.emails?.available ?? 0} (
-                    {context.emails?.inbound ?? 0} inbound)
-                  </div>
-                  <div>
-                    Calls and notes: {context.activity?.retained ?? 0} of{" "}
-                    {context.activity?.available ?? 0}
-                  </div>
-                  {context.steer ? <div>Steer: {context.steer}</div> : null}
-                </div>
-                {context.activity?.items.length ? (
-                  <ul className="mt-2 space-y-1">
-                    {context.activity.items.map((item, index) => (
-                      <li key={index} className="text-muted-foreground">
-                        <span className="text-foreground">{item.title}</span>
-                        {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
-                        {item.at.slice(0, 10)} — {item.excerpt.slice(0, 180)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {context.emails?.items.length ? (
-                  <ul className="mt-2 space-y-1">
-                    {context.emails.items.map((item, index) => (
-                      <li key={index} className="text-muted-foreground">
-                        <span className="text-foreground">
-                          {item.direction}
-                        </span>{" "}
-                        · {item.sentAt.slice(0, 10)} · {item.subject} —{" "}
-                        {item.excerpt.slice(0, 180)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-xs">
-                This draft predates provenance capture, so what it was written
-                from was not recorded. Regenerate to capture it.
-              </p>
-            )}
+                  ) : null}
+                </p>
+              ) : null}
 
-            {(outreach.steps ?? []).map((step, index) => (
-              <div key={index} className="border-border rounded border p-3">
+              {/* The model's queue for the rep: facts it wanted and refused to
+                invent. Answer one as steer and regenerate. */}
+              {(context?.openQuestions?.length ?? 0) > 0 ? (
+                <div className="rounded border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">
+                  <div className="mb-1 font-medium">Questions for the rep</div>
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    {context!.openQuestions!.map((question, index) => (
+                      <li key={index}>{question}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {context ? (
+                <div
+                  className={`rounded border p-3 text-xs ${
+                    context.preview.pretend
+                      ? "border-amber-500/40 bg-amber-500/5"
+                      : "border-border bg-muted/30"
+                  }`}
+                >
+                  {context.preview.pretend ? (
+                    <p className="mb-1.5 font-medium text-amber-300">
+                      Stand-in draft — written before a readable preview
+                      existed, so it describes no real page. Publishing refuses
+                      it. Use it to iterate on copy, then regenerate against the
+                      real preview.
+                    </p>
+                  ) : null}
+                  <p className="font-medium">What the generator read</p>
+                  <div className="mt-1.5 space-y-0.5">
+                    <div>
+                      Preview at generation:{" "}
+                      <span
+                        className={
+                          context.preview.readable
+                            ? "text-emerald-300"
+                            : "text-red-300"
+                        }
+                      >
+                        {context.preview.readable
+                          ? `readable, ${context.preview.characters} chars`
+                          : `NOT readable — ${context.preview.detail}`}
+                      </span>
+                    </div>
+                    <div>Their site: {context.website.characters} chars</div>
+                    <div>
+                      HubSpot emails: {context.emails?.retained ?? 0} of{" "}
+                      {context.emails?.available ?? 0} (
+                      {context.emails?.inbound ?? 0} inbound)
+                    </div>
+                    <div>
+                      Calls and notes: {context.activity?.retained ?? 0} of{" "}
+                      {context.activity?.available ?? 0}
+                    </div>
+                    {context.steer ? <div>Steer: {context.steer}</div> : null}
+                  </div>
+                  {context.activity?.items.length ? (
+                    <ul className="mt-2 space-y-1">
+                      {context.activity.items.map((item, index) => (
+                        <li key={index} className="text-muted-foreground">
+                          <span className="text-foreground">{item.title}</span>
+                          {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
+                          {item.at.slice(0, 10)} — {item.excerpt.slice(0, 180)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {context.emails?.items.length ? (
+                    <ul className="mt-2 space-y-1">
+                      {context.emails.items.map((item, index) => (
+                        <li key={index} className="text-muted-foreground">
+                          <span className="text-foreground">
+                            {item.direction}
+                          </span>{" "}
+                          · {item.sentAt.slice(0, 10)} · {item.subject} —{" "}
+                          {item.excerpt.slice(0, 180)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : (
                 <p className="text-muted-foreground text-xs">
-                  Touch {index + 1} · day {step.delayDays}
-                  {step.subject ? ` · ${step.subject}` : " · in-thread"}
+                  This draft predates provenance capture, so what it was written
+                  from was not recorded. Regenerate to capture it.
                 </p>
-                <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
-                  {step.body}
+              )}
+            </>
+          ) : null}
+
+          {/* The internal debate, made lookable: the template every prospect
+              would get beside the sequence written for this one. Template on
+              the left because it is the baseline being argued against. */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-amber-300">
+                One-template blast — identical for every lead, only name,
+                company and link merged in
+              </p>
+              {blastSteps.map((step, index) => (
+                <div
+                  key={index}
+                  className="rounded border border-amber-500/25 bg-amber-500/5 p-3"
+                >
+                  <p className="text-muted-foreground text-xs">
+                    Touch {index + 1} · day {step.delayDays}
+                    {step.subject ? ` · ${step.subject}` : " · in-thread"}
+                  </p>
+                  <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
+                    {step.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-emerald-300">
+                Bespoke — written for {row.companyName ?? row.domain} from its
+                own record
+              </p>
+              {outreach?.steps?.length ? (
+                outreach.steps.map((step, index) => (
+                  <div key={index} className="border-border rounded border p-3">
+                    <p className="text-muted-foreground text-xs">
+                      Touch {index + 1} · day {step.delayDays}
+                      {step.subject ? ` · ${step.subject}` : " · in-thread"}
+                    </p>
+                    <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
+                      {step.body}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  Nothing generated for this company yet — the template column
+                  is what it would get today.
                 </p>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </Section>
 
       {/* On demand, because it is a provider read that 429s under load */}
