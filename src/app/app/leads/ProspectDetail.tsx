@@ -34,9 +34,28 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex gap-3 py-1 text-sm">
-      <span className="text-muted-foreground w-36 shrink-0">{label}</span>
-      <span className="min-w-0 flex-1">{children}</span>
+    <div className="flex flex-col gap-0.5 py-1 text-sm sm:flex-row sm:gap-3">
+      <span className="text-muted-foreground shrink-0 text-xs sm:w-36 sm:text-sm">
+        {label}
+      </span>
+      <span className="min-w-0 flex-1 break-words">{children}</span>
+    </div>
+  );
+}
+
+/** Header stat: label stacked over value, so narrow columns wrap instead of
+    the fixed-width label colliding with its neighbour's value. */
+function Stat({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="text-sm break-words">{children}</p>
     </div>
   );
 }
@@ -137,6 +156,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
     domain: row.domain,
     previewUrl: row.pregenSiteUrl,
   });
+  const bespokeSteps = outreach?.steps ?? [];
   const context = outreach?.generationContext ?? null;
   // enrichment.leadRank.screenshotUrl — `siteScreenshotUrl` exists nowhere in
   // this table, so the earlier spelling could never have found one.
@@ -154,7 +174,37 @@ export function ProspectDetail({ domain }: { domain: string }) {
       theirs?: Array<{ viewport?: string; screenshotUrl?: string }>;
       ours?: Array<{ viewport?: string; screenshotUrl?: string }>;
     };
+    correspondence?: {
+      computedAt: string;
+      emails: {
+        available: number;
+        inbound: number;
+        outbound: number;
+        items?: Array<{
+          engagementId: string;
+          direction: string;
+          sentAt: string;
+          subject: string;
+          excerpt: string;
+        }>;
+      };
+      activity: {
+        calls: number;
+        meetings: number;
+        notes: number;
+        items?: Array<{
+          engagementId: string;
+          kind: string;
+          occurredAt: string;
+          qualifier: string | null;
+          title: string;
+          excerpt: string;
+        }>;
+      };
+      lastContactAt: string | null;
+    };
   } | null;
+  const correspondence = enrichment?.correspondence;
   const rank = enrichment?.leadRank;
   const visual = enrichment?.previewVisual;
   const desktop = (
@@ -198,13 +248,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
             .filter(Boolean)
             .join(" · ")}
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-x-6 sm:grid-cols-3">
-          <Row label="PMS">{row.pms ?? "—"}</Row>
-          <Row label="Units">{fmt(row.unitCount ?? row.unitEstimate)}</Row>
-          <Row label="Owner">{row.hubspotOwner ?? "unassigned"}</Row>
-          <Row label="Lead status">{row.hubspotLeadStatus ?? "—"}</Row>
-          <Row label="Fit">{fmt(row.scorePregenPotential)}</Row>
-          <Row label="Score version">{row.scoreVersion ?? "—"}</Row>
+        <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
+          <Stat label="PMS">{row.pms ?? "—"}</Stat>
+          <Stat label="Units">{fmt(row.unitCount ?? row.unitEstimate)}</Stat>
+          <Stat label="Owner">{row.hubspotOwner ?? "unassigned"}</Stat>
+          <Stat label="Lead status">{row.hubspotLeadStatus ?? "—"}</Stat>
+          <Stat label="Fit">{fmt(row.scorePregenPotential)}</Stat>
+          <Stat label="Score version">{row.scoreVersion ?? "—"}</Stat>
         </div>
       </header>
 
@@ -306,100 +356,8 @@ export function ProspectDetail({ domain }: { domain: string }) {
         </Section>
       </div>
 
-      {/* The ranker's own read. Internal only — the copy policy forbids telling a
-          prospect anything about their site's quality or alluding to a score. */}
-      {rank ? (
-        <Section
-          title="Ranker assessment"
-          note={`${rank.overall != null ? `overall ${rank.overall} · ` : ""}internal only — never quoted to the prospect`}
-        >
-          <div className="space-y-2 text-sm">
-            {rank.relationshipSummary ? (
-              <Row label="Relationship">{rank.relationshipSummary}</Row>
-            ) : null}
-            {rank.reengagementHook ? (
-              <Row label="Hook">{rank.reengagementHook}</Row>
-            ) : null}
-            {rank.copyNotes ? (
-              <Row label="Copy notes">{rank.copyNotes}</Row>
-            ) : null}
-            {rank.concerns?.length ? (
-              <Row label="Concerns">
-                <ul className="list-disc pl-4">
-                  {rank.concerns.map((concern, index) => (
-                    <li key={index}>{concern}</li>
-                  ))}
-                </ul>
-              </Row>
-            ) : null}
-          </div>
-        </Section>
-      ) : null}
-
-      {/* Reachability — with the rejected rows visible, not hidden */}
-      <Section
-        title="Reachability"
-        note={`Selected channel: ${channel.bestEmail ?? "none"} · route ${channel.route} · verdict ${channel.verdict}`}
-      >
-        {channel.candidates.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No contacts stored. Resolve channels to crawl their site.
-          </p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground text-left text-xs">
-                <th className="border-b py-1 pr-3 font-medium">Email</th>
-                <th className="border-b px-3 py-1 font-medium">Who</th>
-                <th className="border-b px-3 py-1 text-right font-medium">
-                  Score
-                </th>
-                <th className="border-b px-3 py-1 font-medium">Why</th>
-              </tr>
-            </thead>
-            <tbody>
-              {channel.candidates.map((candidate) => (
-                <tr key={`${candidate.kind}-${candidate.email}`}>
-                  <td className="border-b py-1.5 pr-3 font-mono text-xs break-all">
-                    {candidate.email}
-                    {candidate.email === channel.bestEmail ? (
-                      <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300">
-                        selected
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="border-b px-3 py-1.5">
-                    {[candidate.name, candidate.title]
-                      .filter(Boolean)
-                      .join(" · ") || "—"}
-                  </td>
-                  <td className="border-b px-3 py-1.5 text-right">
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs ${VERDICT_TONE[candidate.verdict]}`}
-                    >
-                      {candidate.score}
-                    </span>
-                  </td>
-                  <td className="text-muted-foreground border-b px-3 py-1.5 text-xs">
-                    {[...candidate.risks, ...candidate.reasons].join("; ") ||
-                      "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {channels.length > 0 ? (
-          <p className="text-muted-foreground mt-3 text-xs">
-            Captured channels:{" "}
-            {channels
-              .map((c) => `${c.kind}${c.value ? ` (${c.value})` : ""}`)
-              .join(", ")}
-          </p>
-        ) : null}
-      </Section>
-
-      {/* The sequence, and what it was actually written from */}
+      {/* The sequence, right under the previews it pitches. What it was
+          written from, then blast-vs-bespoke per touch. */}
       <Section
         title="Sequence"
         note={
@@ -488,30 +446,6 @@ export function ProspectDetail({ domain }: { domain: string }) {
                     </div>
                     {context.steer ? <div>Steer: {context.steer}</div> : null}
                   </div>
-                  {context.activity?.items.length ? (
-                    <ul className="mt-2 space-y-1">
-                      {context.activity.items.map((item, index) => (
-                        <li key={index} className="text-muted-foreground">
-                          <span className="text-foreground">{item.title}</span>
-                          {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
-                          {item.at.slice(0, 10)} — {item.excerpt.slice(0, 180)}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {context.emails?.items.length ? (
-                    <ul className="mt-2 space-y-1">
-                      {context.emails.items.map((item, index) => (
-                        <li key={index} className="text-muted-foreground">
-                          <span className="text-foreground">
-                            {item.direction}
-                          </span>{" "}
-                          · {item.sentAt.slice(0, 10)} · {item.subject} —{" "}
-                          {item.excerpt.slice(0, 180)}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-xs">
@@ -522,114 +456,303 @@ export function ProspectDetail({ domain }: { domain: string }) {
             </>
           ) : null}
 
-          {/* The internal debate, made lookable: the template every prospect
-              would get beside the sequence written for this one. Template on
-              the left because it is the baseline being argued against. */}
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-amber-300">
-                One-template blast — identical for every lead, only name,
-                company and link merged in
+          {/* The internal debate, made lookable touch by touch: the template
+              every lead gets and the copy written for this one share a row, so
+              the comparison is same-touch against same-touch. */}
+          <p className="text-xs">
+            <span className="font-medium text-amber-300">Template</span>
+            <span className="text-muted-foreground">
+              {" "}
+              is identical for every lead; only name, company and link merge
+              in.{" "}
+            </span>
+            <span className="font-medium text-emerald-300">Bespoke</span>
+            <span className="text-muted-foreground">
+              {" "}
+              is written from this lead&apos;s own record.
+            </span>
+          </p>
+          {!bespokeSteps.length ? (
+            <p className="text-muted-foreground text-sm">
+              Nothing generated for this company yet. The template touches below
+              are what it would get today.
+            </p>
+          ) : null}
+          {Array.from({
+            length: Math.max(blastSteps.length, bespokeSteps.length),
+          }).map((_, index) => {
+            const blast = blastSteps[index];
+            const bespoke = bespokeSteps[index];
+            return (
+              <div key={index} className="grid gap-3 lg:grid-cols-2">
+                {blast ? (
+                  <div className="rounded border border-amber-500/25 bg-amber-500/5 p-3">
+                    <p className="text-xs">
+                      <span className="font-medium text-amber-300">
+                        Template
+                      </span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · Touch {index + 1} · day {blast.delayDays}
+                        {blast.subject ? ` · ${blast.subject}` : " · in-thread"}
+                      </span>
+                    </p>
+                    <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
+                      {blast.body}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground hidden items-center rounded border border-dashed p-3 text-xs lg:flex">
+                    The template has no touch {index + 1}.
+                  </div>
+                )}
+                {bespoke ? (
+                  <div className="border-border rounded border p-3">
+                    <p className="text-xs">
+                      <span className="font-medium text-emerald-300">
+                        Bespoke
+                      </span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · Touch {index + 1} · day {bespoke.delayDays}
+                        {bespoke.subject
+                          ? ` · ${bespoke.subject}`
+                          : " · in-thread"}
+                      </span>
+                    </p>
+                    <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
+                      {bespoke.body}
+                    </p>
+                  </div>
+                ) : bespokeSteps.length ? (
+                  <div className="text-muted-foreground hidden items-center rounded border border-dashed p-3 text-xs lg:flex">
+                    The bespoke draft has no touch {index + 1}.
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      {/* The ranker's own read. Internal only — the copy policy forbids telling a
+          prospect anything about their site's quality or alluding to a score. */}
+      {rank ? (
+        <Section
+          title="Ranker assessment"
+          note={`${rank.overall != null ? `overall ${rank.overall} · ` : ""}internal only — never quoted to the prospect`}
+        >
+          <div className="space-y-2 text-sm">
+            {rank.relationshipSummary ? (
+              <Row label="Relationship">{rank.relationshipSummary}</Row>
+            ) : null}
+            {rank.reengagementHook ? (
+              <Row label="Hook">{rank.reengagementHook}</Row>
+            ) : null}
+            {rank.copyNotes ? (
+              <Row label="Copy notes">{rank.copyNotes}</Row>
+            ) : null}
+            {rank.concerns?.length ? (
+              <Row label="Concerns">
+                <ul className="list-disc pl-4">
+                  {rank.concerns.map((concern, index) => (
+                    <li key={index}>{concern}</li>
+                  ))}
+                </ul>
+              </Row>
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
+
+      {/* Reachability — with the rejected rows visible, not hidden */}
+      <Section
+        title="Reachability"
+        note={`Selected channel: ${channel.bestEmail ?? "none"} · route ${channel.route} · verdict ${channel.verdict}`}
+      >
+        {channel.candidates.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No contacts stored. Resolve channels to crawl their site.
+          </p>
+        ) : (
+          // Scrolls inside its own box on narrow screens; four columns never
+          // fit a phone and squeezing them makes every cell unreadable.
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="text-muted-foreground text-left text-xs">
+                  <th className="border-b py-1 pr-3 font-medium">Email</th>
+                  <th className="border-b px-3 py-1 font-medium">Who</th>
+                  <th className="border-b px-3 py-1 text-right font-medium">
+                    Score
+                  </th>
+                  <th className="border-b px-3 py-1 font-medium">Why</th>
+                </tr>
+              </thead>
+              <tbody>
+                {channel.candidates.map((candidate) => (
+                  <tr key={`${candidate.kind}-${candidate.email}`}>
+                    <td className="border-b py-1.5 pr-3 font-mono text-xs break-all">
+                      {candidate.email}
+                      {candidate.email === channel.bestEmail ? (
+                        <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300">
+                          selected
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="border-b px-3 py-1.5">
+                      {[candidate.name, candidate.title]
+                        .filter(Boolean)
+                        .join(" · ") || "—"}
+                    </td>
+                    <td className="border-b px-3 py-1.5 text-right">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-xs ${VERDICT_TONE[candidate.verdict]}`}
+                      >
+                        {candidate.score}
+                      </span>
+                    </td>
+                    <td className="text-muted-foreground border-b px-3 py-1.5 text-xs">
+                      {[...candidate.risks, ...candidate.reasons].join("; ") ||
+                        "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {channels.length > 0 ? (
+          <p className="text-muted-foreground mt-3 text-xs">
+            Captured channels:{" "}
+            {channels
+              .map((c) => `${c.kind}${c.value ? ` (${c.value})` : ""}`)
+              .join(", ")}
+          </p>
+        ) : null}
+      </Section>
+
+      {/* The stored record renders instantly; the live HubSpot read is a
+          refresh, because it 429s under bulk load and rarely says anything the
+          last rank or generation did not already capture. */}
+      <Section
+        title="HubSpot correspondence"
+        note={
+          correspondence
+            ? `Stored ${correspondence.computedAt.slice(0, 10)} · refreshed whenever ranking or generation runs`
+            : "Nothing stored yet — rank this prospect, or load live below."
+        }
+      >
+        <div className="space-y-2 text-xs">
+          {correspondence ? (
+            <>
+              <p className="text-muted-foreground">
+                {correspondence.emails.outbound} outbound ·{" "}
+                {correspondence.emails.inbound} inbound ·{" "}
+                {correspondence.activity.calls} calls ·{" "}
+                {correspondence.activity.meetings} meetings ·{" "}
+                {correspondence.activity.notes} notes
+                {correspondence.lastContactAt
+                  ? ` · last contact ${correspondence.lastContactAt.slice(0, 10)}`
+                  : ""}
               </p>
-              {blastSteps.map((step, index) => (
+              {!correspondence.emails.items &&
+              !correspondence.activity.items ? (
+                <p className="text-muted-foreground">
+                  This summary predates message excerpts. Re-rank or regenerate
+                  to store them, or load live below.
+                </p>
+              ) : null}
+              {(correspondence.emails.items ?? []).map((item) => (
                 <div
-                  key={index}
-                  className="rounded border border-amber-500/25 bg-amber-500/5 p-3"
+                  key={item.engagementId}
+                  className="border-border rounded border p-2"
                 >
-                  <p className="text-muted-foreground text-xs">
-                    Touch {index + 1} · day {step.delayDays}
-                    {step.subject ? ` · ${step.subject}` : " · in-thread"}
+                  <p>
+                    <span className="text-foreground">{item.direction}</span> ·{" "}
+                    {item.sentAt.slice(0, 10)} · {item.subject}
                   </p>
-                  <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
-                    {step.body}
+                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                    {item.excerpt}
+                  </p>
+                </div>
+              ))}
+              {(correspondence.activity.items ?? []).map((item) => (
+                <div
+                  key={item.engagementId}
+                  className="border-border rounded border p-2"
+                >
+                  <p>
+                    <span className="text-foreground">{item.title}</span>
+                    {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
+                    {item.occurredAt.slice(0, 10)}
+                  </p>
+                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                    {item.excerpt}
+                  </p>
+                </div>
+              ))}
+            </>
+          ) : null}
+
+          {!showCrm ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowCrm(true)}
+            >
+              {correspondence
+                ? "Load live from HubSpot"
+                : "Load correspondence"}
+            </Button>
+          ) : crm.isPending ? (
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Reading HubSpot…
+            </div>
+          ) : crm.data?.available === false ? (
+            <p className="text-muted-foreground text-sm">{crm.data.reason}.</p>
+          ) : crm.data?.available ? (
+            <div className="space-y-2">
+              <p className="text-foreground font-medium">
+                Live from HubSpot: {crm.data.emails.retained} of{" "}
+                {crm.data.emails.available} emails ·{" "}
+                {crm.data.activity.retained} of {crm.data.activity.available}{" "}
+                calls and notes
+              </p>
+              {crm.data.emails.items.map((item) => (
+                <div
+                  key={item.engagementId}
+                  className="border-border rounded border p-2"
+                >
+                  <p>
+                    <span className="text-foreground">{item.direction}</span> ·{" "}
+                    {item.sentAt.slice(0, 10)} · {item.subject}
+                  </p>
+                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                    {item.body.slice(0, 400)}
+                  </p>
+                </div>
+              ))}
+              {crm.data.activity.items.map((item) => (
+                <div
+                  key={item.engagementId}
+                  className="border-border rounded border p-2"
+                >
+                  <p>
+                    <span className="text-foreground">{item.title}</span>
+                    {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
+                    {item.occurredAt.slice(0, 10)}
+                  </p>
+                  <p className="text-muted-foreground mt-1 [overflow-wrap:anywhere]">
+                    {item.body.slice(0, 400)}
                   </p>
                 </div>
               ))}
             </div>
-
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-emerald-300">
-                Bespoke — written for {row.companyName ?? row.domain} from its
-                own record
-              </p>
-              {outreach?.steps?.length ? (
-                outreach.steps.map((step, index) => (
-                  <div key={index} className="border-border rounded border p-3">
-                    <p className="text-muted-foreground text-xs">
-                      Touch {index + 1} · day {step.delayDays}
-                      {step.subject ? ` · ${step.subject}` : " · in-thread"}
-                    </p>
-                    <p className="mt-1.5 text-sm [overflow-wrap:anywhere] whitespace-pre-wrap">
-                      {step.body}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  Nothing generated for this company yet — the template column
-                  is what it would get today.
-                </p>
-              )}
-            </div>
-          </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">Nothing returned.</p>
+          )}
         </div>
-      </Section>
-
-      {/* On demand, because it is a provider read that 429s under load */}
-      <Section
-        title="Current HubSpot correspondence"
-        note="Fetched on request. This is HubSpot now — not what the copy above was written from."
-      >
-        {!showCrm ? (
-          <Button size="sm" variant="outline" onClick={() => setShowCrm(true)}>
-            Load correspondence
-          </Button>
-        ) : crm.isPending ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Reading HubSpot…
-          </div>
-        ) : crm.data?.available === false ? (
-          <p className="text-muted-foreground text-sm">{crm.data.reason}.</p>
-        ) : crm.data?.available ? (
-          <div className="space-y-2 text-xs">
-            <p className="text-muted-foreground">
-              {crm.data.emails.retained} of {crm.data.emails.available} emails ·{" "}
-              {crm.data.activity.retained} of {crm.data.activity.available}{" "}
-              calls and notes
-            </p>
-            {crm.data.emails.items.map((item) => (
-              <div
-                key={item.engagementId}
-                className="border-border rounded border p-2"
-              >
-                <p>
-                  <span className="text-foreground">{item.direction}</span> ·{" "}
-                  {item.sentAt.slice(0, 10)} · {item.subject}
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  {item.body.slice(0, 400)}
-                </p>
-              </div>
-            ))}
-            {crm.data.activity.items.map((item) => (
-              <div
-                key={item.engagementId}
-                className="border-border rounded border p-2"
-              >
-                <p>
-                  <span className="text-foreground">{item.title}</span>
-                  {item.qualifier ? ` (${item.qualifier})` : ""} ·{" "}
-                  {item.occurredAt.slice(0, 10)}
-                </p>
-                <p className="text-muted-foreground mt-1">
-                  {item.body.slice(0, 400)}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-sm">Nothing returned.</p>
-        )}
       </Section>
 
       {/* The two workflows, in one place. Ranking was script-only until now, so

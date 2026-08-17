@@ -44,7 +44,7 @@ export function blastSequenceFor(input: {
       subject: `We built ${company} a direct booking site`,
       body: `Hi ${name},
 
-We went ahead and built a direct booking website for ${company} — it's live now, with your properties already on it:
+We went ahead and built a direct booking website for ${company}. It's live now, with your properties already on it:
 
 ${link}
 
@@ -56,7 +56,7 @@ Worth a look?`,
       delayDays: 3,
       body: `Hi ${name},
 
-Floating this back up — the site we built for ${company} is still live if you haven't had a chance to open it:
+Floating this back up. The site we built for ${company} is still live if you haven't had a chance to open it:
 
 ${link}
 
@@ -66,11 +66,11 @@ Happy to answer anything, or to tweak it if something looks off.`,
       delayDays: 7,
       body: `Hi ${name},
 
-One number worth knowing: every booking that comes through your own site instead of an OTA keeps 15–20% that would otherwise go to commission. That's what the site we built is for.
+One number worth knowing: every booking that comes through your own site instead of an OTA keeps 15 to 20% that would otherwise go to commission. That's what the site we built is for.
 
 ${link}
 
-If direct booking isn't a priority for ${company} right now, no problem — just say so and I'll close this out.`,
+If direct booking isn't a priority for ${company} right now, no problem. Just say so and I'll close this out.`,
     },
     {
       delayDays: 12,
@@ -80,7 +80,7 @@ Last note from me. The preview for ${company} stays up a little while longer if 
 
 ${link}
 
-If the timing's wrong, I'll leave you alone — and if it's ever right, you know where to find me.`,
+If the timing's wrong, I'll leave you alone. And if it's ever right, you know where to find me.`,
     },
   ];
 }

@@ -6,26 +6,55 @@ import type {
 } from "@/server/services/hubspot-company-email-context.service";
 
 /**
- * What our team has actually said to a company, reduced to counts and dates.
+ * What our team has actually said to a company, persisted where the leads UI
+ * can read it without paying two HubSpot calls per row.
  *
  * The ranker and the sequence generator each load the same two HubSpot
  * histories, and both used to discard everything except their own conclusion.
  * That left the strongest ranking signal we have unavailable anywhere else:
  * the leads card could not tell that Walt Kubiak is named in five logged calls
- * and Barb in one, because reading that costs two API calls per row.
+ * and Barb in one.
  *
- * So the summary is persisted and the raw correspondence is not. This is a
- * deliberate line, not an optimisation. `sales-email-read` is the sensitive
- * scope in the HubSpot app and the corpus doc forbids copying bodies out of the
- * approved environment; a mention count and a date carry the ranking signal
- * without moving anyone's private mail into our database. Anything needing the
- * actual words re-reads HubSpot, where the record belongs.
+ * This started as counts and dates only, with the bodies deliberately left in
+ * HubSpot. That line moved (2026-08-17): drafts already persist email excerpts
+ * in generationContext, the corpus stores anonymized bodies, and the review
+ * surface needs the record visible without an on-demand provider read that
+ * 429s under load. So the summary now carries capped excerpts too. The full
+ * messages still live in HubSpot; the live fetch remains the source of truth.
  */
+export type CorrespondenceEmailItem = {
+  engagementId: string;
+  direction: "outbound" | "inbound" | "unknown";
+  sentAt: string;
+  subject: string;
+  excerpt: string;
+};
+
+export type CorrespondenceActivityItem = {
+  engagementId: string;
+  kind: string;
+  occurredAt: string;
+  qualifier: string | null;
+  title: string;
+  excerpt: string;
+};
+
 export type LeadCorrespondence = {
   computedAt: string;
   hubspotCompanyId: string | null;
-  emails: { available: number; inbound: number; outbound: number };
-  activity: { calls: number; meetings: number; notes: number };
+  emails: {
+    available: number;
+    inbound: number;
+    outbound: number;
+    /** Newest first, capped. Absent on blobs written before 2026-08-17. */
+    items?: CorrespondenceEmailItem[];
+  };
+  activity: {
+    calls: number;
+    meetings: number;
+    notes: number;
+    items?: CorrespondenceActivityItem[];
+  };
   /** Newest logged email, call or meeting. */
   lastContactAt: string | null;
   /**
@@ -36,6 +65,10 @@ export type LeadCorrespondence = {
    */
   contactMentions: Record<string, number>;
 };
+
+const MAX_ITEMS = 20;
+const EMAIL_EXCERPT = 700;
+const ACTIVITY_EXCERPT = 500;
 
 export type CorrespondenceContact = {
   email: string;
@@ -97,6 +130,9 @@ export function summarizeCorrespondence(input: {
   const countKind = (kind: string): number =>
     activityItems.filter((item) => item.kind === kind).length;
 
+  const newestFirst = <T>(items: T[], at: (item: T) => string): T[] =>
+    [...items].sort((a, b) => at(b).localeCompare(at(a)));
+
   return {
     computedAt: new Date().toISOString(),
     hubspotCompanyId: input.hubspotCompanyId,
@@ -105,11 +141,30 @@ export function summarizeCorrespondence(input: {
       inbound: emailItems.filter((item) => item.direction === "inbound").length,
       outbound: emailItems.filter((item) => item.direction === "outbound")
         .length,
+      items: newestFirst(emailItems, (item) => item.sentAt)
+        .slice(0, MAX_ITEMS)
+        .map((item) => ({
+          engagementId: item.engagementId,
+          direction: item.direction,
+          sentAt: item.sentAt,
+          subject: item.subject,
+          excerpt: item.body.slice(0, EMAIL_EXCERPT),
+        })),
     },
     activity: {
       calls: countKind("call"),
       meetings: countKind("meeting"),
       notes: countKind("note"),
+      items: newestFirst(activityItems, (item) => item.occurredAt)
+        .slice(0, MAX_ITEMS)
+        .map((item) => ({
+          engagementId: item.engagementId,
+          kind: item.kind,
+          occurredAt: item.occurredAt,
+          qualifier: item.qualifier,
+          title: item.title,
+          excerpt: item.body.slice(0, ACTIVITY_EXCERPT),
+        })),
     },
     lastContactAt: dates.length ? dates.sort().at(-1)! : null,
     contactMentions: countContactMentions(input.contacts, haystack),
