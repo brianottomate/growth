@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Gift, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
@@ -12,6 +12,7 @@ import {
   blastSequenceFor,
   type TemplatePart,
 } from "@/lib/pregen-blast-template";
+import { osPitchUrl } from "@/lib/pregen-urls";
 
 /**
  * Everything about one prospect on a single surface, addressed by domain.
@@ -332,6 +333,8 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const screenshot = desktop(visual?.theirs) ?? rank?.screenshotUrl;
   const previewShot = desktop(visual?.ours);
   const previewShotAt = visual?.capturedAt;
+  // Derived, never stored: same label and token, wrapped in the pitch page.
+  const wrapperUrl = preview.url ? osPitchUrl(preview.url) : null;
 
   return (
     <div className="space-y-4">
@@ -404,14 +407,32 @@ export function ProspectDetail({ domain }: { domain: string }) {
             >
               {preview.state} · {preview.detail}
             </span>
+            {/* One artifact seen two ways, same pairing as the review card:
+                the bare renderer address the build produced, and the
+                wander.com page that wraps it in the pitch. The wrapper is what
+                the copy actually sends, so it is worth opening first. */}
             {preview.url ? (
               <a
                 href={preview.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs underline underline-offset-2"
+                title="Open the pregen preview they will see"
+                aria-label="Open the pregen preview"
+                className="border-border text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-md border"
               >
-                open
+                <ExternalLink className="size-3.5" />
+              </a>
+            ) : null}
+            {wrapperUrl ? (
+              <a
+                href={wrapperUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="Open the wander.com pitch wrapper"
+                aria-label="Open the wander.com pitch wrapper"
+                className="border-border text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-md border"
+              >
+                <Gift className="size-3.5" />
               </a>
             ) : null}
           </div>
@@ -459,9 +480,10 @@ export function ProspectDetail({ domain }: { domain: string }) {
             <p className="mt-2 text-xs text-red-300">{capture.error.message}</p>
           ) : null}
           {preview.url ? (
-            <p className="text-muted-foreground mt-2 text-xs break-all">
-              {preview.url}
-            </p>
+            <div className="text-muted-foreground mt-2 space-y-1 text-xs break-all">
+              {wrapperUrl ? <p>{wrapperUrl}</p> : null}
+              <p>{preview.url}</p>
+            </div>
           ) : null}
           {preview.state === "dead" ? (
             <p className="mt-2 text-xs text-red-300">
