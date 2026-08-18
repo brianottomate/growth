@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "velite build && next build",
+    "build": "velite build && bun run db:push:vercel-prod && next build",
+    "db:push:vercel-prod": "[ \"$VERCEL_ENV\" = production ] && drizzle-kit push || true",
     "check": "eslint . --cache && tsc --noEmit",
     "clean": "rm -rf node_modules .next .turbo .cache .velite .eslintcache bun.lock",
     "reinstall": "bun run clean && bun install",

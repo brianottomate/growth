@@ -2,11 +2,15 @@
 
 ## Current decision
 
-Wander Growth remains manually `db:push`-managed for now. Vercel builds only the
-application; they never mutate the shared database. Apply schema changes
-deliberately from a current `main` checkout with `--strict --verbose`, or prefer
-an exact idempotent additive-DDL script for operational backfills. Never add
-`--force`.
+Wander Growth is `db:push`-managed, with a production-build backstop
+(2026-08-18, Kristian): `bun run build` runs `drizzle-kit push` when
+`VERCEL_ENV=production`, so a forgotten manual push is applied at deploy
+instead of leaving code that reads columns the database does not have. The
+guard matters because previews share the production database — an unmerged
+branch's schema must not land at preview-build time. Manual push from a
+current `main` checkout remains the deliberate path. Never add `--force`:
+without it, a destructive or ambiguous diff fails the production build
+loudly, which is the correct outcome.
 
 Development and production currently share the same database, so a local push
 is a production migration. This document records how to move to checked-in
