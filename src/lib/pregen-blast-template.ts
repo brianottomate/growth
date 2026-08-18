@@ -18,6 +18,8 @@
  * three touches the template does not answer. That asymmetry is the comparison,
  * not a bug in it.
  *
+ * Last checked against a real send on 2026-08-18 (enrollment 3784915485).
+ *
  * Bodies are parts rather than one string so the UI can mark what actually
  * varies. A reviewer asking "what does this lead receive" and a reviewer asking
  * "what does the template say" want different renderings of the same thing,
@@ -112,7 +114,7 @@ My name is Kyle and I'm the CMO at Wander.com. We built a live preview of your d
         link,
         text(`
 
-WanderOS customers are also seeing a 66% average lift in visibility across AI search platforms (ChatGPT, Perplexity, etc.) after switching.
+WanderOS customers are also seeing a 66% average lift in visibility across AI search platforms (ChatGPT, Google Gemini, etc.) after switching.
 
 If it's useful, we can show you what else WanderOS unlocks to grow your business.`),
       ],
