@@ -5,7 +5,12 @@
  * built preview, which a colleague reviewing the copy has neither of. Same
  * client, same sender, minus those two conditions.
  *
- *   bun --conditions=react-server run scripts/enroll-one-contact.ts <contactId>
+ *   bun --conditions=react-server run scripts/enroll-one-contact.ts \
+ *     [contactId] [senderEmail] [senderUserId]
+ *
+ * The sender defaults to Kyle. Overriding it is for proving the path works
+ * when his inbox will not: HubSpot refuses a sender with no connected inbox,
+ * and that refusal looks identical to a broken integration.
  */
 import {
   enrollContactInSequence,
@@ -18,6 +23,8 @@ import {
 } from "@/lib/pregen-sequence";
 
 const CONTACT_ID = process.argv[2] ?? "242777919150"; // kyletibbitts+pregen@gmail.com
+const SENDER_EMAIL = process.argv[3] ?? PREGEN_SEQUENCE_SENDER_EMAIL;
+const SENDER_USER_ID = process.argv[4] ?? PREGEN_SEQUENCE_SENDER_USER_ID;
 
 const existing = await getContactEnrollment(CONTACT_ID);
 if (existing) {
@@ -28,8 +35,8 @@ if (existing) {
 const enrollment = await enrollContactInSequence({
   hubspotContactId: CONTACT_ID,
   sequenceId: PREGEN_SEQUENCE_ID,
-  senderEmail: PREGEN_SEQUENCE_SENDER_EMAIL,
-  userId: PREGEN_SEQUENCE_SENDER_USER_ID,
+  senderEmail: SENDER_EMAIL,
+  userId: SENDER_USER_ID,
 });
 console.log(JSON.stringify(enrollment, null, 2));
 process.exit(0);
