@@ -129,6 +129,13 @@ function Pill({
   );
 }
 
+/**
+ * Whose connected inbox the sequence sends from. HubSpot rejects an address it
+ * has no mailbox for, and the From line is the point of the motion, so this is
+ * deliberate rather than the signed-in user.
+ */
+const SEQUENCE_SENDER_EMAIL = "kristian@wander.com";
+
 export function LeadsClient() {
   const trpc = useTRPC();
 
@@ -568,9 +575,7 @@ export function LeadsClient() {
             <select
               value={verdict ?? ""}
               onChange={(e) => {
-                void setVerdict(
-                  (e.target.value || null) as typeof verdict,
-                );
+                void setVerdict((e.target.value || null) as typeof verdict);
                 resetPage();
               }}
               className="border-border bg-background rounded-md border px-2 py-1 text-xs"
@@ -1014,6 +1019,19 @@ function ReviewCardList({
   const buildPreview = useMutation(
     trpc.leads.requestPregenSite.mutationOptions({ onSettled: settle }),
   );
+  // The refusals live server-side, so a rejected enrol surfaces as an error
+  // here rather than being pre-empted in the UI. That keeps one list of
+  // conditions instead of a copy per surface that can drift.
+  const enroll = useMutation(
+    trpc.leads.startPregenSequence.mutationOptions({
+      onSettled: settle,
+      onError: (error) => window.alert(error.message),
+      onSuccess: (result) =>
+        window.alert(
+          `Enrolled ${result.toEmail} in ${result.sequenceName}, sending from ${result.enrolledByEmail}.`,
+        ),
+    }),
+  );
 
   return (
     <div className="mt-2 space-y-3">
@@ -1060,11 +1078,27 @@ function ReviewCardList({
                 setPending({ id, kind: "build" });
                 buildPreview.mutate({ domainId: id });
               },
+              onEnroll: (id) => {
+                // The contact is the one the channel scorer already selected and
+                // the card already shows, so enrolling cannot quietly pick
+                // someone the reviewer did not look at.
+                const contact = item.contacts.find(
+                  (c) => c.email === item.channel.bestEmail,
+                );
+                if (!contact) return;
+                setPending({ id, kind: "enroll" });
+                enroll.mutate({
+                  domainId: id,
+                  contactId: contact.id,
+                  senderEmail: SEQUENCE_SENDER_EMAIL,
+                });
+              },
               resolving: busy("resolve"),
               ranking: busy("rank"),
               generating: busy("generate"),
               verifying: busy("verify"),
               building: busy("build"),
+              enrolling: busy("enroll"),
             }}
           />
         );

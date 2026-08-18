@@ -18,6 +18,7 @@ import {
   Phone,
   RefreshCw,
   ShieldAlert,
+  Send,
   ShieldCheck,
   Sparkles,
   type LucideIcon,
@@ -31,7 +32,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import { osPitchUrl } from "@/lib/pregen-urls";
-import { elapsedLabel, isStuck, type InFlightBuild } from "./PregenBuildsBanner";
+import {
+  elapsedLabel,
+  isStuck,
+  type InFlightBuild,
+} from "./PregenBuildsBanner";
 
 /**
  * The one prospect review card.
@@ -389,11 +394,14 @@ export interface ProspectCardActions {
   onRank?: (id: string) => void;
   /** Ask WanderOS to build a pregen site. Async — reports back over the webhook. */
   onBuildPreview?: (id: string) => void;
+  /** Enrol the selected contact in the HubSpot sequence. This one sends mail. */
+  onEnroll?: (id: string) => void;
   resolving?: boolean;
   generating?: boolean;
   verifying?: boolean;
   ranking?: boolean;
   building?: boolean;
+  enrolling?: boolean;
 }
 
 export function ProspectReviewCard({
@@ -605,6 +613,29 @@ export function ProspectReviewCard({
                     <Sparkles className="size-3.5" />
                   )}
                   {data.outreach ? "Regenerate sequence" : "Generate sequence"}
+                </button>
+              )}
+              {/* The only control on this card that causes mail to leave a
+                  mailbox, so it is styled apart from the drafting verbs and
+                  disabled until a channel has actually been selected. Every
+                  refusal is enforced server-side; this surfaces what came back. */}
+              {actions.onEnroll && data.outreach && (
+                <button
+                  onClick={() => actions.onEnroll!(data.id)}
+                  disabled={actions.enrolling || !bestEmail}
+                  title={
+                    bestEmail
+                      ? `Enrol ${bestEmail} in the HubSpot sequence`
+                      : "No channel selected yet"
+                  }
+                  className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {actions.enrolling ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Send className="size-3.5" />
+                  )}
+                  Start sequence
                 </button>
               )}
               <DropdownMenu>
