@@ -95,6 +95,8 @@ export interface ProspectCardData {
     route: ProspectRoute;
     score: number;
     bestEmail: string | null;
+    /** The person a sequence would enrol, which is not always `bestEmail`. */
+    enrollable: ProspectCandidate | null;
     reasons: string[];
     risks: string[];
     candidates: ProspectCandidate[];
@@ -453,13 +455,10 @@ export function ProspectReviewCard({
         }
       : theme;
   const bestEmail = data.channel.bestEmail;
-  // A selected address that came off the website has no `lead_contact` row and
-  // so no way to reach a HubSpot contact. Enrolling it is impossible rather than
-  // merely refused, so the button says so instead of no-opping on click.
-  const enrollableContactId =
-    data.channel.candidates.find(
-      (candidate) => candidate.email === bestEmail,
-    )?.contactId ?? null;
+  // The mailbox we would write to and the person we would enrol are scored
+  // separately, because a scraped `info@` is a reasonable answer to the first
+  // and never an answer to the second.
+  const enrollable = data.channel.enrollable;
 
   /**
    * Workflows that are a conversation rather than a single call.
@@ -631,15 +630,13 @@ export function ProspectReviewCard({
               {actions.onEnroll && data.outreach && (
                 <button
                   onClick={() => actions.onEnroll!(data.id)}
-                  disabled={
-                    actions.enrolling || !bestEmail || !enrollableContactId
-                  }
+                  disabled={actions.enrolling || !enrollable}
                   title={
-                    !bestEmail
-                      ? "No channel selected yet"
-                      : !enrollableContactId
+                    !enrollable
+                      ? bestEmail
                         ? `${bestEmail} was found on the website and has no contact record to enrol`
-                        : `Enrol ${bestEmail} in the HubSpot sequence`
+                        : "No contact on this company can be enrolled"
+                      : `Enrol ${enrollable.name ?? enrollable.email} (${enrollable.email}) in the HubSpot sequence`
                   }
                   className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >

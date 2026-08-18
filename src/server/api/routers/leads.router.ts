@@ -10,6 +10,7 @@ import {
   ilike,
   inArray,
   isNull,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -618,6 +619,8 @@ export const leadsRouter = createTRPCRouter({
                   lastName: leadContactTable.lastName,
                   jobTitle: leadContactTable.jobTitle,
                   verificationStatus: leadContactTable.verificationStatus,
+                  retiredAt: leadContactTable.retiredAt,
+                  retiredReason: leadContactTable.retiredReason,
                   verification: leadContactTable.verification,
                 })
                 .from(leadContactTable)
@@ -688,7 +691,13 @@ export const leadsRouter = createTRPCRouter({
                 {
                   channel: scoreLeadChannel({
                     domain: items.find((i) => i.id === id)!.domain,
-                    contactChannel: parseContactChannel(enrichmentById.get(id)),
+                    contactChannel: parseContactChannel(
+                      (
+                        enrichmentById.get(id) as {
+                          contactChannel?: unknown;
+                        } | null
+                      )?.contactChannel,
+                    ),
                     contacts: contactsByDomain.get(id) ?? [],
                     // Already on the row. Reading it live would be two HubSpot
                     // calls per lead, which is why the card used to rank blind
@@ -795,6 +804,8 @@ export const leadsRouter = createTRPCRouter({
               lastName: leadContactTable.lastName,
               jobTitle: leadContactTable.jobTitle,
               verificationStatus: leadContactTable.verificationStatus,
+              retiredAt: leadContactTable.retiredAt,
+              retiredReason: leadContactTable.retiredReason,
               verification: leadContactTable.verification,
               hubspotContactId: leadContactTable.hubspotContactId,
               emailOptOut: leadContactTable.emailOptOut,
@@ -839,7 +850,10 @@ export const leadsRouter = createTRPCRouter({
 
       const channel = scoreLeadChannel({
         domain: domain.domain,
-        contactChannel: parseContactChannel(domain.enrichment),
+        contactChannel: parseContactChannel(
+          (domain.enrichment as { contactChannel?: unknown } | null)
+            ?.contactChannel,
+        ),
         contacts,
         historyMentions: storedContactMentions(domain.enrichment),
       });
@@ -1395,6 +1409,42 @@ export const leadsRouter = createTRPCRouter({
         });
       }
 
+      // One person per company at a time. Two colleagues receiving the same
+      // "we rebuilt your website" mail on the same morning is the version of
+      // this motion that reads as a blast, and the per-contact check below
+      // cannot see it because it only ever looks at the contact being enrolled.
+      // Retire the current recipient (see `retireLeadContact`) to hand the
+      // company to the next candidate.
+      const [inFlight] = await ctx.db
+        .select({
+          email: leadContactTable.email,
+          enrolledAt: leadSequenceTable.enrolledAt,
+        })
+        .from(leadSequenceTable)
+        .innerJoin(
+          leadContactTable,
+          eq(leadContactTable.id, leadSequenceTable.contactId),
+        )
+        .where(
+          and(
+            eq(leadSequenceTable.domainId, input.domainId),
+            eq(leadSequenceTable.status, "sent"),
+            ne(leadContactTable.id, contact!.id),
+            isNull(leadContactTable.retiredAt),
+          ),
+        )
+        .limit(1);
+      if (inFlight) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${inFlight.email} at ${row.domain} is already in the sequence${
+            inFlight.enrolledAt
+              ? ` (enrolled ${inFlight.enrolledAt.toISOString().slice(0, 10)})`
+              : ""
+          }. Retire that contact before enrolling someone else here.`,
+        });
+      }
+
       // Ask the provider first: a rep may have enrolled from the CRM.
       const existing = await getContactEnrollment(contact!.hubspotContactId!);
       if (existing) {
@@ -1439,6 +1489,43 @@ export const leadsRouter = createTRPCRouter({
         enrolledByEmail: enrollment.enrolledByEmail,
         warnings,
       };
+    }),
+
+  /**
+   * Take one person out of rotation, so the company falls to the next
+   * candidate.
+   *
+   * The case this exists for is a bounce: the send went to the best address we
+   * had, it failed, and the company is otherwise still worth writing to. That
+   * needs to be one click and reversible, because the alternative a reviewer
+   * reaches for is deleting the contact, which loses the evidence of why we
+   * stopped writing to them.
+   */
+  retireLeadContact: protectedProcedure
+    .input(
+      z.object({
+        contactId: z.string(),
+        reason: z.string().trim().min(1).max(200),
+        /** Put them back in rotation; `reason` is kept for the audit trail. */
+        undo: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(leadContactTable)
+        .set(
+          input.undo
+            ? { retiredAt: null, retiredReason: null }
+            : { retiredAt: new Date(), retiredReason: input.reason },
+        )
+        .where(eq(leadContactTable.id, input.contactId))
+        .returning({
+          id: leadContactTable.id,
+          email: leadContactTable.email,
+          retiredAt: leadContactTable.retiredAt,
+        });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return updated;
     }),
 
   publishPregenOutreach: protectedProcedure
@@ -1786,6 +1873,8 @@ export const leadsRouter = createTRPCRouter({
           lastName: leadContactTable.lastName,
           jobTitle: leadContactTable.jobTitle,
           verificationStatus: leadContactTable.verificationStatus,
+          retiredAt: leadContactTable.retiredAt,
+          retiredReason: leadContactTable.retiredReason,
           verification: leadContactTable.verification,
         })
         .from(leadContactTable)
@@ -1842,6 +1931,8 @@ export const leadsRouter = createTRPCRouter({
           lastName: leadContactTable.lastName,
           jobTitle: leadContactTable.jobTitle,
           verificationStatus: leadContactTable.verificationStatus,
+          retiredAt: leadContactTable.retiredAt,
+          retiredReason: leadContactTable.retiredReason,
           verification: leadContactTable.verification,
         })
         .from(leadContactTable)

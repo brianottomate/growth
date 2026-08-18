@@ -14,6 +14,9 @@ export type StoredLeadContact = {
   lastName: string | null;
   jobTitle: string | null;
   verificationStatus?: string | null;
+  /** Set once a human took this person out of rotation; see `retiredAt`. */
+  retiredAt?: Date | string | null;
+  retiredReason?: string | null;
   // Person-verification evidence from the trust layer (Minerva geo + LinkedIn).
   verification?: LeadContactVerification | null;
 };
@@ -54,6 +57,18 @@ export type ChannelScore = {
   route: LeadChannelRoute;
   verdict: LeadChannelVerdict;
   bestEmail: string | null;
+  /**
+   * Who a sequence would actually be sent to, which is a different question
+   * from `bestEmail`.
+   *
+   * `bestEmail` answers "which mailbox do we write to", and for that a scraped
+   * `info@` is a fine answer. Enrolment needs a person: a HubSpot contact to
+   * enrol, and a first name for the greeting. Deriving one from the other let a
+   * scraped address that has no contact row win over a named owner sitting in
+   * the same list, which disabled the button on mckennalodging.com and picked
+   * the mainline over Walt Kubiak on mauiwestside.com.
+   */
+  enrollable: ContactCandidateScore | null;
   score: number;
   reasons: string[];
   risks: string[];
@@ -319,6 +334,23 @@ export function scoreStoredContact(
     };
   }
 
+  // Also a hard zero rather than a penalty. A retired contact is a decision a
+  // human already made, and the point of retiring is that the next candidate
+  // takes the company — which only happens if this one cannot outscore them.
+  if (contact.retiredAt) {
+    return {
+      kind: "stored",
+      contactId: contact.id,
+      email: contact.email,
+      name: name || null,
+      title: contact.jobTitle,
+      score: 0,
+      verdict: "skip",
+      reasons: [],
+      risks: [contact.retiredReason ?? "retired as a recipient"],
+    };
+  }
+
   if (isCorporateForDomain(contact.email, domain)) {
     score += 30;
     reasons.push("corporate-domain email");
@@ -463,12 +495,23 @@ export function scoreLeadChannel(input: {
     candidates.find((candidate) => !isPlaceholderEmail(candidate.email)) ??
     null;
   const bestEmail = bestSiteEmail ?? bestCandidate?.email ?? null;
+  // Highest-scoring candidate we could actually enrol. `candidates` is already
+  // sorted, so the first one with a contact row is the pick, and the scorer's
+  // own promoters (decision-maker title, corporate domain, logged history)
+  // decide it rather than the scrape order.
+  // `score > 0` is what excludes the two hard zeros — placeholder mailboxes and
+  // retired contacts — without this having to re-derive either rule.
+  const enrollable =
+    candidates.find(
+      (candidate) => candidate.contactId != null && candidate.score > 0,
+    ) ?? null;
 
   if (route === "form" && !bestEmail) {
     return {
       route,
       verdict: "form",
       bestEmail: null,
+      enrollable,
       score: 50,
       reasons: ["contact form found on company website"],
       risks: [],
@@ -484,6 +527,7 @@ export function scoreLeadChannel(input: {
     route: bestEmail ? "instantly" : route,
     verdict: verdictFor(score, bestEmail ? "instantly" : route),
     bestEmail,
+    enrollable,
     score,
     reasons,
     risks,

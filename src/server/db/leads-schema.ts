@@ -311,6 +311,15 @@ export const leadContactTable = leadsSchema.table(
     // a pregen site build is not free. Null means HubSpot has not told us yet.
     emailOptOut: t.boolean(),
 
+    // Retired as a recipient: the address bounced, the person left, or a human
+    // judged them the wrong door in. Distinct from `deletedAt` (the row is
+    // still true and still worth showing) and from `emailOptOut` (which is the
+    // contact's own choice and HubSpot's to enforce). Retiring is how a company
+    // moves to the next candidate after a failed send, so the scorer zeroes
+    // these and the enrolment guard ignores them when asking what is in flight.
+    retiredAt: t.timestamp(),
+    retiredReason: t.text(),
+
     // Person-verification evidence (Minerva geo + Bright Data LinkedIn).
     // Re-runnable trust layer — see lead-verify.service.ts.
     verification: t.jsonb().$type<LeadContactVerification>(),

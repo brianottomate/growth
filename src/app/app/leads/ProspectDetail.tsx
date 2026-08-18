@@ -241,6 +241,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const startSequence = useMutation(
     trpc.leads.startPregenSequence.mutationOptions({ onSuccess: invalidate }),
   );
+  const retire = useMutation(
+    trpc.leads.retireLeadContact.mutationOptions({ onSuccess: invalidate }),
+  );
 
   // Live HubSpot correspondence is a provider read, so it waits to be asked for.
   // The draft's own snapshot below is what the copy was written from.
@@ -272,8 +275,10 @@ export function ProspectDetail({ domain }: { domain: string }) {
   // two sequences this lead could receive sit on one screen. Merges in exactly
   // what a HubSpot template would: the selected contact's first name, the
   // company, and the blast-arm link.
+  // The person the Start sequence button would enrol, so the greeting shown
+  // here is the greeting that would actually land.
   const selectedContact = contacts.find(
-    (contact) => contact.email === channel.bestEmail,
+    (contact) => contact.id === channel.enrollable?.contactId,
   );
   const blastSteps = blastSequenceFor({
     firstName: selectedContact?.firstName,
@@ -447,15 +452,13 @@ export function ProspectDetail({ domain }: { domain: string }) {
               this just surfaces what came back. */}
           <Button
             size="sm"
-            disabled={startSequence.isPending || !channel.bestEmail}
+            disabled={startSequence.isPending || !channel.enrollable}
             onClick={() => {
-              const target = contacts.find(
-                (contact) => contact.email === channel.bestEmail,
-              );
-              if (!target) return;
+              const contactId = channel.enrollable?.contactId;
+              if (!contactId) return;
               startSequence.mutate({
                 domainId: row.id,
-                contactId: target.id,
+                contactId,
                 senderEmail: PREGEN_SEQUENCE_SENDER_EMAIL,
                 acknowledgeWarnings: false,
               });
@@ -850,7 +853,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
       {/* Reachability — with the rejected rows visible, not hidden */}
       <Section
         title="Reachability"
-        note={`Selected channel: ${channel.bestEmail ?? "none"} · route ${channel.route} · verdict ${channel.verdict}`}
+        note={`Selected channel: ${channel.bestEmail ?? "none"} · enrols ${channel.enrollable?.email ?? "nobody"} · route ${channel.route} · verdict ${channel.verdict}`}
       >
         {channel.candidates.length === 0 ? (
           <p className="text-muted-foreground text-sm">
@@ -869,6 +872,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
                     Score
                   </th>
                   <th className="border-b px-3 py-1 font-medium">Why</th>
+                  <th className="border-b px-3 py-1 font-medium">
+                    <span className="sr-only">Rotation</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -879,6 +885,12 @@ export function ProspectDetail({ domain }: { domain: string }) {
                       {candidate.email === channel.bestEmail ? (
                         <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300">
                           selected
+                        </span>
+                      ) : null}
+                      {candidate.contactId != null &&
+                      candidate.contactId === channel.enrollable?.contactId ? (
+                        <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300">
+                          enrols
                         </span>
                       ) : null}
                     </td>
@@ -897,6 +909,47 @@ export function ProspectDetail({ domain }: { domain: string }) {
                     <td className="text-muted-foreground border-b px-3 py-1.5 text-xs">
                       {[...candidate.risks, ...candidate.reasons].join("; ") ||
                         "—"}
+                    </td>
+                    {/* Retiring is how a company moves on after a bounce: the
+                        scorer zeroes this person and the next one becomes the
+                        enrolment target. Reversible, because "wrong contact"
+                        and "wrong call about the contact" both happen. */}
+                    <td className="border-b px-3 py-1.5 text-right">
+                      {candidate.contactId ? (
+                        <button
+                          type="button"
+                          disabled={retire.isPending}
+                          className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2 disabled:opacity-50"
+                          onClick={() => {
+                            const contactId = candidate.contactId!;
+                            const wasRetired = contacts.some(
+                              (contact) =>
+                                contact.id === contactId && contact.retiredAt,
+                            );
+                            if (wasRetired) {
+                              retire.mutate({
+                                contactId,
+                                reason: "back in rotation",
+                                undo: true,
+                              });
+                              return;
+                            }
+                            const reason = window.prompt(
+                              `Why is ${candidate.email} out of rotation? (bounced, left the company, wrong person)`,
+                            );
+                            if (!reason?.trim()) return;
+                            retire.mutate({ contactId, reason: reason.trim() });
+                          }}
+                        >
+                          {contacts.some(
+                            (contact) =>
+                              contact.id === candidate.contactId &&
+                              contact.retiredAt,
+                          )
+                            ? "Restore"
+                            : "Retire"}
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
