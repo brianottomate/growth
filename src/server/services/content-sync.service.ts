@@ -20,6 +20,7 @@ import {
   mapXTweetToPlatformPost,
 } from "@/server/clients/x.client";
 import { ingestPlatformPosts } from "./platform-post-ingest.service";
+import { rehostRecentPostVideos } from "./post-video-rehost.service";
 
 // Every organic social surface Zernio exposes. Official APIs can supplement
 // the same canonical rows when configured; Meta Ads remains in the ads model.
@@ -70,12 +71,21 @@ export async function syncBrandContent(options: {
   monthsBack?: number;
   /** If set, overrides monthsBack — pull only the last N days. */
   daysBack?: number;
+  /**
+   * How many of the newest video posts to copy into R2. Provider video URLs are
+   * signed and expire within about a week of the post going up, and the
+   * provider hands back the same expired URL forever after, so a video not
+   * copied while it is fresh is not recoverable from here at all. Rehosting on
+   * every pull is what keeps that window from closing. 0 disables it.
+   */
+  rehostVideoLimit?: number;
 }): Promise<{
   brandId: string;
   candidates: number;
   inserted: number;
   updated: number;
   rehosted: number;
+  videosRehosted: number;
   byPlatform: Record<string, number>;
   errors: string[];
 }> {
@@ -210,12 +220,29 @@ export async function syncBrandContent(options: {
   for (const row of allRows)
     byPlatform[row.platform] = (byPlatform[row.platform] ?? 0) + 1;
 
+  // Bytes, not metadata: kept out of the per-post ingest path so a 200-post
+  // backfill never tries to buffer 200 videos, and bounded to the newest few
+  // because those are the only ones whose provider URL still resolves.
+  let videosRehosted = 0;
+  const videoLimit = options.rehostVideoLimit ?? 4;
+  if (videoLimit > 0) {
+    const videos = await rehostRecentPostVideos({
+      brandId: brand.id,
+      limit: videoLimit,
+    });
+    videosRehosted = videos.rehosted.length;
+    for (const failure of videos.failed) {
+      errors.push(`video rehost ${failure.platformPostId}: ${failure.error}`);
+    }
+  }
+
   return {
     brandId: brand.id,
     candidates: zernioResult.candidates + xResult.candidates,
     inserted: zernioResult.inserted + xResult.inserted,
     updated: zernioResult.updated + xResult.updated,
     rehosted: zernioResult.rehosted + xResult.rehosted,
+    videosRehosted,
     byPlatform,
     errors,
   };

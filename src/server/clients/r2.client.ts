@@ -156,6 +156,22 @@ export function r2BuildPosterKey(
 }
 
 /**
+ * Object key for a re-hosted post video, under `{R2_PREFIX}post-media/{brandId}/`.
+ * Separate from `posters/`: a poster is a thumbnail we can regenerate from the
+ * provider, a video is the only copy once Instagram's signed URL expires.
+ */
+export function r2BuildPostVideoKey(
+  brandId: string,
+  id: string,
+  ext = "mp4",
+): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
+  return [env.R2_PREFIX, "post-media", brandId, `${safeId}.${ext}`]
+    .filter(Boolean)
+    .join("/");
+}
+
+/**
  * Key prefix for one video-analysis run's derived storyboard boards, under
  * `{R2_PREFIX}analysis/{organizationId}/{analysisId}/`. Boards are derived
  * artifacts — deliberately outside the media-library key space.
@@ -227,21 +243,47 @@ export async function r2PutBuffer(
   return r2PublicUrl(key);
 }
 
-/** Server-side: fetch bytes from a URL and PUT them to R2; returns public URL. */
+/**
+ * Server-side: fetch bytes from a URL and PUT them to R2; returns public URL.
+ *
+ * The whole body lands in memory, so `maxBytes` exists for callers copying
+ * video: a reel is a few MB but nothing in the provider payload promises that,
+ * and a serverless function that buffers an unbounded download dies with no
+ * useful error. Refuse it early instead, off Content-Length where we get one.
+ */
 export async function r2PutFromUrl(
   key: string,
   sourceUrl: string,
+  options: { fallbackContentType?: string; maxBytes?: number } = {},
 ): Promise<string> {
   const res = await fetch(sourceUrl);
   if (!res.ok)
     throw new Error(`r2PutFromUrl: fetch ${sourceUrl} → ${res.status}`);
+  const declared = Number(res.headers.get("content-length"));
+  if (
+    options.maxBytes &&
+    Number.isFinite(declared) &&
+    declared > options.maxBytes
+  ) {
+    throw new Error(
+      `r2PutFromUrl: ${sourceUrl} is ${Math.round(declared / 1_000_000)}MB, over the ${Math.round(options.maxBytes / 1_000_000)}MB limit`,
+    );
+  }
   const body = Buffer.from(await res.arrayBuffer());
+  if (options.maxBytes && body.byteLength > options.maxBytes) {
+    throw new Error(
+      `r2PutFromUrl: ${sourceUrl} downloaded ${Math.round(body.byteLength / 1_000_000)}MB, over the ${Math.round(options.maxBytes / 1_000_000)}MB limit`,
+    );
+  }
   await getClient().send(
     new PutObjectCommand({
       Bucket: env.R2_BUCKET,
       Key: key,
       Body: body,
-      ContentType: res.headers.get("content-type") ?? "image/jpeg",
+      ContentType:
+        res.headers.get("content-type") ??
+        options.fallbackContentType ??
+        "image/jpeg",
     }),
   );
   return r2PublicUrl(key);
@@ -255,6 +297,7 @@ export const R2 = {
   analysisKeyPrefix: r2AnalysisKeyPrefix,
   buildAnalysisKey: r2BuildAnalysisKey,
   buildPosterKey: r2BuildPosterKey,
+  buildPostVideoKey: r2BuildPostVideoKey,
   buildUserPhotoKey: r2BuildUserPhotoKey,
   buildUploadKey: r2BuildUploadKey,
   presignPut: r2PresignPut,
