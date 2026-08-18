@@ -935,6 +935,13 @@ export const pregenBuildTable = leadsSchema.table(
      */
     claimedAt: t.timestamp(),
 
+    // Pageviews of the wander.com/os pitch page. `lastAlertedAt` throttles the
+    // Slack ping; the counters are unthrottled funnel data.
+    viewCount: t.integer().default(0).notNull(),
+    firstViewedAt: t.timestamp(),
+    lastViewedAt: t.timestamp(),
+    lastAlertedAt: t.timestamp(),
+
     createdAt: t
       .timestamp()
       .$defaultFn(() => new Date())

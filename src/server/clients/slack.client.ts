@@ -373,6 +373,15 @@ export async function postOnSlack(
   }
 }
 
+/** Escape user-controlled text for mrkdwn so a company name cannot inject
+    mentions or links into a channel post. */
+export function escapeSlackMrkdwn(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // =====================================================
 // INTERNAL UTILITIES
 // =====================================================
