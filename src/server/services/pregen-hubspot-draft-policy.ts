@@ -110,12 +110,6 @@ export function findPregenHubspotDraftViolations(
   options: {
     motion: "fresh" | "reengagement";
     pms: string | null;
-    /**
-     * True when the generator was told who this is being sent as. Addressing
-     * that person's own history as "you" is then correct and is the strongest
-     * material available, so the misattribution check below stands down.
-     */
-    recipientKnown?: boolean;
   },
 ): string[] {
   const touch1 = draft.touches[0];
@@ -147,18 +141,18 @@ export function findPregenHubspotDraftViolations(
   // not we know the recipient.
   if (/^(?:[A-Z][a-z]{1,30}),\s+/.test(opening)) {
     violations.push(
-      "HubSpot renders \"Hi [First name],\" above the opening; do not begin the opening with the recipient's name as a greeting.",
+      'HubSpot renders "Hi [First name]," above the opening; do not begin the opening with the recipient\'s name as a greeting.',
     );
   }
-  // Attributing history to "you" is only wrong when we do not know who "you"
-  // is. When the recipient is resolved, their own reply or call is the best
-  // thing in the email and this used to forbid it.
+  // Personalization is company-level by design. Resolving a recipient tells us
+  // who to greet, not who was on the call: they may have changed roles or left
+  // since, and a reader who never said it does not recognise "you said". The
+  // same detail attributed to the person who actually said it reads fine.
   if (
-    !options.recipientKnown &&
     /\byou\s+(?:replied|asked|said|mentioned|wanted|flagged)\b/i.test(opening)
   ) {
     violations.push(
-      "No recipient was resolved, so this draft is company-level; attribute each message to the person who sent it rather than to \"you\".",
+      'Attribute history to the person who said it, not to "you" — the reader may not be that person, or may no longer work there.',
     );
   }
   if (

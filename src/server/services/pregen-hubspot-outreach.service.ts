@@ -426,7 +426,7 @@ Treat old outbound emails as conversation history, not as factual evidence. They
 
 The HubSpot template adds the greeting, blank paragraphs, preview URL, and sender signature. You own all substantive prose. Each opening and closing must be exactly one compact paragraph with no line breaks, greeting, sign-off, or URL. The first touch should total roughly 70-110 words across its two paragraphs. Follow-ups should be shorter.
 
-WHO YOU ARE WRITING TO. The RECIPIENT block below names the person this will be sent as, when we know them. Write to that person. If the history shows they replied, asked something, or took the call, that is "you" and it is the best material in the email — use it. Everyone else in the record stays in the third person by first name: a colleague of theirs, a teammate of ours, either way "Chris said" and never "you said". If the block says the recipient is unknown, keep the whole draft company-level and attribute every message to the person who sent it.
+WHO YOU ARE WRITING TO. The RECIPIENT block below names the person HubSpot will greet by first name. That greeting is the only thing about them you can treat as current. Everything in the history belongs to the company rather than to whoever opens this email: people change roles and leave, and a reader who was never on the call does not recognise "you said". So attribute every logged message and call to the person who sent or took it, by first name, in the third person. "Chris told Pierce the timing was wrong" is right, and stays right even when the record names the recipient. For facts that belong to the business rather than any individual, write "your team" or name the company. This costs you nothing: the specific, checkable detail is what earns the reply, and it reads as well in the third person.
 
 Do not open with a greeting or write the recipient's name as a salutation. HubSpot adds "Hi [First name]," above your first paragraph, so a name at the top of the opening produces it twice. Using their name once inside a sentence is fine and often good.
 
@@ -757,8 +757,8 @@ ${exemplars}
 RECIPIENT:
 ${
   recipient
-    ? `${[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || recipient.email}${recipient.jobTitle ? `, ${recipient.jobTitle}` : ""}. Anything in the history below that this person said, asked or was on a call for is "you". Anything anyone else said stays in their name.`
-    : `Unknown. No contact on this domain is confidently the one who will be enrolled, so keep the draft company-level and attribute every message in the history to the person who sent it.`
+    ? `${[recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || recipient.email}${recipient.jobTitle ? `, ${recipient.jobTitle}` : ""}. HubSpot greets them by first name; treat nothing else about them as current. The history below is the company's, not theirs, and they may no longer work there.`
+    : `Unknown. HubSpot will greet them generically. The draft is company-level either way.`
 }
 
 WHAT WE KNOW ABOUT THEM (from enrichment):
@@ -832,7 +832,6 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
     const violations = findPregenHubspotDraftViolations(candidate, {
       motion,
       pms: row.pms,
-      recipientKnown: recipient != null,
     });
     lastViolations = violations;
     if (violations.length === 0) {
@@ -850,8 +849,7 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
         : `Pregen HubSpot draft never returned a valid object after 4 attempts: ${lastFailure}`,
     );
   }
-  const cadence =
-    motion === "reengagement" ? [0, 4, 8, 14] : [0, 3, 7, 12];
+  const cadence = motion === "reengagement" ? [0, 4, 8, 14] : [0, 3, 7, 12];
   draft.touches = draft.touches.map((touch, index) => ({
     ...touch,
     delayDays: cadence[index] ?? touch.delayDays,

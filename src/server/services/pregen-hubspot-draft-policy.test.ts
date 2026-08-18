@@ -68,7 +68,7 @@ describe("findPregenHubspotDraftViolations", () => {
       'HubSpot renders "Hi [First name]," above the opening; do not begin the opening with the recipient\'s name as a greeting.',
     );
     expect(violations).toContain(
-      'No recipient was resolved, so this draft is company-level; attribute each message to the person who sent it rather than to "you".',
+      'Attribute history to the person who said it, not to "you" — the reader may not be that person, or may no longer work there.',
     );
     // Claim and register violations now name the touch they came from, because
     // the gate reads all four.
@@ -86,18 +86,33 @@ describe("findPregenHubspotDraftViolations", () => {
     );
   });
 
-  // The generator resolves who this is being sent as. When it knows, writing
-  // that person's own reply back to them is the strongest material available,
-  // and forbidding it produced copy that discussed the recipient in the third
-  // person as though they were a stranger to their own conversation.
-  test("allows addressing the resolved recipient's own history as you", () => {
+  // Personalization is company-level. Resolving a recipient says who HubSpot
+  // greets, not who was on the call: they may have changed roles or left, and
+  // the reader who never said it does not recognise "you asked".
+  test("rejects addressing the reader's history as you, recipient or not", () => {
     expect(
       findPregenHubspotDraftViolations(
         draft(
           "You asked back in May whether this would carry the resort names over. WanderOS runs direct booking for 1,000+ property managers, and our team built something from Maui Kai's own inventory to answer that properly.",
           "Nothing in this private preview can be booked. Is this still worth chasing for you?",
         ),
-        { motion: "reengagement", pms: null, recipientKnown: true },
+        { motion: "reengagement", pms: null },
+      ),
+    ).toContain(
+      'Attribute history to the person who said it, not to "you" — the reader may not be that person, or may no longer work there.',
+    );
+  });
+
+  // The same detail survives the rule; it just carries the name of whoever
+  // actually said it, which is what makes it checkable by the reader.
+  test("allows the same history attributed to the person who said it", () => {
+    expect(
+      findPregenHubspotDraftViolations(
+        draft(
+          "Chris asked Pierce back in May whether this would carry the resort names over. WanderOS runs direct booking for 1,000+ property managers, and our team built something from Maui Kai's own inventory to answer that properly.",
+          "Nothing in this private preview can be booked. Is this still worth chasing for you?",
+        ),
+        { motion: "reengagement", pms: null },
       ),
     ).toEqual([]);
   });
