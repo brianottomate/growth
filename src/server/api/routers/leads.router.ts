@@ -1387,19 +1387,21 @@ export const leadsRouter = createTRPCRouter({
       }
 
       // The copy is company-level, so the greeting is the only per-person part.
-      // A first name that is really the company name reads "Hi Maui Westside
-      // Properties," and is the most visible way this motion can look automated.
+      //
+      // A missing first name is not a warning: the token carries a "there"
+      // fallback in HubSpot, so a generic inbox greets correctly on its own.
+      // What the fallback cannot save is a first name that is really the
+      // company name, because the field is populated and HubSpot renders it —
+      // "Hi Bolewood Capital," is the most visible way this motion can look
+      // automated. Clearing the first name is the fix, not acknowledging it.
       const warnings: string[] = [];
       const firstName = contact!.firstName?.trim() ?? "";
-      if (!firstName) {
-        warnings.push(
-          `${contact!.email} has no first name; the greeting will fall back`,
-        );
-      } else if (
+      if (
+        firstName &&
         firstName.toLowerCase() === row.companyName?.trim().toLowerCase()
       ) {
         warnings.push(
-          `${contact!.email} has the company name in its first-name field, so the greeting will read "Hi ${firstName},"`,
+          `${contact!.email} has the company name in its first-name field, so the greeting will read "Hi ${firstName},". Clear the first name in HubSpot to get "Hi there," instead`,
         );
       }
       if (warnings.length && !input.acknowledgeWarnings) {
@@ -1460,26 +1462,57 @@ export const leadsRouter = createTRPCRouter({
         senderEmail: input.senderEmail,
       });
 
-      const [draft] = await ctx.db
+      // Only an unsent row may be claimed. Taking the newest row unconditionally
+      // meant a second enrolment — the one that follows retiring a bounced
+      // recipient — overwrote the first send's enrollment id and date, which is
+      // the audit trail the rest of this depends on. A retired recipient's row
+      // is already `skipped` by then, so a fresh row is what gets written and
+      // the partial unique index on live rows still holds.
+      const ledger = {
+        status: "sent" as const,
+        contactId: contact!.id,
+        hubspotSequenceId: input.sequenceId,
+        hubspotEnrollmentId: enrollment.id,
+        enrolledAt: new Date(enrollment.enrolledAt),
+        enrolledByEmail: enrollment.enrolledByEmail,
+        sentAt: new Date(enrollment.enrolledAt),
+      };
+      const [claimable] = await ctx.db
         .select()
         .from(leadSequenceTable)
-        .where(eq(leadSequenceTable.domainId, input.domainId))
+        .where(
+          and(
+            eq(leadSequenceTable.domainId, input.domainId),
+            inArray(leadSequenceTable.status, ["draft", "approved"]),
+          ),
+        )
         .orderBy(desc(leadSequenceTable.createdAt))
         .limit(1);
 
-      if (draft) {
+      if (claimable) {
         await ctx.db
           .update(leadSequenceTable)
-          .set({
-            status: "sent",
-            contactId: contact!.id,
-            hubspotSequenceId: input.sequenceId,
-            hubspotEnrollmentId: enrollment.id,
-            enrolledAt: new Date(enrollment.enrolledAt),
-            enrolledByEmail: enrollment.enrolledByEmail,
-            sentAt: new Date(enrollment.enrolledAt),
-          })
-          .where(eq(leadSequenceTable.id, draft.id));
+          .set(ledger)
+          .where(eq(leadSequenceTable.id, claimable.id));
+      } else {
+        // Carry the copy over from whatever was drafted last, so the second
+        // recipient's row still shows what they were sent.
+        const [previous] = await ctx.db
+          .select()
+          .from(leadSequenceTable)
+          .where(eq(leadSequenceTable.domainId, input.domainId))
+          .orderBy(desc(leadSequenceTable.createdAt))
+          .limit(1);
+        await ctx.db.insert(leadSequenceTable).values({
+          domainId: input.domainId,
+          domain: row.domain,
+          angle: previous?.angle,
+          personalizedOn: previous?.personalizedOn,
+          steps: previous?.steps,
+          model: previous?.model,
+          generationContext: previous?.generationContext,
+          ...ledger,
+        });
       }
 
       return {
@@ -1525,7 +1558,26 @@ export const leadsRouter = createTRPCRouter({
           retiredAt: leadContactTable.retiredAt,
         });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
-      return updated;
+
+      // Close out their live sequence row. Without this the partial unique
+      // index on `(domainId) where status in ('queued','sent')` blocks the next
+      // recipient, so retiring would free the guard and still not free the
+      // company. `skipped` keeps the enrollment id and dates, so what was sent
+      // to them stays readable.
+      const closed = input.undo
+        ? []
+        : await ctx.db
+            .update(leadSequenceTable)
+            .set({ status: "skipped" })
+            .where(
+              and(
+                eq(leadSequenceTable.contactId, input.contactId),
+                inArray(leadSequenceTable.status, ["queued", "sent"]),
+              ),
+            )
+            .returning({ id: leadSequenceTable.id });
+
+      return { ...updated, closedSequences: closed.length };
     }),
 
   publishPregenOutreach: protectedProcedure
