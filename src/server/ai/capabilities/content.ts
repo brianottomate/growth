@@ -52,6 +52,9 @@ import { orgBrandIds } from "./brands";
 
 const contentStatus = z.enum(contentStatusEnum.enumValues);
 
+/** A spot in one of these is not waiting to ship. */
+const SHIPPED_OR_OFF_THE_BOARD = ["published", "rejected", "archived"];
+
 async function requireContentWorkItem(
   contentPostId: string,
   ctx: CapabilityContext,
@@ -348,6 +351,36 @@ export const updateContentWorkItem = growthAction({
             `Cannot set format ${draft.format} on a ${owned.platform} spot: ${validation.errors.join("; ")}`,
           );
         }
+      }
+    }
+    // The idea's status is not what the team looks at. The calendar, the Feed
+    // and the pipeline counts all read the spot's status, so marking the idea
+    // published over draft spots is a report of success nobody can see — the
+    // failure that produced this guard (2026-08-18: two newsletter ideas went
+    // `published` while both spots stayed `draft`).
+    if (input.contentStatus === "published") {
+      const requested = new Map(
+        (input.platformDrafts ?? []).map((draft) => [
+          draft.platformPostId,
+          draft.status,
+        ]),
+      );
+      const unshipped = content.platformPosts.filter(
+        (post) =>
+          post.source === "owned" &&
+          !SHIPPED_OR_OFF_THE_BOARD.includes(
+            requested.get(post.id) ?? post.status,
+          ),
+      );
+      if (unshipped.length) {
+        throw new GrowthActionError(
+          "invalid_input",
+          `This idea still has ${unshipped.length} unshipped owned spot${unshipped.length === 1 ? "" : "s"}: ${unshipped
+            .map((post) => `${post.id} (${post.platform}, ${post.status})`)
+            .join(
+              ", ",
+            )}. Marking only the idea published leaves the calendar showing a draft. If the operator posted these by hand, record it with publishingWrite.recordExternalPublish (it moves the spots and rolls the idea up). If it went out through Zernio, use publishingWrite.publishNow.`,
+        );
       }
     }
     if (input.brief) {

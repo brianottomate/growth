@@ -205,6 +205,14 @@ export const growthActionPolicies = {
       idempotent: true,
       reversible: false,
     }),
+    // The odd one out in this group: nothing leaves the building. It writes
+    // the receipt for a send that already happened elsewhere, so it is a
+    // local-write, re-runnable, and undone by moving the spot's status back.
+    recordExternalPublish: write({
+      consequence: "local-write",
+      idempotent: true,
+      undoWith: "contentWrite.updateWorkItem",
+    }),
   },
   sourceSyncWrite: {
     discoverChannels: write({

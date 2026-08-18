@@ -14,6 +14,7 @@ import { isStoryFormat, sequenceScheduledAt } from "@/lib/platform-sequence";
 import {
   type channelPlatformEnum,
   channelTable,
+  type DeliveryProvider,
   contentPostTable,
   type MediaItem,
   messageSendTable,
@@ -646,6 +647,122 @@ async function setPublishingUnitStatus(input: {
   return { id: input.rootPlatformPostId };
 }
 
+/**
+ * Record a publish that happened outside Wander Growth — posted by hand in the
+ * app, sent straight from Customer.io. No provider job exists to send a receipt
+ * back, so this writes the receipt: every owned spot in the unit goes
+ * `published` with a real ship time, and the idea follows once nothing owned
+ * under it is still unshipped.
+ *
+ * Idea status alone is not enough. The calendar, the Feed and the pipeline
+ * counts all read `platform_post.status`, so an idea marked published over
+ * draft spots reads as "still a draft" everywhere the team actually looks.
+ *
+ * This writes no `message_send` row: the send ledger records sends WE made.
+ */
+async function recordExternalPublish(input: {
+  platformPostIds: string[];
+  publishedAt: Date;
+  /** How it actually shipped — natively in the app by default. */
+  provider?: DeliveryProvider;
+  externalUrl?: string | null;
+}): Promise<{
+  platformPostIds: string[];
+  contentPostIds: string[];
+  liveProviderJobs: string[];
+}> {
+  return withTransaction(async (tx) => {
+    const units = await tx
+      .select({
+        id: platformPostTable.id,
+        contentPostId: platformPostTable.contentPostId,
+        publishedAt: platformPostTable.publishedAt,
+        provider: platformPostTable.provider,
+        externalUrl: platformPostTable.externalUrl,
+        deliveryExternalId: platformPostTable.deliveryExternalId,
+        deliveryStatus: platformPostTable.deliveryStatus,
+      })
+      .from(platformPostTable)
+      .where(
+        and(
+          eq(platformPostTable.source, "owned"),
+          or(
+            inArray(platformPostTable.id, input.platformPostIds),
+            inArray(
+              platformPostTable.parentPlatformPostId,
+              input.platformPostIds,
+            ),
+          ),
+        ),
+      );
+
+    // A queued provider job is the provider's to finish. Marking it published
+    // here would leave Zernio holding a job nobody believes in any more.
+    const liveProviderJobs = units
+      .filter(
+        (row) =>
+          row.deliveryExternalId &&
+          row.deliveryStatus !== "published" &&
+          row.deliveryStatus !== "failed",
+      )
+      .map((row) => row.id);
+    const shippable = units.filter((row) => !liveProviderJobs.includes(row.id));
+
+    for (const row of shippable) {
+      await tx
+        .update(platformPostTable)
+        .set({
+          status: "published" as const,
+          publishedAt: row.publishedAt ?? input.publishedAt,
+          provider: row.provider ?? input.provider ?? "native",
+          ...(input.externalUrl && !row.externalUrl
+            ? { externalUrl: input.externalUrl }
+            : {}),
+        })
+        .where(eq(platformPostTable.id, row.id));
+    }
+
+    // Roll each touched idea up, but only when every owned spot under it has
+    // shipped or been taken off the board — a piece with one channel still to
+    // go is not published.
+    const contentPostIds = [
+      ...new Set(
+        shippable.flatMap((row) =>
+          row.contentPostId ? [row.contentPostId] : [],
+        ),
+      ),
+    ];
+    const rolledUp: string[] = [];
+    for (const contentPostId of contentPostIds) {
+      const siblings = await tx
+        .select({ status: platformPostTable.status })
+        .from(platformPostTable)
+        .where(
+          and(
+            eq(platformPostTable.contentPostId, contentPostId),
+            eq(platformPostTable.source, "owned"),
+          ),
+        );
+      const pending = siblings.filter(
+        (sibling) =>
+          !["published", "rejected", "archived"].includes(sibling.status),
+      );
+      if (pending.length) continue;
+      await tx
+        .update(contentPostTable)
+        .set({ status: "published" as const })
+        .where(eq(contentPostTable.id, contentPostId));
+      rolledUp.push(contentPostId);
+    }
+
+    return {
+      platformPostIds: shippable.map((row) => row.id),
+      contentPostIds: rolledUp,
+      liveProviderJobs,
+    };
+  });
+}
+
 /** Set the content-level media pool (`content_post.media`). Deduped by assetId
  *  — the same dedupe the spot attach-list uses. */
 async function setPoolMedia(input: {
@@ -855,6 +972,7 @@ export const ContentService = {
   saveSpotThread,
   setPublishingUnitSchedule,
   setPublishingUnitStatus,
+  recordExternalPublish,
   setPoolMedia,
   setSpotMedia,
   setSpotCarousel,

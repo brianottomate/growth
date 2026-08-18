@@ -73,6 +73,7 @@ import {
 import { PLANNING_TOOLS } from "./planning";
 import {
   publishSocialPostNow,
+  recordExternalPublish,
   rescheduleSocialPost,
   scheduleSocialPost,
   updateScheduledFirstComment,
@@ -266,12 +267,13 @@ export const publishingRead = growthDomainTool({
 
 export const publishingWrite = growthDomainTool({
   description:
-    "Schedule, immediately publish, reschedule, or update a queued first comment through Zernio. Every action is an approval-gated provider write.",
+    "Schedule, immediately publish, reschedule, or update a queued first comment through Zernio — every one of those is an approval-gated provider write. `recordExternalPublish` is the exception: it only records a send that already happened somewhere else.",
   actions: {
     schedule: scheduleSocialPost,
     publishNow: publishSocialPostNow,
     reschedule: rescheduleSocialPost,
     updateFirstComment: updateScheduledFirstComment,
+    recordExternalPublish,
   },
 });
 

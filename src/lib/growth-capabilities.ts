@@ -89,6 +89,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "publishNow",
     "reschedule",
     "updateFirstComment",
+    "recordExternalPublish",
   ],
   sourceSyncWrite: [
     "discoverChannels",
