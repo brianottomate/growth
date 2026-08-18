@@ -180,7 +180,13 @@ export const growthActionPolicies = {
     diagnoseAlignment: read("model-read"),
     inspectConversions: read(),
   },
-  publishingRead: { connections: read(), openTimelinePost: read() },
+  publishingRead: {
+    connections: read(),
+    openTimelinePost: read(),
+    // One model call over a date-bounded shortlist. Reads our own rows and
+    // writes nothing, so the judgement is free to be wrong here.
+    proposeLivePost: read("model-read"),
+  },
   publishingWrite: {
     schedule: write({
       consequence: "provider-write",
@@ -212,6 +218,13 @@ export const growthActionPolicies = {
       consequence: "local-write",
       idempotent: true,
       undoWith: "contentWrite.updateWorkItem",
+    }),
+    // Merges two rows into one and deletes the duplicate. The data survives on
+    // the surviving row, but the row itself does not come back.
+    applyLivePostMatch: write({
+      consequence: "local-write",
+      approval: "user",
+      reversible: false,
     }),
   },
   sourceSyncWrite: {

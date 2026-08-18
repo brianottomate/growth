@@ -72,6 +72,8 @@ import {
 } from "./operations";
 import { PLANNING_TOOLS } from "./planning";
 import {
+  applyLivePostMatchAction,
+  proposeLivePost,
   publishSocialPostNow,
   recordExternalPublish,
   rescheduleSocialPost,
@@ -258,10 +260,12 @@ export const adsRead = growthDomainTool({
 });
 
 export const publishingRead = growthDomainTool({
-  description: "Read publishing connections or open one timeline post.",
+  description:
+    "Read publishing connections, open one timeline post, or work out which live post a hand-posted spot became.",
   actions: {
     connections: listPublishingConnections,
     openTimelinePost,
+    proposeLivePost,
   },
 });
 
@@ -274,6 +278,7 @@ export const publishingWrite = growthDomainTool({
     reschedule: rescheduleSocialPost,
     updateFirstComment: updateScheduledFirstComment,
     recordExternalPublish,
+    applyLivePostMatch: applyLivePostMatchAction,
   },
 });
 

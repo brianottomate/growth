@@ -83,13 +83,14 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "resolveGrouping",
   ],
   adsRead: ["scope", "top", "diagnoseAlignment", "inspectConversions"],
-  publishingRead: ["connections", "openTimelinePost"],
+  publishingRead: ["connections", "openTimelinePost", "proposeLivePost"],
   publishingWrite: [
     "schedule",
     "publishNow",
     "reschedule",
     "updateFirstComment",
     "recordExternalPublish",
+    "applyLivePostMatch",
   ],
   sourceSyncWrite: [
     "discoverChannels",

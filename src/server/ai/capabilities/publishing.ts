@@ -12,6 +12,10 @@ import {
   updateQueuedSocialFirstComment,
 } from "@/server/services/content-publishing.service";
 import { ContentService } from "@/server/services/content.service";
+import {
+  applyLivePostMatch,
+  proposeLivePostMatch,
+} from "@/server/services/publish-reconcile.service";
 import { resolveZonedDateTime } from "@/lib/scheduling-time";
 import { growthAction, GrowthActionError } from "./types";
 
@@ -200,5 +204,58 @@ export const recordExternalPublish = growthAction({
       ideasRolledUpToPublished: result.contentPostIds,
       skippedWithQueuedProviderJob: result.liveProviderJobs,
     };
+  },
+});
+
+export const proposeLivePost = growthAction({
+  description:
+    "Work out which live post a planned spot became, for a spot the team posted by hand. Reads the unclaimed live posts on that account near the planned date and asks the model which one it is, returning the candidate, a confidence and the reasoning. Writes nothing. Use before publishingWrite.applyLivePostMatch, and use it instead of asking the operator for a permalink they would have to go find.",
+  inputSchema: z.object({
+    platformPostId: z.string().describe("Our planned spot."),
+    windowDays: z
+      .number()
+      .int()
+      .min(1)
+      .max(30)
+      .optional()
+      .describe(
+        "How far either side of the planned date to look. Defaults to 4, which covers the one-to-two-day drift between planning and posting. Widen it only when the first pass finds no candidates.",
+      ),
+  }),
+  execute: async (input, ctx) => {
+    await requireOwnedSocialPost(input.platformPostId, ctx.orgId);
+    const result = await proposeLivePostMatch(input);
+    return {
+      ok: true as const,
+      match: result.match,
+      note: result.note,
+      // The shortlist goes back too: a rejected proposal is still a menu the
+      // operator can pick from, and a wrong pick is easier to spot than absent.
+      candidatesConsidered: result.candidates.map((candidate) => ({
+        livePlatformPostId: candidate.id,
+        publishedAt: candidate.publishedAt,
+        format: candidate.format,
+        permalink: candidate.externalUrl,
+        captionOpening: (candidate.text ?? "").slice(0, 120),
+      })),
+    };
+  },
+});
+
+export const applyLivePostMatchAction = growthAction({
+  description:
+    "Confirm that a planned spot and a live post are the same post, and fold them into one row. The planned spot keeps the idea and inherits the provider id, permalink, ship time, caption, media and stats; the duplicate live row is removed. The idea rolls up to published once nothing owned under it is still waiting. Irreversible, so confirm the permalink with the operator first.",
+  inputSchema: z.object({
+    platformPostId: z.string().describe("Our planned spot."),
+    livePlatformPostId: z
+      .string()
+      .describe(
+        "The live row to fold in, as returned by publishingRead.proposeLivePost. Never a provider id.",
+      ),
+  }),
+  execute: async (input, ctx) => {
+    await requireOwnedSocialPost(input.platformPostId, ctx.orgId);
+    const result = await applyLivePostMatch(input);
+    return { ok: true as const, ...result };
   },
 });
