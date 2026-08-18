@@ -934,6 +934,7 @@ function toCardData(item: LeadRow): ProspectCardData | null {
       risks: review.channel.risks,
       candidates: review.channel.candidates.map((c) => ({
         kind: c.kind,
+        contactId: c.contactId,
         email: c.email,
         name: c.name,
         title: c.title,
@@ -1081,15 +1082,17 @@ function ReviewCardList({
               onEnroll: (id) => {
                 // The contact is the one the channel scorer already selected and
                 // the card already shows, so enrolling cannot quietly pick
-                // someone the reviewer did not look at.
-                const contact = item.contacts.find(
-                  (c) => c.email === item.channel.bestEmail,
-                );
-                if (!contact) return;
+                // someone the reviewer did not look at. A candidate with no
+                // `contactId` was scraped off the site and has no row to reach
+                // HubSpot through, so there is nothing to enrol.
+                const contactId = data.channel?.candidates.find(
+                  (candidate) => candidate.email === data.channel?.bestEmail,
+                )?.contactId;
+                if (!contactId) return;
                 setPending({ id, kind: "enroll" });
                 enroll.mutate({
                   domainId: id,
-                  contactId: contact.id,
+                  contactId,
                   senderEmail: SEQUENCE_SENDER_EMAIL,
                 });
               },

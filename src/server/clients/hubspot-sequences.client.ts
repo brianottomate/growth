@@ -21,10 +21,25 @@ import { env } from "@/env";
 const BASE = "https://api.hubapi.com/automation/sequences/2026-03";
 
 /**
- * Kyle's pregen sequence, built 2026-08-17. Four automated emails, in-thread
- * after the first, reading the company-level `growth_pregen_*` tokens.
+ * "Pre-gen site sequence" (309640366), authored by Kyle 2026-08-18 and owned by
+ * him. One automated email on day 1, then FINISH_ENROLLMENT.
+ *
+ * It replaces the four-touch 309570935, which stays in HubSpot unenrolled. Only
+ * two tokens vary per recipient: the contact's first name, and the company's
+ * `growth_pregen_preview_url` behind the "See your preview" link. The rest of
+ * the copy is fixed, so the generated `growth_pregen_touch_*` properties this
+ * repo still writes are not read by this sequence.
+ *
+ * `PREGEN_SEQUENCE_STEPS` is the shape Growth renders on the lead page (see
+ * `src/lib/pregen-blast-template.ts`). HubSpot exposes no readable body for a
+ * sales template, so that copy cannot be derived from the API and is kept in
+ * step with this id by hand. `scripts/check-pregen-sequence.ts` compares the two
+ * and is the thing that notices when someone edits the sequence in the UI.
  */
-export const PREGEN_SEQUENCE_ID = "309570935";
+export const PREGEN_SEQUENCE_ID = "309640366";
+
+/** Email steps in the sequence above; FINISH_ENROLLMENT is not counted. */
+export const PREGEN_SEQUENCE_STEPS = 1;
 
 export const isHubspotSequencesConfigured = !!env.HUBSPOT_ACCESS_TOKEN_OPERATED;
 
@@ -70,6 +85,40 @@ async function call<T>(
       : ((parsed as { message?: string } | null)?.message ??
         `HubSpot ${response.status}`),
   };
+}
+
+export type Sequence = {
+  id: string;
+  name: string;
+  userId: string;
+  steps: Array<{
+    id: string;
+    stepOrder: number;
+    delayMillis: number;
+    /** "EMAIL", "FINISH_ENROLLMENT", task types. */
+    actionType: string;
+    emailPattern?: { id: string; templateId: string };
+  }>;
+};
+
+/**
+ * One sequence, with its steps.
+ *
+ * `userId` is a required query param and is the HubSpot user whose view of the
+ * sequence library answers: a sequence not shared with them 404s even though it
+ * exists. Steps carry only a `templateId`, never the body, which is why the copy
+ * Growth displays cannot be sourced from here.
+ */
+export async function getSequence(input: {
+  sequenceId: string;
+  hubspotUserId: string | number;
+}): Promise<Sequence | null> {
+  const result = await call<Sequence>(
+    `/${encodeURIComponent(input.sequenceId)}?userId=${encodeURIComponent(String(input.hubspotUserId))}`,
+  );
+  if (result.status === 404) return null;
+  if (!result.ok) throw new Error(`Sequence lookup failed: ${result.error}`);
+  return result.data;
 }
 
 /**

@@ -34,6 +34,13 @@ export type ResolvedContactChannel = {
 
 export type ContactCandidateScore = {
   kind: "site" | "stored";
+  /**
+   * The `lead_contact` row, when there is one. Null for an address scraped off
+   * the site that we never stored a person for, which is also exactly the case
+   * that cannot be enrolled: a sequence needs a HubSpot contact, and that is
+   * reached through this row.
+   */
+  contactId: string | null;
   email: string;
   name: string | null;
   title: string | null;
@@ -299,6 +306,7 @@ export function scoreStoredContact(
   if (isPlaceholderEmail(contact.email)) {
     return {
       kind: "stored",
+      contactId: contact.id,
       email: contact.email,
       name: name || null,
       title: contact.jobTitle,
@@ -383,6 +391,7 @@ export function scoreStoredContact(
 
   return {
     kind: "stored",
+    contactId: contact.id,
     email: contact.email,
     name: name || null,
     title: contact.jobTitle,
@@ -413,6 +422,7 @@ function scoreSiteEmail(email: string, domain: string): ContactCandidateScore {
 
   return {
     kind: "site",
+    contactId: null,
     email,
     name: null,
     title: null,

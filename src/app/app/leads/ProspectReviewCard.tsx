@@ -58,6 +58,8 @@ export type ProspectRoute = "instantly" | "form" | "none";
 
 export interface ProspectCandidate {
   kind: string;
+  /** Null when the address came off the site with no `lead_contact` behind it. */
+  contactId: string | null;
   email: string;
   name: string | null;
   title: string | null;
@@ -451,6 +453,13 @@ export function ProspectReviewCard({
         }
       : theme;
   const bestEmail = data.channel.bestEmail;
+  // A selected address that came off the website has no `lead_contact` row and
+  // so no way to reach a HubSpot contact. Enrolling it is impossible rather than
+  // merely refused, so the button says so instead of no-opping on click.
+  const enrollableContactId =
+    data.channel.candidates.find(
+      (candidate) => candidate.email === bestEmail,
+    )?.contactId ?? null;
 
   /**
    * Workflows that are a conversation rather than a single call.
@@ -622,11 +631,15 @@ export function ProspectReviewCard({
               {actions.onEnroll && data.outreach && (
                 <button
                   onClick={() => actions.onEnroll!(data.id)}
-                  disabled={actions.enrolling || !bestEmail}
+                  disabled={
+                    actions.enrolling || !bestEmail || !enrollableContactId
+                  }
                   title={
-                    bestEmail
-                      ? `Enrol ${bestEmail} in the HubSpot sequence`
-                      : "No channel selected yet"
+                    !bestEmail
+                      ? "No channel selected yet"
+                      : !enrollableContactId
+                        ? `${bestEmail} was found on the website and has no contact record to enrol`
+                        : `Enrol ${bestEmail} in the HubSpot sequence`
                   }
                   className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >

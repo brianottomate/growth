@@ -1,15 +1,23 @@
 /**
- * The one-size-fits-all blast sequence, authored by Kyle.
+ * The one-size-fits-all blast, transcribed from the sequence that actually
+ * sends: "Pre-gen site sequence" (309640366), authored and owned by Kyle.
  *
- * This is the other side of the internal debate: one template every prospect
- * gets, with only merge fields varying. It exists so the debate happens over
- * two real sequences on one screen rather than over adjectives, and so the
- * template is inspectable before anyone enrols a contact.
+ * This is the other side of the internal debate: one email every prospect gets,
+ * with only merge fields varying. It exists so the debate happens over two real
+ * sequences on one screen rather than over adjectives, and so a reviewer can
+ * read the template before anyone enrols a contact.
  *
- * Email 1 is Kyle's copy verbatim, punctuation included. Emails 2 to 4 are
- * drafted to his register: one idea each, short lines, the proof point stated
- * plainly, signed with a first name. Send-day spacing is a placeholder, since
- * he specified copy and not cadence.
+ * It is a transcription and not a draft. HubSpot exposes no readable body for a
+ * sales template, so the copy cannot be fetched and this literal is the only
+ * place Growth knows what will land in an inbox. Edit it only to match a change
+ * Kyle already made in HubSpot, never to improve the copy here first, and run
+ * `bun --conditions=react-server scripts/check-pregen-sequence.ts` after — it
+ * compares this shape against the live sequence and is what catches the drift.
+ *
+ * It was four touches until 2026-08-18, when Kyle replaced it with this single
+ * email. The bespoke arm still generates four, so the side-by-side now shows
+ * three touches the template does not answer. That asymmetry is the comparison,
+ * not a bug in it.
  *
  * Bodies are parts rather than one string so the UI can mark what actually
  * varies. A reviewer asking "what does this lead receive" and a reviewer asking
@@ -31,7 +39,7 @@ export type TemplatePart =
 
 export type BlastStep = {
   delayDays: number;
-  /** Kyle wrote two subject lines for touch 1; later touches reply in-thread. */
+  /** An array because HubSpot supports A/B subjects; this sequence sets one. */
   subjects: TemplatePart[][];
   body: TemplatePart[];
 };
@@ -74,6 +82,7 @@ export function blastSequenceFor(input: {
     field: "first name",
     value: input.firstName?.trim() || "there",
   };
+  // HubSpot's own Company Domain Name, not a property this repo writes.
   const domain: TemplatePart = {
     kind: "merge",
     field: "website",
@@ -92,16 +101,13 @@ export function blastSequenceFor(input: {
   return [
     {
       delayDays: 0,
-      subjects: [
-        [text("We rebuilt "), domain, text(" for you")],
-        [domain, text(", rebuilt")],
-      ],
+      subjects: [[text("We rebuilt "), domain, text(" for you")]],
       body: [
         text("Hi "),
         firstName,
         text(`,
 
-We built a live preview of your direct booking site on WanderOS — no work on your end, just wanted you to see it.
+My name is Kyle and I'm the CMO at Wander.com. We built a live preview of your direct booking site on WanderOS. No work on your end, just wanted you to see it.
 
 `),
         link,
@@ -109,66 +115,7 @@ We built a live preview of your direct booking site on WanderOS — no work on y
 
 WanderOS customers are also seeing a 66% average lift in visibility across AI search platforms (ChatGPT, Perplexity, etc.) after switching.
 
-If it's useful I can show you what else WanderOS unlocks to grow your business.
-
-Kyle`),
-      ],
-    },
-    {
-      delayDays: 3,
-      subjects: [],
-      body: [
-        text("Hi "),
-        firstName,
-        text(`,
-
-Bumping this in case it got buried. Your preview is still up:
-
-`),
-        link,
-        text(`
-
-Nothing to rebuild on your side. WanderOS pulls listings, photos and rates from the PMS you already run.
-
-Kyle`),
-      ],
-    },
-    {
-      delayDays: 7,
-      subjects: [],
-      body: [
-        text("Hi "),
-        firstName,
-        text(`,
-
-The reason we build these before asking for a call: every booking that comes through your own site is one you keep the commission on.
-
-`),
-        link,
-        text(`
-
-Happy to walk you through what switching looks like, or to leave it with you.
-
-Kyle`),
-      ],
-    },
-    {
-      delayDays: 12,
-      subjects: [],
-      body: [
-        text("Hi "),
-        firstName,
-        text(`,
-
-Last one from me. Your preview stays up either way:
-
-`),
-        link,
-        text(`
-
-If direct booking isn't a priority this year, just say so and I'll leave it there. If it ever is, you know where to find me.
-
-Kyle`),
+If it's useful, we can show you what else WanderOS unlocks to grow your business.`),
       ],
     },
   ];

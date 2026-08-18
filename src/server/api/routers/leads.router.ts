@@ -1382,8 +1382,7 @@ export const leadsRouter = createTRPCRouter({
           `${contact!.email} has no first name; the greeting will fall back`,
         );
       } else if (
-        row.companyName &&
-        firstName.toLowerCase() === row.companyName.trim().toLowerCase()
+        firstName.toLowerCase() === row.companyName?.trim().toLowerCase()
       ) {
         warnings.push(
           `${contact!.email} has the company name in its first-name field, so the greeting will read "Hi ${firstName},"`,
