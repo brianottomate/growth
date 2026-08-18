@@ -1,18 +1,17 @@
 /**
- * The one-size-fits-all blast, transcribed from the sequence that actually
- * sends: "Pre-gen site sequence" (309640366), authored and owned by Kyle.
+ * The one-size-fits-all blast, mirroring the sequence that actually sends:
+ * "Pre-gen site sequence", authored and owned by Kyle.
  *
  * This is the other side of the internal debate: one email every prospect gets,
  * with only merge fields varying. It exists so the debate happens over two real
  * sequences on one screen rather than over adjectives, and so a reviewer can
  * read the template before anyone enrols a contact.
  *
- * It is a transcription and not a draft. HubSpot exposes no readable body for a
- * sales template, so the copy cannot be fetched and this literal is the only
- * place Growth knows what will land in an inbox. Edit it only to match a change
- * Kyle already made in HubSpot, never to improve the copy here first, and run
- * `bun --conditions=react-server scripts/check-pregen-sequence.ts` after — it
- * compares this shape against the live sequence and is what catches the drift.
+ * The copy is a const because HubSpot serves no readable body for a sales
+ * template, so it cannot be fetched. That means this is a mirror and can fall
+ * behind: `PREGEN_SEQUENCE_URL` is the live original, linked from the lead page
+ * for anyone who wants to check. Edit here to match a change Kyle already made,
+ * not to improve the copy first.
  *
  * It was four touches until 2026-08-18, when Kyle replaced it with this single
  * email. The bespoke arm still generates four, so the side-by-side now shows

@@ -12,6 +12,10 @@ import {
   blastSequenceFor,
   type TemplatePart,
 } from "@/lib/pregen-blast-template";
+import {
+  PREGEN_SEQUENCE_SENDER_EMAIL,
+  PREGEN_SEQUENCE_URL,
+} from "@/lib/pregen-sequence";
 import { osPitchUrl } from "@/lib/pregen-urls";
 
 /**
@@ -201,12 +205,6 @@ const PREVIEW_TONE: Record<string, string> = {
   none: "bg-slate-500/15 text-slate-300",
 };
 
-/**
- * Whose connected inbox the sequence sends from. HubSpot rejects an address it
- * has no mailbox for, and the From line is the whole point of the motion, so
- * this is a deliberate constant rather than the signed-in user.
- */
-const SEQUENCE_SENDER_EMAIL = "kristian@wander.com";
 
 const VERDICT_TONE: Record<string, string> = {
   send: "bg-emerald-500/15 text-emerald-300",
@@ -458,7 +456,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
               startSequence.mutate({
                 domainId: row.id,
                 contactId: target.id,
-                senderEmail: SEQUENCE_SENDER_EMAIL,
+                senderEmail: PREGEN_SEQUENCE_SENDER_EMAIL,
                 acknowledgeWarnings: false,
               });
             }}
@@ -734,13 +732,27 @@ export function ProspectDetail({ domain }: { domain: string }) {
                 is written from this lead&apos;s own record, so all of it does.
               </span>
             </p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setFilled((value) => !value)}
-            >
-              {filled ? "Show merge fields" : "Show filled in"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* The template column is a mirror of HubSpot, kept by hand
+                  because no API returns a sales-template body. This is how a
+                  reviewer checks it against the copy that will actually send. */}
+              <a
+                href={PREGEN_SEQUENCE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline underline-offset-4"
+              >
+                Live copy in HubSpot
+                <ExternalLink className="size-3" />
+              </a>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setFilled((value) => !value)}
+              >
+                {filled ? "Show merge fields" : "Show filled in"}
+              </Button>
+            </div>
           </div>
           {!bespokeSteps.length ? (
             <p className="text-muted-foreground text-sm">

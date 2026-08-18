@@ -19,6 +19,7 @@ import {
   type HubspotPregenCohort,
 } from "@/lib/hubspot-pregen-lists";
 import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
+import { PREGEN_SEQUENCE_SENDER_EMAIL } from "@/lib/pregen-sequence";
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
 import { EnrichDrawer, HsMarker, type LeadRow } from "./EnrichDrawer";
@@ -129,12 +130,6 @@ function Pill({
   );
 }
 
-/**
- * Whose connected inbox the sequence sends from. HubSpot rejects an address it
- * has no mailbox for, and the From line is the point of the motion, so this is
- * deliberate rather than the signed-in user.
- */
-const SEQUENCE_SENDER_EMAIL = "kristian@wander.com";
 
 export function LeadsClient() {
   const trpc = useTRPC();
@@ -1093,7 +1088,7 @@ function ReviewCardList({
                 enroll.mutate({
                   domainId: id,
                   contactId,
-                  senderEmail: SEQUENCE_SENDER_EMAIL,
+                  senderEmail: PREGEN_SEQUENCE_SENDER_EMAIL,
                 });
               },
               resolving: busy("resolve"),
