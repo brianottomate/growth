@@ -464,6 +464,24 @@ async function applyInline(rows: HubspotWebhookEventInsert[]) {
           continue;
         }
 
+        // Sequence outcomes ride in on the same subscription. Checked before
+        // the mirror branch because these are not lead_contact columns; they
+        // move the enrolment ledger instead.
+        if (isSequenceStateProperty(row.propertyName)) {
+          const moved = await applySequenceStateChange({
+            hubspotContactId: row.objectId,
+            propertyName: row.propertyName,
+            value: clean(row.propertyValue),
+          });
+          await markProcessed(
+            row.eventId,
+            moved > 0
+              ? `inline: sequence state ${row.propertyName} moved ${moved} enrolment(s)`
+              : `classified: ${row.propertyName} matched no live enrolment`,
+          );
+          continue;
+        }
+
         if (isMirroredContactProperty(row.propertyName)) {
           const updated = await applyContactPropertyChange({
             contactId: row.objectId,
@@ -576,6 +594,11 @@ async function applyInline(rows: HubspotWebhookEventInsert[]) {
     }
   }
 }
+
+import {
+  applySequenceStateChange,
+  isSequenceStateProperty,
+} from "@/server/services/hubspot-sequence-state";
 
 export async function POST(request: NextRequest) {
   let rawBody: string;
