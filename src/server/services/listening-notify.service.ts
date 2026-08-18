@@ -24,7 +24,7 @@ const RADIO_SOCIAL_LISTENING_CHANNEL_ID = "C0BAW47LFGF";
 // hits: reddit via F5Bot email, instagram via the account-watch cron, twitter
 // via the hourly X recent-search cron (/api/cron/x).
 const SOURCE_OWNER_SLACK_ID: Partial<Record<string, string>> = {
-  reddit: "U09K9UDU5FA",
+  reddit: "U0BHR7V2X35", // Colleen Barndt (StatusLabs) — Reddit
   twitter: "U025DTBSU01", // Kyle — X / Twitter
   instagram: "U0574R1RCD9", // Micaela — Instagram
 };
