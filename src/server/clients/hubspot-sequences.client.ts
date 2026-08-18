@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/env";
+import { PREGEN_SEQUENCE_SENDER_USER_ID } from "@/lib/pregen-sequence";
 
 /**
  * HubSpot sales sequences: enrol a contact, and ask whether one is already in
@@ -26,7 +27,11 @@ const BASE = "https://api.hubapi.com/automation/sequences/2026-03";
  * prospect will receive; `PREGEN_SEQUENCE_URL` is the link a reviewer follows to
  * check the mirror against the real thing.
  */
-export { PREGEN_SEQUENCE_ID, PREGEN_SEQUENCE_URL } from "@/lib/pregen-sequence";
+export {
+  PREGEN_SEQUENCE_ID,
+  PREGEN_SEQUENCE_URL,
+  PREGEN_SEQUENCE_SENDER_USER_ID,
+} from "@/lib/pregen-sequence";
 
 export const isHubspotSequencesConfigured = !!env.HUBSPOT_ACCESS_TOKEN_OPERATED;
 
@@ -62,7 +67,17 @@ async function call<T>(
     },
   });
   const text = await response.text();
-  const parsed = text ? (JSON.parse(text) as unknown) : null;
+  // Not every response is JSON. A contact who has never been enrolled gets a
+  // 404 with an HTML error page, which is the ordinary answer to "is this
+  // contact in a sequence" and was throwing a parse error before the status
+  // check below could read it. That is the first thing every enrolment does,
+  // so it failed on exactly the contacts we most wanted to enrol.
+  let parsed: unknown = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = null;
+  }
   return {
     ok: response.ok,
     status: response.status,
@@ -85,7 +100,7 @@ export async function getContactEnrollment(
   hubspotContactId: string,
 ): Promise<SequenceEnrollment | null> {
   const result = await call<SequenceEnrollment>(
-    `/enrollments/contact/${encodeURIComponent(hubspotContactId)}`,
+    `/enrollments/contact/${encodeURIComponent(hubspotContactId)}?userId=${encodeURIComponent(PREGEN_SEQUENCE_SENDER_USER_ID)}`,
   );
   // 404 is the ordinary "not enrolled" answer, not a failure.
   if (result.status === 404) return null;
@@ -98,15 +113,20 @@ export async function enrollContactInSequence(input: {
   sequenceId: string;
   /** Must be a mailbox connected to the portal; it becomes the From address. */
   senderEmail: string;
+  /** The enrolling HubSpot user. Required by the API, and not the owner id. */
+  userId: string;
 }): Promise<SequenceEnrollment> {
-  const result = await call<SequenceEnrollment>("/enrollments", {
-    method: "POST",
-    body: JSON.stringify({
-      contactId: input.hubspotContactId,
-      sequenceId: input.sequenceId,
-      senderEmail: input.senderEmail,
-    }),
-  });
+  const result = await call<SequenceEnrollment>(
+    `/enrollments?userId=${encodeURIComponent(input.userId)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        contactId: input.hubspotContactId,
+        sequenceId: input.sequenceId,
+        senderEmail: input.senderEmail,
+      }),
+    },
+  );
   if (!result.ok || !result.data) {
     throw new Error(`Enrollment failed: ${result.error}`);
   }

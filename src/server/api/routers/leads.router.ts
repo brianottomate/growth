@@ -51,6 +51,7 @@ import {
   getContactEnrollment,
   isHubspotSequencesConfigured,
   PREGEN_SEQUENCE_ID,
+  PREGEN_SEQUENCE_SENDER_USER_ID,
 } from "@/server/clients/hubspot-sequences.client";
 import {
   readHubspotCompanyActivityHistory,
@@ -1460,6 +1461,7 @@ export const leadsRouter = createTRPCRouter({
         hubspotContactId: contact!.hubspotContactId!,
         sequenceId: input.sequenceId,
         senderEmail: input.senderEmail,
+        userId: PREGEN_SEQUENCE_SENDER_USER_ID,
       });
 
       // Only an unsent row may be claimed. Taking the newest row unconditionally

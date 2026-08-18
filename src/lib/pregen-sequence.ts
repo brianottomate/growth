@@ -29,3 +29,10 @@ export const PREGEN_SEQUENCE_URL = `https://app.hubspot.com/sequences/22480390/s
  * disconnected inbox fails the enrolment loudly instead of sending unsigned.
  */
 export const PREGEN_SEQUENCE_SENDER_EMAIL = "kyle@wander.com";
+
+/**
+ * Kyle's HubSpot *user* id, which the sequences API requires as a `userId`
+ * query param on every call and which is not his owner id (331879496). Both
+ * numbers sit on the same owner record and only one of them works here.
+ */
+export const PREGEN_SEQUENCE_SENDER_USER_ID = "49763654";
