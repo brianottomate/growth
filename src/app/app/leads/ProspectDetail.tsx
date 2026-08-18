@@ -201,6 +201,13 @@ const PREVIEW_TONE: Record<string, string> = {
   none: "bg-slate-500/15 text-slate-300",
 };
 
+/**
+ * Whose connected inbox the sequence sends from. HubSpot rejects an address it
+ * has no mailbox for, and the From line is the whole point of the motion, so
+ * this is a deliberate constant rather than the signed-in user.
+ */
+const SEQUENCE_SENDER_EMAIL = "kristian@wander.com";
+
 const VERDICT_TONE: Record<string, string> = {
   send: "bg-emerald-500/15 text-emerald-300",
   review: "bg-amber-500/15 text-amber-300",
@@ -232,6 +239,9 @@ export function ProspectDetail({ domain }: { domain: string }) {
   );
   const capture = useMutation(
     trpc.leads.capturePreview.mutationOptions({ onSuccess: invalidate }),
+  );
+  const startSequence = useMutation(
+    trpc.leads.startPregenSequence.mutationOptions({ onSuccess: invalidate }),
   );
 
   // Live HubSpot correspondence is a provider read, so it waits to be asked for.
@@ -434,6 +444,27 @@ export function ProspectDetail({ domain }: { domain: string }) {
           >
             Draft against a stand-in
           </Button>
+          {/* The only button here that causes mail to leave a mailbox. The
+              refusals live server-side so they bind regardless of surface;
+              this just surfaces what came back. */}
+          <Button
+            size="sm"
+            disabled={startSequence.isPending || !channel.bestEmail}
+            onClick={() => {
+              const target = contacts.find(
+                (contact) => contact.email === channel.bestEmail,
+              );
+              if (!target) return;
+              startSequence.mutate({
+                domainId: row.id,
+                contactId: target.id,
+                senderEmail: SEQUENCE_SENDER_EMAIL,
+                acknowledgeWarnings: false,
+              });
+            }}
+          >
+            {startSequence.isPending ? "Enrolling…" : "Start sequence"}
+          </Button>
           {/* Hand off to the assistant rather than growing a button per action */}
           <Button
             size="sm"
@@ -466,6 +497,18 @@ export function ProspectDetail({ domain }: { domain: string }) {
         {rank_.data ? (
           <p className="mt-2 text-xs text-emerald-300">
             Ranked. Reload to see the new assessment.
+          </p>
+        ) : null}
+        {startSequence.error ? (
+          <p className="mt-2 text-xs text-red-300">
+            {startSequence.error.message}
+          </p>
+        ) : null}
+        {startSequence.data ? (
+          <p className="mt-2 text-xs text-emerald-300">
+            Enrolled {startSequence.data.toEmail} in{" "}
+            {startSequence.data.sequenceName}, sending from{" "}
+            {startSequence.data.enrolledByEmail}.
           </p>
         ) : null}
       </header>

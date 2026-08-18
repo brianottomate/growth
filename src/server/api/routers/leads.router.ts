@@ -46,12 +46,19 @@ import {
 import { storedContactMentions } from "@/server/services/lead-correspondence";
 import { hubspotCompanyPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
 import {
+  enrollContactInSequence,
+  getContactEnrollment,
+  isHubspotSequencesConfigured,
+  PREGEN_SEQUENCE_ID,
+} from "@/server/clients/hubspot-sequences.client";
+import {
   readHubspotCompanyActivityHistory,
   readHubspotCompanyEmailHistory,
 } from "@/server/services/hubspot-company-email-context.service";
 import { classifyFetchUrl } from "@/server/ai/url-safety";
 import {
   isFreemailEmail,
+  isPlaceholderEmail,
   parseContactChannel,
   PLACEHOLDER_EMAIL_DOMAINS_SQL,
   scoreLeadChannel,
@@ -1292,6 +1299,149 @@ export const leadsRouter = createTRPCRouter({
     }),
   // Human approval boundary: copy the latest reviewed pregen draft into one
   // associated HubSpot contact. This does not enroll the contact.
+  /**
+   * Start the HubSpot sequence for one lead.
+   *
+   * This is the only place in Growth that causes mail to leave a mailbox, so it
+   * is the place the pre-send conditions become binding rather than advisory.
+   * Every refusal below was a thing a reviewer previously had to remember.
+   *
+   * HubSpot is asked whether the contact is already enrolled before we look at
+   * our own ledger, because a rep can enrol from the CRM and Growth would never
+   * hear about it. Our row is written after, so the lead page can answer
+   * "already in flight" without a provider round trip.
+   */
+  startPregenSequence: protectedProcedure
+    .input(
+      z.object({
+        domainId: z.string(),
+        contactId: z.string(),
+        /** Connected inbox the sequence sends from; becomes the From address. */
+        senderEmail: z.string().email(),
+        sequenceId: z.string().default(PREGEN_SEQUENCE_ID),
+        /** Tick to send despite non-blocking warnings (stale preview, etc). */
+        acknowledgeWarnings: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!isHubspotSequencesConfigured) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "HubSpot is not configured",
+        });
+      }
+
+      const row = await ctx.db.query.leadDomainTable.findFirst({
+        where: eq(leadDomainTable.id, input.domainId),
+      });
+      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const contact = await ctx.db.query.leadContactTable.findFirst({
+        where: and(
+          eq(leadContactTable.id, input.contactId),
+          eq(leadContactTable.domainId, input.domainId),
+          isNull(leadContactTable.deletedAt),
+        ),
+      });
+
+      // Hard refusals. Each one is a send that should never happen, so none of
+      // them are overridable by acknowledgeWarnings.
+      const refusals: string[] = [];
+      if (row.excludeFromOutreach) {
+        refusals.push(
+          `${row.domain} is excluded from outreach${row.excludeReason ? `: ${row.excludeReason}` : ""}`,
+        );
+      }
+      if (!contact) refusals.push("That contact is not on this domain");
+      if (contact && !contact.hubspotContactId) {
+        refusals.push(`${contact.email} is not linked to a HubSpot contact`);
+      }
+      if (contact?.emailOptOut) {
+        refusals.push(`${contact.email} has opted out of email`);
+      }
+      if (contact && isPlaceholderEmail(contact.email)) {
+        refusals.push(`${contact.email} is a placeholder address`);
+      }
+      if (!row.pregenSiteUrl) {
+        refusals.push("No preview has been built for this company");
+      }
+      if (refusals.length) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: refusals.join("; "),
+        });
+      }
+
+      // The copy is company-level, so the greeting is the only per-person part.
+      // A first name that is really the company name reads "Hi Maui Westside
+      // Properties," and is the most visible way this motion can look automated.
+      const warnings: string[] = [];
+      const firstName = contact!.firstName?.trim() ?? "";
+      if (!firstName) {
+        warnings.push(
+          `${contact!.email} has no first name; the greeting will fall back`,
+        );
+      } else if (
+        row.companyName &&
+        firstName.toLowerCase() === row.companyName.trim().toLowerCase()
+      ) {
+        warnings.push(
+          `${contact!.email} has the company name in its first-name field, so the greeting will read "Hi ${firstName},"`,
+        );
+      }
+      if (warnings.length && !input.acknowledgeWarnings) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `${warnings.join("; ")}. Re-run with acknowledgeWarnings to send anyway.`,
+        });
+      }
+
+      // Ask the provider first: a rep may have enrolled from the CRM.
+      const existing = await getContactEnrollment(contact!.hubspotContactId!);
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${contact!.email} is already in "${existing.sequenceName}", enrolled ${existing.enrolledAt.slice(0, 10)} by ${existing.enrolledByEmail}`,
+        });
+      }
+
+      const enrollment = await enrollContactInSequence({
+        hubspotContactId: contact!.hubspotContactId!,
+        sequenceId: input.sequenceId,
+        senderEmail: input.senderEmail,
+      });
+
+      const [draft] = await ctx.db
+        .select()
+        .from(leadSequenceTable)
+        .where(eq(leadSequenceTable.domainId, input.domainId))
+        .orderBy(desc(leadSequenceTable.createdAt))
+        .limit(1);
+
+      if (draft) {
+        await ctx.db
+          .update(leadSequenceTable)
+          .set({
+            status: "sent",
+            contactId: contact!.id,
+            hubspotSequenceId: input.sequenceId,
+            hubspotEnrollmentId: enrollment.id,
+            enrolledAt: new Date(enrollment.enrolledAt),
+            enrolledByEmail: enrollment.enrolledByEmail,
+            sentAt: new Date(enrollment.enrolledAt),
+          })
+          .where(eq(leadSequenceTable.id, draft.id));
+      }
+
+      return {
+        enrollmentId: enrollment.id,
+        sequenceName: enrollment.sequenceName,
+        toEmail: enrollment.toEmail,
+        enrolledByEmail: enrollment.enrolledByEmail,
+        warnings,
+      };
+    }),
+
   publishPregenOutreach: protectedProcedure
     .input(
       z.object({

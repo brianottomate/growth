@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { index, pgSchema, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { userTable } from "./auth-schema";
@@ -603,6 +603,15 @@ export const leadSequenceTable = leadsSchema.table(
     // Instantly linkage once queued/sent.
     instantlyCampaignId: t.text(),
     instantlyLeadId: t.text(),
+    // HubSpot sequence enrolment: the ledger that makes a second Start refuse.
+    // HubSpot's own enrollment-status endpoint is checked first (a rep can
+    // enrol from the CRM and Growth would never hear about it), but recording
+    // it here is what lets the lead page answer "already in flight" without a
+    // provider round trip, and what a duplicate guard can index on.
+    hubspotSequenceId: t.text(),
+    hubspotEnrollmentId: t.text(),
+    enrolledAt: t.timestamp(),
+    enrolledByEmail: t.text(),
     sentAt: t.timestamp(),
     createdAt: t
       .timestamp()
@@ -617,6 +626,11 @@ export const leadSequenceTable = leadsSchema.table(
   (table) => [
     index("lead_outreach_domain_id_idx").on(table.domainId),
     index("lead_outreach_status_idx").on(table.status),
+    // One live enrolment per domain. Partial so redrafting a skipped or
+    // replied-to company stays allowed.
+    uniqueIndex("lead_sequence_live_enrollment_idx")
+      .on(table.domainId)
+      .where(sql`${table.status} in ('queued', 'sent')`),
   ],
 );
 export type LeadOutreach = typeof leadSequenceTable.$inferSelect;
