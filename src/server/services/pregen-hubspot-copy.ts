@@ -41,47 +41,56 @@ export function selectCompanyHistoryForGeneration(
   };
 }
 
+/** A paragraph that is nothing but a URL: the link line the renderer emits. */
+function isLinkParagraph(part: string): boolean {
+  return /^https?:\/\/\S+$/.test(part);
+}
+
 type RenderedStep = {
   subject: string | null;
   body: string;
   delayDays: number;
 };
 
-/** A paragraph that is nothing but a URL — the link line the renderer emits. */
-function isLinkParagraph(part: string): boolean {
-  return /^https?:\/\/\S+$/.test(part);
-}
+/**
+ * The company-level token surface: the whole reviewed sequence, on the record
+ * it was actually written about.
+ *
+ * The contact contract above carries two touches because that is what the first
+ * pilot sequence consumed, so publishing silently dropped touches 3 and 4 of
+ * every four-touch draft. It also puts a company-level artefact on a person,
+ * which means the same copy has to be written onto every contact at the company
+ * and goes stale the moment someone changes jobs.
+ *
+ * This is the replacement. Personalization is company-level by design (the
+ * copy attributes history to whoever said it, never to the reader), so the only
+ * per-person token left is the first name HubSpot puts in the greeting, and one
+ * enrolled contact is as good as another.
+ *
+ * Shape follows what the generator actually produces, verified across the batch:
+ * four touches, a subject and the preview link on touch 1 only, the rest
+ * in-thread. Touch 1 splits around the link so the sequence step can render a
+ * real hyperlink from `growth_pregen_preview_url` rather than a bare URL.
+ */
+export function hubspotCompanyPropertiesFromRenderedSteps(
+  steps: RenderedStep[],
+) {
+  const [touch1, ...rest] = steps;
+  if (!touch1) throw new Error("A pregen draft needs at least one touch");
 
-export function hubspotPropertiesFromRenderedSteps(steps: RenderedStep[]) {
-  const touch1 = steps[0];
-  const touch2 = steps[1];
-  if (!touch1 || !touch2) {
-    throw new Error("A pregen HubSpot draft needs at least two touches");
-  }
-
-  const touch1Parts = touch1.body.split(/\n{2,}/).map((part) => part.trim());
-  // Located by shape rather than by comparing against a URL the caller supplies.
-  // The caller's copy was the bare renderer address while the body carried the
-  // attributed one, so an exact match failed on every draft generated after
-  // attribution was added and publishing threw here instead of writing.
-  const linkIndex = touch1Parts.findIndex(isLinkParagraph);
-  if (linkIndex < 1 || linkIndex === touch1Parts.length - 1) {
+  const parts = touch1.body.split(/\n{2,}/).map((part) => part.trim());
+  const linkIndex = parts.findIndex(isLinkParagraph);
+  if (linkIndex < 1 || linkIndex === parts.length - 1) {
     throw new Error("Touch 1 must contain opening, preview URL, and closing");
-  }
-  const touch2Parts = touch2.body.split(/\n{2,}/).map((part) => part.trim());
-  if (touch2Parts.length < 2) {
-    throw new Error("Touch 2 must contain opening and closing");
   }
 
   return {
-    growth_pregen_preview_url: touch1Parts[linkIndex]!,
     growth_pregen_touch_1_subject: touch1.subject ?? "",
-    growth_pregen_touch_1_body: touch1Parts.slice(0, linkIndex).join(" "),
-    growth_pregen_touch_1_observation: touch1Parts
-      .slice(linkIndex + 1)
-      .join(" "),
-    growth_pregen_touch_2_subject: touch2.subject ?? "",
-    growth_pregen_touch_2_body: touch2Parts[0] ?? "",
-    growth_pregen_touch_2_fit: touch2Parts.slice(1).join(" "),
+    growth_pregen_touch_1_opening: parts.slice(0, linkIndex).join("\n\n"),
+    growth_pregen_touch_1_closing: parts.slice(linkIndex + 1).join("\n\n"),
+    // In-thread follow-ups: whole body, no subject, no link of their own.
+    growth_pregen_touch_2_body: rest[0]?.body ?? "",
+    growth_pregen_touch_3_body: rest[1]?.body ?? "",
+    growth_pregen_touch_4_body: rest[2]?.body ?? "",
   };
 }

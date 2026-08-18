@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { CompanyEmailHistory } from "./hubspot-company-email-context.service";
 import {
-  hubspotPropertiesFromRenderedSteps,
+  hubspotCompanyPropertiesFromRenderedSteps,
   selectCompanyHistoryForGeneration,
 } from "./pregen-hubspot-copy";
 
@@ -116,50 +116,59 @@ describe("selectCompanyHistoryForGeneration", () => {
   });
 });
 
-describe("hubspotPropertiesFromRenderedSteps", () => {
-  test("maps model-owned prose into HubSpot-owned paragraph slots", () => {
-    const previewUrl = "https://preview.example/p/123";
-    const properties = hubspotPropertiesFromRenderedSteps([
-      {
-        subject: "A Cascadia preview",
-        body: `Company-specific opening.\n\n${previewUrl}\n\nCompany-specific CTA.`,
-        delayDays: 0,
-      },
-      {
-        subject: null,
-        body: "Product explanation.\n\nCompany-specific fit and CTA.",
-        delayDays: 4,
-      },
-    ]);
-
-    expect(properties).toEqual({
-      growth_pregen_preview_url: previewUrl,
-      growth_pregen_touch_1_subject: "A Cascadia preview",
-      growth_pregen_touch_1_body: "Company-specific opening.",
-      growth_pregen_touch_1_observation: "Company-specific CTA.",
-      growth_pregen_touch_2_subject: "",
-      growth_pregen_touch_2_body: "Product explanation.",
-      growth_pregen_touch_2_fit: "Company-specific fit and CTA.",
-    });
-  });
-
-  // Publishing used to locate this line by comparing it against a URL the
-  // caller passed in. The caller had the bare renderer address, the body had
-  // the attributed wander.com wrapper, and every real draft threw here.
-  test("locates the link line when it carries attribution", () => {
-    const link =
-      "https://www.wander.com/os/maui-westside-properties?t=abc&utm_source=hubspot_sequence&utm_content=mauiwestside.com";
-    const properties = hubspotPropertiesFromRenderedSteps([
+describe("hubspotCompanyPropertiesFromRenderedSteps", () => {
+  // The contact contract this replaced carried two touches, so publishing a
+  // four-touch draft silently dropped half of what the reviewer approved.
+  test("carries all four touches", () => {
+    const link = "https://www.wander.com/os/maui-westside-properties?t=abc";
+    const properties = hubspotCompanyPropertiesFromRenderedSteps([
       {
         subject: "Maui Westside on WanderOS",
         body: `Opening.\n\n${link}\n\nCTA.`,
         delayDays: 0,
       },
-      { subject: null, body: "Two opening.\n\nTwo closing.", delayDays: 3 },
+      { subject: null, body: "Touch two.", delayDays: 3 },
+      { subject: null, body: "Touch three.", delayDays: 7 },
+      { subject: null, body: "Touch four.", delayDays: 12 },
     ]);
 
-    expect(properties.growth_pregen_preview_url).toBe(link);
-    expect(properties.growth_pregen_touch_1_body).toBe("Opening.");
-    expect(properties.growth_pregen_touch_1_observation).toBe("CTA.");
+    expect(properties).toEqual({
+      growth_pregen_touch_1_subject: "Maui Westside on WanderOS",
+      growth_pregen_touch_1_opening: "Opening.",
+      growth_pregen_touch_1_closing: "CTA.",
+      growth_pregen_touch_2_body: "Touch two.",
+      growth_pregen_touch_3_body: "Touch three.",
+      growth_pregen_touch_4_body: "Touch four.",
+    });
+  });
+
+  // The link is a separate company property so the sequence step can render a
+  // hyperlink, which means touch 1 has to split around it. Locating that line
+  // by shape rather than by matching a URL the caller supplies is what keeps
+  // attribution parameters from breaking publish.
+  test("splits touch 1 around an attributed link line", () => {
+    const link =
+      "https://www.wander.com/os/maui?t=abc&utm_source=hubspot_sequence&utm_content=mauiwestside.com";
+    const properties = hubspotCompanyPropertiesFromRenderedSteps([
+      {
+        subject: "S",
+        body: `Line one.\n\nLine two.\n\n${link}\n\nClosing question?`,
+        delayDays: 0,
+      },
+    ]);
+
+    expect(properties.growth_pregen_touch_1_opening).toBe(
+      "Line one.\n\nLine two.",
+    );
+    expect(properties.growth_pregen_touch_1_closing).toBe("Closing question?");
+    expect(properties.growth_pregen_touch_2_body).toBe("");
+  });
+
+  test("refuses touch 1 with no link line", () => {
+    expect(() =>
+      hubspotCompanyPropertiesFromRenderedSteps([
+        { subject: "S", body: "Opening.\n\nClosing.", delayDays: 0 },
+      ]),
+    ).toThrow();
   });
 });

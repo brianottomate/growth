@@ -44,7 +44,7 @@ import {
   PregenMotionSchema,
 } from "@/server/services/pregen-hubspot-outreach.service";
 import { storedContactMentions } from "@/server/services/lead-correspondence";
-import { hubspotPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
+import { hubspotCompanyPropertiesFromRenderedSteps } from "@/server/services/pregen-hubspot-copy";
 import {
   readHubspotCompanyActivityHistory,
   readHubspotCompanyEmailHistory,
@@ -710,7 +710,8 @@ export const leadsRouter = createTRPCRouter({
       const filtered = scoredFacet
         ? rows.filter(
             (row) =>
-              (!input.verdict || row.review?.channel.verdict === input.verdict) &&
+              (!input.verdict ||
+                row.review?.channel.verdict === input.verdict) &&
               (!input.route || row.review?.channel.route === input.route),
           )
         : rows;
@@ -1133,7 +1134,10 @@ export const leadsRouter = createTRPCRouter({
         where: eq(pregenBuildTable.id, input.buildId),
       });
       if (!build?.prospectId) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "No build to refresh" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No build to refresh",
+        });
       }
       if (!isWanderApiConfigured) {
         throw new TRPCError({
@@ -1352,32 +1356,36 @@ export const leadsRouter = createTRPCRouter({
       // ships those sentences at the wrong reader. Publishing still goes ahead,
       // because overriding the pick is a legitimate call, but it cannot go
       // ahead silently.
-      const draftRecipient = outreach.generationContext?.recipient ?? null;
-      const recipientMismatch =
-        draftRecipient != null &&
-        draftRecipient.email.toLowerCase() !== contact.email.toLowerCase();
-
-      // The link comes off the rendered body, which is the copy a rep will
-      // actually send. Passing one in from the draft context meant the property
-      // could disagree with the email.
-      const properties = hubspotPropertiesFromRenderedSteps(outreach.steps);
-      await updateContact(contact.hubspotContactId, properties);
+      // The copy is about the company, not the reader: history is attributed to
+      // whoever said it, and the only per-person token left is the first name
+      // HubSpot puts in the greeting. So it publishes to the company record and
+      // any enrolled contact there renders it correctly. Publishing to a person
+      // meant four-touch drafts lost touches 3 and 4 to a two-touch contact
+      // contract, and the copy went stale the moment that person changed jobs.
+      if (!row.hubspotRecordId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "This domain has no linked HubSpot company to publish to",
+        });
+      }
+      const properties = hubspotCompanyPropertiesFromRenderedSteps(
+        outreach.steps,
+      );
+      await updateCompany(row.hubspotRecordId, properties);
       await ctx.db
         .update(leadSequenceTable)
-        .set({ status: "approved" })
+        .set({ status: "approved", contactId: contact.id })
         .where(eq(leadSequenceTable.id, outreach.id));
       return {
         outreachId: outreach.id,
         contactId: contact.id,
         hubspotContactId: contact.hubspotContactId,
+        hubspotCompanyId: row.hubspotRecordId,
         propertyNames: Object.keys(properties),
         writtenFromPretendPreview,
-        recipientMismatch,
         warning: writtenFromPretendPreview
-          ? `This copy was written against a stand-in preview, so anything it says about the page itself is invented. It is now on the HubSpot contact — regenerate and re-publish once ${row.domain} has a real preview.`
-          : recipientMismatch
-            ? `This copy was written to ${draftRecipient?.name ?? draftRecipient?.email} and addresses their own replies and calls as "you". You published it to ${contact.email}. Read touch 1 and touch 4 before enrolling, or regenerate for this contact.`
-            : null,
+          ? `This copy was written against a stand-in preview, so anything it says about the page itself is invented. It is now on the HubSpot company; regenerate and re-publish once ${row.domain} has a real preview.`
+          : null,
       };
     }),
 

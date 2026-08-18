@@ -391,6 +391,17 @@ export type CompanyProperties = {
   country?: string;
   // Wander Sites pregen write-back (property names from the lead-gen pipeline)
   sites_preview_url?: string;
+  // Company-level pregen token surface. The reviewed sequence describes the
+  // business and attributes history to whoever said it, so it belongs on the
+  // company: any enrolled contact renders it, and it survives someone leaving.
+  // Touch 1 splits around the link so the step can render a real hyperlink.
+  growth_pregen_preview_url?: string;
+  growth_pregen_touch_1_subject?: string;
+  growth_pregen_touch_1_opening?: string;
+  growth_pregen_touch_1_closing?: string;
+  growth_pregen_touch_2_body?: string;
+  growth_pregen_touch_3_body?: string;
+  growth_pregen_touch_4_body?: string;
   pm_company_?: "Yes" | "No";
   ww_listing_url?: string;
   // Read-only context (used by the inbound router)

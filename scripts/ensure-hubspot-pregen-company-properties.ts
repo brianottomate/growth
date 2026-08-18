@@ -1,18 +1,19 @@
 /**
- * Put the preview URL where it belongs: on the company.
+ * The pregen token surface, on the company it describes.
  *
- * The pregen site is one per domain and never varies by person, but the token
- * surface was built contact-first so a sequence token would resolve without
- * depending on an association. The cost of that is visible in
- * stamp-blast-preview-urls.ts, which writes the same URL onto every reachable
- * contact to keep one company-level fact in sync. Verified 2026-08-17: every
- * pregen-2 contact has exactly one primary company association, so a company
- * token resolves and the duplication is no longer buying anything.
+ * The site is one per domain and the reviewed copy attributes every fact to
+ * whoever said it, so the only per-person token left is the first name HubSpot
+ * puts in the greeting. Everything else belongs to the company: any enrolled
+ * contact renders it, and it survives that contact changing jobs.
  *
- * Additive on purpose. The contact property stays and stays populated, so a
- * template already written against it keeps working; this just makes the more
- * correct token available. Person-level copy (the touch bodies, addressed to
- * one named recipient) stays on the contact where it belongs.
+ * It was built contact-first so a sequence token would resolve without
+ * depending on an association. Verified 2026-08-17: every pregen-2 contact has
+ * exactly one primary company association, so that hedge bought nothing and
+ * cost real duplication (stamp-blast-preview-urls.ts writes one company-level
+ * URL onto 19 contacts to keep it in sync).
+ *
+ * Additive. The contact properties stay populated, so a template already
+ * written against them keeps working while the company tokens take over.
  *
  *   bun --conditions=react-server scripts/ensure-hubspot-pregen-company-properties.ts
  *   bun --conditions=react-server scripts/ensure-hubspot-pregen-company-properties.ts --stamp
@@ -39,14 +40,68 @@ const batch = arg("batch") ?? CURRENT_PREGEN_BATCH;
 
 const GROUP = { name: "growth_pregen_sites", label: "Growth - Pre-Gen Sites" };
 
-const PROPERTY = {
-  name: "growth_pregen_preview_url",
-  label: "Growth pregen preview URL",
-  type: "string",
-  fieldType: "text",
-  description:
-    "The wander.com pitch wrapper for this company's pre-generated site, carrying its signed token and campaign attribution. One per company; sequences read it as a personalization token.",
-};
+/**
+ * The whole reviewed sequence lives here, on the company it was written about.
+ * Touch 1 splits around the link so the sequence step can render a hyperlink
+ * from the URL property instead of a bare address; touches 2 to 4 are in-thread
+ * and carry no subject and no link of their own.
+ */
+const PROPERTIES = [
+  {
+    name: "growth_pregen_preview_url",
+    label: "Growth pregen preview URL",
+    type: "string",
+    fieldType: "text",
+    description:
+      "The wander.com pitch wrapper for this company's pre-generated site, carrying its signed token and campaign attribution. One per company; sequences read it as a personalization token.",
+  },
+  {
+    name: "growth_pregen_touch_1_subject",
+    label: "Growth pregen touch 1 subject",
+    type: "string",
+    fieldType: "text",
+    description:
+      "Reviewed subject line for touch 1. Touches 2 to 4 reply in-thread and have none.",
+  },
+  {
+    name: "growth_pregen_touch_1_opening",
+    label: "Growth pregen touch 1 opening",
+    type: "string",
+    fieldType: "textarea",
+    description: "Reviewed touch 1 copy above the preview link.",
+  },
+  {
+    name: "growth_pregen_touch_1_closing",
+    label: "Growth pregen touch 1 closing",
+    type: "string",
+    fieldType: "textarea",
+    description:
+      "Reviewed touch 1 copy below the preview link, ending in the question.",
+  },
+  {
+    name: "growth_pregen_touch_2_body",
+    label: "Growth pregen touch 2 body",
+    type: "string",
+    fieldType: "textarea",
+    description: "Reviewed touch 2, in-thread.",
+  },
+  {
+    name: "growth_pregen_touch_3_body",
+    label: "Growth pregen touch 3 body",
+    type: "string",
+    fieldType: "textarea",
+    description: "Reviewed touch 3, in-thread.",
+  },
+  {
+    name: "growth_pregen_touch_4_body",
+    label: "Growth pregen touch 4 body",
+    type: "string",
+    fieldType: "textarea",
+    description: "Reviewed touch 4, in-thread.",
+  },
+] as const;
+
+const PROPERTY = PROPERTIES[0];
 
 async function hubspot<T>(
   path: string,
@@ -83,18 +138,20 @@ if (!groups.data?.results?.some((group) => group.name === GROUP.name)) {
   console.log(`group ${GROUP.name}: exists`);
 }
 
-const existing = await hubspot(
-  `/crm/v3/properties/companies/${encodeURIComponent(PROPERTY.name)}`,
-);
-if (existing.ok) {
-  console.log(`property ${PROPERTY.name}: exists`);
-} else {
+for (const property of PROPERTIES) {
+  const existing = await hubspot(
+    `/crm/v3/properties/companies/${encodeURIComponent(property.name)}`,
+  );
+  if (existing.ok) {
+    console.log(`property ${property.name}: exists`);
+    continue;
+  }
   const created = await hubspot("/crm/v3/properties/companies", {
     method: "POST",
-    body: JSON.stringify({ ...PROPERTY, groupName: GROUP.name }),
+    body: JSON.stringify({ ...property, groupName: GROUP.name }),
   });
   console.log(
-    `property ${PROPERTY.name}: ${created.ok ? "created" : `FAILED ${created.status} ${JSON.stringify(created.data)}`}`,
+    `property ${property.name}: ${created.ok ? "created" : `FAILED ${created.status} ${JSON.stringify(created.data)}`}`,
   );
 }
 
