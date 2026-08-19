@@ -4,6 +4,8 @@ import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/env";
+import { osInspectUrl } from "@/lib/pregen-urls";
+import { updateCompany } from "@/server/clients/hubspot.client";
 import { db } from "@/server/db";
 import { leadDomainTable, pregenBuildTable } from "@/server/db/leads-schema";
 
@@ -223,6 +225,41 @@ export async function POST(request: NextRequest) {
             ),
           ),
         );
+    }
+  }
+
+  // Mirror a rep-clickable link onto the CRM company, so the build is reachable
+  // from the record without anyone running a script or opening Growth.
+  //
+  // Deliberately NOT `growth_pregen_preview_url`. That property is the
+  // sequence's merge field, so it must carry the beacon — a prospect opening it
+  // is the only signal this motion produces before a reply. This one is the
+  // same page with the beacon off, for the people who look at it for a living.
+  //
+  // Best effort on purpose: the webhook's job is to record the build, and a
+  // HubSpot hiccup should cost a stale property rather than a retried event
+  // whose DB writes have already landed.
+  if (payload.previewUrl && !stale && payload.status !== "FAILED") {
+    const [lead] = await db
+      .select({
+        domain: leadDomainTable.domain,
+        hubspotRecordId: leadDomainTable.hubspotRecordId,
+      })
+      .from(leadDomainTable)
+      .where(eq(leadDomainTable.id, domainId))
+      .limit(1);
+    const inspectUrl = osInspectUrl(payload.previewUrl);
+    if (lead?.hubspotRecordId && inspectUrl) {
+      try {
+        await updateCompany(lead.hubspotRecordId, {
+          growth_pregen_inspect_url: inspectUrl,
+        });
+      } catch (error) {
+        console.warn(
+          `[pregen webhook] Could not write growth_pregen_inspect_url for ${lead.domain}`,
+          error,
+        );
+      }
     }
   }
 

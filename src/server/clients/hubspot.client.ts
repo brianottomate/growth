@@ -396,6 +396,11 @@ export type CompanyProperties = {
   // company: any enrolled contact renders it, and it survives someone leaving.
   // Touch 1 splits around the link so the step can render a real hyperlink.
   growth_pregen_preview_url?: string;
+  // The same page with the view beacon off, for reps opening it from the CRM.
+  // Kept apart from the property above because that one is what sequences send,
+  // and a suppressed beacon on a prospect's link costs the only pre-reply signal
+  // this motion produces.
+  growth_pregen_inspect_url?: string;
   growth_pregen_touch_1_subject?: string;
   growth_pregen_touch_1_opening?: string;
   growth_pregen_touch_1_closing?: string;

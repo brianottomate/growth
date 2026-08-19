@@ -56,6 +56,14 @@ const PROPERTIES = [
       "The wander.com pitch wrapper for this company's pre-generated site, carrying its signed token and campaign attribution. One per company; sequences read it as a personalization token.",
   },
   {
+    name: "growth_pregen_inspect_url",
+    label: "Growth pregen inspect URL",
+    type: "string",
+    fieldType: "text",
+    description:
+      "The same pitch page with the view beacon off (?noping=1), for reps opening it from the CRM. Never send this one: the beacon on growth_pregen_inspect_url's sibling is what tells sales the prospect is looking.",
+  },
+  {
     name: "growth_pregen_touch_1_subject",
     label: "Growth pregen touch 1 subject",
     type: "string",
