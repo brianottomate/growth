@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { osPitchUrl } from "@/lib/pregen-urls";
+import { osInspectUrl } from "@/lib/pregen-urls";
 import {
   elapsedLabel,
   isStuck,
@@ -302,9 +302,9 @@ function SequencePreview({ data }: { data: ProspectCardData }) {
             wander.com wrapper, so that is the page to open first; the bare
             renderer address is the same site without the pitch around it, kept
             because it is what the build actually produced. */}
-        {data.pregenSiteUrl && osPitchUrl(data.pregenSiteUrl) && (
+        {data.pregenSiteUrl && osInspectUrl(data.pregenSiteUrl) && (
           <a
-            href={osPitchUrl(data.pregenSiteUrl) ?? undefined}
+            href={osInspectUrl(data.pregenSiteUrl) ?? undefined}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-[11px] underline underline-offset-2"
@@ -556,9 +556,9 @@ export function ProspectReviewCard({
                   <ExternalLink className="size-3.5" />
                 </a>
               )}
-              {data.pregenSiteUrl && osPitchUrl(data.pregenSiteUrl) && (
+              {data.pregenSiteUrl && osInspectUrl(data.pregenSiteUrl) && (
                 <a
-                  href={osPitchUrl(data.pregenSiteUrl) ?? undefined}
+                  href={osInspectUrl(data.pregenSiteUrl) ?? undefined}
                   target="_blank"
                   rel="noreferrer"
                   title="Open the wander.com pitch wrapper"

@@ -16,7 +16,7 @@ import {
   PREGEN_SEQUENCE_SENDER_EMAIL,
   PREGEN_SEQUENCE_URL,
 } from "@/lib/pregen-sequence";
-import { osPitchUrl } from "@/lib/pregen-urls";
+import { osInspectUrl } from "@/lib/pregen-urls";
 
 /**
  * Everything about one prospect on a single surface, addressed by domain.
@@ -347,7 +347,7 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const previewShot = desktop(visual?.ours);
   const previewShotAt = visual?.capturedAt;
   // Derived, never stored: same label and token, wrapped in the pitch page.
-  const wrapperUrl = preview.url ? osPitchUrl(preview.url) : null;
+  const wrapperUrl = preview.url ? osInspectUrl(preview.url) : null;
 
   return (
     <div className="space-y-4">

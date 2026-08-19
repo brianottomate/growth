@@ -32,6 +32,24 @@ export function osPitchUrl(previewUrl: string): string | null {
 }
 
 /**
+ * The same pitch page, with the view beacon switched off.
+ *
+ * Every link an operator opens from Growth is this one. A rep opening a
+ * prospect's page fires the same beacon the prospect would, and #radio-core-inbound
+ * reads it as "they are on their site right now" — so reviewing a batch
+ * manufactures the exact signal the alert exists to carry, and the assignment it
+ * makes is sticky.
+ *
+ * A separate function rather than an option on `osPitchUrl`, so it cannot end up
+ * on `outreachLinkFor`. The prospect's link must keep the beacon; that view is
+ * the whole signal.
+ */
+export function osInspectUrl(previewUrl: string): string | null {
+  const url = osPitchUrl(previewUrl);
+  return url ? `${url}&noping=1` : null;
+}
+
+/**
  * Per-company attribution, carried over from the retired Instantly generator.
  * Without it the link reaches Amplitude with no way to tell which company
  * opened it, which is the only conversion signal this motion produces before a
