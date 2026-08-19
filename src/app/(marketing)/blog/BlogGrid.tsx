@@ -22,8 +22,8 @@ function getDisplayImageUrl(post: Post): string {
     return post.thumbnail;
   }
   const title = encodeURIComponent(post.h1);
-  const tag = post.category || post.tags[0] || "dating";
-  return `/api/og/display?title=${title}&tag=${encodeURIComponent(tag)}`;
+  const description = post.category || post.tags[0] || "";
+  return `/api/og/blog?title=${title}&description=${encodeURIComponent(description)}`;
 }
 
 function AuthorInfo({
