@@ -131,13 +131,24 @@ export async function POST(request: Request) {
         })
         .onConflictDoNothing({ target: pregenBuildTable.prospectId })
         .returning();
+      // `returning()` after `onConflictDoNothing` comes back empty on the Neon
+      // HTTP driver whether or not the row was written, so re-read rather than
+      // report a successful request as having produced no build.
+      const [stored] = build
+        ? [build]
+        : await db
+            .select()
+            .from(pregenBuildTable)
+            .where(eq(pregenBuildTable.prospectId, prospect.id))
+            .limit(1);
       results.push({
         domain,
         action: "requested",
         prospectId: prospect.id,
         websiteId: prospect.websiteId,
         status: prospect.status,
-        buildId: build?.id ?? null,
+        buildId: stored?.id ?? null,
+        previewUrl: stored?.previewUrl ?? prospect.previewUrl ?? null,
       });
     } catch (error) {
       results.push({
