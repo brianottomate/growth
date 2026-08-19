@@ -6,6 +6,7 @@ import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
 import {
   createWebsiteProspect,
   isWanderApiConfigured,
+  listWebsiteProspects,
   retryWebsiteProspect,
 } from "@/server/clients/wander.client";
 import { db } from "@/server/db";
@@ -44,6 +45,14 @@ const BodySchema = z.object({
   domains: z.array(z.string().trim().min(3)).min(1).max(10),
   apply: z.boolean().default(false),
   retry: z.boolean().default(false),
+  /**
+   * Read what WanderOS itself says about these prospects, without writing
+   * anything. The webhook is the only delivery path and has no reconcile sweep
+   * behind it, so a build stuck GENERATING in our table is ambiguous: the
+   * workflow may be wedged, or it may have settled into an event we dropped.
+   * This is what tells those apart.
+   */
+  status: z.boolean().default(false),
 });
 
 async function retryFailed(domains: string[], apply: boolean) {
@@ -133,6 +142,35 @@ export async function POST(request: Request) {
       { error: "WANDER_API_URL and WANDER_API_KEY are not both set" },
       { status: 412 },
     );
+  }
+
+  if (parsed.data.status) {
+    const { prospects } = await listWebsiteProspects({ take: 100 });
+    const builds = await db
+      .select({
+        domain: pregenBuildTable.domain,
+        prospectId: pregenBuildTable.prospectId,
+        ours: pregenBuildTable.status,
+        requestedAt: pregenBuildTable.requestedAt,
+      })
+      .from(pregenBuildTable)
+      .where(inArray(pregenBuildTable.domain, domains));
+    return NextResponse.json({
+      action: "status",
+      results: builds.map((build) => {
+        const theirs = prospects.find((p) => p.id === build.prospectId);
+        return {
+          domain: build.domain,
+          prospectId: build.prospectId,
+          ourStatus: build.ours,
+          theirStatus: theirs?.status ?? "(not listed)",
+          theirError: theirs?.errorMessage ?? null,
+          minutes: Math.round(
+            (Date.now() - build.requestedAt.getTime()) / 60000,
+          ),
+        };
+      }),
+    });
   }
 
   if (retry) {
