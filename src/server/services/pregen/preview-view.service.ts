@@ -16,6 +16,7 @@ import {
   HUBSPOT_ACCOUNT_ID,
 } from "@/server/clients/hubspot.client";
 import { escapeSlackMrkdwn, postOnSlack } from "@/server/clients/slack.client";
+import { assignPregenOpen } from "./open-rotation.service";
 
 /**
  * A prospect opened their wander.com/os pitch page: stamp the view on the
@@ -34,6 +35,14 @@ const SLACK_TESTING_CHANNEL = "radio-slack-testing";
 
 const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
+function mentionForOwnerId(ownerId: string | null): string | null {
+  if (!ownerId) return null;
+  const slackId = HS_SLACK_IDS[ownerId];
+  if (slackId) return `<@${slackId}>`;
+  const name = HS_OWNER_NAMES[ownerId];
+  return name ? escapeSlackMrkdwn(name) : null;
+}
+
 /** `lead_domain.hubspotOwner` stores a display name, so mentioning walks
     name → owner id → Slack id. Unmapped owners post as plain text and
     Kristian adds the id to HS_SLACK_IDS when it matters. */
@@ -42,8 +51,7 @@ function mentionForOwnerName(ownerName: string | null): string {
   const ownerId = Object.entries(HS_OWNER_NAMES).find(
     ([, name]) => name === ownerName,
   )?.[0];
-  const slackId = ownerId ? HS_SLACK_IDS[ownerId] : undefined;
-  return slackId ? `<@${slackId}>` : escapeSlackMrkdwn(ownerName);
+  return mentionForOwnerId(ownerId ?? null) ?? escapeSlackMrkdwn(ownerName);
 }
 
 export type PregenViewResult =
@@ -119,13 +127,19 @@ export async function recordPregenPreviewView(input: {
     .orderBy(desc(leadSequenceTable.sentAt))
     .limit(1);
 
+  // Routed here rather than up front: the open is the qualifying event, and
+  // reassigning a book of cold companies before anyone reacts moves ownership
+  // on no signal at all. See `open-rotation.service.ts`.
+  const assigned = await assignPregenOpen(build.id);
+
   const company = escapeSlackMrkdwn(
     domain?.companyName ?? build.businessName ?? build.domain,
   );
   const isFirst = build.firstViewedAt == null;
 
   const about = [
-    `Rep: ${mentionForOwnerName(domain?.hubspotOwner ?? null)}`,
+    `Up: ${(assigned && mentionForOwnerId(assigned.ownerId)) ?? "unassigned"}`,
+    `CRM owner: ${mentionForOwnerName(domain?.hubspotOwner ?? null)}`,
     domain?.unitCount ?? domain?.unitEstimate
       ? `${domain.unitCount ?? domain.unitEstimate} homes`
       : null,

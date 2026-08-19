@@ -942,6 +942,22 @@ export const pregenBuildTable = leadsSchema.table(
     lastViewedAt: t.timestamp(),
     lastAlertedAt: t.timestamp(),
 
+    /**
+     * The rep this prospect was routed to, as a HubSpot owner id, decided on
+     * the first view and never re-decided.
+     *
+     * Assignment happens on the open rather than up front because the open is
+     * the scarce thing: pregen-2 built 22 sites and 3 were ever viewed, so
+     * splitting the companies in advance distributes rows while leaving the
+     * handful of actual signals to land wherever they land.
+     *
+     * Sticky because the alert has a 6h cooldown — re-deciding per alert would
+     * hand a prospect who comes back twice to two different people, and leave
+     * no answer to who owns the conversation.
+     */
+    assignedOwnerId: t.text(),
+    assignedAt: t.timestamp(),
+
     createdAt: t
       .timestamp()
       .$defaultFn(() => new Date())
