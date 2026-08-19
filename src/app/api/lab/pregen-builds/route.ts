@@ -53,9 +53,18 @@ const BodySchema = z.object({
    * This is what tells those apart.
    */
   status: z.boolean().default(false),
+  /**
+   * Retry a build whose latest status is not FAILED.
+   *
+   * `createWebsiteProspect` 409s on a source URL it has already seen, so retry is the only
+   * rebuild path there is, and the FAILED guard below makes a READY prospect unrebuildable —
+   * which is exactly what you want to do after fixing image selection. WanderOS still decides:
+   * this only stops Growth refusing on its behalf.
+   */
+  force: z.boolean().default(false),
 });
 
-async function retryFailed(domains: string[], apply: boolean) {
+async function retryFailed(domains: string[], apply: boolean, force = false) {
   const results = [];
   for (const domain of domains) {
     const [build] = await db
@@ -69,7 +78,7 @@ async function retryFailed(domains: string[], apply: boolean) {
       results.push({ domain, action: "skipped", reason: "No build on record" });
       continue;
     }
-    if (build.status !== "FAILED") {
+    if (build.status !== "FAILED" && !force) {
       results.push({
         domain,
         action: "skipped",
@@ -177,7 +186,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       mode: apply ? "apply" : "dry",
       action: "retry",
-      results: await retryFailed(domains, apply),
+      results: await retryFailed(domains, apply, parsed.data.force),
     });
   }
 
