@@ -90,7 +90,9 @@ checklist.
   `src/server/api/root.ts` (`appRouter`). Current routers: user, ads, amplifier,
   audience, brand, cadence, channel, channelSuggestion, content, conversion, inbox,
   initiative, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
-  listening, media, mention, moment, reddit, reschedule, spend, studio, twitter.
+  listening, media, composition, mention, moment, reddit, reschedule, spend, studio,
+  twitter. Compositions save rendered PNGs through the existing R2-backed media
+  service.
   Note: `apply` is a
   tRPC-reserved procedure name.
 - The monthly content loop (strategy targets → slot generation → workbook import →
@@ -269,7 +271,7 @@ streaming endpoint).
   newsletters, pillars, dashboard, org, account, onboarding, plus the newer surfaces
   `overview` (canonical assistant), `plan` (organic authoring + Form|Chat AI agent),
   `apps` (marketplace and assistant storefront operations), `product-atlas`,
-  `studio` (content wheel), `media`
+  `studio` (content wheel), `media`, `compositions`
   (asset library), `listen` (social listening + reply drafts), `inbox`, `campaigns`,
   `audiences`, `people`, `calendar`. `feed-v5` is the live swimlane timeline; older
   `feed*` variants are retired/in-progress prototypes.

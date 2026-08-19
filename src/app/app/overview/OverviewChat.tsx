@@ -1376,12 +1376,16 @@ function ApprovalCard({
                               : toolName ===
                                   "contentMediaWrite.attachLibraryMedia"
                                 ? "Attach this library asset?"
-                                : toolName === "contentMediaWrite.makeCarousel"
-                                  ? "Turn these images into platform carousels?"
+                                : toolName ===
+                                    "contentMediaWrite.freezeComposition"
+                                  ? "Freeze this composition to the library?"
                                   : toolName ===
-                                      "contentMediaWrite.recoverArchiveMedia"
-                                    ? "Recover and attach this archive media?"
-                                    : "Confirm this action?";
+                                      "contentMediaWrite.makeCarousel"
+                                    ? "Turn these images into platform carousels?"
+                                    : toolName ===
+                                        "contentMediaWrite.recoverArchiveMedia"
+                                      ? "Recover and attach this archive media?"
+                                      : "Confirm this action?";
   const primaryLabel = isPublishingSchedule
     ? "Approve & schedule"
     : isPublishingReschedule
@@ -1415,12 +1419,16 @@ function ApprovalCard({
                               : toolName ===
                                   "contentMediaWrite.attachLibraryMedia"
                                 ? "Attach asset"
-                                : toolName === "contentMediaWrite.makeCarousel"
-                                  ? "Make carousels"
+                                : toolName ===
+                                    "contentMediaWrite.freezeComposition"
+                                  ? "Freeze composition"
                                   : toolName ===
-                                      "contentMediaWrite.recoverArchiveMedia"
-                                    ? "Recover & attach"
-                                    : "Confirm";
+                                      "contentMediaWrite.makeCarousel"
+                                    ? "Make carousels"
+                                    : toolName ===
+                                        "contentMediaWrite.recoverArchiveMedia"
+                                      ? "Recover & attach"
+                                      : "Confirm";
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-amber-500">

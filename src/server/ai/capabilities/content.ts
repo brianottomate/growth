@@ -40,12 +40,14 @@ import {
   type ChatImageReference,
 } from "@/lib/chat-attachment";
 import { getContentReadiness } from "@/lib/content-readiness";
+import { freezeCompositionSchema } from "@/lib/compositions";
 import {
   classifyFormatFromFields,
   platformFormatsFor,
   validateSpot,
 } from "@/server/content/formats";
 import { groupPlatformThreads } from "@/lib/platform-thread";
+import { freezeComposition } from "@/server/services/composition.service";
 import { growthAction, GrowthActionError } from "./types";
 import type { CapabilityContext } from "./types";
 import { orgBrandIds } from "./brands";
@@ -1215,6 +1217,42 @@ export const attachLibraryMediaToContent = growthAction({
       contentPostId: content.id,
       attachedPlatformPostIds,
       url: `/app/content/${content.id}`,
+    };
+  },
+});
+
+export const freezeCompositionToLibrary = growthAction({
+  description:
+    "Render one deterministic composition blueprint with an owned R2 library image and save the final PNG as a reusable media asset. Use a mediaAssetId returned by suggestMedia. Freezing only creates the asset; call attachLibraryMedia separately when the operator also wants it attached to content.",
+  inputSchema: freezeCompositionSchema,
+  execute: async (input, ctx) => {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, input.brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!brand) {
+      throw new Error(
+        "That brand is not available in the active organization.",
+      );
+    }
+
+    const asset = await freezeComposition({
+      userId: ctx.userId,
+      spec: input,
+    });
+    return {
+      ok: true as const,
+      mediaAssetId: asset.id,
+      title: asset.title,
+      width: asset.width,
+      height: asset.height,
+      url: asset.url,
+      libraryUrl: "/app/media",
+      compositionUrl: "/app/compositions",
     };
   },
 });

@@ -23,6 +23,7 @@ import {
   createPlatformPost,
   deleteContentWorkItem,
   finishContentMediaUploads,
+  freezeCompositionToLibrary,
   getContentWorkItem,
   importRemoteImagesToContent,
   makeCarouselFromPool,
@@ -201,6 +202,7 @@ export const contentMediaWrite = growthDomainTool({
   actions: {
     attachChatImage: attachChatImageToContent,
     attachLibraryMedia: attachLibraryMediaToContent,
+    freezeComposition: freezeCompositionToLibrary,
     recoverArchiveMedia: recoverArchiveMediaToContent,
     makeCarousel: makeCarouselFromPool,
     prepareUpload: prepareContentMediaUploads,

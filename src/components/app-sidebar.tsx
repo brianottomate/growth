@@ -19,6 +19,7 @@ import {
   Image as ImageIcon,
   Inbox as InboxIcon,
   Layers,
+  LayoutTemplate,
   ListTree,
   LogOut,
   type LucideIcon,
@@ -143,6 +144,11 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     label: "Library",
     items: [
       { label: "Media", href: "/app/media", icon: ImageIcon },
+      {
+        label: "Compositions",
+        href: "/app/compositions",
+        icon: LayoutTemplate,
+      },
       { label: "Pillars", href: "/app/pillars", icon: Layers },
       { label: "People", href: "/app/people", icon: Users },
     ],

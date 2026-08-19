@@ -55,6 +55,8 @@ function guidanceForPath(pathname: string): string | null {
     return "This is the lifecycle workspace. Use lifecycleRead before lifecycleWrite. Customer.io and Outreach remain Growth-only provider integrations.";
   if (pathname.startsWith("/app/media"))
     return "This is the media library. Growth-only Drive and upload capabilities remain available here alongside media analysis.";
+  if (pathname.startsWith("/app/compositions"))
+    return "This is the composition workbench. contentMediaWrite freezeComposition combines one owned R2 library image with a named blueprint into a reusable PNG. Attaching the result to content is a separate attachLibraryMedia action.";
   if (pathname.startsWith("/app/pillars") || pathname.startsWith("/app/series"))
     return "This is a content-structure surface. Use contentStrategyRead before contentStrategyWrite.";
   if (pathname.startsWith("/app/people"))

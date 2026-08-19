@@ -237,6 +237,7 @@ export async function importImageBuffer(input: {
   contentType: string;
   filename: string;
   title?: string;
+  alt?: string;
   width?: number;
   height?: number;
   /** Optional pre-made tile; stored beside the original like browser uploads. */
@@ -285,6 +286,7 @@ export async function importImageBuffer(input: {
       kind: input.contentType === "image/gif" ? "gif" : "image",
       status: "ready",
       title: input.title?.trim() || null,
+      alt: input.alt?.trim() || null,
       filename,
       mimeType: input.contentType,
       size: input.body.byteLength,

@@ -55,6 +55,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   contentMediaWrite: [
     "attachChatImage",
     "attachLibraryMedia",
+    "freezeComposition",
     "recoverArchiveMedia",
     "makeCarousel",
     "prepareUpload",

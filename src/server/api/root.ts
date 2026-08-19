@@ -12,6 +12,7 @@ import { channelSuggestionRouter } from "@/server/api/routers/channelSuggestion.
 import { contentRouter } from "@/server/api/routers/content.router";
 import { contentSuggestionRouter } from "@/server/api/routers/contentSuggestion.router";
 import { contentAnalysisRouter } from "@/server/api/routers/contentAnalysis.router";
+import { compositionRouter } from "@/server/api/routers/composition.router";
 import { creativeWorkRouter } from "@/server/api/routers/creativeWork.router";
 import { conversionRouter } from "@/server/api/routers/conversion.router";
 import { inboxRouter } from "@/server/api/routers/inbox.router";
@@ -60,6 +61,7 @@ export const appRouter = createTRPCRouter({
   googleDrive: googleDriveRouter,
   contentSuggestion: contentSuggestionRouter,
   contentAnalysis: contentAnalysisRouter,
+  composition: compositionRouter,
   creativeWork: creativeWorkRouter,
   conversion: conversionRouter,
   inbox: inboxRouter,

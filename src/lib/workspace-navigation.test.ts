@@ -8,6 +8,7 @@ describe("workspace navigation", () => {
     expect(WORKSPACE_ROUTES.series).toBe("/app/series");
     expect(WORKSPACE_ROUTES.leads).toBe("/app/leads");
     expect(WORKSPACE_ROUTES.spend).toBe("/app/spend");
+    expect(WORKSPACE_ROUTES.compositions).toBe("/app/compositions");
   });
 
   test("allows safe app paths as a forward-compatible fallback", () => {

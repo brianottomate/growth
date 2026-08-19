@@ -1,0 +1,116 @@
+import { describe, expect, test } from "bun:test";
+
+import {
+  COMPOSITION_FORMATS,
+  COMPOSITION_TEMPLATES,
+  compositionSpecSchema,
+  freezeCompositionSchema,
+  getCompositionFormat,
+  getCompositionMetadata,
+  getCompositionTemplate,
+} from "./compositions";
+
+describe("composition blueprints", () => {
+  test("keeps blueprint and canvas identifiers unique", () => {
+    expect(new Set(COMPOSITION_TEMPLATES.map(({ id }) => id)).size).toBe(
+      COMPOSITION_TEMPLATES.length,
+    );
+    expect(new Set(COMPOSITION_FORMATS.map(({ id }) => id)).size).toBe(
+      COMPOSITION_FORMATS.length,
+    );
+  });
+
+  test("registers exact publishing dimensions", () => {
+    expect(COMPOSITION_FORMATS).toMatchObject([
+      { id: "landscape", width: 1200, height: 630 },
+      { id: "square", width: 1080, height: 1080 },
+      { id: "portrait", width: 1080, height: 1350 },
+      { id: "story", width: 1080, height: 1920 },
+    ]);
+  });
+
+  test("resolves every registered blueprint and canvas", () => {
+    for (const template of COMPOSITION_TEMPLATES) {
+      expect(getCompositionTemplate(template.id)).toEqual(template);
+    }
+    for (const format of COMPOSITION_FORMATS) {
+      expect(getCompositionFormat(format.id)).toEqual(format);
+    }
+  });
+
+  test("accepts a reproducible owned-media composition spec", () => {
+    const result = compositionSpecSchema.parse({
+      brandId: "brand_wander",
+      templateId: "split-frame",
+      formatId: "portrait",
+      sourceMediaAssetId: "media_property",
+      title: "The view is only the beginning.",
+      subtitle: "A property story ready for the channel it belongs on.",
+      accent: "#18a8b5",
+    });
+
+    expect(result.imagePosition).toBe("center");
+    expect(result.sourceMediaAssetId).toBe("media_property");
+  });
+
+  test("requires owned media for every image-led blueprint", () => {
+    const result = compositionSpecSchema.safeParse({
+      brandId: "brand_wander",
+      templateId: "editorial-overlay",
+      formatId: "story",
+      title: "Stay somewhere worth remembering.",
+    });
+    expect(result.success).toBe(false);
+
+    expect(
+      compositionSpecSchema.safeParse({
+        brandId: "brand_wander",
+        templateId: "brand-statement",
+        formatId: "square",
+        title: "The best places bring people together.",
+      }).success,
+    ).toBe(true);
+  });
+
+  test("rejects unbounded text, invalid accents, and blank asset titles", () => {
+    expect(() =>
+      freezeCompositionSchema.parse({
+        brandId: "brand_wander",
+        templateId: "image-hero",
+        formatId: "square",
+        sourceMediaAssetId: "media_property",
+        title: "x".repeat(121),
+        accent: "teal",
+        assetTitle: "",
+      }),
+    ).toThrow();
+  });
+
+  test("preserves the versioned recipe saved with a frozen asset", () => {
+    const spec = freezeCompositionSchema.parse({
+      brandId: "brand_wander",
+      templateId: "product-proof",
+      formatId: "landscape",
+      sourceMediaAssetId: "media_product",
+      title: "Every stay, ready to explore.",
+      subtitle: "The exact property proof behind the campaign.",
+      accent: "#18a8b5",
+      imagePosition: "top",
+      assetTitle: "Property proof",
+    });
+
+    expect(getCompositionMetadata(spec, "2026-08-19T00:00:00.000Z")).toEqual({
+      templateId: "product-proof",
+      templateVersion: 1,
+      formatId: "landscape",
+      sourceMediaAssetId: "media_product",
+      title: "Every stay, ready to explore.",
+      subtitle: "The exact property proof behind the campaign.",
+      eyebrow: null,
+      cta: null,
+      accent: "#18a8b5",
+      imagePosition: "top",
+      renderedAt: "2026-08-19T00:00:00.000Z",
+    });
+  });
+});

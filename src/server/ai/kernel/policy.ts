@@ -145,6 +145,7 @@ export const growthActionPolicies = {
   contentMediaWrite: {
     attachChatImage: write({ idempotent: true }),
     attachLibraryMedia: write({ idempotent: true }),
+    freezeComposition: write({ consequence: "provider-write" }),
     recoverArchiveMedia: write({ consequence: "provider-write" }),
     makeCarousel: write({ idempotent: true }),
     prepareUpload: write(),
