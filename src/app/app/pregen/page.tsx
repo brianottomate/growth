@@ -1,0 +1,140 @@
+import { desc } from "drizzle-orm";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { osInspectUrl } from "@/lib/pregen-urls";
+import { getSession } from "@/server/better-auth/server";
+import { db } from "@/server/db";
+import { leadDomainTable, pregenBuildTable } from "@/server/db/leads-schema";
+import { eq } from "drizzle-orm";
+
+/**
+ * Every pre-generated site, newest first.
+ *
+ * Deliberately not a filtered view of /app/leads: that page answers "who should
+ * we write to", one company at a time behind a population filter. This answers
+ * "what have we built", which is the question asked when someone wants to look
+ * at the work — and the batch now spans more sites than a review card list can
+ * be scrolled through.
+ */
+
+export const dynamic = "force-dynamic";
+
+const STATUS_STYLES: Record<string, string> = {
+  READY: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+  GENERATING: "border-violet-500/40 bg-violet-500/10 text-violet-300",
+  FAILED: "border-red-500/40 bg-red-500/10 text-red-300",
+  CLAIMED: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+};
+
+function elapsed(from: Date, to: Date | null): string {
+  const minutes = Math.round(((to ?? new Date()).getTime() - from.getTime()) / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h ${minutes % 60}m` : `${Math.floor(hours / 24)}d`;
+}
+
+export default async function PregenPage() {
+  const session = await getSession();
+  if (!session?.user) redirect("/signin");
+
+  const builds = await db
+    .select({
+      id: pregenBuildTable.id,
+      domain: pregenBuildTable.domain,
+      businessName: pregenBuildTable.businessName,
+      status: pregenBuildTable.status,
+      previewUrl: pregenBuildTable.previewUrl,
+      requestedAt: pregenBuildTable.requestedAt,
+      settledAt: pregenBuildTable.settledAt,
+      claimedAt: pregenBuildTable.claimedAt,
+      viewCount: pregenBuildTable.viewCount,
+      errorMessage: pregenBuildTable.errorMessage,
+      batch: leadDomainTable.pregenBatch,
+      companyName: leadDomainTable.companyName,
+      units: leadDomainTable.unitCount,
+      pms: leadDomainTable.pms,
+    })
+    .from(pregenBuildTable)
+    .leftJoin(leadDomainTable, eq(leadDomainTable.id, pregenBuildTable.domainId))
+    .orderBy(desc(pregenBuildTable.requestedAt));
+
+  const ready = builds.filter((build) => build.status === "READY").length;
+  const viewed = builds.filter((build) => build.viewCount > 0).length;
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6 p-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold">Pre-gen sites</h1>
+        <p className="text-muted-foreground text-sm">
+          {builds.length} built · {ready} ready · {viewed} opened by the prospect · newest first
+        </p>
+      </header>
+
+      <ul className="divide-border divide-y">
+        {builds.map((build) => {
+          // The beacon-free wrapper: opening from here is us looking, and an
+          // operator's click must never read to sales as the prospect browsing.
+          const inspect = build.previewUrl ? osInspectUrl(build.previewUrl) : null;
+          return (
+            <li key={build.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+              <span
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                  STATUS_STYLES[build.status ?? ""] ?? "border-border text-muted-foreground"
+                }`}
+              >
+                {build.status ?? "requested"}
+              </span>
+
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {build.companyName ?? build.businessName ?? build.domain}
+              </span>
+
+              <span className="text-muted-foreground shrink-0 text-xs">
+                {[
+                  build.batch,
+                  build.pms,
+                  build.units ? `${build.units} homes` : null,
+                  build.viewCount > 0 ? `${build.viewCount} views` : null,
+                  build.claimedAt ? "CLAIMED" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+
+              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                {build.requestedAt.toISOString().slice(0, 16).replace("T", " ")} ·{" "}
+                {elapsed(build.requestedAt, build.settledAt)}
+              </span>
+
+              <span className="flex shrink-0 items-center gap-2 text-xs">
+                {inspect ? (
+                  <a href={inspect} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                    preview ↗
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground">no preview</span>
+                )}
+                <a
+                  href={`https://${build.domain}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground underline underline-offset-2"
+                >
+                  their site ↗
+                </a>
+                <Link href={`/app/leads/${build.domain}`} className="text-muted-foreground underline underline-offset-2">
+                  lead
+                </Link>
+              </span>
+
+              {build.errorMessage && (
+                <p className="text-muted-foreground w-full text-xs">{build.errorMessage}</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}

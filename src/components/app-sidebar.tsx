@@ -136,6 +136,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
         href: "/app/leads?pop=target&view=review",
         icon: ClipboardCheck,
       },
+      { label: "Pre-gen sites", href: "/app/pregen", icon: Globe },
       { label: "Lifecycle", href: "/app/lifecycle", icon: Repeat },
       { label: "Transactional", href: "/app/transactional", icon: MailCheck },
     ],
