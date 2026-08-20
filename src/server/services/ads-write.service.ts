@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 
 import {
+  adWriteIdempotencyKey,
   allowlistPlatform,
   googleCreativeRequirement,
   metaDraftProviderControls,
@@ -244,18 +245,26 @@ async function requireAdDestination(input: {
 }
 
 function idempotencyKey(
-  runId: string,
+  context: AdsWriteContext,
   action: string,
   payload: unknown,
+  businessKey?: string | null,
 ): string {
-  const hash = createHash("sha256")
+  const payloadHash = createHash("sha256")
     .update(JSON.stringify(payload))
     .digest("hex")
     .slice(0, 24);
-  return `growth:${runId}:${action}:${hash}`;
+  return adWriteIdempotencyKey({
+    action,
+    runId: context.runId,
+    payloadHash,
+    businessKey,
+  });
 }
 
 export type CreateMetaAdDraftInput = {
+  /** Stable cross-run dedupe key; see adWriteIdempotencyKey. */
+  businessKey?: string | null;
   brandSlug: string;
   connectionAccountId: string;
   adAccountId: string;
@@ -363,7 +372,7 @@ export async function createMetaAdDraft(
     ...metaDraftProviderControls(input.validateOnly),
   };
   const result = await createZernioStandaloneAd(payload, {
-    idempotencyKey: idempotencyKey(context.runId, "create-meta", payload),
+    idempotencyKey: idempotencyKey(context, "create-meta", payload, input.businessKey),
   });
   return {
     brand: destination.brand,
@@ -376,6 +385,8 @@ export async function createMetaAdDraft(
 }
 
 export type CreateGoogleAdInput = {
+  /** Stable cross-run dedupe key; see adWriteIdempotencyKey. */
+  businessKey?: string | null;
   brandSlug: string;
   connectionAccountId: string;
   adAccountId: string;
@@ -446,7 +457,7 @@ export async function createGoogleAd(
     endDate: input.endDate,
   };
   const result = await createZernioStandaloneAd(payload, {
-    idempotencyKey: idempotencyKey(context.runId, "create-google", payload),
+    idempotencyKey: idempotencyKey(context, "create-google", payload, input.businessKey),
   });
   return {
     brand: destination.brand,
@@ -457,6 +468,8 @@ export async function createGoogleAd(
 }
 
 export type BoostMetaPostInput = {
+  /** Stable cross-run dedupe key; see adWriteIdempotencyKey. */
+  businessKey?: string | null;
   brandSlug: string;
   connectionAccountId: string;
   adAccountId: string;
@@ -516,7 +529,7 @@ export async function boostMetaPost(
     targeting: input.targeting,
   };
   const result = await boostZernioMetaPost(payload, {
-    idempotencyKey: idempotencyKey(context.runId, "boost-meta", payload),
+    idempotencyKey: idempotencyKey(context, "boost-meta", payload, input.businessKey),
   });
   return {
     brand: destination.brand,
@@ -533,6 +546,8 @@ export async function duplicateMetaCampaign(input: {
   brandSlug: string;
   campaignId: string;
   renameSuffix?: string;
+  /** Stable cross-run dedupe key; see adWriteIdempotencyKey. */
+  businessKey?: string | null;
 }) {
   const brand = await resolveOwnedBrand(input.organizationId, input.brandSlug);
   const [tree, allowed] = await Promise.all([
@@ -567,10 +582,12 @@ export async function duplicateMetaCampaign(input: {
     input.campaignId,
     { renameSuffix: input.renameSuffix },
     {
-      idempotencyKey: idempotencyKey(input.runId, "duplicate-meta", {
-        campaignId: input.campaignId,
-        renameSuffix: input.renameSuffix,
-      }),
+      idempotencyKey: idempotencyKey(
+        { organizationId: input.organizationId, runId: input.runId },
+        "duplicate-meta",
+        { campaignId: input.campaignId, renameSuffix: input.renameSuffix },
+        input.businessKey,
+      ),
     },
   );
   return {

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  adWriteIdempotencyKey,
   allowlistPlatform,
+  campaignBusinessKey,
   googleCreativeRequirement,
   metaDraftProviderControls,
   sameAdAccountId,
@@ -61,5 +63,86 @@ describe("Zernio ad account boundaries", () => {
         },
       }),
     ).toBeNull();
+  });
+});
+
+describe("provider-write idempotency", () => {
+  const payloadHash = "a".repeat(24);
+
+  test("a business key survives a different run, so a re-run cannot double-create", () => {
+    const first = adWriteIdempotencyKey({
+      action: "create-meta",
+      runId: "run_1",
+      payloadHash,
+      businessKey: "deal_9:pm_4:catalog_sales",
+    });
+    const second = adWriteIdempotencyKey({
+      action: "create-meta",
+      runId: "run_2",
+      payloadHash,
+      businessKey: "deal_9:pm_4:catalog_sales",
+    });
+    expect(first).toBe(second);
+  });
+
+  test("a business key ignores payload drift, so a corrected budget replays the original create", () => {
+    const base = {
+      action: "create-meta",
+      runId: "run_1",
+      businessKey: "deal_9:pm_4:catalog_sales",
+    };
+    expect(
+      adWriteIdempotencyKey({ ...base, payloadHash: "b".repeat(24) }),
+    ).toBe(adWriteIdempotencyKey({ ...base, payloadHash: "c".repeat(24) }));
+  });
+
+  test("campaign type separates keys for the same deal and PM", () => {
+    const catalog = adWriteIdempotencyKey({
+      action: "create-meta",
+      runId: "run_1",
+      payloadHash,
+      businessKey: campaignBusinessKey({
+        dealId: "deal_9",
+        pmId: "pm_4",
+        campaignType: "catalog_sales",
+      }),
+    });
+    const traffic = adWriteIdempotencyKey({
+      action: "create-meta",
+      runId: "run_1",
+      payloadHash,
+      businessKey: campaignBusinessKey({
+        dealId: "deal_9",
+        pmId: "pm_4",
+        campaignType: "traffic",
+      }),
+    });
+    expect(catalog).not.toBe(traffic);
+  });
+
+  test("without a business key the key stays run-scoped and payload-sensitive", () => {
+    const first = adWriteIdempotencyKey({
+      action: "create-meta",
+      runId: "run_1",
+      payloadHash,
+    });
+    expect(first).toBe(`growth:run:run_1:create-meta:${payloadHash}`);
+    expect(
+      adWriteIdempotencyKey({
+        action: "create-meta",
+        runId: "run_2",
+        payloadHash,
+      }),
+    ).not.toBe(first);
+  });
+
+  test("business keys normalize casing and whitespace across surfaces", () => {
+    expect(
+      campaignBusinessKey({
+        dealId: " Deal_9 ",
+        pmId: "PM_4",
+        campaignType: "Catalog_Sales",
+      }),
+    ).toBe("deal_9:pm_4:catalog_sales");
   });
 });
