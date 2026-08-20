@@ -58,7 +58,10 @@ Growth must re-check those platform surfaces before any submission instead of tr
 - Wander for ChatGPT/Codex: the Worker, two public read tools, and interactive
   search resource exist. Growth models `https://www.wander.com/mcp` as the
   distribution endpoint so the storefront and preview can move as one product.
-  The route and any directory submission still require a final live check.
+  The route returned live inventory on 19 August 2026. The prospective
+  storefront now carries the validated review copy, tool hints, output-schema
+  coverage, five positive tests, and three negative tests. Deployment of the
+  revised MCP metadata and OpenAI review remain pending.
 - Wander for Claude: the current Worker responds to Claude and has returned
   live inventory. Growth uses the same modeled branded endpoint; public
   connector review remains a separate evidence gate.

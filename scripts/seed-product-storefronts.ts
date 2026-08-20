@@ -245,7 +245,15 @@ const wanderAtlas: ProductAtlas = productAtlasSchema.parse({
       targetType: "surface",
       targetId: "surface_assistant",
       kind: "api",
-      label: "Current Wander MCP endpoint",
+      label: "Branded Wander MCP endpoint",
+      href: "https://www.wander.com/mcp",
+    },
+    {
+      id: "ref_mcp_worker",
+      targetType: "surface",
+      targetId: "surface_assistant",
+      kind: "api",
+      label: "Cloudflare Worker implementation endpoint",
       href: "https://wander-mcp.wndr.workers.dev/mcp",
     },
     {
@@ -284,22 +292,22 @@ const wanderAtlas: ProductAtlas = productAtlasSchema.parse({
       observedAt: "2026-07-21T19:48:00.000Z",
     },
     {
-      id: "obs_mcp_chatgpt_blocked",
+      id: "obs_mcp_chatgpt_live",
       targetType: "surface",
       targetId: "surface_assistant",
       state: "observed_live",
-      note: "The current deployment returned 403 Forbidden origin for https://chatgpt.com. ChatGPT compatibility is therefore not live yet.",
-      sourceUrl: "https://wander-mcp.wndr.workers.dev/mcp",
-      observedAt: "2026-07-21T19:48:00.000Z",
+      note: "The branded endpoint completed an MCP handshake and returned live Lake Tahoe inventory during the ChatGPT submission smoke on 2026-08-19.",
+      sourceUrl: "https://www.wander.com/mcp",
+      observedAt: "2026-08-19T16:21:27.000Z",
     },
     {
-      id: "obs_mcp_custom_domain",
+      id: "obs_mcp_branded_route",
       targetType: "surface",
       targetId: "surface_assistant",
       state: "observed_live",
-      note: "www.wander.com/mcp currently resolves through the website catch-all rather than the MCP Worker. Use an isolated Worker hostname such as mcp.wander.com.",
+      note: "www.wander.com/mcp is the canonical public route and proxies requests to the Cloudflare Worker implementation.",
       sourceUrl: "https://www.wander.com/mcp",
-      observedAt: "2026-07-21T19:47:00.000Z",
+      observedAt: "2026-08-19T16:21:27.000Z",
     },
   ],
 });
@@ -360,32 +368,44 @@ const assistantContent = (host: "ChatGPT" | "Claude"): StorefrontContent =>
   storefrontContentSchema.parse({
     positioning: {
       audience:
-        "Travelers planning a vacation in an AI assistant who want real Wander inventory and a direct booking path.",
-      valueProposition: `Search Wander stays, inspect live property details, and continue to direct booking without leaving the ${host} planning conversation.`,
+        host === "ChatGPT"
+          ? "Travelers planning a trip in ChatGPT or Codex who want current Wander inventory."
+          : "Travelers planning a vacation with Claude who want real Wander inventory and a direct booking path.",
+      valueProposition:
+        host === "ChatGPT"
+          ? "Search Wander stays by destination and trip needs, inspect public details and availability, then open the selected stay on Wander."
+          : "Search Wander stays, inspect live property details, and continue to direct booking without leaving the Claude planning conversation.",
       category: "Travel",
       keyMessages: [
-        "Search public Wander inventory by destination, dates, guests, price, and amenities",
-        "Browse multi-image interactive stay cards",
-        "Check property details and day-level availability",
-        "Continue to Wander with property, dates, and guests preserved",
+        "Search public Wander inventory by destination, dates, guests, price, amenities, and property type",
+        "Compare interactive stay cards with photos, prices, ratings, and availability",
+        "Inspect public property details without exposing street addresses",
+        "Continue to the property on Wander for booking and payment",
       ],
     },
     copy: {
       displayName: "Wander",
       shortDescription:
-        "Find exceptional vacation homes and continue to direct booking.",
-      longDescription: `Bring Wander into ${host} to search vacation homes conversationally. Explore real inventory with photos, dates, prices, ratings, amenities, and availability, then open the selected Wander with trip context preserved. The first release is public and read-only; booking and payment continue securely on Wander.`,
+        host === "ChatGPT"
+          ? "Find a Wander stay"
+          : "Find exceptional vacation homes and continue to direct booking.",
+      longDescription:
+        host === "ChatGPT"
+          ? "Search public Wander vacation rentals by destination, dates, guests, price, amenities, and property type. Compare matching stays, inspect public details, availability, and pricing, then open a selected property on Wander."
+          : "Bring Wander into Claude to search vacation homes conversationally. Explore real inventory with photos, dates, prices, ratings, amenities, and availability, then open the selected Wander with trip context preserved. The first release is public and read-only; booking and payment continue securely on Wander.",
       tagline: "Find your happy place",
       keywords: [
         "vacation rentals",
         "travel planning",
         "vacation homes",
-        "direct booking",
+        host === "ChatGPT" ? "Wander stays" : "direct booking",
       ],
       supportText:
-        "Website: https://www.wander.com\nSupport: https://www.wander.com/contact\nPrivacy: https://www.wander.com/privacy\nTerms: https://www.wander.com/terms",
+        "Website: https://www.wander.com\nSupport: https://www.wander.com/help\nPrivacy: https://www.wander.com/privacy\nTerms: https://www.wander.com/terms",
       releaseNotes:
-        "Initial public stay-shopping connector with interactive search cards and direct booking handoff.",
+        host === "ChatGPT"
+          ? "Prepared for ChatGPT review with two public read-only tools, interactive search cards, explicit output schemas, and an external booking handoff."
+          : "Initial public stay-shopping connector with interactive search cards and direct booking handoff.",
     },
     iconMediaAssetId: null,
     screenshots: [],
@@ -394,20 +414,58 @@ const assistantContent = (host: "ChatGPT" | "Claude"): StorefrontContent =>
     platformFields: {
       mcpEndpoint: "https://www.wander.com/mcp",
       implementationEndpoint: "https://wander-mcp.wndr.workers.dev/mcp",
-      distributionAssumption:
-        "Modeled as live for storefront planning. Reverify routing before directory submission.",
       authentication: "none",
       runtimeTools: ["search_listings", "get_listing_details"],
       appResource: "ui://wander/search.html",
       checkout: "external_wander_booking",
-      proposedSkills: ["Stay Shopping", "Booking Handoff"],
-      starterPrompts: [
-        "Find a Wander near Lake Tahoe for four guests.",
-        "Show me pet-friendly beach stays for a long weekend.",
-        "Compare these Wander options and open the best booking page.",
-      ],
-      submissionState: "not_started",
-      publicCheckedAt: "2026-07-21",
+      ...(host === "Claude"
+        ? {
+            proposedSkills: ["Stay Shopping", "Booking Handoff"],
+            distributionAssumption:
+              "The branded endpoint is live. Reverify the Claude directory requirements before submission.",
+          }
+        : {}),
+      starterPrompts:
+        host === "ChatGPT"
+          ? [
+              "Find Wander stays in Lake Tahoe next weekend for six guests. Show the strongest options with total price and bedrooms.",
+              "Show me pet-friendly Wander stays around Scottsdale with a pool for no more than $800 per night.",
+              "Find a Wander house for a flexible weekend in the next three months. I want at least three bedrooms, a hot tub, and mountain views.",
+              "Using the Wander search results above, tell me more about the first stay, including its amenities, nearby activities, rating, and public location.",
+              "Find Wander stays near San Diego for four guests next month, then inspect the best match and tell me which requested nights are available.",
+            ]
+          : [
+              "Find a Wander near Lake Tahoe for four guests.",
+              "Show me pet-friendly beach stays for a long weekend.",
+              "Compare these Wander options and open the best booking page.",
+            ],
+      submissionState: host === "ChatGPT" ? "packet_prepared" : "not_started",
+      publicCheckedAt: host === "ChatGPT" ? "2026-08-19" : "2026-07-21",
+      ...(host === "ChatGPT"
+        ? {
+            category: "TRAVEL",
+            toolAnnotations:
+              "Both tools declare readOnlyHint=true, openWorldHint=false, destructiveHint=false, and idempotentHint=true.",
+            outputSchemas: ["search_listings", "get_listing_details"],
+            submissionSchemaVersion: "1",
+            positiveTestCaseCount: "5",
+            negativeTestCaseCount: "3",
+            negativePrompts: [
+              "Find the cheapest round-trip flight from New York to Paris next month.",
+              "Search every vacation rental marketplace and compare all cabins in Aspen.",
+              "Book the first Wander home, charge my card, and send the confirmation.",
+            ],
+            reviewGates: [
+              "Deploy the revised tool metadata and rescan the production MCP endpoint.",
+              "Confirm the privacy policy covers assistant query fields and retention.",
+              "Complete OpenAI organization and domain verification.",
+            ],
+            currentArchitecture:
+              "The branded Wander route proxies to the public Cloudflare Worker implementation.",
+            distributionState:
+              "The branded endpoint is live. The revised review contract and submission packet await repository publication and deployment.",
+          }
+        : {}),
     },
   });
 
@@ -437,10 +495,13 @@ const definitions: {
   },
   {
     surface: "chatgpt_connector",
-    listingStatus: "live",
+    listingStatus: "draft",
     publicUrl: "https://www.wander.com/mcp",
     content: assistantContent("ChatGPT"),
-    freshness: { state: "unknown" },
+    freshness: {
+      state: "stale",
+      note: "Submission packet prepared; deploy the revised MCP contract and complete OpenAI review before marking current.",
+    },
   },
   {
     surface: "claude_connector",

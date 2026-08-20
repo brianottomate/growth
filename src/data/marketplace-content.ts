@@ -1,8 +1,9 @@
 import type { MarketplaceListing } from "@/lib/marketplace-content";
 
 const checkedAt = "2026-07-21";
-const repo = (label: string) => [
-  { source: "repository" as const, label, checkedAt },
+const chatgptCheckedAt = "2026-08-19";
+const repo = (label: string, evidenceCheckedAt = checkedAt) => [
+  { source: "repository" as const, label, checkedAt: evidenceCheckedAt },
 ];
 
 export const wanderMarketplaceListings: MarketplaceListing[] = [
@@ -128,49 +129,55 @@ export const wanderMarketplaceListings: MarketplaceListing[] = [
       "Travelers planning a trip in ChatGPT or Codex who want real Wander inventory",
     strategy:
       "Let travelers search real stays, inspect the best options, and continue to Wander with the trip context intact.",
-    availability: "public",
+    availability: "testing",
     fields: [
       {
         fieldId: "name",
         truth: "source_verified",
         content: "Wander",
-        evidence: repo("wander-mcp/src/server.ts"),
+        evidence: repo("wander-mcp/src/index.ts", chatgptCheckedAt),
       },
       {
         fieldId: "icon",
         truth: "source_verified",
         content: "Wander brand mark used by the interactive MCP resource",
-        next: "Export and validate the exact Plugin Directory asset set.",
-        evidence: repo("wander-mcp/public/wander-mark.svg"),
+        next: "Export and validate the exact plugin listing asset set.",
+        evidence: repo("wander-mcp/src/brand.ts", chatgptCheckedAt),
       },
       {
         fieldId: "promise",
         truth: "draft",
-        content:
-          "Find an exceptional vacation home and continue to direct booking.",
-        next: "Test this against a real planning conversation before submission.",
+        content: "Find a Wander stay",
+        next: "Use the validated submission subtitle in the review portal.",
       },
       {
         fieldId: "capabilities",
         truth: "source_verified",
         content:
           "Search public inventory by destination, dates, guests, price, bedrooms, and amenities. Inspect property facts and availability. Open a Wander booking page with the trip context preserved.",
-        evidence: repo("wander-mcp/src/tools"),
+        evidence: repo("wander-mcp/src/index.ts", chatgptCheckedAt),
       },
       {
         fieldId: "proof",
-        truth: "source_verified",
+        truth: "verified_live",
         content:
-          "The Worker returned live Lake Tahoe inventory and rendered an interactive multi-image stay carousel during connector testing.",
-        next: "Capture the same flow from ChatGPT after the origin fix.",
-        evidence: repo("wander-mcp/test"),
+          "The branded endpoint completed an MCP handshake and returned live Lake Tahoe inventory during the 19 August 2026 submission smoke.",
+        next: "Capture the same flow in ChatGPT web and mobile after the revised tool metadata deploys.",
+        evidence: [
+          {
+            source: "public",
+            label: "Live branded Wander MCP smoke",
+            checkedAt: chatgptCheckedAt,
+            url: "https://www.wander.com/mcp",
+          },
+        ],
       },
       {
         fieldId: "setup",
         truth: "draft",
         content:
           "Connect https://www.wander.com/mcp, then search public Wander inventory and continue to Wander to book.",
-        next: "Reverify the branded route and complete the current submission tests before directory review.",
+        next: "Deploy the revised tool metadata, run Scan Tools, and complete the five positive and three negative submission tests.",
       },
       {
         fieldId: "privacy",
@@ -182,12 +189,12 @@ export const wanderMarketplaceListings: MarketplaceListing[] = [
         fieldId: "terms",
         truth: "source_verified",
         content:
-          "Terms: https://www.wander.com/terms\nSupport: https://www.wander.com/contact",
+          "Terms: https://www.wander.com/terms\nSupport: https://www.wander.com/help",
         evidence: [
           {
             source: "public",
             label: "Wander terms and support pages",
-            checkedAt,
+            checkedAt: chatgptCheckedAt,
             url: "https://www.wander.com/terms",
           },
         ],
