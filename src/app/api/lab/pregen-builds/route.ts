@@ -2,7 +2,6 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { CURRENT_PREGEN_BATCH } from "@/lib/pregen-batch";
 import {
   createWebsiteProspect,
   isWanderApiConfigured,
@@ -22,10 +21,18 @@ import { assertLabAccess } from "@/server/lab-access";
  * and a local run can only ever reach staging. Prod builds therefore have to be
  * asked for by something already holding the prod key, which is this app.
  *
- * Blast radius is bounded by the batch, not by the caller. Only domains stamped
- * into `CURRENT_PREGEN_BATCH` are buildable here, so the worst a leaked
- * ADMIN_TOKEN buys is rebuilding sites for companies already curated into the
- * batch someone is working. Anything outside it goes through /app/leads.
+ * Buildable set is the same bound the send route uses: in `leads`, not excluded
+ * from outreach, not deleted. It was the current batch until 2026-08-20, which
+ * put the harder gate on the cheaper action — a build emails nobody, while
+ * `pregen-send` enrols a prospect and mails them from Kyle's inbox on the same
+ * token with no batch check at all. Scoping builds to a curated list bought no
+ * safety a leaked ADMIN_TOKEN could not route around, and cost real work: an
+ * off-batch domain could only be built by editing the HubSpot list a teammate
+ * curates or by writing `pregen_batch` straight into prod.
+ *
+ * What still bounds this: the ten-domain cap, `excludeFromOutreach`, and the
+ * in-flight check below. A build is reversible and silent; it is the send that
+ * needs the narrow gate.
  *
  *   curl -sX POST https://growth-red.vercel.app/api/lab/pregen-builds \
  *     -H "authorization: Bearer $ADMIN_TOKEN" -H 'content-type: application/json' \
@@ -196,7 +203,6 @@ export async function POST(request: Request) {
     .where(
       and(
         inArray(leadDomainTable.domain, domains),
-        eq(leadDomainTable.pregenBatch, CURRENT_PREGEN_BATCH),
         eq(leadDomainTable.excludeFromOutreach, false),
         isNull(leadDomainTable.deletedAt),
       ),
@@ -210,7 +216,7 @@ export async function POST(request: Request) {
       results.push({
         domain,
         action: "skipped",
-        reason: `Not in ${CURRENT_PREGEN_BATCH}, or excluded from outreach`,
+        reason: "Not in leads, or excluded from outreach",
       });
       continue;
     }
@@ -288,7 +294,6 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    batch: CURRENT_PREGEN_BATCH,
     mode: apply ? "apply" : "dry",
     results,
   });
