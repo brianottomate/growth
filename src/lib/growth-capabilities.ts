@@ -83,7 +83,19 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "proposeGroupings",
     "resolveGrouping",
   ],
-  adsRead: ["scope", "top", "diagnoseAlignment", "inspectConversions"],
+  adsRead: [
+    "scope",
+    "top",
+    "listDestinations",
+    "diagnoseAlignment",
+    "inspectConversions",
+  ],
+  adsWrite: [
+    "createMetaDraft",
+    "createGoogle",
+    "boostMetaPost",
+    "duplicateMetaCampaign",
+  ],
   publishingRead: ["connections", "openTimelinePost", "proposeLivePost"],
   publishingWrite: [
     "schedule",
@@ -157,6 +169,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   contentStrategyRead: "Reading content strategy",
   contentStrategyWrite: "Updating content strategy",
   adsRead: "Reading ads",
+  adsWrite: "Creating ads",
   publishingRead: "Reading publishing state",
   publishingWrite: "Publishing social content",
   sourceSyncWrite: "Synchronizing sources",

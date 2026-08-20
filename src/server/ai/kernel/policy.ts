@@ -32,6 +32,10 @@ export interface GrowthActionPolicy {
 
 const ALL = ["overview-chat", "mcp", "invoke-growth", "test"] as const;
 const PRODUCT = ["overview-chat", "plan-chat", "test"] as const;
+// Provider-spend writes need the in-app approval card. The direct MCP
+// projection executes tools without that continuation, so it cannot advertise
+// these actions until the MCP route enforces an equivalent approval handshake.
+const APPROVAL_PRODUCT = ["overview-chat", "test"] as const;
 const PLAN_READ = [
   "overview-chat",
   "plan-chat",
@@ -178,8 +182,39 @@ export const growthActionPolicies = {
   adsRead: {
     scope: read("provider-read"),
     top: read("provider-read"),
+    listDestinations: read("provider-read"),
     diagnoseAlignment: read("model-read"),
     inspectConversions: read(),
+  },
+  adsWrite: {
+    createMetaDraft: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    createGoogle: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    boostMetaPost: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    duplicateMetaCampaign: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: false,
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
   },
   publishingRead: {
     connections: read(),

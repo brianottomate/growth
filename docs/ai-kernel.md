@@ -23,9 +23,10 @@ parallel atomic registry and no post-hoc grouping layer.
 - Outputs use `{ ok: true, action, data }` or
   `{ ok: false, action?, error: { code, message, retryable, suggestedAction } }`.
 
-`OVERVIEW_TOOLS` contains the 38 canonical in-app capabilities. `MCP_TOOLS` is
-the same catalog projected by action policy; it contains 36 capabilities because
-open-world `researchRead` and in-app `driveRead` stay with the host. The optional `invoke_growth`
+`OVERVIEW_TOOLS` contains the 40 canonical in-app capabilities. `MCP_TOOLS` is
+the same catalog projected by action policy; it contains 37 capabilities because
+open-world `researchRead`, in-app `driveRead`, and approval-only `adsWrite` stay
+with the product. The optional `invoke_growth`
 facade receives only that MCP-safe projection, cannot invoke itself, and stops
 after eight steps.
 

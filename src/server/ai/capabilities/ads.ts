@@ -7,6 +7,13 @@ import {
   computeAdsScope,
   computeTopAds,
 } from "@/server/services/ads-analytics.service";
+import {
+  boostMetaPost,
+  createGoogleAd,
+  createMetaAdDraft,
+  duplicateMetaCampaign,
+  listAdsWriteDestinations,
+} from "@/server/services/ads-write.service";
 import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -68,4 +75,209 @@ export const topAds = growthAction({
   }),
   execute: async (input, ctx) =>
     computeTopAds({ ...input, organizationId: ctx.orgId }),
+});
+
+const platformSchema = z.enum(["meta", "google"]);
+const budgetTypeSchema = z.enum(["daily", "lifetime"]);
+const dateTimeSchema = z.string().datetime({ offset: true });
+const targetingSchema = z.object({
+  countries: z.array(z.string().length(2)).min(1).max(25).optional(),
+  ageMin: z.number().int().min(13).max(65).optional(),
+  ageMax: z.number().int().min(13).max(65).optional(),
+  languages: z.array(z.string().min(2).max(10)).max(25).optional(),
+  audienceId: z.string().min(1).optional(),
+});
+const destinationSchema = {
+  brandSlug: z
+    .string()
+    .trim()
+    .min(1)
+    .describe("Exact owned brand slug returned by brandRead."),
+  connectionAccountId: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "Connected Zernio account id returned by adsRead.listDestinations.",
+    ),
+  adAccountId: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "Exact allowlisted platform ad account returned by adsRead.listDestinations.",
+    ),
+};
+const schedulingSchema = {
+  startDate: dateTimeSchema.optional(),
+  endDate: dateTimeSchema.optional(),
+};
+
+export const listAdsDestinations = growthAction({
+  description:
+    "List the active Zernio Meta or Google connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id.",
+  inputSchema: z.object({
+    brandSlug: destinationSchema.brandSlug,
+    platform: platformSchema,
+  }),
+  execute: async (input, ctx) =>
+    listAdsWriteDestinations({
+      ...input,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const createMetaAdDraftAction = growthAction({
+  description:
+    "Create a complete Meta campaign, ad set, and image ad through Zernio. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
+  inputSchema: z.object({
+    ...destinationSchema,
+    name: z.string().trim().min(1).max(255),
+    campaignName: z.string().trim().min(1).max(255).optional(),
+    adSetName: z.string().trim().min(1).max(255).optional(),
+    adName: z.string().trim().min(1).max(255).optional(),
+    goal: z.enum([
+      "engagement",
+      "traffic",
+      "awareness",
+      "video_views",
+      "lead_generation",
+      "lead_conversion",
+      "conversions",
+      "app_promotion",
+      "catalog_sales",
+    ]),
+    budgetAmount: z
+      .number()
+      .positive()
+      .describe("Budget in whole currency units, never cents."),
+    budgetType: budgetTypeSchema,
+    headline: z.string().trim().min(1).max(255),
+    body: z.string().trim().min(1).max(2_200),
+    description: z.string().trim().min(1).max(255).optional(),
+    callToAction: z.string().trim().min(1).max(64),
+    linkUrl: z.string().url(),
+    imageUrl: z
+      .string()
+      .url()
+      .optional()
+      .describe("Required except for catalog_sales, where Meta renders items."),
+    leadGenFormId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("Required for lead_generation."),
+    targeting: targetingSchema.optional(),
+    ...schedulingSchema,
+    validateOnly: z.boolean().optional().default(false),
+    promotedObject: z
+      .object({
+        pixelId: z.string().min(1).optional(),
+        customEventType: z.string().min(1).optional(),
+        customConversionId: z.string().min(1).optional(),
+        productSetId: z.string().min(1).optional(),
+        pageId: z.string().min(1).optional(),
+        applicationId: z.string().min(1).optional(),
+        objectStoreUrl: z.string().url().optional(),
+      })
+      .optional(),
+  }),
+  execute: async (input, ctx) =>
+    createMetaAdDraft(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const createGoogleAdAction = growthAction({
+  description:
+    "Create one Google Search or Display campaign tree through Zernio. Google creation has no documented validate-only or paused option and may begin spend after provider acceptance. Use traffic for click-optimized delivery; conversion-goal creation is unsupported. Requires explicit operator approval.",
+  inputSchema: z.object({
+    ...destinationSchema,
+    name: z.string().trim().min(1).max(255),
+    campaignType: z.enum(["search", "display"]),
+    goal: z.enum(["engagement", "traffic", "awareness", "video_views"]),
+    budgetAmount: z
+      .number()
+      .positive()
+      .describe("Budget in whole currency units, never cents."),
+    budgetType: budgetTypeSchema,
+    headline: z.string().trim().min(1).max(30),
+    body: z.string().trim().min(1).max(90),
+    linkUrl: z.string().url(),
+    keywords: z.array(z.string().trim().min(1)).min(1).max(20).optional(),
+    negativeKeywords: z.array(z.string().trim().min(1)).max(20).optional(),
+    additionalHeadlines: z
+      .array(z.string().trim().min(1).max(30))
+      .max(14)
+      .optional(),
+    additionalDescriptions: z
+      .array(z.string().trim().min(1).max(90))
+      .max(3)
+      .optional(),
+    images: z
+      .object({
+        landscape: z.string().url(),
+        square: z.string().url(),
+      })
+      .optional()
+      .describe("Required for Display: one 1.91:1 and one 1:1 image."),
+    businessName: z.string().trim().min(1).max(25).optional(),
+    targeting: targetingSchema.optional(),
+    ...schedulingSchema,
+  }),
+  execute: async (input, ctx) =>
+    createGoogleAd(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const boostMetaPostAction = growthAction({
+  description:
+    "Boost one existing Facebook or Instagram post through Zernio while preserving its engagement. Zernio launches the created Meta hierarchy ACTIVE, so approval starts a spend-capable campaign immediately. Provide exactly one provider post identifier. Requires explicit operator approval.",
+  inputSchema: z.object({
+    ...destinationSchema,
+    name: z.string().trim().min(1).max(255),
+    goal: z.enum([
+      "engagement",
+      "traffic",
+      "awareness",
+      "video_views",
+      "lead_generation",
+      "conversions",
+      "app_promotion",
+    ]),
+    postId: z.string().trim().min(1).optional(),
+    platformPostId: z.string().trim().min(1).optional(),
+    budgetAmount: z
+      .number()
+      .positive()
+      .describe("Budget in whole currency units, never cents."),
+    budgetType: budgetTypeSchema,
+    targeting: targetingSchema.optional(),
+    ...schedulingSchema,
+  }),
+  execute: async (input, ctx) =>
+    boostMetaPost(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const duplicateMetaCampaignAction = growthAction({
+  description:
+    "Deep-copy one Meta campaign already visible inside the named brand's allowlisted account. Zernio creates the copied campaign PAUSED and syncs the copy back into the ad tree. Requires explicit operator approval.",
+  inputSchema: z.object({
+    brandSlug: destinationSchema.brandSlug,
+    campaignId: z.string().trim().min(1),
+    renameSuffix: z.string().max(80).optional().default(" (copy)"),
+  }),
+  execute: async (input, ctx) =>
+    duplicateMetaCampaign({
+      ...input,
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
 });

@@ -29,13 +29,15 @@ explicit policy and approval path.
 
 | Surface          | Contract                | Purpose                                                                                     |
 | ---------------- | ----------------------- | ------------------------------------------------------------------------------------------- |
-| Global assistant | 38 canonical tools      | Broad chat across the Growth workspace. Every tool remains available on every page.         |
+| Global assistant | 40 canonical tools      | Broad chat across the Growth workspace. Every tool remains available on every page.         |
 | Planner chat     | 3 read-only tools       | A focused Form or Chat flow for brand context, research, and a reviewable moment blueprint. |
-| Detailed MCP     | 35 connector-safe tools | Deterministic remote access to Growth domains through OAuth.                                |
+| Detailed MCP     | 37 connector-safe tools | Deterministic remote access to Growth domains through OAuth.                                |
 | `invoke_growth`  | 1 coarse MCP facade     | A bounded internal Growth run for hosts that prefer one natural-language tool.              |
 
-The 38 canonical tools contain 114 advertised actions. The wire-visible MCP
-surface has 36 tools: 35 detailed domain tools plus `invoke_growth`.
+The 40 canonical tools contain 130 advertised actions, including approval-only
+`adsWrite` actions for Zernio Meta and Google campaign creation. The
+wire-visible MCP surface has 38 tools: 37 detailed domain tools plus
+`invoke_growth`.
 
 The planner projection contains `brandRead`, `researchRead`, and
 `planningRead`. It does not own another registry and does not limit the global
@@ -75,7 +77,10 @@ pair would be artificial or would mix very different consequences:
 - `workspaceOverview` gathers a broad operational snapshot.
 - `navigateWorkspace` returns a canonical app route.
 - `prepareProductionPacket` saves a reviewed creative handoff.
-- `adsRead` is intentionally read-only.
+- `adsRead` owns performance, alignment, conversion inspection, and allowlisted
+  destination discovery.
+- `adsWrite` owns approved Zernio Meta and Google campaign mutations and is
+  limited to the in-app approval surface.
 - `publishingRead` inspects connections and published work.
 - `sourceSyncWrite` runs explicit source discovery and synchronization.
 - `contentMediaWrite` owns attachments, imports, uploads, and carousel assembly.

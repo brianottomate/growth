@@ -1,6 +1,14 @@
 import "server-only";
 
-import { adsScope, topAds } from "./ads";
+import {
+  adsScope,
+  boostMetaPostAction,
+  createGoogleAdAction,
+  createMetaAdDraftAction,
+  duplicateMetaCampaignAction,
+  listAdsDestinations,
+  topAds,
+} from "./ads";
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
 import {
@@ -252,12 +260,24 @@ export const contentStrategyWrite = growthDomainTool({
 
 export const adsRead = growthDomainTool({
   description:
-    "Read paid-ad scope and performance, diagnose intent alignment, or inspect conversion mappings.",
+    "Read paid-ad scope and performance, inspect allowlisted Zernio destinations, diagnose intent alignment, or inspect conversion mappings.",
   actions: {
     scope: adsScope,
     top: topAds,
+    listDestinations: listAdsDestinations,
     diagnoseAlignment,
     inspectConversions: inspectConversionReality,
+  },
+});
+
+export const adsWrite = growthDomainTool({
+  description:
+    "Create governed Meta and Google ad campaign trees through Zernio. Every action is account-allowlisted and approval-gated. Meta standalone and duplicate operations stay paused; Meta boosts and Google creates may start spend.",
+  actions: {
+    createMetaDraft: createMetaAdDraftAction,
+    createGoogle: createGoogleAdAction,
+    boostMetaPost: boostMetaPostAction,
+    duplicateMetaCampaign: duplicateMetaCampaignAction,
   },
 });
 
@@ -402,6 +422,7 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   contentStrategyRead,
   contentStrategyWrite,
   adsRead,
+  adsWrite,
   publishingRead,
   publishingWrite,
   sourceSyncWrite,

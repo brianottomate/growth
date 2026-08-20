@@ -773,6 +773,184 @@ export type ZernioAdsTreeCampaign = {
   [key: string]: unknown;
 };
 
+export type ZernioAdAccount = {
+  id: string;
+  name?: string;
+  currency?: string;
+  status?: string;
+  approvalStatus?: string;
+  minimumDailyBudget?: number;
+  selectable?: boolean;
+  unusableReason?: string;
+  [key: string]: unknown;
+};
+
+/**
+ * Enumerate the platform ad accounts one connected Zernio account can reach.
+ * Callers must still apply Growth's brand-scoped default-deny allowlist.
+ * https://docs.zernio.com/ad-accounts/list-ad-accounts
+ */
+export async function listZernioAdAccounts(options: {
+  accountId: string;
+  adAccountId?: string;
+  limit?: number;
+}): Promise<ZernioAdAccount[]> {
+  const params = new URLSearchParams({ accountId: options.accountId });
+  if (options.adAccountId) params.set("adAccountId", options.adAccountId);
+  if (options.limit) params.set("limit", String(options.limit));
+  const data = await zernioFetch<unknown>(`/ads/accounts?${params.toString()}`);
+  return unwrapList<ZernioAdAccount>(data, "accounts", "data");
+}
+
+export type ZernioAdTargeting = {
+  countries?: string[];
+  ageMin?: number;
+  ageMax?: number;
+  languages?: string[];
+  audienceId?: string;
+};
+
+export type CreateZernioStandaloneAdInput = {
+  accountId: string;
+  adAccountId: string;
+  name: string;
+  goal:
+    | "engagement"
+    | "traffic"
+    | "awareness"
+    | "video_views"
+    | "lead_generation"
+    | "lead_conversion"
+    | "conversions"
+    | "app_promotion"
+    | "catalog_sales";
+  budgetAmount: number;
+  budgetType: "daily" | "lifetime";
+  headline: string;
+  body: string;
+  linkUrl: string;
+  imageUrl?: string;
+  images?: { landscape: string; square: string };
+  campaignName?: string;
+  adSetName?: string;
+  adName?: string;
+  description?: string;
+  callToAction?: string;
+  campaignType?: "search" | "display";
+  leadGenFormId?: string;
+  keywords?: string[];
+  negativeKeywords?: string[];
+  additionalHeadlines?: string[];
+  additionalDescriptions?: string[];
+  businessName?: string;
+  targeting?: ZernioAdTargeting;
+  startDate?: string;
+  endDate?: string;
+  status?: "PAUSED";
+  validateOnly?: boolean;
+  promotedObject?: {
+    pixelId?: string;
+    customEventType?: string;
+    customConversionId?: string;
+    productSetId?: string;
+    pageId?: string;
+    applicationId?: string;
+    objectStoreUrl?: string;
+  };
+};
+
+export type ZernioAdWriteResponse = {
+  ad?: ZernioAd;
+  validateOnly?: boolean;
+  results?: Array<{
+    node?: string;
+    status?: string;
+    reason?: string;
+  }>;
+  message?: string;
+  [key: string]: unknown;
+};
+
+/**
+ * Create one campaign tree through Zernio's normalized Meta/Google endpoint.
+ * The idempotency key is mandatory here because a blind retry duplicates spend.
+ * https://docs.zernio.com/ad-campaigns/create-standalone-ad
+ */
+export async function createZernioStandaloneAd(
+  input: CreateZernioStandaloneAdInput,
+  options: { idempotencyKey: string },
+): Promise<ZernioAdWriteResponse> {
+  return zernioFetch<ZernioAdWriteResponse>("/ads/create", {
+    method: "POST",
+    headers: { "Idempotency-Key": options.idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
+export type BoostZernioMetaPostInput = {
+  accountId: string;
+  adAccountId: string;
+  name: string;
+  goal:
+    | "engagement"
+    | "traffic"
+    | "awareness"
+    | "video_views"
+    | "lead_generation"
+    | "conversions"
+    | "app_promotion";
+  postId?: string;
+  platformPostId?: string;
+  budget: { amount: number; type: "daily" | "lifetime" };
+  schedule?: { startDate?: string; endDate?: string };
+  targeting?: ZernioAdTargeting;
+};
+
+/** Boosts launch active on Meta, so this client is only called by an approved capability. */
+export async function boostZernioMetaPost(
+  input: BoostZernioMetaPostInput,
+  options: { idempotencyKey: string },
+): Promise<ZernioAdWriteResponse> {
+  return zernioFetch<ZernioAdWriteResponse>("/ads/boost", {
+    method: "POST",
+    headers: { "Idempotency-Key": options.idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
+export type DuplicateZernioMetaCampaignResponse = {
+  copiedCampaignId?: string;
+  discovery?: unknown;
+  raw?: unknown;
+  [key: string]: unknown;
+};
+
+/** Deep-copy a Meta campaign in PAUSED state. */
+export async function duplicateZernioMetaCampaign(
+  campaignId: string,
+  input: {
+    renameSuffix?: string;
+    syncAfter?: boolean;
+  },
+  options: { idempotencyKey: string },
+): Promise<DuplicateZernioMetaCampaignResponse> {
+  return zernioFetch<DuplicateZernioMetaCampaignResponse>(
+    `/ads/campaigns/${encodeURIComponent(campaignId)}/duplicate`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": options.idempotencyKey },
+      body: JSON.stringify({
+        platform: "facebook",
+        deepCopy: true,
+        statusOption: "PAUSED",
+        renameStrategy: "DEEP_RENAME",
+        renameSuffix: input.renameSuffix ?? " (copy)",
+        syncAfter: input.syncAfter ?? true,
+      }),
+    },
+  );
+}
+
 // Paginates per docs: page (1-based), limit max 100, paginated at campaign level.
 // https://docs.zernio.com/ad-campaigns/get-ad-tree
 //

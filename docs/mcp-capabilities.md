@@ -32,16 +32,20 @@ endpoint verifies token issuer, audience, expiry, and scope and then re-checks
 the user's live organization membership on every request. There is no parallel
 connector table and no fallback to the browser session's active or first org.
 
-The MCP tools and the in-app Growth assistant are projections of the same 38-tool
-native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 36
-connector-safe capabilities and omits open-world `researchRead` plus in-app
-`driveRead`. Read-only,
+The MCP tools and the in-app Growth assistant are projections of the same 40-tool
+native AI SDK 7 catalog in `src/server/ai/capabilities`. MCP exposes the 37
+connector-safe capabilities and omits open-world `researchRead`, in-app
+`driveRead`, and approval-only `adsWrite`. Read-only,
 destructive, and idempotency annotations are derived from the same action policy
 used by chat receipts and approvals. Growth runs
 ordinary drafts, plans, and reversible workspace edits immediately once the
 operator's intent is clear. A future tool that publishes or sends externally
 must opt into user approval in policy; MCP clients can additionally honor the
 standard destructive hint.
+
+`adsWrite` follows that rule in the in-app assistant. It stays outside the
+direct MCP projection until that route can enforce the same approval
+continuation before a provider-spend mutation.
 
 The external MCP projection omits Growth's `researchRead` and `driveRead` tools.
 ChatGPT and Claude already provide open-world browsing and their own Drive

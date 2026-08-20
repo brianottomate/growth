@@ -41,7 +41,7 @@ or Drizzle Studio.
 
 - Dedicated OAuth connection (scopes `adwords` + `datamanager`); Zernio uses
   its own approved developer token — no MCC/Standard Access application.
-- The OAuth user's *accessible customers* are all visible → with the Wander
+- The OAuth user's _accessible customers_ are all visible → with the Wander
   MCC (Demand + Supply sub-accounts) the allowlist step above is mandatory.
 - Reads: campaign > ad group > ad tree, spend/CPC/CPM, tracking-URL tags,
   conversion-action discovery.
@@ -52,6 +52,32 @@ or Drizzle Studio.
 - Not yet: Performance Max, Shopping, Video, Demand Gen; conversion-goal
   campaigns (use `traffic`). EEA/UK uploads need consent signals
   (`adUserData`, `adPersonalization`). Conversions lag up to ~3h in reports.
+
+## Governed campaign creation
+
+Growth exposes a narrow Zernio campaign surface through the canonical AI
+kernel:
+
+- `adsRead.listDestinations` resolves an owned brand to its active Zernio
+  connection and intersects Zernio's live ad-account enumeration with the
+  brand-scoped `ad_account` allowlist.
+- `adsWrite.createMetaDraft` supports a single image campaign tree and forces
+  `status: PAUSED`. `validateOnly` uses Meta's dry run. Meta still uploads the
+  referenced image while validating, so the action retains provider-write
+  policy and operator approval.
+- `adsWrite.createGoogle` supports Search and Display. Search requires at least
+  one keyword. Display requires both landscape and square images. Zernio does
+  not document paused creation or a dry run for Google, so approval may create
+  a spend-capable campaign.
+- `adsWrite.boostMetaPost` preserves the existing post engagement. Zernio
+  launches boosts active, which makes the approval card the final spend gate.
+- `adsWrite.duplicateMetaCampaign` deep-copies only a campaign found in the
+  selected brand's allowed Meta account and requests a paused copy.
+
+Create and boost calls send Zernio's `Idempotency-Key` header. The key is stable
+for one assistant run and exact payload, which makes provider retries safe for
+24 hours. The direct OAuth MCP projection does not expose `adsWrite` because
+that route does not yet implement the in-app approval continuation.
 
 ## Guardrails
 
