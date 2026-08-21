@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { osInspectUrl } from "@/lib/pregen-urls";
 import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
-import { leadDomainTable, pregenBuildTable } from "@/server/db/leads-schema";
+import {
+  leadContactTable,
+  leadDomainTable,
+  leadSequenceTable,
+  pregenBuildTable,
+} from "@/server/db/leads-schema";
 import { eq } from "drizzle-orm";
 
 /**
@@ -41,6 +46,7 @@ export default async function PregenPage() {
   const builds = await db
     .select({
       id: pregenBuildTable.id,
+      domainId: pregenBuildTable.domainId,
       domain: pregenBuildTable.domain,
       businessName: pregenBuildTable.businessName,
       status: pregenBuildTable.status,
@@ -54,20 +60,50 @@ export default async function PregenPage() {
       companyName: leadDomainTable.companyName,
       units: leadDomainTable.unitCount,
       pms: leadDomainTable.pms,
+      owner: leadDomainTable.hubspotOwner,
+      tier: leadDomainTable.computedTier,
+      hasDeal: leadDomainTable.hasHubspotDeal,
+      excluded: leadDomainTable.excludeFromOutreach,
+      excludeReason: leadDomainTable.excludeReason,
     })
     .from(pregenBuildTable)
     .leftJoin(leadDomainTable, eq(leadDomainTable.id, pregenBuildTable.domainId))
     .orderBy(desc(pregenBuildTable.requestedAt));
 
+  // Fetched separately rather than joined: a company can carry more than one
+  // sequence row (a retired recipient leaves its own), and joining would
+  // duplicate build rows instead of annotating them.
+  const sent = await db
+    .select({
+      domainId: leadSequenceTable.domainId,
+      enrolledAt: leadSequenceTable.enrolledAt,
+      email: leadContactTable.email,
+    })
+    .from(leadSequenceTable)
+    .leftJoin(
+      leadContactTable,
+      eq(leadContactTable.id, leadSequenceTable.contactId),
+    )
+    .where(eq(leadSequenceTable.status, "sent"));
+  const sentByDomain = new Map(sent.map((row) => [row.domainId, row]));
+
   const ready = builds.filter((build) => build.status === "READY").length;
   const viewed = builds.filter((build) => build.viewCount > 0).length;
+  // Companies, not builds: a rebuild leaves two rows on one domain, and this
+  // number is compared against the sends in HubSpot.
+  const enrolled = new Set(
+    builds
+      .map((build) => build.domainId)
+      .filter((id) => id && sentByDomain.has(id)),
+  ).size;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">Pre-gen sites</h1>
         <p className="text-muted-foreground text-sm">
-          {builds.length} built · {ready} ready · {viewed} opened by the prospect · newest first
+          {builds.length} built · {ready} ready · {viewed} opened by the prospect ·{" "}
+          {enrolled} in sequence · newest first
         </p>
       </header>
 
@@ -76,6 +112,9 @@ export default async function PregenPage() {
           // The beacon-free wrapper: opening from here is us looking, and an
           // operator's click must never read to sales as the prospect browsing.
           const inspect = build.previewUrl ? osInspectUrl(build.previewUrl) : null;
+          const enrolment = build.domainId
+            ? sentByDomain.get(build.domainId)
+            : undefined;
           return (
             <li key={build.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
               <span
@@ -90,6 +129,26 @@ export default async function PregenPage() {
                 {build.companyName ?? build.businessName ?? build.domain}
               </span>
 
+              {enrolment ? (
+                <span
+                  className="shrink-0 rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-300"
+                  title={`${enrolment.email ?? "unknown recipient"}${
+                    enrolment.enrolledAt
+                      ? ` · enrolled ${enrolment.enrolledAt.toISOString().slice(0, 10)}`
+                      : ""
+                  }`}
+                >
+                  in sequence
+                </span>
+              ) : build.excluded ? (
+                <span
+                  className="text-muted-foreground shrink-0 rounded-full border px-2 py-0.5 text-[11px]"
+                  title={build.excludeReason ?? undefined}
+                >
+                  excluded
+                </span>
+              ) : null}
+
               <span className="text-muted-foreground shrink-0 text-xs">
                 {[
                   build.batch,
@@ -97,6 +156,9 @@ export default async function PregenPage() {
                   build.units ? `${build.units} homes` : null,
                   build.viewCount > 0 ? `${build.viewCount} views` : null,
                   build.claimedAt ? "CLAIMED" : null,
+                  build.tier,
+                  build.owner,
+                  build.hasDeal ? "deal" : null,
                 ]
                   .filter(Boolean)
                   .join(" · ")}
