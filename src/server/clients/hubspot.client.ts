@@ -304,8 +304,8 @@ export function resolveHsLabel(
 // =====================================================
 
 export const AE_OTE_ROUND_ROBIN: Record<string, number> = {
-  "82330443": 0.33, // Matt Montanti
-  "94290553": 0.67, // Sean Kearney
+  "82330443": 1.0, // Matt Montanti
+  //"94290553": 0.67, // Sean Kearney
 };
 
 export const AE_SMB_ROUND_ROBIN: Record<string, number> = {
