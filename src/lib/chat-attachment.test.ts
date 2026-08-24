@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import {
+  chatAttachmentLimitLabel,
   findLatestOwnedChatMedia,
   findLatestOwnedChatImage,
   findLatestOwnedChatImages,
+  formatChatAttachmentLimit,
   isChatAttachmentMediaType,
   isOwnedChatImagePath,
   isOwnedChatImageUrl,
@@ -142,6 +144,8 @@ describe("chat video attachments", () => {
     expect(isChatAttachmentMediaType("video/mp4")).toBe(true);
     expect(isChatAttachmentMediaType("video/quicktime")).toBe(true);
     expect(maxChatAttachmentBytes("video/webm")).toBe(250 * 1024 * 1024);
+    expect(formatChatAttachmentLimit(250 * 1024 * 1024)).toBe("250 MB");
+    expect(chatAttachmentLimitLabel("video/webm")).toBe("250 MB");
     expect(isChatAttachmentMediaType("video/x-msvideo")).toBe(false);
   });
 
