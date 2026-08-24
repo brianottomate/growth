@@ -45,6 +45,12 @@ import { isApprovalSuperseded } from "@/lib/chat-approval-state";
 import { formatResolvedPublishingTime } from "@/lib/scheduling-time";
 import { cn } from "@/lib/utils";
 import {
+  isChatAttachmentMediaType,
+  maxChatAttachmentBytes,
+  MAX_CHAT_ATTACHMENTS,
+} from "@/lib/chat-attachment";
+import { putWithProgress } from "@/lib/upload-with-progress";
+import {
   GROWTH_CAPABILITY_LABELS,
   isGrowthCapabilityId,
 } from "@/lib/growth-capabilities";
@@ -163,8 +169,6 @@ const NEXT_STARTERS: { icon: LucideIcon; text: string }[] = [
   { icon: LayoutDashboard, text: "Turn one channel post into a reusable idea" },
 ];
 
-const MAX_CHAT_IMAGES = 10;
-const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
 const LONG_TEXT_ATTACHMENT_THRESHOLD = 2_000;
 
 type PendingAttachment = {
@@ -172,6 +176,8 @@ type PendingAttachment = {
   previewUrl: string;
   hostedUrl?: string;
   mediaType: string;
+  fileName: string;
+  progress: number;
   uploading: boolean;
 };
 
@@ -363,15 +369,16 @@ export function OverviewChat({
   const trpc = useTRPC();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentCountRef = useRef(0);
-  // Files the composer refused (videos, oversize) — reported with the next
-  // send so the assistant can route the operator to the media library.
+  // Files the composer refused are reported with the next send so the
+  // assistant can route oversized or unsupported work to the media library.
   const skippedAttachmentsRef = useRef<
-    Array<{ name: string; sizeMb: number; reason: "video" | "unsupported" | "too_large" }>
+    Array<{ name: string; sizeMb: number; reason: "unsupported" | "too_large" }>
   >([]);
   const previewUrlsRef = useRef(new Set<string>());
   const [pendingAttachments, setPendingAttachments] = useState<
     PendingAttachment[]
   >([]);
+  const [dragActive, setDragActive] = useState(false);
   const createChatUploadUrl = useMutation(
     trpc.media.createChatUploadUrl.mutationOptions(),
   );
@@ -404,17 +411,14 @@ export function OverviewChat({
 
   const attachFiles = useCallback(
     (files: File[]) => {
-      const available = MAX_CHAT_IMAGES - attachmentCountRef.current;
+      const available = MAX_CHAT_ATTACHMENTS - attachmentCountRef.current;
       if (available <= 0) {
-        toast.info(`You can attach up to ${MAX_CHAT_IMAGES} images`);
+        toast.info(`You can attach up to ${MAX_CHAT_ATTACHMENTS} files`);
         return;
       }
 
       const valid: File[] = [];
-      const recordSkip = (
-        file: File,
-        reason: "video" | "unsupported" | "too_large",
-      ) => {
+      const recordSkip = (file: File, reason: "unsupported" | "too_large") => {
         if (skippedAttachmentsRef.current.length >= 10) return;
         skippedAttachmentsRef.current.push({
           name: file.name,
@@ -423,24 +427,20 @@ export function OverviewChat({
         });
       };
       for (const file of files) {
-        if (file.type.startsWith("video/")) {
-          recordSkip(file, "video");
-          toast.error(`Couldn't attach ${file.name}`, {
-            description: "Videos upload via the media library — ask me below",
-          });
-          continue;
-        }
-        if (!file.type.startsWith("image/")) {
+        if (!isChatAttachmentMediaType(file.type)) {
           recordSkip(file, "unsupported");
           toast.error(`Couldn't attach ${file.name}`, {
-            description: "Only images can be attached",
+            description: "Use JPEG, PNG, WebP, AVIF, GIF, MP4, WebM, or MOV",
           });
           continue;
         }
-        if (file.size > MAX_CHAT_IMAGE_BYTES) {
+        const maximumSize = maxChatAttachmentBytes(file.type);
+        if (!maximumSize || file.size > maximumSize) {
           recordSkip(file, "too_large");
           toast.error(`Couldn't attach ${file.name}`, {
-            description: "Image is too large (max 10MB)",
+            description: file.type.startsWith("video/")
+              ? "Video is too large (max 250MB)"
+              : "Image is too large (max 10MB)",
           });
           continue;
         }
@@ -449,7 +449,7 @@ export function OverviewChat({
       if (valid.length === 0) return;
       if (valid.length < files.length) {
         toast.info(
-          `Added ${valid.length} image${valid.length === 1 ? "" : "s"}. A message can contain up to ${MAX_CHAT_IMAGES}.`,
+          `Added ${valid.length} file${valid.length === 1 ? "" : "s"}. A message can contain up to ${MAX_CHAT_ATTACHMENTS}.`,
         );
       }
 
@@ -460,16 +460,19 @@ export function OverviewChat({
           id: crypto.randomUUID(),
           previewUrl,
           mediaType: file.type || "image/png",
+          fileName: file.name,
           file,
         };
       });
       attachmentCountRef.current += prepared.length;
       updatePendingAttachments((current) => [
         ...current,
-        ...prepared.map(({ id, previewUrl, mediaType }) => ({
+        ...prepared.map(({ id, previewUrl, mediaType, fileName }) => ({
           id,
           previewUrl,
           mediaType,
+          fileName,
+          progress: 0,
           uploading: true,
         })),
       ]);
@@ -482,20 +485,24 @@ export function OverviewChat({
               mediaType: attachment.mediaType,
               size: attachment.file.size,
             });
-            const uploaded = await fetch(uploadTarget.uploadUrl, {
-              method: "PUT",
-              headers: { "Content-Type": attachment.mediaType },
-              body: attachment.file,
+            await putWithProgress(uploadTarget.uploadUrl, attachment.file, {
+              contentType: attachment.mediaType,
+              onProgress: (fraction) =>
+                updatePendingAttachments((current) =>
+                  current.map((pending) =>
+                    pending.id === attachment.id
+                      ? { ...pending, progress: fraction }
+                      : pending,
+                  ),
+                ),
             });
-            if (!uploaded.ok) {
-              throw new Error(`R2 upload failed (${uploaded.status})`);
-            }
             updatePendingAttachments((current) =>
               current.map((pending) =>
                 pending.id === attachment.id
                   ? {
                       ...pending,
                       hostedUrl: uploadTarget.url,
+                      progress: 1,
                       uploading: false,
                     }
                   : pending,
@@ -519,7 +526,7 @@ export function OverviewChat({
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(e.clipboardData.items)
-      .filter((item) => item.type.startsWith("image/"))
+      .filter((item) => isChatAttachmentMediaType(item.type))
       .map((item) => item.getAsFile())
       .filter((file): file is File => Boolean(file));
     if (files.length === 0) return;
@@ -531,6 +538,40 @@ export function OverviewChat({
     const files = Array.from(e.target.files ?? []);
     if (files.length > 0) attachFiles(files);
     e.target.value = "";
+  };
+
+  const handlesFiles = (e: React.DragEvent) =>
+    e.dataTransfer.types.includes("Files");
+
+  const handleDragEnter = (e: React.DragEvent<HTMLElement>) => {
+    if (!handlesFiles(e)) return;
+    e.preventDefault();
+    setDragActive(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
+    if (!handlesFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>) => {
+    if (
+      e.relatedTarget instanceof Node &&
+      e.currentTarget.contains(e.relatedTarget)
+    ) {
+      return;
+    }
+    setDragActive(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+    if (!handlesFiles(e)) return;
+    e.preventDefault();
+    setDragActive(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) attachFiles(files);
   };
 
   // One consistent "working" indicator. A turn streams in steps — reasoning, a
@@ -598,24 +639,34 @@ export function OverviewChat({
     !attachmentsUploading &&
     (input.trim().length > 0 || readyAttachments.length > 0);
 
-  // The composer sends text and every ready image as one durable user turn.
+  // The composer sends text and every ready attachment as one durable turn.
   const submitComposer = () => {
     if (!canSend) return;
     const chatAttachments = readyAttachments.map((attachment) => ({
       url: attachment.hostedUrl,
       mediaType: attachment.mediaType,
+      fileName: attachment.fileName,
     }));
+    const videos = chatAttachments.filter((attachment) =>
+      attachment.mediaType.startsWith("video/"),
+    );
+    const visibleText =
+      input.trim() ||
+      (videos.length > 0
+        ? `Uploaded ${videos.map((video) => video.fileName).join(", ")}.`
+        : "");
     const skippedAttachments = skippedAttachmentsRef.current;
     skippedAttachmentsRef.current = [];
     void sendMessage(
       {
-        text: input.trim(),
+        text: visibleText,
         ...(chatAttachments.length > 0
           ? {
               files: chatAttachments.map((attachment) => ({
                 type: "file" as const,
                 mediaType: attachment.mediaType,
                 url: attachment.url,
+                filename: attachment.fileName,
               })),
             }
           : {}),
@@ -665,6 +716,10 @@ export function OverviewChat({
 
   return (
     <div
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={cn(
         "relative flex min-h-0 flex-col",
         variant === "page" ? "h-[calc(100vh-7rem)]" : "h-full",
@@ -887,20 +942,44 @@ export function OverviewChat({
         )}
       >
         <form className="mt-3" onSubmit={submit}>
-          <div className="border-border focus-within:border-primary/50 bg-card rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:shadow-md">
+          <div
+            className={cn(
+              "border-border focus-within:border-primary/50 bg-card relative rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 focus-within:shadow-md",
+              dragActive && "border-primary ring-primary/20 ring-2",
+            )}
+          >
+            {dragActive && (
+              <div className="bg-card/95 text-foreground absolute inset-0 z-20 flex items-center justify-center rounded-xl text-sm font-medium backdrop-blur-sm">
+                Drop images or videos here
+              </div>
+            )}
             {pendingAttachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {pendingAttachments.map((attachment, index) => (
                   <div key={attachment.id} className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={attachment.previewUrl}
-                      alt={`Attachment ${index + 1}`}
-                      className="h-16 w-16 rounded-md border object-cover"
-                    />
+                    {attachment.mediaType.startsWith("video/") ? (
+                      <video
+                        src={attachment.previewUrl}
+                        aria-label={`Video attachment ${index + 1}`}
+                        className="h-16 w-24 rounded-md border bg-black object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={attachment.previewUrl}
+                        alt={`Attachment ${index + 1}`}
+                        className="h-16 w-16 rounded-md border object-cover"
+                      />
+                    )}
                     {attachment.uploading && (
-                      <div className="bg-background/60 absolute inset-0 flex items-center justify-center rounded-md">
+                      <div className="bg-background/70 absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-md">
                         <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                        <span className="text-[9px] tabular-nums">
+                          {Math.round(attachment.progress * 100)}%
+                        </span>
                       </div>
                     )}
                     <button
@@ -945,7 +1024,7 @@ export function OverviewChat({
               placeholder={
                 mode !== "overview"
                   ? "Ask what’s next, or paste something you want to use…"
-                  : "Ask about the workspace… (paste or attach an image)"
+                  : "Ask about the workspace… (drop an image or video)"
               }
               rows={1}
               autoFocus={desktop && active}
@@ -955,7 +1034,7 @@ export function OverviewChat({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/avif,image/gif,video/mp4,video/webm,video/quicktime"
                 multiple
                 className="hidden"
                 onChange={onFilePicked}
@@ -966,8 +1045,8 @@ export function OverviewChat({
                 variant="ghost"
                 className="text-muted-foreground"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={pendingAttachments.length >= MAX_CHAT_IMAGES}
-                aria-label="Attach images"
+                disabled={pendingAttachments.length >= MAX_CHAT_ATTACHMENTS}
+                aria-label="Attach images or videos"
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
@@ -1004,7 +1083,7 @@ export function OverviewChat({
   );
 }
 
-/** A user message bubble with its complete image set and compact long text. */
+/** A user message bubble with its complete media set and compact long text. */
 function UserMessage({ message }: { message: UIMessage }) {
   const images = message.parts.filter(
     (p) =>
@@ -1015,6 +1094,11 @@ function UserMessage({ message }: { message: UIMessage }) {
     .filter((p) => p.type === "text")
     .map((p) => (p as { text: string }).text)
     .join("");
+  const videos = message.parts.filter(
+    (p) =>
+      p.type === "file" &&
+      ((p as { mediaType?: string }).mediaType ?? "").startsWith("video/"),
+  );
   const longText = text.length >= LONG_TEXT_ATTACHMENT_THRESHOLD;
   return (
     <div className="flex max-w-[85%] flex-col items-end gap-1.5">
@@ -1037,6 +1121,24 @@ function UserMessage({ message }: { message: UIMessage }) {
                   "w-full rounded-xl border object-cover",
                   images.length === 1 ? "max-h-56" : "aspect-square",
                 )}
+              />
+            ) : null;
+          })}
+        </div>
+      )}
+      {videos.length > 0 && (
+        <div className="grid w-full max-w-md gap-1.5">
+          {videos.map((part, index) => {
+            const file = part as { url?: string; filename?: string };
+            return file.url ? (
+              <video
+                key={`${message.id}-video-${index}`}
+                src={file.url}
+                aria-label={file.filename ?? `Video attachment ${index + 1}`}
+                className="max-h-72 w-full rounded-xl border bg-black"
+                controls
+                playsInline
+                preload="metadata"
               />
             ) : null;
           })}

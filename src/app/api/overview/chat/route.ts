@@ -28,7 +28,13 @@ import {
   failAssistantRun,
   startAssistantRun,
 } from "@/server/ai/kernel/journal";
+import { GROWTH_MAX_OUTPUT_TOKENS } from "@/server/ai/kernel/limits";
+import {
+  GROWTH_CONVERSATION_CACHE_TTL,
+  withGrowthRollingCache,
+} from "@/server/ai/kernel/prompt-cache";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
+import { summarizeGrowthUsage } from "@/server/ai/kernel/usage";
 import {
   approvalHasExpired,
   validateApprovalContinuation,
@@ -38,7 +44,10 @@ import type {
   AssistantIntent,
   ContentWorkContext,
 } from "@/lib/assistant-events";
-import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
+import {
+  isChatAttachmentMediaType,
+  isOwnedChatAttachmentUrl,
+} from "@/lib/chat-attachment";
 
 /**
  * /overview chat agent — a general growth back-office assistant.
@@ -56,7 +65,19 @@ const MODEL = "claude-sonnet-5";
 function sanitizeForModel(history: UIMessage[]) {
   return history
     .map((message, index) => {
-      if (message.role !== "assistant" || index === history.length - 1) {
+      if (message.role === "user") {
+        return {
+          ...message,
+          parts: message.parts.filter(
+            (part) =>
+              part.type !== "file" ||
+              ((part as { mediaType?: string }).mediaType ?? "").startsWith(
+                "image/",
+              ),
+          ),
+        };
+      }
+      if (index === history.length - 1) {
         return message;
       }
       return {
@@ -121,8 +142,12 @@ export async function POST(req: Request): Promise<Response> {
     intent?: string;
     assistantIntent?: AssistantIntent;
     workContext?: ContentWorkContext;
-    chatAttachment?: { url?: string; mediaType?: string };
-    chatAttachments?: { url?: string; mediaType?: string }[];
+    chatAttachment?: { url?: string; mediaType?: string; fileName?: string };
+    chatAttachments?: {
+      url?: string;
+      mediaType?: string;
+      fileName?: string;
+    }[];
     skippedAttachments?: { name?: string; sizeMb?: number; reason?: string }[];
     threadId?: string;
     pagePath?: string;
@@ -225,37 +250,51 @@ export async function POST(req: Request): Promise<Response> {
       : [];
   const seenAttachmentUrls = new Set<string>();
   const safeAttachments = attachmentCandidates
-    .filter((attachment): attachment is { url: string; mediaType: string } => {
-      if (
-        !attachment.url ||
-        !attachment.mediaType?.startsWith("image/") ||
-        !isOwnedChatImageUrl(attachment.url, session.user.id) ||
-        seenAttachmentUrls.has(attachment.url)
-      ) {
-        return false;
-      }
-      seenAttachmentUrls.add(attachment.url);
-      return true;
-    })
+    .filter(
+      (
+        attachment,
+      ): attachment is {
+        url: string;
+        mediaType: string;
+        fileName?: string;
+      } => {
+        if (
+          !attachment.url ||
+          !attachment.mediaType ||
+          !isChatAttachmentMediaType(attachment.mediaType) ||
+          !isOwnedChatAttachmentUrl(attachment.url, session.user.id) ||
+          seenAttachmentUrls.has(attachment.url)
+        ) {
+          return false;
+        }
+        seenAttachmentUrls.add(attachment.url);
+        return true;
+      },
+    )
     .slice(0, 10);
   const attachmentList = safeAttachments
     .map(
       (attachment, index) =>
-        `${index + 1}. ${attachment.url} (${attachment.mediaType})`,
+        `${index + 1}. ${attachment.fileName ?? "attachment"}: ${attachment.url} (${attachment.mediaType})`,
     )
     .join("\n");
+  const imageCount = safeAttachments.filter((attachment) =>
+    attachment.mediaType.startsWith("image/"),
+  ).length;
+  const videoCount = safeAttachments.length - imageCount;
   const attachmentPrompt =
     safeAttachments.length > 0
-      ? `\n\n# Current pasted images\nThe operator attached ${safeAttachments.length} image${safeAttachments.length === 1 ? "" : "s"}. You can analyze every image visually now. Their durable URLs are:\n${attachmentList}${activeWorkContext ? "\nIf the operator asks to use, save, or attach them to the active content work item, call contentMediaWrite action attachChatImage with the complete images array and preserve this order." : ""}\nIf the operator asks to save pasted media straight into a brand's media library with no content work item involved, call mediaLibraryWrite action saveChatMedia — it stores each item durably and tags images against the brand's managed vocabulary on arrival.\nFor a DatoCMS blog task, pass only the specific image the operator selects as blogAgent attachmentUrl; ask which image if their choice is ambiguous. Do not save or upload images merely because they were pasted.`
+      ? `\n\n# Current chat media\nThe operator attached ${imageCount} image${imageCount === 1 ? "" : "s"} and ${videoCount} video${videoCount === 1 ? "" : "s"}. Images are available as vision inputs. Videos are durable uploads that you can save, name, and organize, but you cannot claim to have visually analyzed their frames in this turn. Their trusted URLs are:\n${attachmentList}${activeWorkContext && imageCount > 0 ? "\nIf the operator asks to use or attach images to the active content work item, call contentMediaWrite action attachChatImage with the complete image array in this order." : ""}\nIf the operator asks to keep any attachment in a brand's media library, call mediaLibraryWrite action saveChatMedia with the complete requested media set. For a DatoCMS blog task, pass only the specific image the operator selects as blogAgent attachmentUrl. Do not save attachments merely because they were added.`
       : activeWorkContext
         ? `\n\n# Persisted image continuity\nIf the operator refers to images pasted earlier in this conversation, call contentMediaWrite action attachChatImage without inventing URLs or MIME types. The action resolves the complete image set from the newest user message with owned attachments in the durable thread.`
         : "";
   const SKIP_REASONS: Record<string, string> = {
-    video: "video — the chat composer only takes images",
     unsupported: "unsupported file type",
-    too_large: "over the 10 MB chat image limit",
+    too_large: "over the chat attachment size limit",
   };
-  const safeSkipped = (Array.isArray(skippedAttachments) ? skippedAttachments : [])
+  const safeSkipped = (
+    Array.isArray(skippedAttachments) ? skippedAttachments : []
+  )
     .filter(
       (item): item is { name: string; sizeMb?: number; reason?: string } =>
         typeof item?.name === "string",
@@ -363,6 +402,7 @@ export async function POST(req: Request): Promise<Response> {
   const context = composeGrowthContext({
     surface: "overview-chat",
     maximumCharacters: 80_000,
+    rollingCacheTtl: GROWTH_CONVERSATION_CACHE_TTL,
     sections: [
       { id: "persona", content: OVERVIEW_AGENT_PERSONA, cache: "session" },
       {
@@ -409,6 +449,13 @@ export async function POST(req: Request): Promise<Response> {
         toolsContext: runtime.toolsContext,
         toolApproval: runtime.toolApproval,
         stopWhen: stepCountIs(20),
+        maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
+        prepareStep: ({ messages }) => ({
+          messages: withGrowthRollingCache(
+            messages,
+            GROWTH_CONVERSATION_CACHE_TTL,
+          ),
+        }),
       });
     } catch (error) {
       await failAssistantRun(runId, compactGrowthError(error));
@@ -479,8 +526,11 @@ export async function POST(req: Request): Promise<Response> {
           updatedAt: new Date(),
         })
         .where(eq(assistantThreadTable.id, thread.id));
+      const steps = await result.steps;
       await completeAssistantRun(runId, {
         persistedMessages: updatedMessages.length,
+        steps: steps.length,
+        usage: summarizeGrowthUsage(await result.usage, steps),
       });
     },
   });

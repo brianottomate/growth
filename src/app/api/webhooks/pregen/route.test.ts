@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { hostFromUrl, tokenFromPreviewUrl } from "./route";
+import { hostFromUrl, tokenFromPreviewUrl } from "./helpers";
 
 /**
  * WanderOS addresses prospects by `sourceUrl`; growth keys leads on a bare
@@ -47,7 +47,9 @@ describe("tokenFromPreviewUrl", () => {
   });
 
   test("returns null when there is no token to extract", () => {
-    expect(tokenFromPreviewUrl("https://example.wanderforoperators.com/")).toBeNull();
+    expect(
+      tokenFromPreviewUrl("https://example.wanderforoperators.com/"),
+    ).toBeNull();
     expect(tokenFromPreviewUrl("https://example.com/?t=")).toBeNull();
     expect(tokenFromPreviewUrl("not a url")).toBeNull();
     expect(tokenFromPreviewUrl(undefined)).toBeNull();

@@ -29,6 +29,7 @@ import {
   prepareVideoAnalysis,
   saveVideoAnalysisRender,
 } from "@/server/services/video-analysis.service";
+import { MAX_CHAT_VIDEO_BYTES } from "@/lib/chat-attachment";
 
 type Ctx = {
   db: typeof db;
@@ -155,11 +156,7 @@ export const mediaRouter = createTRPCRouter({
       z.object({
         fileName: z.string().max(300).optional(),
         mediaType: z.string().min(1).max(120),
-        size: z
-          .number()
-          .int()
-          .positive()
-          .max(10 * 1024 * 1024),
+        size: z.number().int().positive().max(MAX_CHAT_VIDEO_BYTES),
       }),
     )
     .mutation(async ({ ctx, input }) => {

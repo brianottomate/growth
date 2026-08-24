@@ -22,9 +22,15 @@ import {
   failAssistantRun,
   startAssistantRun,
 } from "../kernel/journal";
+import { GROWTH_MAX_OUTPUT_TOKENS } from "../kernel/limits";
+import {
+  GROWTH_TOOL_LOOP_CACHE_TTL,
+  withGrowthRollingCache,
+} from "../kernel/prompt-cache";
 import { growthActionPolicies } from "../kernel/policy";
 import { buildGrowthToolRuntime } from "../kernel/runtime";
 import { runtimeClockSection } from "../kernel/runtime-clock";
+import { summarizeGrowthUsage } from "../kernel/usage";
 import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
 
 type ToolContext = { http?: { authInfo?: AuthInfo } };
@@ -43,6 +49,7 @@ function mcpContextManifest() {
   return {
     surface: "mcp" as const,
     characters: 0,
+    cachedPrefixCharacters: 0,
     sections: [],
   };
 }
@@ -158,10 +165,18 @@ function registerInvokeGrowth(server: McpServer, toolSet: ToolSet) {
           toolsContext: runtime.toolsContext,
           toolApproval: runtime.toolApproval,
           stopWhen: stepCountIs(8),
+          maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
+          prepareStep: ({ messages }) => ({
+            messages: withGrowthRollingCache(
+              messages,
+              GROWTH_TOOL_LOOP_CACHE_TTL,
+            ),
+          }),
         });
         await completeAssistantRun(runId, {
           finishReason: result.finishReason,
           steps: result.steps.length,
+          usage: summarizeGrowthUsage(result.usage, result.steps),
         });
         return {
           content: [{ type: "text" as const, text: result.text }],

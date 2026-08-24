@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "crypto";
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "@/env";
@@ -8,6 +8,8 @@ import { osInspectUrl, outreachLinkFor } from "@/lib/pregen-urls";
 import { updateCompany } from "@/server/clients/hubspot.client";
 import { db } from "@/server/db";
 import { leadDomainTable, pregenBuildTable } from "@/server/db/leads-schema";
+
+import { hostFromUrl, tokenFromPreviewUrl } from "./helpers";
 
 /**
  * WanderOS pregen prospect webhook.
@@ -59,41 +61,6 @@ function secretMatches(provided: string | null): boolean {
   const b = Buffer.from(expected);
   // timingSafeEqual throws on length mismatch, which is itself a signal.
   return a.length === b.length && timingSafeEqual(a, b);
-}
-
-/**
- * `https://www.example.com/x` → `example.com`, to match how leads are keyed.
- *
- * Exported for test: this is the join between WanderOS's `sourceUrl` and
- * `lead_domain.domain`, and it is the only correlation available on the first
- * event for a prospect we did not request ourselves. Getting `www` or a path
- * wrong means the webhook silently reports `matched: false` forever.
- */
-export function hostFromUrl(value: string): string | null {
-  try {
-    return new URL(value).hostname.replace(/^www\./i, "").toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The preview's bearer token, extracted from the monolith's canonical
- * `previewUrl` (`https://<label>.<zone>/?t=<token>`). The payload carries no
- * separate token field, but `/api/pregen/preview/[token]` resolves monolith
- * prospects by `preview_token` — wander.com's /os/<slug> pitch wrapper depends
- * on it — so a mirror row without the token is invisible to that page.
- *
- * Exported for test: this is the join between the webhook and the artifact
- * API's monolith branch; losing the token silently 404s every pitch page.
- */
-export function tokenFromPreviewUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
-  try {
-    return new URL(value).searchParams.get("t") || null;
-  } catch {
-    return null;
-  }
 }
 
 export async function POST(request: NextRequest) {

@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import {
+  findLatestOwnedChatMedia,
   findLatestOwnedChatImage,
   findLatestOwnedChatImages,
+  isChatAttachmentMediaType,
   isOwnedChatImagePath,
   isOwnedChatImageUrl,
+  maxChatAttachmentBytes,
 } from "./chat-attachment";
 
 const ORIGINAL_BASE = process.env.R2_PUBLIC_BASE_URL;
@@ -131,6 +134,51 @@ describe("findLatestOwnedChatImages", () => {
         "usr_123",
       ),
     ).toEqual({ url: second.url, mediaType: second.mediaType });
+  });
+});
+
+describe("chat video attachments", () => {
+  test("accepts supported video MIME types with the larger video limit", () => {
+    expect(isChatAttachmentMediaType("video/mp4")).toBe(true);
+    expect(isChatAttachmentMediaType("video/quicktime")).toBe(true);
+    expect(maxChatAttachmentBytes("video/webm")).toBe(250 * 1024 * 1024);
+    expect(isChatAttachmentMediaType("video/x-msvideo")).toBe(false);
+  });
+
+  test("resolves the newest owned image and video set", () => {
+    expect(
+      findLatestOwnedChatMedia(
+        [
+          {
+            role: "user",
+            parts: [
+              {
+                type: "file",
+                mediaType: "image/png",
+                url: "https://media.growth.wander.com/uploads/chat/usr_123/image-att.png",
+              },
+              {
+                type: "file",
+                mediaType: "video/mp4",
+                filename: "reel.mp4",
+                url: "https://media.growth.wander.com/uploads/chat/usr_123/video-att.mp4",
+              },
+            ],
+          },
+        ],
+        "usr_123",
+      ),
+    ).toEqual([
+      {
+        mediaType: "image/png",
+        url: "https://media.growth.wander.com/uploads/chat/usr_123/image-att.png",
+      },
+      {
+        mediaType: "video/mp4",
+        title: "reel.mp4",
+        url: "https://media.growth.wander.com/uploads/chat/usr_123/video-att.mp4",
+      },
+    ]);
   });
 });
 

@@ -10,7 +10,11 @@ import {
 import { createId } from "../db/utils";
 import { R2 } from "../clients/r2.client";
 import { Stream } from "../clients/stream.client";
-import { isOwnedChatImageUrl } from "@/lib/chat-attachment";
+import {
+  isChatAttachmentMediaType,
+  isOwnedChatAttachmentUrl,
+  maxChatAttachmentBytes,
+} from "@/lib/chat-attachment";
 import { classifyFetchUrl } from "@/server/ai/url-safety";
 
 export const MEDIA_MIME = {
@@ -898,14 +902,21 @@ export async function createChatR2Upload(input: {
   size: number;
   fileName?: string;
 }): Promise<{ uploadUrl: string; url: string; mediaType: string }> {
-  if (!input.mediaType.startsWith("image/"))
-    throw new Error("Only images can be attached");
-  if (input.size > 10 * 1024 * 1024)
-    throw new Error("Image is too large (max 10MB)");
+  if (!isChatAttachmentMediaType(input.mediaType)) {
+    throw new Error("Only supported images and videos can be attached");
+  }
+  const maximumSize = maxChatAttachmentBytes(input.mediaType);
+  if (!maximumSize || input.size > maximumSize) {
+    throw new Error(
+      input.mediaType.startsWith("video/")
+        ? "Video is too large (max 250MB)"
+        : "Image is too large (max 10MB)",
+    );
+  }
 
   const ext = input.mediaType.split("/")[1]?.split("+")[0] ?? "png";
   // Unique key per upload so same-named pastes never collide; scoped per user.
-  const filename = `${createId("att")}-${safeFilename(input.fileName ?? `paste.${ext}`)}`;
+  const filename = `${input.mediaType.startsWith("video/") ? "video" : "image"}-${createId("att")}-${safeFilename(input.fileName ?? `paste.${ext}`)}`;
   const key = R2.buildUploadKey("chat", input.userId, filename);
   return {
     uploadUrl: await R2.presignPut(key, input.mediaType),
@@ -927,7 +938,7 @@ export async function promoteChatMedia(input: {
   if (kind !== "image" && kind !== "gif" && kind !== "video") {
     throw new Error("Only chat images, GIFs, and videos can be promoted");
   }
-  if (!isOwnedChatImageUrl(input.url, input.userId)) {
+  if (!isOwnedChatAttachmentUrl(input.url, input.userId)) {
     throw new Error("Chat attachment does not belong to this operator");
   }
   const parsed = new URL(input.url);

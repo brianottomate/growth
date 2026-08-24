@@ -19,8 +19,14 @@ import {
   failAssistantRun,
   startAssistantRun,
 } from "@/server/ai/kernel/journal";
+import { GROWTH_MAX_OUTPUT_TOKENS } from "@/server/ai/kernel/limits";
+import {
+  GROWTH_CONVERSATION_CACHE_TTL,
+  withGrowthRollingCache,
+} from "@/server/ai/kernel/prompt-cache";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
 import { runtimeClockSection } from "@/server/ai/kernel/runtime-clock";
+import { summarizeGrowthUsage } from "@/server/ai/kernel/usage";
 
 /**
  * /plan is a deterministic product-surface projection of the same canonical
@@ -59,6 +65,7 @@ export async function POST(req: Request): Promise<Response> {
   const context = composeGrowthContext({
     surface: "plan-chat",
     maximumCharacters: 24_000,
+    rollingCacheTtl: GROWTH_CONVERSATION_CACHE_TTL,
     sections: [
       { id: "persona", content: PLAN_AGENT_PERSONA, cache: "session" },
       {
@@ -98,6 +105,13 @@ export async function POST(req: Request): Promise<Response> {
         toolsContext: runtime.toolsContext,
         toolApproval: runtime.toolApproval,
         stopWhen: stepCountIs(8),
+        maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
+        prepareStep: ({ messages: stepMessages }) => ({
+          messages: withGrowthRollingCache(
+            stepMessages,
+            GROWTH_CONVERSATION_CACHE_TTL,
+          ),
+        }),
       });
     } catch (error) {
       await failAssistantRun(runId, compactGrowthError(error));
@@ -116,9 +130,13 @@ export async function POST(req: Request): Promise<Response> {
 
   return result.toUIMessageStreamResponse({
     onFinish: async ({ messages: updatedMessages }) => {
+      const usage = await result.usage;
+      const steps = await result.steps;
       await completeAssistantRun(runId, {
         persistedMessages: 0,
         streamedMessages: updatedMessages.length,
+        steps: steps.length,
+        usage: summarizeGrowthUsage(usage, steps),
       });
     },
   });

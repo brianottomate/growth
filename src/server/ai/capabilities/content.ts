@@ -66,7 +66,11 @@ async function requireContentWorkItem(
       eq(contentPostTable.id, contentPostId),
       isNull(contentPostTable.deletedAt),
     ),
-    with: { brand: true, platformPosts: true, series: true },
+    with: {
+      brand: true,
+      platformPosts: { with: { channel: true } },
+      series: true,
+    },
   });
   if (!content || content.brand?.organizationId !== ctx.orgId) {
     throw new Error(
@@ -110,7 +114,7 @@ const ADD_A_SPOT_HINT =
 
 export const getContentWorkItem = growthAction({
   description:
-    "Read one canonical content work item with its brief, media pool, platform drafts, schedule, and deterministic production-readiness checklist. Call this FIRST when the active conversation is about finishing or refining a content item.",
+    "Read one canonical content work item with its brief, media pool, platform drafts, local schedule, provider receipt/status, connection readiness, and deterministic production-readiness checklist. Call this FIRST when the active conversation is about finishing or refining a content item. A deliveryExternalId is proof that Zernio accepted the post; scheduledAt alone is local intent.",
   inputSchema: z.object({ contentPostId: z.string() }),
   execute: async ({ contentPostId }, ctx) => {
     const content = await requireContentWorkItem(contentPostId, ctx);
@@ -162,12 +166,26 @@ export const getContentWorkItem = growthAction({
         format: group.root.format,
         archetype: group.root.archetype,
         status: group.root.status,
+        channel: group.root.channel
+          ? {
+              id: group.root.channel.id,
+              displayName: group.root.channel.displayName,
+              handle: group.root.channel.handle,
+              connectionStatus: group.root.channel.connectionStatus,
+              defaultProvider: group.root.channel.defaultProvider,
+            }
+          : null,
         text: group.root.text,
         scheduledAt: group.root.scheduledAt,
         provider: group.root.provider,
+        deliveryExternalId: group.root.deliveryExternalId,
         deliveryStatus: group.root.deliveryStatus,
+        deliveryError: group.root.deliveryError,
+        deliveryUpdatedAt: group.root.deliveryUpdatedAt,
         firstComment: group.root.firstCommentText,
         firstCommentStatus: group.root.firstCommentStatus,
+        firstCommentError: group.root.firstCommentError,
+        firstCommentUpdatedAt: group.root.firstCommentUpdatedAt,
         media: group.root.media ?? [],
         assetLinks: group.root.assetLinks ?? [],
         threadItems: group.items.map((post, index) => ({

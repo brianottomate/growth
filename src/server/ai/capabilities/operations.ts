@@ -30,7 +30,7 @@ import {
   seriesTable,
 } from "@/server/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { findLatestOwnedChatImages } from "@/lib/chat-attachment";
+import { findLatestOwnedChatMedia } from "@/lib/chat-attachment";
 import { MediaService } from "@/server/services/media.service";
 import {
   replaceBrandMixTargets,
@@ -254,7 +254,7 @@ export const analyzeMediaAsset = growthAction({
 
 export const saveChatMediaToLibrary = growthAction({
   description:
-    "Save pasted chat media (images or GIFs) into an owned brand's durable media library without needing a content work item, then auto-analyze each image against the brand's managed tag vocabulary so it arrives tagged. Use only when the operator explicitly asks to save, upload, or keep pasted media in the library or media pool. Pass the complete media array for the current turn; when the operator refers to pastes from an earlier turn, omit media and the server resolves the newest owned attachments in this conversation.",
+    "Save pasted chat media (images, GIFs, or videos) into an owned brand's durable media library without needing a content work item, then auto-analyze each image against the brand's managed tag vocabulary so it arrives tagged. Use only when the operator explicitly asks to save, upload, or keep pasted media in the library or media pool. Pass the complete media array for the current turn; when the operator refers to attachments from an earlier turn, omit media and the server resolves the newest owned attachments in this conversation.",
   inputSchema: z.object({
     brandId: z.string(),
     media: z
@@ -290,7 +290,7 @@ export const saveChatMediaToLibrary = growthAction({
         orderBy: [desc(assistantMessageTable.createdAt)],
         limit: 30,
       });
-      media = findLatestOwnedChatImages(
+      media = findLatestOwnedChatMedia(
         rows.map((row) => row.message).reverse(),
         ctx.userId,
       );
