@@ -69,6 +69,25 @@ function listenTab(source: string): string {
   return "monitor";
 }
 
+// Label for the link that goes straight to the post. External collaborators
+// (Status Labs on Reddit) work the alert from Slack and have no tool account, so
+// the message has to name where the reply happens, not just link "Listen".
+function replyLabel(source: string): string {
+  if (source === "reddit") return "Reply on Reddit";
+  if (source === "instagram") return "Reply on Instagram";
+  if (source === "twitter") return "Reply on X";
+  return "Open the thread";
+}
+
+// Reddit threads go cold fast, so age decides whether a reply is worth writing
+// at all. Coarse on purpose: hours then days, no minutes.
+function ageLabel(postedAt: Date): string {
+  const hours = Math.floor((Date.now() - postedAt.getTime()) / 3_600_000);
+  if (hours < 1) return "just now";
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 function trackedLinkFor(m: Mention): string {
   return buildTrackedLink({
     id: m.id,
@@ -102,6 +121,8 @@ function buildBlocks(m: Mention) {
     fields.push({ type: "mrkdwn", text: `*${label}*\n${value}` });
 
   field("Where", sourceLabel(m));
+  if (m.author) field("Who", escapeSlackText(m.author));
+  if (m.postedAt) field("Posted", ageLabel(m.postedAt));
   if (m.keyword) field("Keyword", `\`${m.keyword}\``);
   if (typeof m.relevance === "number") field("Relevance", `${m.relevance}/10`);
   if (m.intentTag) field("Intent", m.intentTag);
@@ -134,14 +155,18 @@ function buildBlocks(m: Mention) {
   // quieter but we don't want to risk the RACI owners' notifications.
   const ownerSlackIds = SOURCE_OWNER_SLACK_IDS[m.source] ?? [];
   const ownerPings = ownerSlackIds.map((id) => `<@${id}>`).join(" ");
-  const listenLink = `<${env.NEXT_PUBLIC_BASE_URL}/app/listen?tab=${listenTab(m.source)}|Open in Listen>`;
+  // Reply link leads; Listen is flagged Wander-only because the owners include
+  // external collaborators who can't sign in and were clicking it blind.
+  const replyLink = `<${m.url}|${replyLabel(m.source)}>`;
+  const listenLink = `<${env.NEXT_PUBLIC_BASE_URL}/app/listen?tab=${listenTab(m.source)}|Listen (Wander only)>`;
+  const actions = `${replyLink} · ${listenLink}`;
   blocks.push({
     type: "section",
     text: {
       type: "mrkdwn",
       text: ownerPings
-        ? `${ownerPings}, you're on this one · ${listenLink}`
-        : listenLink,
+        ? `${ownerPings}, you're on this one · ${actions}`
+        : actions,
     },
   });
 
@@ -161,14 +186,18 @@ function escapeSlackText(text: string): string {
 }
 
 // The action kit, hung off the alert in a thread so the channel stays scannable:
-// the AI-drafted reply to make our own. Only posted when a draft exists.
+// the AI-drafted reply plus the tracked link. Posted on every broadcast, draft
+// or not, because for anyone without a tool account this thread IS the queue
+// row: it carries the disclosure rule and the link to use.
 function buildThreadBlocks(m: Mention) {
   const blocks: SlackBlock[] = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: ":speech_balloon: *Suggested reply* — make it yours, keep it human, and disclose you're with Wander:",
+        text: m.suggestedReply
+          ? ":speech_balloon: *Suggested reply.* Make it yours, keep it human, and say you're with Wander:"
+          : ":speech_balloon: No draft for this one. Write it in your own voice and say you're with Wander.",
       },
     },
   ];
@@ -225,19 +254,17 @@ export async function postMentionToRadio(m: Mention) {
       console.error("[radio] failed to persist slack thread ref", e);
     }
 
-    // Best-effort thread: the suggested reply hangs off the alert so the channel
-    // stays a scannable feed. A thread failure must never change the result the
-    // caller sees for the main post, so we don't await-or-throw on it.
-    if (m.suggestedReply) {
-      await postOnSlack({
-        text: "Suggested reply",
-        channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
-        thread_ts: result.ts,
-        blocks: buildThreadBlocks(m),
-        unfurl_links: false,
-        unfurl_media: false,
-      });
-    }
+    // Best-effort thread: the reply kit hangs off the alert so the channel stays
+    // a scannable feed. A thread failure must never change the result the caller
+    // sees for the main post, so we don't await-or-throw on it.
+    await postOnSlack({
+      text: m.suggestedReply ? "Suggested reply" : "Reply kit",
+      channel: RADIO_SOCIAL_LISTENING_CHANNEL_ID,
+      thread_ts: result.ts,
+      blocks: buildThreadBlocks(m),
+      unfurl_links: false,
+      unfurl_media: false,
+    });
   }
 
   return result;
