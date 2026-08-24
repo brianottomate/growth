@@ -29,7 +29,7 @@ import {
   prepareVideoAnalysis,
   saveVideoAnalysisRender,
 } from "@/server/services/video-analysis.service";
-import { MAX_CHAT_VIDEO_BYTES } from "@/lib/chat-attachment";
+import { maxChatAttachmentBytes } from "@/lib/chat-attachment";
 
 type Ctx = {
   db: typeof db;
@@ -153,11 +153,33 @@ export const mediaRouter = createTRPCRouter({
    */
   createChatUploadUrl: protectedProcedure
     .input(
-      z.object({
-        fileName: z.string().max(300).optional(),
-        mediaType: z.string().min(1).max(120),
-        size: z.number().int().positive().max(MAX_CHAT_VIDEO_BYTES),
-      }),
+      z
+        .object({
+          fileName: z.string().max(300).optional(),
+          mediaType: z.string().min(1).max(120),
+          size: z.number().int().positive(),
+        })
+        .superRefine((input, ctx) => {
+          const maximum = maxChatAttachmentBytes(input.mediaType);
+          if (!maximum) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["mediaType"],
+              message: "Unsupported chat attachment type",
+            });
+          } else if (input.size > maximum) {
+            ctx.addIssue({
+              code: "too_big",
+              origin: "number",
+              maximum,
+              inclusive: true,
+              path: ["size"],
+              message: input.mediaType.startsWith("video/")
+                ? "Video exceeds the 250 MB chat limit"
+                : "Image exceeds the 10 MB chat limit",
+            });
+          }
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       return MediaService.createChatR2Upload({

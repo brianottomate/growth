@@ -22,6 +22,7 @@ import {
 import { GROWTH_MAX_OUTPUT_TOKENS } from "@/server/ai/kernel/limits";
 import {
   GROWTH_CONVERSATION_CACHE_TTL,
+  growthCacheTtlForStep,
   withGrowthRollingCache,
 } from "@/server/ai/kernel/prompt-cache";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
@@ -106,10 +107,10 @@ export async function POST(req: Request): Promise<Response> {
         toolApproval: runtime.toolApproval,
         stopWhen: stepCountIs(8),
         maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
-        prepareStep: ({ messages: stepMessages }) => ({
+        prepareStep: ({ messages: stepMessages, stepNumber }) => ({
           messages: withGrowthRollingCache(
             stepMessages,
-            GROWTH_CONVERSATION_CACHE_TTL,
+            growthCacheTtlForStep(stepNumber),
           ),
         }),
       });

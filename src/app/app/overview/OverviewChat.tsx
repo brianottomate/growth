@@ -487,6 +487,7 @@ export function OverviewChat({
             });
             await putWithProgress(uploadTarget.uploadUrl, attachment.file, {
               contentType: attachment.mediaType,
+              timeoutMs: 10 * 60 * 1000,
               onProgress: (fraction) =>
                 updatePendingAttachments((current) =>
                   current.map((pending) =>

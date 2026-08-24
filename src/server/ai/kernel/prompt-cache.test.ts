@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { ModelMessage } from "ai";
 
-import { withGrowthRollingCache } from "./prompt-cache";
+import { growthCacheTtlForStep, withGrowthRollingCache } from "./prompt-cache";
 
 describe("withGrowthRollingCache", () => {
   it("moves a one-hour breakpoint to the current conversation tail", () => {
@@ -87,5 +87,11 @@ describe("withGrowthRollingCache", () => {
 
   it("handles an empty conversation", () => {
     expect(withGrowthRollingCache([], "5m")).toEqual([]);
+  });
+
+  it("uses the long cache once and cheaper writes inside the tool loop", () => {
+    expect(growthCacheTtlForStep(0)).toBe("1h");
+    expect(growthCacheTtlForStep(1)).toBe("5m");
+    expect(growthCacheTtlForStep(8)).toBe("5m");
   });
 });

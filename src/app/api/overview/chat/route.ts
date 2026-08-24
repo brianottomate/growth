@@ -31,6 +31,7 @@ import {
 import { GROWTH_MAX_OUTPUT_TOKENS } from "@/server/ai/kernel/limits";
 import {
   GROWTH_CONVERSATION_CACHE_TTL,
+  growthCacheTtlForStep,
   withGrowthRollingCache,
 } from "@/server/ai/kernel/prompt-cache";
 import { buildGrowthToolRuntime } from "@/server/ai/kernel/runtime";
@@ -47,6 +48,7 @@ import type {
 import {
   isChatAttachmentMediaType,
   isOwnedChatAttachmentUrl,
+  MAX_CHAT_ATTACHMENTS,
 } from "@/lib/chat-attachment";
 
 /**
@@ -271,7 +273,7 @@ export async function POST(req: Request): Promise<Response> {
         return true;
       },
     )
-    .slice(0, 10);
+    .slice(0, MAX_CHAT_ATTACHMENTS);
   const attachmentList = safeAttachments
     .map(
       (attachment, index) =>
@@ -450,10 +452,10 @@ export async function POST(req: Request): Promise<Response> {
         toolApproval: runtime.toolApproval,
         stopWhen: stepCountIs(20),
         maxOutputTokens: GROWTH_MAX_OUTPUT_TOKENS,
-        prepareStep: ({ messages }) => ({
+        prepareStep: ({ messages, stepNumber }) => ({
           messages: withGrowthRollingCache(
             messages,
-            GROWTH_CONVERSATION_CACHE_TTL,
+            growthCacheTtlForStep(stepNumber),
           ),
         }),
       });

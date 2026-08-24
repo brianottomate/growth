@@ -117,7 +117,7 @@ export const assistantRunTable = pgTable(
     contextManifest: t.jsonb().$type<{
       surface: string;
       characters: number;
-      cachedPrefixCharacters: number;
+      cachedPrefixCharacters?: number;
       cachedPrefixFingerprint?: string;
       rollingCacheTtl?: "5m" | "1h";
       sections: Array<{ id: string; characters: number; cache: string }>;

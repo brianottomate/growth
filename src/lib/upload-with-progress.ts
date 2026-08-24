@@ -16,11 +16,14 @@ export function putWithProgress(
     /** Fractional progress, 0 to 1. Not called if the server hides the length. */
     onProgress?: (fraction: number) => void;
     signal?: AbortSignal;
+    /** Fail a stalled upload instead of blocking the composer forever. */
+    timeoutMs?: number;
   },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     request.open("PUT", url, true);
+    request.timeout = options.timeoutMs ?? 10 * 60 * 1000;
     request.setRequestHeader("Content-Type", options.contentType);
 
     request.upload.onprogress = (event) => {
@@ -38,6 +41,7 @@ export function putWithProgress(
     request.onerror = () =>
       reject(new Error("Upload failed — the connection dropped"));
     request.onabort = () => reject(new Error("Upload cancelled"));
+    request.ontimeout = () => reject(new Error("Upload timed out"));
 
     options.signal?.addEventListener("abort", () => request.abort(), {
       once: true,
