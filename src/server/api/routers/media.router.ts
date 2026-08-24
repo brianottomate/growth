@@ -29,7 +29,10 @@ import {
   prepareVideoAnalysis,
   saveVideoAnalysisRender,
 } from "@/server/services/video-analysis.service";
-import { maxChatAttachmentBytes } from "@/lib/chat-attachment";
+import {
+  formatChatAttachmentLimit,
+  maxChatAttachmentBytes,
+} from "@/lib/chat-attachment";
 
 type Ctx = {
   db: typeof db;
@@ -175,8 +178,8 @@ export const mediaRouter = createTRPCRouter({
               inclusive: true,
               path: ["size"],
               message: input.mediaType.startsWith("video/")
-                ? "Video exceeds the 250 MB chat limit"
-                : "Image exceeds the 10 MB chat limit",
+                ? `Video exceeds the ${formatChatAttachmentLimit(maximum)} chat limit`
+                : `Image exceeds the ${formatChatAttachmentLimit(maximum)} chat limit`,
             });
           }
         }),

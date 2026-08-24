@@ -8,6 +8,8 @@
  * the only API that exposes `upload.onprogress`, so it is worth the older
  * shape.
  */
+const DEFAULT_UPLOAD_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+
 export function putWithProgress(
   url: string,
   file: Blob,
@@ -16,21 +18,39 @@ export function putWithProgress(
     /** Fractional progress, 0 to 1. Not called if the server hides the length. */
     onProgress?: (fraction: number) => void;
     signal?: AbortSignal;
-    /** Fail a stalled upload instead of blocking the composer forever. */
+    /** Abort after this long without progress. Defaults to 10m; 0 disables. */
     timeoutMs?: number;
   },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     request.open("PUT", url, true);
-    request.timeout = options.timeoutMs ?? 10 * 60 * 1000;
     request.setRequestHeader("Content-Type", options.contentType);
 
+    const inactivityTimeoutMs =
+      options.timeoutMs ?? DEFAULT_UPLOAD_INACTIVITY_TIMEOUT_MS;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const clearInactivityTimeout = () => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      timeoutId = undefined;
+    };
+    const armInactivityTimeout = () => {
+      clearInactivityTimeout();
+      if (inactivityTimeoutMs <= 0) return;
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        request.abort();
+      }, inactivityTimeoutMs);
+    };
+
     request.upload.onprogress = (event) => {
+      armInactivityTimeout();
       if (!event.lengthComputable || !options.onProgress) return;
       options.onProgress(Math.min(1, event.loaded / event.total));
     };
     request.onload = () => {
+      clearInactivityTimeout();
       if (request.status >= 200 && request.status < 300) {
         options.onProgress?.(1);
         resolve();
@@ -38,14 +58,19 @@ export function putWithProgress(
       }
       reject(new Error(`Upload failed (${request.status})`));
     };
-    request.onerror = () =>
+    request.onerror = () => {
+      clearInactivityTimeout();
       reject(new Error("Upload failed — the connection dropped"));
-    request.onabort = () => reject(new Error("Upload cancelled"));
-    request.ontimeout = () => reject(new Error("Upload timed out"));
+    };
+    request.onabort = () => {
+      clearInactivityTimeout();
+      reject(new Error(timedOut ? "Upload timed out" : "Upload cancelled"));
+    };
 
     options.signal?.addEventListener("abort", () => request.abort(), {
       once: true,
     });
+    armInactivityTimeout();
     request.send(file);
   });
 }

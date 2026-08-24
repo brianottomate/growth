@@ -11,6 +11,7 @@ import { createId } from "../db/utils";
 import { R2 } from "../clients/r2.client";
 import { Stream } from "../clients/stream.client";
 import {
+  chatAttachmentLimitLabel,
   isChatAttachmentMediaType,
   isOwnedChatAttachmentUrl,
   maxChatAttachmentBytes,
@@ -907,10 +908,9 @@ export async function createChatR2Upload(input: {
   }
   const maximumSize = maxChatAttachmentBytes(input.mediaType);
   if (!maximumSize || input.size > maximumSize) {
+    const limitLabel = chatAttachmentLimitLabel(input.mediaType);
     throw new Error(
-      input.mediaType.startsWith("video/")
-        ? "Video is too large (max 250MB)"
-        : "Image is too large (max 10MB)",
+      `${input.mediaType.startsWith("video/") ? "Video" : "Image"} is too large${limitLabel ? ` (max ${limitLabel})` : ""}`,
     );
   }
 

@@ -33,6 +33,15 @@ export function maxChatAttachmentBytes(mediaType: string): number | null {
   return null;
 }
 
+export function formatChatAttachmentLimit(bytes: number): string {
+  return `${bytes / (1024 * 1024)} MB`;
+}
+
+export function chatAttachmentLimitLabel(mediaType: string): string | null {
+  const maximum = maxChatAttachmentBytes(mediaType);
+  return maximum ? formatChatAttachmentLimit(maximum) : null;
+}
+
 export function isOwnedChatAttachmentPath(
   pathname: string,
   userId: string,

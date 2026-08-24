@@ -45,6 +45,7 @@ import { isApprovalSuperseded } from "@/lib/chat-approval-state";
 import { formatResolvedPublishingTime } from "@/lib/scheduling-time";
 import { cn } from "@/lib/utils";
 import {
+  chatAttachmentLimitLabel,
   isChatAttachmentMediaType,
   maxChatAttachmentBytes,
   MAX_CHAT_ATTACHMENTS,
@@ -437,10 +438,9 @@ export function OverviewChat({
         const maximumSize = maxChatAttachmentBytes(file.type);
         if (!maximumSize || file.size > maximumSize) {
           recordSkip(file, "too_large");
+          const limitLabel = chatAttachmentLimitLabel(file.type);
           toast.error(`Couldn't attach ${file.name}`, {
-            description: file.type.startsWith("video/")
-              ? "Video is too large (max 250MB)"
-              : "Image is too large (max 10MB)",
+            description: `${file.type.startsWith("video/") ? "Video" : "Image"} is too large${limitLabel ? ` (max ${limitLabel})` : ""}`,
           });
           continue;
         }
