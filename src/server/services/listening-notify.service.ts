@@ -15,18 +15,22 @@ import { buildTrackedLink } from "@/lib/tracked-link";
 // equivalent this mirrors.)
 const RADIO_SOCIAL_LISTENING_CHANNEL_ID = "C0BAW47LFGF";
 
-// Per-source Slack owner to @-mention on broadcast, so the channel's RACI owner
-// gets pinged on engage-worthy hits instead of having to watch the channel.
-// Keyed by mention.source (note: X is stored as "twitter"). Lift onto
+// Per-source Slack owners to @-mention on broadcast, so the channel's RACI
+// owners get pinged on engage-worthy hits instead of having to watch the
+// channel. Keyed by mention.source (note: X is stored as "twitter"). A source
+// can carry more than one owner; every id in the list gets pinged. Lift onto
 // listening_source if per-brand ownership is ever needed.
 //
 // All three sources now persist→score→broadcast, so their owners fire on real
 // hits: reddit via F5Bot email, instagram via the account-watch cron, twitter
 // via the hourly X recent-search cron (/api/cron/x).
-const SOURCE_OWNER_SLACK_ID: Partial<Record<string, string>> = {
-  reddit: "U0BHR7V2X35", // Colleen Barndt (StatusLabs) — Reddit
-  twitter: "U025DTBSU01", // Kyle — X / Twitter
-  instagram: "U0574R1RCD9", // Micaela — Instagram
+const SOURCE_OWNER_SLACK_IDS: Partial<Record<string, string[]>> = {
+  reddit: [
+    "U0BHR7V2X35", // Colleen Barndt (StatusLabs), Reddit
+    "U02ML6AG4BE", // Lilianna Hogan, Reddit
+  ],
+  twitter: ["U025DTBSU01"], // Kyle, X / Twitter
+  instagram: ["U0574R1RCD9"], // Micaela, Instagram
 };
 
 // Keep the channel high-signal: only "engage" mentions ("act today") reach
@@ -127,15 +131,16 @@ function buildBlocks(m: Mention) {
   }
 
   // Owner ping stays in a `section`, not a `context` — context styling is
-  // quieter but we don't want to risk the RACI owner's notification.
-  const ownerSlackId = SOURCE_OWNER_SLACK_ID[m.source];
+  // quieter but we don't want to risk the RACI owners' notifications.
+  const ownerSlackIds = SOURCE_OWNER_SLACK_IDS[m.source] ?? [];
+  const ownerPings = ownerSlackIds.map((id) => `<@${id}>`).join(" ");
   const listenLink = `<${env.NEXT_PUBLIC_BASE_URL}/app/listen?tab=${listenTab(m.source)}|Open in Listen>`;
   blocks.push({
     type: "section",
     text: {
       type: "mrkdwn",
-      text: ownerSlackId
-        ? `<@${ownerSlackId}> — you're on this one · ${listenLink}`
+      text: ownerPings
+        ? `${ownerPings}, you're on this one · ${listenLink}`
         : listenLink,
     },
   });
