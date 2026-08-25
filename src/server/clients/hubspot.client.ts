@@ -1034,6 +1034,33 @@ function contactFrom(found: {
   return { id: found.id, values };
 }
 
+/**
+ * Reply evidence for sequence-outcome classification. `hs_sales_email_last_replied`
+ * is the only property this portal reliably stamps on a reply — the sequence
+ * unenrolled/finished dates read absent even on contacts whose enrollment the
+ * UI shows as finished (verified 2026-08-24 on portal 22480390).
+ */
+export async function getContactReplyEvidence(contactId: string): Promise<{
+  lastRepliedAt: Date | null;
+  lastEnrolledAt: Date | null;
+} | null> {
+  try {
+    const found = await client().crm.contacts.basicApi.getById(contactId, [
+      "hs_sales_email_last_replied",
+      "hs_latest_sequence_enrolled_date",
+    ]);
+    const date = (value: string | null | undefined) =>
+      value ? new Date(value) : null;
+    return {
+      lastRepliedAt: date(found.properties?.hs_sales_email_last_replied),
+      lastEnrolledAt: date(found.properties?.hs_latest_sequence_enrolled_date),
+    };
+  } catch (error) {
+    console.error(`❌ [HUBSPOT] getContactReplyEvidence(${contactId})`, error);
+    return null;
+  }
+}
+
 /** Single contact for webhook hydration. `null` when deleted or unreadable. */
 export async function getContactById(
   contactId: string,
