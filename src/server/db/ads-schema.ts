@@ -4,6 +4,7 @@ import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 import { brandTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { MediaItem } from "./content-schema";
+import { performanceCycleTable } from "./performance-schema";
 import { createId } from "./utils";
 import type {
   AudienceActiveWindow,
@@ -149,6 +150,13 @@ export const initiativeTable = pgTable(
 
     budget: t.integer(), // total intended (whole dollars)
 
+    // Sponsored delivery: the paid performance cycle this initiative fulfils.
+    // Null for Wander's own pushes. Ads stay on Wander's brand/channels; this
+    // FK is the only customer linkage (see performance-schema.ts).
+    performanceCycleId: t
+      .text()
+      .references(() => performanceCycleTable.id, { onDelete: "set null" }),
+
     startAt: t.timestamp({ withTimezone: true }),
     endAt: t.timestamp({ withTimezone: true }),
 
@@ -166,6 +174,7 @@ export const initiativeTable = pgTable(
   (table) => [
     index("initiative_brand_idx").on(table.brandId),
     index("initiative_status_idx").on(table.status),
+    index("initiative_performance_cycle_idx").on(table.performanceCycleId),
   ],
 );
 

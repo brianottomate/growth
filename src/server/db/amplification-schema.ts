@@ -4,6 +4,7 @@ import { index, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 import { organizationTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
 import { platformPostTable } from "./content-schema";
+import { performanceCycleTable } from "./performance-schema";
 import { createId } from "./utils";
 
 /**
@@ -105,6 +106,12 @@ export const amplificationTargetTable = pgTable(
     fulfilledByPostId: t.text(),
     notes: t.text(),
 
+    // Sponsored delivery: the paid performance cycle this touch fulfils
+    // (an influencer collab a customer paid for). Null for Wander's own.
+    performanceCycleId: t
+      .text()
+      .references(() => performanceCycleTable.id, { onDelete: "set null" }),
+
     // Receipt for the explicit Slack handoff. A sent receipt makes retries
     // idempotent and keeps "planned" distinct from "actually asked".
     slackStatus: t.text(),
@@ -125,6 +132,9 @@ export const amplificationTargetTable = pgTable(
   }),
   (table) => [
     index("amplification_target_post_idx").on(table.platformPostId),
+    index("amplification_target_performance_cycle_idx").on(
+      table.performanceCycleId,
+    ),
     index("amplification_target_amplifier_idx").on(table.amplifierId),
     uniqueIndex("amplification_target_unique_idx").on(
       table.platformPostId,

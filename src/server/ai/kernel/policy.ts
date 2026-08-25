@@ -102,6 +102,22 @@ export const growthActionPolicies = {
     removeReference: write({ reversible: false }),
   },
   audienceRead: { list: read() },
+  performanceRead: { list: read(), get: read() },
+  // Commercial bookkeeping in our own tables. `attach` tags existing delivery
+  // rows with a cycle id (undo = attach with cycleId null); nothing here
+  // touches a provider or spends.
+  performanceWrite: {
+    createAccount: write(),
+    updateAccount: write({ idempotent: true }),
+    addProperty: write(),
+    updateProperty: write({ idempotent: true }),
+    openCycle: write(),
+    updateCycle: write({ idempotent: true }),
+    attach: write({
+      idempotent: true,
+      undoWith: "performanceWrite.attach",
+    }),
+  },
   audienceWrite: {
     createTarget: write(),
     saveTargets: write({ idempotent: true }),
