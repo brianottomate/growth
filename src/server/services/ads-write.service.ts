@@ -14,15 +14,20 @@ import {
   zernioConnectionMatchesPlatform,
 } from "@/lib/zernio-ads";
 import {
+  addUsersToZernioAdAudience,
   boostZernioMetaPost,
+  createZernioAdAudience,
   createZernioStandaloneAd,
   duplicateZernioMetaCampaign,
   getZernioAdsTree,
   listZernioAccounts,
   listZernioAdAccounts,
+  ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST,
   type CreateZernioStandaloneAdInput,
   type ZernioAccount,
   type ZernioAdTargeting,
+  type ZernioAudienceUser,
+  type ZernioCarouselCard,
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
 import { adAccountTable, brandTable, type Brand } from "@/server/db/schema";
@@ -281,6 +286,8 @@ export type CreateMetaAdDraftInput = {
   callToAction: string;
   linkUrl: string;
   imageUrl?: string;
+  /** 2–10 hand-built cards; mutually exclusive with imageUrl. */
+  carouselCards?: ZernioCarouselCard[];
   leadGenFormId?: string;
   targeting?: ZernioAdTargeting;
   startDate?: string;
@@ -335,8 +342,23 @@ export async function createMetaAdDraft(
       "Meta app promotion requires promotedObject.applicationId and objectStoreUrl",
     );
   }
-  if (input.goal !== "catalog_sales" && !input.imageUrl) {
-    throw new Error("This Meta draft requires imageUrl");
+  if (input.imageUrl && input.carouselCards) {
+    throw new Error(
+      "Provide imageUrl or carouselCards, not both — a carousel replaces the single creative",
+    );
+  }
+  if (
+    input.carouselCards &&
+    (input.carouselCards.length < 2 || input.carouselCards.length > 10)
+  ) {
+    throw new Error("Meta carousels take 2–10 cards");
+  }
+  if (
+    input.goal !== "catalog_sales" &&
+    !input.imageUrl &&
+    !input.carouselCards
+  ) {
+    throw new Error("This Meta draft requires imageUrl or carouselCards");
   }
   if (
     input.budgetType === "daily" &&
@@ -364,6 +386,7 @@ export async function createMetaAdDraft(
     callToAction: input.callToAction,
     linkUrl: input.linkUrl,
     imageUrl: input.imageUrl,
+    carouselCards: input.carouselCards,
     leadGenFormId: input.leadGenFormId,
     targeting: input.targeting,
     startDate: input.startDate,
@@ -595,4 +618,95 @@ export async function duplicateMetaCampaign(input: {
     requestedStatus: "PAUSED" as const,
     provider,
   };
+}
+
+// ---- AUDIENCES -------------------------------------------------------------
+
+export type CreateAdAudienceInput = {
+  brandSlug: string;
+  connectionAccountId: string;
+  adAccountId: string;
+  type: "customer_list" | "lookalike";
+  name: string;
+  description?: string;
+  sourceAudienceId?: string;
+  country?: string;
+  ratio?: number;
+};
+
+/**
+ * Create a Meta custom audience through the brand's allowlisted destination.
+ * No spend, but a provider write — and Zernio's create endpoint is NOT
+ * idempotent (no Idempotency-Key support), so a failure here must surface to
+ * the operator instead of being retried.
+ */
+export async function createAdAudience(
+  input: CreateAdAudienceInput,
+  context: AdsWriteContext,
+) {
+  const destination = await requireAdDestination({
+    organizationId: context.organizationId,
+    brandSlug: input.brandSlug,
+    platform: "meta",
+    connectionAccountId: input.connectionAccountId,
+    adAccountId: input.adAccountId,
+  });
+  if (
+    input.type === "lookalike" &&
+    (!input.sourceAudienceId || !input.country || !input.ratio)
+  ) {
+    throw new Error(
+      "Lookalike audiences require sourceAudienceId, country, and ratio",
+    );
+  }
+  if (input.ratio !== undefined && (input.ratio < 0.01 || input.ratio > 0.2)) {
+    throw new Error("Lookalike ratio must be between 0.01 and 0.20");
+  }
+  const provider = await createZernioAdAudience({
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+    type: input.type,
+    name: input.name,
+    description: input.description,
+    sourceAudienceId: input.sourceAudienceId,
+    country: input.country,
+    ratio: input.ratio,
+  });
+  return {
+    brand: destination.brand,
+    adAccount: destination.adAccount,
+    provider,
+  };
+}
+
+/**
+ * Upload members to a customer_list audience in 10k chunks (Zernio's request
+ * ceiling), sequentially so a mid-batch failure reports exactly how many rows
+ * landed. Members are sent plaintext and hashed server-side by Zernio; never
+ * log the rows themselves.
+ */
+export async function addAdAudienceUsers(input: {
+  audienceId: string;
+  users: ZernioAudienceUser[];
+}) {
+  let uploaded = 0;
+  try {
+    for (
+      let offset = 0;
+      offset < input.users.length;
+      offset += ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST
+    ) {
+      const chunk = input.users.slice(
+        offset,
+        offset + ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST,
+      );
+      await addUsersToZernioAdAudience(input.audienceId, chunk);
+      uploaded += chunk.length;
+    }
+  } catch (error) {
+    throw new Error(
+      `Audience upload failed after ${uploaded}/${input.users.length} members: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  return { audienceId: input.audienceId, uploaded, total: input.users.length };
 }

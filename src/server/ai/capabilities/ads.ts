@@ -129,7 +129,7 @@ export const listAdsDestinations = growthAction({
 
 export const createMetaAdDraftAction = growthAction({
   description:
-    "Create a complete Meta campaign, ad set, and image ad through Zernio. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
+    "Create a complete Meta campaign, ad set, and ad through Zernio — single-image via imageUrl, or a 2–10 card carousel via carouselCards. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
   inputSchema: z.object({
     ...destinationSchema,
     name: z.string().trim().min(1).max(255),
@@ -161,7 +161,25 @@ export const createMetaAdDraftAction = growthAction({
       .string()
       .url()
       .optional()
-      .describe("Required except for catalog_sales, where Meta renders items."),
+      .describe(
+        "Single-image creative. Provide this or carouselCards (except for catalog_sales, where Meta renders items).",
+      ),
+    carouselCards: z
+      .array(
+        z.object({
+          imageUrl: z.string().url(),
+          headline: z.string().trim().min(1).max(255).optional(),
+          description: z.string().trim().min(1).max(255).optional(),
+          linkUrl: z.string().url().optional(),
+          callToAction: z.string().trim().min(1).max(64).optional(),
+        }),
+      )
+      .min(2)
+      .max(10)
+      .optional()
+      .describe(
+        "Hand-built carousel, 2–10 cards rendered in this exact order. Card linkUrl/callToAction fall back to the ad-level values. Mutually exclusive with imageUrl.",
+      ),
     leadGenFormId: z
       .string()
       .trim()

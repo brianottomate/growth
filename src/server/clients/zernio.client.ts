@@ -810,6 +810,20 @@ export type ZernioAdTargeting = {
   audienceId?: string;
 };
 
+/**
+ * One hand-built carousel card (Meta). Cards render in the order given —
+ * deterministic, unlike Zernio's auto-optimizing dynamicCreative pool.
+ * Card-level linkUrl/callToAction fall back to the ad-level values.
+ * https://docs.zernio.com/ad-campaigns/create-standalone-ad#carousel-ads
+ */
+export type ZernioCarouselCard = {
+  imageUrl: string;
+  headline?: string;
+  description?: string;
+  linkUrl?: string;
+  callToAction?: string;
+};
+
 export type CreateZernioStandaloneAdInput = {
   accountId: string;
   adAccountId: string;
@@ -831,6 +845,8 @@ export type CreateZernioStandaloneAdInput = {
   linkUrl: string;
   imageUrl?: string;
   images?: { landscape: string; square: string };
+  /** Meta only: 2–10 cards; mutually exclusive with imageUrl/images. */
+  carouselCards?: ZernioCarouselCard[];
   campaignName?: string;
   adSetName?: string;
   adName?: string;
@@ -949,6 +965,92 @@ export async function duplicateZernioMetaCampaign(
       }),
     },
   );
+}
+
+// ---- AD AUDIENCES ----------------------------------------------------------
+//
+// POST /v1/ads/audiences is discriminated by `type`. We type the two shapes we
+// use: `customer_list` (created empty, filled via addUsersToZernioAdAudience)
+// and Meta-only `lookalike` (fills itself from sourceAudienceId; no upload).
+// Reference the resulting id via ZernioAdTargeting.audienceId on ad create.
+// https://docs.zernio.com/ad-audiences/create-audience
+
+export type ZernioAdAudience = {
+  id?: string;
+  _id?: string;
+  name?: string;
+  type?: string;
+  status?: string; // pending | processing | ready — platform-dependent
+  platform?: string;
+  platformAudienceId?: string;
+  approximateCount?: number;
+  [key: string]: unknown;
+};
+
+export type CreateZernioAdAudienceInput = {
+  accountId: string;
+  adAccountId: string;
+  type: "customer_list" | "lookalike";
+  name: string;
+  description?: string;
+  /** lookalike only: the existing audience to seed from. */
+  sourceAudienceId?: string;
+  /** lookalike only: ISO country code, e.g. "US". */
+  country?: string;
+  /** lookalike only: 0.01–0.20 (1%–20% of the country). */
+  ratio?: number;
+};
+
+/**
+ * Create a custom audience. Zernio documents this endpoint as NOT idempotent
+ * with no Idempotency-Key support — a blind retry creates a duplicate
+ * platform audience, so callers must never auto-retry (zernioFetch does one
+ * fetch, no retry loop; keep it that way for this path).
+ */
+export async function createZernioAdAudience(
+  input: CreateZernioAdAudienceInput,
+): Promise<{ audience?: ZernioAdAudience; [key: string]: unknown }> {
+  return zernioFetch("/ads/audiences", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export type ZernioAudienceUser = { email?: string; phone?: string };
+
+// The documented per-request ceiling on POST /v1/ads/audiences/{id}/users.
+export const ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST = 10_000;
+
+/**
+ * Upload members to a customer_list audience (422 for other types). Plaintext
+ * in — Zernio SHA-256 hashes server-side. Email matches on every platform;
+ * phone is Meta-only. Max 10,000 users per request; batching across requests
+ * is the caller's job so a mid-batch failure is visible, not swallowed here.
+ * https://docs.zernio.com/ad-audiences/add-users
+ */
+export async function addUsersToZernioAdAudience(
+  audienceId: string,
+  users: ZernioAudienceUser[],
+): Promise<Record<string, unknown>> {
+  if (users.length === 0) {
+    throw new Error("Audience upload requires at least one user");
+  }
+  if (users.length > ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST) {
+    throw new Error(
+      `Audience upload exceeds Zernio's ${ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST}-user request limit; chunk before calling`,
+    );
+  }
+  return zernioFetch(`/ads/audiences/${encodeURIComponent(audienceId)}/users`, {
+    method: "POST",
+    body: JSON.stringify({ users }),
+  });
+}
+
+/** Local audience record plus fresh platform data (Meta) when available. */
+export async function getZernioAdAudience(
+  audienceId: string,
+): Promise<{ audience?: ZernioAdAudience; [key: string]: unknown }> {
+  return zernioFetch(`/ads/audiences/${encodeURIComponent(audienceId)}`);
 }
 
 // Paginates per docs: page (1-based), limit max 100, paginated at campaign level.
