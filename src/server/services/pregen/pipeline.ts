@@ -51,12 +51,38 @@ const PIPELINE: Array<{ step: PregenNativeBuildStep; run: StepFn }> = [
  * the UI's progress feed.
  */
 export async function runBuild(buildId: string): Promise<void> {
+  const more = await runNextStep(buildId);
+  if (!more) return;
+
+  // Schedule the next step on a fresh invocation.
+  after(async () => {
+    await runBuild(buildId);
+  });
+}
+
+/**
+ * Run every remaining step in one process, no `after()` involved.
+ *
+ * `after()` needs a request context, so a build cannot be driven from a CLI or
+ * a test through `runBuild`. This is the same steps in the same order, losing
+ * only the fresh-invocation boundary — which is a serverless memory and timeout
+ * concern, not a correctness one. Checkpointing is unchanged, so a run killed
+ * halfway still resumes through the normal path.
+ */
+export async function runBuildToCompletion(buildId: string): Promise<void> {
+  while (await runNextStep(buildId)) {
+    // Each iteration advances exactly one step and persists its outcome.
+  }
+}
+
+/** Advance one step. Returns true when the build has more steps to run. */
+async function runNextStep(buildId: string): Promise<boolean> {
   const build = await db.query.pregenNativeBuildTable.findFirst({
     where: eq(pregenNativeBuildTable.id, buildId),
     with: { prospect: true },
   });
   if (!build) throw new Error(`pregen build not found: ${buildId}`);
-  if (build.status === "succeeded" || build.status === "failed") return;
+  if (build.status === "succeeded" || build.status === "failed") return false;
 
   const completed = new Set(
     build.stepLog.filter((e) => e.finishedAt && !e.error).map((e) => e.step),
@@ -65,7 +91,7 @@ export async function runBuild(buildId: string): Promise<void> {
 
   if (!next) {
     await finishBuild(buildId, "succeeded");
-    return;
+    return false;
   }
 
   const ctx: StepContext = {
@@ -83,13 +109,10 @@ export async function runBuild(buildId: string): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     await markStepFinished(build.id, next.step, { error: message });
     await finishBuild(buildId, "failed", message);
-    return;
+    return false;
   }
 
-  // Schedule the next step on a fresh invocation.
-  after(async () => {
-    await runBuild(buildId);
-  });
+  return true;
 }
 
 // ---- BOOKKEEPING -----------------------------------------------------

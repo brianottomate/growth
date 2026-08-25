@@ -29,10 +29,10 @@ import type {
  * Timing-safe comparison via the shared webhook-auth utils.
  */
 export function requireGatewayAuth(request: NextRequest): NextResponse | null {
-  const configured = env.HUBSPOT_GATEWAY_API_TOKEN;
+  const configured = env.GROWTH_GATEWAY_API_TOKEN;
   if (!configured) {
     console.error(
-      "❌ [hubspot-gateway] HUBSPOT_GATEWAY_API_TOKEN not configured",
+      "❌ [hubspot-gateway] GROWTH_GATEWAY_API_TOKEN not configured",
     );
     return NextResponse.json(
       { success: false, error: "Gateway auth is not configured" },

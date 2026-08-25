@@ -8,8 +8,10 @@ import {
   pregenNativeCrawlPageTable,
 } from "@/server/db/schema";
 import { rankUnitImages } from "../generation/image-ranking";
+import { rehostImages } from "../generation/rehost-images";
 import {
   applyPriceEstimates,
+  CARD_IMAGES,
   dropJunkUnits,
   extractPropertiesFromPages,
   fillUnitDetailsFromNames,
@@ -19,9 +21,12 @@ import {
 
 import type { StepContext } from "../pipeline";
 
-/** Below this many units the gallery reads as broken; the build should fail
- * loudly rather than ship a two-card grid. (Monolith MIN_GALLERY_UNITS.) */
-const MIN_GALLERY_UNITS = 3;
+/**
+ * Candidates rehosted per unit. One more than a card shows, so an image that
+ * fails to fetch backfills instead of costing a slot. Rehosting is the
+ * expensive step here, so the spare is deliberately thin.
+ */
+const REHOSTED_PER_UNIT = CARD_IMAGES + 1;
 
 /**
  * Property extraction (monolith: prospect-enrichment steps 4–6). Reads the
@@ -67,22 +72,40 @@ export async function injectPropertiesStep(ctx: StepContext) {
   // crawl's order leads with bathrooms and laundry rooms often enough that an
   // unranked lead image is the main thing making a preview look generated.
   const ranked = await rankUnitImages(rankAndTrim(priced));
-  const units = toGalleryUnits(ranked);
 
-  if (units.length < MIN_GALLERY_UNITS) {
-    throw new Error(
-      `inject_properties: only ${units.length} renderable units (need ${MIN_GALLERY_UNITS}) — extracted ${properties.length}, ${kept.length} after junk filter`,
-    );
-  }
+  // Rehost after ranking, never before: ranking is what removes the logos and
+  // wordmarks, and there is no reason to pay a fetch, a decode and a PUT for
+  // bytes we are about to throw away.
+  const { hosted, passthrough } = await rehostImages(
+    ctx.prospectId,
+    ranked.flatMap((unit) => unit.imageUrls.slice(0, REHOSTED_PER_UNIT)),
+  );
+  const units = toGalleryUnits(ranked, hosted);
+
+  // No unit floor. An empty gallery is a preview worth sending, not a failed
+  // build: the site itself, the brand and copy and structure, is what the
+  // outreach pitches, and the renderer shows an example band in place of an
+  // empty one (pregen-preview PropertyGalleryExample) rather than a hole where
+  // the "Browse homes" link points. Failing here threw the whole page away —
+  // on the monolith side that pattern cost 40% of staging runs and is what
+  // wander#21218 removes.
 
   await db
     .update(pregenNativeBuildTable)
     .set({ extractedProperties: units })
     .where(eq(pregenNativeBuildTable.id, ctx.buildId));
 
+  // Per-stage counts, so a zero gallery is diagnosable from the step log
+  // without a re-run: they say whether extraction found nothing, the junk
+  // filter ate it, or every image failed to rehost.
   return {
     extracted: properties.length,
     afterJunkFilter: kept.length,
+    imageCandidates: ranked.reduce(
+      (n, unit) => n + Math.min(unit.imageUrls.length, REHOSTED_PER_UNIT),
+      0,
+    ),
+    imagesHosted: passthrough ? 0 : hosted.size,
     galleryUnits: units.length,
   };
 }

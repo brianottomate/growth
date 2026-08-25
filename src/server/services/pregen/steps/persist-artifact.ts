@@ -10,8 +10,16 @@ import {
 } from "@/server/db/schema";
 import { rankImagesForLead } from "../generation/image-ranking";
 import { applyArtifactImages, buildImagePool } from "../generation/images";
+import { rehostImages } from "../generation/rehost-images";
 
 import type { StepContext } from "../pipeline";
+
+/**
+ * Pool images we bother to rehost. The slots are a hero, a handful of cards and
+ * a CTA background, and the pool is ordered best-first, so everything past this
+ * is a tail that no page ever places.
+ */
+const REHOSTED_POOL_IMAGES = 12;
 
 /**
  * Assembly: fill image slots from crawled sources, then move the build's
@@ -51,7 +59,21 @@ export async function persistArtifactStep(ctx: StepContext) {
       units: build.extractedProperties ?? [],
     }),
   );
-  const pages = applyArtifactImages(build.draftPages, pool);
+
+  // Same reason the gallery images are rehosted: a hero background loaded
+  // cross-origin from the prospect's own CDN is the single most visible thing
+  // on the page and it can vanish for a viewer while still answering 200 to us.
+  // Unit leads are already on our bucket by this point and pass through
+  // untouched.
+  const { hosted } = await rehostImages(
+    ctx.prospectId,
+    pool.slice(0, REHOSTED_POOL_IMAGES),
+  );
+  const hostedPool = pool
+    .map((url) => hosted.get(url))
+    .filter((url): url is string => Boolean(url));
+
+  const pages = applyArtifactImages(build.draftPages, hostedPool);
 
   const [prior] = await db
     .select({ n: count() })
@@ -66,7 +88,7 @@ export async function persistArtifactStep(ctx: StepContext) {
     pages,
   });
 
-  return { pages: pages.length };
+  return { pages: pages.length, poolImages: hostedPool.length };
 }
 
 const asString = (value: unknown): string | undefined =>

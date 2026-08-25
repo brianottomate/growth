@@ -12,7 +12,7 @@ export async function GET() {
     status: "ok",
     service: "hubspot-gateway",
     hubspotConfigured: isHubspotConfigured,
-    gatewayAuthConfigured: !!env.HUBSPOT_GATEWAY_API_TOKEN,
+    gatewayAuthConfigured: !!env.GROWTH_GATEWAY_API_TOKEN,
     timestamp: new Date().toISOString(),
   });
 }

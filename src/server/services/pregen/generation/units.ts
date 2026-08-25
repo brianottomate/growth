@@ -8,9 +8,11 @@ import type { PregenNativeExtractedProperty } from "@/server/db/schema";
 
 // Ported from the monolith's prospect-enrichment/ (see docs/port/
 // unit-extraction.md): extraction prompt, grounding, junk filter, name-regex
-// fill, price estimates, and rankAndTrim — all verbatim logic. Deferred for
-// V0 (noted, not forgotten): contact-sheet image boards (thumbnailIndex
-// selection) and R2 image rehosting — V0 hotlinks the first 3 source images.
+// fill, price estimates, and rankAndTrim — all verbatim logic. Photo selection
+// takes a different route than the monolith's contact-sheet + thumbnailIndex
+// pass: see image-ranking.ts, which ranks and rejects in one vision call.
+// Rehosting now happens too (rehost-images.ts); toGalleryUnits maps through
+// its result rather than hotlinking source URLs.
 
 const SONNET = () => anthropic("claude-sonnet-5");
 
@@ -378,20 +380,36 @@ export function rankAndTrim(properties: SourceProperty[]): SourceProperty[] {
   return indexed.slice(0, MAX_GALLERY_UNITS).map(({ p }) => p);
 }
 
+/** Photos on a card. The fourth candidate exists only to backfill. */
+export const CARD_IMAGES = 3;
+
 /**
  * Map to the persisted unit shape. Zero-image units are dropped (a card with
  * no photo reads as broken); bedrooms/bathrooms only set when > 0 (zero means
- * unknown → omit). V0 hotlinks the first 3 source images — rehosting to R2
- * comes before real outreach.
+ * unknown → omit).
+ *
+ * `hosted` maps a source URL to the copy we serve. A URL missing from it did
+ * not survive fetch or preparation, so it is skipped and the next candidate
+ * moves up: a single unfetchable image costs a slot, not a card. Units whose
+ * every candidate failed drop out here, which is why the caller must not treat
+ * a thin gallery as a failed build.
  */
 export function toGalleryUnits(
   properties: SourceProperty[],
+  hosted: Map<string, string>,
 ): PregenNativeExtractedProperty[] {
   return properties
+    .map((p) => ({
+      ...p,
+      imageUrls: p.imageUrls
+        .map((url) => hosted.get(url))
+        .filter((url): url is string => Boolean(url))
+        .slice(0, CARD_IMAGES),
+    }))
     .filter((p) => p.imageUrls.length > 0)
     .map((p) => ({
       name: p.name,
-      imageUrls: p.imageUrls.slice(0, 3),
+      imageUrls: p.imageUrls,
       ...(p.features && p.features.bedrooms > 0
         ? { bedrooms: p.features.bedrooms }
         : {}),

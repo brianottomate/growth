@@ -99,7 +99,7 @@ export const env = createEnv({
     HUBSPOT_ACCESS_TOKEN_OPERATED: z.string().optional(),
     // Inbound bearer for /api/hubspot/v1/* callers (wander.com, monolith) —
     // authenticates callers to OUR gateway routes, unrelated to HubSpot auth
-    HUBSPOT_GATEWAY_API_TOKEN: z.string().min(32).optional(),
+    GROWTH_GATEWAY_API_TOKEN: z.string().min(32).optional(),
     // HubSpot webhooks — the shared private app's client secret, used to
     // verify the v3 request signature on /api/webhooks/hubspot
     HUBSPOT_WEBHOOK_CLIENT_SECRET: z.string().optional(),
@@ -240,7 +240,7 @@ export const env = createEnv({
     BRIGHT_DATA_API_KEY: process.env.BRIGHT_DATA_API_KEY,
     // HubSpot
     HUBSPOT_ACCESS_TOKEN_OPERATED: process.env.HUBSPOT_ACCESS_TOKEN_OPERATED,
-    HUBSPOT_GATEWAY_API_TOKEN: process.env.HUBSPOT_GATEWAY_API_TOKEN,
+    GROWTH_GATEWAY_API_TOKEN: process.env.GROWTH_GATEWAY_API_TOKEN,
     HUBSPOT_WEBHOOK_CLIENT_SECRET: process.env.HUBSPOT_WEBHOOK_CLIENT_SECRET,
     // Lead enrichment — discovery providers
     PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY,

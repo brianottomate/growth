@@ -4,6 +4,8 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
+import { HERO_DESCRIPTION_MAX_WORDS, heroFaults } from "./hero-style";
+
 import type { PregenNativeBrandKit } from "@/server/db/schema";
 import { formatLocationPhrase, type BrandKitTone } from "./brand-kit";
 import { HOMEPAGE_SOURCE_FILTER } from "./source-filter";
@@ -106,7 +108,13 @@ const positional = (schemas: z.ZodTypeAny[]) =>
 
 const homepageHero = (): CopySchema => ({
   schema: z.object({ title: optString(), description: optString() }).strict(),
-  promptHint: ["- title: 3–6 words", "- description: 1 sentence, ≤22 words"],
+  // A ceiling reads to the model as a target: the monolith's equivalent budget produced three
+  // descriptions in a row within a word of its limit. Stated as an aim with a hard stop instead,
+  // and verified after the call by `heroFaults`.
+  promptHint: [
+    "- title: 3–6 words",
+    `- description: one short sentence, aim for 10–12 words and never exceed ${HERO_DESCRIPTION_MAX_WORDS}. Say one thing and stop.`,
+  ],
 });
 
 const propertyGallery = (): CopySchema => ({
@@ -572,17 +580,61 @@ export async function generateHomepageCopy(input: {
       prompt,
     });
 
-    const generated = output.sections;
-    const sections = [...template];
-    plan.forEach(({ templateIndex }, outputIndex) => {
-      const copy = generated[`s${outputIndex + 1}`] as
-        | Record<string, unknown>
-        | undefined;
-      const templateSection = sections[templateIndex];
-      if (copy && templateSection) {
-        sections[templateIndex] = mergeSectionCopy(templateSection, copy);
+    const apply = (generated: Record<string, unknown>) => {
+      const sections = [...template];
+      plan.forEach(({ templateIndex }, outputIndex) => {
+        const copy = generated[`s${outputIndex + 1}`] as
+          | Record<string, unknown>
+          | undefined;
+        const templateSection = sections[templateIndex];
+        if (copy && templateSection) {
+          sections[templateIndex] = mergeSectionCopy(templateSection, copy);
+        }
+      });
+      return sections;
+    };
+
+    let sections = apply(output.sections);
+
+    // One corrective pass on the hero, and only when it actually tripped. The voice rules above
+    // are good and the model still writes past them; naming the specific fault back to it is what
+    // fixes the line, where a schema-level bound would just reject the object and leave the worse
+    // copy in place.
+    const hero = sections.find((section) => section.type === "homepage-hero") as
+      | { title?: string; description?: string }
+      | undefined;
+    const faults = hero ? heroFaults(hero) : [];
+    if (faults.length > 0) {
+      console.warn("[pregen] hero copy tripped the style check, retrying", {
+        faults,
+      });
+      const retry = await generateText({
+        model: anthropic("claude-sonnet-5"),
+        output: Output.object({ schema }),
+        temperature: 0.2,
+        maxOutputTokens: 16_000,
+        prompt: `${prompt}
+
+# Correction
+
+Your previous attempt failed on the hero:
+${faults.map((fault) => `- ${fault}`).join("\n")}
+
+Rewrite every section. Keep the same facts and the same voice; fix the hero.`,
+      }).catch(() => undefined);
+
+      // Keep the retry only if the hero actually came back clean; a second bad attempt is no
+      // better than the first, and re-rendering the whole page for it costs more than it earns.
+      if (retry) {
+        const retried = apply(retry.output.sections);
+        const retriedHero = retried.find(
+          (section) => section.type === "homepage-hero",
+        ) as { title?: string; description?: string } | undefined;
+        if (retriedHero && heroFaults(retriedHero).length === 0) {
+          sections = retried;
+        }
       }
-    });
+    }
 
     return { sections, usedFallback: false };
   } catch (error) {

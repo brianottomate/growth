@@ -5,6 +5,7 @@ import { generateText, Output } from "ai";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { r2IsPublicUrl } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
 import {
   pregenNativeBuildTable,
@@ -14,6 +15,7 @@ import {
   type PregenNativeExtractedProperty,
   type PregenNativePage,
 } from "@/server/db/schema";
+import { rehostedSourceHash } from "./generation/rehost-images";
 
 // Evaluators re-judge a PERSISTED build from its own stored evidence (crawl
 // corpus, extracted properties, artifact). They never re-crawl and never call
@@ -267,7 +269,25 @@ async function evaluateImageProvenance(loaded: LoadedBuild) {
     }
   });
 
-  const unknown = [...imageUrls].filter((url) => !loaded.corpus.includes(url));
+  // An image we rehosted no longer appears literally in the crawl corpus, so a
+  // plain substring check would fail every build the moment rehosting landed.
+  // The stored filename is sha256(sourceUrl), which makes the trace exact
+  // rather than approximate: hash every URL the corpus contains and look the
+  // hosted one up. Provenance stays a real check, not a widened one.
+  const corpusHashes = new Set(
+    (loaded.corpus.match(/https?:\/\/[^\s"']+/g) ?? []).map((url) =>
+      rehostedSourceHash(url.replace(/[),.]+$/, "")),
+    ),
+  );
+  const tracesToCorpus = (url: string): boolean => {
+    if (loaded.corpus.includes(url)) return true;
+    if (!r2IsPublicUrl(url)) return false;
+    const filename = url.split("/").pop() ?? "";
+    const hash = filename.split(".")[0] ?? "";
+    return hash.length > 0 && corpusHashes.has(hash);
+  };
+
+  const unknown = [...imageUrls].filter((url) => !tracesToCorpus(url));
   const status: PregenNativeEvaluationStatus =
     placeholders.length > 0 || unknown.length > 0 ? "failed" : "passed";
 
