@@ -921,6 +921,10 @@ export const pregenBuildTable = leadsSchema.table(
       .timestamp()
       .$defaultFn(() => new Date())
       .notNull(),
+    // Day the send-queue cron may enrol this build's domain. Day granularity on
+    // purpose; the 8am Pacific cron is the clock. Stays set after sending — the
+    // one-live-enrolment guard is what prevents a resend, not this field.
+    sendScheduledFor: t.date(),
     // `occurredAt` from the last webhook applied. Guards against an out-of-order
     // delivery overwriting a newer state with an older one.
     lastEventAt: t.timestamp(),

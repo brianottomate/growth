@@ -99,12 +99,20 @@ export default async function PregenPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Pre-gen sites</h1>
-        <p className="text-muted-foreground text-sm">
-          {builds.length} built · {ready} ready · {viewed} opened by the prospect ·{" "}
-          {enrolled} in sequence · newest first
-        </p>
+      <header className="flex items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold">Pre-gen sites</h1>
+          <p className="text-muted-foreground text-sm">
+            {builds.length} built · {ready} ready · {viewed} opened by the prospect ·{" "}
+            {enrolled} in sequence · newest first
+          </p>
+        </div>
+        <Link
+          href="/app/pregen/review"
+          className="border-border hover:bg-muted rounded border px-3 py-1.5 text-sm"
+        >
+          Review next wave
+        </Link>
       </header>
 
       <ul className="divide-border divide-y">

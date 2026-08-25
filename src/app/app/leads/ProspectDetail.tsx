@@ -216,6 +216,7 @@ const VERDICT_TONE: Record<string, string> = {
 export function ProspectDetail({ domain }: { domain: string }) {
   const trpc = useTRPC();
   const [showCrm, setShowCrm] = useState(false);
+  const [previewFrameOpen, setPreviewFrameOpen] = useState(false);
   // Filled by default: the reviewer's question is almost always "what does this
   // lead receive", and the template reading is one click away.
   const [filled, setFilled] = useState(true);
@@ -618,6 +619,29 @@ export function ProspectDetail({ domain }: { domain: string }) {
           ) : null}
         </Section>
       </div>
+
+      {/* The preview itself, live. The renderer URL, not the wander.com/os
+          wrapper — the beacon lives on the wrapper, so browsing here cannot
+          read as the prospect looking. Mounted only when opened. */}
+      {preview.url ? (
+        <details
+          className="border-border rounded border"
+          onToggle={(event) =>
+            setPreviewFrameOpen((event.target as HTMLDetailsElement).open)
+          }
+        >
+          <summary className="text-muted-foreground hover:text-foreground cursor-pointer px-4 py-2 text-sm select-none">
+            Browse the live preview inline
+          </summary>
+          {previewFrameOpen ? (
+            <iframe
+              src={preview.url}
+              title={`Live preview for ${row.domain}`}
+              className="h-[80vh] w-full bg-white"
+            />
+          ) : null}
+        </details>
+      ) : null}
 
       {/* The sequence, right under the previews it pitches. What it was
           written from, then blast-vs-bespoke per touch. */}
