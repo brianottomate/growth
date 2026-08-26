@@ -70,6 +70,7 @@ export const growthActionPolicies = {
   workspaceOverview: { overview: read() },
   navigateWorkspace: { navigate: read() },
   prepareProductionPacket: { prepare: write() },
+  renderSocialPosts: { render: read() },
   // Delegates to the blog sub-agent, which writes DRAFTS in the production
   // CMS. provider-write because the effect lands in DatoCMS, not our DB;
   // not reversible from here because undo means editing in Dato.

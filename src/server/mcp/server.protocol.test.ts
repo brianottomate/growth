@@ -44,8 +44,25 @@ async function assertToolCatalog(client: Client) {
   expect(names.length).toBeGreaterThanOrEqual(30);
   expect(names).toContain("workspaceOverview");
   expect(names).toContain("invoke_growth");
+  expect(names).toContain("renderSocialPosts");
   expect(names).not.toContain("researchRead");
   expect(names).not.toContain("driveRead");
+
+  const previewTool = tools.find((tool) => tool.name === "renderSocialPosts");
+  expect(previewTool?._meta?.ui).toEqual({
+    resourceUri: "ui://wander-growth/social-post-preview/v1.html",
+    visibility: ["model", "app"],
+  });
+
+  const resource = await client.readResource({
+    uri: "ui://wander-growth/social-post-preview/v1.html",
+  });
+  expect(resource.contents[0]?.mimeType).toBe("text/html;profile=mcp-app");
+  expect(
+    resource.contents[0] && "text" in resource.contents[0]
+      ? resource.contents[0].text
+      : "",
+  ).toContain("Social posts");
 }
 
 describe("Growth MCP protocol compatibility", () => {

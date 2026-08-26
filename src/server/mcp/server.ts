@@ -4,6 +4,21 @@ import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 
 import { MCP_TOOLS } from "@/server/ai/capabilities";
 import { registerMcpTools } from "@/server/ai/capabilities/to-mcp-server";
+import { env } from "@/env";
+import { registerSocialPostPreviewResource } from "./social-post-preview-ui";
+
+function socialPostPreviewResourceDomains() {
+  const domains = new Set<string>();
+  if (env.R2_PUBLIC_BASE_URL) {
+    domains.add(new URL(env.R2_PUBLIC_BASE_URL).origin);
+  }
+  if (env.NEXT_PUBLIC_STREAM_SUBDOMAIN) {
+    domains.add(
+      `https://${env.NEXT_PUBLIC_STREAM_SUBDOMAIN}.cloudflarestream.com`,
+    );
+  }
+  return [...domains];
+}
 
 export function createGrowthMcpServer() {
   const server = new McpServer({
@@ -14,6 +29,7 @@ export function createGrowthMcpServer() {
   });
 
   registerMcpTools(server, MCP_TOOLS);
+  registerSocialPostPreviewResource(server, socialPostPreviewResourceDomains());
   return server;
 }
 

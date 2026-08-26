@@ -9,6 +9,7 @@ import { navigateWorkspace } from "./navigation";
 import { newsletterAgent } from "./newsletter";
 import { workspaceOverview } from "./overview";
 import { prepareProductionPacket } from "./production";
+import { renderSocialPosts } from "./social-post-preview";
 import { capabilityAllowsSurface } from "../kernel/policy";
 
 export { registerMcpTools } from "./to-mcp-server";
@@ -23,6 +24,7 @@ export const OVERVIEW_TOOLS = {
   workspaceOverview,
   navigateWorkspace,
   prepareProductionPacket,
+  renderSocialPosts,
   blogAgent,
   newsletterAgent,
   ...DOMAIN_CAPABILITY_TOOLS,

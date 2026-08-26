@@ -67,6 +67,7 @@ Notable portable workflows:
 - inspect and edit Product Atlas graphs and storefront target content;
 - route stale storefront updates and confirm external surfaces after completion;
 - return canonical navigation URLs;
+- render selected social post IDs as platform-aware inline MCP App previews;
 - discover brand handles and save reviewable channel suggestions;
 - scrape public posts with a durable ingest-run record;
 - sync owned history, website structure, and blog articles;

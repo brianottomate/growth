@@ -69,7 +69,7 @@ export type VideoCreativeAnalysis = z.infer<typeof videoAnalysisSchema> & {
 async function getPost(platformPostId: string) {
   return db.query.platformPostTable.findFirst({
     where: eq(platformPostTable.id, platformPostId),
-    with: { brand: true },
+    with: { brand: true, channel: true },
   });
 }
 

@@ -32,6 +32,8 @@ import { buildGrowthToolRuntime } from "../kernel/runtime";
 import { runtimeClockSection } from "../kernel/runtime-clock";
 import { summarizeGrowthUsage } from "../kernel/usage";
 import type { GrowthExecutionContext, GrowthTool } from "../kernel/tool";
+import { socialPostPreviewOutputSchema } from "./social-post-preview";
+import { SOCIAL_POST_PREVIEW_URI } from "@/server/mcp/social-post-preview-ui";
 
 type ToolContext = { http?: { authInfo?: AuthInfo } };
 
@@ -219,6 +221,7 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
     );
     const nativeDefinition = definition as GrowthTool<unknown, unknown>;
     const inputSchema = nativeDefinition.transportInputSchema;
+    const rendersSocialPostPreview = name === "renderSocialPosts";
     server.registerTool(
       name,
       {
@@ -228,6 +231,9 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
             ? definition.description
             : undefined,
         inputSchema,
+        ...(rendersSocialPostPreview
+          ? { outputSchema: socialPostPreviewOutputSchema }
+          : {}),
         annotations: {
           readOnlyHint: policies.every((policy) =>
             policy.consequence.endsWith("read"),
@@ -239,6 +245,19 @@ export function registerMcpTools(server: McpServer, toolSet: ToolSet) {
           idempotentHint: policies.every((policy) => policy.idempotent),
           openWorldHint: name === "researchRead",
         },
+        ...(rendersSocialPostPreview
+          ? {
+              _meta: {
+                ui: {
+                  resourceUri: SOCIAL_POST_PREVIEW_URI,
+                  visibility: ["model", "app"],
+                },
+                "openai/outputTemplate": SOCIAL_POST_PREVIEW_URI,
+                "openai/toolInvocation/invoking": "Rendering social posts",
+                "openai/toolInvocation/invoked": "Social posts ready",
+              },
+            }
+          : {}),
       },
       async (input, extra) => {
         let runId: string | undefined;
