@@ -115,6 +115,7 @@ import {
   openPerformanceCycleAction,
   refreshPerformanceCycleSpendAction,
   searchAttachableCampaignsAction,
+  syncAdCampaignsAction,
   updatePerformanceAccountAction,
   updatePerformanceCycleAction,
   updatePerformancePropertyAction,
@@ -184,6 +185,7 @@ export const performanceWrite = growthDomainTool({
     updateCycle: updatePerformanceCycleAction,
     attach: attachToPerformanceCycleAction,
     refreshSpend: refreshPerformanceCycleSpendAction,
+    syncCampaigns: syncAdCampaignsAction,
   },
 });
 

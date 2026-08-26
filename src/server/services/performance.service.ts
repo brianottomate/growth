@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { db } from "@/server/db";
 import {
+  adSpotTable,
   amplificationTargetTable,
   campaignTable,
   initiativeTable,
@@ -327,7 +328,56 @@ export async function getPerformanceAccount(
             ),
         ]);
 
-  return { account, delivery: { initiatives, lifecycleCampaigns, amplificationTargets } };
+  // The ads themselves, so "is the right creative running" is answerable here
+  // rather than only in Ads Manager.
+  const initiativeIds = initiatives.map((row) => row.id);
+  const campaigns =
+    initiativeIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: campaignTable.id,
+            name: campaignTable.name,
+            status: campaignTable.status,
+            platform: campaignTable.platform,
+            spend: campaignTable.spend,
+            stats: campaignTable.stats,
+            manageUrl: campaignTable.manageUrl,
+            heroThumbnailUrl: campaignTable.heroThumbnailUrl,
+            initiativeId: campaignTable.initiativeId,
+          })
+          .from(campaignTable)
+          .where(inArray(campaignTable.initiativeId, initiativeIds));
+  const campaignIds = campaigns.map((row) => row.id);
+  const ads =
+    campaignIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: adSpotTable.id,
+            campaignId: adSpotTable.campaignId,
+            name: adSpotTable.name,
+            status: adSpotTable.status,
+            adSetName: adSpotTable.adSetName,
+            thumbnailUrl: adSpotTable.thumbnailUrl,
+            media: adSpotTable.media,
+            stats: adSpotTable.stats,
+            externalId: adSpotTable.externalId,
+            businessKey: adSpotTable.businessKey,
+          })
+          .from(adSpotTable)
+          .where(inArray(adSpotTable.campaignId, campaignIds));
+
+  return {
+    account,
+    delivery: {
+      initiatives,
+      lifecycleCampaigns,
+      amplificationTargets,
+      campaigns,
+      ads,
+    },
+  };
 }
 
 export async function createPerformanceAccount(

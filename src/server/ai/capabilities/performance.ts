@@ -25,6 +25,8 @@ import {
   type PerformanceActor,
 } from "@/server/services/performance.service";
 
+import { syncZernioAds } from "@/server/services/ads-sync.service";
+
 import { growthAction } from "./types";
 
 const actorFrom = (ctx: { orgId: string }): PerformanceActor => ({
@@ -100,6 +102,39 @@ export const refreshPerformanceCycleSpendAction = growthAction({
   inputSchema: z.object({ cycleId: z.string().min(1) }),
   execute: (input, ctx) =>
     refreshPerformanceCycleSpend(actorFrom(ctx), input.cycleId),
+});
+
+export const syncAdCampaignsAction = growthAction({
+  description:
+    "Pull ad campaigns from Zernio into Growth so they can be attached to a performance cycle, then reprice every cycle's observed spend. Bounded to recent campaigns by default because the provider returns every campaign an account has ever had; widen with sinceDays or drop the window with sinceDays null. Reads the provider and writes only our own mirror rows.",
+  inputSchema: z.object({
+    brandSlug: z.string().trim().min(1).default("wander"),
+    platform: z.enum(["meta_ads", "google_ads"]).default("meta_ads"),
+    sinceDays: z
+      .number()
+      .int()
+      .min(1)
+      .max(1_095)
+      .nullable()
+      .optional()
+      .describe("Ingest window in days; null for no window. Defaults to 120."),
+    minSpend: z
+      .number()
+      .min(0)
+      .optional()
+      .describe("Skip campaigns below this observed spend in whole dollars."),
+    statuses: z.array(z.string().trim().min(1)).optional(),
+    limit: z.number().int().min(1).max(500).optional(),
+  }),
+  execute: (input) =>
+    syncZernioAds({
+      brandSlug: input.brandSlug,
+      platform: input.platform,
+      sinceDays: input.sinceDays,
+      minSpend: input.minSpend,
+      statuses: input.statuses,
+      limit: input.limit,
+    }),
 });
 
 export const attachToPerformanceCycleAction = growthAction({

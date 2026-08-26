@@ -123,6 +123,12 @@ export const growthActionPolicies = {
     }),
     // Derived from campaign rows already in our DB; safe to re-run.
     refreshSpend: write({ idempotent: true }),
+    // Reads Zernio and upserts our own mirror rows. No provider mutation and
+    // no spend, so it needs no approval, but it is a background-weight call.
+    syncCampaigns: write({
+      consequence: "background-run",
+      idempotent: true,
+    }),
   },
   audienceWrite: {
     createTarget: write(),

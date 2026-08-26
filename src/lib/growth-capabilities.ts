@@ -35,6 +35,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "updateCycle",
     "attach",
     "refreshSpend",
+    "syncCampaigns",
   ],
   audienceWrite: [
     "createTarget",

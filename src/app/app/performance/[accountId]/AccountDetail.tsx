@@ -15,6 +15,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTRPC } from "@/trpc/react";
+import {
+  AddPropertyForm,
+  CycleStatusPicker,
+  OpenCycleForm,
+} from "./CycleForms";
 
 const usd = (value: number | null | undefined) =>
   typeof value === "number"
@@ -78,9 +83,12 @@ export function AccountDetail({ accountId }: { accountId: string }) {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">
-          Sponsored homes ({account.properties.length})
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">
+            Sponsored homes ({account.properties.length})
+          </h2>
+          <AddPropertyForm accountId={accountId} />
+        </div>
         <div className="border-border divide-border divide-y rounded-lg border">
           {account.properties.map((property) => (
             <div
@@ -119,7 +127,10 @@ export function AccountDetail({ accountId }: { accountId: string }) {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">Cycles</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Cycles</h2>
+          <OpenCycleForm accountId={accountId} />
+        </div>
         {account.cycles.map((cycle) => {
           // The take rate is invisible in a monthly total; a daily figure is
           // what an ad set is actually set to, so overspend shows up here.
@@ -150,9 +161,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                   <span className="font-mono text-sm font-semibold">
                     {cycle.period}
                   </span>
-                  <span className="text-muted-foreground text-xs">
-                    {cycle.status}
-                  </span>
+                  <CycleStatusPicker cycleId={cycle.id} status={cycle.status} />
                 </div>
                 <div className="text-sm tabular-nums">
                   <span className="text-muted-foreground text-xs">billed </span>
@@ -235,6 +244,20 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                     )
                   }
                   attaching={attach.isPending}
+                />
+              )}
+
+              {forCycle.ads.length > 0 && (
+                <AdGrid
+                  ads={delivery.ads.filter((ad) =>
+                    delivery.campaigns.some(
+                      (campaign) =>
+                        campaign.id === ad.campaignId &&
+                        forCycle.ads.some(
+                          (init) => init.id === campaign.initiativeId,
+                        ),
+                    ),
+                  )}
                 />
               )}
 
@@ -450,6 +473,81 @@ function CampaignPicker({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The ads themselves. `businessKey` present means Growth drafted it;
+ * `externalId` present means the platform accepted it. Showing both makes a
+ * drafted-but-never-launched ad visible instead of looking identical to a live
+ * one.
+ */
+function AdGrid({
+  ads,
+}: {
+  ads: {
+    id: string;
+    name: string | null;
+    status: string | null;
+    adSetName: string | null;
+    thumbnailUrl: string | null;
+    stats: { impressions?: number; spend?: number; clicks?: number } | null;
+    externalId: string | null;
+    businessKey: string | null;
+  }[];
+}) {
+  if (ads.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <div className="text-muted-foreground text-xs font-medium">
+        Ads ({ads.length})
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {ads.map((ad) => (
+          <div
+            key={ad.id}
+            className="border-border flex gap-2 rounded-md border p-2"
+          >
+            {ad.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={ad.thumbnailUrl}
+                alt=""
+                className="size-14 shrink-0 rounded object-cover"
+              />
+            ) : (
+              <span className="bg-surface-secondary text-muted-foreground/60 flex size-14 shrink-0 items-center justify-center rounded text-[10px]">
+                no art
+              </span>
+            )}
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="truncate text-xs font-medium" title={ad.name ?? ""}>
+                {ad.name ?? ad.id}
+              </div>
+              <div className="text-muted-foreground truncate text-[11px]">
+                {ad.adSetName ?? "no ad set"}
+              </div>
+              <div className="text-muted-foreground text-[11px] tabular-nums">
+                {ad.stats?.impressions !== undefined
+                  ? `${ad.stats.impressions.toLocaleString("en-US")} impr`
+                  : "no delivery"}
+                {ad.stats?.spend !== undefined &&
+                  ` · $${ad.stats.spend.toFixed(2)}`}
+              </div>
+              <div className="text-[10px]">
+                {ad.externalId ? (
+                  <span className="text-emerald-300">live</span>
+                ) : ad.businessKey ? (
+                  <span className="text-sky-300">drafted, not launched</span>
+                ) : (
+                  <span className="text-muted-foreground/60">unknown</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

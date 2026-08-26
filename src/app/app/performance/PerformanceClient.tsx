@@ -6,6 +6,7 @@ import { Check, Minus } from "lucide-react";
 
 import type { PerformanceAccountStatus } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
+import { NewAccountDialog } from "./NewAccountDialog";
 
 const STATUS_META: Record<
   PerformanceAccountStatus,
@@ -49,7 +50,8 @@ export function PerformanceClient() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
         <h1 className="text-xl font-semibold">Performance+</h1>
         <p className="text-muted-foreground text-sm">
           Property managers paying for placement on Wander&apos;s marketing
@@ -57,6 +59,8 @@ export function PerformanceClient() {
           <span className="font-mono text-xs">wander.com/list-plus</span>;
           payment is handled offline.
         </p>
+        </div>
+        <NewAccountDialog />
       </header>
 
       {isLoading && (
@@ -67,8 +71,7 @@ export function PerformanceClient() {
         <div className="border-border rounded-lg border border-dashed p-8 text-center">
           <p className="text-sm font-medium">No Performance+ customers yet</p>
           <p className="text-muted-foreground mt-1 text-sm">
-            Onboard one from the assistant: &ldquo;onboard &lt;company&gt; as a
-            Performance+ customer&rdquo;.
+            Use the button above, or ask the assistant to onboard one.
           </p>
         </div>
       )}

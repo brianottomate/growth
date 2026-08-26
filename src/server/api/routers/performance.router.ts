@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { Database } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
+import { syncZernioAds } from "@/server/services/ads-sync.service";
 
 import {
   addPerformanceProperty,
@@ -117,6 +118,20 @@ export const performanceRouter = {
     .mutation(async ({ ctx, input }) =>
       attachToPerformanceCycle(await actorFor(ctx), input),
     ),
+
+  syncCampaigns: protectedProcedure
+    .input(
+      z.object({
+        brandSlug: z.string().trim().min(1).default("wander"),
+        sinceDays: z.number().int().min(1).max(1_095).nullable().optional(),
+        minSpend: z.number().min(0).optional(),
+        limit: z.number().int().min(1).max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await actorFor(ctx);
+      return syncZernioAds({ ...input, platform: "meta_ads" });
+    }),
 
   refreshSpend: protectedProcedure
     .input(z.object({ cycleId: z.string().min(1) }))
