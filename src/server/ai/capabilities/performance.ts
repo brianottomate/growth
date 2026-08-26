@@ -6,8 +6,10 @@ import {
   addPerformanceProperty,
   addPerformancePropertySchema,
   refreshPerformanceCycleSpend,
+  listSponsoredAbandonment,
   searchAttachableCampaigns,
   searchAttachableCampaignsSchema,
+  sponsoredAbandonmentSchema,
   attachToPerformanceCycle,
   attachToPerformanceCycleSchema,
   createPerformanceAccount,
@@ -102,6 +104,13 @@ export const refreshPerformanceCycleSpendAction = growthAction({
   inputSchema: z.object({ cycleId: z.string().min(1) }),
   execute: (input, ctx) =>
     refreshPerformanceCycleSpend(actorFrom(ctx), input.cycleId),
+});
+
+export const listSponsoredAbandonmentAction = growthAction({
+  description:
+    "Guests who abandoned checkout (or wishlisted) on a Performance+ customer's sponsored homes, hottest first. Joined on the listing id the tracked event carries, never on property name. Use this to answer what a customer's boosted homes produced and to hand BDRs a follow-up list. Read-only; it does not contact anyone.",
+  inputSchema: sponsoredAbandonmentSchema,
+  execute: (input, ctx) => listSponsoredAbandonment(actorFrom(ctx), input),
 });
 
 export const syncAdCampaignsAction = growthAction({

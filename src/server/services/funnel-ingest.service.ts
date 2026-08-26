@@ -65,6 +65,23 @@ function asString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+/**
+ * The tracked events carry the listing id and slug inside a Segment-style
+ * `products` array (see wander.com buildCheckoutStartedData), not at the top
+ * level. Top-level `property_id` is accepted as a fallback for any producer
+ * that flattens it.
+ */
+function firstProduct(
+  props: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const products: unknown = props.products;
+  if (!Array.isArray(products) || products.length === 0) return undefined;
+  const first: unknown = products[0];
+  return typeof first === "object" && first !== null
+    ? (first as Record<string, unknown>)
+    : undefined;
+}
+
 function asBoolean(value: unknown): boolean | undefined {
   if (typeof value === "boolean") return value;
   if (value === "true") return true;
@@ -155,10 +172,15 @@ export async function ingestFunnelEvent(
     }
 
     case "product_added_to_wishlist": {
+      const wishlistProduct = firstProduct(props);
       const values = {
         lastWishlistTs: eventTs,
         lastWishlistProperty:
           asString(props.property_name) ?? asString(props.name) ?? null,
+        lastWishlistPropertyId:
+          asString(wishlistProduct?.product_id) ??
+          asString(props.property_id) ??
+          null,
       };
       await db
         .insert(funnelStateTable)
@@ -185,10 +207,15 @@ export async function ingestFunnelEvent(
     }
 
     case "checkout_previewed": {
+      const previewProduct = firstProduct(props);
       const values = {
         lastCheckoutPreviewTs: eventTs,
         lastCheckoutPreviewProperty:
           asString(props.property_name) ?? asString(props.name) ?? null,
+        lastCheckoutPreviewPropertyId:
+          asString(previewProduct?.product_id) ??
+          asString(props.property_id) ??
+          null,
         lastCheckoutPreviewCheckin: asDateOnly(props.checkin_date) ?? null,
         lastCheckoutPreviewCheckout: asDateOnly(props.checkout_date) ?? null,
         lastCheckoutPreviewValue: asNumber(props.value) ?? null,
@@ -205,10 +232,17 @@ export async function ingestFunnelEvent(
     }
 
     case "checkout_started": {
+      const checkoutProduct = firstProduct(props);
       const values = {
         lastCheckoutTs: eventTs,
         lastCheckoutProperty:
           asString(props.property_name) ?? asString(props.name) ?? null,
+        lastCheckoutPropertyId:
+          asString(checkoutProduct?.product_id) ??
+          asString(props.property_id) ??
+          null,
+        lastCheckoutPropertySlug:
+          asString(checkoutProduct?.slug) ?? asString(props.slug) ?? null,
         lastCheckoutCheckin: asDateOnly(props.checkin_date) ?? null,
         lastCheckoutCheckout: asDateOnly(props.checkout_date) ?? null,
         lastCheckoutValue: asNumber(props.value) ?? null,

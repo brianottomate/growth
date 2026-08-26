@@ -112,6 +112,7 @@ import {
   createPerformanceAccountAction,
   getPerformanceAccountAction,
   listPerformanceAccountsAction,
+  listSponsoredAbandonmentAction,
   openPerformanceCycleAction,
   refreshPerformanceCycleSpendAction,
   searchAttachableCampaignsAction,
@@ -170,6 +171,7 @@ export const performanceRead = growthDomainTool({
     list: listPerformanceAccountsAction,
     get: getPerformanceAccountAction,
     searchAttachableCampaigns: searchAttachableCampaignsAction,
+    sponsoredAbandonment: listSponsoredAbandonmentAction,
   },
 });
 

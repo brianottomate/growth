@@ -256,3 +256,76 @@ export function CycleStatusPicker({
     </select>
   );
 }
+
+/**
+ * Manual propertyId entry. The value is the listing id — the same one the
+ * catalog uses as retailer_id and the tracked events send as
+ * products[0].product_id — so filling it is what makes abandonment and
+ * booking attribution match this home.
+ */
+export function PropertyIdField({
+  propertyRowId,
+  propertyId,
+}: {
+  propertyRowId: string;
+  propertyId: string | null;
+}) {
+  const trpc = useTRPC();
+  const invalidate = useInvalidate();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(propertyId ?? "");
+
+  const update = useMutation(
+    trpc.performance.updateProperty.mutationOptions({
+      onSuccess: async () => {
+        await invalidate();
+        setEditing(false);
+      },
+    }),
+  );
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="font-mono text-xs hover:underline"
+        title="Edit listing id"
+      >
+        {propertyId ?? <span className="text-amber-300">set property id</span>}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder="listing id"
+        className="h-7 w-56 font-mono text-xs"
+      />
+      <Button
+        size="sm"
+        className="h-7"
+        disabled={update.isPending}
+        onClick={() =>
+          update.mutate({
+            propertyId: propertyRowId,
+            monolithPropertyId: value.trim() || null,
+          })
+        }
+      >
+        Save
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7"
+        onClick={() => setEditing(false)}
+      >
+        Cancel
+      </Button>
+    </div>
+  );
+}

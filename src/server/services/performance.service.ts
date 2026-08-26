@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, ilike, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
@@ -8,6 +8,7 @@ import {
   adSpotTable,
   amplificationTargetTable,
   campaignTable,
+  funnelStateTable,
   initiativeTable,
   lifecycleCampaignTable,
   performanceAccountTable,
@@ -780,5 +781,158 @@ async function attachCampaignToCycle(
     initiativeId: wrapperId,
     createdWrapper: !existing,
     actualSpendCents: spend.actualSpendCents,
+  };
+}
+
+// ---- SPONSORED ABANDONMENT (the BDR signal) --------------------------------
+
+export const sponsoredAbandonmentSchema = z.object({
+  accountId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Scope to one customer; omit for every sponsored home."),
+  sinceHours: z.number().int().min(1).max(720).default(168),
+  stage: z
+    .enum(["checkout", "wishlist", "any"])
+    .default("checkout")
+    .describe("Checkout is the abandoned-cart signal BDRs asked for."),
+  includeConverted: z
+    .boolean()
+    .default(false)
+    .describe("Include users who went on to purchase after abandoning."),
+  limit: z.number().int().min(1).max(200).default(50),
+});
+
+/**
+ * Guests who abandoned on a sponsored property.
+ *
+ * Joined on the listing id (`funnel_state.lastCheckoutPropertyId` =
+ * `performance_property.propertyId`), which is the value the tracked event
+ * already carries in `products[0].product_id` and the same id the Meta catalog
+ * uses as its retailer_id. Deliberately not matched on property name: the
+ * Amplitude display name and the catalog name differ, and a name match would
+ * silently attribute one customer's abandonment to another.
+ *
+ * A property with no `propertyId` yet cannot match, so it is reported
+ * separately rather than counted as zero abandonment.
+ */
+export async function listSponsoredAbandonment(
+  actor: PerformanceActor,
+  input: z.infer<typeof sponsoredAbandonmentSchema>,
+) {
+  if (input.accountId) await requireAccount(actor, input.accountId);
+  const since = new Date(Date.now() - input.sinceHours * 60 * 60 * 1000);
+
+  const properties = await db
+    .select({
+      propertyRowId: performancePropertyTable.id,
+      propertyId: performancePropertyTable.propertyId,
+      title: performancePropertyTable.title,
+      wanderUrl: performancePropertyTable.wanderUrl,
+      accountId: performanceAccountTable.id,
+      accountName: performanceAccountTable.name,
+      contactName: performanceAccountTable.contactName,
+    })
+    .from(performancePropertyTable)
+    .innerJoin(
+      performanceAccountTable,
+      eq(performanceAccountTable.id, performancePropertyTable.accountId),
+    )
+    .where(
+      and(
+        eq(performanceAccountTable.organizationId, actor.orgId),
+        isNull(performanceAccountTable.deletedAt),
+        isNull(performancePropertyTable.deletedAt),
+        input.accountId
+          ? eq(performancePropertyTable.accountId, input.accountId)
+          : undefined,
+      ),
+    );
+
+  const unresolved = properties.filter((row) => !row.propertyId);
+  const byPropertyId = new Map(
+    properties.filter((row) => row.propertyId).map((row) => [row.propertyId!, row]),
+  );
+  const ids = [...byPropertyId.keys()];
+  if (ids.length === 0) {
+    return { events: [], unresolvedProperties: unresolved, matchedProperties: 0 };
+  }
+
+  const stageColumn =
+    input.stage === "wishlist"
+      ? funnelStateTable.lastWishlistPropertyId
+      : funnelStateTable.lastCheckoutPropertyId;
+  const stageTs =
+    input.stage === "wishlist"
+      ? funnelStateTable.lastWishlistTs
+      : funnelStateTable.lastCheckoutTs;
+
+  const rows = await db
+    .select({
+      userId: funnelStateTable.userId,
+      email: funnelStateTable.email,
+      checkoutPropertyId: funnelStateTable.lastCheckoutPropertyId,
+      wishlistPropertyId: funnelStateTable.lastWishlistPropertyId,
+      propertyName: funnelStateTable.lastCheckoutProperty,
+      checkin: funnelStateTable.lastCheckoutCheckin,
+      checkout: funnelStateTable.lastCheckoutCheckout,
+      value: funnelStateTable.lastCheckoutValue,
+      checkoutTs: funnelStateTable.lastCheckoutTs,
+      wishlistTs: funnelStateTable.lastWishlistTs,
+      paymentTs: funnelStateTable.lastPaymentTs,
+      paymentSubmitTs: funnelStateTable.lastPaymentSubmitTs,
+      purchaseTs: funnelStateTable.lastPurchaseTs,
+    })
+    .from(funnelStateTable)
+    .where(
+      and(
+        inArray(stageColumn, ids),
+        gte(stageTs, since),
+        input.includeConverted ? undefined : isNull(funnelStateTable.lastPurchaseTs),
+      ),
+    )
+    .orderBy(desc(stageTs))
+    .limit(input.limit);
+
+  const events = rows.map((row) => {
+    const matchId =
+      input.stage === "wishlist" ? row.wishlistPropertyId : row.checkoutPropertyId;
+    const property = matchId ? byPropertyId.get(matchId) : undefined;
+    // Payment submitted with no purchase is the hottest state there is: the
+    // guest tried to pay and something stopped them.
+    const heat = row.purchaseTs
+      ? "converted"
+      : row.paymentSubmitTs
+        ? "payment_failed"
+        : row.paymentTs
+          ? "payment_entered"
+          : "checkout_abandoned";
+    return {
+      userId: row.userId,
+      email: row.email,
+      heat,
+      abandonedAt: input.stage === "wishlist" ? row.wishlistTs : row.checkoutTs,
+      propertyName: row.propertyName,
+      checkin: row.checkin,
+      checkout: row.checkout,
+      value: row.value,
+      account: property
+        ? {
+            id: property.accountId,
+            name: property.accountName,
+            contactName: property.contactName,
+          }
+        : null,
+      property: property
+        ? { title: property.title, wanderUrl: property.wanderUrl }
+        : null,
+    };
+  });
+
+  return {
+    events,
+    unresolvedProperties: unresolved,
+    matchedProperties: ids.length,
   };
 }

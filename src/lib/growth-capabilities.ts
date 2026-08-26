@@ -25,7 +25,12 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "removeReference",
   ],
   audienceRead: ["list"],
-  performanceRead: ["list", "get", "searchAttachableCampaigns"],
+  performanceRead: [
+    "list",
+    "get",
+    "searchAttachableCampaigns",
+    "sponsoredAbandonment",
+  ],
   performanceWrite: [
     "createAccount",
     "updateAccount",

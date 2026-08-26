@@ -17,7 +17,9 @@ import {
   attachToPerformanceCycleSchema,
   openPerformanceCycle,
   openPerformanceCycleSchema,
+  listSponsoredAbandonment,
   refreshPerformanceCycleSpend,
+  sponsoredAbandonmentSchema,
   searchAttachableCampaigns,
   searchAttachableCampaignsSchema,
   updatePerformanceAccount,
@@ -117,6 +119,12 @@ export const performanceRouter = {
     .input(attachToPerformanceCycleSchema)
     .mutation(async ({ ctx, input }) =>
       attachToPerformanceCycle(await actorFor(ctx), input),
+    ),
+
+  sponsoredAbandonment: protectedProcedure
+    .input(sponsoredAbandonmentSchema)
+    .query(async ({ ctx, input }) =>
+      listSponsoredAbandonment(await actorFor(ctx), input),
     ),
 
   syncCampaigns: protectedProcedure

@@ -19,6 +19,7 @@ import {
   AddPropertyForm,
   CycleStatusPicker,
   OpenCycleForm,
+  PropertyIdField,
 } from "./CycleForms";
 
 const usd = (value: number | null | undefined) =>
@@ -109,12 +110,11 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                   <ExternalLink className="size-3" />
                 </a>
               </div>
-              <div className="text-muted-foreground font-mono text-xs">
-                {property.propertyId ? (
-                  property.propertyId
-                ) : (
-                  <span className="text-amber-300">no property id</span>
-                )}
+              <div className="text-muted-foreground">
+                <PropertyIdField
+                  propertyRowId={property.id}
+                  propertyId={property.propertyId}
+                />
               </div>
             </div>
           ))}
@@ -292,6 +292,8 @@ export function AccountDetail({ accountId }: { accountId: string }) {
           </p>
         )}
       </section>
+
+      <SponsoredAbandonment accountId={accountId} />
 
       <div className="border-border text-muted-foreground flex items-start gap-2 rounded-lg border border-dashed p-3 text-xs">
         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-300" />
@@ -550,5 +552,99 @@ function AdGrid({
         ))}
       </div>
     </div>
+  );
+}
+
+const HEAT_META: Record<string, { label: string; cls: string }> = {
+  payment_failed: { label: "tried to pay", cls: "text-red-300" },
+  payment_entered: { label: "entered payment", cls: "text-amber-300" },
+  checkout_abandoned: { label: "left checkout", cls: "text-sky-300" },
+  converted: { label: "booked", cls: "text-emerald-300" },
+};
+
+/**
+ * The BDR-facing signal: guests who got far on a sponsored home and stopped.
+ * Matched on listing id, so a home without one cannot appear and is called out
+ * rather than reported as zero.
+ */
+function SponsoredAbandonment({ accountId }: { accountId: string }) {
+  const trpc = useTRPC();
+  const { data, isLoading } = useQuery(
+    trpc.performance.sponsoredAbandonment.queryOptions({
+      accountId,
+      sinceHours: 168,
+      stage: "checkout",
+      includeConverted: false,
+      limit: 25,
+    }),
+  );
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold">
+        Abandoned on sponsored homes · last 7 days
+      </h2>
+
+      {isLoading && (
+        <p className="text-muted-foreground text-sm">Checking funnel state…</p>
+      )}
+
+      {data && data.unresolvedProperties.length > 0 && (
+        <p className="text-xs text-amber-300">
+          {data.unresolvedProperties.length} home
+          {data.unresolvedProperties.length === 1 ? "" : "s"} have no listing id
+          yet, so abandonment on them cannot be matched. Set the id above.
+        </p>
+      )}
+
+      {data && data.events.length === 0 && data.matchedProperties > 0 && (
+        <p className="text-muted-foreground text-sm">
+          No abandoned checkouts on the {data.matchedProperties} matched home
+          {data.matchedProperties === 1 ? "" : "s"} in this window.
+        </p>
+      )}
+
+      {data && data.events.length > 0 && (
+        <div className="border-border divide-border divide-y rounded-lg border">
+          {data.events.map((event) => {
+            const heat = HEAT_META[event.heat] ?? {
+              label: event.heat,
+              cls: "text-muted-foreground",
+            };
+            return (
+              <div
+                key={`${event.userId}-${String(event.abandonedAt)}`}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-medium">
+                    {event.email ?? event.userId}
+                  </div>
+                  <div className="text-muted-foreground truncate">
+                    {event.property?.title ?? event.propertyName ?? "—"}
+                    {event.checkin && event.checkout
+                      ? ` · ${event.checkin} → ${event.checkout}`
+                      : ""}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {typeof event.value === "number" && (
+                    <span className="tabular-nums">
+                      ${event.value.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                    </span>
+                  )}
+                  <span className={heat.cls}>{heat.label}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-muted-foreground text-xs">
+        Matched on listing id from the tracked event, never on property name.
+        Nothing is sent to Outreach from here yet.
+      </p>
+    </section>
   );
 }
