@@ -5,6 +5,9 @@ import { z } from "zod";
 import {
   addPerformanceProperty,
   addPerformancePropertySchema,
+  refreshPerformanceCycleSpend,
+  searchAttachableCampaigns,
+  searchAttachableCampaignsSchema,
   attachToPerformanceCycle,
   attachToPerformanceCycleSchema,
   createPerformanceAccount,
@@ -84,9 +87,24 @@ export const updatePerformanceCycleAction = growthAction({
   execute: (input, ctx) => updatePerformanceCycle(actorFrom(ctx), input),
 });
 
+export const searchAttachableCampaignsAction = growthAction({
+  description:
+    "Find platform ad campaigns that are not yet attached to any performance cycle, newest first. Use this before attaching so the campaign is chosen by id rather than guessed from its name.",
+  inputSchema: searchAttachableCampaignsSchema,
+  execute: (input, ctx) => searchAttachableCampaigns(actorFrom(ctx), input),
+});
+
+export const refreshPerformanceCycleSpendAction = growthAction({
+  description:
+    "Recompute one cycle's observed spend from the campaigns attached to it. Reads the unrounded per-campaign figures, so it answers whether a customer is being overspent against their media budget.",
+  inputSchema: z.object({ cycleId: z.string().min(1) }),
+  execute: (input, ctx) =>
+    refreshPerformanceCycleSpend(actorFrom(ctx), input.cycleId),
+});
+
 export const attachToPerformanceCycleAction = growthAction({
   description:
-    "Attach one delivery row (initiative, lifecycle campaign, or amplification target) to a performance cycle so it counts toward the customer's report, or detach it with cycleId null. This tags existing delivery; it never creates ads or sends anything.",
+    "Attach one delivery row to a performance cycle so it counts toward the customer's report, or detach it with cycleId null. Kind 'campaign' is the one to use for an ad campaign that already exists on the platform: campaigns reach a cycle through an initiative, and this creates or reuses a wrapper initiative when the campaign has none. This tags existing delivery; it never creates ads or sends anything.",
   inputSchema: attachToPerformanceCycleSchema,
   execute: (input, ctx) => attachToPerformanceCycle(actorFrom(ctx), input),
 });

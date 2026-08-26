@@ -169,6 +169,21 @@ export const performanceCycleTable = pgTable(
     billedAmount: t.integer(), // whole dollars the customer pays
     mediaBudget: t.integer(), // whole dollars that reach ad platforms
 
+    /**
+     * Observed spend across every campaign attached to this cycle, in CENTS.
+     *
+     * Cents rather than dollars because this is the number compared against
+     * `mediaBudget` to decide whether a customer is being overspent, and
+     * `campaign.spend` is already rounded to whole dollars ($24.66 stored as
+     * 25). The rollup reads the unrounded `campaign.stats.spend` instead and
+     * keeps the precision as an integer, so no float drift accumulates across
+     * a portfolio.
+     *
+     * Null means never computed, which is different from zero.
+     */
+    actualSpendCents: t.integer(),
+    actualSpendAt: t.timestamp({ withTimezone: true }),
+
     status: performanceCycleStatusEnum().default("planned").notNull(),
     notes: t.text(),
 

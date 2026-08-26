@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   audiencePlanFor,
+  performanceAdBusinessKey,
   buildPerformanceAdPlan,
   dailyBudgetFromMedia,
   performanceAdName,
@@ -39,6 +40,36 @@ describe("naming", () => {
     expect(propertySlot(0)).toBe("A");
     expect(propertySlot(25)).toBe("Z");
     expect(propertySlot(26)).toBe("AA");
+  });
+});
+
+describe("business key", () => {
+  it("is stable across surfaces for the same ad", () => {
+    const a = performanceAdBusinessKey({
+      accountId: "perf_abc",
+      period: "2026-08",
+      adName: "PropertyB_Static_Wander Pawleys Island",
+    });
+    const b = performanceAdBusinessKey({
+      accountId: " PERF_ABC ",
+      period: "2026-08",
+      adName: "propertyb_static_wander pawleys island",
+    });
+    expect(a).toBe(b);
+  });
+
+  it("separates the same ad across cycles, so a relaunch is a new ad", () => {
+    const august = performanceAdBusinessKey({
+      accountId: "perf_abc",
+      period: "2026-08",
+      adName: "AllProperties_Carousel",
+    });
+    const september = performanceAdBusinessKey({
+      accountId: "perf_abc",
+      period: "2026-09",
+      adName: "AllProperties_Carousel",
+    });
+    expect(august).not.toBe(september);
   });
 });
 

@@ -25,7 +25,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "removeReference",
   ],
   audienceRead: ["list"],
-  performanceRead: ["list", "get"],
+  performanceRead: ["list", "get", "searchAttachableCampaigns"],
   performanceWrite: [
     "createAccount",
     "updateAccount",
@@ -34,6 +34,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "openCycle",
     "updateCycle",
     "attach",
+    "refreshSpend",
   ],
   audienceWrite: [
     "createTarget",

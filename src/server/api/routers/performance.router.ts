@@ -12,8 +12,13 @@ import {
   createPerformanceAccountSchema,
   getPerformanceAccount,
   listPerformanceAccounts,
+  attachToPerformanceCycle,
+  attachToPerformanceCycleSchema,
   openPerformanceCycle,
   openPerformanceCycleSchema,
+  refreshPerformanceCycleSpend,
+  searchAttachableCampaigns,
+  searchAttachableCampaignsSchema,
   updatePerformanceAccount,
   updatePerformanceAccountSchema,
   updatePerformanceCycle,
@@ -99,5 +104,23 @@ export const performanceRouter = {
     .input(updatePerformanceCycleSchema)
     .mutation(async ({ ctx, input }) =>
       updatePerformanceCycle(await actorFor(ctx), input),
+    ),
+
+  attachableCampaigns: protectedProcedure
+    .input(searchAttachableCampaignsSchema)
+    .query(async ({ ctx, input }) =>
+      searchAttachableCampaigns(await actorFor(ctx), input),
+    ),
+
+  attach: protectedProcedure
+    .input(attachToPerformanceCycleSchema)
+    .mutation(async ({ ctx, input }) =>
+      attachToPerformanceCycle(await actorFor(ctx), input),
+    ),
+
+  refreshSpend: protectedProcedure
+    .input(z.object({ cycleId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      refreshPerformanceCycleSpend(await actorFor(ctx), input.cycleId),
     ),
 } satisfies TRPCRouterRecord;

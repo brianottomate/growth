@@ -85,6 +85,7 @@ export function PerformanceClient() {
                 <th>Cycle</th>
                 <th className="text-right!">Billed</th>
                 <th className="text-right!">Media</th>
+                <th className="text-right!">Spent</th>
                 <th className="text-center!">Ads</th>
                 <th className="text-center!">Emails</th>
                 <th className="text-center!">Creators</th>
@@ -144,6 +145,22 @@ export function PerformanceClient() {
                     <td className="text-right tabular-nums">
                       {usd(cycle?.mediaBudget)}
                     </td>
+                    <td className="text-right tabular-nums">
+                      {typeof cycle?.actualSpendCents === "number" ? (
+                        <span
+                          className={
+                            cycle.mediaBudget &&
+                            cycle.actualSpendCents / 100 > cycle.mediaBudget
+                              ? "text-red-300"
+                              : undefined
+                          }
+                        >
+                          ${(cycle.actualSpendCents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </td>
                     <td className="text-center">
                       <Count value={cycle?.delivery.ads ?? 0} />
                     </td>
@@ -168,8 +185,10 @@ export function PerformanceClient() {
       )}
 
       <p className="text-muted-foreground text-xs">
-        Bookings and recommendations are not tracked yet — booking attribution
-        needs the Order Completed webhook, and reports are generated per cycle.
+        Spent is the sum of every campaign attached to the cycle, refreshed by
+        the Zernio ads sync, and turns red past the media budget. Bookings and
+        recommendations are not tracked yet — attribution needs the Order
+        Completed webhook.
       </p>
     </div>
   );

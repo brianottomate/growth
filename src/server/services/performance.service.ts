@@ -1,11 +1,12 @@
 import "server-only";
 
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
 import {
   amplificationTargetTable,
+  campaignTable,
   initiativeTable,
   lifecycleCampaignTable,
   performanceAccountTable,
@@ -121,8 +122,19 @@ export const attachToPerformanceCycleSchema = z.object({
     .min(1)
     .nullable()
     .describe("Target cycle, or null to detach."),
-  kind: z.enum(["initiative", "lifecycleCampaign", "amplificationTarget"]),
+  kind: z.enum([
+    "initiative",
+    "campaign",
+    "lifecycleCampaign",
+    "amplificationTarget",
+  ]),
   id: z.string().min(1).describe("The delivery row being attached."),
+});
+
+export const searchAttachableCampaignsSchema = z.object({
+  query: z.string().trim().max(200).optional(),
+  platform: z.string().trim().max(40).optional(),
+  limit: z.number().int().min(1).max(50).default(20),
 });
 
 async function requireAccount(actor: PerformanceActor, accountId: string) {
@@ -173,6 +185,8 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
           status: true,
           billedAmount: true,
           mediaBudget: true,
+          actualSpendCents: true,
+          actualSpendAt: true,
         },
       },
       reports: {
@@ -423,11 +437,117 @@ export async function updatePerformanceCycle(
  * without org scoping of their own, so the cycle's account is the boundary
  * checked here; a detach revalidates via the row's current cycle.
  */
+/**
+ * Campaigns that could be attached to a cycle: platform campaigns that either
+ * have no initiative at all (the shape every synced campaign arrives in) or
+ * whose initiative is not already on a cycle. Ordered by platform start date,
+ * because sync stamps `createdAt` with the ingest time and that sorts useless.
+ */
+export async function searchAttachableCampaigns(
+  actor: PerformanceActor,
+  input: z.infer<typeof searchAttachableCampaignsSchema>,
+) {
+  const rows = await db
+    .select({
+      id: campaignTable.id,
+      name: campaignTable.name,
+      platform: campaignTable.platform,
+      status: campaignTable.status,
+      spend: campaignTable.spend,
+      stats: campaignTable.stats,
+      startAt: campaignTable.startAt,
+      externalId: campaignTable.externalId,
+      heroThumbnailUrl: campaignTable.heroThumbnailUrl,
+      initiativeId: campaignTable.initiativeId,
+      initiativeCycleId: initiativeTable.performanceCycleId,
+    })
+    .from(campaignTable)
+    .leftJoin(initiativeTable, eq(initiativeTable.id, campaignTable.initiativeId))
+    .where(
+      and(
+        isNull(initiativeTable.performanceCycleId),
+        input.query
+          ? ilike(campaignTable.name, `%${input.query}%`)
+          : undefined,
+        input.platform
+          ? eq(campaignTable.platform, input.platform as "meta_ads")
+          : undefined,
+      ),
+    )
+    .orderBy(desc(campaignTable.startAt))
+    .limit(input.limit);
+  return { campaigns: rows };
+}
+
+/**
+ * Sum observed spend for every campaign under the cycle's attached
+ * initiatives, in cents.
+ *
+ * Reads `stats.spend` (unrounded) in preference to `campaign.spend`, which the
+ * schema documents as a coarse whole-dollar rollup — $24.66 is stored there as
+ * 25, and summing rounded dollars across a portfolio drifts against the media
+ * budget in the customer's favour or ours, unpredictably.
+ */
+export async function recomputePerformanceCycleSpend(cycleId: string) {
+  const campaigns = await db
+    .select({ spend: campaignTable.spend, stats: campaignTable.stats })
+    .from(campaignTable)
+    .innerJoin(
+      initiativeTable,
+      eq(initiativeTable.id, campaignTable.initiativeId),
+    )
+    .where(eq(initiativeTable.performanceCycleId, cycleId));
+
+  const cents = campaigns.reduce((total, row) => {
+    const precise = row.stats?.spend;
+    const dollars = typeof precise === "number" ? precise : (row.spend ?? 0);
+    return total + Math.round(dollars * 100);
+  }, 0);
+
+  await db
+    .update(performanceCycleTable)
+    .set({ actualSpendCents: cents, actualSpendAt: new Date() })
+    .where(eq(performanceCycleTable.id, cycleId));
+  return { cycleId, actualSpendCents: cents, campaigns: campaigns.length };
+}
+
+/**
+ * Refresh every cycle's observed spend. Called at the end of the Zernio ads
+ * sync so it rides a compute wake the sync already paid for (see the cron
+ * budget note in AGENTS.md) rather than adding a mark of its own.
+ */
+export async function recomputeAllPerformanceCycleSpend() {
+  const cycles = await db
+    .select({ id: performanceCycleTable.id })
+    .from(performanceCycleTable);
+  const results = [];
+  for (const cycle of cycles) {
+    results.push(await recomputePerformanceCycleSpend(cycle.id));
+  }
+  return { cycles: results.length, results };
+}
+
+/** Ownership-checked entry point for the capability and router surfaces. */
+export async function refreshPerformanceCycleSpend(
+  actor: PerformanceActor,
+  cycleId: string,
+) {
+  await requireCycle(actor, cycleId);
+  return recomputePerformanceCycleSpend(cycleId);
+}
+
 export async function attachToPerformanceCycle(
   actor: PerformanceActor,
   input: z.infer<typeof attachToPerformanceCycleSchema>,
 ) {
   if (input.cycleId) await requireCycle(actor, input.cycleId);
+
+  // A platform campaign has no cycle FK of its own — it reaches a cycle through
+  // its initiative. Synced campaigns have no initiative at all, so attaching
+  // one mints a wrapper initiative for the cycle and reuses it thereafter.
+  if (input.kind === "campaign") {
+    return attachCampaignToCycle(actor, input.cycleId, input.id);
+  }
 
   const target = {
     initiative: {
@@ -469,5 +589,146 @@ export async function attachToPerformanceCycle(
     id: input.id,
     performanceCycleId: input.cycleId,
     previousCycleId: row.cycleId,
+  };
+}
+
+/** Wrapper-initiative slug for a cycle, so repeated attaches reuse one row. */
+const cycleWrapperSlug = (cycleId: string) => `perf-cycle-${cycleId}`;
+
+async function attachCampaignToCycle(
+  actor: PerformanceActor,
+  cycleId: string | null,
+  campaignId: string,
+) {
+  const campaign = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, campaignId),
+    columns: {
+      id: true,
+      name: true,
+      brandId: true,
+      platform: true,
+      initiativeId: true,
+      budget: true,
+      startAt: true,
+      endAt: true,
+    },
+  });
+  if (!campaign) {
+    throw new PerformanceError("NOT_FOUND", `Campaign not found: ${campaignId}`);
+  }
+
+  // Detach: clear the campaign's link to a cycle-owned wrapper. A campaign
+  // whose initiative is a real strategic push is left alone — detaching must
+  // not silently orphan Wander's own campaign from its initiative.
+  if (!cycleId) {
+    const current = campaign.initiativeId
+      ? await db.query.initiativeTable.findFirst({
+          where: eq(initiativeTable.id, campaign.initiativeId),
+          columns: { id: true, slug: true, performanceCycleId: true },
+        })
+      : null;
+    if (current?.performanceCycleId) {
+      await requireCycle(actor, current.performanceCycleId);
+      const isWrapper =
+        current.slug === cycleWrapperSlug(current.performanceCycleId);
+      if (isWrapper) {
+        await db
+          .update(campaignTable)
+          .set({ initiativeId: null })
+          .where(eq(campaignTable.id, campaignId));
+        // A wrapper exists only to carry campaigns. Left on the cycle once its
+        // last campaign detaches it renders as an empty delivery row, so it
+        // comes off the cycle with the campaign it was minted for.
+        const siblings = await db
+          .select({ id: campaignTable.id })
+          .from(campaignTable)
+          .where(eq(campaignTable.initiativeId, current.id))
+          .limit(1);
+        if (siblings.length === 0) {
+          await db
+            .update(initiativeTable)
+            .set({ performanceCycleId: null, status: "archived" })
+            .where(eq(initiativeTable.id, current.id));
+        }
+      }
+      await recomputePerformanceCycleSpend(current.performanceCycleId);
+      return {
+        kind: "campaign" as const,
+        id: campaignId,
+        performanceCycleId: null,
+        detachedFromWrapper: isWrapper,
+      };
+    }
+    return {
+      kind: "campaign" as const,
+      id: campaignId,
+      performanceCycleId: null,
+      detachedFromWrapper: false,
+    };
+  }
+
+  const cycle = await requireCycle(actor, cycleId);
+
+  // Already has an initiative: put that initiative on the cycle rather than
+  // rewriting the campaign's parent, so an existing push keeps its grouping.
+  if (campaign.initiativeId) {
+    await db
+      .update(initiativeTable)
+      .set({ performanceCycleId: cycleId })
+      .where(eq(initiativeTable.id, campaign.initiativeId));
+    const spend = await recomputePerformanceCycleSpend(cycleId);
+    return {
+      kind: "campaign" as const,
+      id: campaignId,
+      performanceCycleId: cycleId,
+      initiativeId: campaign.initiativeId,
+      createdWrapper: false,
+      actualSpendCents: spend.actualSpendCents,
+    };
+  }
+
+  const slug = cycleWrapperSlug(cycleId);
+  const existing = await db.query.initiativeTable.findFirst({
+    where: eq(initiativeTable.slug, slug),
+    columns: { id: true },
+  });
+  const wrapperId =
+    existing?.id ??
+    (
+      await db
+        .insert(initiativeTable)
+        .values({
+          brandId: campaign.brandId,
+          name: `Performance+ · ${cycle.period}`,
+          slug,
+          goal: "performance",
+          description:
+            "Wrapper initiative created by attaching a platform campaign to a performance cycle. Campaigns reach a cycle through an initiative; a hand-built campaign has none.",
+          status: "active",
+          targetChannels: [campaign.platform],
+          performanceCycleId: cycleId,
+          startAt: campaign.startAt,
+          endAt: campaign.endAt,
+        })
+        .returning({ id: initiativeTable.id })
+    )[0]!.id;
+
+  await db
+    .update(initiativeTable)
+    .set({ performanceCycleId: cycleId })
+    .where(eq(initiativeTable.id, wrapperId));
+  await db
+    .update(campaignTable)
+    .set({ initiativeId: wrapperId })
+    .where(eq(campaignTable.id, campaignId));
+
+  const spend = await recomputePerformanceCycleSpend(cycleId);
+  return {
+    kind: "campaign" as const,
+    id: campaignId,
+    performanceCycleId: cycleId,
+    initiativeId: wrapperId,
+    createdWrapper: !existing,
+    actualSpendCents: spend.actualSpendCents,
   };
 }

@@ -113,6 +113,8 @@ import {
   getPerformanceAccountAction,
   listPerformanceAccountsAction,
   openPerformanceCycleAction,
+  refreshPerformanceCycleSpendAction,
+  searchAttachableCampaignsAction,
   updatePerformanceAccountAction,
   updatePerformanceCycleAction,
   updatePerformancePropertyAction,
@@ -166,6 +168,7 @@ export const performanceRead = growthDomainTool({
   actions: {
     list: listPerformanceAccountsAction,
     get: getPerformanceAccountAction,
+    searchAttachableCampaigns: searchAttachableCampaignsAction,
   },
 });
 
@@ -180,6 +183,7 @@ export const performanceWrite = growthDomainTool({
     openCycle: openPerformanceCycleAction,
     updateCycle: updatePerformanceCycleAction,
     attach: attachToPerformanceCycleAction,
+    refreshSpend: refreshPerformanceCycleSpendAction,
   },
 });
 

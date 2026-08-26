@@ -11,6 +11,7 @@ import {
 import { brandTable } from "@/server/db/brand-schema";
 import { type ChannelPlatform, channelTable } from "@/server/db/channel-schema";
 import { getAllAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
+import { recomputeAllPerformanceCycleSpend } from "@/server/services/performance.service";
 import {
   getZernioAdsTree,
   isZernioConfigured,
@@ -185,6 +186,8 @@ export async function syncZernioAds(options?: {
   updated: number;
   skipped: number;
   byObjective: Record<string, number>;
+  /** Performance+ cycles whose observed spend was refreshed from this sync. */
+  cyclesRepriced: number;
   errors: string[];
 }> {
   const brandSlug = options?.brandSlug ?? "wander";
@@ -223,6 +226,7 @@ export async function syncZernioAds(options?: {
       brandId: brand.id,
       channelId: "",
       candidates: 0,
+      cyclesRepriced: 0,
       inserted: 0,
       updated: 0,
       skipped: 0,
@@ -386,6 +390,18 @@ export async function syncZernioAds(options?: {
     byObjective[k] = (byObjective[k] ?? 0) + 1;
   }
 
+  // Observed spend for Performance+ cycles is derived from the campaign rows
+  // this sync just refreshed, so it rides the same compute wake rather than
+  // earning a cron mark of its own. A failure here must not fail the sync.
+  let cyclesRepriced = 0;
+  try {
+    cyclesRepriced = (await recomputeAllPerformanceCycleSpend()).cycles;
+  } catch (error) {
+    errors.push(
+      `cycle spend rollup failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
   return {
     brandId: brand.id,
     channelId,
@@ -394,6 +410,7 @@ export async function syncZernioAds(options?: {
     updated,
     skipped: skippedJunk,
     byObjective,
+    cyclesRepriced,
     errors,
   };
 }

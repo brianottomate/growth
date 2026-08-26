@@ -102,7 +102,11 @@ export const growthActionPolicies = {
     removeReference: write({ reversible: false }),
   },
   audienceRead: { list: read() },
-  performanceRead: { list: read(), get: read() },
+  performanceRead: {
+    list: read(),
+    get: read(),
+    searchAttachableCampaigns: read(),
+  },
   // Commercial bookkeeping in our own tables. `attach` tags existing delivery
   // rows with a cycle id (undo = attach with cycleId null); nothing here
   // touches a provider or spends.
@@ -117,6 +121,8 @@ export const growthActionPolicies = {
       idempotent: true,
       undoWith: "performanceWrite.attach",
     }),
+    // Derived from campaign rows already in our DB; safe to re-run.
+    refreshSpend: write({ idempotent: true }),
   },
   audienceWrite: {
     createTarget: write(),

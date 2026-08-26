@@ -179,6 +179,22 @@ export function performanceAdName(input: {
   return `Property${propertySlot(input.index)}_${input.format}_${input.propertyName.trim()}`;
 }
 
+/**
+ * Deterministic key for one ad in one cycle, mirroring `campaignBusinessKey`'s
+ * lower-cased colon-delimited shape. Stored on `ad_spot.businessKey` and sent
+ * to the provider as the idempotency key, so the same ad drafted twice from
+ * different surfaces is recognised as the same ad rather than duplicated.
+ */
+export function performanceAdBusinessKey(input: {
+  accountId: string;
+  period: string;
+  adName: string;
+}): string {
+  return [input.accountId, input.period, input.adName]
+    .map((part) => part.trim().toLowerCase().replace(/\s+/g, "-"))
+    .join(":");
+}
+
 export type PerformanceAdPlanItem = {
   name: string;
   kind: "static" | "carousel" | "all_properties_carousel" | "catalog";
