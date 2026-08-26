@@ -5,10 +5,12 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
 import {
+  leadContactTable,
   leadDomainTable,
   leadSequenceTable,
   pregenBuildTable,
 } from "@/server/db/leads-schema";
+import { pickBestPregenContact } from "@/server/services/pregen-send.service";
 
 /**
  * A batch of previews stacked as live iframes, so a send wave can be reviewed
@@ -25,6 +27,75 @@ import {
 export const dynamic = "force-dynamic";
 
 const REVIEW_CAP = 10;
+
+/**
+ * Who this send goes to and what we know about them, above the preview.
+ *
+ * Reviewing a site in isolation answers "is this good", not "is this good for
+ * them" — and the greeting warning below is the one defect that is invisible in
+ * the preview yet blocks the send.
+ */
+function RecipientStrip({
+  row,
+  pick,
+}: {
+  row: {
+    companyName: string | null;
+    city: string | null;
+    state: string | null;
+    pms: string | null;
+    unitCount: number | null;
+    unitEstimate: number | null;
+    computedTier: string | null;
+  };
+  pick: ReturnType<typeof pickBestPregenContact> | undefined;
+}) {
+  const contact = pick?.contact;
+  const name = contact
+    ? [contact.firstName, contact.lastName].filter(Boolean).join(" ")
+    : "";
+  const firstName = contact?.firstName?.trim() ?? "";
+  // The refusal the batch send raises: HubSpot renders the first-name token, so
+  // a company name parked there greets the prospect as "Hi OmniVillas,".
+  const greetingBroken =
+    !!firstName &&
+    firstName.toLowerCase() === row.companyName?.trim().toLowerCase();
+  const units = row.unitCount ?? row.unitEstimate;
+  const facts = [
+    [row.city, row.state].filter(Boolean).join(", ") || null,
+    row.pms,
+    units ? `${units} units` : null,
+    row.computedTier ? `tier ${row.computedTier}` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="text-muted-foreground mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {contact ? (
+        <span className="text-foreground">
+          {name || "(no name)"}
+          {contact.jobTitle ? (
+            <span className="text-muted-foreground"> · {contact.jobTitle}</span>
+          ) : null}
+          <span className="text-muted-foreground"> · {contact.email}</span>
+        </span>
+      ) : (
+        <span className="text-amber-400">
+          No enrollable contact — this one cannot send
+        </span>
+      )}
+      {pick && pick.enrollable > 1 ? (
+        <span>best of {pick.enrollable}</span>
+      ) : null}
+      {facts.length ? <span>{facts.join(" · ")}</span> : null}
+      {greetingBroken ? (
+        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-amber-300">
+          greeting would read &ldquo;Hi {firstName},&rdquo; — clear the first
+          name in HubSpot
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function PregenReviewPage({
   searchParams,
@@ -43,11 +114,19 @@ export default async function PregenReviewPage({
 
   const rows = await db
     .select({
+      domainId: leadDomainTable.id,
       domain: pregenBuildTable.domain,
       businessName: pregenBuildTable.businessName,
       previewUrl: pregenBuildTable.previewUrl,
       sendScheduledFor: pregenBuildTable.sendScheduledFor,
       companyName: leadDomainTable.companyName,
+      city: leadDomainTable.city,
+      state: leadDomainTable.state,
+      pms: leadDomainTable.pms,
+      unitCount: leadDomainTable.unitCount,
+      unitEstimate: leadDomainTable.unitEstimate,
+      computedTier: leadDomainTable.computedTier,
+      enrichment: leadDomainTable.enrichment,
     })
     .from(pregenBuildTable)
     .innerJoin(
@@ -71,6 +150,36 @@ export default async function PregenReviewPage({
     .limit(REVIEW_CAP);
 
   const previews = rows.filter((row) => row.previewUrl);
+
+  // Who the email would actually go to, resolved through the send path's own
+  // picker so this page cannot show one person while the send picks another.
+  const contacts = previews.length
+    ? await db
+        .select()
+        .from(leadContactTable)
+        .where(
+          and(
+            inArray(
+              leadContactTable.domainId,
+              previews.map((row) => row.domainId),
+            ),
+            isNull(leadContactTable.deletedAt),
+          ),
+        )
+    : [];
+  const byDomainId = new Map<string, (typeof contacts)[number][]>();
+  for (const contact of contacts) {
+    const list = byDomainId.get(contact.domainId) ?? [];
+    list.push(contact);
+    byDomainId.set(contact.domainId, list);
+  }
+
+  const recipients = new Map(
+    previews.map((row) => [
+      row.domain,
+      pickBestPregenContact(row, byDomainId.get(row.domainId) ?? []),
+    ]),
+  );
 
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6">
@@ -131,6 +240,7 @@ export default async function PregenReviewPage({
                   </Link>
                 </span>
               </div>
+              <RecipientStrip row={row} pick={recipients.get(row.domain)} />
               <iframe
                 src={row.previewUrl!}
                 title={`Preview for ${row.domain}`}

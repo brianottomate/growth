@@ -25,6 +25,40 @@ export type PregenSendResult = {
   sequence?: string;
 };
 
+type StoredContact = typeof leadContactTable.$inferSelect;
+
+/**
+ * The contact a send would pick for one domain, or null when none is enrollable.
+ *
+ * Exported so the review page can name the person who will actually receive the
+ * email rather than re-deriving it — a second ranking implementation would
+ * drift, and reviewing a send addressed to someone else is worse than not
+ * showing a name at all.
+ */
+export function pickBestPregenContact(
+  row: { domain: string; enrichment: unknown },
+  contacts: StoredContact[],
+): { contact: StoredContact; score: number; enrollable: number } | null {
+  const mentions = storedContactMentions(row.enrichment);
+  const ranked = contacts
+    .filter(
+      (contact) =>
+        contact.hubspotContactId != null &&
+        !contact.emailOptOut &&
+        !isPlaceholderEmail(contact.email),
+    )
+    .map((contact) => ({
+      contact,
+      score: scoreStoredContact(contact, row.domain, {
+        historyMentions: mentions?.get(contact.email.toLowerCase()),
+      }).score,
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  const best = ranked[0];
+  return best ? { ...best, enrollable: ranked.length } : null;
+}
+
 /**
  * Enrol a set of domains in Kyle's pregen sequence, one best contact each.
  *
@@ -74,23 +108,7 @@ export async function enrolPregenDomains(
           isNull(leadContactTable.deletedAt),
         ),
       );
-    const mentions = storedContactMentions(row.enrichment);
-    const ranked = contacts
-      .filter(
-        (contact) =>
-          contact.hubspotContactId != null &&
-          !contact.emailOptOut &&
-          !isPlaceholderEmail(contact.email),
-      )
-      .map((contact) => ({
-        contact,
-        score: scoreStoredContact(contact, row.domain, {
-          historyMentions: mentions?.get(contact.email.toLowerCase()),
-        }).score,
-      }))
-      .sort((left, right) => right.score - left.score);
-
-    const best = ranked[0]?.contact;
+    const best = pickBestPregenContact(row, contacts)?.contact;
     if (!best) {
       results.push({
         domain,
