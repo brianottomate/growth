@@ -125,6 +125,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Grow",
     items: [
+      { label: "Performance+", href: "/app/performance", icon: Handshake },
       { label: "Leads", href: "/app/leads", icon: Database, exact: true },
       {
         // Not a route of its own — send-review was deleted (same table, same

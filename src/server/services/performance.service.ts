@@ -167,7 +167,6 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
       },
       cycles: {
         orderBy: desc(performanceCycleTable.period),
-        limit: 3,
         columns: {
           id: true,
           period: true,
@@ -176,9 +175,74 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
           mediaBudget: true,
         },
       },
+      reports: {
+        columns: { id: true, cycleId: true, status: true },
+      },
     },
   });
-  return { accounts };
+
+  // Delivery counts per cycle, so the list can answer "is anything running for
+  // this customer" without a per-row round trip.
+  const cycleIds = accounts.flatMap((account) =>
+    account.cycles.map((cycle) => cycle.id),
+  );
+  const delivery = new Map<
+    string,
+    { ads: number; emails: number; influencers: number }
+  >();
+  if (cycleIds.length > 0) {
+    const bump = (
+      cycleId: string | null,
+      key: "ads" | "emails" | "influencers",
+    ) => {
+      if (!cycleId) return;
+      const row =
+        delivery.get(cycleId) ?? { ads: 0, emails: 0, influencers: 0 };
+      row[key] += 1;
+      delivery.set(cycleId, row);
+    };
+    const [initiatives, campaigns, amplifications] = await Promise.all([
+      db
+        .select({ cycleId: initiativeTable.performanceCycleId })
+        .from(initiativeTable)
+        .where(inArray(initiativeTable.performanceCycleId, cycleIds)),
+      db
+        .select({ cycleId: lifecycleCampaignTable.performanceCycleId })
+        .from(lifecycleCampaignTable)
+        .where(inArray(lifecycleCampaignTable.performanceCycleId, cycleIds)),
+      db
+        .select({ cycleId: amplificationTargetTable.performanceCycleId })
+        .from(amplificationTargetTable)
+        .where(inArray(amplificationTargetTable.performanceCycleId, cycleIds)),
+    ]);
+    initiatives.forEach((row) => bump(row.cycleId, "ads"));
+    campaigns.forEach((row) => bump(row.cycleId, "emails"));
+    amplifications.forEach((row) => bump(row.cycleId, "influencers"));
+  }
+
+  return {
+    accounts: accounts.map((account) => {
+      const current = account.cycles[0] ?? null;
+      return {
+        ...account,
+        currentCycle: current
+          ? {
+              ...current,
+              delivery:
+                delivery.get(current.id) ??
+                { ads: 0, emails: 0, influencers: 0 },
+              hasReport: account.reports.some(
+                (report) => report.cycleId === current.id,
+              ),
+            }
+          : null,
+        lifetimeBilled: account.cycles.reduce(
+          (total, cycle) => total + (cycle.billedAmount ?? 0),
+          0,
+        ),
+      };
+    }),
+  };
 }
 
 export async function getPerformanceAccount(

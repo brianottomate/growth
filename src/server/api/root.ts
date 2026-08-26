@@ -20,6 +20,7 @@ import { initiativeRouter } from "@/server/api/routers/initiative.router";
 import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
+import { performanceRouter } from "@/server/api/routers/performance.router";
 import { planImportRouter } from "@/server/api/routers/planImport.router";
 import { productStorefrontRouter } from "@/server/api/routers/productStorefront.router";
 import { instantlyRouter } from "@/server/api/routers/instantly.router";
@@ -69,6 +70,7 @@ export const appRouter = createTRPCRouter({
   newsletter: newsletterRouter,
   org: orgRouter,
   outreach: outreachRouter,
+  performance: performanceRouter,
   planImport: planImportRouter,
   productStorefront: productStorefrontRouter,
   instantly: instantlyRouter,
