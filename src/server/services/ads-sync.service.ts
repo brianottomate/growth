@@ -10,7 +10,7 @@ import {
 } from "@/server/db/ads-schema";
 import { brandTable } from "@/server/db/brand-schema";
 import { type ChannelPlatform, channelTable } from "@/server/db/channel-schema";
-import { getAllAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
+import { getAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
 import { recomputeAllPerformanceCycleSpend } from "@/server/services/performance.service";
 import {
   getZernioAdsTree,
@@ -232,7 +232,13 @@ export async function syncZernioAds(options?: {
   });
   if (!brand) throw new Error(`Brand "${brandSlug}" not found`);
 
-  const allowedAccounts = await getAllAllowedAdAccountIds();
+  // Scoped to THIS brand's allowed accounts, not the global allowed set.
+  // Zernio's tree spans the whole workspace, so with the global set a sync
+  // for one brand ingested every other brand's campaigns under its channels
+  // (caught on the first client-brand sync, 2026-08-27). Cross-brand
+  // attribution is worse than under-ingesting; a campaign nobody's brand
+  // claims stays out until its account is allowed on the right brand.
+  const allowedAccounts = await getAllowedAdAccountIds(brand.id);
   // Meta allowlist rows carry the `act_` prefix; Zernio sometimes reports the
   // bare id. Compare both spellings.
   const isAllowed = (acct: string) =>

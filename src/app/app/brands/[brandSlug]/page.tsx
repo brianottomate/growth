@@ -2,8 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 
+import { desc, eq as eqOp } from "drizzle-orm";
+
 import { db } from "@/server/db";
 import {
+  adSpotTable,
   brandInspirationTable,
   brandTable,
   memberTable,
@@ -66,6 +69,25 @@ export default async function BrandPage({
     peers: strategy.peerBrandCount,
     hasStrategyTargets: strategy.hasTargets,
   });
+
+  // Latest synced ads across the brand's allowed ad accounts — an overview
+  // strip only; management lives on the ads pages.
+  const latestSpots = await db.query.adSpotTable.findMany({
+    where: eqOp(adSpotTable.brandId, brand.id),
+    orderBy: [desc(adSpotTable.createdAt)],
+    limit: 12,
+  });
+  const spotCampaignIds = [
+    ...new Set(latestSpots.map((spot) => spot.campaignId)),
+  ];
+  const spotCampaigns =
+    spotCampaignIds.length > 0
+      ? await db.query.campaignTable.findMany({
+          where: (table, { inArray }) => inArray(table.id, spotCampaignIds),
+          columns: { id: true, name: true },
+        })
+      : [];
+  const campaignName = new Map(spotCampaigns.map((row) => [row.id, row.name]));
 
   // Pillars available to target for this brand (by slug), for the "add" menu.
   const pillars = PILLARS.filter(
@@ -130,6 +152,58 @@ export default async function BrandPage({
       <ClientConnectCard brandId={brand.id} />
 
       <AdAccountsCard brandId={brand.id} brandSlug={brand.slug ?? brandSlug} />
+
+      {latestSpots.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="text-base font-semibold">Latest ads</h2>
+              <p className="text-muted-foreground mt-0.5 text-sm">
+                The most recently synced ads across this brand&apos;s accounts.
+              </p>
+            </div>
+            <Link
+              href={`/app/brands/${brandSlug}/ads`}
+              className="text-muted-foreground text-sm hover:underline"
+            >
+              All ads
+            </Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {latestSpots.map((spot) => (
+              <Link
+                key={spot.id}
+                href={`/app/brands/${brandSlug}/ads/${spot.campaignId}`}
+                className="bg-card w-40 shrink-0 overflow-hidden rounded-xl border transition-colors hover:border-white/20"
+              >
+                <div className="bg-muted relative h-24">
+                  {(spot.media?.[0]?.url ?? spot.thumbnailUrl) && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={spot.media?.[0]?.url ?? spot.thumbnailUrl ?? ""}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                  {spot.status && (
+                    <span className="absolute top-1 right-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white capitalize backdrop-blur-sm">
+                      {spot.status}
+                    </span>
+                  )}
+                </div>
+                <div className="p-2">
+                  <p className="truncate text-xs font-medium">
+                    {spot.name ?? "Untitled ad"}
+                  </p>
+                  <p className="text-muted-foreground truncate text-[10px]">
+                    {campaignName.get(spot.campaignId) ?? spot.platform}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section id="strategy" className="scroll-mt-6 space-y-3">
         <div>

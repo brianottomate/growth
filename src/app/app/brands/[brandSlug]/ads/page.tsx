@@ -58,10 +58,20 @@ function CampaignRow({
   spots: AdSpot[];
   brandSlug: string;
 }) {
+  const thumbnail = c.heroThumbnailUrl ?? spots.find((s) => s.media?.[0]?.url)?.media?.[0]?.url;
   return (
     <div className="bg-card flex flex-col gap-2 rounded-xl border p-3">
       <div className="flex items-center gap-3">
-        <ChannelLogo platform={c.platform} className="size-6" />
+        {thumbnail ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnail}
+            alt=""
+            className="size-12 shrink-0 rounded-lg border object-cover"
+          />
+        ) : (
+          <ChannelLogo platform={c.platform} className="size-6" />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Link
