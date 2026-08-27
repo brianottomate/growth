@@ -17,6 +17,7 @@ function initiative(overrides: Partial<Initiative> = {}): Initiative {
     status: "active",
     targetChannels: ["meta_ads", "google_ads"],
     budget: 10_000,
+    performanceCycleId: null,
     startAt: new Date("2026-07-01"),
     endAt: new Date("2026-09-30"),
     createdAt: new Date(),

@@ -106,6 +106,21 @@ import {
   updateProductAtlas,
   updateProductStorefront,
 } from "./product-storefront";
+import {
+  addPerformancePropertyAction,
+  attachToPerformanceCycleAction,
+  createPerformanceAccountAction,
+  getPerformanceAccountAction,
+  listPerformanceAccountsAction,
+  listSponsoredAbandonmentAction,
+  openPerformanceCycleAction,
+  refreshPerformanceCycleSpendAction,
+  searchAttachableCampaignsAction,
+  syncAdCampaignsAction,
+  updatePerformanceAccountAction,
+  updatePerformanceCycleAction,
+  updatePerformancePropertyAction,
+} from "./performance";
 import { readWebPage, webSearch } from "./research";
 import { growthDomainTool } from "./types";
 
@@ -146,6 +161,33 @@ export const storefrontWrite = growthDomainTool({
     copySiblingContent: copySiblingStorefrontContent,
     captureReference: captureProductStorefrontReference,
     removeReference: removeProductStorefrontReference,
+  },
+});
+
+export const performanceRead = growthDomainTool({
+  description:
+    "Read performance accounts — property managers paying for sponsored placement on Wander's marketing surfaces — with their properties, billing cycles, and attached delivery.",
+  actions: {
+    list: listPerformanceAccountsAction,
+    get: getPerformanceAccountAction,
+    searchAttachableCampaigns: searchAttachableCampaignsAction,
+    sponsoredAbandonment: listSponsoredAbandonmentAction,
+  },
+});
+
+export const performanceWrite = growthDomainTool({
+  description:
+    "Manage performance accounts: onboard customers, add sponsored properties, open and update billing cycles, and attach existing delivery (initiatives, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
+  actions: {
+    createAccount: createPerformanceAccountAction,
+    updateAccount: updatePerformanceAccountAction,
+    addProperty: addPerformancePropertyAction,
+    updateProperty: updatePerformancePropertyAction,
+    openCycle: openPerformanceCycleAction,
+    updateCycle: updatePerformanceCycleAction,
+    attach: attachToPerformanceCycleAction,
+    refreshSpend: refreshPerformanceCycleSpendAction,
+    syncCampaigns: syncAdCampaignsAction,
   },
 });
 
@@ -413,6 +455,8 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   storefrontWrite,
   audienceRead,
   audienceWrite,
+  performanceRead,
+  performanceWrite,
   researchRead,
   contentRead,
   contentWrite,

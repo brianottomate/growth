@@ -103,6 +103,35 @@ export const growthActionPolicies = {
     removeReference: write({ reversible: false }),
   },
   audienceRead: { list: read() },
+  performanceRead: {
+    list: read(),
+    get: read(),
+    searchAttachableCampaigns: read(),
+    sponsoredAbandonment: read(),
+  },
+  // Commercial bookkeeping in our own tables. `attach` tags existing delivery
+  // rows with a cycle id (undo = attach with cycleId null); nothing here
+  // touches a provider or spends.
+  performanceWrite: {
+    createAccount: write(),
+    updateAccount: write({ idempotent: true }),
+    addProperty: write(),
+    updateProperty: write({ idempotent: true }),
+    openCycle: write(),
+    updateCycle: write({ idempotent: true }),
+    attach: write({
+      idempotent: true,
+      undoWith: "performanceWrite.attach",
+    }),
+    // Derived from campaign rows already in our DB; safe to re-run.
+    refreshSpend: write({ idempotent: true }),
+    // Reads Zernio and upserts our own mirror rows. No provider mutation and
+    // no spend, so it needs no approval, but it is a background-weight call.
+    syncCampaigns: write({
+      consequence: "background-run",
+      idempotent: true,
+    }),
+  },
   audienceWrite: {
     createTarget: write(),
     saveTargets: write({ idempotent: true }),

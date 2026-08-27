@@ -1,9 +1,10 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { brandTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { MediaItem } from "./content-schema";
+import { performanceCycleTable } from "./performance-schema";
 import { createId } from "./utils";
 import type {
   AudienceActiveWindow,
@@ -149,6 +150,13 @@ export const initiativeTable = pgTable(
 
     budget: t.integer(), // total intended (whole dollars)
 
+    // Sponsored delivery: the paid performance cycle this initiative fulfils.
+    // Null for Wander's own pushes. Ads stay on Wander's brand/channels; this
+    // FK is the only customer linkage (see performance-schema.ts).
+    performanceCycleId: t
+      .text()
+      .references(() => performanceCycleTable.id, { onDelete: "set null" }),
+
     startAt: t.timestamp({ withTimezone: true }),
     endAt: t.timestamp({ withTimezone: true }),
 
@@ -166,6 +174,7 @@ export const initiativeTable = pgTable(
   (table) => [
     index("initiative_brand_idx").on(table.brandId),
     index("initiative_status_idx").on(table.status),
+    index("initiative_performance_cycle_idx").on(table.performanceCycleId),
   ],
 );
 
@@ -303,6 +312,15 @@ export const adSpotTable = pgTable(
     externalId: t.text(), // platform ad id
     manageUrl: t.text(),
 
+    /**
+     * Deterministic key for the ad this row represents, set when Growth drafts
+     * it and carried through to the provider as the Zernio idempotency key.
+     * It is what links a drafted ad to the live ad it became: `externalId`
+     * only exists after the platform accepts it, so without this a relaunch
+     * cannot tell a duplicate from a new ad. Null for rows discovered by sync.
+     */
+    businessKey: t.text(),
+
     createdAt: t
       .timestamp()
       .$defaultFn(() => new Date())
@@ -317,6 +335,9 @@ export const adSpotTable = pgTable(
     index("ad_spot_campaign_idx").on(table.campaignId),
     index("ad_spot_brand_idx").on(table.brandId),
     index("ad_spot_status_idx").on(table.status),
+    uniqueIndex("ad_spot_business_key_idx")
+      .on(table.businessKey)
+      .where(sql`${table.businessKey} IS NOT NULL`),
   ],
 );
 

@@ -25,6 +25,7 @@ export * from "./cadence-schema";
 export * from "./funnel-schema";
 export * from "./leads-schema";
 export * from "./lifecycle-schema";
+export * from "./performance-schema";
 export * from "./transactional-schema";
 export * from "./listening-schema";
 export * from "./media-schema";

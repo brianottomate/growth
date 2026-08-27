@@ -4,6 +4,7 @@ import { index, pgEnum, pgTable, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { brandTable } from "./brand-schema";
 import { channelTable, deliveryProviderEnum } from "./channel-schema";
 import { cleanupStatusEnum } from "./content-schema";
+import { performanceCycleTable } from "./performance-schema";
 import { createId } from "./utils";
 
 // ---- LIFECYCLE DOMAIN ----------------------------------------------
@@ -287,6 +288,12 @@ export const lifecycleCampaignTable = pgTable(
       .text()
       .references(() => lifecycleProgramTable.id, { onDelete: "set null" }),
 
+    // Sponsored delivery: the paid performance cycle this campaign fulfils
+    // (e.g. a customer's hero spot in a guest email). Null for Wander's own.
+    performanceCycleId: t
+      .text()
+      .references(() => performanceCycleTable.id, { onDelete: "set null" }),
+
     name: t.text().notNull(),
     description: t.text(),
 
@@ -323,6 +330,9 @@ export const lifecycleCampaignTable = pgTable(
   }),
   (table) => [
     index("lifecycle_campaign_brand_idx").on(table.brandId),
+    index("lifecycle_campaign_performance_cycle_idx").on(
+      table.performanceCycleId,
+    ),
     index("lifecycle_campaign_kind_idx").on(table.kind),
     index("lifecycle_campaign_run_state_idx").on(table.runState),
     index("lifecycle_campaign_cleanup_idx").on(table.cleanupStatus),

@@ -11,6 +11,7 @@ import {
 import { brandTable } from "@/server/db/brand-schema";
 import { type ChannelPlatform, channelTable } from "@/server/db/channel-schema";
 import { getAllAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
+import { recomputeAllPerformanceCycleSpend } from "@/server/services/performance.service";
 import {
   getZernioAdsTree,
   isZernioConfigured,
@@ -171,13 +172,35 @@ function campaignPlatform(c: Record<string, unknown>): string {
  * (brand, platform[, externalId]) and its externalId is backfilled onto
  * placeholder rows.
  */
+/**
+ * Default ingest window. Zernio's tree returns every campaign an ad account
+ * has ever had, and Wander's has hundreds of ended tests. Pulling all of them
+ * buries the handful that matter and makes the attach picker unusable, so the
+ * sync is bounded by default and widened deliberately.
+ */
+export const ADS_SYNC_DEFAULT_SINCE_DAYS = 120;
+
+export type AdsSyncFilters = {
+  /**
+   * Only campaigns started (or, absent a start date, last updated) within this
+   * many days. Pass null for no window — the old unbounded behaviour.
+   */
+  sinceDays?: number | null;
+  /** Skip campaigns whose observed spend is below this many whole dollars. */
+  minSpend?: number;
+  /** Only these campaign statuses, lower-cased (e.g. ["active","paused"]). */
+  statuses?: string[];
+  /** Hard cap after filtering, newest first. */
+  limit?: number;
+};
+
 export async function syncZernioAds(options?: {
   brandSlug?: string;
   /** channel_platform ad value; default "meta_ads" (original behavior). */
   platform?: ChannelPlatform;
   /** Scope to one platform ad account (e.g. a Google customer id). */
   adAccountId?: string;
-}): Promise<{
+} & AdsSyncFilters): Promise<{
   brandId: string;
   channelId: string;
   candidates: number;
@@ -185,6 +208,17 @@ export async function syncZernioAds(options?: {
   updated: number;
   skipped: number;
   byObjective: Record<string, number>;
+  /** Performance+ cycles whose observed spend was refreshed from this sync. */
+  cyclesRepriced: number;
+  /** Campaigns the tree returned but the ingest window excluded. */
+  filteredOut: number;
+  /** The window actually applied, so a caller can see what it did not fetch. */
+  appliedFilters: {
+    sinceDays: number | null;
+    minSpend: number | null;
+    statuses: string[] | null;
+    limit: number | null;
+  };
   errors: string[];
 }> {
   const brandSlug = options?.brandSlug ?? "wander";
@@ -208,8 +242,35 @@ export async function syncZernioAds(options?: {
   const sameAccount = (a: string, b: string) =>
     a.replace(/^act_/, "") === b.replace(/^act_/, "");
 
+  const sinceDays =
+    options?.sinceDays === null
+      ? null
+      : (options?.sinceDays ?? ADS_SYNC_DEFAULT_SINCE_DAYS);
+  const minSpend = options?.minSpend ?? null;
+  const statuses = options?.statuses?.map((value) => value.toLowerCase()) ?? null;
+  const limit = options?.limit ?? null;
+  const cutoff =
+    sinceDays === null ? null : Date.now() - sinceDays * 24 * 60 * 60 * 1000;
+  const appliedFilters = { sinceDays, minSpend, statuses, limit };
+
+  const campaignMoment = (obj: Record<string, unknown>) => {
+    const raw =
+      str(obj.platformCreatedAt) ??
+      str(obj.startTime) ??
+      str(obj.startAt) ??
+      str(obj.updatedAt) ??
+      str(obj.createdAt);
+    const parsed = raw ? Date.parse(raw) : Number.NaN;
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+  const campaignSpend = (obj: Record<string, unknown>) => {
+    const metrics = obj.metrics as Record<string, unknown> | undefined;
+    const value = metrics?.spend ?? obj.spend;
+    return typeof value === "number" ? value : Number(value ?? 0) || 0;
+  };
+
   const fullTree = await getZernioAdsTree();
-  const tree = fullTree.filter((c) => {
+  const scoped = fullTree.filter((c) => {
     const obj = c as Record<string, unknown>;
     if (campaignPlatform(obj) !== platform) return false;
     const acct = str(obj.platformAdAccountId);
@@ -218,15 +279,42 @@ export async function syncZernioAds(options?: {
       return false;
     return true;
   });
+
+  // Window applied after the allowlist so default-deny is never widened by it.
+  // A campaign with no parseable date is KEPT: an unknown age is not evidence
+  // of being stale, and dropping it would silently hide a live campaign.
+  let tree = scoped.filter((c) => {
+    const obj = c as Record<string, unknown>;
+    if (cutoff !== null) {
+      const moment = campaignMoment(obj);
+      if (moment !== null && moment < cutoff) return false;
+    }
+    if (minSpend !== null && campaignSpend(obj) < minSpend) return false;
+    if (statuses) {
+      const status = str(obj.status)?.toLowerCase();
+      if (!status || !statuses.includes(status)) return false;
+    }
+    return true;
+  });
+  tree.sort((a, b) => {
+    const left = campaignMoment(a) ?? 0;
+    const right = campaignMoment(b) ?? 0;
+    return right - left;
+  });
+  if (limit !== null) tree = tree.slice(0, limit);
+  const filteredOut = scoped.length - tree.length;
   if (tree.length === 0) {
     return {
       brandId: brand.id,
       channelId: "",
       candidates: 0,
+      cyclesRepriced: 0,
       inserted: 0,
       updated: 0,
       skipped: 0,
       byObjective: {},
+      filteredOut,
+      appliedFilters,
       errors: ["empty ads tree"],
     };
   }
@@ -386,6 +474,18 @@ export async function syncZernioAds(options?: {
     byObjective[k] = (byObjective[k] ?? 0) + 1;
   }
 
+  // Observed spend for Performance+ cycles is derived from the campaign rows
+  // this sync just refreshed, so it rides the same compute wake rather than
+  // earning a cron mark of its own. A failure here must not fail the sync.
+  let cyclesRepriced = 0;
+  try {
+    cyclesRepriced = (await recomputeAllPerformanceCycleSpend()).cycles;
+  } catch (error) {
+    errors.push(
+      `cycle spend rollup failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
   return {
     brandId: brand.id,
     channelId,
@@ -394,6 +494,9 @@ export async function syncZernioAds(options?: {
     updated,
     skipped: skippedJunk,
     byObjective,
+    cyclesRepriced,
+    filteredOut,
+    appliedFilters,
     errors,
   };
 }

@@ -68,6 +68,7 @@ export const funnelStateTable = pgTable(
     // -- Wishlist (from `Product Added To Wishlist`) --
     lastWishlistTs: t.timestamp({ withTimezone: true }),
     lastWishlistProperty: t.text(),
+    lastWishlistPropertyId: t.text(),
 
     // -- Reserve click (from `Property Reserve Clicked`) --
     // The click-intent twin of Checkout Previewed (~16k/30d): a discrete
@@ -82,13 +83,26 @@ export const funnelStateTable = pgTable(
     // (no user_id at ingest).
     lastCheckoutPreviewTs: t.timestamp({ withTimezone: true }),
     lastCheckoutPreviewProperty: t.text(),
+    lastCheckoutPreviewPropertyId: t.text(),
     lastCheckoutPreviewCheckin: t.date(),
     lastCheckoutPreviewCheckout: t.date(),
     lastCheckoutPreviewValue: t.doublePrecision(),
 
     // -- Checkout (from `Checkout Started`) --
     lastCheckoutTs: t.timestamp({ withTimezone: true }),
+    /**
+     * Display name of the property. Kept because it is what a human reads, but
+     * it is NOT a join key — Amplitude names and catalog names differ.
+     */
     lastCheckoutProperty: t.text(),
+    /**
+     * The listing id, from `products[0].product_id` on the tracked event. This
+     * is the same value as the Meta catalog's retailer_id and
+     * performance_property.propertyId, so it joins abandonment to a sponsored
+     * home exactly rather than by name.
+     */
+    lastCheckoutPropertyId: t.text(),
+    lastCheckoutPropertySlug: t.text(),
     lastCheckoutCheckin: t.date(),
     lastCheckoutCheckout: t.date(),
     lastCheckoutValue: t.doublePrecision(),
@@ -118,6 +132,9 @@ export const funnelStateTable = pgTable(
   (table) => [
     uniqueIndex("funnel_state_user_idx").on(table.userId),
     index("funnel_state_email_idx").on(table.email),
+    // Sponsored-property lookups join on these.
+    index("funnel_state_checkout_property_idx").on(table.lastCheckoutPropertyId),
+    index("funnel_state_wishlist_property_idx").on(table.lastWishlistPropertyId),
     // The sweep filters on stage timestamps; keep them indexed.
     index("funnel_state_last_search_ts_idx").on(table.lastSearchTs),
     index("funnel_state_last_wishlist_ts_idx").on(table.lastWishlistTs),
