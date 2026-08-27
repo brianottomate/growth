@@ -545,10 +545,16 @@ export const brandRouter = createTRPCRouter({
    * nothing is ingested until a human clicks allow here.
    */
   adAccounts: protectedProcedure
-    .input(z.object({ brandId: z.string() }))
+    .input(
+      z.object({
+        brandId: z.string(),
+        /** false = registry only (cheap); true = live Zernio enumeration. */
+        discover: z.boolean().default(true),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
-      return listBrandAdAccounts(input.brandId);
+      return listBrandAdAccounts(input.brandId, { discover: input.discover });
     }),
 
   setAdAccountAllowed: protectedProcedure

@@ -51,7 +51,9 @@ export type BrandAdAccount = {
  */
 export async function listBrandAdAccounts(
   brandId: string,
+  options: { discover?: boolean } = {},
 ): Promise<BrandAdAccount[]> {
+  const discover = options.discover ?? true;
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
     columns: { id: true, zernioProfileId: true },
@@ -65,7 +67,9 @@ export async function listBrandAdAccounts(
   };
   const discovered: Discovered[] = [];
 
-  if (brand.zernioProfileId && isZernioConfigured) {
+  // discover=false skips the live Zernio enumeration — the cheap path for
+  // rendering what is already decided (the page); the dialog discovers.
+  if (discover && brand.zernioProfileId && isZernioConfigured) {
     const connections = (await listZernioAccounts()).filter(
       (account) =>
         zernioAccountProfileId(account) === brand.zernioProfileId &&
