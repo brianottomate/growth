@@ -7,6 +7,8 @@ import {
   syncBrandConnect,
 } from "@/server/services/brand-connect.service";
 
+import { ConnectButton } from "./ConnectButton";
+
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -87,12 +89,7 @@ export default async function ConnectPage({
                 Connected ✓
               </span>
             ) : (
-              <a
-                href={`/connect/${token}/start/${row.key}`}
-                className="rounded-md bg-white px-3.5 py-1.5 text-sm font-medium text-black hover:bg-white/85"
-              >
-                Connect
-              </a>
+              <ConnectButton href={`/connect/${token}/start/${row.key}`} />
             )}
           </div>
         ))}
