@@ -19,8 +19,6 @@ import { ContentStructureAssistantButton } from "@/components/content-structure-
 
 import { BrandStrategyClient } from "./BrandStrategyClient";
 import { BrandSurfaceMap } from "./BrandSurfaceMap";
-import { AdAccountsCard } from "./AdAccountsCard";
-import { ClientConnectCard } from "./ClientConnectCard";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +125,12 @@ export default async function BrandPage({
               Ads
             </Link>
             <Link
+              href={`/app/brands/${brand.slug}/setup`}
+              className="text-muted-foreground hover:underline"
+            >
+              Setup
+            </Link>
+            <Link
               href="/app/channels"
               className="text-muted-foreground hover:underline"
             >
@@ -148,10 +152,6 @@ export default async function BrandPage({
       </header>
 
       <BrandSurfaceMap brandId={brand.id} summary={surfaceSummary} />
-
-      <ClientConnectCard brandId={brand.id} />
-
-      <AdAccountsCard brandId={brand.id} brandSlug={brand.slug ?? brandSlug} />
 
       {latestSpots.length > 0 && (
         <section className="space-y-3">

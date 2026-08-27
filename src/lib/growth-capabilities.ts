@@ -109,6 +109,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "inspectConversions",
   ],
   adsWrite: [
+    "draftCampaign",
     "createMetaDraft",
     "createGoogle",
     "boostMetaPost",

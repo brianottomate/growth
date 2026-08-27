@@ -14,6 +14,7 @@ import {
   duplicateMetaCampaign,
   listAdsWriteDestinations,
 } from "@/server/services/ads-write.service";
+import { createDraftCampaign } from "@/server/services/ads-draft.service";
 import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -122,6 +123,29 @@ export const listAdsDestinations = growthAction({
   }),
   execute: async (input, ctx) =>
     listAdsWriteDestinations({
+      ...input,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const draftCampaignAction = growthAction({
+  description:
+    "Create a LOCAL draft campaign row — the editable first-party object shown on the campaign canvas (/app/brands/{brandSlug}/ads/{campaignId}). Nothing touches any ad platform: drafting is free and reversible, and launching is a separate operator-approved step. Use adsWrite.createMetaDraft/createGoogle when the user wants the campaign created ON the provider.",
+  inputSchema: z.object({
+    brandSlug: destinationSchema.brandSlug,
+    name: z.string().trim().min(1).max(300),
+    platform: z.enum(["meta_ads", "google_ads"]),
+    objective: z.string().trim().max(200).optional(),
+    budget: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Total intended budget in whole dollars."),
+    initiativeId: z.string().trim().min(1).optional(),
+  }),
+  execute: async (input, ctx) =>
+    createDraftCampaign({
       ...input,
       organizationId: ctx.orgId,
     }),

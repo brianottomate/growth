@@ -14,6 +14,7 @@ import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
 import { DeliverySwitch } from "./DeliverySwitch";
+import { InitiativeLink } from "./InitiativeLink";
 
 export const dynamic = "force-dynamic";
 
@@ -159,8 +160,14 @@ export default async function CampaignPage({
               {platformLabel(campaign.platform)}
               {campaign.objective ? ` · ${campaign.objective}` : ""} ·{" "}
               {fmtDate(campaign.startAt)} – {fmtDate(campaign.endAt)}
-              {initiative ? ` · ${initiative.name}` : ""}
             </p>
+            <div className="mt-2">
+              <InitiativeLink
+                brandId={brand.id}
+                campaignId={campaign.id}
+                initiative={initiative ?? null}
+              />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {campaign.manageUrl && (

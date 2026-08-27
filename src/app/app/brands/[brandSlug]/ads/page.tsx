@@ -18,6 +18,8 @@ import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { CopyButton } from "@/components/copy-button";
 
+import { NewCampaignButton } from "./NewCampaignButton";
+
 const money = (n: number | null | undefined) =>
   n == null ? "—" : n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n}`;
 
@@ -328,76 +330,10 @@ export default async function BrandAdsPage({
             {money(totalSpend)} / 30d
           </p>
         </div>
-        <CopyButton text={md} label="Copy for ChatGPT / Claude" />
-      </div>
-
-      {/* ad channels */}
-      <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
-        Ad channels · {channels.length} connected
-      </h2>
-      <div className="grid gap-3 md:grid-cols-3">
-        {channels.map((c) => {
-          const connected = c.connectionStatus === "connected";
-          return (
-            <div key={c.id} className="bg-card rounded-2xl border p-4">
-              <div className="flex items-start gap-2.5">
-                <ChannelLogo platform={c.platform} className="size-8" />
-                <div className="flex-1">
-                  <div className="text-sm font-semibold">
-                    {platformLabel(c.platform)}
-                  </div>
-                  <div className="text-muted-foreground text-[11px]">
-                    {c.handle}
-                  </div>
-                </div>
-                <span
-                  className={`mt-1 size-1.5 rounded-full ${
-                    connected ? "bg-emerald-500" : "bg-red-500"
-                  }`}
-                />
-              </div>
-              <div className="mt-3 flex items-end gap-6">
-                <div>
-                  <div className="text-lg font-semibold">
-                    {money(channelSpend(c.id))}
-                  </div>
-                  <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
-                    Spend · 30d
-                  </div>
-                </div>
-                <div>
-                  <div className="text-lg font-semibold">
-                    {channelCampaigns(c.id)}
-                  </div>
-                  <div className="text-muted-foreground text-[10px] tracking-wide uppercase">
-                    Campaigns
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between border-t pt-3">
-                <span
-                  className={`text-[11px] font-medium ${
-                    connected ? "text-emerald-400" : "text-red-400"
-                  }`}
-                >
-                  {connected ? "Connected" : "Needs reconnect"}
-                </span>
-                {c.manageUrl && (
-                  <a
-                    href={c.manageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:bg-accent rounded-full border px-2.5 py-1 text-xs font-medium"
-                  >
-                    {connected
-                      ? `Open in ${platformLabel(c.platform)} ↗`
-                      : "Reconnect ↗"}
-                  </a>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        <div className="flex items-center gap-2">
+          <CopyButton text={md} label="Copy for ChatGPT / Claude" />
+          <NewCampaignButton brandId={brand.id} />
+        </div>
       </div>
 
       {/* initiatives → per-channel campaigns */}

@@ -217,6 +217,8 @@ export const growthActionPolicies = {
     inspectConversions: read(),
   },
   adsWrite: {
+    // Local DB row only; no provider call, no spend. Launch is separate.
+    draftCampaign: write(),
     createMetaDraft: write({
       consequence: "provider-write",
       approval: "user",
