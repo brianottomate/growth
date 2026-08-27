@@ -862,6 +862,34 @@ export async function listZernioAdAccounts(options: {
   return unwrapList<ZernioAdAccount>(data, "accounts", "data");
 }
 
+/**
+ * Pause or resume one campaign — the platform's own on/off switch, cascaded
+ * by the platform to its ad sets and ads. `updated: 0` is a normal success
+ * (it counts only ads whose stored status changed alongside the switch).
+ * NOTE (Meta): a campaign created paused may ALSO need its ad set resumed;
+ * the echoed `status` is the confirmation the switch landed.
+ * https://docs.zernio.com/ads/campaign-status
+ */
+export async function setZernioCampaignStatus(input: {
+  campaignId: string;
+  status: "active" | "paused";
+  platform?: string;
+}): Promise<{
+  status?: string;
+  updated?: number;
+  skipped?: number;
+  skippedReasons?: Record<string, unknown>;
+  message?: string;
+}> {
+  return zernioFetch(`/ads/campaigns/${input.campaignId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({
+      status: input.status,
+      ...(input.platform ? { platform: input.platform } : {}),
+    }),
+  });
+}
+
 export type ZernioAdTargeting = {
   countries?: string[];
   ageMin?: number;

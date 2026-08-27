@@ -68,7 +68,8 @@ export const BRAND_CONNECT_CHANNELS = [
 export type BrandConnectChannelKey =
   (typeof BRAND_CONNECT_CHANNELS)[number]["key"];
 
-function newConnectToken(): string {
+/** Exported so brand creation can stamp a token at insert (no Zernio call). */
+export function newConnectToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
@@ -87,37 +88,16 @@ export async function getBrandByConnectToken(token: string) {
 }
 
 /**
- * Make a brand connectable: ensure it has a Zernio profile and a share token.
- * Reuses an existing Zernio profile with the brand's exact name rather than
- * failing on the unique-name constraint (create is NOT idempotent, so the
- * lookup must come first — never retry the create).
+ * Make a brand connectable. Minting the token needs no Zernio call — the
+ * Zernio profile is created lazily on the client's first Connect click
+ * (ensureBrandZernioProfile), so a link exists the moment a brand does.
  */
 export async function ensureBrandConnect(brandId: string) {
-  if (!isZernioConfigured) throw new Error("Zernio is not configured");
-
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
   if (!brand?.organizationId) {
     throw new Error("Only owned brands can have a connect link");
-  }
-
-  let profileId = brand.zernioProfileId;
-  if (!profileId) {
-    const existing = (await listZernioProfiles({ includeOverLimit: true })).find(
-      (profile) => profile.name?.toLowerCase() === brand.name.toLowerCase(),
-    );
-    const profile =
-      existing ??
-      (await createZernioProfile({
-        name: brand.name,
-        description: brand.id,
-      }));
-    profileId = profile._id ?? null;
-    if (!profileId) throw new Error("Could not resolve a Zernio profile id");
-    // Adopt the profile through the existing path so conflict checks and any
-    // pre-connected accounts are handled the same way as a manual import.
-    await connectBrandToZernioProfile(brand.id, profileId);
   }
 
   let token = brand.connectToken;
@@ -129,7 +109,35 @@ export async function ensureBrandConnect(brandId: string) {
       .where(eq(brandTable.id, brandId));
   }
 
-  return { token, url: brandConnectUrl(token), zernioProfileId: profileId };
+  return { token, url: brandConnectUrl(token) };
+}
+
+/**
+ * Resolve (or create) the brand's Zernio profile. Reuses an existing profile
+ * with the brand's exact name rather than failing on the unique-name
+ * constraint — the lookup must come first because profile create is NOT
+ * idempotent, and it must never be auto-retried.
+ */
+async function ensureBrandZernioProfile(brand: {
+  id: string;
+  name: string;
+  zernioProfileId: string | null;
+}): Promise<string> {
+  if (brand.zernioProfileId) return brand.zernioProfileId;
+  if (!isZernioConfigured) throw new Error("Zernio is not configured");
+
+  const existing = (await listZernioProfiles({ includeOverLimit: true })).find(
+    (profile) => profile.name?.toLowerCase() === brand.name.toLowerCase(),
+  );
+  const profile =
+    existing ??
+    (await createZernioProfile({ name: brand.name, description: brand.id }));
+  const profileId = profile._id;
+  if (!profileId) throw new Error("Could not resolve a Zernio profile id");
+  // Adopt the profile through the existing path so conflict checks and any
+  // pre-connected accounts are handled the same way as a manual import.
+  await connectBrandToZernioProfile(brand.id, profileId);
+  return profileId;
 }
 
 /** Revoke the sent link by replacing it. The old URL stops resolving. */
@@ -155,17 +163,15 @@ export async function startBrandConnect(
 ): Promise<string> {
   const brand = await getBrandByConnectToken(token);
   if (!brand) throw new Error("Unknown connect link");
-  if (!brand.zernioProfileId) {
-    throw new Error("Brand has no Zernio profile yet");
-  }
   const channel = BRAND_CONNECT_CHANNELS.find(
     (candidate) => candidate.key === channelKey,
   );
   if (!channel) throw new Error("Unknown channel");
 
+  const profileId = await ensureBrandZernioProfile(brand);
   return getZernioConnectUrl({
     target: channel.target,
-    profileId: brand.zernioProfileId,
+    profileId,
     redirectUrl: `${brandConnectUrl(token)}?connected=${channel.key}`,
   });
 }

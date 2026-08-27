@@ -49,14 +49,27 @@ const INITIATIVE_STATUS: Record<string, string> = {
 };
 
 /** One per-channel campaign + its ad-spot creatives. */
-function CampaignRow({ c, spots }: { c: Campaign; spots: AdSpot[] }) {
+function CampaignRow({
+  c,
+  spots,
+  brandSlug,
+}: {
+  c: Campaign;
+  spots: AdSpot[];
+  brandSlug: string;
+}) {
   return (
     <div className="bg-card flex flex-col gap-2 rounded-xl border p-3">
       <div className="flex items-center gap-3">
         <ChannelLogo platform={c.platform} className="size-6" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{c.name}</span>
+            <Link
+              href={`/app/brands/${brandSlug}/ads/${c.id}`}
+              className="truncate text-sm font-medium hover:underline"
+            >
+              {c.name}
+            </Link>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
                 CAMPAIGN_STATUS[c.status] ?? CAMPAIGN_STATUS.draft
@@ -477,6 +490,7 @@ export default async function BrandAdsPage({
                       key={c.id}
                       c={c}
                       spots={spotsByCampaign.get(c.id) ?? []}
+                      brandSlug={brandSlug}
                     />
                   ))
                 )}
@@ -497,6 +511,7 @@ export default async function BrandAdsPage({
                 key={c.id}
                 c={c}
                 spots={spotsByCampaign.get(c.id) ?? []}
+                brandSlug={brandSlug}
               />
             ))}
           </div>

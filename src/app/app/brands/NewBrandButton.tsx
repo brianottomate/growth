@@ -40,12 +40,18 @@ export function NewBrandButton() {
 
   const createM = useMutation(
     trpc.brand.create.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (brand) => {
         setOpen(false);
         setName("");
         setWebsite("");
         setBrandType("company");
-        router.refresh();
+        // Land on the brand page: the next step (send the connect link,
+        // review channels) lives there, not on the list.
+        if (brand?.slug) {
+          router.push(`/app/brands/${brand.slug}`);
+        } else {
+          router.refresh();
+        }
       },
     }),
   );

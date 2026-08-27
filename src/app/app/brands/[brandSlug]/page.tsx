@@ -16,6 +16,7 @@ import { ContentStructureAssistantButton } from "@/components/content-structure-
 
 import { BrandStrategyClient } from "./BrandStrategyClient";
 import { BrandSurfaceMap } from "./BrandSurfaceMap";
+import { AdAccountsCard } from "./AdAccountsCard";
 import { ClientConnectCard } from "./ClientConnectCard";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +128,8 @@ export default async function BrandPage({
       <BrandSurfaceMap brandId={brand.id} summary={surfaceSummary} />
 
       <ClientConnectCard brandId={brand.id} />
+
+      <AdAccountsCard brandId={brand.id} brandSlug={brand.slug ?? brandSlug} />
 
       <section id="strategy" className="scroll-mt-6 space-y-3">
         <div>

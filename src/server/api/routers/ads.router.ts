@@ -9,6 +9,9 @@ import {
   computeTopAds,
 } from "@/server/services/ads-analytics.service";
 
+import { setCampaignDelivery } from "@/server/services/ads-write.service";
+import { createId } from "@/server/db/utils";
+
 import { protectedProcedure } from "../trpc";
 import { memberTable } from "@/server/db/schema";
 import type { Database } from "@/server/db";
@@ -78,6 +81,24 @@ export const adsRouter = {
       computeTopAds({
         ...input,
         organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  /**
+   * The Launch/Pause button. A provider write that starts or stops spend, so
+   * it stays a deliberate operator click — the mutation is the approval.
+   */
+  setCampaignDelivery: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        status: z.enum(["active", "paused"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setCampaignDelivery(input, {
+        organizationId: await organizationIdFor(ctx),
+        runId: createId("run"),
       }),
     ),
 } satisfies TRPCRouterRecord;

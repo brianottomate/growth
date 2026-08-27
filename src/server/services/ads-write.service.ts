@@ -22,6 +22,7 @@ import {
   getZernioAdsTree,
   listZernioAccounts,
   listZernioAdAccounts,
+  setZernioCampaignStatus,
   ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST,
   type CreateZernioStandaloneAdInput,
   type ZernioAccount,
@@ -30,7 +31,12 @@ import {
   type ZernioCarouselCard,
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
-import { adAccountTable, brandTable, type Brand } from "@/server/db/schema";
+import {
+  adAccountTable,
+  brandTable,
+  campaignTable,
+  type Brand,
+} from "@/server/db/schema";
 
 type AdsWriteContext = { organizationId: string; runId: string };
 
@@ -709,4 +715,59 @@ export async function addAdAudienceUsers(input: {
     );
   }
   return { audienceId: input.audienceId, uploaded, total: input.users.length };
+}
+
+// ---- DELIVERY SWITCH -------------------------------------------------
+
+const DELIVERY_PLATFORMS: Record<string, string> = {
+  meta_ads: "facebook",
+  google_ads: "google",
+};
+
+/**
+ * Pause or resume a synced campaign — the Launch button on the campaign
+ * page. This is the moment money starts (or stops) moving, so it is only
+ * reachable from an authenticated operator action; the click IS the
+ * approval. Local status is updated only after the provider confirms.
+ */
+export async function setCampaignDelivery(
+  input: { campaignId: string; status: "active" | "paused" },
+  context: AdsWriteContext,
+) {
+  const campaign = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, input.campaignId),
+  });
+  if (!campaign) throw new Error("Campaign not found");
+  if (!campaign.brandId) throw new Error("Campaign has no brand");
+
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, campaign.brandId),
+    columns: { organizationId: true, name: true },
+  });
+  if (brand?.organizationId !== context.organizationId) {
+    throw new Error("No access to this campaign");
+  }
+  if (!campaign.externalId) {
+    throw new Error(
+      "This campaign has no platform id yet — it was never synced or launched on the provider",
+    );
+  }
+  const platform = DELIVERY_PLATFORMS[campaign.platform];
+  if (!platform) {
+    throw new Error(`Delivery toggle not supported for ${campaign.platform}`);
+  }
+
+  const provider = await setZernioCampaignStatus({
+    campaignId: campaign.externalId,
+    status: input.status,
+    platform,
+  });
+
+  const [updated] = await db
+    .update(campaignTable)
+    .set({ status: input.status === "active" ? "live" : "paused" })
+    .where(eq(campaignTable.id, campaign.id))
+    .returning({ id: campaignTable.id, status: campaignTable.status });
+
+  return { campaign: updated, provider };
 }

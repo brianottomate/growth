@@ -23,8 +23,14 @@ import {
   brandConnectUrl,
   ensureBrandConnect,
   getBrandConnectStatus,
+  newConnectToken,
   regenerateBrandConnectToken,
 } from "@/server/services/brand-connect.service";
+import {
+  listBrandAdAccounts,
+  setBrandAdAccountAllowed,
+} from "@/server/services/brand-ad-accounts.service";
+import { syncZernioAds } from "@/server/services/ads-sync.service";
 
 type Ctx = {
   db: typeof db;
@@ -214,6 +220,9 @@ export const brandRouter = createTRPCRouter({
             name: input.name,
             slug,
             website,
+            // Owned brands are connectable from birth; the Zernio profile is
+            // created lazily on the client's first Connect click.
+            connectToken: newConnectToken(),
           })
           .returning();
         // Enrichment runs after the response so create feels instant; the
@@ -528,5 +537,72 @@ export const brandRouter = createTRPCRouter({
       await assertBrandManageable(ctx, input.brandId);
       const result = await regenerateBrandConnectToken(input.brandId);
       return { url: result.url };
+    }),
+
+  /**
+   * Ad-account allowlist surface: what the brand's ads connections can reach
+   * and which accounts an operator has explicitly allowed. Default-deny —
+   * nothing is ingested until a human clicks allow here.
+   */
+  adAccounts: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      return listBrandAdAccounts(input.brandId);
+    }),
+
+  setAdAccountAllowed: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        platform: z.enum(["facebook", "google"]),
+        externalId: z.string().min(1),
+        name: z.string().nullable(),
+        isAllowed: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      return setBrandAdAccountAllowed({
+        ...input,
+        decidedBy: ctx.session.user.email ?? ctx.session.user.id,
+      });
+    }),
+
+  /** Pull the brand's recent campaigns through the allowlist, both ad platforms. */
+  syncRecentAds: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        sinceDays: z.number().int().min(1).max(1_095).optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+        minSpend: z.number().min(0).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      if (!brand.slug) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Only owned brands can sync ads",
+        });
+      }
+      const results = [];
+      for (const platform of ["meta_ads", "google_ads"] as const) {
+        results.push(
+          await syncZernioAds({
+            brandSlug: brand.slug,
+            platform,
+            sinceDays: input.sinceDays ?? undefined,
+            limit: input.limit ?? 10,
+            minSpend: input.minSpend,
+          }),
+        );
+      }
+      return {
+        inserted: results.reduce((sum, r) => sum + r.inserted, 0),
+        updated: results.reduce((sum, r) => sum + r.updated, 0),
+        filteredOut: results.reduce((sum, r) => sum + r.filteredOut, 0),
+      };
     }),
 });
