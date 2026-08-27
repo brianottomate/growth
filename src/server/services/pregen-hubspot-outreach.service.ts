@@ -824,6 +824,12 @@ Write the four-touch sequence now. Prioritize actual inbound questions over assu
       candidate = humanizeDraft(generated.output);
     } catch (error) {
       lastFailure = error instanceof Error ? error.message : String(error);
+      // The thrown summary reaches the browser truncated, and four identical
+      // sub-second failures (a 4xx from the provider, not a bad draft) are
+      // indistinguishable from four real attempts without this.
+      console.warn(
+        `⚠️ [PregenDraft] ${domain} attempt ${attempt + 1}/4 failed: ${lastFailure}`,
+      );
       // Structural, not editorial, so the nudge is about shape rather than
       // about the copy. Exactly four touches is the constraint models miss.
       correction = `\n\nThe previous attempt did not return a valid object (${lastFailure}). Return exactly four touches, each with subject, opening, closing and delayDays, and populate motion, angle, personalizedOn and historyUsed. Touch 1 has a subject; touches 2 to 4 have subject null.`;
