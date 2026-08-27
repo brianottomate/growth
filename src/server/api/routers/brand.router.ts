@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { waitUntil } from "@vercel/functions";
 import { and, eq, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
@@ -18,6 +19,12 @@ import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
+import {
+  brandConnectUrl,
+  ensureBrandConnect,
+  getBrandConnectStatus,
+  regenerateBrandConnectToken,
+} from "@/server/services/brand-connect.service";
 
 type Ctx = {
   db: typeof db;
@@ -209,8 +216,14 @@ export const brandRouter = createTRPCRouter({
             website,
           })
           .returning();
+        // Enrichment runs after the response so create feels instant; the
+        // card fills in when the scrape lands.
         if (brand && website && shouldEnrich) {
-          await applyEnrichment(ctx, brand.id, website);
+          waitUntil(
+            applyEnrichment(ctx, brand.id, website).catch((error) => {
+              console.error("brand enrichment failed", brand.id, error);
+            }),
+          );
         }
         return brand;
       }
@@ -485,5 +498,35 @@ export const brandRouter = createTRPCRouter({
           ),
         );
       return { brandId: input.brandId };
+    }),
+
+  /**
+   * Client connect: the no-login link a Performance customer uses to connect
+   * their own accounts into this brand's Zernio profile.
+   */
+  connectStatus: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const brand = await assertBrandManageable(ctx, input.brandId);
+      return {
+        url: brand.connectToken ? brandConnectUrl(brand.connectToken) : null,
+        channels: await getBrandConnectStatus(input.brandId),
+      };
+    }),
+
+  createConnectLink: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      const result = await ensureBrandConnect(input.brandId);
+      return { url: result.url };
+    }),
+
+  regenerateConnectLink: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      const result = await regenerateBrandConnectToken(input.brandId);
+      return { url: result.url };
     }),
 });

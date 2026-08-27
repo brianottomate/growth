@@ -173,6 +173,11 @@ export const brandTable = pgTable(
     // one profile in that workspace; its connected accounts live on `channel`.
     zernioProfileId: t.text(),
 
+    // Bearer secret for /connect/[token], the no-login page where a client
+    // connects their own accounts into this brand's Zernio profile. The link
+    // is the credential: regenerating it is how a sent link is revoked.
+    connectToken: t.text(),
+
     // Cached aggregate (sum of channel followers) for overview cards.
     followerCount: t.integer(),
 
@@ -206,6 +211,7 @@ export const brandTable = pgTable(
     index("brand_type_idx").on(table.type),
     uniqueIndex("brand_org_slug_idx").on(table.organizationId, table.slug),
     uniqueIndex("brand_zernio_profile_idx").on(table.zernioProfileId),
+    uniqueIndex("brand_connect_token_idx").on(table.connectToken),
     check(
       "brand_zernio_profile_owned_check",
       sql`${table.zernioProfileId} IS NULL OR ${table.organizationId} IS NOT NULL`,

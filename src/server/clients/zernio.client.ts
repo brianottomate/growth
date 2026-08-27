@@ -117,6 +117,66 @@ export async function listZernioProfiles(
   return unwrapList<ZernioProfile>(data, "profiles", "data");
 }
 
+/**
+ * Create a Zernio profile (workspace grouping). Names must be unique within
+ * the team. NOT idempotent — callers must check for an existing profile first
+ * and must never auto-retry a create.
+ */
+export async function createZernioProfile(input: {
+  name: string;
+  description?: string;
+}): Promise<ZernioProfile> {
+  const data = await zernioFetch<ZernioProfile & { profile?: ZernioProfile }>(
+    `/profiles`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  const profile = data.profile ?? data;
+  if (!profile._id) {
+    throw new Error("Zernio profile create returned no id");
+  }
+  return profile;
+}
+
+// ---- CONNECT (client-facing OAuth links) ----------------------------
+// GET /v1/connect/{platform} returns an authUrl to send the end-user to. In
+// the standard (non-headless) flow Zernio hosts any selection screens and
+// then redirects the browser to `redirectUrl` with `connected=<platform>`
+// query params. Ads platforms use /v1/connect/{platform}/ads instead — for
+// Meta that skips the Page picker entirely.
+// https://docs.zernio.com/connect
+
+export type ZernioConnectPlatform =
+  | { kind: "posting"; platform: string }
+  | { kind: "ads"; platform: string };
+
+export async function getZernioConnectUrl(input: {
+  target: ZernioConnectPlatform;
+  profileId: string;
+  redirectUrl: string;
+}): Promise<string> {
+  const params = new URLSearchParams({
+    profileId: input.profileId,
+    redirect_url: input.redirectUrl,
+  });
+  const path =
+    input.target.kind === "ads"
+      ? `/connect/${input.target.platform}/ads`
+      : `/connect/${input.target.platform}`;
+  const data = await zernioFetch<{
+    authUrl?: string;
+    url?: string;
+    alreadyConnected?: boolean;
+  }>(`${path}?${params.toString()}`);
+  const authUrl = data.authUrl ?? data.url;
+  if (!authUrl) {
+    if (data.alreadyConnected) {
+      throw new Error("already_connected");
+    }
+    throw new Error("Zernio connect returned no authUrl");
+  }
+  return authUrl;
+}
+
 // ---- POSTS (scheduled / published, multi-platform fan-out) ---------
 // One Zernio post fans out to N platforms via `platforms[]`; each entry maps to
 // one of our `platform_post` rows. https://docs.zernio.com/posts/list-posts

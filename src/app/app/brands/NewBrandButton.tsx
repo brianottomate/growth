@@ -75,10 +75,24 @@ export function NewBrandButton() {
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-2">
+            {/* Website first: it is the highest-leverage input (enrichment
+                fills the rest from it in the background after create). */}
+            <div className="flex flex-col gap-1.5">
+              <Label>Website</Label>
+              <Input
+                autoFocus
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="example.com"
+              />
+              <p className="text-muted-foreground text-xs">
+                Optional — details auto-fill from the site after create.
+              </p>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <Label>Name</Label>
               <Input
-                autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Wander"
@@ -99,18 +113,6 @@ export function NewBrandButton() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label>Website</Label>
-              <Input
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="example.com"
-              />
-              <p className="text-muted-foreground text-xs">
-                Optional — we&apos;ll auto-fill details from the site.
-              </p>
             </div>
           </div>
 
