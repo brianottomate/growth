@@ -18,6 +18,7 @@ import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { CopyButton } from "@/components/copy-button";
 
+import { AttachCampaign } from "./AttachCampaign";
 import { NewCampaignButton } from "./NewCampaignButton";
 
 const money = (n: number | null | undefined) =>
@@ -55,9 +56,11 @@ function CampaignRow({
   c,
   spots,
   brandSlug,
+  attachBrandId,
 }: {
   c: PlatformCampaign;
   spots: AdSpot[];
+  attachBrandId?: string;
   brandSlug: string;
 }) {
   const thumbnail = c.heroThumbnailUrl ?? spots.find((s) => s.media?.[0]?.url)?.media?.[0]?.url;
@@ -87,7 +90,7 @@ function CampaignRow({
                 CAMPAIGN_STATUS[c.status] ?? CAMPAIGN_STATUS.draft
               }`}
             >
-              {c.status}
+              {platformLabel(c.platform)} · {c.status}
             </span>
           </div>
           <div className="text-muted-foreground mt-0.5 text-[11px]">
@@ -121,6 +124,13 @@ function CampaignRow({
           </a>
         )}
       </div>
+      {attachBrandId && (
+        <AttachCampaign
+          brandId={attachBrandId}
+          platformCampaignId={c.id}
+          suggestedName={c.name}
+        />
+      )}
       {spots.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
           {spots.map((s) => (
@@ -362,7 +372,12 @@ export default async function BrandAdsPage({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-semibold">{init.name}</span>
+                    <Link
+                      href={`/app/brands/${brandSlug}/ads/draft/${init.id}`}
+                      className="text-base font-semibold hover:underline"
+                    >
+                      {init.name}
+                    </Link>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
                         INITIATIVE_STATUS[init.status] ??
@@ -417,11 +432,11 @@ export default async function BrandAdsPage({
                       className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
                         ok
                           ? "border-emerald-500/30 text-emerald-300"
-                          : "border-amber-500/40 text-amber-300"
+                          : "border-border text-muted-foreground"
                       }`}
                     >
                       <ChannelLogo platform={ch} className="size-3.5" />
-                      {platformLabel(ch)} {ok ? "✓" : "⚠ not set up"}
+                      {platformLabel(ch)} {ok ? "✓ running" : "· planned"}
                     </span>
                   );
                 })}
@@ -461,6 +476,7 @@ export default async function BrandAdsPage({
                 c={c}
                 spots={spotsByCampaign.get(c.id) ?? []}
                 brandSlug={brandSlug}
+                attachBrandId={brand.id}
               />
             ))}
           </div>

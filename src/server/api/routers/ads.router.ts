@@ -17,9 +17,9 @@ import {
 import {
   addDraftAd,
   addDraftAdSet,
+  attachPlatformCampaign,
   createDraftInitiative,
-  linkCampaignToInitiative,
-  listBrandInitiatives,
+  listBrandCampaigns,
 } from "@/server/services/ads-draft.service";
 import { createId } from "@/server/db/utils";
 
@@ -154,32 +154,32 @@ export const adsRouter = {
       }),
     ),
 
-  linkToInitiative: protectedProcedure
+  /** Adopt a synced platform campaign under a first-party campaign. */
+  attachPlatformCampaign: protectedProcedure
     .input(
       z
         .object({
           platformCampaignId: z.string().min(1),
           campaignId: z.string().nullish(),
-          newInitiativeName: z.string().trim().max(200).nullish(),
+          newCampaignName: z.string().trim().max(300).nullish(),
         })
         .refine(
           (value) =>
-            Boolean(value.campaignId) ||
-            Boolean(value.newInitiativeName?.trim()),
-          { message: "Pick an initiative or name a new one" },
+            Boolean(value.campaignId) || Boolean(value.newCampaignName?.trim()),
+          { message: "Pick a campaign or name a new one" },
         ),
     )
     .mutation(async ({ ctx, input }) =>
-      linkCampaignToInitiative({
+      attachPlatformCampaign({
         ...input,
         organizationId: await organizationIdFor(ctx),
       }),
     ),
 
-  initiatives: protectedProcedure
+  campaigns: protectedProcedure
     .input(z.object({ brandId: z.string().min(1) }))
     .query(async ({ ctx, input }) =>
-      listBrandInitiatives({
+      listBrandCampaigns({
         brandId: input.brandId,
         organizationId: await organizationIdFor(ctx),
       }),

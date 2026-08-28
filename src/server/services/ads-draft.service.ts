@@ -231,19 +231,30 @@ export async function getDraftInitiative(
  * Adopt a campaign born on a platform into the first-party layer: attach it
  * to an initiative, minting one when a name is given instead of an id.
  */
-export async function linkCampaignToInitiative(input: {
+/**
+ * Adopt a platform campaign (one born in Ads Manager and pulled in by sync)
+ * into the first-party layer: attach it to a campaign, minting one when a
+ * name is given instead of an id.
+ *
+ * A minted campaign inherits what the platform already knows — budget, dates,
+ * and the platform itself as a target channel — so the umbrella starts out
+ * describing reality instead of an empty shell the operator has to retype.
+ */
+export async function attachPlatformCampaign(input: {
   organizationId: string;
   platformCampaignId: string;
+  /** Attach to this existing campaign… */
   campaignId?: string | null;
-  newInitiativeName?: string | null;
+  /** …or mint one with this name. */
+  newCampaignName?: string | null;
 }) {
-  const campaign = await db.query.platformCampaignTable.findFirst({
+  const platformCampaign = await db.query.platformCampaignTable.findFirst({
     where: eq(platformCampaignTable.id, input.platformCampaignId),
   });
-  if (!campaign) throw new Error("Campaign not found");
+  if (!platformCampaign) throw new Error("Platform campaign not found");
   const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, campaign.brandId),
-    columns: { id: true, organizationId: true },
+    where: eq(brandTable.id, platformCampaign.brandId),
+    columns: { id: true, slug: true, organizationId: true },
   });
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this campaign");
@@ -251,40 +262,61 @@ export async function linkCampaignToInitiative(input: {
 
   let campaignId = input.campaignId ?? null;
   if (campaignId) {
-    const initiative = await db.query.campaignTable.findFirst({
+    const existing = await db.query.campaignTable.findFirst({
       where: eq(campaignTable.id, campaignId),
-      columns: { brandId: true },
+      columns: { brandId: true, targetChannels: true },
     });
-    if (initiative?.brandId !== brand.id) {
-      throw new Error("That initiative does not belong to this brand");
+    if (existing?.brandId !== brand.id) {
+      throw new Error("That campaign does not belong to this brand");
+    }
+    // Widen the umbrella's platform list if this adds a new surface.
+    const targets = new Set(existing.targetChannels ?? []);
+    if (!targets.has(platformCampaign.platform)) {
+      targets.add(platformCampaign.platform);
+      await db
+        .update(campaignTable)
+        .set({ targetChannels: [...targets] })
+        .where(eq(campaignTable.id, campaignId));
     }
   }
-  if (!campaignId && input.newInitiativeName?.trim()) {
-    const [initiative] = await db
+
+  if (!campaignId) {
+    const name = input.newCampaignName?.trim() ?? platformCampaign.name;
+    if (!name) throw new Error("Give the campaign a name");
+    const [created] = await db
       .insert(campaignTable)
       .values({
         id: createId("camp"),
         brandId: brand.id,
-        name: input.newInitiativeName.trim(),
+        name,
+        // Adopting something that already ran means the push is underway.
         status: "active",
+        targetChannels: [platformCampaign.platform],
+        budget: platformCampaign.budget,
+        startAt: platformCampaign.startAt,
+        endAt: platformCampaign.endAt,
       })
       .returning({ id: campaignTable.id });
-    campaignId = initiative!.id;
+    campaignId = created!.id;
   }
 
   const [updated] = await db
     .update(platformCampaignTable)
     .set({ campaignId })
-    .where(eq(platformCampaignTable.id, campaign.id))
+    .where(eq(platformCampaignTable.id, platformCampaign.id))
     .returning({
       id: platformCampaignTable.id,
       campaignId: platformCampaignTable.campaignId,
     });
-  return updated!;
+
+  return {
+    ...updated!,
+    path: `/app/brands/${brand.slug}/ads/draft/${campaignId}`,
+  };
 }
 
-/** The brand's initiatives, newest first — the picker's options. */
-export async function listBrandInitiatives(input: {
+/** The brand's campaigns, newest first — the attach picker's options. */
+export async function listBrandCampaigns(input: {
   organizationId: string;
   brandId: string;
 }) {

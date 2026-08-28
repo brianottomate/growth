@@ -29,10 +29,10 @@ export function InitiativeLink({
   const [newName, setNewName] = useState("");
 
   const options = useQuery(
-    trpc.ads.initiatives.queryOptions({ brandId }, { enabled: open }),
+    trpc.ads.campaigns.queryOptions({ brandId }, { enabled: open }),
   );
   const link = useMutation(
-    trpc.ads.linkToInitiative.mutationOptions({
+    trpc.ads.attachPlatformCampaign.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         setNewName("");
@@ -44,7 +44,7 @@ export function InitiativeLink({
   if (initiative) {
     return (
       <span className="text-muted-foreground text-sm">
-        Initiative: <span className="text-foreground">{initiative.name}</span>
+        Campaign: <span className="text-foreground">{initiative.name}</span>
       </span>
     );
   }
@@ -53,7 +53,7 @@ export function InitiativeLink({
     return (
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
         <Link2 className="size-3.5" />
-        Link to initiative
+        Attach to a campaign
       </Button>
     );
   }
@@ -71,7 +71,7 @@ export function InitiativeLink({
         }}
       >
         <option value="" disabled>
-          {options.isPending ? "Loading…" : "Pick an initiative"}
+          {options.isPending ? "Loading…" : "Pick a campaign"}
         </option>
         {(options.data ?? []).map((row) => (
           <option key={row.id} value={row.id}>
@@ -83,7 +83,7 @@ export function InitiativeLink({
       <Input
         value={newName}
         onChange={(event) => setNewName(event.target.value)}
-        placeholder="New initiative name"
+        placeholder="New campaign name"
         className="h-8 w-44 text-xs"
       />
       <Button
@@ -92,7 +92,7 @@ export function InitiativeLink({
         disabled={!newName.trim() || link.isPending}
         loading={link.isPending}
         onClick={() =>
-          link.mutate({ platformCampaignId, newInitiativeName: newName.trim() })
+          link.mutate({ platformCampaignId, newCampaignName: newName.trim() })
         }
       >
         Create & link
