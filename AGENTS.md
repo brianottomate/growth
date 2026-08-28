@@ -59,6 +59,29 @@ mock wiring, or freeze a private implementation detail. See
 One-off scripts live in `scripts/` (run via `bun run scripts/<file>.ts`) and
 `src/scripts/` (operational tooling, e.g. CIO sync/repair — see `cio:diagnose`/`cio:repair`).
 
+## Branches, releases, deployment
+
+Since 2026-08-28 this repo follows the org-wide release-drafter flow
+(`wandercom/wander` → `documentation/6_releases.md`). What it means here:
+
+- `dev` is the default branch and the only branch to target. `main` no longer
+  exists. Never push `prod`: it is the Vercel production branch, so a direct
+  push deploys production outside the release flow.
+- Ship a change: branch from `dev`, open a PR to `dev`, squash-merge after one
+  approving review (branch ruleset; authors cannot self-approve).
+- Every merge to `dev` deploys a preview build. Production only moves when a
+  GitHub Release is published.
+- Merges to `dev` accumulate in a draft release. To deploy production, publish
+  the draft; the `Deploy` action checks out the tag and creates the production
+  deployment through the Vercel API. Verify the draft tag is the next semver
+  before publishing.
+- PR labels `major`/`minor`/`patch` set the version bump; unlabeled PRs count
+  as patch.
+- Rollback: re-run the `Deploy` workflow run of the last good release. A rerun
+  triggers a Vercel instant rollback to that release's deployment.
+- Git history was rewritten on 2026-08-27 to purge `public/lab` media
+  (129M → 6.6M clones). `public/lab/` is gitignored; keep binaries out of git.
+
 ## Stack
 
 Next.js 16 (App Router, React 19) · tRPC v11 + TanStack Query (SuperJSON) · Drizzle ORM on
