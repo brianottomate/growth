@@ -58,6 +58,9 @@ export function PushToPlatform({
     defaultBudget != null ? String(defaultBudget) : "",
   );
   const [budgetType, setBudgetType] = useState<"daily" | "lifetime">("daily");
+  // Meta rejects a lifetime budget with no end date, so ask for it here
+  // rather than letting the platform bounce the push.
+  const [endDate, setEndDate] = useState("");
   const [destinationKey, setDestinationKey] = useState("");
 
   const destinations = useQuery(
@@ -95,6 +98,7 @@ export function PushToPlatform({
     Boolean(chosen) &&
     Number.isFinite(budgetNumber) &&
     budgetNumber > 0 &&
+    (budgetType !== "lifetime" || Boolean(endDate)) &&
     !push.isPending;
 
   return (
@@ -183,6 +187,20 @@ export function PushToPlatform({
               </select>
             </div>
           </div>
+          {budgetType === "lifetime" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="push-end">End date</Label>
+              <Input
+                id="push-end"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                Required for a lifetime budget — it is the date the spend stops.
+              </p>
+            </div>
+          )}
           {push.error && (
             <p className="text-xs text-red-300">{push.error.message}</p>
           )}
@@ -208,6 +226,7 @@ export function PushToPlatform({
                 goal,
                 budgetAmount: budgetNumber,
                 budgetType,
+                endDate: endDate ? new Date(endDate).toISOString() : undefined,
                 validateOnly: true,
               })
             }
@@ -228,6 +247,7 @@ export function PushToPlatform({
                 goal,
                 budgetAmount: budgetNumber,
                 budgetType,
+                endDate: endDate ? new Date(endDate).toISOString() : undefined,
               })
             }
           >

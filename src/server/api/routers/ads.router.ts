@@ -323,6 +323,8 @@ export const adsRouter = {
         ]),
         budgetAmount: z.number().positive(),
         budgetType: z.enum(["daily", "lifetime"]),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
         validateOnly: z.boolean().optional(),
       }),
     )

@@ -884,6 +884,9 @@ export async function pushDraftToPlatform(
       | "conversions";
     budgetAmount: number;
     budgetType: "daily" | "lifetime";
+    /** ISO dates. Meta REQUIRES an end date for lifetime budgets. */
+    startDate?: string;
+    endDate?: string;
     validateOnly?: boolean;
     promotedObject?: { pixelId?: string; customEventType?: string };
   },
@@ -954,6 +957,17 @@ export async function pushDraftToPlatform(
     where: eq(adSetTable.campaignId, campaign.id),
   });
 
+  // A lifetime budget has to know when it stops; Meta rejects it otherwise.
+  // Fall back to the campaign's own schedule before asking the operator.
+  const startDate =
+    input.startDate ?? campaign.startAt?.toISOString() ?? undefined;
+  const endDate = input.endDate ?? campaign.endAt?.toISOString() ?? undefined;
+  if (input.budgetType === "lifetime" && !endDate) {
+    throw new Error(
+      "A lifetime budget needs an end date — set one on the campaign, or switch to a daily budget",
+    );
+  }
+
   // ---- GOOGLE ---------------------------------------------------------
   // Google's hierarchy is campaign → ad group, and its campaign TYPE decides
   // everything (Search needs keywords, Display needs sized images). One call
@@ -994,6 +1008,8 @@ export async function pushDraftToPlatform(
         additionalHeadlines: google?.additionalHeadlines,
         additionalDescriptions: google?.additionalDescriptions,
         businessName: google?.businessName ?? brand.name,
+        startDate,
+        endDate,
         images:
           campaignType === "display"
             ? { landscape: hero.media![0]!.url, square: hero.media![0]!.url }
@@ -1076,6 +1092,8 @@ export async function pushDraftToPlatform(
       linkUrl,
       creatives: creativesFor(spots),
       targeting: audienceId ? { audienceId } : undefined,
+      startDate,
+      endDate,
       promotedObject: input.promotedObject,
       ...metaDraftProviderControls(input.validateOnly),
     };
@@ -1179,6 +1197,8 @@ export async function pushDraftToPlatform(
       linkUrl,
       creatives: creativesFor(subset),
       targeting: audienceId ? { audienceId } : undefined,
+      startDate,
+      endDate,
       promotedObject: input.promotedObject,
       ...metaDraftProviderControls(false),
     };
