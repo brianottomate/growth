@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useTRPC } from "@/trpc/react";
 
 /**
@@ -24,7 +25,13 @@ import { useTRPC } from "@/trpc/react";
  * name and a platform are enough to start; everything else is edited in chat
  * and read on the canvas.
  */
-export function NewCampaignButton({ brandId }: { brandId: string }) {
+export function NewCampaignButton({
+  brandId,
+  brandWebsite,
+}: {
+  brandId: string;
+  brandWebsite?: string | null;
+}) {
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -33,6 +40,11 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
     "meta_ads",
   ]);
   const [budget, setBudget] = useState("");
+  // Prefilled from the brand so the field is never empty, but visible and
+  // editable: paid traffic to a homepage converts far worse than traffic to
+  // the specific property or offer page.
+  const [landingUrl, setLandingUrl] = useState(brandWebsite ?? "");
+  const [description, setDescription] = useState("");
 
   const create = useMutation(
     trpc.ads.createDraft.mutationOptions({
@@ -120,6 +132,30 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
               />
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="camp-landing">Landing URL</Label>
+            <Input
+              id="camp-landing"
+              value={landingUrl}
+              onChange={(event) => setLandingUrl(event.target.value)}
+              placeholder="https://…"
+            />
+            <p className="text-muted-foreground text-xs">
+              Where the ads send people. Every ad inherits this unless it
+              overrides it. Point it at the specific property or offer page —
+              a homepage converts far worse on paid traffic.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="camp-description">What is this push for?</Label>
+            <Textarea
+              id="camp-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={2}
+              placeholder="The audience, the season, the goal — context chat and the team read later."
+            />
+          </div>
           {create.error && (
             <p className="text-xs text-red-300">{create.error.message}</p>
           )}
@@ -134,6 +170,8 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
                 brandId,
                 name: name.trim(),
                 targetChannels: platforms,
+                landingUrl: landingUrl.trim() || null,
+                description: description.trim() || null,
                 budget:
                   budget === "" || !Number.isFinite(Number(budget))
                     ? null

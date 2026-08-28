@@ -31,9 +31,12 @@ import { useTRPC } from "@/trpc/react";
 export function AddAdButton({
   campaignId,
   brandId,
+  inheritedLinkUrl,
 }: {
   campaignId: string;
   brandId: string;
+  /** The campaign's landing URL; ads only set their own to override it. */
+  inheritedLinkUrl?: string | null;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -104,12 +107,21 @@ export function AddAdButton({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="ad-link">Link URL</Label>
+                  <Label htmlFor="ad-link">
+                    Link URL{" "}
+                    <span className="text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </Label>
                   <Input
                     id="ad-link"
                     value={linkUrl}
                     onChange={(event) => setLinkUrl(event.target.value)}
-                    placeholder="https://…"
+                    placeholder={
+                      inheritedLinkUrl
+                        ? `Inherits ${inheritedLinkUrl}`
+                        : "https://…"
+                    }
                   />
                 </div>
               </div>

@@ -82,6 +82,7 @@ export async function createDraftInitiative(input: {
   name: string;
   goal?: string | null;
   landingUrl?: string | null;
+  description?: string | null;
   /** Intended platforms; the push decides what actually ships. */
   targetChannels?: DraftAdPlatform[];
   /** Whole dollars for the whole push. */
@@ -100,6 +101,7 @@ export async function createDraftInitiative(input: {
       status: "planned",
       goal: input.goal ?? null,
       landingUrl: input.landingUrl ?? null,
+      description: input.description ?? null,
       targetChannels: input.targetChannels ?? ["meta_ads"],
       budget: input.budget ?? null,
       startAt: input.startAt ?? null,

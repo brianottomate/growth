@@ -127,6 +127,7 @@ export const adsRouter = {
           .default(["meta_ads"]),
         goal: z.string().trim().max(200).nullish(),
         landingUrl: z.string().url().nullish(),
+        description: z.string().trim().max(2000).nullish(),
         budget: z.number().int().min(0).nullish(),
       }),
     )

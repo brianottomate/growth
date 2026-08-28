@@ -86,11 +86,17 @@ export default async function CampaignDraftPage({
                 <span className="truncate">· {initiative.landingUrl}</span>
               )}
             </p>
+            {initiative.description && (
+              <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
+                {initiative.description}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <AddAdButton
               campaignId={initiative.id}
               brandId={draft.brand.id}
+              inheritedLinkUrl={initiative.landingUrl}
             />
             {spots.length > 0 && (
               <PushToPlatform

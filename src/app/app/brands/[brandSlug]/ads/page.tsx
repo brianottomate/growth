@@ -345,7 +345,10 @@ export default async function BrandAdsPage({
         </div>
         <div className="flex items-center gap-2">
           <CopyButton text={md} label="Copy for ChatGPT / Claude" />
-          <NewCampaignButton brandId={brand.id} />
+          <NewCampaignButton
+            brandId={brand.id}
+            brandWebsite={brand.website}
+          />
         </div>
       </div>
 
