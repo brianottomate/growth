@@ -86,6 +86,11 @@ export const growthActionPolicies = {
     getMap: read("local-read", PLAN_READ),
     next: read("local-read", PLAN_READ),
   },
+  brandWrite: {
+    create: write(),
+    // Re-running refreshes the same fields from the same site.
+    enrich: write({ idempotent: true }),
+  },
   productAtlasRead: { list: read(), get: read() },
   productAtlasWrite: { create: write(), update: write({ idempotent: true }) },
   storefrontRead: { list: read(), get: read(), listReferences: read() },

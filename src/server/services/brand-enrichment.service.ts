@@ -67,3 +67,16 @@ export async function enrichBrandFromWebsite(
     },
   };
 }
+
+/**
+ * A display-name guess from scraped metadata: the first segment of the page
+ * title before the usual separator garnish ("Homi — find your place" → "Homi").
+ */
+export function suggestNameFromEnrichment(
+  enrichment: BrandEnrichment,
+): string | null {
+  const title = enrichment.websiteMeta.title ?? enrichment.tagline;
+  if (!title) return null;
+  const first = title.split(/[|•·–—]|( - )/)[0]?.trim();
+  return first && first.length >= 2 ? first : null;
+}

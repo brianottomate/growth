@@ -23,9 +23,13 @@ import {
   brandConnectUrl,
   ensureBrandConnect,
   getBrandConnectStatus,
-  newConnectToken,
   regenerateBrandConnectToken,
 } from "@/server/services/brand-connect.service";
+import {
+  createOwnedBrand,
+  enrichBrandById,
+} from "@/server/services/brand-ops.service";
+import { suggestNameFromEnrichment } from "@/server/services/brand-enrichment.service";
 import {
   listBrandAdAccounts,
   setBrandAdAccountAllowed,
@@ -135,28 +139,6 @@ function slugify(name: string): string {
   );
 }
 
-/** Scrape `website` and write the results onto the brand. Returns the brand. */
-async function applyEnrichment(
-  ctx: Ctx,
-  brandId: string,
-  website: string,
-): Promise<Brand | null> {
-  const enrichment = await enrichBrandFromWebsite(website);
-  if (!enrichment) return null;
-
-  const [updated] = await ctx.db
-    .update(brandTable)
-    .set({
-      ...(enrichment.tagline && { tagline: enrichment.tagline }),
-      ...(enrichment.description && { description: enrichment.description }),
-      ...(enrichment.logo && { logo: enrichment.logo }),
-      websiteMeta: enrichment.websiteMeta,
-    })
-    .where(eq(brandTable.id, brandId))
-    .returning();
-  return updated ?? null;
-}
-
 export const brandRouter = createTRPCRouter({
   /**
    * Create a brand. Two scopes:
@@ -185,6 +167,23 @@ export const brandRouter = createTRPCRouter({
           })
           .optional(),
         enrich: z.boolean().optional(),
+        /** Pre-fetched preview from brand.previewEnrichment — saved inline. */
+        enrichment: z
+          .object({
+            tagline: z.string().max(500).nullish(),
+            description: z.string().max(4000).nullish(),
+            logo: z.string().url().nullish(),
+            websiteMeta: z
+              .object({
+                title: z.string().optional(),
+                description: z.string().optional(),
+                favicon: z.string().optional(),
+                ogImage: z.string().optional(),
+                scrapedAt: z.string().optional(),
+              })
+              .nullish(),
+          })
+          .nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -199,37 +198,19 @@ export const brandRouter = createTRPCRouter({
             message: "You must belong to an organization to create a brand",
           });
         }
-        // Unique slug within the org.
-        let slug = slugify(input.name);
-        const slugTaken = await ctx.db.query.brandTable.findFirst({
-          where: and(
-            eq(brandTable.organizationId, orgId),
-            eq(brandTable.slug, slug),
-          ),
+        const brand = await createOwnedBrand({
+          organizationId: orgId,
+          ownerId: ctx.session.user.id,
+          name: input.name,
+          website,
+          brandType: input.brandType,
+          enrichment: input.enrichment,
         });
-        if (slugTaken)
-          slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
-
-        const [brand] = await ctx.db
-          .insert(brandTable)
-          .values({
-            id: createId("brand"),
-            organizationId: orgId,
-            ownerId: ctx.session.user.id,
-            type: input.brandType ?? "company",
-            name: input.name,
-            slug,
-            website,
-            // Owned brands are connectable from birth; the Zernio profile is
-            // created lazily on the client's first Connect click.
-            connectToken: newConnectToken(),
-          })
-          .returning();
-        // Enrichment runs after the response so create feels instant; the
-        // card fills in when the scrape lands.
-        if (brand && website && shouldEnrich) {
+        // Without a pre-fetched preview, enrichment runs after the response
+        // so create feels instant; the card fills in when the scrape lands.
+        if (website && shouldEnrich && !input.enrichment) {
           waitUntil(
-            applyEnrichment(ctx, brand.id, website).catch((error) => {
+            enrichBrandById(brand.id).catch((error) => {
               console.error("brand enrichment failed", brand.id, error);
             }),
           );
@@ -336,8 +317,11 @@ export const brandRouter = createTRPCRouter({
         }
       }
 
-      if (website && shouldEnrich)
-        await applyEnrichment(ctx, reference.id, website);
+      if (website && shouldEnrich) {
+        await enrichBrandById(reference.id, website).catch((error) => {
+          console.error("reference enrichment failed", reference.id, error);
+        });
+      }
       return reference;
     }),
 
@@ -396,14 +380,43 @@ export const brandRouter = createTRPCRouter({
           message: "Add a website URL before enriching",
         });
       }
-      const updated = await applyEnrichment(ctx, brand.id, brand.website);
-      if (!updated) {
+      const result = await enrichBrandById(brand.id);
+      if (!result) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Could not read that website",
         });
       }
-      return updated;
+      return result.brand;
+    }),
+
+  /**
+   * Scrape a website WITHOUT saving anything — the dialog's Enrich button.
+   * The values come back to the client for preview and ride up again on
+   * brand.create.
+   */
+  previewEnrichment: protectedProcedure
+    .input(z.object({ website: z.string().trim().min(3).max(2000) }))
+    .mutation(async ({ input }) => {
+      const website = normalizeWebsite(input.website);
+      if (!website) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a URL" });
+      }
+      const enrichment = await enrichBrandFromWebsite(website);
+      if (!enrichment) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Could not read that website",
+        });
+      }
+      return {
+        website,
+        suggestedName: suggestNameFromEnrichment(enrichment),
+        tagline: enrichment.tagline ?? null,
+        description: enrichment.description ?? null,
+        logo: enrichment.logo ?? null,
+        websiteMeta: enrichment.websiteMeta,
+      };
     }),
 
   /** Soft-delete an owned brand. Use `untrack` for reference brands. */

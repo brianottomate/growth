@@ -23,7 +23,11 @@ import {
   updateAudienceTarget,
 } from "./audiences";
 import { getBrandMap } from "./brand-map";
-import { listBrands } from "./brands";
+import {
+  createBrandAction,
+  enrichBrandAction,
+  listBrands,
+} from "./brands";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
 import { inspectConversionReality } from "./conversions";
 import {
@@ -131,6 +135,12 @@ import { growthDomainTool } from "./types";
 export const brandRead = growthDomainTool({
   description: "Read brands, their mapped surfaces, and the next useful move.",
   actions: { list: listBrands, getMap: getBrandMap, next: nextForBrand },
+});
+
+export const brandWrite = growthDomainTool({
+  description:
+    "Create an owned brand, or enrich one from its website (logo, tagline, description). Create first, enrich second — they are deliberately separate steps.",
+  actions: { create: createBrandAction, enrich: enrichBrandAction },
 });
 
 export const productAtlasRead = growthDomainTool({
@@ -457,6 +467,7 @@ export const listeningRead = growthDomainTool({
 export const DOMAIN_CAPABILITY_TOOLS = {
   driveRead,
   brandRead,
+  brandWrite,
   productAtlasRead,
   productAtlasWrite,
   storefrontRead,

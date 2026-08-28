@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Globe, Plus, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,27 +16,34 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useTRPC } from "@/trpc/react";
+import { useTRPC, type RouterOutputs } from "@/trpc/react";
 
-const TYPES = [
-  { value: "company", label: "Company" },
-  { value: "personal", label: "Personal" },
-];
+type Enrichment = RouterOutputs["brand"]["previewEnrichment"];
 
+/**
+ * URL → Enrich → the form fills itself → Save. The scrape happens before the
+ * brand exists (brand.previewEnrichment), the values preview on the client,
+ * and ride up again on create. Only the name stays editable — everything
+ * else is the site's own words.
+ */
 export function NewBrandButton() {
   const router = useRouter();
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [brandType, setBrandType] = useState("company");
   const [website, setWebsite] = useState("");
+  const [name, setName] = useState("");
+  const [enrichment, setEnrichment] = useState<Enrichment | null>(null);
+
+  const enrich = useMutation(
+    trpc.brand.previewEnrichment.mutationOptions({
+      onSuccess: (result) => {
+        setEnrichment(result);
+        if (!name.trim() && result.suggestedName) {
+          setName(result.suggestedName);
+        }
+      },
+    }),
+  );
 
   const createM = useMutation(
     trpc.brand.create.mutationOptions({
@@ -44,7 +51,7 @@ export function NewBrandButton() {
         setOpen(false);
         setName("");
         setWebsite("");
-        setBrandType("company");
+        setEnrichment(null);
         // Land on the brand page: the next step (send the connect link,
         // review channels) lives there, not on the list.
         if (brand?.slug) {
@@ -58,10 +65,21 @@ export function NewBrandButton() {
 
   const save = () =>
     createM.mutate({
-      name,
+      name: name.trim(),
       scope: "owned",
-      brandType: brandType as never,
-      website: website || undefined,
+      brandType: "company",
+      website: enrichment?.website ?? (website.trim() || undefined),
+      enrichment: enrichment
+        ? {
+            tagline: enrichment.tagline,
+            description: enrichment.description,
+            logo: enrichment.logo,
+            websiteMeta: enrichment.websiteMeta,
+          }
+        : undefined,
+      // The preview already ran (or was skipped on purpose) — never re-scrape
+      // in the background on this path.
+      enrich: false,
     });
 
   return (
@@ -76,24 +94,38 @@ export function NewBrandButton() {
           <DialogHeader>
             <DialogTitle>New brand</DialogTitle>
             <DialogDescription>
-              Create an owned company or personal brand in Wander Growth.
+              Drop the website in and let the enrichment fill the rest.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-2">
-            {/* Website first: it is the highest-leverage input (enrichment
-                fills the rest from it in the background after create). */}
             <div className="flex flex-col gap-1.5">
               <Label>Website</Label>
-              <Input
-                autoFocus
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="example.com"
-              />
-              <p className="text-muted-foreground text-xs">
-                Optional — details auto-fill from the site after create.
-              </p>
+              <div className="flex gap-2">
+                <Input
+                  autoFocus
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="example.com"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && website.trim()) {
+                      enrich.mutate({ website: website.trim() });
+                    }
+                  }}
+                />
+                <Button
+                  variant="secondary"
+                  disabled={!website.trim() || enrich.isPending}
+                  loading={enrich.isPending}
+                  onClick={() => enrich.mutate({ website: website.trim() })}
+                >
+                  <Sparkles className="size-3.5" />
+                  Enrich
+                </Button>
+              </div>
+              {enrich.error && (
+                <p className="text-xs text-red-300">{enrich.error.message}</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -101,25 +133,41 @@ export function NewBrandButton() {
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Wander"
+                placeholder="Homi"
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label>Type</Label>
-              <Select value={brandType} onValueChange={setBrandType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {enrichment && (
+              <div className="border-border bg-surface-secondary/30 flex items-start gap-3 rounded-xl border p-3">
+                {enrichment.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={enrichment.logo}
+                    alt=""
+                    className="bg-muted size-14 shrink-0 rounded-lg border object-cover"
+                  />
+                ) : (
+                  <div className="bg-muted flex size-14 shrink-0 items-center justify-center rounded-lg border">
+                    <Globe className="text-muted-foreground size-5" />
+                  </div>
+                )}
+                <div className="min-w-0 space-y-0.5">
+                  {enrichment.tagline && (
+                    <p className="truncate text-sm font-medium">
+                      {enrichment.tagline}
+                    </p>
+                  )}
+                  {enrichment.description && (
+                    <p className="text-muted-foreground line-clamp-3 text-xs">
+                      {enrichment.description}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground/60 text-xs">
+                    {enrichment.website}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
