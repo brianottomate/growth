@@ -1,0 +1,190 @@
+name: Deploy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-production:
+    if: github.event.release.prerelease == false
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    environment: Production
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_DEPLOYMENT_NAME: ${{ vars.VERCEL_DEPLOYMENT_NAME }}
+      REPOSITORY_ID: ${{ github.event.repository.id }}
+      REPOSITORY_OWNER: ${{ github.repository_owner }}
+      REPOSITORY_NAME: ${{ github.event.repository.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 1
+
+      - name: Deploy or roll back Production
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          require_env() {
+            if [[ -z "${!1:-}" ]]; then
+              echo "Missing required environment variable: $1" >&2
+              exit 1
+            fi
+          }
+
+          for variable in RELEASE_TAG VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_DEPLOYMENT_NAME REPOSITORY_ID REPOSITORY_OWNER REPOSITORY_NAME; do
+            require_env "$variable"
+          done
+
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Production releases must use a stable vMAJOR.MINOR.PATCH tag; received $RELEASE_TAG." >&2
+            exit 1
+          fi
+
+          RELEASE_SHA=$(git rev-parse "${RELEASE_TAG}^{}")
+
+          create_deployment() {
+            local deployment_id payload response
+            payload=$(jq -n \
+              --arg project "$VERCEL_PROJECT_ID" \
+              --arg deployment_name "$VERCEL_DEPLOYMENT_NAME" \
+              --arg repo_id "$REPOSITORY_ID" \
+              --arg ref "refs/tags/$RELEASE_TAG" \
+              --arg sha "$RELEASE_SHA" \
+              --arg tag "$RELEASE_TAG" \
+              --arg repository_owner "$REPOSITORY_OWNER" \
+              --arg repository_name "$REPOSITORY_NAME" \
+              --arg run_id "$GITHUB_RUN_ID" \
+              --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+              '{
+                name: $deployment_name,
+                project: $project,
+                target: "production",
+                gitSource: { type: "github", repoId: $repo_id, ref: $ref, sha: $sha },
+                meta: {
+                  githubDeployment: "1",
+                  githubCommitRef: $ref,
+                  githubCommitSha: $sha,
+                  githubCommitOrg: $repository_owner,
+                  githubCommitRepo: $repository_name,
+                  githubOrg: $repository_owner,
+                  githubRepo: $repository_name,
+                  githubRunId: $run_id,
+                  githubRunAttempt: $run_attempt,
+                  gitSha: $sha,
+                  releaseTag: $tag
+                }
+              }')
+
+            if ! response=$(curl --silent --show-error --fail-with-body \
+              --request POST \
+              --url "https://api.vercel.com/v13/deployments?teamId=$VERCEL_TEAM_ID" \
+              --header "Authorization: Bearer $VERCEL_TOKEN" \
+              --header 'Content-Type: application/json' \
+              --data "$payload"); then
+              echo "$response" >&2
+              return 1
+            fi
+
+            deployment_id=$(jq --raw-output '.id // .uid // empty' <<<"$response")
+            if [[ -z "$deployment_id" ]]; then
+              echo "Vercel did not return a deployment ID: $response" >&2
+              return 1
+            fi
+
+            echo "Created production deployment $deployment_id."
+            wait_for_deployment "$deployment_id"
+          }
+
+          wait_for_deployment() {
+            local deployment_id=$1 response state
+
+            for _ in {1..120}; do
+              if ! response=$(curl --silent --show-error --fail-with-body \
+                --url "https://api.vercel.com/v13/deployments/$deployment_id?teamId=$VERCEL_TEAM_ID" \
+                --header "Authorization: Bearer $VERCEL_TOKEN"); then
+                echo "$response" >&2
+                return 1
+              fi
+
+              state=$(jq --raw-output '.readyState // .state // empty' <<<"$response")
+              case "$state" in
+                READY)
+                  echo "Production deployment $deployment_id is READY."
+                  return 0
+                  ;;
+                ERROR | CANCELED)
+                  echo "Production deployment $deployment_id finished with $state: $response" >&2
+                  return 1
+                  ;;
+              esac
+
+              sleep 5
+            done
+
+            echo "Timed out waiting for production deployment $deployment_id: $response" >&2
+            return 1
+          }
+
+          rollback_production() {
+            local deployments deployment_id
+
+            if ! deployments=$(curl --silent --show-error --fail-with-body \
+              --get \
+              --url 'https://api.vercel.com/v7/deployments' \
+              --header "Authorization: Bearer $VERCEL_TOKEN" \
+              --data-urlencode "teamId=$VERCEL_TEAM_ID" \
+              --data-urlencode "projectId=$VERCEL_PROJECT_ID" \
+              --data-urlencode "sha=$RELEASE_SHA" \
+              --data-urlencode 'target=production' \
+              --data-urlencode 'state=READY' \
+              --data-urlencode 'rollbackCandidate=true' \
+              --data-urlencode 'limit=100'); then
+              echo 'Could not look up a prior production deployment; rebuilding instead.' >&2
+              return 1
+            fi
+
+            deployment_id=$(jq --raw-output '
+              [.deployments[] | select(.isRollbackCandidate == true)]
+              | sort_by(.createdAt)
+              | last
+              | .uid // empty
+            ' <<<"$deployments")
+
+            if [[ -z "$deployment_id" ]]; then
+              echo 'No rollback candidate exists for this release SHA; rebuilding instead.' >&2
+              return 1
+            fi
+
+            if ! curl --silent --show-error --fail-with-body \
+              --request POST \
+              --get \
+              --url "https://api.vercel.com/v1/projects/$VERCEL_PROJECT_ID/rollback/$deployment_id" \
+              --header "Authorization: Bearer $VERCEL_TOKEN" \
+              --data-urlencode "teamId=$VERCEL_TEAM_ID" \
+              --data-urlencode "description=GitHub Actions rerun for $RELEASE_TAG" >/dev/null; then
+              echo "Could not roll back to $deployment_id; rebuilding instead." >&2
+              return 1
+            fi
+
+            echo "Rolled Production back to $deployment_id."
+          }
+
+          if [[ "$GITHUB_RUN_ATTEMPT" -gt 1 ]] && rollback_production; then
+            exit 0
+          fi
+
+          create_deployment
