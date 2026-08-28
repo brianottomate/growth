@@ -4,6 +4,8 @@ import {
   adsScope,
   boostMetaPostAction,
   createGoogleAdAction,
+  addAudienceUsersAction,
+  createAudienceAction,
   createMetaAdDraftAction,
   draftCampaignAction,
   duplicateMetaCampaignAction,
@@ -319,6 +321,8 @@ export const adsWrite = growthDomainTool({
   actions: {
     draftCampaign: draftCampaignAction,
     createMetaDraft: createMetaAdDraftAction,
+    createAudience: createAudienceAction,
+    addAudienceUsers: addAudienceUsersAction,
     createGoogle: createGoogleAdAction,
     boostMetaPost: boostMetaPostAction,
     duplicateMetaCampaign: duplicateMetaCampaignAction,

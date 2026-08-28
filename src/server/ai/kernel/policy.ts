@@ -219,6 +219,23 @@ export const growthActionPolicies = {
   adsWrite: {
     // Local DB row only; no provider call, no spend. Launch is separate.
     draftCampaign: write(),
+    // Provider write, no spend. Zernio's create is NOT idempotent — never
+    // auto-retry; surface failures to the operator.
+    createAudience: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: false,
+      reversible: true,
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    // Server-side hashed upload into an existing list; resumable batches.
+    addAudienceUsers: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: true,
+      surfaces: APPROVAL_PRODUCT,
+    }),
     createMetaDraft: write({
       consequence: "provider-write",
       approval: "user",
