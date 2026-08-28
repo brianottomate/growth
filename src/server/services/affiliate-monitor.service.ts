@@ -61,12 +61,12 @@ function yesterdayUtc(): { start: Date; end: Date; day: string } {
 
 async function snapshotMetrics(
   program: PartnerProgram,
-  campaignId: string,
+  platformCampaignId: string,
   clicks?: number,
 ): Promise<{ actions: number; revenue: number }> {
   const { start, end, day } = yesterdayUtc();
   const actions = await listActions({
-    campaignId,
+    platformCampaignId,
     actionDateStart: start,
     actionDateEnd: end,
   });
@@ -124,12 +124,12 @@ async function snapshotMetrics(
 
 async function syncPartners(
   program: PartnerProgram,
-  campaignId: string,
+  platformCampaignId: string,
 ): Promise<{
   synced: number;
   pending: Array<{ id: string; name?: string; website?: string }>;
 }> {
-  const partners = await listMediaPartners({ campaignId });
+  const partners = await listMediaPartners({ platformCampaignId });
   const pending: Array<{ id: string; name?: string; website?: string }> = [];
 
   for (const p of partners) {
@@ -289,9 +289,9 @@ async function checkTrackingHealth(
  */
 async function checkInquiries(
   program: PartnerProgram,
-  campaignId: string,
+  platformCampaignId: string,
 ): Promise<number> {
-  const inquiries = await listActionInquiries(campaignId);
+  const inquiries = await listActionInquiries(platformCampaignId);
   const fresh: AffiliateItem[] = [];
   for (const inq of inquiries) {
     if (!inq.Id) continue;
@@ -407,7 +407,7 @@ export async function runDailyAffiliateMonitor(): Promise<
       let byDay: ImpactDayPerformance[] | null = null;
       try {
         byDay = await listPerformanceByDay({
-          campaignId: program.externalProgramId,
+          platformCampaignId: program.externalProgramId,
           startDay: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000)
             .toISOString()
             .slice(0, 10),

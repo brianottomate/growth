@@ -11,7 +11,7 @@ import {
   brandTable,
   channelPlatformEnum,
   contentPostTable,
-  initiativeTable,
+  campaignTable,
   channelTable,
   platformPostTable,
   seriesTable,
@@ -273,7 +273,7 @@ export async function generateMomentBlueprint(opts: {
 }
 
 export type CommitMomentResult = {
-  initiativeId: string;
+  campaignId: string;
   seriesId: string | null;
   slots: number;
   amplifierTargets: number;
@@ -299,7 +299,7 @@ export async function commitMomentBlueprint(opts: {
   const endAt = at(Math.max(0, ...offsets));
 
   const [initiative] = await db
-    .insert(initiativeTable)
+    .insert(campaignTable)
     .values({
       brandId: opts.brandId,
       name: opts.name,
@@ -308,7 +308,7 @@ export async function commitMomentBlueprint(opts: {
       startAt,
       endAt,
     })
-    .returning({ id: initiativeTable.id });
+    .returning({ id: campaignTable.id });
   const momentId = initiative!.id;
 
   const channels = await db.query.channelTable.findMany({
@@ -327,7 +327,7 @@ export async function commitMomentBlueprint(opts: {
         brandId: opts.brandId,
         name: bp.seriesName ?? opts.name,
         theme: bp.theme,
-        initiativeId: momentId,
+        campaignId: momentId,
         status: "planned",
         startAt,
         endAt,
@@ -359,7 +359,7 @@ export async function commitMomentBlueprint(opts: {
         status: "slot",
         slotKind: s.slotKind,
         origin: "ai",
-        initiativeId: momentId,
+        campaignId: momentId,
         seriesId,
         plannedAt: scheduledAt,
         targetSpots,
@@ -424,7 +424,7 @@ export async function commitMomentBlueprint(opts: {
   }
 
   return {
-    initiativeId: momentId,
+    campaignId: momentId,
     seriesId,
     slots: bp.slots.length,
     amplifierTargets,

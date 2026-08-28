@@ -88,7 +88,7 @@ async function ensurePersonalizedCampaign(): Promise<string> {
 }
 
 export type QueueResult = {
-  campaignId: string;
+  platformCampaignId: string;
   leadId: string | null;
   recipient: string;
 };
@@ -110,7 +110,7 @@ export async function queueInstantlyLead(
   if (!row?.steps?.length)
     throw new Error("No outreach draft to queue for this domain");
 
-  const campaignId = await ensurePersonalizedCampaign();
+  const platformCampaignId = await ensurePersonalizedCampaign();
 
   const steps = row.steps;
   const custom_variables: Record<string, string> = {
@@ -121,7 +121,7 @@ export async function queueInstantlyLead(
   }
 
   const res = await addLeadsBulk({
-    campaign_id: campaignId,
+    campaign_id: platformCampaignId,
     leads: [{ email: recipientEmail, custom_variables }],
     skip_if_in_campaign: true,
     // NOT verifying on import — verification parks leads in a queue so they never
@@ -134,12 +134,12 @@ export async function queueInstantlyLead(
     .update(leadSequenceTable)
     .set({
       status: "queued",
-      instantlyCampaignId: campaignId,
+      instantlyCampaignId: platformCampaignId,
       instantlyLeadId: leadId,
     })
     .where(eq(leadSequenceTable.id, row.id));
 
-  return { campaignId, leadId, recipient: recipientEmail };
+  return { platformCampaignId, leadId, recipient: recipientEmail };
 }
 
 /**
@@ -147,7 +147,7 @@ export async function queueInstantlyLead(
  * starts sending per the schedule. Campaign-level action (not per lead).
  */
 export async function activateInstantlyCampaign(): Promise<{
-  campaignId: string;
+  platformCampaignId: string;
 }> {
   const existing = await listCampaigns({ search: CAMPAIGN_NAME, limit: 10 });
   const found = existing.items.find((c) => c.name === CAMPAIGN_NAME);
@@ -157,5 +157,5 @@ export async function activateInstantlyCampaign(): Promise<{
     );
   }
   await activateCampaign(found.id);
-  return { campaignId: found.id };
+  return { platformCampaignId: found.id };
 }

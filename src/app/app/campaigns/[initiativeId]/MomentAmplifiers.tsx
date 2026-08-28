@@ -62,7 +62,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
 
   const { data, isLoading } = useQuery(
     trpc.amplifier.targetsForInitiative.queryOptions({
-      initiativeId: momentId,
+      campaignId: momentId,
     }),
   );
   const targets = data?.targets;
@@ -71,7 +71,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   const invalidate = () =>
     queryClient.invalidateQueries(
       trpc.amplifier.targetsForInitiative.queryOptions({
-        initiativeId: momentId,
+        campaignId: momentId,
       }),
     );
 

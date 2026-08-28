@@ -295,9 +295,9 @@ export async function getCustomerActivities(customerId: string, limit = 10) {
 }
 
 /** Read one provider campaign before freezing a governed broadcast send. */
-export async function getCustomerIoCampaign(campaignId: number) {
+export async function getCustomerIoCampaign(platformCampaignId: number) {
   const response = await appApiRequest<{ campaign: CustomerIoCampaign }>(
-    `/campaigns/${campaignId}`,
+    `/campaigns/${platformCampaignId}`,
   );
   return response?.campaign ?? null;
 }
@@ -495,11 +495,11 @@ export async function removeRelationship(params: {
  * Trigger an API-triggered broadcast.
  */
 export async function triggerBroadcast(
-  campaignId: number,
+  platformCampaignId: number,
   data?: Record<string, unknown>,
   recipients?: { emails?: string[]; ids?: string[]; segment?: { id: number } },
 ) {
-  return apiClient.triggerBroadcast(campaignId, data ?? {}, recipients ?? {});
+  return apiClient.triggerBroadcast(platformCampaignId, data ?? {}, recipients ?? {});
 }
 
 // =====================================================

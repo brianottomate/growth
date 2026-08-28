@@ -22,12 +22,12 @@ import { useTRPC } from "@/trpc/react";
  * operator approval the ads-write policy requires.
  */
 export function DeliverySwitch({
-  campaignId,
+  platformCampaignId,
   status,
   hasExternalId,
   spendLine,
 }: {
-  campaignId: string;
+  platformCampaignId: string;
   status: string;
   hasExternalId: boolean;
   spendLine: string;
@@ -65,7 +65,7 @@ export function DeliverySwitch({
         variant={isRunning ? "outline" : "default"}
         onClick={() =>
           isRunning
-            ? toggle.mutate({ campaignId, status: "paused" })
+            ? toggle.mutate({ platformCampaignId, status: "paused" })
             : setConfirming(true)
         }
         loading={toggle.isPending}
@@ -108,7 +108,7 @@ export function DeliverySwitch({
             <Button
               size="sm"
               loading={toggle.isPending}
-              onClick={() => toggle.mutate({ campaignId, status: "active" })}
+              onClick={() => toggle.mutate({ platformCampaignId, status: "active" })}
             >
               Launch
             </Button>

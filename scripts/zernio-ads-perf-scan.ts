@@ -59,7 +59,7 @@ type Ad = {
   createdAt?: string;
 };
 
-type Campaign = {
+type PlatformCampaign = {
   campaignName?: string;
   name?: string;
   status?: string;
@@ -69,8 +69,8 @@ type Campaign = {
   adSets?: Array<{ adSetName?: string; ads?: Ad[] }>;
 };
 
-async function fetchTree(fromDate: string, toDate: string): Promise<Campaign[]> {
-  const all: Campaign[] = [];
+async function fetchTree(fromDate: string, toDate: string): Promise<PlatformCampaign[]> {
+  const all: PlatformCampaign[] = [];
   for (let page = 1; page <= 60; page++) {
     const url = `${BASE}/ads/tree?source=all&fromDate=${fromDate}&toDate=${toDate}&page=${page}&limit=100`;
     const res = await fetch(url, {
@@ -80,12 +80,12 @@ async function fetchTree(fromDate: string, toDate: string): Promise<Campaign[]> 
     if (!res.ok) throw new Error(`tree page ${page}: ${res.status} ${await res.text()}`);
     const data: unknown = await res.json();
     const obj = (data && typeof data === "object" ? data : {}) as {
-      campaigns?: Campaign[];
-      data?: Campaign[];
+      campaigns?: PlatformCampaign[];
+      data?: PlatformCampaign[];
       pagination?: { pages?: number };
     };
-    const items: Campaign[] = Array.isArray(data)
-      ? (data as Campaign[])
+    const items: PlatformCampaign[] = Array.isArray(data)
+      ? (data as PlatformCampaign[])
       : (obj.campaigns ?? obj.data ?? []);
     all.push(...items);
     const pages = obj.pagination?.pages ?? 1;

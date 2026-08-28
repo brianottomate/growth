@@ -10,11 +10,11 @@ import {
 } from "@/server/services/ads-alignment.service";
 import {
   brandTable,
-  campaignTable,
+  platformCampaignTable,
   channelPlatformEnum,
   contentPostTable,
-  initiativeStatusEnum,
-  initiativeTable,
+  campaignStatusEnum,
+  campaignTable,
   memberTable,
 } from "@/server/db/schema";
 
@@ -63,11 +63,11 @@ async function assertBrandAccess(ctx: Ctx, brandId: string) {
 }
 
 /** Load an initiative and assert access through its brand. */
-async function assertInitiativeAccess(ctx: Ctx, initiativeId: string) {
-  const initiative = await ctx.db.query.initiativeTable.findFirst({
+async function assertInitiativeAccess(ctx: Ctx, campaignId: string) {
+  const initiative = await ctx.db.query.campaignTable.findFirst({
     where: and(
-      eq(initiativeTable.id, initiativeId),
-      isNull(initiativeTable.deletedAt),
+      eq(campaignTable.id, campaignId),
+      isNull(campaignTable.deletedAt),
     ),
   });
   if (!initiative) throw new TRPCError({ code: "NOT_FOUND" });
@@ -75,7 +75,7 @@ async function assertInitiativeAccess(ctx: Ctx, initiativeId: string) {
   return initiative;
 }
 
-const statusSchema = z.enum(initiativeStatusEnum.enumValues);
+const statusSchema = z.enum(campaignStatusEnum.enumValues);
 const platformSchema = z.enum(channelPlatformEnum.enumValues);
 
 const initiativeFields = {
@@ -95,7 +95,7 @@ const initiativeFields = {
  * Initiatives — the campaign/moment management surface (/app/campaigns).
  * An initiative is the umbrella for a push: a seasonal moment, a major
  * event, or a long-running campaign. Content posts and ad campaigns hang
- * off it via their `initiativeId`. The moment planner (/app/plan) creates
+ * off it via their `campaignId`. The moment planner (/app/plan) creates
  * these too; this router is the generic CRUD + linking lane.
  */
 export const initiativeRouter = createTRPCRouter({
@@ -105,13 +105,13 @@ export const initiativeRouter = createTRPCRouter({
     const brandIds = await orgBrandIds(ctx, orgId);
     if (brandIds.length === 0) return { initiatives: [] };
 
-    const initiatives = await ctx.db.query.initiativeTable.findMany({
+    const initiatives = await ctx.db.query.campaignTable.findMany({
       where: and(
-        inArray(initiativeTable.brandId, brandIds),
-        isNull(initiativeTable.deletedAt),
+        inArray(campaignTable.brandId, brandIds),
+        isNull(campaignTable.deletedAt),
       ),
       with: { brand: { columns: { id: true, name: true, slug: true } } },
-      orderBy: [desc(initiativeTable.startAt)],
+      orderBy: [desc(campaignTable.startAt)],
     });
     const ids = initiatives.map((i) => i.id);
     if (ids.length === 0) return { initiatives: [] };
@@ -119,28 +119,28 @@ export const initiativeRouter = createTRPCRouter({
     const [contentCounts, adCounts] = await Promise.all([
       ctx.db
         .select({
-          initiativeId: contentPostTable.initiativeId,
+          campaignId: contentPostTable.campaignId,
           status: contentPostTable.status,
           n: count(),
         })
         .from(contentPostTable)
         .where(
           and(
-            inArray(contentPostTable.initiativeId, ids),
+            inArray(contentPostTable.campaignId, ids),
             isNull(contentPostTable.deletedAt),
           ),
         )
-        .groupBy(contentPostTable.initiativeId, contentPostTable.status),
+        .groupBy(contentPostTable.campaignId, contentPostTable.status),
       ctx.db
-        .select({ initiativeId: campaignTable.initiativeId, n: count() })
-        .from(campaignTable)
-        .where(inArray(campaignTable.initiativeId, ids))
-        .groupBy(campaignTable.initiativeId),
+        .select({ campaignId: platformCampaignTable.campaignId, n: count() })
+        .from(platformCampaignTable)
+        .where(inArray(platformCampaignTable.campaignId, ids))
+        .groupBy(platformCampaignTable.campaignId),
     ]);
 
     return {
       initiatives: initiatives.map((i) => {
-        const mine = contentCounts.filter((c) => c.initiativeId === i.id);
+        const mine = contentCounts.filter((c) => c.campaignId === i.id);
         return {
           ...i,
           contentCount: mine.reduce((s, c) => s + c.n, 0),
@@ -148,7 +148,7 @@ export const initiativeRouter = createTRPCRouter({
             .filter((c) => c.status === "published")
             .reduce((s, c) => s + c.n, 0),
           adCampaignCount:
-            adCounts.find((c) => c.initiativeId === i.id)?.n ?? 0,
+            adCounts.find((c) => c.campaignId === i.id)?.n ?? 0,
         };
       }),
     };
@@ -167,7 +167,7 @@ export const initiativeRouter = createTRPCRouter({
         }),
         ctx.db.query.contentPostTable.findMany({
           where: and(
-            eq(contentPostTable.initiativeId, initiative.id),
+            eq(contentPostTable.campaignId, initiative.id),
             isNull(contentPostTable.deletedAt),
           ),
           columns: {
@@ -180,8 +180,8 @@ export const initiativeRouter = createTRPCRouter({
           with: { series: { columns: { id: true, name: true, color: true } } },
           orderBy: [contentPostTable.plannedAt],
         }),
-        ctx.db.query.campaignTable.findMany({
-          where: eq(campaignTable.initiativeId, initiative.id),
+        ctx.db.query.platformCampaignTable.findMany({
+          where: eq(platformCampaignTable.campaignId, initiative.id),
           columns: { id: true, name: true, status: true },
           with: { channel: { columns: { platform: true } } },
         }),
@@ -196,7 +196,7 @@ export const initiativeRouter = createTRPCRouter({
       await assertBrandAccess(ctx, input.brandId);
       const { brandId, ...rest } = input;
       const [initiative] = await ctx.db
-        .insert(initiativeTable)
+        .insert(campaignTable)
         .values({ brandId, ...rest })
         .returning();
       return initiative;
@@ -208,38 +208,38 @@ export const initiativeRouter = createTRPCRouter({
       await assertInitiativeAccess(ctx, input.id);
       const { id, ...rest } = input;
       const [initiative] = await ctx.db
-        .update(initiativeTable)
+        .update(campaignTable)
         .set(rest)
-        .where(eq(initiativeTable.id, id))
+        .where(eq(campaignTable.id, id))
         .returning();
       return initiative;
     }),
 
-  /** Soft-delete. Linked content keeps its rows; initiativeId is cleared. */
+  /** Soft-delete. Linked content keeps its rows; campaignId is cleared. */
   archive: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertInitiativeAccess(ctx, input.id);
       await ctx.db
         .update(contentPostTable)
-        .set({ initiativeId: null })
-        .where(eq(contentPostTable.initiativeId, input.id));
+        .set({ campaignId: null })
+        .where(eq(contentPostTable.campaignId, input.id));
       await ctx.db
-        .update(initiativeTable)
+        .update(campaignTable)
         .set({ deletedAt: new Date(), status: "archived" })
-        .where(eq(initiativeTable.id, input.id));
+        .where(eq(campaignTable.id, input.id));
       return { ok: true };
     }),
 
   /** Brand content not yet attached to any initiative — the link picker. */
   linkableContent: protectedProcedure
-    .input(z.object({ initiativeId: z.string() }))
+    .input(z.object({ campaignId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const initiative = await assertInitiativeAccess(ctx, input.initiativeId);
+      const initiative = await assertInitiativeAccess(ctx, input.campaignId);
       return ctx.db.query.contentPostTable.findMany({
         where: and(
           eq(contentPostTable.brandId, initiative.brandId),
-          isNull(contentPostTable.initiativeId),
+          isNull(contentPostTable.campaignId),
           isNull(contentPostTable.deletedAt),
         ),
         columns: {
@@ -257,16 +257,16 @@ export const initiativeRouter = createTRPCRouter({
   linkContent: protectedProcedure
     .input(
       z.object({
-        initiativeId: z.string(),
+        campaignId: z.string(),
         contentPostIds: z.array(z.string()).min(1).max(200),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const initiative = await assertInitiativeAccess(ctx, input.initiativeId);
+      const initiative = await assertInitiativeAccess(ctx, input.campaignId);
       // Same-brand only — a campaign never owns another brand's content.
       await ctx.db
         .update(contentPostTable)
-        .set({ initiativeId: initiative.id })
+        .set({ campaignId: initiative.id })
         .where(
           and(
             inArray(contentPostTable.id, input.contentPostIds),
@@ -277,16 +277,16 @@ export const initiativeRouter = createTRPCRouter({
     }),
 
   unlinkContent: protectedProcedure
-    .input(z.object({ initiativeId: z.string(), contentPostId: z.string() }))
+    .input(z.object({ campaignId: z.string(), contentPostId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await assertInitiativeAccess(ctx, input.initiativeId);
+      await assertInitiativeAccess(ctx, input.campaignId);
       await ctx.db
         .update(contentPostTable)
-        .set({ initiativeId: null })
+        .set({ campaignId: null })
         .where(
           and(
             eq(contentPostTable.id, input.contentPostId),
-            eq(contentPostTable.initiativeId, input.initiativeId),
+            eq(contentPostTable.campaignId, input.campaignId),
           ),
         );
       return { ok: true };
@@ -296,10 +296,10 @@ export const initiativeRouter = createTRPCRouter({
 
   /** Full alignment diff for one initiative (detail page). */
   alignment: protectedProcedure
-    .input(z.object({ initiativeId: z.string() }))
+    .input(z.object({ campaignId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await assertInitiativeAccess(ctx, input.initiativeId);
-      return computeInitiativeAlignment(input.initiativeId);
+      await assertInitiativeAccess(ctx, input.campaignId);
+      return computeInitiativeAlignment(input.campaignId);
     }),
 
   /** Per-initiative drift rollup across the org's brands (index page). */
@@ -313,36 +313,36 @@ export const initiativeRouter = createTRPCRouter({
   linkCampaigns: protectedProcedure
     .input(
       z.object({
-        initiativeId: z.string(),
+        campaignId: z.string(),
         campaignIds: z.array(z.string()).min(1).max(100),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const initiative = await assertInitiativeAccess(ctx, input.initiativeId);
+      const initiative = await assertInitiativeAccess(ctx, input.campaignId);
       // Same-brand only — an initiative never claims another brand's campaign.
       await ctx.db
-        .update(campaignTable)
-        .set({ initiativeId: initiative.id })
+        .update(platformCampaignTable)
+        .set({ campaignId: initiative.id })
         .where(
           and(
-            inArray(campaignTable.id, input.campaignIds),
-            eq(campaignTable.brandId, initiative.brandId),
+            inArray(platformCampaignTable.id, input.campaignIds),
+            eq(platformCampaignTable.brandId, initiative.brandId),
           ),
         );
       return { ok: true };
     }),
 
   unlinkCampaign: protectedProcedure
-    .input(z.object({ initiativeId: z.string(), campaignId: z.string() }))
+    .input(z.object({ campaignId: z.string(), platformCampaignId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await assertInitiativeAccess(ctx, input.initiativeId);
+      await assertInitiativeAccess(ctx, input.campaignId);
       await ctx.db
-        .update(campaignTable)
-        .set({ initiativeId: null })
+        .update(platformCampaignTable)
+        .set({ campaignId: null })
         .where(
           and(
-            eq(campaignTable.id, input.campaignId),
-            eq(campaignTable.initiativeId, input.initiativeId),
+            eq(platformCampaignTable.id, input.platformCampaignId),
+            eq(platformCampaignTable.campaignId, input.campaignId),
           ),
         );
       return { ok: true };

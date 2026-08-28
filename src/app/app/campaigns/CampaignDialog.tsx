@@ -26,7 +26,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { platformLabel } from "@/components/channel-logos";
-import type { ChannelPlatform, InitiativeStatus } from "@/server/db/schema";
+import type { ChannelPlatform, CampaignStatus } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
 
 export type CampaignDraft = {
@@ -35,7 +35,7 @@ export type CampaignDraft = {
   name: string;
   description?: string | null;
   goal?: string | null;
-  status: InitiativeStatus;
+  status: CampaignStatus;
   landingUrl?: string | null;
   color?: string | null;
   targetChannels?: string[] | null;
@@ -115,7 +115,7 @@ export function CampaignDialog({
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [goal, setGoal] = useState(initial?.goal ?? "");
-  const [status, setStatus] = useState<InitiativeStatus>(
+  const [status, setStatus] = useState<CampaignStatus>(
     initial?.status ?? "planned",
   );
   const [landingUrl, setLandingUrl] = useState(initial?.landingUrl ?? "");
@@ -266,7 +266,7 @@ export function CampaignDialog({
               <Label>Status</Label>
               <Select
                 value={status}
-                onValueChange={(v) => setStatus(v as InitiativeStatus)}
+                onValueChange={(v) => setStatus(v as CampaignStatus)}
               >
                 <SelectTrigger>
                   <SelectValue />

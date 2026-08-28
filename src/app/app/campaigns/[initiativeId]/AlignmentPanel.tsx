@@ -34,21 +34,21 @@ const fmtUsd = (n: number | undefined) =>
  * fixes); campaign changes happen in the platform's own manager.
  */
 export function AlignmentPanel({
-  initiativeId,
+  campaignId,
   onChanged,
 }: {
-  initiativeId: string;
+  campaignId: string;
   onChanged: () => Promise<void>;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery(
-    trpc.initiative.alignment.queryOptions({ initiativeId }),
+    trpc.initiative.alignment.queryOptions({ campaignId }),
   );
 
   const invalidate = async () => {
     await queryClient.invalidateQueries(
-      trpc.initiative.alignment.queryOptions({ initiativeId }),
+      trpc.initiative.alignment.queryOptions({ campaignId }),
     );
     await onChanged();
   };
@@ -178,7 +178,7 @@ export function AlignmentPanel({
               disabled={linkCampaigns.isPending}
               onClick={() =>
                 linkCampaigns.mutate({
-                  initiativeId,
+                  campaignId,
                   campaignIds: suggestions.map((s) => s.id),
                 })
               }
@@ -203,7 +203,7 @@ export function AlignmentPanel({
                   disabled={linkCampaigns.isPending}
                   onClick={() =>
                     linkCampaigns.mutate({
-                      initiativeId,
+                      campaignId,
                       campaignIds: [s.id],
                     })
                   }
@@ -240,7 +240,7 @@ export function AlignmentPanel({
                     variant="ghost"
                     disabled={unlinkCampaign.isPending}
                     onClick={() =>
-                      unlinkCampaign.mutate({ initiativeId, campaignId: c.id })
+                      unlinkCampaign.mutate({ campaignId, platformCampaignId: c.id })
                     }
                   >
                     Unlink

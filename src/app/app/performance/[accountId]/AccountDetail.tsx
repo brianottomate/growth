@@ -237,9 +237,9 @@ export function AccountDetail({ accountId }: { accountId: string }) {
 
               {pickerFor === cycle.id && (
                 <CampaignPicker
-                  onAttach={(campaignId) =>
+                  onAttach={(platformCampaignId) =>
                     attach.mutate(
-                      { cycleId: cycle.id, kind: "campaign", id: campaignId },
+                      { cycleId: cycle.id, kind: "campaign", id: platformCampaignId },
                       { onSuccess: () => setPickerFor(null) },
                     )
                   }
@@ -252,9 +252,9 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                   ads={delivery.ads.filter((ad) =>
                     delivery.campaigns.some(
                       (campaign) =>
-                        campaign.id === ad.campaignId &&
+                        campaign.id === ad.platformCampaignId &&
                         forCycle.ads.some(
-                          (init) => init.id === campaign.initiativeId,
+                          (init) => init.id === campaign.campaignId,
                         ),
                     ),
                   )}
@@ -270,7 +270,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
                       onClick={() =>
                         attach.mutate({
                           cycleId: null,
-                          kind: "initiative",
+                          kind: "campaign",
                           id: row.id,
                         })
                       }
@@ -416,7 +416,7 @@ function CampaignPicker({
   onAttach,
   attaching,
 }: {
-  onAttach: (campaignId: string) => void;
+  onAttach: (platformCampaignId: string) => void;
   attaching: boolean;
 }) {
   const trpc = useTRPC();

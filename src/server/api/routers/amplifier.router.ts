@@ -12,7 +12,7 @@ import {
   channelPlatformEnum,
   channelTable,
   contentPostTable,
-  initiativeTable,
+  campaignTable,
   memberTable,
   platformPostTable,
 } from "@/server/db/schema";
@@ -57,8 +57,8 @@ async function assertAmplifierAccess(ctx: Ctx, id: string) {
 }
 
 async function assertMomentAccess(ctx: Ctx, id: string) {
-  const moment = await ctx.db.query.initiativeTable.findFirst({
-    where: and(eq(initiativeTable.id, id), isNull(initiativeTable.deletedAt)),
+  const moment = await ctx.db.query.campaignTable.findFirst({
+    where: and(eq(campaignTable.id, id), isNull(campaignTable.deletedAt)),
   });
   if (!moment) throw new TRPCError({ code: "NOT_FOUND" });
   const brand = await ctx.db.query.brandTable.findFirst({
@@ -97,10 +97,10 @@ async function assertTargetAccess(ctx: Ctx, id: string) {
 
 /** The initiative's platform posts (via its content items) — the candidates an
  * amplification ask can anchor to. */
-async function platformPostsForInitiative(ctx: Ctx, initiativeId: string) {
+async function platformPostsForInitiative(ctx: Ctx, campaignId: string) {
   const contents = await ctx.db.query.contentPostTable.findMany({
     where: and(
-      eq(contentPostTable.initiativeId, initiativeId),
+      eq(contentPostTable.campaignId, campaignId),
       isNull(contentPostTable.deletedAt),
     ),
     columns: { id: true, title: true },
@@ -377,10 +377,10 @@ export const amplifierRouter = createTRPCRouter({
 
   /** All targets across an initiative's posts (the campaign roll-up view). */
   targetsForInitiative: protectedProcedure
-    .input(z.object({ initiativeId: z.string() }))
+    .input(z.object({ campaignId: z.string() }))
     .query(async ({ ctx, input }) => {
-      await assertMomentAccess(ctx, input.initiativeId);
-      const posts = await platformPostsForInitiative(ctx, input.initiativeId);
+      await assertMomentAccess(ctx, input.campaignId);
+      const posts = await platformPostsForInitiative(ctx, input.campaignId);
       if (posts.length === 0) return { targets: [], posts: [] };
       const targets = await ctx.db.query.amplificationTargetTable.findMany({
         where: inArray(

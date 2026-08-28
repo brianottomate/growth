@@ -15,10 +15,10 @@ import {
   audienceTable,
   brandInspirationTable,
   brandTable,
-  campaignTable,
+  platformCampaignTable,
   channelTable,
   contentPostTable,
-  initiativeTable,
+  campaignTable,
   memberTable,
   organizationTable,
   platformPostTable,
@@ -1285,7 +1285,7 @@ async function main() {
   const initDemand = createId("init");
   const initBrand = createId("init");
   const initSaas = createId("init");
-  await db.insert(initiativeTable).values([
+  await db.insert(campaignTable).values([
     {
       id: initSupply,
       brandId: wander,
@@ -1345,11 +1345,11 @@ async function main() {
   const campCoastal = createId("camp");
   const campBecomeHost = createId("camp");
   const campOperator = createId("camp");
-  await db.insert(campaignTable).values([
+  await db.insert(platformCampaignTable).values([
     // --- Supply (/list) ---
     {
       id: campBecomeHost,
-      initiativeId: initSupply,
+      campaignId: initSupply,
       brandId: wander,
       channelId: metaCh,
       platform: "meta_ads",
@@ -1364,7 +1364,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initSupply,
+      campaignId: initSupply,
       brandId: wander,
       channelId: googleCh,
       platform: "google_ads",
@@ -1380,7 +1380,7 @@ async function main() {
     // --- Demand (bookings) ---
     {
       id: campCoastal,
-      initiativeId: initDemand,
+      campaignId: initDemand,
       brandId: wander,
       channelId: metaCh,
       platform: "meta_ads",
@@ -1396,7 +1396,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initDemand,
+      campaignId: initDemand,
       brandId: wander,
       channelId: metaCh,
       platform: "meta_ads",
@@ -1412,7 +1412,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initDemand,
+      campaignId: initDemand,
       brandId: wander,
       channelId: googleCh,
       platform: "google_ads",
@@ -1427,7 +1427,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initDemand,
+      campaignId: initDemand,
       brandId: wander,
       channelId: googleCh,
       platform: "google_ads",
@@ -1443,7 +1443,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initDemand,
+      campaignId: initDemand,
       brandId: wander,
       channelId: openaiCh,
       platform: "openai_ads",
@@ -1458,7 +1458,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initDemand,
+      campaignId: initDemand,
       brandId: wander,
       channelId: openaiCh,
       platform: "openai_ads",
@@ -1474,7 +1474,7 @@ async function main() {
     // --- Brand ---
     {
       id: createId("camp"),
-      initiativeId: initBrand,
+      campaignId: initBrand,
       brandId: wander,
       channelId: metaCh,
       platform: "meta_ads",
@@ -1490,7 +1490,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initBrand,
+      campaignId: initBrand,
       brandId: wander,
       channelId: metaCh,
       platform: "meta_ads",
@@ -1506,7 +1506,7 @@ async function main() {
     // --- SaaS (/os) ---
     {
       id: campOperator,
-      initiativeId: initSaas,
+      campaignId: initSaas,
       brandId: wanderos,
       channelId: osMetaCh,
       platform: "meta_ads",
@@ -1521,7 +1521,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initSaas,
+      campaignId: initSaas,
       brandId: wanderos,
       channelId: osMetaCh,
       platform: "meta_ads",
@@ -1537,7 +1537,7 @@ async function main() {
     },
     {
       id: createId("camp"),
-      initiativeId: initSaas,
+      campaignId: initSaas,
       brandId: wanderos,
       channelId: osMetaCh,
       platform: "meta_ads",
@@ -1555,7 +1555,7 @@ async function main() {
 
   // Ad spots (creatives) under a few campaigns.
   const spot = (
-    campaignId: string,
+    platformCampaignId: string,
     channelId: string,
     spotBrandId: string,
     platform: "meta_ads" | "google_ads" | "openai_ads",
@@ -1566,17 +1566,17 @@ async function main() {
     stats: { spend: number; impressions: number; clicks: number; ctr: number },
   ) => ({
     id: createId("ad"),
-    campaignId,
+    platformCampaignId,
     channelId,
     brandId: spotBrandId,
     platform,
     name: body.length > 30 ? `${body.slice(0, 30)}…` : body,
     status,
     adSetName: "Prospecting · US",
-    media: [{ url: adImg(`ad-${campaignId}-${i}`), type: "image" as const }],
+    media: [{ url: adImg(`ad-${platformCampaignId}-${i}`), type: "image" as const }],
     body,
     linkUrl: link,
-    thumbnailUrl: adImg(`ad-${campaignId}-${i}`),
+    thumbnailUrl: adImg(`ad-${platformCampaignId}-${i}`),
     platformObjective: "OUTCOME_LEADS",
     optimizationGoal: "LEAD_GENERATION",
     bidStrategy: "LOWEST_COST",

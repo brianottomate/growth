@@ -8,7 +8,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import { initiativeTable } from "./ads-schema";
+import { campaignTable } from "./ads-schema";
 import { userTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
 import {
@@ -182,9 +182,9 @@ export const seriesTable = pgTable(
 
     // The strategic "moment" this series ladders up to (the raised initiative —
     // organic series + paid campaigns + amplification targets all reference it).
-    initiativeId: t
+    campaignId: t
       .text()
-      .references(() => initiativeTable.id, { onDelete: "set null" }),
+      .references(() => campaignTable.id, { onDelete: "set null" }),
 
     name: t.text().notNull(),
     slug: t.text(), // url-safe, unique within a brand
@@ -217,7 +217,7 @@ export const seriesTable = pgTable(
   (table) => [
     index("series_brand_idx").on(table.brandId),
     index("series_status_idx").on(table.status),
-    index("series_initiative_idx").on(table.initiativeId),
+    index("series_initiative_idx").on(table.campaignId),
     index("series_pillar_idx").on(table.brandId, table.pillar),
   ],
 );
@@ -254,9 +254,9 @@ export const contentPostTable = pgTable(
     // Optional strategic push this content supports (the organic counterpart to
     // a campaign living under the same initiative). Lets a slot be anchored to a
     // goal-driven initiative as well as / instead of a series.
-    initiativeId: t
+    campaignId: t
       .text()
-      .references(() => initiativeTable.id, { onDelete: "set null" }),
+      .references(() => campaignTable.id, { onDelete: "set null" }),
 
     // Owner / assignee shown in the Feed.
     ownerId: t.text().references(() => userTable.id),
@@ -338,7 +338,7 @@ export const contentPostTable = pgTable(
     index("content_post_status_idx").on(table.status),
     index("content_post_pillar_idx").on(table.pillar),
     index("content_post_series_idx").on(table.seriesId),
-    index("content_post_initiative_idx").on(table.initiativeId),
+    index("content_post_initiative_idx").on(table.campaignId),
     index("content_post_planned_at_idx").on(table.plannedAt),
   ],
 );
@@ -770,9 +770,9 @@ export const contentPostRelations = relations(
       fields: [contentPostTable.seriesId],
       references: [seriesTable.id],
     }),
-    initiative: one(initiativeTable, {
-      fields: [contentPostTable.initiativeId],
-      references: [initiativeTable.id],
+    initiative: one(campaignTable, {
+      fields: [contentPostTable.campaignId],
+      references: [campaignTable.id],
     }),
     owner: one(userTable, {
       fields: [contentPostTable.ownerId],
@@ -827,9 +827,9 @@ export const seriesRelations = relations(seriesTable, ({ one, many }) => ({
     fields: [seriesTable.brandId],
     references: [brandTable.id],
   }),
-  initiative: one(initiativeTable, {
-    fields: [seriesTable.initiativeId],
-    references: [initiativeTable.id],
+  initiative: one(campaignTable, {
+    fields: [seriesTable.campaignId],
+    references: [campaignTable.id],
   }),
   contentPosts: many(contentPostTable),
 }));

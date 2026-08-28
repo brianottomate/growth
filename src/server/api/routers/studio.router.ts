@@ -19,7 +19,7 @@ import {
   channelPlatformEnum,
   channelTable,
   contentPostTable,
-  initiativeTable,
+  campaignTable,
   memberTable,
   platformPostTable,
   seriesTable,
@@ -153,10 +153,10 @@ export const studioRouter = createTRPCRouter({
       });
 
       // Paid lane: initiatives overlapping the year.
-      const allInitiatives = await ctx.db.query.initiativeTable.findMany({
+      const allInitiatives = await ctx.db.query.campaignTable.findMany({
         where: and(
-          eq(initiativeTable.brandId, input.brandId),
-          isNull(initiativeTable.deletedAt),
+          eq(campaignTable.brandId, input.brandId),
+          isNull(campaignTable.deletedAt),
         ),
       });
       const initiatives = allInitiatives

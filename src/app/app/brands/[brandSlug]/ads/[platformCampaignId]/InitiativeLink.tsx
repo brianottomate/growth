@@ -16,11 +16,11 @@ import { useTRPC } from "@/trpc/react";
  */
 export function InitiativeLink({
   brandId,
-  campaignId,
+  platformCampaignId,
   initiative,
 }: {
   brandId: string;
-  campaignId: string;
+  platformCampaignId: string;
   initiative: { id: string; name: string } | null;
 }) {
   const trpc = useTRPC();
@@ -66,7 +66,7 @@ export function InitiativeLink({
         defaultValue=""
         onChange={(event) => {
           if (event.target.value) {
-            link.mutate({ campaignId, initiativeId: event.target.value });
+            link.mutate({ platformCampaignId, campaignId: event.target.value });
           }
         }}
       >
@@ -92,7 +92,7 @@ export function InitiativeLink({
         disabled={!newName.trim() || link.isPending}
         loading={link.isPending}
         onClick={() =>
-          link.mutate({ campaignId, newInitiativeName: newName.trim() })
+          link.mutate({ platformCampaignId, newInitiativeName: newName.trim() })
         }
       >
         Create & link

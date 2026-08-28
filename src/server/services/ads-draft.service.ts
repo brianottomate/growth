@@ -7,8 +7,8 @@ import {
   adSetTable,
   adSpotTable,
   brandTable,
+  platformCampaignTable,
   campaignTable,
-  initiativeTable,
   type MediaItem,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
@@ -54,11 +54,11 @@ async function requireOwnedBrand(input: {
 }
 
 async function requireOwnedInitiative(
-  initiativeId: string,
+  campaignId: string,
   organizationId: string,
 ) {
-  const initiative = await db.query.initiativeTable.findFirst({
-    where: eq(initiativeTable.id, initiativeId),
+  const initiative = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, campaignId),
   });
   if (!initiative) throw new Error("Campaign draft not found");
   const brand = await db.query.brandTable.findFirst({
@@ -92,7 +92,7 @@ export async function createDraftInitiative(input: {
   const brand = await requireOwnedBrand(input);
 
   const [initiative] = await db
-    .insert(initiativeTable)
+    .insert(campaignTable)
     .values({
       id: createId("init"),
       brandId: brand.id,
@@ -121,7 +121,7 @@ export async function createDraftInitiative(input: {
  */
 export async function addDraftAdSet(input: {
   organizationId: string;
-  initiativeId: string;
+  campaignId: string;
   name: string;
   audienceTargetId?: string | null;
   budget?: number | null;
@@ -129,7 +129,7 @@ export async function addDraftAdSet(input: {
   optimizationGoal?: string | null;
 }) {
   const { initiative, brand } = await requireOwnedInitiative(
-    input.initiativeId,
+    input.campaignId,
     input.organizationId,
   );
 
@@ -137,7 +137,7 @@ export async function addDraftAdSet(input: {
     .insert(adSetTable)
     .values({
       id: createId("adset"),
-      initiativeId: initiative.id,
+      campaignId: initiative.id,
       brandId: brand.id,
       name: input.name.trim(),
       audienceTargetId: input.audienceTargetId ?? null,
@@ -156,7 +156,7 @@ export async function addDraftAdSet(input: {
  */
 export async function addDraftAd(input: {
   organizationId: string;
-  initiativeId: string;
+  campaignId: string;
   adSetId?: string | null;
   name: string;
   headline?: string | null;
@@ -166,16 +166,16 @@ export async function addDraftAd(input: {
   businessKey?: string | null;
 }) {
   const { initiative, brand } = await requireOwnedInitiative(
-    input.initiativeId,
+    input.campaignId,
     input.organizationId,
   );
 
   if (input.adSetId) {
     const adSet = await db.query.adSetTable.findFirst({
       where: eq(adSetTable.id, input.adSetId),
-      columns: { initiativeId: true },
+      columns: { campaignId: true },
     });
-    if (adSet?.initiativeId !== initiative.id) {
+    if (adSet?.campaignId !== initiative.id) {
       throw new Error("That ad set belongs to a different campaign draft");
     }
   }
@@ -187,7 +187,7 @@ export async function addDraftAd(input: {
   const [spot] = await db
     .insert(adSpotTable)
     .values({
-      initiativeId: initiative.id,
+      campaignId: initiative.id,
       adSetRowId: input.adSetId ?? null,
       brandId: brand.id,
       // Platform is intent until the push; the initiative's targetChannels
@@ -207,21 +207,21 @@ export async function addDraftAd(input: {
 /** The whole draft, for the draft page. */
 export async function getDraftInitiative(
   organizationId: string,
-  initiativeId: string,
+  campaignId: string,
 ) {
   const { initiative, brand } = await requireOwnedInitiative(
-    initiativeId,
+    campaignId,
     organizationId,
   );
   const [adSets, spots, campaigns] = await Promise.all([
     db.query.adSetTable.findMany({
-      where: eq(adSetTable.initiativeId, initiative.id),
+      where: eq(adSetTable.campaignId, initiative.id),
     }),
     db.query.adSpotTable.findMany({
-      where: eq(adSpotTable.initiativeId, initiative.id),
+      where: eq(adSpotTable.campaignId, initiative.id),
     }),
-    db.query.campaignTable.findMany({
-      where: eq(campaignTable.initiativeId, initiative.id),
+    db.query.platformCampaignTable.findMany({
+      where: eq(platformCampaignTable.campaignId, initiative.id),
     }),
   ]);
   return { initiative, brand, adSets, spots, campaigns };
@@ -233,12 +233,12 @@ export async function getDraftInitiative(
  */
 export async function linkCampaignToInitiative(input: {
   organizationId: string;
-  campaignId: string;
-  initiativeId?: string | null;
+  platformCampaignId: string;
+  campaignId?: string | null;
   newInitiativeName?: string | null;
 }) {
-  const campaign = await db.query.campaignTable.findFirst({
-    where: eq(campaignTable.id, input.campaignId),
+  const campaign = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
   });
   if (!campaign) throw new Error("Campaign not found");
   const brand = await db.query.brandTable.findFirst({
@@ -249,36 +249,36 @@ export async function linkCampaignToInitiative(input: {
     throw new Error("No access to this campaign");
   }
 
-  let initiativeId = input.initiativeId ?? null;
-  if (initiativeId) {
-    const initiative = await db.query.initiativeTable.findFirst({
-      where: eq(initiativeTable.id, initiativeId),
+  let campaignId = input.campaignId ?? null;
+  if (campaignId) {
+    const initiative = await db.query.campaignTable.findFirst({
+      where: eq(campaignTable.id, campaignId),
       columns: { brandId: true },
     });
     if (initiative?.brandId !== brand.id) {
       throw new Error("That initiative does not belong to this brand");
     }
   }
-  if (!initiativeId && input.newInitiativeName?.trim()) {
+  if (!campaignId && input.newInitiativeName?.trim()) {
     const [initiative] = await db
-      .insert(initiativeTable)
+      .insert(campaignTable)
       .values({
         id: createId("init"),
         brandId: brand.id,
         name: input.newInitiativeName.trim(),
         status: "active",
       })
-      .returning({ id: initiativeTable.id });
-    initiativeId = initiative!.id;
+      .returning({ id: campaignTable.id });
+    campaignId = initiative!.id;
   }
 
   const [updated] = await db
-    .update(campaignTable)
-    .set({ initiativeId })
-    .where(eq(campaignTable.id, campaign.id))
+    .update(platformCampaignTable)
+    .set({ campaignId })
+    .where(eq(platformCampaignTable.id, campaign.id))
     .returning({
-      id: campaignTable.id,
-      initiativeId: campaignTable.initiativeId,
+      id: platformCampaignTable.id,
+      campaignId: platformCampaignTable.campaignId,
     });
   return updated!;
 }
@@ -295,9 +295,9 @@ export async function listBrandInitiatives(input: {
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this brand");
   }
-  return db.query.initiativeTable.findMany({
-    where: eq(initiativeTable.brandId, input.brandId),
-    orderBy: [desc(initiativeTable.createdAt)],
+  return db.query.campaignTable.findMany({
+    where: eq(campaignTable.brandId, input.brandId),
+    orderBy: [desc(campaignTable.createdAt)],
     columns: { id: true, name: true, status: true },
   });
 }

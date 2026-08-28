@@ -4,10 +4,10 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  type PlatformCampaign,
+  platformCampaignTable,
   type Campaign,
   campaignTable,
-  type Initiative,
-  initiativeTable,
 } from "@/server/db/schema";
 
 // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ import {
 // link/unlink mutation or a change made in the platform's own manager.
 // ---------------------------------------------------------------------------
 
-/** Campaign statuses that count as "delivering on the intent". */
+/** PlatformCampaign statuses that count as "delivering on the intent". */
 const FULFILLING_STATUSES = new Set(["live", "scheduled"]);
 
 export type ChannelVerdict =
@@ -32,7 +32,7 @@ export type AlignedCampaign = {
   id: string;
   name: string;
   platform: string;
-  status: Campaign["status"];
+  status: PlatformCampaign["status"];
   /** Precise spend from the latest Zernio snapshot when present, else the coarse column. */
   spend: number | undefined;
   budget: number | undefined;
@@ -52,9 +52,9 @@ export type CampaignSuggestion = AlignedCampaign & {
 };
 
 export type InitiativeAlignment = {
-  initiativeId: string;
+  campaignId: string;
   name: string;
-  status: Initiative["status"];
+  status: Campaign["status"];
   targetChannels: string[];
   channels: ChannelAlignment[];
   /** Linked campaigns running on platforms the initiative never asked for. */
@@ -75,11 +75,11 @@ export type InitiativeAlignment = {
 
 // ---- pure business rules (unit-tested through alignment outcomes; no db) ---
 
-function campaignSpend(c: Campaign): number | undefined {
+function campaignSpend(c: PlatformCampaign): number | undefined {
   return c.stats?.spend ?? c.spend ?? undefined;
 }
 
-function toAligned(c: Campaign): AlignedCampaign {
+function toAligned(c: PlatformCampaign): AlignedCampaign {
   return {
     id: c.id,
     name: c.name,
@@ -122,10 +122,10 @@ function windowsOverlap(
  */
 export function scoreSuggestion(
   initiative: Pick<
-    Initiative,
+    Campaign,
     "name" | "slug" | "goal" | "targetChannels" | "startAt" | "endAt"
   >,
-  campaign: Campaign,
+  campaign: PlatformCampaign,
 ): number | undefined {
   const intended = initiative.targetChannels ?? [];
   if (!intended.includes(campaign.platform)) return undefined;
@@ -146,9 +146,9 @@ export function scoreSuggestion(
 
 /** The pure diff: intent + linked reality + unlinked candidates → alignment. */
 export function diffInitiative(
-  initiative: Initiative,
-  linked: Campaign[],
-  unlinkedCandidates: Campaign[],
+  initiative: Campaign,
+  linked: PlatformCampaign[],
+  unlinkedCandidates: PlatformCampaign[],
 ): InitiativeAlignment {
   const targetChannels = initiative.targetChannels ?? [];
 
@@ -185,7 +185,7 @@ export function diffInitiative(
   const suggestions = unlinkedCandidates
     .map((c) => ({ campaign: c, score: scoreSuggestion(initiative, c) }))
     .filter(
-      (s): s is { campaign: Campaign; score: number } => s.score !== undefined,
+      (s): s is { campaign: PlatformCampaign; score: number } => s.score !== undefined,
     )
     .sort(
       (a, b) =>
@@ -196,7 +196,7 @@ export function diffInitiative(
     .map((s) => ({ ...toAligned(s.campaign), score: s.score }));
 
   return {
-    initiativeId: initiative.id,
+    campaignId: initiative.id,
     name: initiative.name,
     status: initiative.status,
     targetChannels,
@@ -219,24 +219,24 @@ export function diffInitiative(
 
 /** Full alignment for one initiative (detail page / capability). */
 export async function computeInitiativeAlignment(
-  initiativeId: string,
+  campaignId: string,
 ): Promise<InitiativeAlignment> {
-  const initiative = await db.query.initiativeTable.findFirst({
+  const initiative = await db.query.campaignTable.findFirst({
     where: and(
-      eq(initiativeTable.id, initiativeId),
-      isNull(initiativeTable.deletedAt),
+      eq(campaignTable.id, campaignId),
+      isNull(campaignTable.deletedAt),
     ),
   });
-  if (!initiative) throw new Error(`Initiative ${initiativeId} not found`);
+  if (!initiative) throw new Error(`Campaign ${campaignId} not found`);
 
   const [linked, unlinked] = await Promise.all([
-    db.query.campaignTable.findMany({
-      where: eq(campaignTable.initiativeId, initiativeId),
+    db.query.platformCampaignTable.findMany({
+      where: eq(platformCampaignTable.campaignId, campaignId),
     }),
-    db.query.campaignTable.findMany({
+    db.query.platformCampaignTable.findMany({
       where: and(
-        eq(campaignTable.brandId, initiative.brandId),
-        isNull(campaignTable.initiativeId),
+        eq(platformCampaignTable.brandId, initiative.brandId),
+        isNull(platformCampaignTable.campaignId),
       ),
     }),
   ]);
@@ -245,9 +245,9 @@ export async function computeInitiativeAlignment(
 }
 
 export type AlignmentOverviewRow = {
-  initiativeId: string;
+  campaignId: string;
   name: string;
-  status: Initiative["status"];
+  status: Campaign["status"];
   missingChannels: string[];
   inactiveChannels: string[];
   unplannedCount: number;
@@ -262,25 +262,25 @@ export async function computeAlignmentOverview(
 ): Promise<AlignmentOverviewRow[]> {
   if (brandIds.length === 0) return [];
 
-  const initiatives = await db.query.initiativeTable.findMany({
+  const initiatives = await db.query.campaignTable.findMany({
     where: and(
-      inArray(initiativeTable.brandId, brandIds),
-      isNull(initiativeTable.deletedAt),
-      inArray(initiativeTable.status, ["planned", "active", "paused"]),
+      inArray(campaignTable.brandId, brandIds),
+      isNull(campaignTable.deletedAt),
+      inArray(campaignTable.status, ["planned", "active", "paused"]),
     ),
   });
   if (initiatives.length === 0) return [];
 
-  const campaigns = await db.query.campaignTable.findMany({
-    where: inArray(campaignTable.brandId, brandIds),
+  const campaigns = await db.query.platformCampaignTable.findMany({
+    where: inArray(platformCampaignTable.brandId, brandIds),
   });
-  const linkedByInitiative = new Map<string, Campaign[]>();
-  const unlinkedByBrand = new Map<string, Campaign[]>();
+  const linkedByInitiative = new Map<string, PlatformCampaign[]>();
+  const unlinkedByBrand = new Map<string, PlatformCampaign[]>();
   for (const c of campaigns) {
-    if (c.initiativeId) {
-      const arr = linkedByInitiative.get(c.initiativeId) ?? [];
+    if (c.campaignId) {
+      const arr = linkedByInitiative.get(c.campaignId) ?? [];
       arr.push(c);
-      linkedByInitiative.set(c.initiativeId, arr);
+      linkedByInitiative.set(c.campaignId, arr);
     } else {
       const arr = unlinkedByBrand.get(c.brandId) ?? [];
       arr.push(c);
@@ -295,7 +295,7 @@ export async function computeAlignmentOverview(
       unlinkedByBrand.get(i.brandId) ?? [],
     );
     return {
-      initiativeId: i.id,
+      campaignId: i.id,
       name: i.name,
       status: i.status,
       missingChannels: alignment.channels

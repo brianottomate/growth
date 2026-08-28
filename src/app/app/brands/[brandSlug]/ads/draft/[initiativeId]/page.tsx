@@ -8,8 +8,8 @@ import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { getDraftInitiative } from "@/server/services/ads-draft.service";
 
-import { AddAdButton } from "../../[campaignId]/AddAdButton";
-import { PushToPlatform } from "../../[campaignId]/PushToPlatform";
+import { AddAdButton } from "../../[platformCampaignId]/AddAdButton";
+import { PushToPlatform } from "../../[platformCampaignId]/PushToPlatform";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +24,9 @@ const money = (n: number | null | undefined) =>
 export default async function CampaignDraftPage({
   params,
 }: {
-  params: Promise<{ brandSlug: string; initiativeId: string }>;
+  params: Promise<{ brandSlug: string; campaignId: string }>;
 }) {
-  const { brandSlug, initiativeId } = await params;
+  const { brandSlug, campaignId } = await params;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -37,7 +37,7 @@ export default async function CampaignDraftPage({
   const org = membership?.organization;
   if (!org) notFound();
 
-  const draft = await getDraftInitiative(org.id, initiativeId).catch(
+  const draft = await getDraftInitiative(org.id, campaignId).catch(
     () => null,
   );
   if (draft?.brand.slug !== brandSlug) notFound();
@@ -89,12 +89,12 @@ export default async function CampaignDraftPage({
           </div>
           <div className="flex items-center gap-2">
             <AddAdButton
-              initiativeId={initiative.id}
+              campaignId={initiative.id}
               brandId={draft.brand.id}
             />
             {spots.length > 0 && (
               <PushToPlatform
-                initiativeId={initiative.id}
+                campaignId={initiative.id}
                 brandSlug={brandSlug}
                 spotCount={spots.length}
                 defaultBudget={initiative.budget}

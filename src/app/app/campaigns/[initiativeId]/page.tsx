@@ -12,17 +12,17 @@ export const metadata: Metadata = {
 export default async function CampaignDetailPage({
   params,
 }: {
-  params: Promise<{ initiativeId: string }>;
+  params: Promise<{ campaignId: string }>;
 }) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
-  const { initiativeId } = await params;
+  const { campaignId } = await params;
 
-  prefetch(trpc.initiative.get.queryOptions({ id: initiativeId }));
+  prefetch(trpc.initiative.get.queryOptions({ id: campaignId }));
 
   return (
     <HydrateClient>
-      <CampaignDetail initiativeId={initiativeId} />
+      <CampaignDetail campaignId={campaignId} />
     </HydrateClient>
   );
 }

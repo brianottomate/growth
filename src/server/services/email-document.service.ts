@@ -23,7 +23,7 @@ import {
   emailDocumentTable,
   emailDocumentVersionTable,
   emailGenerationJobTable,
-  initiativeTable,
+  campaignTable,
   messageSendTable,
   platformPostTable,
   seriesTable,
@@ -311,7 +311,7 @@ export async function createEmailSlot(input: {
   ctaText?: string;
   pillar?: string;
   seriesId?: string;
-  initiativeId?: string;
+  campaignId?: string;
   plannedAt?: string;
 }) {
   const [brand, series, initiative, newsletterChannel] = await Promise.all([
@@ -331,12 +331,12 @@ export async function createEmailSlot(input: {
           ),
         })
       : null,
-    input.initiativeId
-      ? db.query.initiativeTable.findFirst({
+    input.campaignId
+      ? db.query.campaignTable.findFirst({
           where: and(
-            eq(initiativeTable.id, input.initiativeId),
-            eq(initiativeTable.brandId, input.brandId),
-            isNull(initiativeTable.deletedAt),
+            eq(campaignTable.id, input.campaignId),
+            eq(campaignTable.brandId, input.brandId),
+            isNull(campaignTable.deletedAt),
           ),
         })
       : null,
@@ -353,7 +353,7 @@ export async function createEmailSlot(input: {
   if (!brand) throw new Error("Brand not found in this workspace.");
   if (input.seriesId && !series)
     throw new Error("Series not found for this brand.");
-  if (input.initiativeId && !initiative) {
+  if (input.campaignId && !initiative) {
     throw new Error("Initiative not found for this brand.");
   }
   const plannedAt = input.plannedAt ? new Date(input.plannedAt) : null;
@@ -373,7 +373,7 @@ export async function createEmailSlot(input: {
         ctaText: input.ctaText,
         pillar,
         seriesId: series?.id,
-        initiativeId: initiative?.id,
+        campaignId: initiative?.id,
         plannedAt,
         status: "slot",
         slotKind: series || initiative ? "anchored" : "freeflow",

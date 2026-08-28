@@ -7,9 +7,9 @@ import { db } from "@/server/db";
 import {
   adSpotTable,
   amplificationTargetTable,
-  campaignTable,
+  platformCampaignTable,
   funnelStateTable,
-  initiativeTable,
+  campaignTable,
   lifecycleCampaignTable,
   performanceAccountTable,
   performanceCycleTable,
@@ -125,8 +125,8 @@ export const attachToPerformanceCycleSchema = z.object({
     .nullable()
     .describe("Target cycle, or null to detach."),
   kind: z.enum([
-    "initiative",
     "campaign",
+    "platformCampaign",
     "lifecycleCampaign",
     "amplificationTarget",
   ]),
@@ -219,9 +219,9 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
     };
     const [initiatives, campaigns, amplifications] = await Promise.all([
       db
-        .select({ cycleId: initiativeTable.performanceCycleId })
-        .from(initiativeTable)
-        .where(inArray(initiativeTable.performanceCycleId, cycleIds)),
+        .select({ cycleId: campaignTable.performanceCycleId })
+        .from(campaignTable)
+        .where(inArray(campaignTable.performanceCycleId, cycleIds)),
       db
         .select({ cycleId: lifecycleCampaignTable.performanceCycleId })
         .from(lifecycleCampaignTable)
@@ -296,14 +296,14 @@ export async function getPerformanceAccount(
       : await Promise.all([
           db
             .select({
-              id: initiativeTable.id,
-              name: initiativeTable.name,
-              status: initiativeTable.status,
-              budget: initiativeTable.budget,
-              performanceCycleId: initiativeTable.performanceCycleId,
+              id: campaignTable.id,
+              name: campaignTable.name,
+              status: campaignTable.status,
+              budget: campaignTable.budget,
+              performanceCycleId: campaignTable.performanceCycleId,
             })
-            .from(initiativeTable)
-            .where(inArray(initiativeTable.performanceCycleId, cycleIds)),
+            .from(campaignTable)
+            .where(inArray(campaignTable.performanceCycleId, cycleIds)),
           db
             .select({
               id: lifecycleCampaignTable.id,
@@ -337,18 +337,18 @@ export async function getPerformanceAccount(
       ? []
       : await db
           .select({
-            id: campaignTable.id,
-            name: campaignTable.name,
-            status: campaignTable.status,
-            platform: campaignTable.platform,
-            spend: campaignTable.spend,
-            stats: campaignTable.stats,
-            manageUrl: campaignTable.manageUrl,
-            heroThumbnailUrl: campaignTable.heroThumbnailUrl,
-            initiativeId: campaignTable.initiativeId,
+            id: platformCampaignTable.id,
+            name: platformCampaignTable.name,
+            status: platformCampaignTable.status,
+            platform: platformCampaignTable.platform,
+            spend: platformCampaignTable.spend,
+            stats: platformCampaignTable.stats,
+            manageUrl: platformCampaignTable.manageUrl,
+            heroThumbnailUrl: platformCampaignTable.heroThumbnailUrl,
+            campaignId: platformCampaignTable.campaignId,
           })
-          .from(campaignTable)
-          .where(inArray(campaignTable.initiativeId, initiativeIds));
+          .from(platformCampaignTable)
+          .where(inArray(platformCampaignTable.campaignId, initiativeIds));
   const campaignIds = campaigns.map((row) => row.id);
   const ads =
     campaignIds.length === 0
@@ -356,7 +356,7 @@ export async function getPerformanceAccount(
       : await db
           .select({
             id: adSpotTable.id,
-            campaignId: adSpotTable.campaignId,
+            platformCampaignId: adSpotTable.platformCampaignId,
             name: adSpotTable.name,
             status: adSpotTable.status,
             adSetName: adSpotTable.adSetName,
@@ -367,7 +367,7 @@ export async function getPerformanceAccount(
             businessKey: adSpotTable.businessKey,
           })
           .from(adSpotTable)
-          .where(inArray(adSpotTable.campaignId, campaignIds));
+          .where(inArray(adSpotTable.platformCampaignId, campaignIds));
 
   return {
     account,
@@ -500,32 +500,32 @@ export async function searchAttachableCampaigns(
 ) {
   const rows = await db
     .select({
-      id: campaignTable.id,
-      name: campaignTable.name,
-      platform: campaignTable.platform,
-      status: campaignTable.status,
-      spend: campaignTable.spend,
-      stats: campaignTable.stats,
-      startAt: campaignTable.startAt,
-      externalId: campaignTable.externalId,
-      heroThumbnailUrl: campaignTable.heroThumbnailUrl,
-      initiativeId: campaignTable.initiativeId,
-      initiativeCycleId: initiativeTable.performanceCycleId,
+      id: platformCampaignTable.id,
+      name: platformCampaignTable.name,
+      platform: platformCampaignTable.platform,
+      status: platformCampaignTable.status,
+      spend: platformCampaignTable.spend,
+      stats: platformCampaignTable.stats,
+      startAt: platformCampaignTable.startAt,
+      externalId: platformCampaignTable.externalId,
+      heroThumbnailUrl: platformCampaignTable.heroThumbnailUrl,
+      campaignId: platformCampaignTable.campaignId,
+      initiativeCycleId: campaignTable.performanceCycleId,
     })
-    .from(campaignTable)
-    .leftJoin(initiativeTable, eq(initiativeTable.id, campaignTable.initiativeId))
+    .from(platformCampaignTable)
+    .leftJoin(campaignTable, eq(campaignTable.id, platformCampaignTable.campaignId))
     .where(
       and(
-        isNull(initiativeTable.performanceCycleId),
+        isNull(campaignTable.performanceCycleId),
         input.query
-          ? ilike(campaignTable.name, `%${input.query}%`)
+          ? ilike(platformCampaignTable.name, `%${input.query}%`)
           : undefined,
         input.platform
-          ? eq(campaignTable.platform, input.platform as "meta_ads")
+          ? eq(platformCampaignTable.platform, input.platform as "meta_ads")
           : undefined,
       ),
     )
-    .orderBy(desc(campaignTable.startAt))
+    .orderBy(desc(platformCampaignTable.startAt))
     .limit(input.limit);
   return { campaigns: rows };
 }
@@ -541,13 +541,13 @@ export async function searchAttachableCampaigns(
  */
 export async function recomputePerformanceCycleSpend(cycleId: string) {
   const campaigns = await db
-    .select({ spend: campaignTable.spend, stats: campaignTable.stats })
-    .from(campaignTable)
+    .select({ spend: platformCampaignTable.spend, stats: platformCampaignTable.stats })
+    .from(platformCampaignTable)
     .innerJoin(
-      initiativeTable,
-      eq(initiativeTable.id, campaignTable.initiativeId),
+      campaignTable,
+      eq(campaignTable.id, platformCampaignTable.campaignId),
     )
-    .where(eq(initiativeTable.performanceCycleId, cycleId));
+    .where(eq(campaignTable.performanceCycleId, cycleId));
 
   const cents = campaigns.reduce((total, row) => {
     const precise = row.stats?.spend;
@@ -596,15 +596,15 @@ export async function attachToPerformanceCycle(
   // A platform campaign has no cycle FK of its own — it reaches a cycle through
   // its initiative. Synced campaigns have no initiative at all, so attaching
   // one mints a wrapper initiative for the cycle and reuses it thereafter.
-  if (input.kind === "campaign") {
+  if (input.kind === "platformCampaign") {
     return attachCampaignToCycle(actor, input.cycleId, input.id);
   }
 
   const target = {
-    initiative: {
-      table: initiativeTable,
-      idColumn: initiativeTable.id,
-      cycleColumn: initiativeTable.performanceCycleId,
+    campaign: {
+      table: campaignTable,
+      idColumn: campaignTable.id,
+      cycleColumn: campaignTable.performanceCycleId,
     },
     lifecycleCampaign: {
       table: lifecycleCampaignTable,
@@ -649,32 +649,32 @@ const cycleWrapperSlug = (cycleId: string) => `perf-cycle-${cycleId}`;
 async function attachCampaignToCycle(
   actor: PerformanceActor,
   cycleId: string | null,
-  campaignId: string,
+  platformCampaignId: string,
 ) {
-  const campaign = await db.query.campaignTable.findFirst({
-    where: eq(campaignTable.id, campaignId),
+  const campaign = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, platformCampaignId),
     columns: {
       id: true,
       name: true,
       brandId: true,
       platform: true,
-      initiativeId: true,
+      campaignId: true,
       budget: true,
       startAt: true,
       endAt: true,
     },
   });
   if (!campaign) {
-    throw new PerformanceError("NOT_FOUND", `Campaign not found: ${campaignId}`);
+    throw new PerformanceError("NOT_FOUND", `Campaign not found: ${platformCampaignId}`);
   }
 
   // Detach: clear the campaign's link to a cycle-owned wrapper. A campaign
   // whose initiative is a real strategic push is left alone — detaching must
   // not silently orphan Wander's own campaign from its initiative.
   if (!cycleId) {
-    const current = campaign.initiativeId
-      ? await db.query.initiativeTable.findFirst({
-          where: eq(initiativeTable.id, campaign.initiativeId),
+    const current = campaign.campaignId
+      ? await db.query.campaignTable.findFirst({
+          where: eq(campaignTable.id, campaign.campaignId),
           columns: { id: true, slug: true, performanceCycleId: true },
         })
       : null;
@@ -684,35 +684,35 @@ async function attachCampaignToCycle(
         current.slug === cycleWrapperSlug(current.performanceCycleId);
       if (isWrapper) {
         await db
-          .update(campaignTable)
-          .set({ initiativeId: null })
-          .where(eq(campaignTable.id, campaignId));
+          .update(platformCampaignTable)
+          .set({ campaignId: null })
+          .where(eq(platformCampaignTable.id, platformCampaignId));
         // A wrapper exists only to carry campaigns. Left on the cycle once its
         // last campaign detaches it renders as an empty delivery row, so it
         // comes off the cycle with the campaign it was minted for.
         const siblings = await db
-          .select({ id: campaignTable.id })
-          .from(campaignTable)
-          .where(eq(campaignTable.initiativeId, current.id))
+          .select({ id: platformCampaignTable.id })
+          .from(platformCampaignTable)
+          .where(eq(platformCampaignTable.campaignId, current.id))
           .limit(1);
         if (siblings.length === 0) {
           await db
-            .update(initiativeTable)
+            .update(campaignTable)
             .set({ performanceCycleId: null, status: "archived" })
-            .where(eq(initiativeTable.id, current.id));
+            .where(eq(campaignTable.id, current.id));
         }
       }
       await recomputePerformanceCycleSpend(current.performanceCycleId);
       return {
-        kind: "campaign" as const,
-        id: campaignId,
+        kind: "platformCampaign" as const,
+        id: platformCampaignId,
         performanceCycleId: null,
         detachedFromWrapper: isWrapper,
       };
     }
     return {
-      kind: "campaign" as const,
-      id: campaignId,
+      kind: "platformCampaign" as const,
+      id: platformCampaignId,
       performanceCycleId: null,
       detachedFromWrapper: false,
     };
@@ -722,32 +722,32 @@ async function attachCampaignToCycle(
 
   // Already has an initiative: put that initiative on the cycle rather than
   // rewriting the campaign's parent, so an existing push keeps its grouping.
-  if (campaign.initiativeId) {
+  if (campaign.campaignId) {
     await db
-      .update(initiativeTable)
+      .update(campaignTable)
       .set({ performanceCycleId: cycleId })
-      .where(eq(initiativeTable.id, campaign.initiativeId));
+      .where(eq(campaignTable.id, campaign.campaignId));
     const spend = await recomputePerformanceCycleSpend(cycleId);
     return {
-      kind: "campaign" as const,
-      id: campaignId,
+      kind: "platformCampaign" as const,
+      id: platformCampaignId,
       performanceCycleId: cycleId,
-      initiativeId: campaign.initiativeId,
+      campaignId: campaign.campaignId,
       createdWrapper: false,
       actualSpendCents: spend.actualSpendCents,
     };
   }
 
   const slug = cycleWrapperSlug(cycleId);
-  const existing = await db.query.initiativeTable.findFirst({
-    where: eq(initiativeTable.slug, slug),
+  const existing = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.slug, slug),
     columns: { id: true },
   });
   const wrapperId =
     existing?.id ??
     (
       await db
-        .insert(initiativeTable)
+        .insert(campaignTable)
         .values({
           brandId: campaign.brandId,
           name: `Performance+ · ${cycle.period}`,
@@ -761,24 +761,24 @@ async function attachCampaignToCycle(
           startAt: campaign.startAt,
           endAt: campaign.endAt,
         })
-        .returning({ id: initiativeTable.id })
+        .returning({ id: campaignTable.id })
     )[0]!.id;
 
   await db
-    .update(initiativeTable)
-    .set({ performanceCycleId: cycleId })
-    .where(eq(initiativeTable.id, wrapperId));
-  await db
     .update(campaignTable)
-    .set({ initiativeId: wrapperId })
-    .where(eq(campaignTable.id, campaignId));
+    .set({ performanceCycleId: cycleId })
+    .where(eq(campaignTable.id, wrapperId));
+  await db
+    .update(platformCampaignTable)
+    .set({ campaignId: wrapperId })
+    .where(eq(platformCampaignTable.id, platformCampaignId));
 
   const spend = await recomputePerformanceCycleSpend(cycleId);
   return {
-    kind: "campaign" as const,
-    id: campaignId,
+    kind: "platformCampaign" as const,
+    id: platformCampaignId,
     performanceCycleId: cycleId,
-    initiativeId: wrapperId,
+    campaignId: wrapperId,
     createdWrapper: !existing,
     actualSpendCents: spend.actualSpendCents,
   };

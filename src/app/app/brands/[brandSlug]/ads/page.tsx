@@ -8,10 +8,10 @@ import {
   adSpotTable,
   audienceTable,
   brandTable,
-  type Campaign,
-  campaignTable,
+  type PlatformCampaign,
+  platformCampaignTable,
   channelTable,
-  initiativeTable,
+  campaignTable,
   memberTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
@@ -56,7 +56,7 @@ function CampaignRow({
   spots,
   brandSlug,
 }: {
-  c: Campaign;
+  c: PlatformCampaign;
   spots: AdSpot[];
   brandSlug: string;
 }) {
@@ -189,14 +189,14 @@ export default async function BrandAdsPage({
   const channels = await db.query.channelTable.findMany({
     where: and(eq(channelTable.brandId, brand.id), eq(channelTable.kind, "ad")),
   });
-  const campaigns = await db.query.campaignTable.findMany({
-    where: eq(campaignTable.brandId, brand.id),
+  const campaigns = await db.query.platformCampaignTable.findMany({
+    where: eq(platformCampaignTable.brandId, brand.id),
   });
   const audiences = await db.query.audienceTable.findMany({
     where: eq(audienceTable.brandId, brand.id),
   });
-  const initiatives = await db.query.initiativeTable.findMany({
-    where: eq(initiativeTable.brandId, brand.id),
+  const initiatives = await db.query.campaignTable.findMany({
+    where: eq(campaignTable.brandId, brand.id),
   });
   const adSpots = await db.query.adSpotTable.findMany({
     where: eq(adSpotTable.brandId, brand.id),
@@ -206,10 +206,10 @@ export default async function BrandAdsPage({
   const campaignsByInitiative = new Map<string, typeof campaigns>();
   const ungroupedCampaigns: typeof campaigns = [];
   for (const c of campaigns) {
-    if (c.initiativeId) {
-      const list = campaignsByInitiative.get(c.initiativeId) ?? [];
+    if (c.campaignId) {
+      const list = campaignsByInitiative.get(c.campaignId) ?? [];
       list.push(c);
-      campaignsByInitiative.set(c.initiativeId, list);
+      campaignsByInitiative.set(c.campaignId, list);
     } else {
       ungroupedCampaigns.push(c);
     }
@@ -218,10 +218,10 @@ export default async function BrandAdsPage({
   // the draft page, not here.
   const spotsByCampaign = new Map<string, typeof adSpots>();
   for (const s of adSpots) {
-    if (!s.campaignId) continue;
-    const list = spotsByCampaign.get(s.campaignId) ?? [];
+    if (!s.platformCampaignId) continue;
+    const list = spotsByCampaign.get(s.platformCampaignId) ?? [];
     list.push(s);
-    spotsByCampaign.set(s.campaignId, list);
+    spotsByCampaign.set(s.platformCampaignId, list);
   }
   const initiativeSpend = (initId: string) =>
     (campaignsByInitiative.get(initId) ?? []).reduce(

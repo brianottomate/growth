@@ -26,14 +26,14 @@ import type {
 
 // ---- ENUMS ---------------------------------------------------------
 
-export const campaignStatusEnum = pgEnum("campaign_status", [
+export const platformCampaignStatusEnum = pgEnum("platform_campaign_status", [
   "draft",
   "scheduled",
   "live",
   "paused",
   "ended",
 ]);
-export type CampaignStatus = (typeof campaignStatusEnum.enumValues)[number];
+export type PlatformCampaignStatus = (typeof platformCampaignStatusEnum.enumValues)[number];
 
 export const audienceTypeEnum = pgEnum("audience_type", [
   "segment",
@@ -116,22 +116,22 @@ export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
  * verifies them against `targetChannels`. The paid counterpart of a
  * `content_post` (one intent → many platform executions).
  */
-export const initiativeStatusEnum = pgEnum("initiative_status", [
+export const campaignStatusEnum = pgEnum("campaign_status", [
   "planned",
   "active",
   "paused",
   "completed",
   "archived",
 ]);
-export type InitiativeStatus = (typeof initiativeStatusEnum.enumValues)[number];
+export type CampaignStatus = (typeof campaignStatusEnum.enumValues)[number];
 
-export const initiativeTable = pgTable(
-  "initiative",
+export const campaignTable = pgTable(
+  "campaign",
   (t) => ({
     id: t
       .text()
       .primaryKey()
-      .$defaultFn(() => createId("init")),
+      .$defaultFn(() => createId("camp")),
 
     brandId: t
       .text()
@@ -148,7 +148,7 @@ export const initiativeTable = pgTable(
     description: t.text(),
     color: t.text(), // UI accent (hex), used for feed bands
 
-    status: initiativeStatusEnum().default("active").notNull(),
+    status: campaignStatusEnum().default("active").notNull(),
 
     // Channels the CMO wants this to run on (platform slugs). The per-channel
     // `campaign` rows are the implementations we verify against this list.
@@ -178,24 +178,24 @@ export const initiativeTable = pgTable(
     deletedAt: t.timestamp(),
   }),
   (table) => [
-    index("initiative_brand_idx").on(table.brandId),
-    index("initiative_status_idx").on(table.status),
-    index("initiative_performance_cycle_idx").on(table.performanceCycleId),
+    index("campaign_brand_idx").on(table.brandId),
+    index("campaign_status_idx").on(table.status),
+    index("campaign_performance_cycle_idx").on(table.performanceCycleId),
   ],
 );
 
-export type Initiative = typeof initiativeTable.$inferSelect;
-export type InitiativeInsert = typeof initiativeTable.$inferInsert;
+export type Campaign = typeof campaignTable.$inferSelect;
+export type CampaignInsert = typeof campaignTable.$inferInsert;
 
 // ---- CAMPAIGN ------------------------------------------------------
 
-export const campaignTable = pgTable(
-  "campaign",
+export const platformCampaignTable = pgTable(
+  "platform_campaign",
   (t) => ({
     id: t
       .text()
       .primaryKey()
-      .$defaultFn(() => createId("camp")),
+      .$defaultFn(() => createId("pcamp")),
 
     // Canonical parent: the ad account it runs on. brandId is a denormalized
     // convenience for brand-scoped queries (a channel's brand never changes).
@@ -210,12 +210,12 @@ export const campaignTable = pgTable(
     platform: channelPlatformEnum().notNull(), // badge; denormalized from channel
 
     // Optional parent push this per-channel campaign implements.
-    initiativeId: t
+    campaignId: t
       .text()
-      .references(() => initiativeTable.id, { onDelete: "set null" }),
+      .references(() => campaignTable.id, { onDelete: "set null" }),
 
     name: t.text().notNull(),
-    status: campaignStatusEnum().default("draft").notNull(),
+    status: platformCampaignStatusEnum().default("draft").notNull(),
     objective: t.text(),
 
     startAt: t.timestamp({ withTimezone: true }),
@@ -246,15 +246,15 @@ export const campaignTable = pgTable(
       .notNull(),
   }),
   (table) => [
-    index("campaign_brand_idx").on(table.brandId),
-    index("campaign_channel_idx").on(table.channelId),
-    index("campaign_status_idx").on(table.status),
-    index("campaign_initiative_idx").on(table.initiativeId),
+    index("platform_campaign_brand_idx").on(table.brandId),
+    index("platform_campaign_channel_idx").on(table.channelId),
+    index("platform_campaign_status_idx").on(table.status),
+    index("platform_campaign_campaign_idx").on(table.campaignId),
   ],
 );
 
-export type Campaign = typeof campaignTable.$inferSelect;
-export type CampaignInsert = typeof campaignTable.$inferInsert;
+export type PlatformCampaign = typeof platformCampaignTable.$inferSelect;
+export type PlatformCampaignInsert = typeof platformCampaignTable.$inferInsert;
 
 // ---- AD SPOT (one creative under a campaign; mirrors a Zernio Ad) ----
 
@@ -297,16 +297,16 @@ export const adSetTable = pgTable(
 
     /**
      * The first-party push this ad set belongs to. Drafts hang off the
-     * initiative alone; `campaignId` is stamped when the push creates the
+     * initiative alone; `platformCampaignId` is stamped when the push creates the
      * per-platform campaign.
      */
-    initiativeId: t
-      .text()
-      .references(() => initiativeTable.id, { onDelete: "cascade" }),
-    /** The per-platform campaign, once this ad set exists on a platform. */
     campaignId: t
       .text()
       .references(() => campaignTable.id, { onDelete: "cascade" }),
+    /** The per-platform campaign, once this ad set exists on a platform. */
+    platformCampaignId: t
+      .text()
+      .references(() => platformCampaignTable.id, { onDelete: "cascade" }),
     brandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
@@ -348,12 +348,12 @@ export const adSetTable = pgTable(
       .$onUpdate(() => new Date()),
   }),
   (table) => [
-    index("ad_set_campaign_idx").on(table.campaignId),
-    index("ad_set_initiative_idx").on(table.initiativeId),
+    index("ad_set_campaign_idx").on(table.platformCampaignId),
+    index("ad_set_initiative_idx").on(table.campaignId),
     index("ad_set_brand_idx").on(table.brandId),
     check(
       "ad_set_parent_check",
-      sql`${table.initiativeId} IS NOT NULL OR ${table.campaignId} IS NOT NULL`,
+      sql`${table.campaignId} IS NOT NULL OR ${table.platformCampaignId} IS NOT NULL`,
     ),
     index("ad_set_audience_target_idx").on(table.audienceTargetId),
     uniqueIndex("ad_set_external_id_idx")
@@ -373,13 +373,13 @@ export const adSpotTable = pgTable(
       .$defaultFn(() => createId("ad")),
 
     /** First-party push, for ads drafted before any platform campaign exists. */
-    initiativeId: t
-      .text()
-      .references(() => initiativeTable.id, { onDelete: "cascade" }),
-    /** Per-platform campaign; stamped by the push, set by sync. */
     campaignId: t
       .text()
       .references(() => campaignTable.id, { onDelete: "cascade" }),
+    /** Per-platform campaign; stamped by the push, set by sync. */
+    platformCampaignId: t
+      .text()
+      .references(() => platformCampaignTable.id, { onDelete: "cascade" }),
     channelId: t
       .text()
       .references(() => channelTable.id, { onDelete: "set null" }),
@@ -444,7 +444,7 @@ export const adSpotTable = pgTable(
       .notNull(),
   }),
   (table) => [
-    index("ad_spot_campaign_idx").on(table.campaignId),
+    index("ad_spot_campaign_idx").on(table.platformCampaignId),
     index("ad_spot_brand_idx").on(table.brandId),
     index("ad_spot_status_idx").on(table.status),
     uniqueIndex("ad_spot_business_key_idx")
@@ -687,9 +687,9 @@ export const audiencePlacementTable = pgTable(
       .text()
       .references(() => audienceTable.id, { onDelete: "cascade" })
       .notNull(),
-    campaignId: t
+    platformCampaignId: t
       .text()
-      .references(() => campaignTable.id, { onDelete: "cascade" })
+      .references(() => platformCampaignTable.id, { onDelete: "cascade" })
       .notNull(),
     adSetId: t.text(),
     adSetName: t.text(),
@@ -708,43 +708,43 @@ export const audiencePlacementTable = pgTable(
   }),
   (table) => [
     index("audience_placement_audience_idx").on(table.audienceId),
-    index("audience_placement_campaign_idx").on(table.campaignId),
+    index("audience_placement_campaign_idx").on(table.platformCampaignId),
   ],
 );
 
 // ---- RELATIONS -----------------------------------------------------
 
 export const initiativeRelations = relations(
-  initiativeTable,
+  campaignTable,
   ({ one, many }) => ({
     brand: one(brandTable, {
-      fields: [initiativeTable.brandId],
+      fields: [campaignTable.brandId],
       references: [brandTable.id],
     }),
-    campaigns: many(campaignTable),
+    campaigns: many(platformCampaignTable),
   }),
 );
 
-export const campaignRelations = relations(campaignTable, ({ one, many }) => ({
+export const campaignRelations = relations(platformCampaignTable, ({ one, many }) => ({
   brand: one(brandTable, {
-    fields: [campaignTable.brandId],
+    fields: [platformCampaignTable.brandId],
     references: [brandTable.id],
   }),
   channel: one(channelTable, {
-    fields: [campaignTable.channelId],
+    fields: [platformCampaignTable.channelId],
     references: [channelTable.id],
   }),
-  initiative: one(initiativeTable, {
-    fields: [campaignTable.initiativeId],
-    references: [initiativeTable.id],
+  initiative: one(campaignTable, {
+    fields: [platformCampaignTable.campaignId],
+    references: [campaignTable.id],
   }),
   adSpots: many(adSpotTable),
 }));
 
 export const adSpotRelations = relations(adSpotTable, ({ one }) => ({
-  campaign: one(campaignTable, {
-    fields: [adSpotTable.campaignId],
-    references: [campaignTable.id],
+  campaign: one(platformCampaignTable, {
+    fields: [adSpotTable.platformCampaignId],
+    references: [platformCampaignTable.id],
   }),
   brand: one(brandTable, {
     fields: [adSpotTable.brandId],
@@ -811,9 +811,9 @@ export const audiencePlacementRelations = relations(
       fields: [audiencePlacementTable.audienceId],
       references: [audienceTable.id],
     }),
-    campaign: one(campaignTable, {
-      fields: [audiencePlacementTable.campaignId],
-      references: [campaignTable.id],
+    campaign: one(platformCampaignTable, {
+      fields: [audiencePlacementTable.platformCampaignId],
+      references: [platformCampaignTable.id],
     }),
   }),
 );

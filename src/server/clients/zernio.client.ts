@@ -871,7 +871,7 @@ export async function listZernioAdAccounts(options: {
  * https://docs.zernio.com/ads/campaign-status
  */
 export async function setZernioCampaignStatus(input: {
-  campaignId: string;
+  platformCampaignId: string;
   status: "active" | "paused";
   platform?: string;
 }): Promise<{
@@ -881,7 +881,7 @@ export async function setZernioCampaignStatus(input: {
   skippedReasons?: Record<string, unknown>;
   message?: string;
 }> {
-  return zernioFetch(`/ads/campaigns/${input.campaignId}/status`, {
+  return zernioFetch(`/ads/campaigns/${input.platformCampaignId}/status`, {
     method: "PUT",
     body: JSON.stringify({
       status: input.status,
@@ -1048,7 +1048,7 @@ export type DuplicateZernioMetaCampaignResponse = {
 
 /** Deep-copy a Meta campaign in PAUSED state. */
 export async function duplicateZernioMetaCampaign(
-  campaignId: string,
+  platformCampaignId: string,
   input: {
     renameSuffix?: string;
     syncAfter?: boolean;
@@ -1056,7 +1056,7 @@ export async function duplicateZernioMetaCampaign(
   options: { idempotencyKey: string },
 ): Promise<DuplicateZernioMetaCampaignResponse> {
   return zernioFetch<DuplicateZernioMetaCampaignResponse>(
-    `/ads/campaigns/${encodeURIComponent(campaignId)}/duplicate`,
+    `/ads/campaigns/${encodeURIComponent(platformCampaignId)}/duplicate`,
     {
       method: "POST",
       headers: { "Idempotency-Key": options.idempotencyKey },
@@ -1210,7 +1210,7 @@ export async function getZernioAdsTree(
 }
 
 export type AdWithContext = ZernioAd & {
-  campaignId?: string;
+  platformCampaignId?: string;
   campaignName?: string;
   campaignStatus?: string;
   adSetId?: string;
@@ -1247,7 +1247,7 @@ export async function listAllZernioAdsWithComments(
   const adSetIds = new Set<string>();
   const statusCounts: Record<string, number> = {};
   for (const ad of allAds) {
-    if (ad.campaignId) campaignIds.add(ad.campaignId);
+    if (ad.platformCampaignId) campaignIds.add(ad.platformCampaignId);
     if (ad.adSetId) adSetIds.add(ad.adSetId);
     const s = (ad.status ?? "unknown").toLowerCase();
     statusCounts[s] = (statusCounts[s] ?? 0) + 1;
@@ -1308,7 +1308,7 @@ export async function listAllZernioAds(): Promise<AdWithContext[]> {
       for (const ad of adSet.ads ?? []) {
         ads.push({
           ...ad,
-          campaignId: typeof cid === "string" ? cid : undefined,
+          platformCampaignId: typeof cid === "string" ? cid : undefined,
           campaignName: campaign.name,
           campaignStatus: campaign.status,
           adSetId: typeof asid === "string" ? asid : undefined,

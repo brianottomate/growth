@@ -8,7 +8,7 @@ import {
   amplificationTargetTable,
   brandTable,
   contentPostTable,
-  initiativeTable,
+  campaignTable,
   memberTable,
   platformPostTable,
 } from "@/server/db/schema";
@@ -111,16 +111,16 @@ export const momentRouter = createTRPCRouter({
     }),
 
   get: protectedProcedure
-    .input(z.object({ initiativeId: z.string() }))
+    .input(z.object({ campaignId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const initiative = await ctx.db.query.initiativeTable.findFirst({
-        where: eq(initiativeTable.id, input.initiativeId),
+      const initiative = await ctx.db.query.campaignTable.findFirst({
+        where: eq(campaignTable.id, input.campaignId),
       });
       if (!initiative) return null;
       await assertOwnedBrandAccess(ctx, initiative.brandId);
       const slots = await ctx.db.query.contentPostTable.findMany({
         where: and(
-          eq(contentPostTable.initiativeId, input.initiativeId),
+          eq(contentPostTable.campaignId, input.campaignId),
           eq(contentPostTable.status, "slot"),
         ),
         orderBy: [asc(contentPostTable.plannedAt)],
@@ -128,7 +128,7 @@ export const momentRouter = createTRPCRouter({
       // Targets hang off platform posts now; roll up across the initiative's
       // content items.
       const contents = await ctx.db.query.contentPostTable.findMany({
-        where: eq(contentPostTable.initiativeId, input.initiativeId),
+        where: eq(contentPostTable.campaignId, input.campaignId),
         columns: { id: true },
       });
       const posts = contents.length

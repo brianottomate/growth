@@ -7,12 +7,12 @@ import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ChannelLogo } from "@/components/channel-logos";
-import type { InitiativeStatus } from "@/server/db/schema";
+import type { CampaignStatus } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
 import { CampaignDialog } from "./CampaignDialog";
 
 export const STATUS_META: Record<
-  InitiativeStatus,
+  CampaignStatus,
   { label: string; dot: string; cls: string }
 > = {
   active: { label: "Active", dot: "bg-emerald-400", cls: "text-emerald-300" },
@@ -31,7 +31,7 @@ export const STATUS_META: Record<
 };
 
 // Display order — what's running first, history last.
-const ORDER: InitiativeStatus[] = [
+const ORDER: CampaignStatus[] = [
   "active",
   "planned",
   "paused",
@@ -62,7 +62,7 @@ export function CampaignsClient({
 
   const [createOpen, setCreateOpen] = useState(false);
 
-  const byStatus = (s: InitiativeStatus) =>
+  const byStatus = (s: CampaignStatus) =>
     initiatives
       .filter((i) => i.status === s)
       .sort(

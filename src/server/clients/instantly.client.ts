@@ -658,7 +658,7 @@ export async function replyToEmail(
  * This is the path to surfacing replies in-app / routing them to a real person.
  */
 export async function getCampaignReplies(
-  campaignId: string,
+  platformCampaignId: string,
   opts?: { maxPages?: number },
 ): Promise<InstantlyEmail[]> {
   const out: InstantlyEmail[] = [];
@@ -666,7 +666,7 @@ export async function getCampaignReplies(
   const maxPages = opts?.maxPages ?? 20;
   for (let p = 0; p < maxPages; p++) {
     const res = await listEmails({
-      campaign_id: campaignId,
+      campaign_id: platformCampaignId,
       email_type: "received",
       preview_only: false,
       limit: 100,

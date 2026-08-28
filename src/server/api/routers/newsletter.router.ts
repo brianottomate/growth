@@ -100,7 +100,7 @@ export const newsletterRouter = createTRPCRouter({
         ctaText: z.string().trim().max(1_000).optional(),
         pillar: z.string().trim().max(120).optional(),
         seriesId: z.string().optional(),
-        initiativeId: z.string().optional(),
+        campaignId: z.string().optional(),
         plannedAt: z.string().datetime().optional(),
       }),
     )

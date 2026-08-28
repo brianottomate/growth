@@ -102,7 +102,7 @@ export const adsRouter = {
   setCampaignDelivery: protectedProcedure
     .input(
       z.object({
-        campaignId: z.string().min(1),
+        platformCampaignId: z.string().min(1),
         status: z.enum(["active", "paused"]),
       }),
     )
@@ -140,7 +140,7 @@ export const adsRouter = {
   addDraftAdSet: protectedProcedure
     .input(
       z.object({
-        initiativeId: z.string().min(1),
+        campaignId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
         audienceTargetId: z.string().nullish(),
         budget: z.number().int().min(0).nullish(),
@@ -158,13 +158,13 @@ export const adsRouter = {
     .input(
       z
         .object({
-          campaignId: z.string().min(1),
-          initiativeId: z.string().nullish(),
+          platformCampaignId: z.string().min(1),
+          campaignId: z.string().nullish(),
           newInitiativeName: z.string().trim().max(200).nullish(),
         })
         .refine(
           (value) =>
-            Boolean(value.initiativeId) ||
+            Boolean(value.campaignId) ||
             Boolean(value.newInitiativeName?.trim()),
           { message: "Pick an initiative or name a new one" },
         ),
@@ -189,7 +189,7 @@ export const adsRouter = {
   addDraftAd: protectedProcedure
     .input(
       z.object({
-        initiativeId: z.string().min(1),
+        campaignId: z.string().min(1),
         adSetId: z.string().nullish(),
         name: z.string().trim().min(1).max(300),
         headline: z.string().trim().max(255).nullish(),
@@ -240,7 +240,7 @@ export const adsRouter = {
   pushDraftToPlatform: protectedProcedure
     .input(
       z.object({
-        initiativeId: z.string().min(1),
+        campaignId: z.string().min(1),
         connectionAccountId: z.string().min(1),
         adAccountId: z.string().min(1),
         goal: z.enum([

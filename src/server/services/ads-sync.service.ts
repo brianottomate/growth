@@ -5,8 +5,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   type AdStats,
-  campaignTable,
-  type CampaignStatus,
+  platformCampaignTable,
+  type PlatformCampaignStatus,
 } from "@/server/db/ads-schema";
 import { brandTable } from "@/server/db/brand-schema";
 import { type ChannelPlatform, channelTable } from "@/server/db/channel-schema";
@@ -24,7 +24,7 @@ import {
 // (boosted organic posts, abandoned 2022 tests). See zernio-ads-validate.ts.
 const MIN_CAMPAIGN_DATE = Date.parse("2024-01-01");
 
-type CampaignInsert = typeof campaignTable.$inferInsert;
+type CampaignInsert = typeof platformCampaignTable.$inferInsert;
 
 function num(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
@@ -35,7 +35,7 @@ function str(v: unknown): string | undefined {
 }
 
 // Zernio campaign status → our enum. The tree reports lowercase active/paused.
-function mapStatus(raw: unknown): CampaignStatus {
+function mapStatus(raw: unknown): PlatformCampaignStatus {
   switch (str(raw)?.toLowerCase()) {
     case "active":
       return "live";
@@ -122,11 +122,11 @@ function accountManageUrl(
 function campaignManageUrl(
   platform: ChannelPlatform,
   accountId: string | undefined,
-  campaignId: string | undefined,
+  platformCampaignId: string | undefined,
 ): string | undefined {
-  if (!accountId || !campaignId) return undefined;
+  if (!accountId || !platformCampaignId) return undefined;
   if (platform === "meta_ads")
-    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId.replace("act_", "")}&selected_campaign_ids=${campaignId}`;
+    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId.replace("act_", "")}&selected_campaign_ids=${platformCampaignId}`;
   return accountManageUrl(platform, accountId);
 }
 
@@ -163,7 +163,7 @@ function campaignPlatform(c: Record<string, unknown>): string {
  * into `campaign` (one row per Zernio campaign, keyed on platformCampaignId).
  * Stores a latest metrics snapshot + one hero creative so feed/calendar can
  * render a card without touching `ad_spot`. Idempotent — safe to re-run;
- * updates metrics in place. `initiativeId` stays null (authored by hand).
+ * updates metrics in place. `campaignId` stays null (authored by hand).
  *
  * The tree mixes every connected platform, so campaigns are filtered three
  * ways: by `platform`, by the default-deny ad-account allowlist, and — when
@@ -430,12 +430,12 @@ export async function syncZernioAds(options?: {
     .filter((x): x is string => !!x);
   const existing = extIds.length
     ? await db
-        .select({ id: campaignTable.id, externalId: campaignTable.externalId })
-        .from(campaignTable)
+        .select({ id: platformCampaignTable.id, externalId: platformCampaignTable.externalId })
+        .from(platformCampaignTable)
         .where(
           and(
-            eq(campaignTable.brandId, brand.id),
-            inArray(campaignTable.externalId, extIds),
+            eq(platformCampaignTable.brandId, brand.id),
+            inArray(platformCampaignTable.externalId, extIds),
           ),
         )
     : [];
@@ -447,7 +447,7 @@ export async function syncZernioAds(options?: {
     const existingId = c.externalId ? idByExt.get(c.externalId) : undefined;
     if (existingId) {
       await db
-        .update(campaignTable)
+        .update(platformCampaignTable)
         .set({
           name: c.name,
           status: c.status,
@@ -461,7 +461,7 @@ export async function syncZernioAds(options?: {
           channelId: c.channelId,
           manageUrl: c.manageUrl,
         })
-        .where(eq(campaignTable.id, existingId));
+        .where(eq(platformCampaignTable.id, existingId));
       updated++;
     } else {
       toInsert.push(c);
@@ -470,7 +470,7 @@ export async function syncZernioAds(options?: {
 
   if (toInsert.length) {
     for (let i = 0; i < toInsert.length; i += 100) {
-      await db.insert(campaignTable).values(toInsert.slice(i, i + 100));
+      await db.insert(platformCampaignTable).values(toInsert.slice(i, i + 100));
     }
   }
 

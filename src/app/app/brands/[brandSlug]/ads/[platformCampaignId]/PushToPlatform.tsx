@@ -34,12 +34,12 @@ const GOALS = [
  * not cost.
  */
 export function PushToPlatform({
-  initiativeId,
+  campaignId,
   brandSlug,
   spotCount,
   defaultBudget,
 }: {
-  initiativeId: string;
+  campaignId: string;
   brandSlug: string;
   spotCount: number;
   defaultBudget: number | null;
@@ -188,7 +188,7 @@ export function PushToPlatform({
             onClick={() =>
               chosen &&
               push.mutate({
-                initiativeId,
+                campaignId,
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,
@@ -207,7 +207,7 @@ export function PushToPlatform({
             onClick={() =>
               chosen &&
               push.mutate({
-                initiativeId,
+                campaignId,
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,

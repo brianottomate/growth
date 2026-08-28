@@ -14,16 +14,16 @@ import {
   listEmails,
 } from "@/server/clients/instantly.client";
 
-const campaignId = process.argv[2];
+const platformCampaignId = process.argv[2];
 
 const unread = await getUnreadCount().catch(() => null);
 console.log(`Unread in Unibox: ${unread?.count ?? "(n/a)"}\n`);
 
-const replies = campaignId
-  ? await getCampaignReplies(campaignId)
+const replies = platformCampaignId
+  ? await getCampaignReplies(platformCampaignId)
   : (await listEmails({ email_type: "received", preview_only: false, limit: 20 })).items;
 
-console.log(`${replies.length} received email(s)${campaignId ? ` for campaign ${campaignId}` : " (workspace-wide, latest 20)"}:\n`);
+console.log(`${replies.length} received email(s)${platformCampaignId ? ` for campaign ${platformCampaignId}` : " (workspace-wide, latest 20)"}:\n`);
 
 for (const e of replies) {
   const when = e.timestamp_created?.slice(0, 16).replace("T", " ");

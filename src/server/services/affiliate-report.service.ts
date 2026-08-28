@@ -100,7 +100,7 @@ export async function runWeeklyAffiliateReport(): Promise<
       const weekAgo = new Date(now.getTime() - 7 * 864e5);
 
       const actions = await listActions({
-        campaignId: program.externalProgramId,
+        platformCampaignId: program.externalProgramId,
         actionDateStart: weekAgo,
         actionDateEnd: now,
       });

@@ -6,8 +6,8 @@ import { db } from "@/server/db";
 import {
   adSpotTable,
   brandTable,
+  platformCampaignTable,
   campaignTable,
-  initiativeTable,
   memberTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
@@ -51,9 +51,9 @@ const STATUS_STYLE: Record<string, string> = {
 export default async function CampaignPage({
   params,
 }: {
-  params: Promise<{ brandSlug: string; campaignId: string }>;
+  params: Promise<{ brandSlug: string; platformCampaignId: string }>;
 }) {
-  const { brandSlug, campaignId } = await params;
+  const { brandSlug, platformCampaignId } = await params;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -74,21 +74,21 @@ export default async function CampaignPage({
   });
   if (!brand) notFound();
 
-  const campaign = await db.query.campaignTable.findFirst({
+  const campaign = await db.query.platformCampaignTable.findFirst({
     where: and(
-      eq(campaignTable.id, campaignId),
-      eq(campaignTable.brandId, brand.id),
+      eq(platformCampaignTable.id, platformCampaignId),
+      eq(platformCampaignTable.brandId, brand.id),
     ),
   });
   if (!campaign) notFound();
 
   const [spots, initiative] = await Promise.all([
     db.query.adSpotTable.findMany({
-      where: eq(adSpotTable.campaignId, campaign.id),
+      where: eq(adSpotTable.platformCampaignId, campaign.id),
     }),
-    campaign.initiativeId
-      ? db.query.initiativeTable.findFirst({
-          where: eq(initiativeTable.id, campaign.initiativeId),
+    campaign.campaignId
+      ? db.query.campaignTable.findFirst({
+          where: eq(campaignTable.id, campaign.campaignId),
           columns: { id: true, name: true },
         })
       : Promise.resolve(null),
@@ -164,7 +164,7 @@ export default async function CampaignPage({
             <div className="mt-2">
               <InitiativeLink
                 brandId={brand.id}
-                campaignId={campaign.id}
+                platformCampaignId={campaign.id}
                 initiative={initiative ?? null}
               />
             </div>
@@ -181,7 +181,7 @@ export default async function CampaignPage({
               </a>
             )}
             <DeliverySwitch
-              campaignId={campaign.id}
+              platformCampaignId={campaign.id}
               status={campaign.status}
               hasExternalId={Boolean(campaign.externalId)}
               spendLine={

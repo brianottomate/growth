@@ -135,7 +135,7 @@ export const listAdsDestinations = growthAction({
 
 export const draftCampaignAction = growthAction({
   description:
-    "Create a LOCAL campaign draft (an initiative) — the editable first-party object shown at /app/brands/{brandSlug}/ads/draft/{initiativeId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
+    "Create a LOCAL campaign draft (an initiative) — the editable first-party object shown at /app/brands/{brandSlug}/ads/draft/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     name: z.string().trim().min(1).max(300),
@@ -153,7 +153,7 @@ export const draftCampaignAction = growthAction({
       .min(0)
       .optional()
       .describe("Total intended budget in whole dollars."),
-    initiativeId: z.string().trim().min(1).optional(),
+    campaignId: z.string().trim().min(1).optional(),
   }),
   execute: async (input, ctx) =>
     createDraftInitiative({
@@ -324,7 +324,7 @@ export const duplicateMetaCampaignAction = growthAction({
     "Deep-copy one Meta campaign already visible inside the named brand's allowlisted account. Zernio creates the copied campaign PAUSED and syncs the copy back into the ad tree. Requires explicit operator approval.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
-    campaignId: z.string().trim().min(1),
+    platformCampaignId: z.string().trim().min(1),
     renameSuffix: z.string().max(80).optional().default(" (copy)"),
   }),
   execute: async (input, ctx) =>
@@ -403,7 +403,7 @@ export const draftAdAction = growthAction({
   description:
     "Add a drafted ad to a LOCAL campaign draft (one created with adsWrite.draftCampaign). Local only — nothing touches the platform until the operator pushes the draft. The creative is an image URL, ideally a media-library asset URL.",
   inputSchema: z.object({
-    initiativeId: z.string().trim().min(1),
+    campaignId: z.string().trim().min(1),
     adSetId: z.string().trim().min(1).optional(),
     name: z.string().trim().min(1).max(300),
     headline: z.string().trim().max(255).optional(),
@@ -419,7 +419,7 @@ export const draftAdAction = growthAction({
   }),
   execute: async (input, ctx) =>
     addDraftAd({
-      initiativeId: input.initiativeId,
+      campaignId: input.campaignId,
       adSetId: input.adSetId ?? null,
       name: input.name,
       headline: input.headline ?? null,

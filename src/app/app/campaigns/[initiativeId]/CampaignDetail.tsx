@@ -47,11 +47,11 @@ const CONTENT_STATUS_LABEL: Record<string, string> = {
 const fmtDay = (d: Date | null) =>
   d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
 
-export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
+export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data: campaign } = useQuery(
-    trpc.initiative.get.queryOptions({ id: initiativeId }),
+    trpc.initiative.get.queryOptions({ id: campaignId }),
   );
 
   const [editOpen, setEditOpen] = useState(false);
@@ -60,14 +60,14 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries(
-        trpc.initiative.get.queryOptions({ id: initiativeId }),
+        trpc.initiative.get.queryOptions({ id: campaignId }),
       ),
       queryClient.invalidateQueries(trpc.initiative.overview.queryOptions()),
       queryClient.invalidateQueries(
-        trpc.initiative.linkableContent.queryOptions({ initiativeId }),
+        trpc.initiative.linkableContent.queryOptions({ campaignId }),
       ),
       queryClient.invalidateQueries(
-        trpc.initiative.alignment.queryOptions({ initiativeId }),
+        trpc.initiative.alignment.queryOptions({ campaignId }),
       ),
     ]);
   };
@@ -223,7 +223,7 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
                     type="button"
                     aria-label="Unlink"
                     onClick={() =>
-                      unlink.mutate({ initiativeId, contentPostId: p.id })
+                      unlink.mutate({ campaignId, contentPostId: p.id })
                     }
                     className="text-muted-foreground hover:text-foreground opacity-0 transition-opacity group-hover:opacity-100"
                   >
@@ -272,10 +272,10 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
       </section>
 
       {/* ---- intent vs. actual (strategy ↔ synced reality) ----------- */}
-      <AlignmentPanel initiativeId={initiativeId} onChanged={invalidate} />
+      <AlignmentPanel campaignId={campaignId} onChanged={invalidate} />
 
       {/* ---- amplifiers (earned reach) -------------------------------- */}
-      <MomentAmplifiers momentId={initiativeId} />
+      <MomentAmplifiers momentId={campaignId} />
 
       <CampaignDialog
         open={editOpen}
@@ -300,7 +300,7 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
       <LinkContentDialog
         open={linkOpen}
         onOpenChange={setLinkOpen}
-        initiativeId={initiativeId}
+        campaignId={campaignId}
         onLinked={invalidate}
       />
     </div>
@@ -311,12 +311,12 @@ export function CampaignDetail({ initiativeId }: { initiativeId: string }) {
 function LinkContentDialog({
   open,
   onOpenChange,
-  initiativeId,
+  campaignId,
   onLinked,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initiativeId: string;
+  campaignId: string;
   onLinked: () => Promise<void>;
 }) {
   const trpc = useTRPC();
@@ -324,7 +324,7 @@ function LinkContentDialog({
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const { data: linkable, isLoading } = useQuery({
-    ...trpc.initiative.linkableContent.queryOptions({ initiativeId }),
+    ...trpc.initiative.linkableContent.queryOptions({ campaignId }),
     enabled: open,
   });
 
@@ -418,7 +418,7 @@ function LinkContentDialog({
           </Button>
           <Button
             onClick={() =>
-              link.mutate({ initiativeId, contentPostIds: [...picked] })
+              link.mutate({ campaignId, contentPostIds: [...picked] })
             }
             disabled={picked.size === 0 || link.isPending}
           >

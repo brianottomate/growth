@@ -29,10 +29,10 @@ import { useTRPC } from "@/trpc/react";
  * so anything made anywhere in growth is one picker away from being an ad.
  */
 export function AddAdButton({
-  initiativeId,
+  campaignId,
   brandId,
 }: {
-  initiativeId: string;
+  campaignId: string;
   brandId: string;
 }) {
   const trpc = useTRPC();
@@ -146,7 +146,7 @@ export function AddAdButton({
               loading={add.isPending}
               onClick={() =>
                 add.mutate({
-                  initiativeId,
+                  campaignId,
                   name: name.trim(),
                   body: body.trim() || null,
                   linkUrl: linkUrl.trim() || null,

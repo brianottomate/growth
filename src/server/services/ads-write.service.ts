@@ -38,9 +38,9 @@ import {
   audienceTable,
   audienceTargetTable,
   brandTable,
-  campaignTable,
+  platformCampaignTable,
   channelTable,
-  initiativeTable,
+  campaignTable,
   type Brand,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
@@ -580,7 +580,7 @@ export async function duplicateMetaCampaign(input: {
   organizationId: string;
   runId: string;
   brandSlug: string;
-  campaignId: string;
+  platformCampaignId: string;
   renameSuffix?: string;
   /** Stable cross-run dedupe key; see adWriteIdempotencyKey. */
   businessKey?: string | null;
@@ -601,7 +601,7 @@ export async function duplicateMetaCampaign(input: {
     const accountId = row.platformAdAccountId;
     const platform = typeof row.platform === "string" ? row.platform : "";
     return (
-      candidateId === input.campaignId &&
+      candidateId === input.platformCampaignId &&
       zernioConnectionMatchesPlatform("meta", platform) &&
       typeof accountId === "string" &&
       allowed.some((allowedAccount) =>
@@ -611,17 +611,17 @@ export async function duplicateMetaCampaign(input: {
   });
   if (!campaign) {
     throw new Error(
-      `Meta campaign ${input.campaignId} is outside ${brand.name}'s allowed accounts`,
+      `Meta campaign ${input.platformCampaignId} is outside ${brand.name}'s allowed accounts`,
     );
   }
   const provider = await duplicateZernioMetaCampaign(
-    input.campaignId,
+    input.platformCampaignId,
     { renameSuffix: input.renameSuffix },
     {
       idempotencyKey: idempotencyKey(
         { organizationId: input.organizationId, runId: input.runId },
         "duplicate-meta",
-        { campaignId: input.campaignId, renameSuffix: input.renameSuffix },
+        { platformCampaignId: input.platformCampaignId, renameSuffix: input.renameSuffix },
         input.businessKey,
       ),
     },
@@ -788,11 +788,11 @@ const DELIVERY_PLATFORMS: Record<string, string> = {
  * approval. Local status is updated only after the provider confirms.
  */
 export async function setCampaignDelivery(
-  input: { campaignId: string; status: "active" | "paused" },
+  input: { platformCampaignId: string; status: "active" | "paused" },
   context: AdsWriteContext,
 ) {
-  const campaign = await db.query.campaignTable.findFirst({
-    where: eq(campaignTable.id, input.campaignId),
+  const campaign = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
   });
   if (!campaign) throw new Error("Campaign not found");
   if (!campaign.brandId) throw new Error("Campaign has no brand");
@@ -815,16 +815,16 @@ export async function setCampaignDelivery(
   }
 
   const provider = await setZernioCampaignStatus({
-    campaignId: campaign.externalId,
+    platformCampaignId: campaign.externalId,
     status: input.status,
     platform,
   });
 
   const [updated] = await db
-    .update(campaignTable)
+    .update(platformCampaignTable)
     .set({ status: input.status === "active" ? "live" : "paused" })
-    .where(eq(campaignTable.id, campaign.id))
-    .returning({ id: campaignTable.id, status: campaignTable.status });
+    .where(eq(platformCampaignTable.id, campaign.id))
+    .returning({ id: platformCampaignTable.id, status: platformCampaignTable.status });
 
   return { campaign: updated, provider };
 }
@@ -840,7 +840,7 @@ export async function setCampaignDelivery(
  */
 export async function pushDraftToPlatform(
   input: {
-    initiativeId: string;
+    campaignId: string;
     connectionAccountId: string;
     adAccountId: string;
     goal:
@@ -856,8 +856,8 @@ export async function pushDraftToPlatform(
   },
   context: AdsWriteContext,
 ) {
-  const initiative = await db.query.initiativeTable.findFirst({
-    where: eq(initiativeTable.id, input.initiativeId),
+  const initiative = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, input.campaignId),
   });
   if (!initiative) throw new Error("Campaign draft not found");
   const brand = await db.query.brandTable.findFirst({
@@ -868,10 +868,10 @@ export async function pushDraftToPlatform(
   }
   if (!brand.slug) throw new Error("Brand has no slug");
 
-  const alreadyLive = await db.query.campaignTable.findFirst({
+  const alreadyLive = await db.query.platformCampaignTable.findFirst({
     where: and(
-      eq(campaignTable.initiativeId, initiative.id),
-      eq(campaignTable.platform, "meta_ads"),
+      eq(platformCampaignTable.campaignId, initiative.id),
+      eq(platformCampaignTable.platform, "meta_ads"),
     ),
     columns: { id: true },
   });
@@ -891,7 +891,7 @@ export async function pushDraftToPlatform(
 
   const spots = await db.query.adSpotTable.findMany({
     where: and(
-      eq(adSpotTable.initiativeId, initiative.id),
+      eq(adSpotTable.campaignId, initiative.id),
       isNull(adSpotTable.externalId),
     ),
   });
@@ -958,9 +958,9 @@ export async function pushDraftToPlatform(
 
   if (input.validateOnly || result.validateOnly) {
     return {
-      initiativeId: initiative.id,
+      campaignId: initiative.id,
       validateOnly: true,
-      campaignId: null,
+      platformCampaignId: null,
       adsCreated: 0,
       provider: result,
     };
@@ -987,13 +987,13 @@ export async function pushDraftToPlatform(
   }
 
   const [campaign] = await db
-    .insert(campaignTable)
+    .insert(platformCampaignTable)
     .values({
       id: createId("camp"),
       channelId: channel.id,
       brandId: brand.id,
       platform: "meta_ads",
-      initiativeId: initiative.id,
+      campaignId: initiative.id,
       name: initiative.name,
       status: "paused",
       objective: input.goal,
@@ -1003,9 +1003,9 @@ export async function pushDraftToPlatform(
     .returning();
 
   await db
-    .update(initiativeTable)
+    .update(campaignTable)
     .set({ status: "active" })
-    .where(eq(initiativeTable.id, initiative.id));
+    .where(eq(campaignTable.id, initiative.id));
 
   const responseAds = result.ads ?? (result.ad ? [result.ad] : []);
   for (const spot of spots) {
@@ -1017,7 +1017,7 @@ export async function pushDraftToPlatform(
     await db
       .update(adSpotTable)
       .set({
-        campaignId: campaign!.id,
+        platformCampaignId: campaign!.id,
         channelId: channel.id,
         externalId: platformAdId ?? match?.id ?? match?._id ?? null,
         adSetId: result.platformAdSetId ?? null,
@@ -1027,13 +1027,13 @@ export async function pushDraftToPlatform(
   }
   await db
     .update(adSetTable)
-    .set({ campaignId: campaign!.id, externalId: result.platformAdSetId ?? null })
-    .where(eq(adSetTable.initiativeId, initiative.id));
+    .set({ platformCampaignId: campaign!.id, externalId: result.platformAdSetId ?? null })
+    .where(eq(adSetTable.campaignId, initiative.id));
 
   return {
-    initiativeId: initiative.id,
+    campaignId: initiative.id,
     validateOnly: false,
-    campaignId: campaign!.id,
+    platformCampaignRowId: campaign!.id,
     platformCampaignId,
     platformAdSetId: result.platformAdSetId ?? null,
     adsCreated: responseAds.length,

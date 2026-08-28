@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
-import type { Campaign, Initiative } from "@/server/db/schema";
+import type { PlatformCampaign, Campaign } from "@/server/db/schema";
 import { diffInitiative, scoreSuggestion } from "./ads-alignment.service";
 
 // Minimal fixture builders — only fields the diff reads, cast to full rows.
-function initiative(overrides: Partial<Initiative> = {}): Initiative {
+function initiative(overrides: Partial<Campaign> = {}): Campaign {
   return {
     id: "init_1",
     brandId: "brand_1",
@@ -27,13 +27,13 @@ function initiative(overrides: Partial<Initiative> = {}): Initiative {
   };
 }
 
-function campaign(overrides: Partial<Campaign> = {}): Campaign {
+function campaign(overrides: Partial<PlatformCampaign> = {}): PlatformCampaign {
   return {
     id: "camp_1",
     channelId: "chan_1",
     brandId: "brand_1",
     platform: "meta_ads",
-    initiativeId: "init_1",
+    campaignId: "init_1",
     name: "Prospecting Supply Broad",
     status: "live",
     objective: null,
@@ -167,15 +167,15 @@ describe("diffInitiative", () => {
 
   it("suggestions ranked by score then spend, capped at 10", () => {
     const candidates = [
-      campaign({ id: "s1", initiativeId: null, name: "Supply push exact" }),
+      campaign({ id: "s1", campaignId: null, name: "Supply push exact" }),
       campaign({
         id: "s2",
-        initiativeId: null,
+        campaignId: null,
         name: "Supply only",
         stats: { spend: 9_999 },
       }),
-      campaign({ id: "s3", initiativeId: null, name: "Unrelated name" }),
-      campaign({ id: "off-platform", initiativeId: null, platform: "x_ads" }),
+      campaign({ id: "s3", campaignId: null, name: "Unrelated name" }),
+      campaign({ id: "off-platform", campaignId: null, platform: "x_ads" }),
     ];
     const a = diffInitiative(initiative(), [], candidates);
     expect(a.suggestions.map((s) => s.id)).toEqual(["s1", "s2", "s3"]);

@@ -78,13 +78,13 @@ export default async function BrandPage({
   const spotCampaignIds = [
     ...new Set(
       latestSpots
-        .map((spot) => spot.campaignId)
+        .map((spot) => spot.platformCampaignId)
         .filter((id): id is string => Boolean(id)),
     ),
   ];
   const spotCampaigns =
     spotCampaignIds.length > 0
-      ? await db.query.campaignTable.findMany({
+      ? await db.query.platformCampaignTable.findMany({
           where: (table, { inArray }) => inArray(table.id, spotCampaignIds),
           columns: { id: true, name: true },
         })
@@ -178,8 +178,8 @@ export default async function BrandPage({
               <Link
                 key={spot.id}
                 href={
-                  spot.campaignId
-                    ? `/app/brands/${brandSlug}/ads/${spot.campaignId}`
+                  spot.platformCampaignId
+                    ? `/app/brands/${brandSlug}/ads/${spot.platformCampaignId}`
                     : `/app/brands/${brandSlug}/ads`
                 }
                 className="bg-card w-40 shrink-0 overflow-hidden rounded-xl border transition-colors hover:border-white/20"
@@ -204,8 +204,8 @@ export default async function BrandPage({
                     {spot.name ?? "Untitled ad"}
                   </p>
                   <p className="text-muted-foreground truncate text-[10px]">
-                    {(spot.campaignId
-                      ? campaignName.get(spot.campaignId)
+                    {(spot.platformCampaignId
+                      ? campaignName.get(spot.platformCampaignId)
                       : null) ?? spot.platform}
                   </p>
                 </div>

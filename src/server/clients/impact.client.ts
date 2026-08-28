@@ -140,7 +140,7 @@ function isoNoMillis(d: Date): string {
  * Dates are ISO 8601 with time; the window may not exceed 45 days.
  */
 export async function listActions(input: {
-  campaignId: string;
+  platformCampaignId: string;
   actionDateStart: Date;
   actionDateEnd: Date;
   state?: "PENDING" | "APPROVED" | "REVERSED";
@@ -148,7 +148,7 @@ export async function listActions(input: {
   const actions = await impactFetchAllPages(
     "/Actions",
     {
-      CampaignId: input.campaignId,
+      CampaignId: input.platformCampaignId,
       ActionDateStart: isoNoMillis(input.actionDateStart),
       ActionDateEnd: isoNoMillis(input.actionDateEnd),
       State: input.state,
@@ -236,7 +236,7 @@ function parseDisplayDate(v: unknown): string | null {
  * (~40–65/day on the live program vs ~1 action/day).
  */
 export async function listPerformanceByDay(input: {
-  campaignId: string;
+  platformCampaignId: string;
   startDay: string; // YYYY-MM-DD
   endDay: string;
 }): Promise<ImpactDayPerformance[]> {
@@ -245,7 +245,7 @@ export async function listPerformanceByDay(input: {
     {
       START_DATE: input.startDay,
       END_DATE: input.endDay,
-      SUBAID: input.campaignId,
+      SUBAID: input.platformCampaignId,
     },
   );
   const rows = Array.isArray(data.Records)
@@ -300,11 +300,11 @@ export interface ImpactActionInquiry {
 }
 
 export async function listActionInquiries(
-  campaignId: string,
+  platformCampaignId: string,
 ): Promise<ImpactActionInquiry[]> {
   const inquiries = await impactFetchAllPages(
     "/ActionInquiries",
-    { CampaignId: campaignId },
+    { CampaignId: platformCampaignId },
     "ActionInquiries",
   );
   return inquiries.map((i) => ({
@@ -370,12 +370,12 @@ export interface ImpactPartner {
 
 /** List partners, optionally scoped to a program and/or network state. */
 export async function listMediaPartners(input?: {
-  campaignId?: string;
+  platformCampaignId?: string;
   state?: string;
 }): Promise<ImpactPartner[]> {
   const partners = await impactFetchAllPages(
     "/MediaPartners",
-    { CampaignId: input?.campaignId, State: input?.state },
+    { CampaignId: input?.platformCampaignId, State: input?.state },
     "Partners",
   );
   return partners.map((p) => ({
