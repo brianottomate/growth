@@ -12,6 +12,7 @@ import { AddAdButton } from "../../[platformCampaignId]/AddAdButton";
 import { AdSets } from "./AdSets";
 import { CreativePool } from "./CreativePool";
 import { GoogleSettings } from "./GoogleSettings";
+import { WorkInChatButton } from "./WorkInChatButton";
 import { PushToPlatform } from "../../[platformCampaignId]/PushToPlatform";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +97,13 @@ export default async function CampaignDraftPage({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <WorkInChatButton
+              brandId={draft.brand.id}
+              brandName={draft.brand.slug ?? brandSlug}
+              campaignId={initiative.id}
+              campaignName={initiative.name}
+              hasAds={spots.length > 0}
+            />
             <AddAdButton
               campaignId={initiative.id}
               brandId={draft.brand.id}

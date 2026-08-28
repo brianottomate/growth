@@ -27,6 +27,7 @@ import { useTRPC } from "@/trpc/react";
 import {
   ASSISTANT_INTENT_EVENT,
   type AssistantIntent,
+  type AdCampaignWorkContext,
   type ContentWorkContext,
 } from "@/lib/assistant-events";
 import { OverviewChat } from "./OverviewChat";
@@ -60,6 +61,8 @@ export function OverviewAssistantPopup({
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
   const [intentBrandId, setIntentBrandId] = useState<string | null>(null);
+  const [campaignContext, setCampaignContext] =
+    useState<AdCampaignWorkContext | null>(null);
   const [workContext, setWorkContext] = useState<ContentWorkContext | null>(
     null,
   );
@@ -122,6 +125,15 @@ export function OverviewAssistantPopup({
       // global (its own Postgres schema, no organizationId), so a prospect
       // handed to the assistant carries no brand to select.
       setIntentBrandId("brandId" in intent ? (intent.brandId ?? null) : null);
+      if (intent.type === "work_ad_campaign") {
+        setCampaignContext({
+          type: intent.type,
+          brandId: intent.brandId,
+          brandName: intent.brandName,
+          campaignId: intent.campaignId,
+          campaignName: intent.campaignName,
+        });
+      }
       if (intent.type === "work_content_post") {
         setWorkContext({
           type: intent.type,
@@ -326,6 +338,7 @@ export function OverviewAssistantPopup({
               intent={searchParams.get("intent") ?? undefined}
               seedPrompt={searchParams.get("prompt") ?? undefined}
               workContext={workContext ?? undefined}
+              campaignContext={campaignContext ?? undefined}
             />
           ) : (
             <div className="text-muted-foreground grid h-full place-items-center">

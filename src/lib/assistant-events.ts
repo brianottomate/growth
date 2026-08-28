@@ -63,9 +63,25 @@ export type AssistantIntent =
   | BuildChannelStrategyIntent
   | ShapeContentStructureIntent
   | PlanEmailIntent
-  | WorkProspectIntent;
+  | WorkProspectIntent
+  | WorkAdCampaignIntent;
+
+/**
+ * Hand a campaign draft to the assistant — the paid counterpart of
+ * work_content_post. The campaign page is read-only by design, so refining
+ * headlines and primary text happens here, with the campaign in context.
+ */
+export type WorkAdCampaignIntent = {
+  type: "work_ad_campaign";
+  brandId: string;
+  brandName: string;
+  campaignId: string;
+  campaignName: string;
+  visibleText: string;
+};
 
 export type ContentWorkContext = Omit<WorkContentIntent, "visibleText">;
+export type AdCampaignWorkContext = Omit<WorkAdCampaignIntent, "visibleText">;
 
 export function sendAssistantIntent(intent: AssistantIntent) {
   window.dispatchEvent(

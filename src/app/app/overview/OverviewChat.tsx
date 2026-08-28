@@ -58,6 +58,7 @@ import {
 import {
   ASSISTANT_INTENT_EVENT,
   type AssistantIntent,
+  type AdCampaignWorkContext,
   type ContentWorkContext,
 } from "@/lib/assistant-events";
 import { capabilityWritesWorkspace } from "@/lib/assistant-write-effect";
@@ -195,6 +196,7 @@ export function OverviewChat({
   intent,
   seedPrompt,
   workContext,
+  campaignContext,
 }: {
   threadId: string;
   initialMessages: UIMessage[];
@@ -214,6 +216,7 @@ export function OverviewChat({
    */
   seedPrompt?: string;
   workContext?: ContentWorkContext;
+  campaignContext?: AdCampaignWorkContext;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -243,6 +246,7 @@ export function OverviewChat({
     brandId,
     intent,
     workContext,
+    campaignContext,
     pagePath: pathname,
   };
 

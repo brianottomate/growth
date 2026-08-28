@@ -14,6 +14,7 @@ import {
   assistantMessageTable,
   assistantThreadTable,
   brandTable,
+  campaignTable,
   contentPostTable,
   memberTable,
 } from "@/server/db/schema";
@@ -43,6 +44,7 @@ import {
 import { runtimeClockSection } from "@/server/ai/kernel/runtime-clock";
 import type {
   AssistantIntent,
+  AdCampaignWorkContext,
   ContentWorkContext,
 } from "@/lib/assistant-events";
 import {
@@ -130,6 +132,7 @@ export async function POST(req: Request): Promise<Response> {
     intent: rawIntent,
     assistantIntent,
     workContext,
+    campaignContext,
     chatAttachment,
     chatAttachments,
     skippedAttachments,
@@ -144,6 +147,7 @@ export async function POST(req: Request): Promise<Response> {
     intent?: string;
     assistantIntent?: AssistantIntent;
     workContext?: ContentWorkContext;
+    campaignContext?: AdCampaignWorkContext;
     chatAttachment?: { url?: string; mediaType?: string; fileName?: string };
     chatAttachments?: {
       url?: string;
@@ -210,7 +214,29 @@ export async function POST(req: Request): Promise<Response> {
           platform: selectedPlatformPost?.platform,
         }
       : null;
+  const requestedCampaignContext =
+    assistantIntent?.type === "work_ad_campaign"
+      ? assistantIntent
+      : campaignContext;
+  const campaignWorkItem = requestedCampaignContext?.campaignId
+    ? await db.query.campaignTable.findFirst({
+        where: eq(campaignTable.id, requestedCampaignContext.campaignId),
+        with: { brand: { columns: { organizationId: true, name: true } } },
+      })
+    : null;
+  const activeCampaignContext: AdCampaignWorkContext | null =
+    campaignWorkItem?.brand?.organizationId === membership.organizationId
+      ? {
+          type: "work_ad_campaign",
+          brandId: campaignWorkItem.brandId,
+          brandName: campaignWorkItem.brand.name,
+          campaignId: campaignWorkItem.id,
+          campaignName: campaignWorkItem.name,
+        }
+      : null;
+
   const requestedBrandId =
+    activeCampaignContext?.brandId ??
     activeWorkContext?.brandId ??
     (assistantIntent && "brandId" in assistantIntent
       ? assistantIntent.brandId
@@ -241,10 +267,15 @@ export async function POST(req: Request): Promise<Response> {
           : assistantIntent?.type === "plan_email"
             ? `\n\n# Triggered intent\nThe operator wants to plan a newsletter issue or one-off blast${brand ? ` for ${brand.name}` : ""}. First distinguish a recurring newsletter.broadcast from a cadence-independent newsletter.blast. Talk through the premise, pillar or series relationship, CTA, and Growth content-calendar timing. Use emailWrite action createSlot only after the operator agrees to the exact empty slot. Do not generate the full email during batch or cadence planning; use action generateDraft only later for one individually selected slot.`
             : "";
-  const workContextPrompt =
-    activeWorkContext && brand
-      ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call contentRead action getWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists, and apply authorized writes directly.`
+  const campaignContextPrompt =
+    activeCampaignContext && brand
+      ? `\n\n# Active ad campaign\nThe operator is working on the campaign “${activeCampaignContext.campaignName}” (campaignId: ${activeCampaignContext.campaignId}) for ${brand.name}. It is a first-party draft: ads and ad sets live on it, and per-platform campaigns are created only by the push. Use adsWrite action draftAd to add ads and draftAdSet to add an ad set — both are local and touch no provider. Prefer concrete copy over suggestion lists. Never push or launch on the operator's behalf; those are deliberate clicks on the campaign page.`
       : "";
+  const workContextPrompt =
+    campaignContextPrompt +
+    (activeWorkContext && brand
+      ? `\n\n# Active content work item\nThe operator is working on “${activeWorkContext.contentTitle}” (contentPostId: ${activeWorkContext.contentPostId}) for ${brand.name}.${activeWorkContext.platformPostId ? ` Focus the ${activeWorkContext.platform ?? "selected"} rendering (platformPostId: ${activeWorkContext.platformPostId}).` : ""} Call contentRead action getWorkItem before making claims about readiness or current copy. Prefer concrete edits over suggestion lists, and apply authorized writes directly.`
+      : "");
   const attachmentCandidates = Array.isArray(chatAttachments)
     ? chatAttachments
     : chatAttachment
