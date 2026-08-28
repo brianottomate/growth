@@ -78,11 +78,19 @@ export async function createDraftCampaign(input: {
   endAt?: Date | null;
   initiativeId?: string | null;
 }) {
+  if (!input.brandId && !input.brandSlug) {
+    throw new Error("brandId or brandSlug is required");
+  }
   const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, input.brandId),
+    where: input.brandId
+      ? eq(brandTable.id, input.brandId)
+      : and(
+          eq(brandTable.slug, input.brandSlug!),
+          eq(brandTable.organizationId, input.organizationId),
+        ),
     columns: { id: true, name: true, slug: true, organizationId: true },
   });
-  if (brand?.organizationId !== input.organizationId) {
+  if (!brand || brand.organizationId !== input.organizationId) {
     throw new Error("No access to this brand");
   }
 
