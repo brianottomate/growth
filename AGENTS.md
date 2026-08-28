@@ -82,6 +82,35 @@ Since 2026-08-28 this repo follows the org-wide release-drafter flow
 - Git history was rewritten on 2026-08-27 to purge `public/lab` media
   (129M → 6.6M clones). `public/lab/` is gitignored; keep binaries out of git.
 
+### `canary` is a pointer, never a source of truth
+
+`canary` exists so a change can be seen on a real URL
+(https://growth-git-canary-wanderdev.vercel.app) without a PR, a review, or a
+release. It is a **disposable preview pointer**, and treating it as anything
+else is what forks the history: `dev` squash-merges every PR, so a commit that
+also lives on `canary` gets a different SHA there, the two branches diverge,
+and the next PR cannot merge cleanly.
+
+**The rule: work never originates on `canary`, and `dev` is never merged into
+it.** Always branch from `dev`; publish to canary by force-pushing a copy.
+
+```bash
+# 1. Start work — ALWAYS from dev, never from canary
+git fetch origin dev && git checkout -b feat/x origin/dev
+
+# 2. See it on the canary URL (a copy; canary keeps no unique commits)
+git push origin feat/x:canary --force-with-lease
+
+# 3. Ship it — PR into dev, squash-merge, publish the release
+
+# 4. Realign canary after the merge (never `git merge dev` into canary)
+git fetch origin dev && git push origin origin/dev:canary --force-with-lease
+```
+
+Never: commit directly on `canary`, branch a feature from `canary`, or merge
+`dev` into `canary`. If canary ever holds a commit that is not on `dev`, it is
+already wrong — reset it rather than merging it.
+
 ## Stack
 
 Next.js 16 (App Router, React 19) · tRPC v11 + TanStack Query (SuperJSON) · Drizzle ORM on

@@ -15,15 +15,15 @@ import { createId } from "@/server/db/utils";
 
 // ---- FIRST-PARTY AD DRAFTS --------------------------------------------
 //
-// The thing you author is an INITIATIVE: one push, brand-scoped, carrying its
+// The thing you author is a CAMPAIGN: one push, brand-scoped, carrying its
 // ad sets (targeting + budget) and ads (creative + copy). Per-platform
-// `campaign` rows are created by the push, from the platform's own response —
-// which is why `campaign` gets to keep meaning "a real campaign on a real ad
-// account" and why a draft never needs a placeholder channel to exist.
+// `platform_campaign` rows are created by the push, from the platform's own
+// response — which is why `platform_campaign` means "a real campaign on a
+// real ad account" and why a draft never needs a placeholder channel.
 //
-// It is the same canonical/per-surface split the organic side already uses
-// (content_post → platform_post); `initiative` is literally the shared layer,
-// referenced by content_post and series as well as campaign.
+// Same canonical/per-surface split the organic side uses
+// (content_post → platform_post); `campaign` is the shared layer, referenced
+// by content_post and series as well as platform_campaign.
 
 export type DraftAdPlatform = "meta_ads" | "google_ads";
 
@@ -94,7 +94,7 @@ export async function createDraftInitiative(input: {
   const [initiative] = await db
     .insert(campaignTable)
     .values({
-      id: createId("init"),
+      id: createId("camp"),
       brandId: brand.id,
       name: input.name,
       status: "planned",
@@ -263,7 +263,7 @@ export async function linkCampaignToInitiative(input: {
     const [initiative] = await db
       .insert(campaignTable)
       .values({
-        id: createId("init"),
+        id: createId("camp"),
         brandId: brand.id,
         name: input.newInitiativeName.trim(),
         status: "active",
