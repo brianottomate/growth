@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
 import {
   adWriteIdempotencyKey,
@@ -17,6 +17,7 @@ import {
   addUsersToZernioAdAudience,
   boostZernioMetaPost,
   createZernioAdAudience,
+  createZernioAdCampaign,
   createZernioStandaloneAd,
   duplicateZernioMetaCampaign,
   getZernioAdsTree,
@@ -27,6 +28,7 @@ import {
   type CreateZernioStandaloneAdInput,
   type ZernioAccount,
   type ZernioAdTargeting,
+  type ZernioAdWriteResponse,
   type ZernioAudienceUser,
   type ZernioCarouselCard,
 } from "@/server/clients/zernio.client";
@@ -829,6 +831,36 @@ export async function setCampaignDelivery(
   return { campaign: updated, provider };
 }
 
+
+/**
+ * The platform id of the audience an ad set buys. Our first-party
+ * `audience_target` is the "who"; the mirrored `audience` row carries the
+ * platform's own id, which is what targeting actually accepts. Returns null
+ * when the target has never been compiled to this platform — the ad set then
+ * runs on its geo/demographic targeting alone rather than failing the push.
+ */
+async function platformAudienceIdFor(
+  audienceTargetId: string | null,
+  brandId: string,
+  platform: "meta_ads" | "google_ads",
+): Promise<string | null> {
+  if (!audienceTargetId) return null;
+  const rows = await db
+    .select({ externalId: audienceTable.externalId })
+    .from(audienceTable)
+    .innerJoin(channelTable, eq(channelTable.id, audienceTable.channelId))
+    .where(
+      and(
+        eq(audienceTable.targetId, audienceTargetId),
+        eq(audienceTable.brandId, brandId),
+        eq(channelTable.platform, platform),
+        isNotNull(audienceTable.externalId),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.externalId ?? null;
+}
+
 // ---- DRAFT → PLATFORM --------------------------------------------------
 
 /**
@@ -841,6 +873,7 @@ export async function setCampaignDelivery(
 export async function pushDraftToPlatform(
   input: {
     campaignId: string;
+    platform?: "meta_ads" | "google_ads";
     connectionAccountId: string;
     adAccountId: string;
     goal:
@@ -856,12 +889,13 @@ export async function pushDraftToPlatform(
   },
   context: AdsWriteContext,
 ) {
-  const initiative = await db.query.campaignTable.findFirst({
+  const platform = input.platform ?? "meta_ads";
+  const campaign = await db.query.campaignTable.findFirst({
     where: eq(campaignTable.id, input.campaignId),
   });
-  if (!initiative) throw new Error("Campaign draft not found");
+  if (!campaign) throw new Error("Campaign draft not found");
   const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, initiative.brandId),
+    where: eq(brandTable.id, campaign.brandId),
   });
   if (brand?.organizationId !== context.organizationId) {
     throw new Error("No access to this campaign draft");
@@ -870,28 +904,28 @@ export async function pushDraftToPlatform(
 
   const alreadyLive = await db.query.platformCampaignTable.findFirst({
     where: and(
-      eq(platformCampaignTable.campaignId, initiative.id),
-      eq(platformCampaignTable.platform, "meta_ads"),
+      eq(platformCampaignTable.campaignId, campaign.id),
+      eq(platformCampaignTable.platform, platform),
     ),
     columns: { id: true },
   });
   if (alreadyLive) {
     throw new Error(
-      "This draft already has a Meta campaign — edit it there, or draft a new push",
+      `This campaign already exists on ${platform === "meta_ads" ? "Meta" : "Google"} — edit it there, or draft a new push`,
     );
   }
 
   const destination = await requireAdDestination({
     organizationId: context.organizationId,
     brandSlug: brand.slug,
-    platform: "meta",
+    platform: platform === "meta_ads" ? "meta" : "google",
     connectionAccountId: input.connectionAccountId,
     adAccountId: input.adAccountId,
   });
 
   const spots = await db.query.adSpotTable.findMany({
     where: and(
-      eq(adSpotTable.campaignId, initiative.id),
+      eq(adSpotTable.campaignId, campaign.id),
       isNull(adSpotTable.externalId),
     ),
   });
@@ -909,12 +943,100 @@ export async function pushDraftToPlatform(
     );
   }
   const linkUrl =
-    spots.find((spot) => spot.linkUrl)?.linkUrl ?? initiative.landingUrl;
+    spots.find((spot) => spot.linkUrl)?.linkUrl ?? campaign.landingUrl;
   if (!linkUrl) {
     throw new Error(
-      "Set a landing URL on the draft, or a link URL on at least one ad",
+      "Set a landing URL on the campaign, or a link URL on at least one ad",
     );
   }
+
+  const adSets = await db.query.adSetTable.findMany({
+    where: eq(adSetTable.campaignId, campaign.id),
+  });
+
+  // ---- GOOGLE ---------------------------------------------------------
+  // Google's hierarchy is campaign → ad group, and its campaign TYPE decides
+  // everything (Search needs keywords, Display needs sized images). One call
+  // builds the whole tree; multi-ad-group is not modelled yet.
+  if (platform === "google_ads") {
+    const google = campaign.platformConfig?.google;
+    const campaignType = google?.campaignType;
+    if (!campaignType) {
+      throw new Error(
+        "Set the Google campaign type (search or display) on the campaign first",
+      );
+    }
+    if (campaignType === "search" && (google?.keywords ?? []).length === 0) {
+      throw new Error(
+        "A Google Search campaign needs keywords — it buys nothing without them",
+      );
+    }
+    if (input.goal === "conversions") {
+      throw new Error("Google push supports traffic, engagement, awareness, and video_views");
+    }
+    const hero = spots[0]!;
+    const result = await createGoogleAd(
+      {
+        businessKey: `push:${campaign.id}:google`,
+        brandSlug: brand.slug,
+        connectionAccountId: input.connectionAccountId,
+        adAccountId: destination.adAccount.id,
+        name: campaign.name,
+        campaignType,
+        goal: input.goal,
+        budgetAmount: input.budgetAmount,
+        budgetType: input.budgetType,
+        headline: hero.headline ?? hero.name ?? campaign.name,
+        body: hero.body ?? campaign.description ?? campaign.name,
+        linkUrl,
+        keywords: google?.keywords,
+        negativeKeywords: google?.negativeKeywords,
+        additionalHeadlines: google?.additionalHeadlines,
+        additionalDescriptions: google?.additionalDescriptions,
+        businessName: google?.businessName ?? brand.name,
+        images:
+          campaignType === "display"
+            ? { landscape: hero.media![0]!.url, square: hero.media![0]!.url }
+            : undefined,
+      },
+      context,
+    );
+    if (input.validateOnly) {
+      return {
+        campaignId: campaign.id,
+        platform,
+        validateOnly: true,
+        adsCreated: 0,
+        provider: result,
+      };
+    }
+    const created = await recordPlatformCampaign({
+      campaign,
+      brand,
+      platform,
+      goal: input.goal,
+      budgetAmount: input.budgetAmount,
+      platformCampaignId:
+        (result.provider as ZernioAdWriteResponse | undefined)
+          ?.platformCampaignId ?? null,
+      spots,
+      adSets,
+      platformAdSetId:
+        (result.provider as ZernioAdWriteResponse | undefined)
+          ?.platformAdSetId ?? null,
+    });
+    return {
+      campaignId: campaign.id,
+      platform,
+      validateOnly: false,
+      platformCampaignRowId: created.id,
+      adsCreated: spots.length,
+      path: `/app/brands/${brand.slug}/ads/${created.id}`,
+      provider: result,
+    };
+  }
+
+  // ---- META -----------------------------------------------------------
   if (
     input.goal === "conversions" &&
     !(input.promotedObject?.pixelId && input.promotedObject.customEventType)
@@ -924,120 +1046,276 @@ export async function pushDraftToPlatform(
     );
   }
 
-  const payload: CreateZernioStandaloneAdInput = {
-    accountId: input.connectionAccountId,
-    adAccountId: destination.adAccount.id,
-    name: initiative.name,
-    campaignName: initiative.name,
-    goal: input.goal,
-    budgetAmount: input.budgetAmount,
-    budgetType: input.budgetType,
-    // Top-level creative fields double as defaults for creatives[] entries.
-    headline: spots[0]!.headline ?? spots[0]!.name ?? initiative.name,
-    body: spots[0]!.body ?? initiative.name,
-    linkUrl,
-    creatives: spots.map((spot) => ({
-      name: spot.name ?? initiative.name,
+  const creativesFor = (subset: typeof spots) =>
+    subset.map((spot) => ({
+      name: spot.name ?? campaign.name,
       headline: spot.headline ?? undefined,
       body: spot.body ?? undefined,
       imageUrl: spot.media![0]!.url,
       linkUrl: spot.linkUrl ?? linkUrl,
-    })),
-    promotedObject: input.promotedObject,
-    ...metaDraftProviderControls(input.validateOnly),
-  };
+    }));
 
-  const result = await createZernioStandaloneAd(payload, {
-    idempotencyKey: idempotencyKey(
-      context,
-      "push-draft",
-      payload,
-      `push:${initiative.id}:meta`,
-    ),
-  });
-
-  if (input.validateOnly || result.validateOnly) {
+  // One ad set (or none defined) is a single call — fewer moving parts and
+  // nothing to clean up if Meta rejects it.
+  if (adSets.length <= 1) {
+    const only = adSets[0];
+    const audienceId = only
+      ? await platformAudienceIdFor(only.audienceTargetId, brand.id, platform)
+      : null;
+    const payload: CreateZernioStandaloneAdInput = {
+      accountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      name: campaign.name,
+      campaignName: campaign.name,
+      adSetName: only?.name,
+      goal: input.goal,
+      budgetAmount: only?.budget ?? input.budgetAmount,
+      budgetType: (only?.budgetType as "daily" | "lifetime") ?? input.budgetType,
+      headline: spots[0]!.headline ?? spots[0]!.name ?? campaign.name,
+      body: spots[0]!.body ?? campaign.name,
+      linkUrl,
+      creatives: creativesFor(spots),
+      targeting: audienceId ? { audienceId } : undefined,
+      promotedObject: input.promotedObject,
+      ...metaDraftProviderControls(input.validateOnly),
+    };
+    const result = await createZernioStandaloneAd(payload, {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-draft",
+        payload,
+        `push:${campaign.id}:meta`,
+      ),
+    });
+    if (input.validateOnly || result.validateOnly) {
+      return {
+        campaignId: campaign.id,
+        platform,
+        validateOnly: true,
+        adsCreated: 0,
+        provider: result,
+      };
+    }
+    const created = await recordPlatformCampaign({
+      campaign,
+      brand,
+      platform,
+      goal: input.goal,
+      budgetAmount: input.budgetAmount,
+      platformCampaignId: result.platformCampaignId ?? null,
+      spots,
+      adSets,
+      platformAdSetId: result.platformAdSetId ?? null,
+    });
     return {
-      campaignId: initiative.id,
-      validateOnly: true,
-      platformCampaignId: null,
-      adsCreated: 0,
+      campaignId: campaign.id,
+      platform,
+      validateOnly: false,
+      platformCampaignRowId: created.id,
+      adsCreated: (result.ads ?? (result.ad ? [result.ad] : [])).length,
+      path: `/app/brands/${brand.slug}/ads/${created.id}`,
       provider: result,
     };
   }
 
-  // The platform accepted it — mirror the campaign it created.
-  const platformCampaignId =
-    result.platformCampaignId ??
-    (typeof result.ad?.platformCampaignId === "string"
-      ? result.ad.platformCampaignId
-      : null);
+  // Several ad sets: create the campaign shell once with NO budget (ABO, so
+  // each ad set brings its own), then one create per ad set carrying its
+  // budget, its audience, and the ads assigned to it.
+  if (input.validateOnly) {
+    throw new Error(
+      "Dry run covers single-ad-set pushes only; Meta has no dry run for the two-step shape",
+    );
+  }
+  const shell = await createZernioAdCampaign(
+    {
+      accountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      name: campaign.name,
+      goal: input.goal,
+      status: "PAUSED",
+    },
+    {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-shell",
+        { campaignId: campaign.id },
+        `shell:${campaign.id}:meta`,
+      ),
+    },
+  );
+  const shellId =
+    shell.campaign?.platformCampaignId ?? shell.campaign?.id ?? null;
+  if (!shellId) throw new Error("Zernio returned no campaign id for the shell");
+
+  const perAdSet = [];
+  for (const adSet of adSets) {
+    const assigned = spots.filter((spot) => spot.adSetRowId === adSet.id);
+    // Ads with no ad set assigned ride with the first one rather than being
+    // silently dropped.
+    const subset =
+      assigned.length > 0
+        ? assigned
+        : adSet.id === adSets[0]!.id
+          ? spots.filter((spot) => !spot.adSetRowId)
+          : [];
+    if (subset.length === 0) continue;
+    const audienceId = await platformAudienceIdFor(
+      adSet.audienceTargetId,
+      brand.id,
+      platform,
+    );
+    const payload: CreateZernioStandaloneAdInput = {
+      accountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      existingCampaignId: shellId,
+      name: adSet.name,
+      adSetName: adSet.name,
+      goal: input.goal,
+      budgetAmount: adSet.budget ?? input.budgetAmount,
+      budgetType:
+        (adSet.budgetType as "daily" | "lifetime") ?? input.budgetType,
+      headline: subset[0]!.headline ?? subset[0]!.name ?? campaign.name,
+      body: subset[0]!.body ?? campaign.name,
+      linkUrl,
+      creatives: creativesFor(subset),
+      targeting: audienceId ? { audienceId } : undefined,
+      promotedObject: input.promotedObject,
+      ...metaDraftProviderControls(false),
+    };
+    const result = await createZernioStandaloneAd(payload, {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-adset",
+        payload,
+        `push:${campaign.id}:${adSet.id}`,
+      ),
+    });
+    perAdSet.push({ adSet, result, subset });
+  }
+
+  const created = await recordPlatformCampaign({
+    campaign,
+    brand,
+    platform,
+    goal: input.goal,
+    budgetAmount: input.budgetAmount,
+    platformCampaignId: shellId,
+    spots: [],
+    adSets: [],
+    platformAdSetId: null,
+  });
+
+  for (const { adSet, result, subset } of perAdSet) {
+    await db
+      .update(adSetTable)
+      .set({
+        platformCampaignId: created.id,
+        externalId: result.platformAdSetId ?? null,
+        status: "paused",
+      })
+      .where(eq(adSetTable.id, adSet.id));
+    const responseAds = result.ads ?? (result.ad ? [result.ad] : []);
+    for (const spot of subset) {
+      const match =
+        responseAds.find((ad) => ad.name === spot.name) ??
+        (responseAds.length === 1 ? responseAds[0] : undefined);
+      await db
+        .update(adSpotTable)
+        .set({
+          platformCampaignId: created.id,
+          externalId:
+            (typeof match?.platformAdId === "string"
+              ? match.platformAdId
+              : null) ??
+            match?.id ??
+            match?._id ??
+            null,
+          adSetId: result.platformAdSetId ?? null,
+          status: "paused",
+        })
+        .where(eq(adSpotTable.id, spot.id));
+    }
+  }
+
+  return {
+    campaignId: campaign.id,
+    platform,
+    validateOnly: false,
+    platformCampaignRowId: created.id,
+    adSetsCreated: perAdSet.length,
+    adsCreated: perAdSet.reduce((n, entry) => n + entry.subset.length, 0),
+    path: `/app/brands/${brand.slug}/ads/${created.id}`,
+  };
+}
+
+/**
+ * Mirror what the platform created: the platform_campaign row plus the
+ * externalIds on the ads and ad sets it produced.
+ */
+async function recordPlatformCampaign(input: {
+  campaign: typeof campaignTable.$inferSelect;
+  brand: Brand;
+  platform: "meta_ads" | "google_ads";
+  goal: string;
+  budgetAmount: number;
+  platformCampaignId: string | null;
+  spots: (typeof adSpotTable.$inferSelect)[];
+  adSets: (typeof adSetTable.$inferSelect)[];
+  platformAdSetId: string | null;
+}) {
   const channel = await db.query.channelTable.findFirst({
     where: and(
-      eq(channelTable.brandId, brand.id),
-      eq(channelTable.platform, "meta_ads"),
+      eq(channelTable.brandId, input.brand.id),
+      eq(channelTable.platform, input.platform),
       isNull(channelTable.deletedAt),
     ),
     columns: { id: true },
   });
   if (!channel) {
     throw new Error(
-      "The ads were created on Meta but no local Meta channel exists to file them under — run Pull recent ads",
+      "The ads were created but no local channel exists to file them under — run Pull recent ads",
     );
   }
-
-  const [campaign] = await db
+  const [created] = await db
     .insert(platformCampaignTable)
     .values({
-      id: createId("camp"),
+      id: createId("pcamp"),
       channelId: channel.id,
-      brandId: brand.id,
-      platform: "meta_ads",
-      campaignId: initiative.id,
-      name: initiative.name,
+      brandId: input.brand.id,
+      platform: input.platform,
+      campaignId: input.campaign.id,
+      name: input.campaign.name,
       status: "paused",
       objective: input.goal,
       budget: Math.round(input.budgetAmount),
-      externalId: platformCampaignId,
+      externalId: input.platformCampaignId,
     })
     .returning();
 
   await db
     .update(campaignTable)
     .set({ status: "active" })
-    .where(eq(campaignTable.id, initiative.id));
+    .where(eq(campaignTable.id, input.campaign.id));
 
-  const responseAds = result.ads ?? (result.ad ? [result.ad] : []);
-  for (const spot of spots) {
-    const match =
-      responseAds.find((ad) => ad.name === spot.name) ??
-      (responseAds.length === 1 ? responseAds[0] : undefined);
-    const platformAdId =
-      typeof match?.platformAdId === "string" ? match.platformAdId : null;
+  for (const spot of input.spots) {
     await db
       .update(adSpotTable)
       .set({
-        platformCampaignId: campaign!.id,
+        platformCampaignId: created!.id,
         channelId: channel.id,
-        externalId: platformAdId ?? match?.id ?? match?._id ?? null,
-        adSetId: result.platformAdSetId ?? null,
+        adSetId: input.platformAdSetId,
         status: "paused",
       })
       .where(eq(adSpotTable.id, spot.id));
   }
-  await db
-    .update(adSetTable)
-    .set({ platformCampaignId: campaign!.id, externalId: result.platformAdSetId ?? null })
-    .where(eq(adSetTable.campaignId, initiative.id));
-
-  return {
-    campaignId: initiative.id,
-    validateOnly: false,
-    platformCampaignRowId: campaign!.id,
-    platformCampaignId,
-    platformAdSetId: result.platformAdSetId ?? null,
-    adsCreated: responseAds.length,
-    path: `/app/brands/${brand.slug}/ads/${campaign!.id}`,
-    provider: result,
-  };
+  for (const adSet of input.adSets) {
+    await db
+      .update(adSetTable)
+      .set({
+        platformCampaignId: created!.id,
+        externalId: input.platformAdSetId,
+      })
+      .where(eq(adSetTable.id, adSet.id));
+  }
+  return created!;
 }

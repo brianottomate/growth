@@ -948,6 +948,12 @@ export type CreateZernioStandaloneAdInput = {
     linkUrl?: string;
     callToAction?: string;
   }[];
+  /**
+   * Slot a new ad set into an existing platform campaign instead of minting
+   * one. This is how a campaign carries several ad sets: create the campaign
+   * shell once, then one create per ad set with its own budget and targeting.
+   */
+  existingCampaignId?: string;
   campaignName?: string;
   adSetName?: string;
   adName?: string;
@@ -975,6 +981,31 @@ export type CreateZernioStandaloneAdInput = {
     objectStoreUrl?: string;
   };
 };
+
+/**
+ * Create the campaign shell WITHOUT its first ad set and ad. Omitting a
+ * budget here means ABO — each ad set brings its own budget when it joins,
+ * which is what our first-party ad sets model.
+ * https://docs.zernio.com/ad-campaigns/create-campaign
+ */
+export async function createZernioAdCampaign(
+  input: {
+    accountId: string;
+    adAccountId: string;
+    name: string;
+    goal: string;
+    budgetAmount?: number;
+    budgetType?: "daily" | "lifetime";
+    status?: "PAUSED";
+  },
+  options: { idempotencyKey: string },
+): Promise<{ campaign?: { id?: string; platformCampaignId?: string; objective?: string } }> {
+  return zernioFetch("/ads/campaigns", {
+    method: "POST",
+    headers: { "Idempotency-Key": options.idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
 
 export type ZernioAdWriteResponse = {
   ad?: ZernioAd;

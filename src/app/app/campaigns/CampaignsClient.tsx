@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
@@ -9,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { ChannelLogo } from "@/components/channel-logos";
 import type { CampaignStatus } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
-import { CampaignDialog } from "./CampaignDialog";
 
 export const STATUS_META: Record<
   CampaignStatus,
@@ -60,7 +58,6 @@ export function CampaignsClient({
   const { data } = useQuery(trpc.initiative.overview.queryOptions());
   const initiatives = data?.initiatives ?? [];
 
-  const [createOpen, setCreateOpen] = useState(false);
 
   const byStatus = (s: CampaignStatus) =>
     initiatives
@@ -77,13 +74,16 @@ export function CampaignsClient({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Seasonal moments, major events, and long-running pushes — and
-            everything attached to them.
+            Every brand&apos;s campaigns in one place. A campaign is created
+            on the brand it belongs to and opens there; this is the index
+            across all of them.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="size-4" />
-          New campaign
+        <Button variant="outline" asChild>
+          <Link href="/app/brands">
+            <Plus className="size-4" />
+            New campaign
+          </Link>
         </Button>
       </div>
 
@@ -132,7 +132,11 @@ export function CampaignsClient({
                 return (
                   <Link
                     key={i.id}
-                    href={`/app/campaigns/${i.id}`}
+                    href={
+                      i.brand?.slug
+                        ? `/app/brands/${i.brand.slug}/ads/draft/${i.id}`
+                        : `/app/campaigns/${i.id}`
+                    }
                     className="bg-card hover:bg-accent/40 flex items-center gap-3 rounded-xl border p-3.5 transition-colors"
                   >
                     <span
@@ -195,11 +199,6 @@ export function CampaignsClient({
         );
       })}
 
-      <CampaignDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        brands={brands}
-      />
     </div>
   );
 }

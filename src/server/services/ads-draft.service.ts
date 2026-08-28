@@ -10,6 +10,7 @@ import {
   brandTable,
   platformCampaignTable,
   campaignTable,
+  type CampaignPlatformConfig,
   type MediaItem,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
@@ -261,6 +262,30 @@ export async function setCampaignCreativePool(input: {
   const [updated] = await db
     .update(campaignTable)
     .set({ creativePool: input.media })
+    .where(eq(campaignTable.id, initiative.id))
+    .returning({ id: campaignTable.id });
+  return updated!;
+}
+
+/** Per-platform campaign settings (Google type/keywords, Meta pixel). */
+export async function setCampaignPlatformConfig(input: {
+  organizationId: string;
+  campaignId: string;
+  google?: CampaignPlatformConfig["google"] | null;
+  meta?: CampaignPlatformConfig["meta"] | null;
+}) {
+  const { initiative } = await requireOwnedInitiative(
+    input.campaignId,
+    input.organizationId,
+  );
+  const next: CampaignPlatformConfig = {
+    ...(initiative.platformConfig ?? {}),
+    ...(input.google !== undefined ? { google: input.google ?? undefined } : {}),
+    ...(input.meta !== undefined ? { meta: input.meta ?? undefined } : {}),
+  };
+  const [updated] = await db
+    .update(campaignTable)
+    .set({ platformConfig: next })
     .where(eq(campaignTable.id, initiative.id))
     .returning({ id: campaignTable.id });
   return updated!;

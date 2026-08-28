@@ -38,12 +38,18 @@ export function PushToPlatform({
   brandSlug,
   spotCount,
   defaultBudget,
+  platform = "meta_ads",
+  adSetCount = 0,
 }: {
   campaignId: string;
   brandSlug: string;
   spotCount: number;
   defaultBudget: number | null;
+  platform?: "meta_ads" | "google_ads";
+  adSetCount?: number;
 }) {
+  const isMeta = platform === "meta_ads";
+  const platformLabel = isMeta ? "Meta" : "Google";
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -56,7 +62,7 @@ export function PushToPlatform({
 
   const destinations = useQuery(
     trpc.ads.destinations.queryOptions(
-      { brandSlug, platform: "meta" },
+      { brandSlug, platform: isMeta ? "meta" : "google" },
       { enabled: open },
     ),
   );
@@ -96,16 +102,18 @@ export function PushToPlatform({
       <DialogTrigger asChild>
         <Button size="sm">
           <UploadCloud className="size-3.5" />
-          Push to Meta
+          Push to {platformLabel}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Push this draft to Meta?</DialogTitle>
+          <DialogTitle>Push this draft to {platformLabel}?</DialogTitle>
           <DialogDescription>
-            Creates the campaign, one ad set, and {spotCount} ad
-            {spotCount === 1 ? "" : "s"} on Meta — all PAUSED. Nothing spends
-            until you hit Launch on the campaign afterwards.
+            Creates the campaign,{" "}
+            {adSetCount > 1 ? `${adSetCount} ad sets` : "one ad set"}, and{" "}
+            {spotCount} ad{spotCount === 1 ? "" : "s"} on {platformLabel} — all
+            PAUSED. Nothing spends until you hit Launch on the campaign
+            afterwards.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -183,12 +191,18 @@ export function PushToPlatform({
           <Button
             size="sm"
             variant="outline"
-            disabled={!canPush}
+            title={
+              adSetCount > 1
+                ? "Meta has no dry run for the multi-ad-set shape"
+                : undefined
+            }
+            disabled={!canPush || (isMeta && adSetCount > 1)}
             loading={push.isPending}
             onClick={() =>
               chosen &&
               push.mutate({
                 campaignId,
+                platform,
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,
@@ -208,6 +222,7 @@ export function PushToPlatform({
               chosen &&
               push.mutate({
                 campaignId,
+                platform,
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,

@@ -125,6 +125,28 @@ export const campaignStatusEnum = pgEnum("campaign_status", [
 ]);
 export type CampaignStatus = (typeof campaignStatusEnum.enumValues)[number];
 
+/**
+ * Per-platform campaign settings. Only what the platform demands and the
+ * first-party layer cannot express generically.
+ */
+export type CampaignPlatformConfig = {
+  google?: {
+    /** Zernio supports search and display; the type decides everything else. */
+    campaignType?: "search" | "display";
+    /** Search only, and required by it — a Search campaign with no keywords buys nothing. */
+    keywords?: string[];
+    negativeKeywords?: string[];
+    additionalHeadlines?: string[];
+    additionalDescriptions?: string[];
+    /** Display only: Google renders the advertiser name on the creative. */
+    businessName?: string;
+  };
+  meta?: {
+    pixelId?: string;
+    customEventType?: string;
+  };
+};
+
 export const campaignTable = pgTable(
   "campaign",
   (t) => ({
@@ -153,6 +175,16 @@ export const campaignTable = pgTable(
     // Channels the CMO wants this to run on (platform slugs). The per-channel
     // `campaign` rows are the implementations we verify against this list.
     targetChannels: t.jsonb().$type<string[]>(),
+
+    /**
+     * Per-platform intent that has no cross-platform meaning: Google needs a
+     * campaign type and keywords, Meta needs a pixel and event. Typed JSONB
+     * rather than per-platform extension tables because these are payload we
+     * read whole and never filter, join, or aggregate on — and because ad
+     * platforms change their shapes far faster than a migration cadence.
+     * Anything we DO query (budget, status, externalId) stays a column.
+     */
+    platformConfig: t.jsonb().$type<CampaignPlatformConfig>().default({}),
 
     /**
      * Shared creative for this campaign's ads — the paid counterpart of the

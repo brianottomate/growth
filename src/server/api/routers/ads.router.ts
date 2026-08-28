@@ -19,6 +19,7 @@ import {
   addDraftAdSet,
   attachPlatformCampaign,
   listBrandAudienceTargets,
+  setCampaignPlatformConfig,
   setCampaignCreativePool,
   createDraftInitiative,
   listBrandCampaigns,
@@ -179,6 +180,38 @@ export const adsRouter = {
       }),
     ),
 
+  setCampaignPlatformConfig: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        google: z
+          .object({
+            campaignType: z.enum(["search", "display"]).optional(),
+            keywords: z.array(z.string().trim().min(1)).max(200).optional(),
+            negativeKeywords: z
+              .array(z.string().trim().min(1))
+              .max(200)
+              .optional(),
+            additionalHeadlines: z
+              .array(z.string().trim().min(1).max(30))
+              .max(14)
+              .optional(),
+            additionalDescriptions: z
+              .array(z.string().trim().min(1).max(90))
+              .max(4)
+              .optional(),
+            businessName: z.string().trim().max(120).optional(),
+          })
+          .nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setCampaignPlatformConfig({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
   setCampaignCreativePool: protectedProcedure
     .input(
       z.object({
@@ -278,6 +311,7 @@ export const adsRouter = {
     .input(
       z.object({
         campaignId: z.string().min(1),
+        platform: z.enum(["meta_ads", "google_ads"]).default("meta_ads"),
         connectionAccountId: z.string().min(1),
         adAccountId: z.string().min(1),
         goal: z.enum([

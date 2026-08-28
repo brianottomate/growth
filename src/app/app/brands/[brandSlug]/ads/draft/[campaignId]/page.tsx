@@ -11,6 +11,7 @@ import { getDraftInitiative } from "@/server/services/ads-draft.service";
 import { AddAdButton } from "../../[platformCampaignId]/AddAdButton";
 import { AdSets } from "./AdSets";
 import { CreativePool } from "./CreativePool";
+import { GoogleSettings } from "./GoogleSettings";
 import { PushToPlatform } from "../../[platformCampaignId]/PushToPlatform";
 
 export const dynamic = "force-dynamic";
@@ -100,14 +101,18 @@ export default async function CampaignDraftPage({
               brandId={draft.brand.id}
               inheritedLinkUrl={initiative.landingUrl}
             />
-            {spots.length > 0 && (
-              <PushToPlatform
-                campaignId={initiative.id}
-                brandSlug={brandSlug}
-                spotCount={spots.length}
-                defaultBudget={initiative.budget}
-              />
-            )}
+            {spots.length > 0 &&
+              (targets.length > 0 ? targets : ["meta_ads"]).map((target) => (
+                <PushToPlatform
+                  key={target}
+                  campaignId={initiative.id}
+                  brandSlug={brandSlug}
+                  spotCount={spots.length}
+                  defaultBudget={initiative.budget}
+                  platform={target as "meta_ads" | "google_ads"}
+                  adSetCount={adSets.length}
+                />
+              ))}
           </div>
         </div>
       </header>
@@ -167,6 +172,13 @@ export default async function CampaignDraftPage({
         brandId={draft.brand.id}
         pool={initiative.creativePool ?? []}
       />
+
+      {targets.includes("google_ads") && (
+        <GoogleSettings
+          campaignId={initiative.id}
+          config={initiative.platformConfig?.google}
+        />
+      )}
 
       <AdSets
         campaignId={initiative.id}
