@@ -214,8 +214,11 @@ export default async function BrandAdsPage({
       ungroupedCampaigns.push(c);
     }
   }
+  // Drafted ads have no campaign until the push creates one; they show on
+  // the draft page, not here.
   const spotsByCampaign = new Map<string, typeof adSpots>();
   for (const s of adSpots) {
+    if (!s.campaignId) continue;
     const list = spotsByCampaign.get(s.campaignId) ?? [];
     list.push(s);
     spotsByCampaign.set(s.campaignId, list);

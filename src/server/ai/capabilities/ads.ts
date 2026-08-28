@@ -18,7 +18,7 @@ import {
 } from "@/server/services/ads-write.service";
 import {
   addDraftAd,
-  createDraftCampaign,
+  createDraftInitiative,
 } from "@/server/services/ads-draft.service";
 import { growthAction } from "./types";
 
@@ -135,19 +135,18 @@ export const listAdsDestinations = growthAction({
 
 export const draftCampaignAction = growthAction({
   description:
-    "Create a LOCAL draft campaign row — the editable first-party object shown on the campaign canvas (/app/brands/{brandSlug}/ads/{campaignId}). Nothing touches any ad platform: drafting is free and reversible, and launching is a separate operator-approved step. Use adsWrite.createMetaDraft/createGoogle when the user wants the campaign created ON the provider.",
+    "Create a LOCAL campaign draft (an initiative) — the editable first-party object shown at /app/brands/{brandSlug}/ads/draft/{initiativeId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     name: z.string().trim().min(1).max(300),
-    platforms: z
+    targetChannels: z
       .array(z.enum(["meta_ads", "google_ads"]))
       .min(1)
       .max(2)
       .optional()
-      .describe(
-        "One campaign per platform. Two platforms mints an initiative that groups them as one push.",
-      ),
-    objective: z.string().trim().max(200).optional(),
+      .describe("Intended platforms; the push decides what actually ships."),
+    landingUrl: z.string().url().optional(),
+    goal: z.string().trim().max(200).optional(),
     budget: z
       .number()
       .int()
@@ -157,7 +156,7 @@ export const draftCampaignAction = growthAction({
     initiativeId: z.string().trim().min(1).optional(),
   }),
   execute: async (input, ctx) =>
-    createDraftCampaign({
+    createDraftInitiative({
       ...input,
       organizationId: ctx.orgId,
     }),
@@ -402,9 +401,10 @@ export const addAudienceUsersAction = growthAction({
 
 export const draftAdAction = growthAction({
   description:
-    "Add a drafted ad to a LOCAL draft campaign (one created with adsWrite.draftCampaign). Local only — nothing touches the platform until the operator pushes the draft from the campaign canvas. The creative is an image URL, ideally a media-library asset URL.",
+    "Add a drafted ad to a LOCAL campaign draft (one created with adsWrite.draftCampaign). Local only — nothing touches the platform until the operator pushes the draft. The creative is an image URL, ideally a media-library asset URL.",
   inputSchema: z.object({
-    campaignId: z.string().trim().min(1),
+    initiativeId: z.string().trim().min(1),
+    adSetId: z.string().trim().min(1).optional(),
     name: z.string().trim().min(1).max(300),
     headline: z.string().trim().max(255).optional(),
     body: z.string().trim().max(2_200).optional(),
@@ -419,7 +419,8 @@ export const draftAdAction = growthAction({
   }),
   execute: async (input, ctx) =>
     addDraftAd({
-      campaignId: input.campaignId,
+      initiativeId: input.initiativeId,
+      adSetId: input.adSetId ?? null,
       name: input.name,
       headline: input.headline ?? null,
       body: input.body ?? null,

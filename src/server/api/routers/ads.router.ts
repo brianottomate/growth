@@ -11,12 +11,13 @@ import {
 
 import {
   listAdsWriteDestinations,
-  pushDraftCampaignToPlatform,
+  pushDraftToPlatform,
   setCampaignDelivery,
 } from "@/server/services/ads-write.service";
 import {
   addDraftAd,
-  createDraftCampaign,
+  addDraftAdSet,
+  createDraftInitiative,
   linkCampaignToInitiative,
   listBrandInitiatives,
 } from "@/server/services/ads-draft.service";
@@ -114,22 +115,40 @@ export const adsRouter = {
 
   /** A local draft: the editable object chat and the canvas work on. No
    *  provider call — launching is the separate, approved step. */
-  createDraftCampaign: protectedProcedure
+  createDraft: protectedProcedure
     .input(
       z.object({
         brandId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
-        platforms: z
+        targetChannels: z
           .array(z.enum(["meta_ads", "google_ads"]))
           .min(1)
           .max(2)
           .default(["meta_ads"]),
-        objective: z.string().trim().max(200).nullish(),
+        goal: z.string().trim().max(200).nullish(),
+        landingUrl: z.string().url().nullish(),
         budget: z.number().int().min(0).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      createDraftCampaign({
+      createDraftInitiative({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  addDraftAdSet: protectedProcedure
+    .input(
+      z.object({
+        initiativeId: z.string().min(1),
+        name: z.string().trim().min(1).max(300),
+        audienceTargetId: z.string().nullish(),
+        budget: z.number().int().min(0).nullish(),
+        budgetType: z.enum(["daily", "lifetime"]).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      addDraftAdSet({
         ...input,
         organizationId: await organizationIdFor(ctx),
       }),
@@ -170,7 +189,8 @@ export const adsRouter = {
   addDraftAd: protectedProcedure
     .input(
       z.object({
-        campaignId: z.string().min(1),
+        initiativeId: z.string().min(1),
+        adSetId: z.string().nullish(),
         name: z.string().trim().min(1).max(300),
         headline: z.string().trim().max(255).nullish(),
         body: z.string().trim().max(2_200).nullish(),
@@ -220,7 +240,7 @@ export const adsRouter = {
   pushDraftToPlatform: protectedProcedure
     .input(
       z.object({
-        campaignId: z.string().min(1),
+        initiativeId: z.string().min(1),
         connectionAccountId: z.string().min(1),
         adAccountId: z.string().min(1),
         goal: z.enum([
@@ -236,7 +256,7 @@ export const adsRouter = {
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      pushDraftCampaignToPlatform(input, {
+      pushDraftToPlatform(input, {
         organizationId: await organizationIdFor(ctx),
         runId: createId("run"),
       }),

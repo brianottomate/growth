@@ -13,10 +13,8 @@ import {
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
-import { AddAdButton } from "./AddAdButton";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { InitiativeLink } from "./InitiativeLink";
-import { PushToPlatform } from "./PushToPlatform";
 
 export const dynamic = "force-dynamic";
 
@@ -172,17 +170,6 @@ export default async function CampaignPage({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!campaign.externalId && (
-              <AddAdButton campaignId={campaign.id} brandId={brand.id} />
-            )}
-            {!campaign.externalId && spots.length > 0 && (
-              <PushToPlatform
-                campaignId={campaign.id}
-                brandSlug={brandSlug}
-                spotCount={spots.length}
-                defaultBudget={campaign.budget}
-              />
-            )}
             {campaign.manageUrl && (
               <a
                 href={campaign.manageUrl}

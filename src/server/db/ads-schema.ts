@@ -1,5 +1,11 @@
 import { relations, sql } from "drizzle-orm";
-import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  pgEnum,
+  pgTable,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { brandTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
@@ -289,10 +295,18 @@ export const adSetTable = pgTable(
       .primaryKey()
       .$defaultFn(() => createId("adset")),
 
+    /**
+     * The first-party push this ad set belongs to. Drafts hang off the
+     * initiative alone; `campaignId` is stamped when the push creates the
+     * per-platform campaign.
+     */
+    initiativeId: t
+      .text()
+      .references(() => initiativeTable.id, { onDelete: "cascade" }),
+    /** The per-platform campaign, once this ad set exists on a platform. */
     campaignId: t
       .text()
-      .references(() => campaignTable.id, { onDelete: "cascade" })
-      .notNull(),
+      .references(() => campaignTable.id, { onDelete: "cascade" }),
     brandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
@@ -335,7 +349,12 @@ export const adSetTable = pgTable(
   }),
   (table) => [
     index("ad_set_campaign_idx").on(table.campaignId),
+    index("ad_set_initiative_idx").on(table.initiativeId),
     index("ad_set_brand_idx").on(table.brandId),
+    check(
+      "ad_set_parent_check",
+      sql`${table.initiativeId} IS NOT NULL OR ${table.campaignId} IS NOT NULL`,
+    ),
     index("ad_set_audience_target_idx").on(table.audienceTargetId),
     uniqueIndex("ad_set_external_id_idx")
       .on(table.externalId)
@@ -353,10 +372,14 @@ export const adSpotTable = pgTable(
       .primaryKey()
       .$defaultFn(() => createId("ad")),
 
+    /** First-party push, for ads drafted before any platform campaign exists. */
+    initiativeId: t
+      .text()
+      .references(() => initiativeTable.id, { onDelete: "cascade" }),
+    /** Per-platform campaign; stamped by the push, set by sync. */
     campaignId: t
       .text()
-      .references(() => campaignTable.id, { onDelete: "cascade" })
-      .notNull(),
+      .references(() => campaignTable.id, { onDelete: "cascade" }),
     channelId: t
       .text()
       .references(() => channelTable.id, { onDelete: "set null" }),

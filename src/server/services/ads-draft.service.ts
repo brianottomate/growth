@@ -4,100 +4,33 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  adSetTable,
   adSpotTable,
   brandTable,
   campaignTable,
-  channelTable,
   initiativeTable,
   type MediaItem,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
-import { getAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
 
-// ---- FIRST-PARTY CAMPAIGN DRAFTS --------------------------------------
+// ---- FIRST-PARTY AD DRAFTS --------------------------------------------
 //
-// A draft campaign is a local `campaign` row with no `externalId`: the
-// editable object that chat and the campaign canvas work on before anything
-// touches a provider. Launching (creating it on the platform) is a separate,
-// operator-approved step — drafting is free and reversible.
+// The thing you author is an INITIATIVE: one push, brand-scoped, carrying its
+// ad sets (targeting + budget) and ads (creative + copy). Per-platform
+// `campaign` rows are created by the push, from the platform's own response —
+// which is why `campaign` gets to keep meaning "a real campaign on a real ad
+// account" and why a draft never needs a placeholder channel to exist.
+//
+// It is the same canonical/per-surface split the organic side already uses
+// (content_post → platform_post); `initiative` is literally the shared layer,
+// referenced by content_post and series as well as campaign.
 
 export type DraftAdPlatform = "meta_ads" | "google_ads";
 
-/**
- * The channel a draft hangs on: the brand's ad channel for the platform,
- * preferring one bound to an allowed ad account (that is where a launch
- * would land). Creates a placeholder channel when the brand has none yet,
- * matching how ads-sync handles never-before-seen accounts.
- */
-async function resolveDraftChannel(
-  brand: { id: string; name: string },
-  platform: DraftAdPlatform,
-): Promise<string> {
-  const channels = await db.query.channelTable.findMany({
-    where: and(
-      eq(channelTable.brandId, brand.id),
-      eq(channelTable.platform, platform),
-      eq(channelTable.kind, "ad"),
-      isNull(channelTable.deletedAt),
-    ),
-    columns: { id: true, externalId: true },
-  });
-  if (channels.length > 0) {
-    const allowed = await getAllowedAdAccountIds(brand.id);
-    const sameAccount = (a: string, b: string) =>
-      a.replace(/^act_/, "") === b.replace(/^act_/, "");
-    const bound = channels.find(
-      (channel) =>
-        channel.externalId &&
-        [...allowed].some((id) => sameAccount(id, channel.externalId!)),
-    );
-    return (bound ?? channels[0]!).id;
-  }
-  // Placeholder until a real ad account is allowed and synced — must not
-  // render as a connected channel.
-  const [created] = await db
-    .insert(channelTable)
-    .values({
-      id: createId("chan"),
-      brandId: brand.id,
-      kind: "ad",
-      platform,
-      displayName: brand.name,
-      connectionStatus: "disconnected",
-    })
-    .returning({ id: channelTable.id });
-  return created!.id;
-}
-
-/** An initiative id from a caller is only trusted after it maps to the brand. */
-async function assertInitiativeBelongsToBrand(
-  initiativeId: string,
-  brandId: string,
-) {
-  const initiative = await db.query.initiativeTable.findFirst({
-    where: eq(initiativeTable.id, initiativeId),
-    columns: { brandId: true },
-  });
-  if (initiative?.brandId !== brandId) {
-    throw new Error("That initiative does not belong to this brand");
-  }
-}
-
-export async function createDraftCampaign(input: {
+async function requireOwnedBrand(input: {
   organizationId: string;
-  /** One of brandId / brandSlug is required. */
   brandId?: string;
   brandSlug?: string;
-  name: string;
-  /** One campaign per platform; >1 mints an initiative to group them. */
-  platforms?: DraftAdPlatform[];
-  platform?: DraftAdPlatform;
-  objective?: string | null;
-  /** Whole dollars, total intended for the campaign. */
-  budget?: number | null;
-  startAt?: Date | null;
-  endAt?: Date | null;
-  initiativeId?: string | null;
 }) {
   if (!input.brandId && !input.brandSlug) {
     throw new Error("brandId or brandSlug is required");
@@ -117,75 +50,186 @@ export async function createDraftCampaign(input: {
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this brand");
   }
+  return brand;
+}
 
-  if (input.initiativeId) {
-    await assertInitiativeBelongsToBrand(input.initiativeId, brand.id);
+async function requireOwnedInitiative(
+  initiativeId: string,
+  organizationId: string,
+) {
+  const initiative = await db.query.initiativeTable.findFirst({
+    where: eq(initiativeTable.id, initiativeId),
+  });
+  if (!initiative) throw new Error("Campaign draft not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, initiative.brandId),
+    columns: { id: true, slug: true, organizationId: true },
+  });
+  if (brand?.organizationId !== organizationId) {
+    throw new Error("No access to this campaign draft");
   }
+  return { initiative, brand };
+}
 
-  const platforms =
-    input.platforms && input.platforms.length > 0
-      ? [...new Set(input.platforms)]
-      : [input.platform ?? "meta_ads"];
+/**
+ * Create the draft: an initiative, nothing else. Platforms are recorded as
+ * intent (`targetChannels`) and only become real campaigns at push time.
+ */
+export async function createDraftInitiative(input: {
+  organizationId: string;
+  brandId?: string;
+  brandSlug?: string;
+  name: string;
+  goal?: string | null;
+  landingUrl?: string | null;
+  /** Intended platforms; the push decides what actually ships. */
+  targetChannels?: DraftAdPlatform[];
+  /** Whole dollars for the whole push. */
+  budget?: number | null;
+  startAt?: Date | null;
+  endAt?: Date | null;
+}) {
+  const brand = await requireOwnedBrand(input);
 
-  // One first-party push, N per-platform campaigns — the same canonical/
-  // per-surface split content uses (content_post → platform_post). A single
-  // platform needs no wrapper; two or more get an initiative so the push is
-  // one object in the UI and in reporting.
-  let initiativeId = input.initiativeId ?? null;
-  if (!initiativeId && platforms.length > 1) {
-    const [initiative] = await db
-      .insert(initiativeTable)
-      .values({
-        id: createId("init"),
-        brandId: brand.id,
-        name: input.name,
-        status: "planned",
-        targetChannels: platforms,
-        budget: input.budget ?? null,
-      })
-      .returning({ id: initiativeTable.id });
-    initiativeId = initiative!.id;
-  }
-
-  const campaigns = [];
-  for (const platform of platforms) {
-    const channelId = await resolveDraftChannel(brand, platform);
-    const [campaign] = await db
-      .insert(campaignTable)
-      .values({
-        id: createId("camp"),
-        channelId,
-        brandId: brand.id,
-        platform,
-        initiativeId,
-        name: input.name,
-        status: "draft",
-        objective: input.objective ?? null,
-        // Split evenly across platforms so the sum matches the intent.
-        budget:
-          input.budget != null
-            ? Math.floor(input.budget / platforms.length)
-            : null,
-        startAt: input.startAt ?? null,
-        endAt: input.endAt ?? null,
-      })
-      .returning();
-    campaigns.push(campaign!);
-  }
+  const [initiative] = await db
+    .insert(initiativeTable)
+    .values({
+      id: createId("init"),
+      brandId: brand.id,
+      name: input.name,
+      status: "planned",
+      goal: input.goal ?? null,
+      landingUrl: input.landingUrl ?? null,
+      targetChannels: input.targetChannels ?? ["meta_ads"],
+      budget: input.budget ?? null,
+      startAt: input.startAt ?? null,
+      endAt: input.endAt ?? null,
+    })
+    .returning();
 
   return {
-    campaign: campaigns[0]!,
-    campaigns,
-    initiativeId,
+    initiative: initiative!,
     brandSlug: brand.slug,
-    path: `/app/brands/${brand.slug}/ads/${campaigns[0]!.id}`,
+    path: `/app/brands/${brand.slug}/ads/draft/${initiative!.id}`,
   };
 }
 
 /**
- * Adopt a campaign (usually a synced, unlinked one) into the first-party
- * intent layer: attach it to an initiative, minting the initiative when a
- * name is given instead of an id.
+ * Add an ad set — the targeting + budget layer every platform has (Meta ad
+ * set, Google ad group). One initiative can carry several, which is how a
+ * real prospecting build splits audiences.
+ */
+export async function addDraftAdSet(input: {
+  organizationId: string;
+  initiativeId: string;
+  name: string;
+  audienceTargetId?: string | null;
+  budget?: number | null;
+  budgetType?: "daily" | "lifetime" | null;
+  optimizationGoal?: string | null;
+}) {
+  const { initiative, brand } = await requireOwnedInitiative(
+    input.initiativeId,
+    input.organizationId,
+  );
+
+  const [adSet] = await db
+    .insert(adSetTable)
+    .values({
+      id: createId("adset"),
+      initiativeId: initiative.id,
+      brandId: brand.id,
+      name: input.name.trim(),
+      audienceTargetId: input.audienceTargetId ?? null,
+      budget: input.budget ?? null,
+      budgetType: input.budgetType ?? null,
+      optimizationGoal: input.optimizationGoal ?? null,
+    })
+    .returning();
+  return adSet!;
+}
+
+/**
+ * Add a drafted ad. Creative comes from the media library (a MediaItem
+ * carrying assetId) or a direct URL. Ads hang off the initiative, and
+ * optionally off one of its ad sets.
+ */
+export async function addDraftAd(input: {
+  organizationId: string;
+  initiativeId: string;
+  adSetId?: string | null;
+  name: string;
+  headline?: string | null;
+  body?: string | null;
+  linkUrl?: string | null;
+  media?: MediaItem[] | null;
+  businessKey?: string | null;
+}) {
+  const { initiative, brand } = await requireOwnedInitiative(
+    input.initiativeId,
+    input.organizationId,
+  );
+
+  if (input.adSetId) {
+    const adSet = await db.query.adSetTable.findFirst({
+      where: eq(adSetTable.id, input.adSetId),
+      columns: { initiativeId: true },
+    });
+    if (adSet?.initiativeId !== initiative.id) {
+      throw new Error("That ad set belongs to a different campaign draft");
+    }
+  }
+
+  const businessKey =
+    input.businessKey ??
+    `${initiative.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
+
+  const [spot] = await db
+    .insert(adSpotTable)
+    .values({
+      initiativeId: initiative.id,
+      adSetRowId: input.adSetId ?? null,
+      brandId: brand.id,
+      // Platform is intent until the push; the initiative's targetChannels
+      // decide where this ad actually ships.
+      platform: "meta_ads",
+      name: input.name.trim(),
+      headline: input.headline ?? null,
+      body: input.body ?? null,
+      linkUrl: input.linkUrl ?? null,
+      media: input.media ?? null,
+      businessKey,
+    })
+    .returning();
+  return spot!;
+}
+
+/** The whole draft, for the draft page. */
+export async function getDraftInitiative(
+  organizationId: string,
+  initiativeId: string,
+) {
+  const { initiative, brand } = await requireOwnedInitiative(
+    initiativeId,
+    organizationId,
+  );
+  const [adSets, spots, campaigns] = await Promise.all([
+    db.query.adSetTable.findMany({
+      where: eq(adSetTable.initiativeId, initiative.id),
+    }),
+    db.query.adSpotTable.findMany({
+      where: eq(adSpotTable.initiativeId, initiative.id),
+    }),
+    db.query.campaignTable.findMany({
+      where: eq(campaignTable.initiativeId, initiative.id),
+    }),
+  ]);
+  return { initiative, brand, adSets, spots, campaigns };
+}
+
+/**
+ * Adopt a campaign born on a platform into the first-party layer: attach it
+ * to an initiative, minting one when a name is given instead of an id.
  */
 export async function linkCampaignToInitiative(input: {
   organizationId: string;
@@ -207,7 +251,13 @@ export async function linkCampaignToInitiative(input: {
 
   let initiativeId = input.initiativeId ?? null;
   if (initiativeId) {
-    await assertInitiativeBelongsToBrand(initiativeId, brand.id);
+    const initiative = await db.query.initiativeTable.findFirst({
+      where: eq(initiativeTable.id, initiativeId),
+      columns: { brandId: true },
+    });
+    if (initiative?.brandId !== brand.id) {
+      throw new Error("That initiative does not belong to this brand");
+    }
   }
   if (!initiativeId && input.newInitiativeName?.trim()) {
     const [initiative] = await db
@@ -226,7 +276,10 @@ export async function linkCampaignToInitiative(input: {
     .update(campaignTable)
     .set({ initiativeId })
     .where(eq(campaignTable.id, campaign.id))
-    .returning({ id: campaignTable.id, initiativeId: campaignTable.initiativeId });
+    .returning({
+      id: campaignTable.id,
+      initiativeId: campaignTable.initiativeId,
+    });
   return updated!;
 }
 
@@ -247,65 +300,4 @@ export async function listBrandInitiatives(input: {
     orderBy: [desc(initiativeTable.createdAt)],
     columns: { id: true, name: true, status: true },
   });
-}
-
-/**
- * Add a drafted ad (spot) to a draft campaign. The creative comes from the
- * media library (a MediaItem carrying assetId) or a direct URL. businessKey
- * makes the same drafted ad recognisable across surfaces and becomes the
- * dedupe key when the draft is pushed to the platform.
- */
-export async function addDraftAd(input: {
-  organizationId: string;
-  campaignId: string;
-  name: string;
-  headline?: string | null;
-  body?: string | null;
-  linkUrl?: string | null;
-  media?: MediaItem[] | null;
-  businessKey?: string | null;
-}) {
-  const campaign = await db.query.campaignTable.findFirst({
-    where: eq(campaignTable.id, input.campaignId),
-  });
-  if (!campaign) throw new Error("Campaign not found");
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, campaign.brandId),
-    columns: { organizationId: true },
-  });
-  if (brand?.organizationId !== input.organizationId) {
-    throw new Error("No access to this campaign");
-  }
-  if (campaign.externalId) {
-    throw new Error(
-      "This campaign is already on the platform — add creatives there, or draft a new campaign",
-    );
-  }
-
-  const businessKey =
-    input.businessKey ??
-    `${campaign.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
-
-  const [spot] = await db
-    .insert(adSpotTable)
-    .values({
-      campaignId: campaign.id,
-      channelId: campaign.channelId,
-      brandId: campaign.brandId,
-      platform: campaign.platform,
-      name: input.name.trim(),
-      headline: input.headline ?? null,
-      body: input.body ?? null,
-      linkUrl: input.linkUrl ?? null,
-      media: input.media ?? null,
-      businessKey,
-    })
-    .returning();
-
-  await db
-    .update(campaignTable)
-    .set({ adSpots: (campaign.adSpots ?? 0) + 1 })
-    .where(eq(campaignTable.id, campaign.id));
-
-  return spot!;
 }

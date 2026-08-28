@@ -34,12 +34,12 @@ const GOALS = [
  * not cost.
  */
 export function PushToPlatform({
-  campaignId,
+  initiativeId,
   brandSlug,
   spotCount,
   defaultBudget,
 }: {
-  campaignId: string;
+  initiativeId: string;
   brandSlug: string;
   spotCount: number;
   defaultBudget: number | null;
@@ -73,10 +73,12 @@ export function PushToPlatform({
   const push = useMutation(
     trpc.ads.pushDraftToPlatform.mutationOptions({
       onSuccess: (result) => {
-        // A dry run stays open to show its result; a real push moves on.
+        // A dry run stays open to show its result; a real push lands on the
+        // campaign the platform just created.
         if (!result.validateOnly) {
           setOpen(false);
-          router.refresh();
+          if (result.path) router.push(result.path);
+          else router.refresh();
         }
       },
     }),
@@ -102,8 +104,8 @@ export function PushToPlatform({
           <DialogTitle>Push this draft to Meta?</DialogTitle>
           <DialogDescription>
             Creates the campaign, one ad set, and {spotCount} ad
-            {spotCount === 1 ? "" : "s"} — all PAUSED. Nothing spends until you
-            hit Launch afterwards.
+            {spotCount === 1 ? "" : "s"} on Meta — all PAUSED. Nothing spends
+            until you hit Launch on the campaign afterwards.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -186,7 +188,7 @@ export function PushToPlatform({
             onClick={() =>
               chosen &&
               push.mutate({
-                campaignId,
+                initiativeId,
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,
@@ -205,7 +207,7 @@ export function PushToPlatform({
             onClick={() =>
               chosen &&
               push.mutate({
-                campaignId,
+                initiativeId,
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,

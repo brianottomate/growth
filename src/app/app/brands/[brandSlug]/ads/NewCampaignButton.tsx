@@ -35,7 +35,7 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
   const [budget, setBudget] = useState("");
 
   const create = useMutation(
-    trpc.ads.createDraftCampaign.mutationOptions({
+    trpc.ads.createDraft.mutationOptions({
       onSuccess: (result) => {
         setOpen(false);
         router.push(result.path);
@@ -56,8 +56,8 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
           <DialogTitle>New campaign draft</DialogTitle>
           <DialogDescription>
             A local draft — nothing reaches an ad platform until you push it.
-            Pick both platforms to run one push across Meta and Google; each
-            gets its own campaign under a shared initiative.
+            Pick both to plan one push across Meta and Google; each platform
+            gets its own campaign when the push runs.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -133,7 +133,7 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
               create.mutate({
                 brandId,
                 name: name.trim(),
-                platforms,
+                targetChannels: platforms,
                 budget:
                   budget === "" || !Number.isFinite(Number(budget))
                     ? null

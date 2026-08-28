@@ -76,7 +76,11 @@ export default async function BrandPage({
     limit: 12,
   });
   const spotCampaignIds = [
-    ...new Set(latestSpots.map((spot) => spot.campaignId)),
+    ...new Set(
+      latestSpots
+        .map((spot) => spot.campaignId)
+        .filter((id): id is string => Boolean(id)),
+    ),
   ];
   const spotCampaigns =
     spotCampaignIds.length > 0
@@ -173,7 +177,11 @@ export default async function BrandPage({
             {latestSpots.map((spot) => (
               <Link
                 key={spot.id}
-                href={`/app/brands/${brandSlug}/ads/${spot.campaignId}`}
+                href={
+                  spot.campaignId
+                    ? `/app/brands/${brandSlug}/ads/${spot.campaignId}`
+                    : `/app/brands/${brandSlug}/ads`
+                }
                 className="bg-card w-40 shrink-0 overflow-hidden rounded-xl border transition-colors hover:border-white/20"
               >
                 <div className="bg-muted relative h-24">
@@ -196,7 +204,9 @@ export default async function BrandPage({
                     {spot.name ?? "Untitled ad"}
                   </p>
                   <p className="text-muted-foreground truncate text-[10px]">
-                    {campaignName.get(spot.campaignId) ?? spot.platform}
+                    {(spot.campaignId
+                      ? campaignName.get(spot.campaignId)
+                      : null) ?? spot.platform}
                   </p>
                 </div>
               </Link>

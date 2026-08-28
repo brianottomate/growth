@@ -29,10 +29,10 @@ import { useTRPC } from "@/trpc/react";
  * so anything made anywhere in growth is one picker away from being an ad.
  */
 export function AddAdButton({
-  campaignId,
+  initiativeId,
   brandId,
 }: {
-  campaignId: string;
+  initiativeId: string;
   brandId: string;
 }) {
   const trpc = useTRPC();
@@ -69,7 +69,7 @@ export function AddAdButton({
           <DialogHeader>
             <DialogTitle>Draft an ad</DialogTitle>
             <DialogDescription>
-              Stays local until the campaign is pushed to the platform.
+              Stays local until the draft is pushed to a platform.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -146,7 +146,7 @@ export function AddAdButton({
               loading={add.isPending}
               onClick={() =>
                 add.mutate({
-                  campaignId,
+                  initiativeId,
                   name: name.trim(),
                   body: body.trim() || null,
                   linkUrl: linkUrl.trim() || null,
