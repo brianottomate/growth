@@ -128,11 +128,18 @@ export const adsRouter = {
 
   linkToInitiative: protectedProcedure
     .input(
-      z.object({
-        campaignId: z.string().min(1),
-        initiativeId: z.string().nullish(),
-        newInitiativeName: z.string().trim().max(200).nullish(),
-      }),
+      z
+        .object({
+          campaignId: z.string().min(1),
+          initiativeId: z.string().nullish(),
+          newInitiativeName: z.string().trim().max(200).nullish(),
+        })
+        .refine(
+          (value) =>
+            Boolean(value.initiativeId) ||
+            Boolean(value.newInitiativeName?.trim()),
+          { message: "Pick an initiative or name a new one" },
+        ),
     )
     .mutation(async ({ ctx, input }) =>
       linkCampaignToInitiative({

@@ -51,6 +51,8 @@ async function resolveDraftChannel(
     );
     return (bound ?? channels[0]!).id;
   }
+  // Placeholder until a real ad account is allowed and synced — must not
+  // render as a connected channel.
   const [created] = await db
     .insert(channelTable)
     .values({
@@ -58,10 +60,25 @@ async function resolveDraftChannel(
       brandId: brand.id,
       kind: "ad",
       platform,
-      handle: brand.name,
+      displayName: brand.name,
+      connectionStatus: "disconnected",
     })
     .returning({ id: channelTable.id });
   return created!.id;
+}
+
+/** An initiative id from a caller is only trusted after it maps to the brand. */
+async function assertInitiativeBelongsToBrand(
+  initiativeId: string,
+  brandId: string,
+) {
+  const initiative = await db.query.initiativeTable.findFirst({
+    where: eq(initiativeTable.id, initiativeId),
+    columns: { brandId: true },
+  });
+  if (!initiative || initiative.brandId !== brandId) {
+    throw new Error("That initiative does not belong to this brand");
+  }
 }
 
 export async function createDraftCampaign(input: {
@@ -82,16 +99,23 @@ export async function createDraftCampaign(input: {
     throw new Error("brandId or brandSlug is required");
   }
   const brand = await db.query.brandTable.findFirst({
-    where: input.brandId
-      ? eq(brandTable.id, input.brandId)
-      : and(
-          eq(brandTable.slug, input.brandSlug!),
-          eq(brandTable.organizationId, input.organizationId),
-        ),
+    where: and(
+      input.brandId
+        ? eq(brandTable.id, input.brandId)
+        : and(
+            eq(brandTable.slug, input.brandSlug!),
+            eq(brandTable.organizationId, input.organizationId),
+          ),
+      isNull(brandTable.deletedAt),
+    ),
     columns: { id: true, name: true, slug: true, organizationId: true },
   });
   if (!brand || brand.organizationId !== input.organizationId) {
     throw new Error("No access to this brand");
+  }
+
+  if (input.initiativeId) {
+    await assertInitiativeBelongsToBrand(input.initiativeId, brand.id);
   }
 
   const channelId = await resolveDraftChannel(brand, input.platform);
@@ -143,6 +167,9 @@ export async function linkCampaignToInitiative(input: {
   }
 
   let initiativeId = input.initiativeId ?? null;
+  if (initiativeId) {
+    await assertInitiativeBelongsToBrand(initiativeId, brand.id);
+  }
   if (!initiativeId && input.newInitiativeName?.trim()) {
     const [initiative] = await db
       .insert(initiativeTable)

@@ -90,6 +90,7 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
               <Input
                 id="camp-budget"
                 type="number"
+                min={0}
                 value={budget}
                 onChange={(event) => setBudget(event.target.value)}
                 placeholder="500"
@@ -110,7 +111,10 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
                 brandId,
                 name: name.trim(),
                 platform,
-                budget: budget === "" ? null : Math.round(Number(budget)),
+                budget:
+                  budget === "" || !Number.isFinite(Number(budget))
+                    ? null
+                    : Math.max(0, Math.round(Number(budget))),
               })
             }
           >
