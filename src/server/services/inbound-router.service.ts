@@ -32,6 +32,7 @@ import { envSelect } from "@/env";
 import { postOnSlack } from "@/server/clients/slack.client";
 import { mapPmsToHsValues } from "@/server/services/pms-mapping.service";
 import { getEmailDomain, isPersonalEmail } from "@/lib/email";
+import { resolveOnboardingSlackHeadline } from "@/lib/onboarding-slack";
 
 // =====================================================
 // INBOUND LEAD ROUTER
@@ -44,17 +45,6 @@ import { getEmailDomain, isPersonalEmail } from "@/lib/email";
 // contact/company/deal, notify sales on Slack. Exposed to callers (wander.com)
 // through POST /api/hubspot/v1/inbound. Classification logic is intentionally
 // unchanged from the wander.com original — diff against it when reviewing.
-
-// orgId only exists once an org has been created, so its absence means the
-// lead is still on the pre-auth business step (CORE-5029).
-export function resolveOnboardingSlackHeadline(
-  onboardingComplete: boolean | undefined,
-  orgId: string | null | undefined,
-): string {
-  if (onboardingComplete) return `:wander: *New Onboarding Completed*`;
-  if (orgId) return `:wander: *New Lead Stuck in Onboarding*`;
-  return `:wander: *New Onboarding Started*`;
-}
 
 const OS_INBOUND_RADIO_CHANNEL_ID = "C0A3PMXE3MG";
 // Test traffic goes here instead — same channel growth's postOnSlack redirects

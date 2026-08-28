@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { resolveOnboardingSlackHeadline } from "./inbound-router.service";
+import { resolveOnboardingSlackHeadline } from "./onboarding-slack";
 
 describe("resolveOnboardingSlackHeadline", () => {
   test("a pre-auth lead with no org yet reads as started, not stuck", () => {
