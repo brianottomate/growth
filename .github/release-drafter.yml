@@ -1,0 +1,20 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+tag-prefix: v
+change-template: '- $TITLE @$AUTHOR ([#$NUMBER]($URL))'
+change-title-escapes: '\<*_&'
+version-resolver:
+  major:
+    labels:
+      - major
+  minor:
+    labels:
+      - minor
+  patch:
+    labels:
+      - patch
+  default: patch
+template: |
+  ## Changes
+
+  $CHANGES
