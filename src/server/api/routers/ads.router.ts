@@ -10,6 +10,11 @@ import {
 } from "@/server/services/ads-analytics.service";
 
 import { setCampaignDelivery } from "@/server/services/ads-write.service";
+import {
+  createDraftCampaign,
+  linkCampaignToInitiative,
+  listBrandInitiatives,
+} from "@/server/services/ads-draft.service";
 import { createId } from "@/server/db/utils";
 
 import { protectedProcedure } from "../trpc";
@@ -99,6 +104,56 @@ export const adsRouter = {
       setCampaignDelivery(input, {
         organizationId: await organizationIdFor(ctx),
         runId: createId("run"),
+      }),
+    ),
+
+  /** A local draft: the editable object chat and the canvas work on. No
+   *  provider call — launching is the separate, approved step. */
+  createDraftCampaign: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        name: z.string().trim().min(1).max(300),
+        platform: z.enum(["meta_ads", "google_ads"]),
+        objective: z.string().trim().max(200).nullish(),
+        budget: z.number().int().min(0).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      createDraftCampaign({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  linkToInitiative: protectedProcedure
+    .input(
+      z
+        .object({
+          campaignId: z.string().min(1),
+          initiativeId: z.string().nullish(),
+          newInitiativeName: z.string().trim().max(200).nullish(),
+        })
+        .refine(
+          (value) =>
+            Boolean(value.initiativeId) ||
+            Boolean(value.newInitiativeName?.trim()),
+          { message: "Pick an initiative or name a new one" },
+        ),
+    )
+    .mutation(async ({ ctx, input }) =>
+      linkCampaignToInitiative({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  initiatives: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      listBrandInitiatives({
+        brandId: input.brandId,
+        organizationId: await organizationIdFor(ctx),
       }),
     ),
 } satisfies TRPCRouterRecord;

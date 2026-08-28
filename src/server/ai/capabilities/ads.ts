@@ -13,7 +13,10 @@ import {
   createMetaAdDraft,
   duplicateMetaCampaign,
   listAdsWriteDestinations,
+  createAdAudience,
+  addAdAudienceUsers,
 } from "@/server/services/ads-write.service";
+import { createDraftCampaign } from "@/server/services/ads-draft.service";
 import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -122,6 +125,29 @@ export const listAdsDestinations = growthAction({
   }),
   execute: async (input, ctx) =>
     listAdsWriteDestinations({
+      ...input,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const draftCampaignAction = growthAction({
+  description:
+    "Create a LOCAL draft campaign row — the editable first-party object shown on the campaign canvas (/app/brands/{brandSlug}/ads/{campaignId}). Nothing touches any ad platform: drafting is free and reversible, and launching is a separate operator-approved step. Use adsWrite.createMetaDraft/createGoogle when the user wants the campaign created ON the provider.",
+  inputSchema: z.object({
+    brandSlug: destinationSchema.brandSlug,
+    name: z.string().trim().min(1).max(300),
+    platform: z.enum(["meta_ads", "google_ads"]),
+    objective: z.string().trim().max(200).optional(),
+    budget: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Total intended budget in whole dollars."),
+    initiativeId: z.string().trim().min(1).optional(),
+  }),
+  execute: async (input, ctx) =>
+    createDraftCampaign({
       ...input,
       organizationId: ctx.orgId,
     }),
@@ -298,4 +324,60 @@ export const duplicateMetaCampaignAction = growthAction({
       organizationId: ctx.orgId,
       runId: ctx.runId,
     }),
+});
+
+export const createAudienceAction = growthAction({
+  description:
+    "Create a Meta custom audience (customer_list or lookalike) on an allowlisted ad account through Zernio. No spend, but a provider write — and the endpoint is NOT idempotent, so a failure must be reported to the operator, never retried. Lookalikes require sourceAudienceId, country, and ratio (0.01–0.20).",
+  inputSchema: z.object({
+    ...destinationSchema,
+    type: z.enum(["customer_list", "lookalike"]),
+    name: z.string().trim().min(1).max(255),
+    description: z.string().trim().max(500).optional(),
+    sourceAudienceId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("Lookalike seed: the platform id of an existing audience."),
+    country: z
+      .string()
+      .trim()
+      .length(2)
+      .optional()
+      .describe("Lookalike target country, ISO-3166 alpha-2 (e.g. US)."),
+    ratio: z
+      .number()
+      .min(0.01)
+      .max(0.2)
+      .optional()
+      .describe("Lookalike breadth: 0.01 = top 1% of the country."),
+  }),
+  execute: async (input, ctx) =>
+    createAdAudience(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const addAudienceUsersAction = growthAction({
+  description:
+    "Upload members (plaintext email and/or phone; Zernio hashes server-side) to an existing customer_list audience. Batches of 10,000 per request; partial progress is reported on failure so a retry can resume rather than duplicate.",
+  inputSchema: z.object({
+    audienceId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The platform audience id returned by createAudience."),
+    users: z
+      .array(
+        z.object({
+          email: z.string().email().optional(),
+          phone: z.string().trim().min(5).optional(),
+        }),
+      )
+      .min(1)
+      .max(50_000),
+  }),
+  execute: async (input) => addAdAudienceUsers(input),
 });

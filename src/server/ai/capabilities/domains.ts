@@ -4,7 +4,10 @@ import {
   adsScope,
   boostMetaPostAction,
   createGoogleAdAction,
+  addAudienceUsersAction,
+  createAudienceAction,
   createMetaAdDraftAction,
+  draftCampaignAction,
   duplicateMetaCampaignAction,
   listAdsDestinations,
   topAds,
@@ -316,7 +319,10 @@ export const adsWrite = growthDomainTool({
   description:
     "Create governed Meta and Google ad campaign trees through Zernio. Every action is account-allowlisted and approval-gated. Meta standalone and duplicate operations stay paused; Meta boosts and Google creates may start spend.",
   actions: {
+    draftCampaign: draftCampaignAction,
     createMetaDraft: createMetaAdDraftAction,
+    createAudience: createAudienceAction,
+    addAudienceUsers: addAudienceUsersAction,
     createGoogle: createGoogleAdAction,
     boostMetaPost: boostMetaPostAction,
     duplicateMetaCampaign: duplicateMetaCampaignAction,
