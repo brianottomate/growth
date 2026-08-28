@@ -1,11 +1,12 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
   adSetTable,
   adSpotTable,
+  audienceTargetTable,
   brandTable,
   platformCampaignTable,
   campaignTable,
@@ -192,9 +193,10 @@ export async function addDraftAd(input: {
       campaignId: initiative.id,
       adSetRowId: input.adSetId ?? null,
       brandId: brand.id,
-      // Platform is intent until the push; the initiative's targetChannels
-      // decide where this ad actually ships.
-      platform: "meta_ads",
+      // Intent until the push decides; the campaign's first target channel is
+      // a truer default than a hardcoded one for a Google-only draft.
+      platform: ((initiative.targetChannels?.[0] ??
+        "meta_ads") as typeof adSpotTable.$inferInsert.platform),
       name: input.name.trim(),
       headline: input.headline ?? null,
       body: input.body ?? null,
@@ -226,7 +228,61 @@ export async function getDraftInitiative(
       where: eq(platformCampaignTable.campaignId, initiative.id),
     }),
   ]);
-  return { initiative, brand, adSets, spots, campaigns };
+  // Ad sets carry the "who" via audienceTargetId; resolve the names so the
+  // page can show the audience rather than an opaque id.
+  const targetIds = [
+    ...new Set(
+      adSets
+        .map((row) => row.audienceTargetId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const audienceTargets =
+    targetIds.length > 0
+      ? await db.query.audienceTargetTable.findMany({
+          where: inArray(audienceTargetTable.id, targetIds),
+          columns: { id: true, name: true, geography: true },
+        })
+      : [];
+
+  return { initiative, brand, adSets, spots, campaigns, audienceTargets };
+}
+
+/** Replace the campaign's shared creative pool. */
+export async function setCampaignCreativePool(input: {
+  organizationId: string;
+  campaignId: string;
+  media: MediaItem[];
+}) {
+  const { initiative } = await requireOwnedInitiative(
+    input.campaignId,
+    input.organizationId,
+  );
+  const [updated] = await db
+    .update(campaignTable)
+    .set({ creativePool: input.media })
+    .where(eq(campaignTable.id, initiative.id))
+    .returning({ id: campaignTable.id });
+  return updated!;
+}
+
+/** The brand's audience targets — the ad-set picker's options. */
+export async function listBrandAudienceTargets(input: {
+  organizationId: string;
+  brandId: string;
+}) {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, input.brandId),
+    columns: { organizationId: true },
+  });
+  if (brand?.organizationId !== input.organizationId) {
+    throw new Error("No access to this brand");
+  }
+  return db.query.audienceTargetTable.findMany({
+    where: eq(audienceTargetTable.brandId, input.brandId),
+    orderBy: [desc(audienceTargetTable.createdAt)],
+    columns: { id: true, name: true, description: true, geography: true },
+  });
 }
 
 /**

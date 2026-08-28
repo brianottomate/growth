@@ -18,6 +18,8 @@ import {
   addDraftAd,
   addDraftAdSet,
   attachPlatformCampaign,
+  listBrandAudienceTargets,
+  setCampaignCreativePool,
   createDraftInitiative,
   listBrandCampaigns,
 } from "@/server/services/ads-draft.service";
@@ -173,6 +175,40 @@ export const adsRouter = {
     .mutation(async ({ ctx, input }) =>
       attachPlatformCampaign({
         ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  setCampaignCreativePool: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        media: z
+          .array(
+            z.object({
+              url: z.string().url(),
+              type: z.enum(["image", "video", "carousel"]),
+              assetId: z.string().optional(),
+              thumbnail: z.string().optional(),
+              width: z.number().optional(),
+              height: z.number().optional(),
+            }),
+          )
+          .max(50),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setCampaignCreativePool({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  audienceTargets: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      listBrandAudienceTargets({
+        brandId: input.brandId,
         organizationId: await organizationIdFor(ctx),
       }),
     ),

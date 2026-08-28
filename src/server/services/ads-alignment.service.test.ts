@@ -16,6 +16,7 @@ function initiative(overrides: Partial<Campaign> = {}): Campaign {
     color: null,
     status: "active",
     targetChannels: ["meta_ads", "google_ads"],
+    creativePool: [],
     budget: 10_000,
     performanceCycleId: null,
     startAt: new Date("2026-07-01"),

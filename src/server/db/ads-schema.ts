@@ -154,6 +154,13 @@ export const campaignTable = pgTable(
     // `campaign` rows are the implementations we verify against this list.
     targetChannels: t.jsonb().$type<string[]>(),
 
+    /**
+     * Shared creative for this campaign's ads — the paid counterpart of the
+     * content post's media pool. Picked once from the brand's media library
+     * so an ad references it rather than re-picking per ad.
+     */
+    creativePool: t.jsonb().$type<MediaItem[]>().default([]),
+
     budget: t.integer(), // total intended (whole dollars)
 
     // Sponsored delivery: the paid performance cycle this initiative fulfils.

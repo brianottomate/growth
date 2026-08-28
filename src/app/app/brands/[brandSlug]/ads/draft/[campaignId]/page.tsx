@@ -9,6 +9,8 @@ import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { getDraftInitiative } from "@/server/services/ads-draft.service";
 
 import { AddAdButton } from "../../[platformCampaignId]/AddAdButton";
+import { AdSets } from "./AdSets";
+import { CreativePool } from "./CreativePool";
 import { PushToPlatform } from "../../[platformCampaignId]/PushToPlatform";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +44,7 @@ export default async function CampaignDraftPage({
   );
   if (draft?.brand.slug !== brandSlug) notFound();
 
-  const { initiative, adSets, spots, campaigns } = draft;
+  const { initiative, adSets, spots, campaigns, audienceTargets } = draft;
   const targets = initiative.targetChannels ?? [];
 
   return (
@@ -159,6 +161,19 @@ export default async function CampaignDraftPage({
           </div>
         </section>
       )}
+
+      <CreativePool
+        campaignId={initiative.id}
+        brandId={draft.brand.id}
+        pool={initiative.creativePool ?? []}
+      />
+
+      <AdSets
+        campaignId={initiative.id}
+        brandId={draft.brand.id}
+        adSets={adSets}
+        audienceTargets={audienceTargets}
+      />
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold">
