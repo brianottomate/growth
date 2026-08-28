@@ -89,7 +89,9 @@ export async function createDraftCampaign(input: {
   brandId?: string;
   brandSlug?: string;
   name: string;
-  platform: DraftAdPlatform;
+  /** One campaign per platform; >1 mints an initiative to group them. */
+  platforms?: DraftAdPlatform[];
+  platform?: DraftAdPlatform;
   objective?: string | null;
   /** Whole dollars, total intended for the campaign. */
   budget?: number | null;
@@ -120,28 +122,63 @@ export async function createDraftCampaign(input: {
     await assertInitiativeBelongsToBrand(input.initiativeId, brand.id);
   }
 
-  const channelId = await resolveDraftChannel(brand, input.platform);
-  const [campaign] = await db
-    .insert(campaignTable)
-    .values({
-      id: createId("camp"),
-      channelId,
-      brandId: brand.id,
-      platform: input.platform,
-      initiativeId: input.initiativeId ?? null,
-      name: input.name,
-      status: "draft",
-      objective: input.objective ?? null,
-      budget: input.budget ?? null,
-      startAt: input.startAt ?? null,
-      endAt: input.endAt ?? null,
-    })
-    .returning();
+  const platforms =
+    input.platforms && input.platforms.length > 0
+      ? [...new Set(input.platforms)]
+      : [input.platform ?? "meta_ads"];
+
+  // One first-party push, N per-platform campaigns — the same canonical/
+  // per-surface split content uses (content_post → platform_post). A single
+  // platform needs no wrapper; two or more get an initiative so the push is
+  // one object in the UI and in reporting.
+  let initiativeId = input.initiativeId ?? null;
+  if (!initiativeId && platforms.length > 1) {
+    const [initiative] = await db
+      .insert(initiativeTable)
+      .values({
+        id: createId("init"),
+        brandId: brand.id,
+        name: input.name,
+        status: "planned",
+        targetChannels: platforms,
+        budget: input.budget ?? null,
+      })
+      .returning({ id: initiativeTable.id });
+    initiativeId = initiative!.id;
+  }
+
+  const campaigns = [];
+  for (const platform of platforms) {
+    const channelId = await resolveDraftChannel(brand, platform);
+    const [campaign] = await db
+      .insert(campaignTable)
+      .values({
+        id: createId("camp"),
+        channelId,
+        brandId: brand.id,
+        platform,
+        initiativeId,
+        name: input.name,
+        status: "draft",
+        objective: input.objective ?? null,
+        // Split evenly across platforms so the sum matches the intent.
+        budget:
+          input.budget != null
+            ? Math.floor(input.budget / platforms.length)
+            : null,
+        startAt: input.startAt ?? null,
+        endAt: input.endAt ?? null,
+      })
+      .returning();
+    campaigns.push(campaign!);
+  }
 
   return {
-    campaign: campaign!,
+    campaign: campaigns[0]!,
+    campaigns,
+    initiativeId,
     brandSlug: brand.slug,
-    path: `/app/brands/${brand.slug}/ads/${campaign!.id}`,
+    path: `/app/brands/${brand.slug}/ads/${campaigns[0]!.id}`,
   };
 }
 
@@ -222,6 +259,7 @@ export async function addDraftAd(input: {
   organizationId: string;
   campaignId: string;
   name: string;
+  headline?: string | null;
   body?: string | null;
   linkUrl?: string | null;
   media?: MediaItem[] | null;
@@ -256,6 +294,7 @@ export async function addDraftAd(input: {
       brandId: campaign.brandId,
       platform: campaign.platform,
       name: input.name.trim(),
+      headline: input.headline ?? null,
       body: input.body ?? null,
       linkUrl: input.linkUrl ?? null,
       media: input.media ?? null,

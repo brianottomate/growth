@@ -29,9 +29,9 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [platform, setPlatform] = useState<"meta_ads" | "google_ads">(
+  const [platforms, setPlatforms] = useState<("meta_ads" | "google_ads")[]>([
     "meta_ads",
-  );
+  ]);
   const [budget, setBudget] = useState("");
 
   const create = useMutation(
@@ -55,8 +55,9 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
         <DialogHeader>
           <DialogTitle>New campaign draft</DialogTitle>
           <DialogDescription>
-            A local draft — nothing touches the ad platform until you launch
-            it. Add ads and refine it in chat, watch it on the canvas.
+            A local draft — nothing reaches an ad platform until you push it.
+            Pick both platforms to run one push across Meta and Google; each
+            gets its own campaign under a shared initiative.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -67,23 +68,45 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
               autoFocus
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="HOMI_PROSPECTING_PURCHASES"
+              placeholder="WANDER_PROSPECTING_PURCHASES"
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="camp-platform">Platform</Label>
-              <select
-                id="camp-platform"
-                value={platform}
-                onChange={(event) =>
-                  setPlatform(event.target.value as typeof platform)
-                }
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              >
-                <option value="meta_ads">Meta Ads</option>
-                <option value="google_ads">Google Ads</option>
-              </select>
+              <Label>Platforms</Label>
+              <div className="flex gap-2">
+                {(
+                  [
+                    { value: "meta_ads", label: "Meta" },
+                    { value: "google_ads", label: "Google" },
+                  ] as const
+                ).map((option) => {
+                  const on = platforms.includes(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() =>
+                        setPlatforms((current) =>
+                          current.includes(option.value)
+                            ? current.length > 1
+                              ? current.filter((p) => p !== option.value)
+                              : current
+                            : [...current, option.value],
+                        )
+                      }
+                      className={`h-9 flex-1 rounded-md border text-sm transition-colors ${
+                        on
+                          ? "border-white/30 bg-white/10 font-medium"
+                          : "border-input text-muted-foreground hover:bg-white/5"
+                      }`}
+                    >
+                      {on ? "✓ " : ""}
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="camp-budget">Budget ($, optional)</Label>
@@ -110,7 +133,7 @@ export function NewCampaignButton({ brandId }: { brandId: string }) {
               create.mutate({
                 brandId,
                 name: name.trim(),
-                platform,
+                platforms,
                 budget:
                   budget === "" || !Number.isFinite(Number(budget))
                     ? null

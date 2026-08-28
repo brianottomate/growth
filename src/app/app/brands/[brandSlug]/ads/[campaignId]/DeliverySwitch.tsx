@@ -49,9 +49,9 @@ export function DeliverySwitch({
     return (
       <span
         className="text-muted-foreground/70 text-xs"
-        title="This campaign only exists locally — nothing to switch on the platform yet."
+        title="Add ads, then push the draft to Meta. Launch appears once the campaign exists on the platform."
       >
-        not on the platform yet
+        draft — push it to Meta to launch
       </span>
     );
   }

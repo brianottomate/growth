@@ -34,10 +34,14 @@ import { db } from "@/server/db";
 import {
   adAccountTable,
   adSpotTable,
+  audienceTable,
+  audienceTargetTable,
   brandTable,
   campaignTable,
+  channelTable,
   type Brand,
 } from "@/server/db/schema";
+import { createId } from "@/server/db/utils";
 
 type AdsWriteContext = { organizationId: string; runId: string };
 
@@ -639,6 +643,12 @@ export type CreateAdAudienceInput = {
   sourceAudienceId?: string;
   country?: string;
   ratio?: number;
+  /**
+   * The first-party audience_target this platform asset fulfils. Stamping it
+   * is what keeps "who we are buying" defined once and compiled per platform,
+   * rather than the platform asset becoming its own orphan definition.
+   */
+  audienceTargetId?: string;
 };
 
 /**
@@ -669,6 +679,16 @@ export async function createAdAudience(
   if (input.ratio !== undefined && (input.ratio < 0.01 || input.ratio > 0.2)) {
     throw new Error("Lookalike ratio must be between 0.01 and 0.20");
   }
+  if (input.audienceTargetId) {
+    const target = await db.query.audienceTargetTable.findFirst({
+      where: eq(audienceTargetTable.id, input.audienceTargetId),
+      columns: { brandId: true },
+    });
+    if (target?.brandId !== destination.brand.id) {
+      throw new Error("That audience target belongs to a different brand");
+    }
+  }
+
   const provider = await createZernioAdAudience({
     accountId: input.connectionAccountId,
     adAccountId: destination.adAccount.id,
@@ -679,9 +699,43 @@ export async function createAdAudience(
     country: input.country,
     ratio: input.ratio,
   });
+
+  // Mirror the platform asset locally so it is visible on the brand's ads
+  // page and linked to the first-party target it fulfils.
+  const externalId =
+    (typeof provider.id === "string" ? provider.id : undefined) ??
+    (typeof provider._id === "string" ? provider._id : undefined) ??
+    null;
+  const channel = await db.query.channelTable.findFirst({
+    where: and(
+      eq(channelTable.brandId, destination.brand.id),
+      eq(channelTable.platform, "meta_ads"),
+      isNull(channelTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  let mirrored = null;
+  if (channel) {
+    [mirrored] = await db
+      .insert(audienceTable)
+      .values({
+        id: createId("aud"),
+        channelId: channel.id,
+        brandId: destination.brand.id,
+        targetId: input.audienceTargetId ?? null,
+        name: input.name,
+        type: input.type === "lookalike" ? "lookalike" : "custom",
+        source: "manual",
+        externalId,
+      })
+      .returning();
+  }
+
   return {
     brand: destination.brand,
     adAccount: destination.adAccount,
+    audienceId: mirrored?.id ?? null,
+    audienceTargetId: input.audienceTargetId ?? null,
     provider,
   };
 }
@@ -870,11 +924,12 @@ export async function pushDraftCampaignToPlatform(
     budgetAmount: input.budgetAmount,
     budgetType: input.budgetType,
     // Top-level creative fields double as defaults for creatives[] entries.
-    headline: spots[0]!.name ?? campaign.name,
+    headline: spots[0]!.headline ?? spots[0]!.name ?? campaign.name,
     body: spots[0]!.body ?? campaign.name,
     linkUrl,
     creatives: spots.map((spot) => ({
       name: spot.name ?? campaign.name,
+      headline: spot.headline ?? undefined,
       body: spot.body ?? undefined,
       imageUrl: spot.media![0]!.url,
       linkUrl: spot.linkUrl ?? linkUrl,

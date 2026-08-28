@@ -119,7 +119,11 @@ export const adsRouter = {
       z.object({
         brandId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
-        platform: z.enum(["meta_ads", "google_ads"]),
+        platforms: z
+          .array(z.enum(["meta_ads", "google_ads"]))
+          .min(1)
+          .max(2)
+          .default(["meta_ads"]),
         objective: z.string().trim().max(200).nullish(),
         budget: z.number().int().min(0).nullish(),
       }),
@@ -168,6 +172,7 @@ export const adsRouter = {
       z.object({
         campaignId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
+        headline: z.string().trim().max(255).nullish(),
         body: z.string().trim().max(2_200).nullish(),
         linkUrl: z.string().url().nullish(),
         media: z

@@ -139,7 +139,14 @@ export const draftCampaignAction = growthAction({
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     name: z.string().trim().min(1).max(300),
-    platform: z.enum(["meta_ads", "google_ads"]),
+    platforms: z
+      .array(z.enum(["meta_ads", "google_ads"]))
+      .min(1)
+      .max(2)
+      .optional()
+      .describe(
+        "One campaign per platform. Two platforms mints an initiative that groups them as one push.",
+      ),
     objective: z.string().trim().max(200).optional(),
     budget: z
       .number()
@@ -355,6 +362,14 @@ export const createAudienceAction = growthAction({
       .max(0.2)
       .optional()
       .describe("Lookalike breadth: 0.01 = top 1% of the country."),
+    audienceTargetId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "The first-party audience_target this platform asset fulfils (from audienceRead). Stamp it so the who stays defined once.",
+      ),
   }),
   execute: async (input, ctx) =>
     createAdAudience(input, {
@@ -391,6 +406,7 @@ export const draftAdAction = growthAction({
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     name: z.string().trim().min(1).max(300),
+    headline: z.string().trim().max(255).optional(),
     body: z.string().trim().max(2_200).optional(),
     linkUrl: z.string().url(),
     imageUrl: z.string().url(),
@@ -405,6 +421,7 @@ export const draftAdAction = growthAction({
     addDraftAd({
       campaignId: input.campaignId,
       name: input.name,
+      headline: input.headline ?? null,
       body: input.body ?? null,
       linkUrl: input.linkUrl,
       media: [

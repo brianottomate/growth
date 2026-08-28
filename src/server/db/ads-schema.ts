@@ -268,6 +268,83 @@ export type AdStats = {
   costPerConversion?: number;
 };
 
+
+// ---- AD SET: the targeting + budget layer ---------------------------
+//
+// Every ad platform puts targeting, audience, and budget on the ad set (Meta
+// ad set, Google ad group, LinkedIn campaign), NOT on the campaign or the ad.
+// Modeling it first-party is what lets a draft express "this audience at this
+// budget in these places" before it exists on any platform — and what lets one
+// campaign carry several audiences, which is how a real prospecting build is
+// structured.
+//
+// `audienceTargetId` is the join into the first-party audience layer
+// (audience_target → audience_activation → the mirrored platform audience), so
+// the who is defined once and compiled per platform rather than retyped here.
+export const adSetTable = pgTable(
+  "ad_set",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("adset")),
+
+    campaignId: t
+      .text()
+      .references(() => campaignTable.id, { onDelete: "cascade" })
+      .notNull(),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    name: t.text().notNull(),
+    /** Raw platform status (active/paused/…); null while local-only. */
+    status: t.text(),
+
+    /** The first-party "who" this ad set is buying. */
+    audienceTargetId: t
+      .text()
+      .references(() => audienceTargetTable.id, { onDelete: "set null" }),
+    /** The mirrored platform audience asset, once one exists. */
+    audienceId: t
+      .text()
+      .references(() => audienceTable.id, { onDelete: "set null" }),
+
+    /** Whole currency units, matching campaign.budget. */
+    budget: t.integer(),
+    budgetType: t.text(), // "daily" | "lifetime"
+    optimizationGoal: t.text(),
+    bidStrategy: t.text(),
+
+    /** Where this ad set buys, when it overrides the audience's own geography. */
+    geography: t.jsonb().$type<AudienceGeography>(),
+    /** Compiled platform targeting spec, as sent to (or read from) the platform. */
+    targetingSpec: t.jsonb(),
+
+    externalId: t.text(), // platform ad set id
+    startAt: t.timestamp({ withTimezone: true }),
+    endAt: t.timestamp({ withTimezone: true }),
+
+    createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: t
+      .timestamp({ withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  }),
+  (table) => [
+    index("ad_set_campaign_idx").on(table.campaignId),
+    index("ad_set_brand_idx").on(table.brandId),
+    index("ad_set_audience_target_idx").on(table.audienceTargetId),
+    uniqueIndex("ad_set_external_id_idx")
+      .on(table.externalId)
+      .where(sql`${table.externalId} IS NOT NULL`),
+  ],
+);
+
+export type AdSet = typeof adSetTable.$inferSelect;
+
 export const adSpotTable = pgTable(
   "ad_spot",
   (t) => ({
@@ -290,11 +367,23 @@ export const adSpotTable = pgTable(
     platform: channelPlatformEnum().notNull(),
 
     name: t.text(),
+    /**
+     * The short punch line above/below the creative. First-party because every
+     * platform has the same {headline, body} pair (Meta headline + primary
+     * text, Google headline + description, LinkedIn headline + intro); the
+     * per-platform quirks (Google's headline arrays) stay in platform payloads.
+     */
+    headline: t.text(),
     status: t.text(), // raw platform status (active/paused/…); ingested as-is
 
     // Ad set denormalized (Zernio's AdWithContext flattens it onto the ad).
+    /** Platform ad set id (mirrored from sync). See adSetRowId for the FK. */
     adSetId: t.text(),
     adSetName: t.text(),
+    /** First-party ad set this ad belongs to. */
+    adSetRowId: t
+      .text()
+      .references(() => adSetTable.id, { onDelete: "set null" }),
 
     // Creative — maps Zernio creative (image/video/thumb + body + link).
     media: t.jsonb().$type<MediaItem[]>(),

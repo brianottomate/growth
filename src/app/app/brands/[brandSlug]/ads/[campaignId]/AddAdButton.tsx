@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { ImagePlus, Plus } from "lucide-react";
@@ -99,7 +100,7 @@ export function AddAdButton({
                     id="ad-name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="PropertyA_Static_The Rowhouse"
+                    placeholder="PropertyA_Static_Wander Pawleys Island"
                   />
                 </div>
                 <div className="space-y-1">
@@ -123,6 +124,17 @@ export function AddAdButton({
                 placeholder="The copy shown above the creative."
               />
             </div>
+            <p className="text-muted-foreground text-xs">
+              Creatives come from the brand&apos;s{" "}
+              <Link href="/app/media" className="underline">
+                media library
+              </Link>{" "}
+              — if it&apos;s empty, upload there or generate one in{" "}
+              <Link href="/app/studio" className="underline">
+                the studio
+              </Link>{" "}
+              first.
+            </p>
             {add.error && (
               <p className="text-xs text-red-300">{add.error.message}</p>
             )}

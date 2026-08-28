@@ -226,10 +226,19 @@ export default async function CampaignPage({
           </span>
         </h2>
         {spots.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No ads on this campaign yet. Draft them in chat — they appear here
-            as they are created.
-          </p>
+          <div className="text-muted-foreground space-y-1 text-sm">
+            <p>
+              No ads on this campaign yet. Add one from the brand&apos;s{" "}
+              <Link href="/app/media" className="underline">
+                media library
+              </Link>
+              , make something new in{" "}
+              <Link href="/app/studio" className="underline">
+                the studio
+              </Link>
+              , or draft them in chat.
+            </p>
+          </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sortedSpots.map((spot) => (

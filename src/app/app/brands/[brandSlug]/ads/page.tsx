@@ -97,7 +97,7 @@ function CampaignRow({
               : c.startAt
                 ? `from ${fmtDate(c.startAt)}`
                 : "—"}{" "}
-            · {c.adSpots} spot{c.adSpots === 1 ? "" : "s"}
+            · {spots.length} spot{spots.length === 1 ? "" : "s"}
           </div>
         </div>
         <div className="text-right">
