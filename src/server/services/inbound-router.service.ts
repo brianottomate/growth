@@ -45,6 +45,23 @@ import { getEmailDomain, isPersonalEmail } from "@/lib/email";
 // through POST /api/hubspot/v1/inbound. Classification logic is intentionally
 // unchanged from the wander.com original — diff against it when reviewing.
 
+/**
+ * Resolves the Slack headline for an "Onboarding" source lead (CORE-5029).
+ * A two-state boolean couldn't distinguish "just started" from "stuck": the
+ * business-step forward fires pre-auth, before an org exists, and posted as
+ * "stuck" on a brand-new signup. `orgId` is only ever sent once an org
+ * exists (the make.com path, ~10 min post-creation) — no `orgId` means the
+ * lead hasn't gotten past the pre-auth business step yet.
+ */
+export function resolveOnboardingSlackHeadline(
+  onboardingComplete: boolean | undefined,
+  orgId: string | null | undefined,
+): string {
+  if (onboardingComplete) return `:wander: *New Onboarding Completed*`;
+  if (orgId) return `:wander: *New Lead Stuck in Onboarding*`;
+  return `:wander: *New Onboarding Started*`;
+}
+
 const OS_INBOUND_RADIO_CHANNEL_ID = "C0A3PMXE3MG";
 // Test traffic goes here instead — same channel growth's postOnSlack redirects
 // to on non-prod deployments. Covers the gap where test traffic (e.g. a
@@ -674,9 +691,7 @@ export async function osInboundLeadRouter({
 
   const slackText =
     source === "Onboarding"
-      ? onboardingComplete
-        ? `:wander: *New Onboarding Completed*`
-        : `:wander: *New Lead Stuck in Onboarding*`
+      ? resolveOnboardingSlackHeadline(onboardingComplete, orgId)
       : source === "Wander Listed Application"
         ? `:wander: *New Wander Listed Application*`
         : pmsMeta
