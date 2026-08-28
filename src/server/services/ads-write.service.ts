@@ -33,6 +33,7 @@ import {
 import { db } from "@/server/db";
 import {
   adAccountTable,
+  adSpotTable,
   brandTable,
   campaignTable,
   type Brand,
@@ -770,4 +771,163 @@ export async function setCampaignDelivery(
     .returning({ id: campaignTable.id, status: campaignTable.status });
 
   return { campaign: updated, provider };
+}
+
+// ---- DRAFT → PLATFORM --------------------------------------------------
+
+/**
+ * Push a local draft campaign (no externalId) to Meta as ONE campaign + ONE
+ * ad set + its drafted ads, via Zernio's multi-creative shape, forced PAUSED.
+ * The operator's click is the approval; spend starts only when the delivery
+ * switch is flipped afterwards. Idempotency-Key carries the campaign id, so
+ * a retry of the same push replays instead of duplicating.
+ */
+export async function pushDraftCampaignToPlatform(
+  input: {
+    campaignId: string;
+    connectionAccountId: string;
+    adAccountId: string;
+    goal:
+      | "engagement"
+      | "traffic"
+      | "awareness"
+      | "video_views"
+      | "conversions";
+    budgetAmount: number;
+    budgetType: "daily" | "lifetime";
+    validateOnly?: boolean;
+    promotedObject?: { pixelId?: string; customEventType?: string };
+  },
+  context: AdsWriteContext,
+) {
+  const campaign = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, input.campaignId),
+  });
+  if (!campaign) throw new Error("Campaign not found");
+  if (campaign.externalId) {
+    throw new Error("This campaign is already on the platform");
+  }
+  if (campaign.platform !== "meta_ads") {
+    throw new Error("Draft push is Meta-only for now");
+  }
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, campaign.brandId),
+  });
+  if (brand?.organizationId !== context.organizationId) {
+    throw new Error("No access to this campaign");
+  }
+  if (!brand.slug) throw new Error("Brand has no slug");
+
+  const destination = await requireAdDestination({
+    organizationId: context.organizationId,
+    brandSlug: brand.slug,
+    platform: "meta",
+    connectionAccountId: input.connectionAccountId,
+    adAccountId: input.adAccountId,
+  });
+
+  const spots = await db.query.adSpotTable.findMany({
+    where: and(
+      eq(adSpotTable.campaignId, campaign.id),
+      isNull(adSpotTable.externalId),
+    ),
+  });
+  if (spots.length === 0) {
+    throw new Error("This draft has no ads to push — add ads first");
+  }
+  const invalid = spots.filter(
+    (spot) =>
+      !spot.media?.[0]?.url ||
+      spot.media[0].type !== "image" ||
+      !(spot.linkUrl ?? campaign.name),
+  );
+  if (invalid.length > 0) {
+    throw new Error(
+      `${invalid.length} drafted ad(s) are missing an image creative: ${invalid
+        .map((spot) => spot.name ?? spot.id)
+        .join(", ")}`,
+    );
+  }
+  const linkUrl = spots.find((spot) => spot.linkUrl)?.linkUrl;
+  if (!linkUrl) {
+    throw new Error("At least one drafted ad needs a linkUrl");
+  }
+  if (
+    input.goal === "conversions" &&
+    !(input.promotedObject?.pixelId && input.promotedObject.customEventType)
+  ) {
+    throw new Error(
+      "conversions requires promotedObject.pixelId and customEventType",
+    );
+  }
+
+  const payload: CreateZernioStandaloneAdInput = {
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+    name: campaign.name,
+    campaignName: campaign.name,
+    goal: input.goal,
+    budgetAmount: input.budgetAmount,
+    budgetType: input.budgetType,
+    // Top-level creative fields double as defaults for creatives[] entries.
+    headline: spots[0]!.name ?? campaign.name,
+    body: spots[0]!.body ?? campaign.name,
+    linkUrl,
+    creatives: spots.map((spot) => ({
+      name: spot.name ?? campaign.name,
+      body: spot.body ?? undefined,
+      imageUrl: spot.media![0]!.url,
+      linkUrl: spot.linkUrl ?? linkUrl,
+    })),
+    promotedObject: input.promotedObject,
+    ...metaDraftProviderControls(input.validateOnly),
+  };
+
+  const result = await createZernioStandaloneAd(payload, {
+    idempotencyKey: idempotencyKey(
+      context,
+      "push-draft",
+      payload,
+      `push:${campaign.id}`,
+    ),
+  });
+
+  if (!input.validateOnly && !result.validateOnly) {
+    const platformCampaignId =
+      result.platformCampaignId ??
+      (typeof result.ad?.platformCampaignId === "string"
+        ? result.ad.platformCampaignId
+        : undefined);
+    if (platformCampaignId) {
+      await db
+        .update(campaignTable)
+        .set({ externalId: platformCampaignId, status: "paused" })
+        .where(eq(campaignTable.id, campaign.id));
+    }
+    const responseAds = result.ads ?? (result.ad ? [result.ad] : []);
+    for (const spot of spots) {
+      const match = responseAds.find(
+        (ad) => ad.name === spot.name || responseAds.length === 1,
+      );
+      const platformAdId =
+        typeof match?.platformAdId === "string" ? match.platformAdId : null;
+      await db
+        .update(adSpotTable)
+        .set({
+          externalId: platformAdId ?? match?.id ?? match?._id ?? null,
+          adSetId: result.platformAdSetId ?? null,
+          status: "paused",
+        })
+        .where(eq(adSpotTable.id, spot.id));
+    }
+  }
+
+  return {
+    campaignId: campaign.id,
+    validateOnly: Boolean(input.validateOnly),
+    platformCampaignId: result.platformCampaignId ?? null,
+    platformAdSetId: result.platformAdSetId ?? null,
+    adsCreated: (result.ads ?? (result.ad ? [result.ad] : [])).length,
+    provider: result,
+  };
 }

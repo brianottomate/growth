@@ -4,10 +4,12 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  adSpotTable,
   brandTable,
   campaignTable,
   channelTable,
   initiativeTable,
+  type MediaItem,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { getAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
@@ -208,4 +210,63 @@ export async function listBrandInitiatives(input: {
     orderBy: [desc(initiativeTable.createdAt)],
     columns: { id: true, name: true, status: true },
   });
+}
+
+/**
+ * Add a drafted ad (spot) to a draft campaign. The creative comes from the
+ * media library (a MediaItem carrying assetId) or a direct URL. businessKey
+ * makes the same drafted ad recognisable across surfaces and becomes the
+ * dedupe key when the draft is pushed to the platform.
+ */
+export async function addDraftAd(input: {
+  organizationId: string;
+  campaignId: string;
+  name: string;
+  body?: string | null;
+  linkUrl?: string | null;
+  media?: MediaItem[] | null;
+  businessKey?: string | null;
+}) {
+  const campaign = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, input.campaignId),
+  });
+  if (!campaign) throw new Error("Campaign not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, campaign.brandId),
+    columns: { organizationId: true },
+  });
+  if (brand?.organizationId !== input.organizationId) {
+    throw new Error("No access to this campaign");
+  }
+  if (campaign.externalId) {
+    throw new Error(
+      "This campaign is already on the platform — add creatives there, or draft a new campaign",
+    );
+  }
+
+  const businessKey =
+    input.businessKey ??
+    `${campaign.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
+
+  const [spot] = await db
+    .insert(adSpotTable)
+    .values({
+      campaignId: campaign.id,
+      channelId: campaign.channelId,
+      brandId: campaign.brandId,
+      platform: campaign.platform,
+      name: input.name.trim(),
+      body: input.body ?? null,
+      linkUrl: input.linkUrl ?? null,
+      media: input.media ?? null,
+      businessKey,
+    })
+    .returning();
+
+  await db
+    .update(campaignTable)
+    .set({ adSpots: (campaign.adSpots ?? 0) + 1 })
+    .where(eq(campaignTable.id, campaign.id));
+
+  return spot!;
 }

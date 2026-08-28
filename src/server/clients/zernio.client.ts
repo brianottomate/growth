@@ -935,6 +935,19 @@ export type CreateZernioStandaloneAdInput = {
   images?: { landscape: string; square: string };
   /** Meta only: 2–10 cards; mutually exclusive with imageUrl/images. */
   carouselCards?: ZernioCarouselCard[];
+  /**
+   * Meta only: multi-creative shape — ONE ad set with N ads sharing budget and
+   * targeting. Mutually exclusive with imageUrl/images/carouselCards. The 201
+   * response carries { ads, platformCampaignId, platformAdSetId }.
+   */
+  creatives?: {
+    name: string;
+    headline?: string;
+    body?: string;
+    imageUrl: string;
+    linkUrl?: string;
+    callToAction?: string;
+  }[];
   campaignName?: string;
   adSetName?: string;
   adName?: string;
@@ -965,6 +978,10 @@ export type CreateZernioStandaloneAdInput = {
 
 export type ZernioAdWriteResponse = {
   ad?: ZernioAd;
+  /** Multi-creative shape: the N ads of the single ad set that was created. */
+  ads?: ZernioAd[];
+  platformCampaignId?: string;
+  platformAdSetId?: string;
   validateOnly?: boolean;
   results?: Array<{
     node?: string;
