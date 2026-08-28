@@ -76,7 +76,7 @@ async function assertInitiativeBelongsToBrand(
     where: eq(initiativeTable.id, initiativeId),
     columns: { brandId: true },
   });
-  if (!initiative || initiative.brandId !== brandId) {
+  if (initiative?.brandId !== brandId) {
     throw new Error("That initiative does not belong to this brand");
   }
 }
@@ -110,7 +110,7 @@ export async function createDraftCampaign(input: {
     ),
     columns: { id: true, name: true, slug: true, organizationId: true },
   });
-  if (!brand || brand.organizationId !== input.organizationId) {
+  if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this brand");
   }
 
