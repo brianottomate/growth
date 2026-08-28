@@ -87,3 +87,6 @@ scripts/.social-handles-*.json
 
 # Nested git worktrees — a second checkout of this repo, never content of it.
 .worktrees/
+
+# Lab media (mp4 renders, motion studies) stays out of git; history rewritten 2026-08-27 to purge it
+public/lab/
