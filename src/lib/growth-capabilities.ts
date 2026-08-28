@@ -110,6 +110,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   ],
   adsWrite: [
     "draftCampaign",
+    "draftAd",
     "createMetaDraft",
     "createAudience",
     "addAudienceUsers",

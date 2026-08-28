@@ -16,7 +16,10 @@ import {
   createAdAudience,
   addAdAudienceUsers,
 } from "@/server/services/ads-write.service";
-import { createDraftCampaign } from "@/server/services/ads-draft.service";
+import {
+  addDraftAd,
+  createDraftCampaign,
+} from "@/server/services/ads-draft.service";
 import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -380,4 +383,33 @@ export const addAudienceUsersAction = growthAction({
       .max(50_000),
   }),
   execute: async (input) => addAdAudienceUsers(input),
+});
+
+export const draftAdAction = growthAction({
+  description:
+    "Add a drafted ad to a LOCAL draft campaign (one created with adsWrite.draftCampaign). Local only — nothing touches the platform until the operator pushes the draft from the campaign canvas. The creative is an image URL, ideally a media-library asset URL.",
+  inputSchema: z.object({
+    campaignId: z.string().trim().min(1),
+    name: z.string().trim().min(1).max(300),
+    body: z.string().trim().max(2_200).optional(),
+    linkUrl: z.string().url(),
+    imageUrl: z.string().url(),
+    assetId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("media_asset id when the image comes from the library."),
+  }),
+  execute: async (input, ctx) =>
+    addDraftAd({
+      campaignId: input.campaignId,
+      name: input.name,
+      body: input.body ?? null,
+      linkUrl: input.linkUrl,
+      media: [
+        { url: input.imageUrl, type: "image", assetId: input.assetId },
+      ],
+      organizationId: ctx.orgId,
+    }),
 });

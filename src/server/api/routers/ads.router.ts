@@ -9,8 +9,13 @@ import {
   computeTopAds,
 } from "@/server/services/ads-analytics.service";
 
-import { setCampaignDelivery } from "@/server/services/ads-write.service";
 import {
+  listAdsWriteDestinations,
+  pushDraftCampaignToPlatform,
+  setCampaignDelivery,
+} from "@/server/services/ads-write.service";
+import {
+  addDraftAd,
   createDraftCampaign,
   linkCampaignToInitiative,
   listBrandInitiatives,
@@ -154,6 +159,81 @@ export const adsRouter = {
       listBrandInitiatives({
         brandId: input.brandId,
         organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  /** Drafted ad on a draft campaign; creative comes from the media library. */
+  addDraftAd: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        name: z.string().trim().min(1).max(300),
+        body: z.string().trim().max(2_200).nullish(),
+        linkUrl: z.string().url().nullish(),
+        media: z
+          .array(
+            z.object({
+              url: z.string().url(),
+              type: z.enum(["image", "video", "carousel"]),
+              assetId: z.string().optional(),
+              thumbnail: z.string().optional(),
+              width: z.number().optional(),
+              height: z.number().optional(),
+            }),
+          )
+          .max(1)
+          .nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      addDraftAd({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  /** The allowlisted destinations for the push dialog. */
+  destinations: protectedProcedure
+    .input(
+      z.object({
+        brandSlug: z.string().trim().min(1),
+        platform: z.enum(["meta", "google"]),
+      }),
+    )
+    .query(async ({ ctx, input }) =>
+      listAdsWriteDestinations({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  /**
+   * Create the draft on Meta — PAUSED — via Zernio's multi-creative shape.
+   * A provider write behind a deliberate operator click; spend starts only
+   * when the delivery switch is flipped afterwards.
+   */
+  pushDraftToPlatform: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        connectionAccountId: z.string().min(1),
+        adAccountId: z.string().min(1),
+        goal: z.enum([
+          "engagement",
+          "traffic",
+          "awareness",
+          "video_views",
+          "conversions",
+        ]),
+        budgetAmount: z.number().positive(),
+        budgetType: z.enum(["daily", "lifetime"]),
+        validateOnly: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      pushDraftCampaignToPlatform(input, {
+        organizationId: await organizationIdFor(ctx),
+        runId: createId("run"),
       }),
     ),
 } satisfies TRPCRouterRecord;

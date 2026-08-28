@@ -217,8 +217,9 @@ export const growthActionPolicies = {
     inspectConversions: read(),
   },
   adsWrite: {
-    // Local DB row only; no provider call, no spend. Launch is separate.
+    // Local DB rows only; no provider call, no spend. Push is separate.
     draftCampaign: write(),
+    draftAd: write(),
     // Provider write, no spend. Zernio's create is NOT idempotent — never
     // auto-retry; surface failures to the operator.
     createAudience: write({
