@@ -4,8 +4,7 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: deploy-production
@@ -19,6 +18,7 @@ jobs:
     environment: Production
     env:
       RELEASE_TAG: ${{ github.event.release.tag_name }}
+      RELEASE_SHA: ${{ github.sha }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
@@ -28,11 +28,6 @@ jobs:
       REPOSITORY_NAME: ${{ github.event.repository.name }}
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
-          fetch-depth: 1
-
       - name: Deploy or roll back Production
         shell: bash
         run: |
@@ -45,7 +40,7 @@ jobs:
             fi
           }
 
-          for variable in RELEASE_TAG VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_DEPLOYMENT_NAME REPOSITORY_ID REPOSITORY_OWNER REPOSITORY_NAME; do
+          for variable in RELEASE_TAG RELEASE_SHA VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_DEPLOYMENT_NAME REPOSITORY_ID REPOSITORY_OWNER REPOSITORY_NAME; do
             require_env "$variable"
           done
 
@@ -54,15 +49,13 @@ jobs:
             exit 1
           fi
 
-          RELEASE_SHA=$(git rev-parse "${RELEASE_TAG}^{}")
-
           create_deployment() {
             local deployment_id payload response
             payload=$(jq -n \
               --arg project "$VERCEL_PROJECT_ID" \
               --arg deployment_name "$VERCEL_DEPLOYMENT_NAME" \
               --arg repo_id "$REPOSITORY_ID" \
-              --arg ref "refs/tags/$RELEASE_TAG" \
+              --arg ref "$RELEASE_SHA" \
               --arg sha "$RELEASE_SHA" \
               --arg tag "$RELEASE_TAG" \
               --arg repository_owner "$REPOSITORY_OWNER" \
