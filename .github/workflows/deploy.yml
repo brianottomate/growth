@@ -4,9 +4,6 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: read
-
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -29,11 +26,6 @@ jobs:
       REPOSITORY_NAME: ${{ github.event.repository.name }}
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 1
-
       - name: Deploy or roll back Production
         shell: bash
         run: |
@@ -46,7 +38,7 @@ jobs:
             fi
           }
 
-          for variable in RELEASE_TAG VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_DEPLOYMENT_NAME REPOSITORY_ID REPOSITORY_OWNER REPOSITORY_NAME; do
+          for variable in RELEASE_TAG RELEASE_SHA VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_DEPLOYMENT_NAME REPOSITORY_ID REPOSITORY_OWNER REPOSITORY_NAME; do
             require_env "$variable"
           done
 
