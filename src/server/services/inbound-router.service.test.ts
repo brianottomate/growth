@@ -3,13 +3,6 @@ import { describe, expect, test } from "bun:test";
 import { resolveOnboardingSlackHeadline } from "./inbound-router.service";
 
 describe("resolveOnboardingSlackHeadline", () => {
-  /**
-   * CORE-5029: the business-step forward fires pre-auth, before an org
-   * exists, and sends no onboardingComplete flag. Before this distinguished
-   * "just started" from "stuck", that fell into the same branch as a lead
-   * stuck for 10+ minutes and posted "Stuck in Onboarding" on a brand-new
-   * signup that hadn't even created an org yet.
-   */
   test("a pre-auth lead with no org yet reads as started, not stuck", () => {
     expect(resolveOnboardingSlackHeadline(undefined, undefined)).toBe(
       ":wander: *New Onboarding Started*",

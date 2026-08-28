@@ -45,14 +45,8 @@ import { getEmailDomain, isPersonalEmail } from "@/lib/email";
 // through POST /api/hubspot/v1/inbound. Classification logic is intentionally
 // unchanged from the wander.com original — diff against it when reviewing.
 
-/**
- * Resolves the Slack headline for an "Onboarding" source lead (CORE-5029).
- * A two-state boolean couldn't distinguish "just started" from "stuck": the
- * business-step forward fires pre-auth, before an org exists, and posted as
- * "stuck" on a brand-new signup. `orgId` is only ever sent once an org
- * exists (the make.com path, ~10 min post-creation) — no `orgId` means the
- * lead hasn't gotten past the pre-auth business step yet.
- */
+// orgId only exists once an org has been created, so its absence means the
+// lead is still on the pre-auth business step (CORE-5029).
 export function resolveOnboardingSlackHeadline(
   onboardingComplete: boolean | undefined,
   orgId: string | null | undefined,
