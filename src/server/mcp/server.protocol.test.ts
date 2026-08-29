@@ -27,9 +27,12 @@ const authInfo: AuthInfo = {
 
 let handler: McpHttpHandler;
 
+// Importing the server pulls the whole capability graph, which takes ~6s
+// cold — over bun's 5s default hook timeout, so this failed on a cold cache
+// or a loaded machine and passed warm. The work is an import, not a wait.
 beforeAll(async () => {
   ({ growthMcpHttpHandler: handler } = await import("@/server/mcp/server"));
-});
+}, 60_000);
 
 function createTransport() {
   return new StreamableHTTPClientTransport(endpoint, {
