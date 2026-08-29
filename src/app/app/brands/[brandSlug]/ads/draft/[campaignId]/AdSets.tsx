@@ -61,6 +61,12 @@ export function AdSets({
     }),
   );
 
+  const removeAdSet = useMutation(
+    trpc.ads.deleteDraftAdSet.mutationOptions({
+      onSuccess: () => router.refresh(),
+    }),
+  );
+
   const audienceName = (id: string | null) =>
     id ? (audienceTargets.find((a) => a.id === id)?.name ?? "—") : null;
 
@@ -194,6 +200,16 @@ export function AdSets({
               <span className="text-muted-foreground/60 text-xs">
                 {adSet.externalId ? "live" : "drafted"}
               </span>
+              {!adSet.externalId && (
+                <button
+                  type="button"
+                  onClick={() => removeAdSet.mutate({ adSetId: adSet.id })}
+                  disabled={removeAdSet.isPending}
+                  className="text-muted-foreground/60 hover:text-red-300 text-xs"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           ))}
         </div>

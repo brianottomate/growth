@@ -18,6 +18,7 @@ import {
   boostZernioMetaPost,
   createZernioAdAudience,
   createZernioAdCampaign,
+  deleteZernioCampaign,
   createZernioStandaloneAd,
   duplicateZernioMetaCampaign,
   getZernioAdsTree,
@@ -311,6 +312,111 @@ export type CreateMetaAdDraftInput = {
   promotedObject?: CreateZernioStandaloneAdInput["promotedObject"];
 };
 
+/**
+ * Everything Meta rejects, checked once against the payload the API actually
+ * receives rather than against any one caller's input shape.
+ *
+ * Three call sites build a Meta payload — the single draft, the single-ad-set
+ * push, and the per-ad-set push — and for a while only the first carried these
+ * rules. That is how a push shipped without the lifetime-budget end date the
+ * draft path had guarded from the start. Add a rule here, not at a call site.
+ */
+export function assertMetaAdPayload(
+  payload: CreateZernioStandaloneAdInput,
+  adAccount: { currency?: string; minimumDailyBudget?: number },
+) {
+  const { goal, promotedObject } = payload;
+
+  if (payload.budgetType === "lifetime" && !payload.endDate) {
+    throw new Error("Meta lifetime budgets require endDate");
+  }
+  if (
+    goal === "catalog_sales" &&
+    (!promotedObject?.productSetId ||
+      !promotedObject.pixelId ||
+      !promotedObject.customEventType)
+  ) {
+    throw new Error(
+      "Meta catalog sales require promotedObject.productSetId, pixelId, and customEventType",
+    );
+  }
+  if (
+    (goal === "conversions" || goal === "lead_conversion") &&
+    (!promotedObject?.pixelId ||
+      (!promotedObject.customEventType && !promotedObject.customConversionId))
+  ) {
+    throw new Error(
+      `${goal} requires promotedObject.pixelId and an event or custom conversion`,
+    );
+  }
+  if (goal === "lead_generation" && !payload.leadGenFormId) {
+    throw new Error("Meta lead generation requires leadGenFormId");
+  }
+  if (
+    goal === "app_promotion" &&
+    (!promotedObject?.applicationId || !promotedObject.objectStoreUrl)
+  ) {
+    throw new Error(
+      "Meta app promotion requires promotedObject.applicationId and objectStoreUrl",
+    );
+  }
+
+  // The three creative shapes are mutually exclusive, and one of them has to
+  // be there — except for catalog sales, where the product set is the creative.
+  const shapes = [
+    payload.imageUrl ? "imageUrl" : null,
+    payload.carouselCards ? "carouselCards" : null,
+    payload.creatives?.length ? "creatives" : null,
+  ].filter(Boolean);
+  if (shapes.length > 1) {
+    throw new Error(
+      `Provide one creative shape, not ${shapes.length} (${shapes.join(", ")})`,
+    );
+  }
+  if (shapes.length === 0 && goal !== "catalog_sales") {
+    throw new Error(
+      "This Meta ad needs an image, a carousel, or a creatives array",
+    );
+  }
+  if (
+    payload.carouselCards &&
+    (payload.carouselCards.length < 2 || payload.carouselCards.length > 10)
+  ) {
+    throw new Error("Meta carousels take 2\u201310 cards");
+  }
+  payload.creatives?.forEach((creative, index) => {
+    for (const field of ["headline", "body", "imageUrl"] as const) {
+      if (!creative[field]?.trim()) {
+        throw new Error(`creatives[${index}].${field} is required`);
+      }
+    }
+  });
+
+  if (
+    payload.budgetType === "daily" &&
+    adAccount.minimumDailyBudget !== undefined &&
+    payload.budgetAmount < adAccount.minimumDailyBudget
+  ) {
+    throw new Error(
+      `Meta daily budget must be at least ${adAccount.minimumDailyBudget} ${adAccount.currency ?? "in the account currency"}`,
+    );
+  }
+}
+
+/** The only way this service creates a Meta ad. Validates, then sends. */
+async function createMetaAd(
+  payload: CreateZernioStandaloneAdInput,
+  options: {
+    idempotencyKey: string;
+    adAccount: { currency?: string; minimumDailyBudget?: number };
+  },
+) {
+  assertMetaAdPayload(payload, options.adAccount);
+  return createZernioStandaloneAd(payload, {
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export async function createMetaAdDraft(
   input: CreateMetaAdDraftInput,
   context: AdsWriteContext,
@@ -322,69 +428,6 @@ export async function createMetaAdDraft(
     connectionAccountId: input.connectionAccountId,
     adAccountId: input.adAccountId,
   });
-  if (input.budgetType === "lifetime" && !input.endDate) {
-    throw new Error("Meta lifetime budgets require endDate");
-  }
-  if (
-    input.goal === "catalog_sales" &&
-    (!input.promotedObject?.productSetId ||
-      !input.promotedObject.pixelId ||
-      !input.promotedObject.customEventType)
-  ) {
-    throw new Error(
-      "Meta catalog sales require promotedObject.productSetId, pixelId, and customEventType",
-    );
-  }
-  if (
-    ["conversions", "lead_conversion"].includes(input.goal) &&
-    (!input.promotedObject?.pixelId ||
-      (!input.promotedObject.customEventType &&
-        !input.promotedObject.customConversionId))
-  ) {
-    throw new Error(
-      `${input.goal} requires promotedObject.pixelId and an event or custom conversion`,
-    );
-  }
-  if (input.goal === "lead_generation" && !input.leadGenFormId) {
-    throw new Error("Meta lead generation requires leadGenFormId");
-  }
-  if (
-    input.goal === "app_promotion" &&
-    (!input.promotedObject?.applicationId ||
-      !input.promotedObject.objectStoreUrl)
-  ) {
-    throw new Error(
-      "Meta app promotion requires promotedObject.applicationId and objectStoreUrl",
-    );
-  }
-  if (input.imageUrl && input.carouselCards) {
-    throw new Error(
-      "Provide imageUrl or carouselCards, not both — a carousel replaces the single creative",
-    );
-  }
-  if (
-    input.carouselCards &&
-    (input.carouselCards.length < 2 || input.carouselCards.length > 10)
-  ) {
-    throw new Error("Meta carousels take 2–10 cards");
-  }
-  if (
-    input.goal !== "catalog_sales" &&
-    !input.imageUrl &&
-    !input.carouselCards
-  ) {
-    throw new Error("This Meta draft requires imageUrl or carouselCards");
-  }
-  if (
-    input.budgetType === "daily" &&
-    destination.adAccount.minimumDailyBudget !== undefined &&
-    input.budgetAmount < destination.adAccount.minimumDailyBudget
-  ) {
-    throw new Error(
-      `Meta daily budget must be at least ${destination.adAccount.minimumDailyBudget} ${destination.adAccount.currency ?? "in the account currency"}`,
-    );
-  }
-
   const payload: CreateZernioStandaloneAdInput = {
     accountId: input.connectionAccountId,
     adAccountId: destination.adAccount.id,
@@ -409,8 +452,14 @@ export async function createMetaAdDraft(
     promotedObject: input.promotedObject,
     ...metaDraftProviderControls(input.validateOnly),
   };
-  const result = await createZernioStandaloneAd(payload, {
-    idempotencyKey: idempotencyKey(context, "create-meta", payload, input.businessKey),
+  const result = await createMetaAd(payload, {
+    idempotencyKey: idempotencyKey(
+      context,
+      "create-meta",
+      payload,
+      input.businessKey,
+    ),
+    adAccount: destination.adAccount,
   });
   return {
     brand: destination.brand,
@@ -1053,23 +1102,59 @@ export async function pushDraftToPlatform(
   }
 
   // ---- META -----------------------------------------------------------
-  if (
-    input.goal === "conversions" &&
-    !(input.promotedObject?.pixelId && input.promotedObject.customEventType)
-  ) {
-    throw new Error(
-      "conversions requires promotedObject.pixelId and customEventType",
-    );
-  }
+  // Goal and creative requirements are enforced in assertMetaAdPayload, which
+  // every create below goes through. A throw from inside the multi-ad-set
+  // loop is caught by the rollback, so nothing is left half-built.
 
   const creativesFor = (subset: typeof spots) =>
     subset.map((spot) => ({
       name: spot.name ?? campaign.name,
-      headline: spot.headline ?? undefined,
-      body: spot.body ?? undefined,
+      // Every creative carries its own headline and body in the
+      // multi-creative shape. The top-level ones seed the ad set; Meta does
+      // not fall back to them per creative.
+      headline: spot.headline ?? spot.name ?? campaign.name,
+      body: spot.body ?? campaign.description ?? campaign.name,
       imageUrl: spot.media![0]!.url,
       linkUrl: spot.linkUrl ?? linkUrl,
     }));
+
+  /**
+   * One Meta ad set as the API sees it: its budget, its targeting, and the
+   * ads inside it. Minting a campaign and slotting into an existing shell are
+   * the same request bar `existingCampaignId`, so both pushes build it here.
+   */
+  const adSetPayload = (args: {
+    adSet?: (typeof adSets)[number];
+    subset: typeof spots;
+    audienceId: string | null;
+    existingCampaignId?: string;
+    validateOnly: boolean;
+  }): CreateZernioStandaloneAdInput => ({
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+    ...(args.existingCampaignId
+      ? { existingCampaignId: args.existingCampaignId }
+      : { campaignName: campaign.name }),
+    name: args.existingCampaignId
+      ? (args.adSet?.name ?? campaign.name)
+      : campaign.name,
+    adSetName: args.adSet?.name,
+    goal: input.goal,
+    budgetAmount: args.adSet?.budget ?? input.budgetAmount,
+    budgetType:
+      (args.adSet?.budgetType as "daily" | "lifetime") ?? input.budgetType,
+    // Top-level headline and body seed the ad set; each creative carries its
+    // own below.
+    headline: args.subset[0]!.headline ?? args.subset[0]!.name ?? campaign.name,
+    body: args.subset[0]!.body ?? campaign.description ?? campaign.name,
+    linkUrl,
+    creatives: creativesFor(args.subset),
+    targeting: args.audienceId ? { audienceId: args.audienceId } : undefined,
+    startDate,
+    endDate,
+    promotedObject: input.promotedObject,
+    ...metaDraftProviderControls(args.validateOnly),
+  });
 
   // One ad set (or none defined) is a single call — fewer moving parts and
   // nothing to clean up if Meta rejects it.
@@ -1078,32 +1163,15 @@ export async function pushDraftToPlatform(
     const audienceId = only
       ? await platformAudienceIdFor(only.audienceTargetId, brand.id, platform)
       : null;
-    const payload: CreateZernioStandaloneAdInput = {
-      accountId: input.connectionAccountId,
-      adAccountId: destination.adAccount.id,
-      name: campaign.name,
-      campaignName: campaign.name,
-      adSetName: only?.name,
-      goal: input.goal,
-      budgetAmount: only?.budget ?? input.budgetAmount,
-      budgetType: (only?.budgetType as "daily" | "lifetime") ?? input.budgetType,
-      headline: spots[0]!.headline ?? spots[0]!.name ?? campaign.name,
-      body: spots[0]!.body ?? campaign.name,
-      linkUrl,
-      creatives: creativesFor(spots),
-      targeting: audienceId ? { audienceId } : undefined,
-      startDate,
-      endDate,
-      promotedObject: input.promotedObject,
-      ...metaDraftProviderControls(input.validateOnly),
-    };
-    const result = await createZernioStandaloneAd(payload, {
-      idempotencyKey: idempotencyKey(
-        context,
-        "push-draft",
-        payload,
-        `push:${campaign.id}:meta`,
-      ),
+    const payload = adSetPayload({
+      adSet: only,
+      subset: spots,
+      audienceId,
+      validateOnly: input.validateOnly ?? false,
+    });
+    const result = await createMetaAd(payload, {
+      idempotencyKey: idempotencyKey(context, "push-draft", payload, `push:${campaign.id}:meta`),
+      adAccount: destination.adAccount,
     });
     if (input.validateOnly || result.validateOnly) {
       return {
@@ -1166,6 +1234,11 @@ export async function pushDraftToPlatform(
   if (!shellId) throw new Error("Zernio returned no campaign id for the shell");
 
   const perAdSet = [];
+  // If any ad set fails, the shell is a campaign with no ads: invisible to
+  // the tree, unreachable from the UI, and impossible to clean up by hand
+  // without the accountId escape hatch. Delete it here rather than stranding
+  // it, and surface which ad set failed.
+  try {
   for (const adSet of adSets) {
     const assigned = spots.filter((spot) => spot.adSetRowId === adSet.id);
     // Ads with no ad set assigned ride with the first one rather than being
@@ -1182,35 +1255,32 @@ export async function pushDraftToPlatform(
       brand.id,
       platform,
     );
-    const payload: CreateZernioStandaloneAdInput = {
-      accountId: input.connectionAccountId,
-      adAccountId: destination.adAccount.id,
+    const payload = adSetPayload({
+      adSet,
+      subset,
+      audienceId,
       existingCampaignId: shellId,
-      name: adSet.name,
-      adSetName: adSet.name,
-      goal: input.goal,
-      budgetAmount: adSet.budget ?? input.budgetAmount,
-      budgetType:
-        (adSet.budgetType as "daily" | "lifetime") ?? input.budgetType,
-      headline: subset[0]!.headline ?? subset[0]!.name ?? campaign.name,
-      body: subset[0]!.body ?? campaign.name,
-      linkUrl,
-      creatives: creativesFor(subset),
-      targeting: audienceId ? { audienceId } : undefined,
-      startDate,
-      endDate,
-      promotedObject: input.promotedObject,
-      ...metaDraftProviderControls(false),
-    };
-    const result = await createZernioStandaloneAd(payload, {
-      idempotencyKey: idempotencyKey(
-        context,
-        "push-adset",
-        payload,
-        `push:${campaign.id}:${adSet.id}`,
-      ),
+      validateOnly: false,
+    });
+    const result = await createMetaAd(payload, {
+      idempotencyKey: idempotencyKey(context, "push-adset", payload, `push:${campaign.id}:${adSet.id}`),
+      adAccount: destination.adAccount,
     });
     perAdSet.push({ adSet, result, subset });
+  }
+  } catch (error) {
+    await deleteZernioCampaign({
+      campaignId: shellId,
+      accountId: input.connectionAccountId,
+    }).catch((cleanupError) => {
+      console.error("push rollback failed", shellId, cleanupError);
+    });
+    const built = perAdSet.length;
+    throw new Error(
+      `Push failed after ${built} of ${adSets.length} ad sets — the campaign was removed from Meta so nothing is half-built. ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 
   const created = await recordPlatformCampaign({
@@ -1338,4 +1408,55 @@ async function recordPlatformCampaign(input: {
       .where(eq(adSetTable.id, adSet.id));
   }
   return created!;
+}
+
+// ---- DELETE ------------------------------------------------------------
+
+/**
+ * Delete a platform campaign: the real one, on the real ad account.
+ *
+ * A provider delete that cascades to ad sets and ads, so it is the operator's
+ * click that authorizes it — never chat, never a background job. The local
+ * rows go only after the platform confirms, so a failed provider call leaves
+ * growth still describing reality rather than quietly forgetting a campaign
+ * that is still live and still spending.
+ */
+export async function deletePlatformCampaign(
+  input: { platformCampaignId: string; connectionAccountId?: string },
+  context: AdsWriteContext,
+) {
+  const platformCampaign = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
+  });
+  if (!platformCampaign) throw new Error("Platform campaign not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, platformCampaign.brandId),
+    columns: { id: true, organizationId: true },
+  });
+  if (brand?.organizationId !== context.organizationId) {
+    throw new Error("No access to this campaign");
+  }
+
+  let provider: Record<string, unknown> | null = null;
+  if (platformCampaign.externalId) {
+    provider = await deleteZernioCampaign({
+      campaignId: platformCampaign.externalId,
+      // Needed only for an empty shell, ignored otherwise — so always send it
+      // when we know it, and a stranded shell deletes like anything else.
+      accountId: input.connectionAccountId,
+    });
+  }
+
+  await db
+    .delete(adSpotTable)
+    .where(eq(adSpotTable.platformCampaignId, platformCampaign.id));
+  await db
+    .update(adSetTable)
+    .set({ platformCampaignId: null, externalId: null, status: null })
+    .where(eq(adSetTable.platformCampaignId, platformCampaign.id));
+  await db
+    .delete(platformCampaignTable)
+    .where(eq(platformCampaignTable.id, platformCampaign.id));
+
+  return { deleted: true, hadExternalId: Boolean(platformCampaign.externalId), provider };
 }

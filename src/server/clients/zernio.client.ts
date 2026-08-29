@@ -863,6 +863,42 @@ export async function listZernioAdAccounts(options: {
 }
 
 /**
+ * Delete a campaign on the platform, cascading to its ad sets and ads.
+ *
+ * `accountId` is the escape hatch for an EMPTY campaign: one with no ads has
+ * no local Ad document, so Zernio's own lookup 404s. Sending accountId skips
+ * that lookup and forwards straight to the platform. It is ignored when the
+ * campaign does have ads — which is exactly the shell a half-failed
+ * multi-ad-set push leaves behind.
+ * https://docs.zernio.com/ads/delete-campaign
+ */
+export async function deleteZernioCampaign(input: {
+  campaignId: string;
+  accountId?: string;
+}): Promise<Record<string, unknown>> {
+  return zernioFetch(`/ads/campaigns/${input.campaignId}`, {
+    method: "DELETE",
+    body: JSON.stringify(
+      input.accountId ? { accountId: input.accountId } : {},
+    ),
+  });
+}
+
+/** Delete one ad set; cascades to its ads, never to the campaign. */
+export async function deleteZernioAdSet(
+  adSetId: string,
+): Promise<Record<string, unknown>> {
+  return zernioFetch(`/ads/ad-sets/${adSetId}`, { method: "DELETE" });
+}
+
+/** Cancel one ad. Preserved for history rather than erased. */
+export async function deleteZernioAd(
+  adId: string,
+): Promise<Record<string, unknown>> {
+  return zernioFetch(`/ads/${adId}`, { method: "DELETE" });
+}
+
+/**
  * Pause or resume one campaign — the platform's own on/off switch, cascaded
  * by the platform to its ad sets and ads. `updated: 0` is a normal success
  * (it counts only ads whose stored status changed alongside the switch).
@@ -942,8 +978,10 @@ export type CreateZernioStandaloneAdInput = {
    */
   creatives?: {
     name: string;
-    headline?: string;
-    body?: string;
+    // Required per creative. Nothing falls back to the top-level headline or
+    // body — those seed the ad set, not the individual ads.
+    headline: string;
+    body: string;
     imageUrl: string;
     linkUrl?: string;
     callToAction?: string;

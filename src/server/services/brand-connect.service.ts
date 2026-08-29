@@ -187,7 +187,8 @@ export async function getBrandConnectStatus(brandId: string) {
     where: and(
       eq(channelTable.brandId, brandId),
       eq(channelTable.defaultProvider, "zernio"),
-      isNotNull(channelTable.externalId),
+      // An ad channel has no externalId until ads-sync learns the platform's
+      // ad-account id, but it is connected the moment the client authorises.
       isNull(channelTable.deletedAt),
     ),
     columns: { platform: true, handle: true, displayName: true },

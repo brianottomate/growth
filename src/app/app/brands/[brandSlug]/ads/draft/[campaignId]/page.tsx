@@ -12,6 +12,8 @@ import { AddAdButton } from "../../[platformCampaignId]/AddAdButton";
 import { AdSets } from "./AdSets";
 import { CreativePool } from "./CreativePool";
 import { GoogleSettings } from "./GoogleSettings";
+import { DeleteAdButton } from "./DeleteAdButton";
+import { DeleteCampaignButton } from "./DeleteCampaignButton";
 import { WorkInChatButton } from "./WorkInChatButton";
 import { PushToPlatform } from "../../[platformCampaignId]/PushToPlatform";
 
@@ -97,6 +99,12 @@ export default async function CampaignDraftPage({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <DeleteCampaignButton
+              campaignId={initiative.id}
+              campaignName={initiative.name}
+              brandSlug={brandSlug}
+              livePlatformCampaigns={campaigns.length}
+            />
             <WorkInChatButton
               brandId={draft.brand.id}
               brandName={draft.brand.slug ?? brandSlug}
@@ -219,9 +227,10 @@ export default async function CampaignDraftPage({
             {spots.map((spot) => (
               <div
                 key={spot.id}
-                className="bg-card overflow-hidden rounded-xl border"
+                className="bg-card group overflow-hidden rounded-xl border"
               >
                 <div className="bg-muted relative aspect-video">
+                  {!spot.externalId && <DeleteAdButton adSpotId={spot.id} />}
                   {(spot.media?.[0]?.url ?? spot.thumbnailUrl) && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

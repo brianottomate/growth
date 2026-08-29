@@ -10,6 +10,7 @@ import {
 } from "@/server/services/ads-analytics.service";
 
 import {
+  deletePlatformCampaign,
   listAdsWriteDestinations,
   pushDraftToPlatform,
   setCampaignDelivery,
@@ -17,6 +18,9 @@ import {
 import {
   addDraftAd,
   addDraftAdSet,
+  deleteDraftAd,
+  deleteDraftAdSet,
+  deleteDraftCampaign,
   attachPlatformCampaign,
   listBrandAudienceTargets,
   setCampaignPlatformConfig,
@@ -332,6 +336,56 @@ export const adsRouter = {
       pushDraftToPlatform(input, {
         organizationId: await organizationIdFor(ctx),
         runId: createId("run"),
+      }),
+    ),
+  /**
+   * Deletes. The provider one cascades on a real ad account, so it stays an
+   * operator click — it is deliberately not exposed to chat.
+   */
+  deletePlatformCampaign: protectedProcedure
+    .input(
+      z.object({
+        platformCampaignId: z.string().min(1),
+        connectionAccountId: z.string().nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      deletePlatformCampaign(
+        {
+          platformCampaignId: input.platformCampaignId,
+          connectionAccountId: input.connectionAccountId ?? undefined,
+        },
+        {
+          organizationId: await organizationIdFor(ctx),
+          runId: createId("run"),
+        },
+      ),
+    ),
+
+  deleteDraftCampaign: protectedProcedure
+    .input(z.object({ campaignId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      deleteDraftCampaign({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  deleteDraftAdSet: protectedProcedure
+    .input(z.object({ adSetId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      deleteDraftAdSet({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  deleteDraftAd: protectedProcedure
+    .input(z.object({ adSpotId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      deleteDraftAd({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
       }),
     ),
 } satisfies TRPCRouterRecord;

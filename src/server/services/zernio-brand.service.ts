@@ -164,6 +164,7 @@ export async function connectBrandToZernioProfile(
   for (const account of profileAccounts) {
     const externalId = accountId(account)!;
     const platform = mapZernioPlatform(account.platform) as ChannelPlatform;
+    const isAdChannel = platform.endsWith("_ads");
     let existing = await db.query.channelTable.findFirst({
       where: and(
         eq(channelTable.brandId, brandId),
@@ -172,6 +173,26 @@ export async function connectBrandToZernioProfile(
       ),
       columns: { id: true, profileImageUrl: true, metadata: true },
     });
+    // An ad channel is keyed by the platform's ad account, which this call
+    // does not know, so match on the aggregator id we stored — and failing
+    // that, adopt the brand's existing ad channel for this platform rather
+    // than adding a second one beside it.
+    if (!existing && isAdChannel) {
+      const adChannels = await db.query.channelTable.findMany({
+        where: and(
+          eq(channelTable.brandId, brandId),
+          eq(channelTable.platform, platform),
+          eq(channelTable.kind, "ad"),
+        ),
+        columns: { id: true, profileImageUrl: true, metadata: true },
+      });
+      existing =
+        adChannels.find(
+          (candidate) =>
+            (candidate.metadata as Record<string, unknown> | null)
+              ?.zernioAccountId === externalId,
+        ) ?? adChannels[0];
+    }
     // A profile may have been discovered and accepted before the account was
     // connected in Zernio. Adopt that channel instead of creating a duplicate.
     if (!existing) {
@@ -228,13 +249,18 @@ export async function connectBrandToZernioProfile(
       }
     }
     const values = {
-      kind: platform.endsWith("_ads") ? ("ad" as const) : ("social" as const),
+      kind: isAdChannel ? ("ad" as const) : ("social" as const),
       platform,
       handle: account.username ?? null,
       displayName: account.displayName ?? account.name ?? null,
       profileUrl: account.profileUrl ?? null,
       profileImageUrl,
-      externalId,
+      // `externalId` on an AD channel is the PLATFORM's ad-account id
+      // (act_…), which only ads-sync learns. Claiming Zernio's own account id
+      // here made sync unable to recognise the row and create a second one —
+      // two "Meta Ads" cards for one connection. The aggregator's id lives in
+      // metadata instead, and the row waits for sync to fill externalId.
+      ...(isAdChannel ? {} : { externalId }),
       connectionStatus: connectionStatus(account),
       defaultProvider: "zernio" as const,
       followerCount: account.followersCount ?? null,
@@ -243,6 +269,7 @@ export async function connectBrandToZernioProfile(
       metadata: {
         ...existingMetadata,
         zernioProfileId: profileId,
+        zernioAccountId: externalId,
         zernioPlatform: account.platform,
         zernioPlatformStatus: account.platformStatus ?? null,
       },

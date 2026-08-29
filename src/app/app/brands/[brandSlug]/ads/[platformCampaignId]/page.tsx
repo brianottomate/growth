@@ -13,6 +13,7 @@ import {
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
+import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { InitiativeLink } from "./InitiativeLink";
 
@@ -180,6 +181,13 @@ export default async function CampaignPage({
                 Open in platform ↗
               </a>
             )}
+            <DeletePlatformCampaign
+              platformCampaignId={campaign.id}
+              campaignName={campaign.name}
+              brandSlug={brandSlug}
+              isLive={campaign.status === "live"}
+              spend={campaign.spend}
+            />
             <DeliverySwitch
               platformCampaignId={campaign.id}
               status={campaign.status}

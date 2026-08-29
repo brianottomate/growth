@@ -416,3 +416,75 @@ export async function listBrandCampaigns(input: {
     columns: { id: true, name: true, status: true },
   });
 }
+
+// ---- DELETE (local only) ----------------------------------------------
+//
+// These remove first-party rows and never touch a platform. A campaign that
+// has already produced platform campaigns refuses to delete: those are real
+// objects still spending, and forgetting them here would not stop them.
+
+export async function deleteDraftCampaign(input: {
+  organizationId: string;
+  campaignId: string;
+}) {
+  const { initiative } = await requireOwnedInitiative(
+    input.campaignId,
+    input.organizationId,
+  );
+  const live = await db.query.platformCampaignTable.findMany({
+    where: eq(platformCampaignTable.campaignId, initiative.id),
+    columns: { id: true },
+  });
+  if (live.length > 0) {
+    throw new Error(
+      `This campaign has ${live.length} campaign(s) on a platform — delete those first, or they keep running without anything here describing them`,
+    );
+  }
+  await db.delete(adSpotTable).where(eq(adSpotTable.campaignId, initiative.id));
+  await db.delete(adSetTable).where(eq(adSetTable.campaignId, initiative.id));
+  await db.delete(campaignTable).where(eq(campaignTable.id, initiative.id));
+  return { deleted: true };
+}
+
+export async function deleteDraftAdSet(input: {
+  organizationId: string;
+  adSetId: string;
+}) {
+  const adSet = await db.query.adSetTable.findFirst({
+    where: eq(adSetTable.id, input.adSetId),
+  });
+  if (!adSet) throw new Error("Ad set not found");
+  if (adSet.externalId) {
+    throw new Error(
+      "This ad set exists on a platform — delete it there, or delete the whole platform campaign",
+    );
+  }
+  if (!adSet.campaignId) throw new Error("Ad set has no campaign");
+  await requireOwnedInitiative(adSet.campaignId, input.organizationId);
+  // Its ads survive, unassigned, rather than disappearing with it.
+  await db
+    .update(adSpotTable)
+    .set({ adSetRowId: null })
+    .where(eq(adSpotTable.adSetRowId, adSet.id));
+  await db.delete(adSetTable).where(eq(adSetTable.id, adSet.id));
+  return { deleted: true };
+}
+
+export async function deleteDraftAd(input: {
+  organizationId: string;
+  adSpotId: string;
+}) {
+  const spot = await db.query.adSpotTable.findFirst({
+    where: eq(adSpotTable.id, input.adSpotId),
+  });
+  if (!spot) throw new Error("Ad not found");
+  if (spot.externalId) {
+    throw new Error(
+      "This ad is live on a platform — delete it there, or delete the whole platform campaign",
+    );
+  }
+  if (!spot.campaignId) throw new Error("Ad has no campaign");
+  await requireOwnedInitiative(spot.campaignId, input.organizationId);
+  await db.delete(adSpotTable).where(eq(adSpotTable.id, spot.id));
+  return { deleted: true };
+}
