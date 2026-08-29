@@ -91,6 +91,18 @@ const config: NextConfig = {
     ];
   },
 
+  async redirects() {
+    return [
+      {
+        // Campaign drafts lived at /ads/draft/<id> until the ads routes were
+        // collapsed onto /ads/<id>. Those links are in chat history and Slack.
+        source: "/app/brands/:brandSlug/ads/draft/:campaignId",
+        destination: "/app/brands/:brandSlug/ads/:campaignId",
+        permanent: true,
+      },
+    ];
+  },
+
   async rewrites() {
     return [
       {

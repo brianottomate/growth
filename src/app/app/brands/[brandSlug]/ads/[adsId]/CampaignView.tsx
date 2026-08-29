@@ -8,31 +8,29 @@ import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { getDraftInitiative } from "@/server/services/ads-draft.service";
 
-import { AddAdButton } from "../../[platformCampaignId]/AddAdButton";
+import { AddAdButton } from "./AddAdButton";
 import { AdSets } from "./AdSets";
+import { money } from "./format";
+import { PlatformCampaignCard } from "./PlatformCampaignCard";
 import { CreativePool } from "./CreativePool";
 import { GoogleSettings } from "./GoogleSettings";
 import { DeleteAdButton } from "./DeleteAdButton";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
 import { WorkInChatButton } from "./WorkInChatButton";
-import { PushToPlatform } from "../../[platformCampaignId]/PushToPlatform";
-
-export const dynamic = "force-dynamic";
-
-const money = (n: number | null | undefined) =>
-  n == null ? "—" : `$${n.toLocaleString()}`;
+import { PushToPlatform } from "./PushToPlatform";
 
 /**
  * The campaign draft: the first-party object you author. Mostly read-only —
  * editing happens in chat; the dialogs here are utilities for the basics.
  * Per-platform campaigns don't exist yet; the push creates them.
  */
-export default async function CampaignDraftPage({
-  params,
+export async function CampaignView({
+  brandSlug,
+  campaignId,
 }: {
-  params: Promise<{ brandSlug: string; campaignId: string }>;
+  brandSlug: string;
+  campaignId: string;
 }) {
-  const { brandSlug, campaignId } = await params;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -48,7 +46,14 @@ export default async function CampaignDraftPage({
   );
   if (draft?.brand.slug !== brandSlug) notFound();
 
-  const { initiative, adSets, spots, campaigns, audienceTargets } = draft;
+  const {
+    initiative,
+    adSets,
+    spots,
+    campaigns,
+    audienceTargets,
+    platformAudiences,
+  } = draft;
   const targets = initiative.targetChannels ?? [];
 
   return (
@@ -141,6 +146,19 @@ export default async function CampaignDraftPage({
           </p>
         </div>
         <div className="bg-card rounded-xl border p-3">
+          <p className="text-muted-foreground text-xs">Spend to date</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums">
+            {campaigns.length === 0
+              ? "—"
+              : money(
+                  campaigns.reduce(
+                    (total, row) => total + (row.stats?.spend ?? row.spend ?? 0),
+                    0,
+                  ),
+                )}
+          </p>
+        </div>
+        <div className="bg-card rounded-xl border p-3">
           <p className="text-muted-foreground text-xs">Ad sets</p>
           <p className="mt-1 text-lg font-semibold tabular-nums">
             {adSets.length}
@@ -152,32 +170,27 @@ export default async function CampaignDraftPage({
             {spots.length}
           </p>
         </div>
-        <div className="bg-card rounded-xl border p-3">
-          <p className="text-muted-foreground text-xs">Live campaigns</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums">
-            {campaigns.length}
-          </p>
-        </div>
       </div>
 
       {campaigns.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-base font-semibold">On the platforms</h2>
+          <h2 className="text-base font-semibold">
+            On the platforms{" "}
+            <span className="text-muted-foreground text-sm font-normal">
+              {campaigns.length}
+            </span>
+          </h2>
           <div className="space-y-2">
             {campaigns.map((campaign) => (
-              <Link
+              <PlatformCampaignCard
                 key={campaign.id}
-                href={`/app/brands/${brandSlug}/ads/${campaign.id}`}
-                className="bg-card flex items-center gap-3 rounded-xl border p-3 transition-colors hover:border-white/20"
-              >
-                <ChannelLogo platform={campaign.platform} className="size-5" />
-                <span className="flex-1 truncate text-sm font-medium">
-                  {campaign.name}
-                </span>
-                <span className="text-muted-foreground text-xs capitalize">
-                  {campaign.status}
-                </span>
-              </Link>
+                campaign={campaign}
+                brandSlug={brandSlug}
+                adCount={
+                  spots.filter((spot) => spot.platformCampaignId === campaign.id)
+                    .length
+                }
+              />
             ))}
           </div>
         </section>
@@ -199,8 +212,10 @@ export default async function CampaignDraftPage({
       <AdSets
         campaignId={initiative.id}
         brandId={draft.brand.id}
+        brandSlug={brandSlug}
         adSets={adSets}
         audienceTargets={audienceTargets}
+        platformAudiences={platformAudiences}
       />
 
       <section className="space-y-3">

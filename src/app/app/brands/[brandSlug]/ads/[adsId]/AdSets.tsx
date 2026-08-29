@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Plus, Users } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { Plus, RefreshCw, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,12 +14,27 @@ type AdSet = {
   id: string;
   name: string;
   audienceTargetId: string | null;
+  audienceId: string | null;
   budget: number | null;
   budgetType: string | null;
   externalId: string | null;
 };
 
 type AudienceTarget = { id: string; name: string };
+type PlatformAudience = {
+  id: string;
+  name: string;
+  type: string;
+  sizeLabel: string | null;
+};
+
+/**
+ * Encoded so one <select> can express three different things: broad, a
+ * first-party target we resolve per platform, or a platform audience the
+ * client already built.
+ */
+const BROAD = "";
+const encode = (kind: "t" | "a", id: string) => `${kind}:${id}`;
 
 /**
  * Ad sets are where targeting, audience, and budget live on every platform
@@ -31,44 +45,74 @@ type AudienceTarget = { id: string; name: string };
 export function AdSets({
   campaignId,
   brandId,
+  brandSlug,
   adSets,
   audienceTargets,
+  platformAudiences,
 }: {
   campaignId: string;
   brandId: string;
+  brandSlug: string;
   adSets: AdSet[];
   audienceTargets: AudienceTarget[];
+  platformAudiences: PlatformAudience[];
 }) {
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [audienceTargetId, setAudienceTargetId] = useState("");
+  const [audience, setAudience] = useState(BROAD);
   const [budget, setBudget] = useState("");
+  const [newAudience, setNewAudience] = useState("");
 
-  const options = useQuery(
-    trpc.ads.audienceTargets.queryOptions({ brandId }, { enabled: open }),
-  );
   const add = useMutation(
     trpc.ads.addDraftAdSet.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         setName("");
-        setAudienceTargetId("");
+        setAudience(BROAD);
         setBudget("");
         router.refresh();
       },
     }),
   );
-
   const removeAdSet = useMutation(
     trpc.ads.deleteDraftAdSet.mutationOptions({
       onSuccess: () => router.refresh(),
     }),
   );
+  // Creating the target here keeps the half-filled ad-set form alive; sending
+  // someone to /app/audiences to define one loses everything they typed.
+  const createTarget = useMutation(
+    trpc.audience.createTarget.mutationOptions({
+      onSuccess: (target) => {
+        setAudience(encode("t", target.id));
+        setNewAudience("");
+        router.refresh();
+      },
+    }),
+  );
+  const pullAudiences = useMutation(
+    trpc.ads.syncPlatformAudiences.mutationOptions({
+      onSuccess: () => router.refresh(),
+    }),
+  );
 
-  const audienceName = (id: string | null) =>
-    id ? (audienceTargets.find((a) => a.id === id)?.name ?? "—") : null;
+  const labelFor = (adSet: AdSet) => {
+    if (adSet.audienceId) {
+      return (
+        platformAudiences.find((row) => row.id === adSet.audienceId)?.name ??
+        "platform audience"
+      );
+    }
+    if (adSet.audienceTargetId) {
+      return (
+        audienceTargets.find((row) => row.id === adSet.audienceTargetId)
+          ?.name ?? "audience"
+      );
+    }
+    return "Broad";
+  };
 
   return (
     <section className="space-y-3">
@@ -110,22 +154,30 @@ export function AdSets({
               <Label htmlFor="adset-audience">Audience</Label>
               <select
                 id="adset-audience"
-                value={audienceTargetId}
-                onChange={(event) => setAudienceTargetId(event.target.value)}
+                value={audience}
+                onChange={(event) => setAudience(event.target.value)}
                 className="border-input bg-background h-8 w-full rounded-md border px-2 text-xs"
               >
-                <option value="">
-                  {options.isPending
-                    ? "Loading…"
-                    : (options.data ?? []).length === 0
-                      ? "No audiences defined yet"
-                      : "Pick an audience"}
-                </option>
-                {(options.data ?? []).map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.name}
-                  </option>
-                ))}
+                <option value={BROAD}>Broad — let the platform find them</option>
+                {audienceTargets.length > 0 && (
+                  <optgroup label="Your audiences">
+                    {audienceTargets.map((row) => (
+                      <option key={row.id} value={encode("t", row.id)}>
+                        {row.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {platformAudiences.length > 0 && (
+                  <optgroup label="Already in the ad account">
+                    {platformAudiences.map((row) => (
+                      <option key={row.id} value={encode("a", row.id)}>
+                        {row.name}
+                        {row.sizeLabel ? ` (${row.sizeLabel})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div className="space-y-1.5">
@@ -141,15 +193,49 @@ export function AdSets({
               />
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={newAudience}
+              onChange={(event) => setNewAudience(event.target.value)}
+              placeholder="Or name a new audience…"
+              className="h-8 max-w-xs text-xs"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!newAudience.trim() || createTarget.isPending}
+              loading={createTarget.isPending}
+              onClick={() =>
+                createTarget.mutate({ brandId, name: newAudience.trim() })
+              }
+            >
+              Create
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              loading={pullAudiences.isPending}
+              onClick={() => pullAudiences.mutate({ brandSlug })}
+            >
+              <RefreshCw className="size-3.5" />
+              Pull from ad account
+            </Button>
+          </div>
+
           <p className="text-muted-foreground text-xs">
-            Audiences are defined once per brand in{" "}
-            <Link href="/app/audiences" className="underline">
-              Audiences
-            </Link>{" "}
-            and compiled per platform when the campaign is pushed.
+            Broad is a real choice, and often the right one — strong creative
+            plus a wide pool beats hand-cut interests on most accounts. Reach
+            for an audience when you have a genuine list or seed.
           </p>
-          {add.error && (
-            <p className="text-xs text-red-300">{add.error.message}</p>
+          {(add.error ?? createTarget.error ?? pullAudiences.error) && (
+            <p className="text-xs text-red-300">
+              {
+                (add.error ?? createTarget.error ?? pullAudiences.error)
+                  ?.message
+              }
+            </p>
           )}
           <div className="flex gap-2">
             <Button
@@ -160,7 +246,12 @@ export function AdSets({
                 add.mutate({
                   campaignId,
                   name: name.trim(),
-                  audienceTargetId: audienceTargetId || null,
+                  audienceTargetId: audience.startsWith("t:")
+                    ? audience.slice(2)
+                    : null,
+                  audienceId: audience.startsWith("a:")
+                    ? audience.slice(2)
+                    : null,
                   budget: budget === "" ? null : Math.round(Number(budget)),
                   budgetType: budget === "" ? null : "daily",
                 })
@@ -177,8 +268,9 @@ export function AdSets({
 
       {adSets.length === 0 && !open ? (
         <p className="text-muted-foreground text-sm">
-          No ad sets yet. A campaign needs at least one to say who it is
-          buying — the push creates one per ad set on the platform.
+          No ad sets yet. Push without one and we create a single ad set from
+          the campaign budget, targeting broad. Add them when you want to split
+          audiences or budget.
         </p>
       ) : (
         <div className="space-y-2">
@@ -190,7 +282,7 @@ export function AdSets({
               <span className="text-sm font-medium">{adSet.name}</span>
               <span className="text-muted-foreground flex items-center gap-1 text-xs">
                 <Users className="size-3.5" />
-                {audienceName(adSet.audienceTargetId) ?? "no audience set"}
+                {labelFor(adSet)}
               </span>
               <span className="text-muted-foreground ml-auto text-xs tabular-nums">
                 {adSet.budget != null

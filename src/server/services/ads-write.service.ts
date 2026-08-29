@@ -24,6 +24,7 @@ import {
   getZernioAdsTree,
   listZernioAccounts,
   listZernioAdAccounts,
+  listZernioAdAudiences,
   setZernioCampaignStatus,
   ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST,
   type CreateZernioStandaloneAdInput,
@@ -40,6 +41,8 @@ import {
   adSpotTable,
   audienceTable,
   audienceTargetTable,
+  type AudienceSource,
+  type AudienceType,
   brandTable,
   platformCampaignTable,
   channelTable,
@@ -710,6 +713,109 @@ export type CreateAdAudienceInput = {
  * idempotent (no Idempotency-Key support), so a failure here must surface to
  * the operator instead of being retried.
  */
+/**
+ * Mirror the custom audiences that already exist in a brand's allowlisted ad
+ * accounts into `audience` rows.
+ *
+ * Zernio has no first-party audience concept, so a client who spent two years
+ * building lookalikes and website-visitor audiences has all of that sitting in
+ * their ad account, invisible to us until we ask. Without this the audience
+ * picker on a campaign can only offer audiences we created ourselves, which on
+ * a new client is none.
+ *
+ * Read-only against the provider; writes only our own mirror rows.
+ */
+export async function syncBrandPlatformAudiences(input: {
+  organizationId: string;
+  brandSlug: string;
+}) {
+  const platforms: ZernioAdPlatform[] = ["meta", "google"];
+  let mirrored = 0;
+  const errors: string[] = [];
+
+  for (const platform of platforms) {
+    const listed = await listAdsWriteDestinations({
+      organizationId: input.organizationId,
+      brandSlug: input.brandSlug,
+      platform,
+    }).catch((error: unknown) => {
+      errors.push(
+        `${platform}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    });
+    if (!listed) continue;
+
+    const channelPlatform = platform === "meta" ? "meta_ads" : "google_ads";
+    const channel = await db.query.channelTable.findFirst({
+      where: and(
+        eq(channelTable.brandId, listed.brand.id),
+        eq(channelTable.platform, channelPlatform),
+        isNull(channelTable.deletedAt),
+      ),
+      columns: { id: true },
+    });
+    if (!channel) continue;
+
+    for (const destination of listed.destinations) {
+      const remote = await listZernioAdAudiences({
+        accountId: destination.connectionAccountId,
+        adAccountId: destination.adAccountId,
+      }).catch((error: unknown) => {
+        errors.push(
+          `${destination.adAccountId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return [];
+      });
+
+      for (const audience of remote) {
+        const externalId =
+          audience.platformAudienceId ?? audience.id ?? audience._id;
+        if (!externalId || !audience.name) continue;
+        const existing = await db.query.audienceTable.findFirst({
+          where: and(
+            eq(audienceTable.brandId, listed.brand.id),
+            eq(audienceTable.externalId, externalId),
+          ),
+          columns: { id: true },
+        });
+        const values = {
+          brandId: listed.brand.id,
+          channelId: channel.id,
+          name: audience.name,
+          // Zernio's `type` is its own vocabulary; ours is coarser. Only
+          // lookalike maps cleanly, everything else is a custom audience.
+          type: (audience.type === "lookalike"
+            ? "lookalike"
+            : "custom") as AudienceType,
+          source: (audience.type === "customer_list"
+            ? "customer_list"
+            : audience.type === "lookalike"
+              ? "lookalike_seed"
+              : "manual") as AudienceSource,
+          externalId,
+          sizeLabel:
+            audience.approximateCount != null
+              ? `~${audience.approximateCount.toLocaleString()}`
+              : null,
+          definition: audience as Record<string, unknown>,
+        };
+        if (existing) {
+          await db
+            .update(audienceTable)
+            .set(values)
+            .where(eq(audienceTable.id, existing.id));
+        } else {
+          await db.insert(audienceTable).values(values);
+        }
+        mirrored++;
+      }
+    }
+  }
+
+  return { mirrored, errors };
+}
+
 export async function createAdAudience(
   input: CreateAdAudienceInput,
   context: AdsWriteContext,
@@ -888,19 +994,46 @@ export async function setCampaignDelivery(
  * when the target has never been compiled to this platform — the ad set then
  * runs on its geo/demographic targeting alone rather than failing the push.
  */
+/**
+ * The platform audience id an ad set should target, or null for broad.
+ *
+ * An ad set can name its audience two ways: `audienceId` points straight at a
+ * mirrored platform audience (what the client already built in their ad
+ * account), while `audienceTargetId` names our first-party intent and has to
+ * be resolved to whichever platform audience fulfils it. The direct pointer
+ * wins when both are set, because it is the more specific instruction.
+ */
 async function platformAudienceIdFor(
-  audienceTargetId: string | null,
+  adSet: { audienceId: string | null; audienceTargetId: string | null },
   brandId: string,
   platform: "meta_ads" | "google_ads",
 ): Promise<string | null> {
-  if (!audienceTargetId) return null;
+  if (adSet.audienceId) {
+    const [direct] = await db
+      .select({ externalId: audienceTable.externalId })
+      .from(audienceTable)
+      .innerJoin(channelTable, eq(channelTable.id, audienceTable.channelId))
+      .where(
+        and(
+          eq(audienceTable.id, adSet.audienceId),
+          eq(audienceTable.brandId, brandId),
+          // An audience lives in one ad account. Targeting a Meta audience
+          // from a Google push would send a meaningless id to the platform.
+          eq(channelTable.platform, platform),
+          isNotNull(audienceTable.externalId),
+        ),
+      )
+      .limit(1);
+    if (direct?.externalId) return direct.externalId;
+  }
+  if (!adSet.audienceTargetId) return null;
   const rows = await db
     .select({ externalId: audienceTable.externalId })
     .from(audienceTable)
     .innerJoin(channelTable, eq(channelTable.id, audienceTable.channelId))
     .where(
       and(
-        eq(audienceTable.targetId, audienceTargetId),
+        eq(audienceTable.targetId, adSet.audienceTargetId),
         eq(audienceTable.brandId, brandId),
         eq(channelTable.platform, platform),
         isNotNull(audienceTable.externalId),
@@ -1161,7 +1294,7 @@ export async function pushDraftToPlatform(
   if (adSets.length <= 1) {
     const only = adSets[0];
     const audienceId = only
-      ? await platformAudienceIdFor(only.audienceTargetId, brand.id, platform)
+      ? await platformAudienceIdFor(only, brand.id, platform)
       : null;
     const payload = adSetPayload({
       adSet: only,
@@ -1250,11 +1383,7 @@ export async function pushDraftToPlatform(
           ? spots.filter((spot) => !spot.adSetRowId)
           : [];
     if (subset.length === 0) continue;
-    const audienceId = await platformAudienceIdFor(
-      adSet.audienceTargetId,
-      brand.id,
-      platform,
-    );
+    const audienceId = await platformAudienceIdFor(adSet, brand.id, platform);
     const payload = adSetPayload({
       adSet,
       subset,

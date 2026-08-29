@@ -198,6 +198,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
   const finalizeUpload = useMutation(
     trpc.media.finalizeUpload.mutationOptions(),
   );
+  const failUpload = useMutation(trpc.media.failUpload.mutationOptions());
   const finalizeLinkCreate = () => {
     toast.success("Link added");
     setLinkOpen(false);
@@ -267,6 +268,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
       }
 
       const uploadKey = `${file.name}-${file.size}-${file.lastModified}`;
+      let pendingMediaId: string | null = null;
       setUploadingCount((c) => c + 1);
       setUploads((current) => [
         ...current,
@@ -279,13 +281,15 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         const decoded = isImage
           ? await createImageThumbnail(file)
           : await createVideoThumbnail(file);
+        const created = await createUploadUrl.mutateAsync({
+          brandId,
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+        });
+        pendingMediaId = created.mediaId;
         const { mediaId, uploadUrl, publicUrl, pathname, thumbnailUploadUrl } =
-          await createUploadUrl.mutateAsync({
-            brandId,
-            filename: file.name,
-            mimeType: file.type,
-            size: file.size,
-          });
+          created;
         await putWithProgress(uploadUrl, file, {
           contentType: file.type,
           onProgress: (fraction) =>
@@ -318,9 +322,18 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
           height: decoded?.sourceHeight || undefined,
           hasThumbnail,
         });
+        pendingMediaId = null;
         toast.success(`Uploaded ${file.name}`);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Upload failed");
+        const message = err instanceof Error ? err.message : "Upload failed";
+        // Without this the row sits on `uploading` forever, because the only
+        // writer that would have moved it is the finalize that never ran.
+        if (pendingMediaId) {
+          await failUpload
+            .mutateAsync({ mediaId: pendingMediaId, reason: message })
+            .catch(() => undefined);
+        }
+        toast.error(message);
       } finally {
         setUploadingCount((c) => c - 1);
         setUploads((current) =>
@@ -329,7 +342,7 @@ export function MediaLibrary({ brands }: { brands: Brand[] }) {
         void invalidate();
       }
     },
-    [brandId, createUploadUrl, finalizeUpload, invalidate],
+    [brandId, createUploadUrl, failUpload, finalizeUpload, invalidate],
   );
 
   const handleFiles = useCallback(

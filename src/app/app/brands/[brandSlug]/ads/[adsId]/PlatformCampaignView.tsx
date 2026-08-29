@@ -13,35 +13,10 @@ import {
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
+import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { InitiativeLink } from "./InitiativeLink";
-
-export const dynamic = "force-dynamic";
-
-const money = (n: number | null | undefined) =>
-  n == null
-    ? "—"
-    : n >= 1000
-      ? `$${(n / 1000).toFixed(1)}K`
-      : `$${n.toLocaleString()}`;
-
-const fmtDate = (d: Date | null) =>
-  d
-    ? d.toLocaleDateString([], {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "—";
-
-const STATUS_STYLE: Record<string, string> = {
-  live: "bg-emerald-500/15 text-emerald-300",
-  scheduled: "bg-sky-500/15 text-sky-300",
-  paused: "bg-amber-500/15 text-amber-300",
-  ended: "bg-muted text-muted-foreground",
-  draft: "bg-muted text-muted-foreground",
-};
 
 /**
  * The campaign canvas: a view-only display of one campaign — its state, its
@@ -49,12 +24,13 @@ const STATUS_STYLE: Record<string, string> = {
  * just renders current state. The one control is the delivery switch, because
  * launching by button click is a deliberate operator moment.
  */
-export default async function CampaignPage({
-  params,
+export async function PlatformCampaignView({
+  brandSlug,
+  platformCampaignId,
 }: {
-  params: Promise<{ brandSlug: string; platformCampaignId: string }>;
+  brandSlug: string;
+  platformCampaignId: string;
 }) {
-  const { brandSlug, platformCampaignId } = await params;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -151,7 +127,7 @@ export default async function CampaignPage({
               </h1>
               <span
                 className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
-                  STATUS_STYLE[campaign.status] ?? STATUS_STYLE.draft
+                  statusStyle(campaign.status)
                 }`}
               >
                 {campaign.status}
@@ -160,7 +136,7 @@ export default async function CampaignPage({
             <p className="text-muted-foreground mt-1 text-sm">
               {platformLabel(campaign.platform)}
               {campaign.objective ? ` · ${campaign.objective}` : ""} ·{" "}
-              {fmtDate(campaign.startAt)} – {fmtDate(campaign.endAt)}
+              {fmtDate(campaign.startAt) ?? "—"} – {fmtDate(campaign.endAt) ?? "—"}
             </p>
             <div className="mt-2">
               <InitiativeLink

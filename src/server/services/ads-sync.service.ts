@@ -1,9 +1,11 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
+  adSetTable,
+  adSpotTable,
   type AdStats,
   platformCampaignTable,
   type PlatformCampaignStatus,
@@ -194,6 +196,215 @@ export type AdsSyncFilters = {
   limit?: number;
 };
 
+
+/**
+ * Whether the tree we just fetched was complete enough to conclude that a
+ * campaign missing from it was deleted on the platform.
+ *
+ * Absence is only evidence of deletion when nothing could have hidden a live
+ * campaign. Any ingest window (sinceDays, minSpend, statuses, limit), any
+ * campaign the window dropped, and any error mid-sync all make absence
+ * meaningless, so a partial sync reconciles nothing. Getting this wrong marks
+ * a client's running campaigns as ended.
+ *
+ * `accountScoped` is the subtle one: a sync narrowed to a single ad account
+ * sees none of the brand's other accounts, and channel resolution can put two
+ * accounts on one channel row — so the reconcile query would sweep campaigns
+ * this tree was never asked about.
+ */
+export function treeIsCompleteEnoughToReconcile(input: {
+  filteredOut: number;
+  errorCount: number;
+  accountScoped: boolean;
+  limit: number | null;
+  sinceDays: number | null;
+  minSpend: number | null;
+  statuses: string[] | null;
+}) {
+  return (
+    !input.accountScoped &&
+    input.filteredOut === 0 &&
+    input.errorCount === 0 &&
+    input.limit === null &&
+    input.sinceDays === null &&
+    input.minSpend === null &&
+    input.statuses === null
+  );
+}
+
+/**
+ * Mirror a synced campaign's ad sets and ads into real rows.
+ *
+ * Sync used to record `adSpots` as a bare count, so a pulled campaign showed
+ * "0 ads" and no creative anywhere in the UI while claiming to have some. The
+ * push already writes these rows; sync writing them too is what makes a
+ * pulled campaign and a pushed one read the same.
+ *
+ * Keyed on the platform's own ids, so re-running updates in place.
+ */
+async function syncCampaignChildren(input: {
+  brandId: string;
+  channelId: string;
+  platform: ChannelPlatform;
+  tree: ZernioAdsTreeCampaign[];
+  rowIdByExternalId: Map<string, string>;
+}) {
+  type PendingSet = {
+    externalId: string;
+    values: typeof adSetTable.$inferInsert;
+  };
+  type PendingAd = {
+    externalId: string;
+    adSetExternalId: string | undefined;
+    values: typeof adSpotTable.$inferInsert;
+  };
+  const sets: PendingSet[] = [];
+  const ads: PendingAd[] = [];
+
+  for (const campaign of input.tree) {
+    const obj = campaign as Record<string, unknown>;
+    const campaignExternalId =
+      str(obj.platformCampaignId) ?? campaign.id ?? campaign._id;
+    const rowId = campaignExternalId
+      ? input.rowIdByExternalId.get(campaignExternalId)
+      : undefined;
+    if (!rowId) continue;
+
+    for (const adSet of campaign.adSets ?? []) {
+      const setObj = adSet as Record<string, unknown>;
+      const setExternalId =
+        str(setObj.platformAdSetId) ?? adSet.id ?? adSet._id;
+      if (setExternalId) {
+        sets.push({
+          externalId: setExternalId,
+          values: {
+            brandId: input.brandId,
+            platformCampaignId: rowId,
+            name: adSet.name ?? setExternalId,
+            status: adSet.status ?? null,
+            budget: num(
+              (setObj.budget as { amount?: unknown } | undefined)?.amount ??
+                setObj.budget,
+            ) ?? null,
+            budgetType:
+              str((setObj.budget as { type?: unknown } | undefined)?.type) ??
+              null,
+            externalId: setExternalId,
+          },
+        });
+      }
+
+      for (const ad of adSet.ads ?? []) {
+        const adExternalId = ad.platformAdId ?? ad.id ?? ad._id;
+        if (!adExternalId) continue;
+        const creative = ad.creative ?? {};
+        const image = creative.imageUrl ?? creative.videoUrl ?? null;
+        const media = image
+          ? [
+              {
+                url: image,
+                type: creative.videoUrl ? ("video" as const) : ("image" as const),
+              },
+            ]
+          : null;
+        ads.push({
+          externalId: adExternalId,
+          adSetExternalId: setExternalId,
+          values: {
+            brandId: input.brandId,
+            platformCampaignId: rowId,
+            channelId: input.channelId,
+            platform: input.platform,
+            name: ad.name ?? adExternalId,
+            status: ad.status ?? null,
+            adSetId: ad.platformAdSetId ?? setExternalId ?? null,
+            adSetName: adSet.name ?? null,
+            media,
+            body: creative.body ?? null,
+            linkUrl: creative.linkUrl ?? null,
+            thumbnailUrl: creative.thumbnailUrl ?? null,
+            platformObjective: ad.platformObjective ?? null,
+            optimizationGoal: ad.optimizationGoal ?? null,
+            bidStrategy: ad.bidStrategy ?? null,
+            externalId: adExternalId,
+          },
+        });
+      }
+    }
+  }
+
+  // Ad sets first: the ads reference them by row id.
+  const setRowIdByExternalId = new Map<string, string>();
+  if (sets.length) {
+    const existing = await db
+      .select({ id: adSetTable.id, externalId: adSetTable.externalId })
+      .from(adSetTable)
+      .where(
+        inArray(
+          adSetTable.externalId,
+          sets.map((row) => row.externalId),
+        ),
+      );
+    for (const row of existing) {
+      if (row.externalId) setRowIdByExternalId.set(row.externalId, row.id);
+    }
+    for (const pending of sets) {
+      const known = setRowIdByExternalId.get(pending.externalId);
+      if (known) {
+        await db
+          .update(adSetTable)
+          .set(pending.values)
+          .where(eq(adSetTable.id, known));
+      } else {
+        const [inserted] = await db
+          .insert(adSetTable)
+          .values(pending.values)
+          .returning({ id: adSetTable.id });
+        if (inserted) setRowIdByExternalId.set(pending.externalId, inserted.id);
+      }
+    }
+  }
+
+  let adsWritten = 0;
+  if (ads.length) {
+    const existing = await db
+      .select({ id: adSpotTable.id, externalId: adSpotTable.externalId })
+      .from(adSpotTable)
+      .where(
+        and(
+          eq(adSpotTable.brandId, input.brandId),
+          inArray(
+            adSpotTable.externalId,
+            ads.map((row) => row.externalId),
+          ),
+        ),
+      );
+    const adRowIdByExternalId = new Map(
+      existing.flatMap((row) => (row.externalId ? [[row.externalId, row.id]] : [])),
+    );
+    for (const pending of ads) {
+      const values = {
+        ...pending.values,
+        adSetRowId: pending.adSetExternalId
+          ? (setRowIdByExternalId.get(pending.adSetExternalId) ?? null)
+          : null,
+      };
+      const known = adRowIdByExternalId.get(pending.externalId);
+      if (known) {
+        await db
+          .update(adSpotTable)
+          .set(values)
+          .where(eq(adSpotTable.id, known));
+      } else {
+        await db.insert(adSpotTable).values(values);
+      }
+      adsWritten++;
+    }
+  }
+
+  return { adSets: setRowIdByExternalId.size, ads: adsWritten };
+}
+
 export async function syncZernioAds(options?: {
   brandSlug?: string;
   /** channel_platform ad value; default "meta_ads" (original behavior). */
@@ -210,6 +421,11 @@ export async function syncZernioAds(options?: {
   byObjective: Record<string, number>;
   /** Performance+ cycles whose observed spend was refreshed from this sync. */
   cyclesRepriced: number;
+  /** Ad set and ad rows mirrored from the tree. */
+  adSetsWritten: number;
+  adsWritten: number;
+  /** Live campaigns no longer on the platform, marked ended. */
+  reconciled: number;
   /** Campaigns the tree returned but the ingest window excluded. */
   filteredOut: number;
   /** The window actually applied, so a caller can see what it did not fetch. */
@@ -318,6 +534,9 @@ export async function syncZernioAds(options?: {
       inserted: 0,
       updated: 0,
       skipped: 0,
+      adSetsWritten: 0,
+      adsWritten: 0,
+      reconciled: 0,
       byObjective: {},
       filteredOut,
       appliedFilters,
@@ -474,6 +693,71 @@ export async function syncZernioAds(options?: {
     }
   }
 
+  // --- Mirror the tree's ad sets and ads into real rows ----------------
+  const rowIds = extIds.length
+    ? await db
+        .select({
+          id: platformCampaignTable.id,
+          externalId: platformCampaignTable.externalId,
+        })
+        .from(platformCampaignTable)
+        .where(
+          and(
+            eq(platformCampaignTable.brandId, brand.id),
+            inArray(platformCampaignTable.externalId, extIds),
+          ),
+        )
+    : [];
+  const rowIdByExternalId = new Map(
+    rowIds.flatMap((row) => (row.externalId ? [[row.externalId, row.id]] : [])),
+  );
+  let children = { adSets: 0, ads: 0 };
+  try {
+    children = await syncCampaignChildren({
+      brandId: brand.id,
+      channelId,
+      platform,
+      tree,
+      rowIdByExternalId,
+    });
+  } catch (error) {
+    errors.push(
+      `ad set/ad mirror failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  // --- Reconcile campaigns that vanished from the platform -------------
+  // Absence from the tree only means "deleted" when the tree was complete.
+  // Any applied window (sinceDays, minSpend, statuses, limit) or any error
+  // can drop a campaign that is alive and well, so a partial sync reconciles
+  // nothing. Status is restored on the next sync if the campaign reappears,
+  // which keeps this reversible.
+  let reconciled = 0;
+  const treeWasComplete = treeIsCompleteEnoughToReconcile({
+    filteredOut,
+    errorCount: errors.length,
+    accountScoped: Boolean(options?.adAccountId),
+    limit,
+    sinceDays,
+    minSpend,
+    statuses,
+  });
+  if (treeWasComplete && extIds.length) {
+    const gone = await db
+      .update(platformCampaignTable)
+      .set({ status: "ended" })
+      .where(
+        and(
+          eq(platformCampaignTable.brandId, brand.id),
+          eq(platformCampaignTable.channelId, channelId),
+          notInArray(platformCampaignTable.externalId, extIds),
+          inArray(platformCampaignTable.status, ["live", "scheduled"]),
+        ),
+      )
+      .returning({ id: platformCampaignTable.id });
+    reconciled = gone.length;
+  }
+
   const byObjective: Record<string, number> = {};
   for (const c of candidates) {
     const k = c.objective ?? "(none)";
@@ -499,6 +783,9 @@ export async function syncZernioAds(options?: {
     inserted: toInsert.length,
     updated,
     skipped: skippedJunk,
+    adSetsWritten: children.adSets,
+    adsWritten: children.ads,
+    reconciled,
     byObjective,
     cyclesRepriced,
     filteredOut,

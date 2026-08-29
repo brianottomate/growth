@@ -376,7 +376,7 @@ export default async function BrandAdsPage({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
-                      href={`/app/brands/${brandSlug}/ads/draft/${init.id}`}
+                      href={`/app/brands/${brandSlug}/ads/${init.id}`}
                       className="text-base font-semibold hover:underline"
                     >
                       {init.name}
@@ -469,9 +469,13 @@ export default async function BrandAdsPage({
 
       {ungroupedCampaigns.length > 0 && (
         <>
-          <h3 className="text-muted-foreground mt-6 mb-2 text-xs font-semibold tracking-wider uppercase">
-            Unlinked campaigns · {ungroupedCampaigns.length}
+          <h3 className="text-muted-foreground mt-6 mb-1 text-xs font-semibold tracking-wider uppercase">
+            Not in a campaign yet · {ungroupedCampaigns.length}
           </h3>
+          <p className="text-muted-foreground mb-2 text-xs">
+            Pulled from the ad account. They run fine as they are; attaching
+            one just groups its spend under a campaign you author.
+          </p>
           <div className="flex flex-col gap-2">
             {ungroupedCampaigns.map((c) => (
               <CampaignRow

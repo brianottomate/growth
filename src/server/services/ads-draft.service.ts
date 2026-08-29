@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import {
   adSetTable,
   adSpotTable,
+  audienceTable,
   audienceTargetTable,
   brandTable,
   platformCampaignTable,
@@ -114,7 +115,7 @@ export async function createDraftInitiative(input: {
   return {
     initiative: initiative!,
     brandSlug: brand.slug,
-    path: `/app/brands/${brand.slug}/ads/draft/${initiative!.id}`,
+    path: `/app/brands/${brand.slug}/ads/${initiative!.id}`,
   };
 }
 
@@ -128,6 +129,8 @@ export async function addDraftAdSet(input: {
   campaignId: string;
   name: string;
   audienceTargetId?: string | null;
+  /** A mirrored platform audience, when the client already built one. */
+  audienceId?: string | null;
   budget?: number | null;
   budgetType?: "daily" | "lifetime" | null;
   optimizationGoal?: string | null;
@@ -145,6 +148,7 @@ export async function addDraftAdSet(input: {
       brandId: brand.id,
       name: input.name.trim(),
       audienceTargetId: input.audienceTargetId ?? null,
+      audienceId: input.audienceId ?? null,
       budget: input.budget ?? null,
       budgetType: input.budgetType ?? null,
       optimizationGoal: input.optimizationGoal ?? null,
@@ -246,7 +250,22 @@ export async function getDraftInitiative(
         })
       : [];
 
-  return { initiative, brand, adSets, spots, campaigns, audienceTargets };
+  // Mirrored platform audiences an ad set may point at directly. Listed for
+  // the whole brand rather than per ad set so the picker can offer them.
+  const platformAudiences = await db.query.audienceTable.findMany({
+    where: eq(audienceTable.brandId, brand.id),
+    columns: { id: true, name: true, type: true, sizeLabel: true },
+  });
+
+  return {
+    initiative,
+    brand,
+    adSets,
+    spots,
+    campaigns,
+    audienceTargets,
+    platformAudiences,
+  };
 }
 
 /** Replace the campaign's shared creative pool. */
@@ -394,7 +413,7 @@ export async function attachPlatformCampaign(input: {
 
   return {
     ...updated!,
-    path: `/app/brands/${brand.slug}/ads/draft/${campaignId}`,
+    path: `/app/brands/${brand.slug}/ads/${campaignId}`,
   };
 }
 

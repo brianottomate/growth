@@ -14,6 +14,7 @@ import {
   listAdsWriteDestinations,
   pushDraftToPlatform,
   setCampaignDelivery,
+  syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
 import {
   addDraftAd,
@@ -151,6 +152,7 @@ export const adsRouter = {
         campaignId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
         audienceTargetId: z.string().nullish(),
+        audienceId: z.string().nullish(),
         budget: z.number().int().min(0).nullish(),
         budgetType: z.enum(["daily", "lifetime"]).nullish(),
       }),
@@ -247,6 +249,19 @@ export const adsRouter = {
       listBrandAudienceTargets({
         brandId: input.brandId,
         organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  /**
+   * Pull the custom audiences already sitting in the brand's allowlisted ad
+   * accounts. Read-only against the provider; it only writes our mirror rows.
+   */
+  syncPlatformAudiences: protectedProcedure
+    .input(z.object({ brandSlug: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      syncBrandPlatformAudiences({
+        organizationId: await organizationIdFor(ctx),
+        brandSlug: input.brandSlug,
       }),
     ),
 

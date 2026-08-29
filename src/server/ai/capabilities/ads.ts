@@ -135,7 +135,7 @@ export const listAdsDestinations = growthAction({
 
 export const draftCampaignAction = growthAction({
   description:
-    "Create a LOCAL campaign draft (an initiative) — the editable first-party object shown at /app/brands/{brandSlug}/ads/draft/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
+    "Create a LOCAL campaign draft (an initiative) — the editable first-party object shown at /app/brands/{brandSlug}/ads/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     name: z.string().trim().min(1).max(300),

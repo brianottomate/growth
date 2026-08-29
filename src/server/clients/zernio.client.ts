@@ -1220,6 +1220,29 @@ export async function addUsersToZernioAdAudience(
   });
 }
 
+/**
+ * List the custom audiences already living in one ad account. Zernio has no
+ * first-party audience concept — every audience belongs to a platform ad
+ * account — so this is the only way to see what a client already built before
+ * they connected. Growth mirrors these into `audience` rows so an ad set can
+ * target them.
+ * https://docs.zernio.com/ad-audiences/list-audiences
+ */
+export async function listZernioAdAudiences(input: {
+  accountId: string;
+  adAccountId: string;
+}): Promise<ZernioAdAudience[]> {
+  const query = new URLSearchParams({
+    accountId: input.accountId,
+    adAccountId: input.adAccountId,
+  });
+  const response = await zernioFetch<{
+    audiences?: ZernioAdAudience[];
+    data?: ZernioAdAudience[];
+  }>(`/ads/audiences?${query.toString()}`);
+  return response.audiences ?? response.data ?? [];
+}
+
 /** Local audience record plus fresh platform data (Meta) when available. */
 export async function getZernioAdAudience(
   audienceId: string,

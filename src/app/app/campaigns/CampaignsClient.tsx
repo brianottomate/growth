@@ -134,7 +134,7 @@ export function CampaignsClient({
                     key={i.id}
                     href={
                       i.brand?.slug
-                        ? `/app/brands/${i.brand.slug}/ads/draft/${i.id}`
+                        ? `/app/brands/${i.brand.slug}/ads/${i.id}`
                         : `/app/campaigns/${i.id}`
                     }
                     className="bg-card hover:bg-accent/40 flex items-center gap-3 rounded-xl border p-3.5 transition-colors"

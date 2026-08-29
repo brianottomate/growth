@@ -207,6 +207,34 @@ export async function finalizeR2Upload(input: {
   return updated ?? null;
 }
 
+/**
+ * Mark an upload that never delivered its bytes.
+ *
+ * A failed or hung PUT used to leave the row on `uploading` forever: it shows
+ * in the library as a broken tile, and nothing ever cleans it up because the
+ * only writer is the finalize call that never came. Only moves rows still
+ * waiting, so a late-but-successful finalize is never overwritten.
+ */
+/** How long an unfinalised upload stays visible before it reads as dead. */
+const STALE_UPLOAD_MINUTES = 15;
+
+export async function failR2Upload(mediaId: string, reason?: string) {
+  const [updated] = await db
+    .update(mediaAssetTable)
+    .set({
+      status: "error",
+      alt: reason ? reason.slice(0, 500) : undefined,
+    })
+    .where(
+      and(
+        eq(mediaAssetTable.id, mediaId),
+        eq(mediaAssetTable.status, "uploading"),
+      ),
+    )
+    .returning({ id: mediaAssetTable.id });
+  return updated ?? null;
+}
+
 export async function verifyR2Upload(mediaId: string) {
   const asset = await getMedia(mediaId);
   if (
@@ -731,6 +759,10 @@ export async function listMedia(input: {
   return db.query.mediaAssetTable.findMany({
     where: and(
       eq(mediaAssetTable.brandId, input.brandId),
+      // An upload still unfinalised after this long never landed — the tab
+      // closed, or the PUT hung. Hide it rather than showing a dead tile.
+      sql<boolean>`(${mediaAssetTable.status} <> 'uploading'
+        or ${mediaAssetTable.createdAt} > now() - make_interval(mins => ${STALE_UPLOAD_MINUTES}))`,
       input.kind ? eq(mediaAssetTable.kind, input.kind) : undefined,
       input.folderId === null
         ? isNull(mediaAssetTable.folderId)
@@ -991,6 +1023,7 @@ export async function promoteChatImage(input: {
 
 export const MediaService = {
   createR2Upload,
+  failR2Upload,
   finalizeR2Upload,
   importImageBuffer,
   verifyR2Upload,

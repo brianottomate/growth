@@ -476,6 +476,14 @@ export const mediaRouter = createTRPCRouter({
       });
     }),
 
+  /** Record an upload whose bytes never arrived, so it stops reading as pending. */
+  failUpload: protectedProcedure
+    .input(z.object({ mediaId: z.string(), reason: z.string().max(500).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertMediaAccess(ctx, input.mediaId);
+      return MediaService.failR2Upload(input.mediaId, input.reason);
+    }),
+
   finalizeUpload: protectedProcedure
     .input(
       z.object({
