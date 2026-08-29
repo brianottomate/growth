@@ -144,6 +144,13 @@ export type CampaignPlatformConfig = {
   meta?: {
     pixelId?: string;
     customEventType?: string;
+    /**
+     * Where the budget lives. CBO puts it on the campaign and lets Meta move
+     * it between ad sets, which is what you want when testing audiences
+     * against each other. ABO gives each ad set its own fixed budget, which
+     * is what you want when a split must be held. Defaults to CBO.
+     */
+    budgetMode?: "cbo" | "abo";
   };
 };
 

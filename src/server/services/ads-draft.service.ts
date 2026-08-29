@@ -297,10 +297,23 @@ export async function setCampaignPlatformConfig(input: {
     input.campaignId,
     input.organizationId,
   );
+  // Callers send the keys they are changing, so merge inside each platform
+  // rather than replacing it — a budget-mode toggle must not drop the pixel
+  // configured elsewhere on the same page. An explicit null still clears.
+  const current = initiative.platformConfig ?? {};
+  const merge = <K extends keyof CampaignPlatformConfig>(
+    key: K,
+    value: CampaignPlatformConfig[K] | null | undefined,
+  ) =>
+    value === undefined
+      ? {}
+      : value === null
+        ? { [key]: undefined }
+        : { [key]: { ...(current[key] ?? {}), ...value } };
   const next: CampaignPlatformConfig = {
-    ...(initiative.platformConfig ?? {}),
-    ...(input.google !== undefined ? { google: input.google ?? undefined } : {}),
-    ...(input.meta !== undefined ? { meta: input.meta ?? undefined } : {}),
+    ...current,
+    ...merge("google", input.google),
+    ...merge("meta", input.meta),
   };
   const [updated] = await db
     .update(campaignTable)

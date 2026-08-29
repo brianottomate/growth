@@ -962,8 +962,13 @@ export type CreateZernioStandaloneAdInput = {
     | "conversions"
     | "app_promotion"
     | "catalog_sales";
-  budgetAmount: number;
-  budgetType: "daily" | "lifetime";
+  /**
+   * Omitted in two cases: the attach shape (`adSetId`), where the ad set
+   * already owns the money, and an ad set joining a CBO campaign, where the
+   * campaign does. Sending it in either case fights the owner.
+   */
+  budgetAmount?: number;
+  budgetType?: "daily" | "lifetime";
   headline: string;
   body: string;
   linkUrl: string;
@@ -986,6 +991,11 @@ export type CreateZernioStandaloneAdInput = {
     linkUrl?: string;
     callToAction?: string;
   }[];
+  /**
+   * Attach ONE more ad to an ad set that already exists, inheriting its
+   * budget, targeting, schedule and goal. Those must not be resent.
+   */
+  adSetId?: string;
   /**
    * Slot a new ad set into an existing platform campaign instead of minting
    * one. This is how a campaign carries several ad sets: create the campaign
@@ -1032,6 +1042,12 @@ export async function createZernioAdCampaign(
     adAccountId: string;
     name: string;
     goal: string;
+    /**
+     * Campaign-level (CBO) budget in WHOLE currency units — 50 is $50.00, not
+     * 50 cents. Meta's own Marketing API takes minor units for the same
+     * number, so this is an easy and expensive mix-up. Omit for ABO, where
+     * each ad set brings its own.
+     */
     budgetAmount?: number;
     budgetType?: "daily" | "lifetime";
     status?: "PAUSED";

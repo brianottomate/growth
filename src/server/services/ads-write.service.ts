@@ -330,6 +330,13 @@ export function assertMetaAdPayload(
 ) {
   const { goal, promotedObject } = payload;
 
+  // Budget has an owner. Normally this call's ad set, but an attach inherits
+  // it from the ad set it joins, and an ad set under a CBO campaign inherits
+  // it from the campaign.
+  const inheritsBudget = Boolean(payload.adSetId ?? payload.existingCampaignId);
+  if (payload.budgetAmount === undefined && !inheritsBudget) {
+    throw new Error("This Meta ad needs a budget, or an ad set to inherit one");
+  }
   if (payload.budgetType === "lifetime" && !payload.endDate) {
     throw new Error("Meta lifetime budgets require endDate");
   }
@@ -397,6 +404,7 @@ export function assertMetaAdPayload(
 
   if (
     payload.budgetType === "daily" &&
+    payload.budgetAmount !== undefined &&
     adAccount.minimumDailyBudget !== undefined &&
     payload.budgetAmount < adAccount.minimumDailyBudget
   ) {
@@ -1239,6 +1247,24 @@ export async function pushDraftToPlatform(
   // every create below goes through. A throw from inside the multi-ad-set
   // loop is caught by the rollback, so nothing is left half-built.
 
+  // Two or more images on one ad IS a carousel. `ad_spot.media` is already an
+  // array, so nothing new has to be modelled: an ad either carries one image
+  // (a static) or several (cards, in the order they were added).
+  const isCarousel = (spot: (typeof spots)[number]) =>
+    (spot.media?.length ?? 0) >= 2;
+
+  const useCbo = (campaign.platformConfig?.meta?.budgetMode ?? "cbo") === "cbo";
+
+  const carouselCardsFor = (spot: (typeof spots)[number]) =>
+    spot.media!.slice(0, 10).map((item, index) => ({
+      imageUrl: item.url,
+      headline:
+        index === 0
+          ? (spot.headline ?? spot.name ?? campaign.name)
+          : (spot.headline ?? campaign.name),
+      linkUrl: spot.linkUrl ?? linkUrl,
+    }));
+
   const creativesFor = (subset: typeof spots) =>
     subset.map((spot) => ({
       name: spot.name ?? campaign.name,
@@ -1273,9 +1299,16 @@ export async function pushDraftToPlatform(
       : campaign.name,
     adSetName: args.adSet?.name,
     goal: input.goal,
-    budgetAmount: args.adSet?.budget ?? input.budgetAmount,
-    budgetType:
-      (args.adSet?.budgetType as "daily" | "lifetime") ?? input.budgetType,
+    // Under CBO the campaign owns the money; an ad set that also sends a
+    // budget is fighting the thing that makes CBO worth using.
+    ...(useCbo && args.existingCampaignId
+      ? {}
+      : {
+          budgetAmount: args.adSet?.budget ?? input.budgetAmount,
+          budgetType:
+            (args.adSet?.budgetType as "daily" | "lifetime") ??
+            input.budgetType,
+        }),
     // Top-level headline and body seed the ad set; each creative carries its
     // own below.
     headline: args.subset[0]!.headline ?? args.subset[0]!.name ?? campaign.name,
@@ -1289,6 +1322,113 @@ export async function pushDraftToPlatform(
     ...metaDraftProviderControls(args.validateOnly),
   });
 
+  /**
+   * Create one ad set and everything inside it.
+   *
+   * Meta's create endpoint takes ONE creative shape per call: N statics via
+   * `creatives[]`, or a single carousel via `carouselCards`. A campaign that
+   * mixes both needs more than one call, so the first makes the ad set and
+   * each leftover carousel attaches to it with `adSetId`, inheriting its
+   * budget, targeting and schedule (which must not be resent).
+   */
+  const createAdSetWithSpots = async (args: {
+    adSet?: (typeof adSets)[number];
+    subset: typeof spots;
+    audienceId: string | null;
+    existingCampaignId?: string;
+    validateOnly: boolean;
+    keyScope: string;
+  }) => {
+    const statics = args.subset.filter((spot) => !isCarousel(spot));
+    const carousels = args.subset.filter(isCarousel);
+    // Whichever shape opens the ad set; the rest attach to it afterwards.
+    const leading = statics.length > 0 ? undefined : carousels[0];
+    const trailing = leading ? carousels.slice(1) : carousels;
+
+    const payload: CreateZernioStandaloneAdInput = {
+      ...adSetPayload({
+        adSet: args.adSet,
+        subset: args.subset,
+        audienceId: args.audienceId,
+        existingCampaignId: args.existingCampaignId,
+        validateOnly: args.validateOnly,
+      }),
+      ...(leading
+        ? { creatives: undefined, carouselCards: carouselCardsFor(leading) }
+        : { creatives: creativesFor(statics) }),
+    };
+    const result = await createMetaAd(payload, {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-adset",
+        payload,
+        args.keyScope,
+      ),
+      adAccount: destination.adAccount,
+    });
+
+    // A dry run validates the opening call only; there is no ad set id to
+    // attach the rest to until something is really created.
+    if (args.validateOnly || result.validateOnly) {
+      return { result, attached: [], spotsCreated: args.subset.length };
+    }
+
+    // Once the opening call lands, the campaign exists on Meta. A later
+    // attach failing would leave it half-built and mostly invisible, so undo
+    // it here rather than stranding it. The multi-ad-set path rolls back its
+    // own shell; this covers the single-ad-set path, which owns the campaign
+    // the opening call just created.
+    const rollbackCampaignId = args.existingCampaignId
+      ? null
+      : (result.platformCampaignId ?? null);
+    const attached = [];
+    try {
+    for (const spot of trailing) {
+      const attachPayload: CreateZernioStandaloneAdInput = {
+        accountId: input.connectionAccountId,
+        adAccountId: destination.adAccount.id,
+        adSetId: result.platformAdSetId!,
+        name: spot.name ?? campaign.name,
+        goal: input.goal,
+        headline: spot.headline ?? spot.name ?? campaign.name,
+        body: spot.body ?? campaign.description ?? campaign.name,
+        linkUrl: spot.linkUrl ?? linkUrl,
+        carouselCards: carouselCardsFor(spot),
+        ...metaDraftProviderControls(false),
+      };
+      attached.push({
+        spot,
+        result: await createMetaAd(attachPayload, {
+          idempotencyKey: idempotencyKey(
+            context,
+            "push-attach",
+            attachPayload,
+            `${args.keyScope}:${spot.id}`,
+          ),
+          adAccount: destination.adAccount,
+        }),
+      });
+    }
+    } catch (error) {
+      if (rollbackCampaignId) {
+        await deleteZernioCampaign({
+          campaignId: rollbackCampaignId,
+          accountId: input.connectionAccountId,
+        }).catch((cleanupError) => {
+          console.error("attach rollback failed", rollbackCampaignId, cleanupError);
+        });
+      }
+      throw new Error(
+        `Push failed while attaching carousel ${attached.length + 1} of ${trailing.length}${
+          rollbackCampaignId
+            ? " — the campaign was removed from Meta so nothing is half-built"
+            : ""
+        }. ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return { result, attached, spotsCreated: args.subset.length };
+  };
+
   // One ad set (or none defined) is a single call — fewer moving parts and
   // nothing to clean up if Meta rejects it.
   if (adSets.length <= 1) {
@@ -1296,15 +1436,12 @@ export async function pushDraftToPlatform(
     const audienceId = only
       ? await platformAudienceIdFor(only, brand.id, platform)
       : null;
-    const payload = adSetPayload({
+    const { result } = await createAdSetWithSpots({
       adSet: only,
       subset: spots,
       audienceId,
       validateOnly: input.validateOnly ?? false,
-    });
-    const result = await createMetaAd(payload, {
-      idempotencyKey: idempotencyKey(context, "push-draft", payload, `push:${campaign.id}:meta`),
-      adAccount: destination.adAccount,
+      keyScope: `push:${campaign.id}:meta`,
     });
     if (input.validateOnly || result.validateOnly) {
       return {
@@ -1337,9 +1474,13 @@ export async function pushDraftToPlatform(
     };
   }
 
-  // Several ad sets: create the campaign shell once with NO budget (ABO, so
-  // each ad set brings its own), then one create per ad set carrying its
-  // budget, its audience, and the ads assigned to it.
+  // Several ad sets: create the campaign shell once, then one create per ad
+  // set carrying its audience and the ads assigned to it.
+  //
+  // Under CBO (the default) the budget sits on the shell and Meta moves it to
+  // whichever ad set is working, which is the point of running two audiences
+  // against each other. Under ABO the shell carries no budget and each ad set
+  // brings its own fixed amount, for when a split has to be held.
   if (input.validateOnly) {
     throw new Error(
       "Dry run covers single-ad-set pushes only; Meta has no dry run for the two-step shape",
@@ -1351,6 +1492,9 @@ export async function pushDraftToPlatform(
       adAccountId: destination.adAccount.id,
       name: campaign.name,
       goal: input.goal,
+      ...(useCbo
+        ? { budgetAmount: input.budgetAmount, budgetType: input.budgetType }
+        : {}),
       status: "PAUSED",
     },
     {
@@ -1384,16 +1528,13 @@ export async function pushDraftToPlatform(
           : [];
     if (subset.length === 0) continue;
     const audienceId = await platformAudienceIdFor(adSet, brand.id, platform);
-    const payload = adSetPayload({
+    const { result } = await createAdSetWithSpots({
       adSet,
       subset,
       audienceId,
       existingCampaignId: shellId,
       validateOnly: false,
-    });
-    const result = await createMetaAd(payload, {
-      idempotencyKey: idempotencyKey(context, "push-adset", payload, `push:${campaign.id}:${adSet.id}`),
-      adAccount: destination.adAccount,
+      keyScope: `push:${campaign.id}:${adSet.id}`,
     });
     perAdSet.push({ adSet, result, subset });
   }

@@ -209,6 +209,13 @@ export const adsRouter = {
             businessName: z.string().trim().max(120).optional(),
           })
           .nullish(),
+        meta: z
+          .object({
+            pixelId: z.string().trim().max(64).optional(),
+            customEventType: z.string().trim().max(64).optional(),
+            budgetMode: z.enum(["cbo", "abo"]).optional(),
+          })
+          .nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) =>

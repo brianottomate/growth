@@ -81,6 +81,43 @@ describe("assertMetaAdPayload", () => {
     ).toThrow(/pixelId/);
   });
 
+  it("lets an ad set inherit its budget rather than restating it", () => {
+    const { budgetAmount: _a, budgetType: _b, ...noBudget } = base;
+    // Standalone: nothing owns the money, so this is a mistake.
+    expect(() => assertMetaAdPayload(noBudget, account)).toThrow(/needs a budget/);
+    // Attaching to an existing ad set, and joining a CBO campaign, both have
+    // an owner above them.
+    expect(() =>
+      assertMetaAdPayload({ ...noBudget, adSetId: "1202500" }, account),
+    ).not.toThrow();
+    expect(() =>
+      assertMetaAdPayload({ ...noBudget, existingCampaignId: "23850" }, account),
+    ).not.toThrow();
+  });
+
+  it("treats a carousel as its own creative shape", () => {
+    const cards = [
+      { imageUrl: "https://cdn.example.com/1.jpg", headline: "One" },
+      { imageUrl: "https://cdn.example.com/2.jpg", headline: "Two" },
+    ];
+    expect(() =>
+      assertMetaAdPayload(
+        { ...base, imageUrl: undefined, carouselCards: cards },
+        account,
+      ),
+    ).not.toThrow();
+    // Mixing shapes in one call is what Meta rejects.
+    expect(() =>
+      assertMetaAdPayload({ ...base, carouselCards: cards }, account),
+    ).toThrow(/one creative shape/);
+    expect(() =>
+      assertMetaAdPayload(
+        { ...base, imageUrl: undefined, carouselCards: cards.slice(0, 1) },
+        account,
+      ),
+    ).toThrow(/2\u201310 cards/);
+  });
+
   it("enforces the ad account's daily minimum", () => {
     expect(() =>
       assertMetaAdPayload({ ...base, budgetAmount: 5 }, account),

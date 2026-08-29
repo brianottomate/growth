@@ -49,6 +49,7 @@ export function AdSets({
   adSets,
   audienceTargets,
   platformAudiences,
+  budgetMode,
 }: {
   campaignId: string;
   brandId: string;
@@ -56,6 +57,7 @@ export function AdSets({
   adSets: AdSet[];
   audienceTargets: AudienceTarget[];
   platformAudiences: PlatformAudience[];
+  budgetMode: "cbo" | "abo";
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -97,6 +99,11 @@ export function AdSets({
       onSuccess: () => router.refresh(),
     }),
   );
+  const setBudgetMode = useMutation(
+    trpc.ads.setCampaignPlatformConfig.mutationOptions({
+      onSuccess: () => router.refresh(),
+    }),
+  );
 
   const labelFor = (adSet: AdSet) => {
     if (adSet.audienceId) {
@@ -128,6 +135,42 @@ export function AdSets({
             Who this campaign buys, and at what budget. One per audience.
           </p>
         </div>
+      </div>
+
+      {/* Budget ownership only bites once there is more than one ad set. */}
+      <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+        <span>Budget</span>
+        {(
+          [
+            ["cbo", "Shared across ad sets"],
+            ["abo", "Fixed per ad set"],
+          ] as const
+        ).map(([mode, label]) => (
+          <button
+            key={mode}
+            type="button"
+            disabled={setBudgetMode.isPending}
+            onClick={() =>
+              setBudgetMode.mutate({ campaignId, meta: { budgetMode: mode } })
+            }
+            className={`rounded-full border px-2.5 py-0.5 ${
+              budgetMode === mode
+                ? "border-white/25 text-foreground"
+                : "border-transparent hover:border-white/10"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="text-muted-foreground/60">
+          {budgetMode === "cbo"
+            ? "Meta moves spend to whichever audience works."
+            : "Each ad set holds its own amount."}
+        </span>
+      </div>
+
+      <div className="flex items-end justify-between">
+        <div />
         {!open && (
           <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
             <Plus className="size-3.5" />

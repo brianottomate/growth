@@ -216,6 +216,7 @@ export async function CampaignView({
         adSets={adSets}
         audienceTargets={audienceTargets}
         platformAudiences={platformAudiences}
+        budgetMode={initiative.platformConfig?.meta?.budgetMode ?? "cbo"}
       />
 
       <section className="space-y-3">
@@ -257,6 +258,11 @@ export async function CampaignView({
                   <span className="absolute top-1.5 right-1.5 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
                     {spot.externalId ? "live" : "drafted"}
                   </span>
+                  {(spot.media?.length ?? 0) >= 2 && (
+                    <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
+                      carousel · {spot.media!.length} cards
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-1 p-3">
                   <p className="truncate text-sm font-medium">
