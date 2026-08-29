@@ -44,7 +44,7 @@ export const listPerformanceAccountsAction = growthAction({
 
 export const getPerformanceAccountAction = growthAction({
   description:
-    "Read one performance account completely: contact, plan, sponsored properties, every billing cycle, report list, and the delivery attached to each cycle (initiatives, lifecycle campaigns, amplification targets).",
+    "Read one performance account completely: contact, plan, sponsored properties, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
   inputSchema: z.object({ accountId: z.string().min(1) }),
   execute: (input, ctx) => getPerformanceAccount(actorFrom(ctx), input.accountId),
 });
@@ -148,7 +148,7 @@ export const syncAdCampaignsAction = growthAction({
 
 export const attachToPerformanceCycleAction = growthAction({
   description:
-    "Attach one delivery row to a performance cycle so it counts toward the customer's report, or detach it with cycleId null. Kind 'campaign' is the one to use for an ad campaign that already exists on the platform: campaigns reach a cycle through an initiative, and this creates or reuses a wrapper initiative when the campaign has none. This tags existing delivery; it never creates ads or sends anything.",
+    "Attach one delivery row to a performance cycle so it counts toward the customer's report, or detach it with cycleId null. Kind 'campaign' is the one to use for an ad campaign that already exists on the platform: platform campaigns reach a cycle through a campaign, and this creates or reuses a wrapper campaign when the platform campaign has none. This tags existing delivery; it never creates ads or sends anything.",
   inputSchema: attachToPerformanceCycleSchema,
   execute: (input, ctx) => attachToPerformanceCycle(actorFrom(ctx), input),
 });

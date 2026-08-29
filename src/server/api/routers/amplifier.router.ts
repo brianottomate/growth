@@ -95,9 +95,9 @@ async function assertTargetAccess(ctx: Ctx, id: string) {
   return target;
 }
 
-/** The initiative's platform posts (via its content items) — the candidates an
+/** The campaign's platform posts (via its content items) — the candidates an
  * amplification ask can anchor to. */
-async function platformPostsForInitiative(ctx: Ctx, campaignId: string) {
+async function platformPostsForCampaign(ctx: Ctx, campaignId: string) {
   const contents = await ctx.db.query.contentPostTable.findMany({
     where: and(
       eq(contentPostTable.campaignId, campaignId),
@@ -375,12 +375,12 @@ export const amplifierRouter = createTRPCRouter({
       return t;
     }),
 
-  /** All targets across an initiative's posts (the campaign roll-up view). */
-  targetsForInitiative: protectedProcedure
+  /** All targets across a campaign's posts (the roll-up view). */
+  targetsForCampaign: protectedProcedure
     .input(z.object({ campaignId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertMomentAccess(ctx, input.campaignId);
-      const posts = await platformPostsForInitiative(ctx, input.campaignId);
+      const posts = await platformPostsForCampaign(ctx, input.campaignId);
       if (posts.length === 0) return { targets: [], posts: [] };
       const targets = await ctx.db.query.amplificationTargetTable.findMany({
         where: inArray(

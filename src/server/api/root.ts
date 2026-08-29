@@ -16,7 +16,7 @@ import { compositionRouter } from "@/server/api/routers/composition.router";
 import { creativeWorkRouter } from "@/server/api/routers/creativeWork.router";
 import { conversionRouter } from "@/server/api/routers/conversion.router";
 import { inboxRouter } from "@/server/api/routers/inbox.router";
-import { initiativeRouter } from "@/server/api/routers/initiative.router";
+import { campaignRouter } from "@/server/api/routers/campaign.router";
 import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
@@ -66,7 +66,7 @@ export const appRouter = createTRPCRouter({
   creativeWork: creativeWorkRouter,
   conversion: conversionRouter,
   inbox: inboxRouter,
-  initiative: initiativeRouter,
+  campaign: campaignRouter,
   newsletter: newsletterRouter,
   org: orgRouter,
   outreach: outreachRouter,

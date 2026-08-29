@@ -73,8 +73,8 @@ const DOMAIN_BY_TABLE: Record<string, string> = {
   cadence_target: "Cadence",
   mix_target: "Cadence",
   // ads-schema
-  initiative: "Ads",
   campaign: "Ads",
+  platform_campaign: "Ads",
   ad_spot: "Ads",
   audience: "Ads",
   audience_target: "Ads",

@@ -31,7 +31,7 @@ import { scrapeBasicContent } from "@/server/clients/firecrawl.client";
  *      asks). NO DB writes. Scales from a single asset push to a full launch arc,
  *      and can REJECT (verdict="campaign") when it's pure ads-ops, not content.
  *   2. commitMomentBlueprint — materializes the (edited) blueprint into a real
- *      initiative + (series for an arc) + slots + amplifier targets.
+ *      campaign + (series for an arc) + slots + amplifier targets.
  */
 
 const MODEL = "claude-sonnet-5";
@@ -134,7 +134,7 @@ If reference images/brief are given, treat them as the HERO creative and plan it
 
 slotKind: "anchored" ONLY for hard date-pinned beats; "freeflow" for the reactive/optional/amplification beats. Don't mark everything anchored.
 Keep it tight and high-signal — never 30 slots.
-For email, distinguish the editorial stream from a launch send: use newsletter.broadcast only for a recurring newsletter issue; use newsletter.blast for a one-off announcement, launch, reactivation, waitlist, or experiment email. A blast is a normal calendar spot in the initiative, not part of newsletter cadence.
+For email, distinguish the editorial stream from a launch send: use newsletter.broadcast only for a recurring newsletter issue; use newsletter.blast for a one-off announcement, launch, reactivation, waitlist, or experiment email. A blast is a normal calendar spot in the campaign, not part of newsletter cadence.
 Always fill in "missing": an honest note on what you did NOT cover (a channel left out, a cadence gap, a beat you'd expect).`;
 
 /** A pinned beat the operator wants reproduced verbatim during a refine. */
@@ -298,7 +298,7 @@ export async function commitMomentBlueprint(opts: {
   const startAt = at(Math.min(0, ...offsets));
   const endAt = at(Math.max(0, ...offsets));
 
-  const [initiative] = await db
+  const [campaign] = await db
     .insert(campaignTable)
     .values({
       brandId: opts.brandId,
@@ -309,7 +309,7 @@ export async function commitMomentBlueprint(opts: {
       endAt,
     })
     .returning({ id: campaignTable.id });
-  const momentId = initiative!.id;
+  const momentId = campaign!.id;
 
   const channels = await db.query.channelTable.findMany({
     where: eq(channelTable.brandId, opts.brandId),

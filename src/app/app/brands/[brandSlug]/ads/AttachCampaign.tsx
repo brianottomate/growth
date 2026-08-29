@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link2 } from "lucide-react";
+import { Link2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,10 @@ import { useTRPC } from "@/trpc/react";
  * between things born in Ads Manager and things growth knows about. Attaching
  * two platform campaigns to the same campaign is just doing this twice, which
  * is why there is no multi-select here.
+ *
+ * Promoting is the common case for an import nobody planned: it mints a
+ * campaign named after the run and adopts it, so it gets its own top-level
+ * button rather than living behind the picker.
  */
 export function AttachCampaign({
   brandId,
@@ -44,15 +48,37 @@ export function AttachCampaign({
 
   if (!open) {
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-7"
-        onClick={() => setOpen(true)}
-      >
-        <Link2 className="size-3.5" />
-        Attach
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7"
+          disabled={attach.isPending}
+          onClick={() => setOpen(true)}
+        >
+          <Link2 className="size-3.5" />
+          Attach to a campaign
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7"
+          disabled={attach.isPending || !suggestedName.trim()}
+          loading={attach.isPending}
+          onClick={() =>
+            attach.mutate({
+              platformCampaignId,
+              newCampaignName: suggestedName.trim(),
+            })
+          }
+        >
+          <Sparkles className="size-3.5" />
+          Start a campaign from this
+        </Button>
+        {attach.error && (
+          <p className="w-full text-xs text-red-300">{attach.error.message}</p>
+        )}
+      </div>
     );
   }
 

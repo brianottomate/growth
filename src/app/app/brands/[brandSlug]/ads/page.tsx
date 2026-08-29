@@ -30,7 +30,7 @@ const money = (n: number | null | undefined) =>
 const fmtDate = (d: Date) =>
   d.toLocaleDateString([], { month: "short", day: "numeric" });
 
-const CAMPAIGN_STATUS: Record<string, string> = {
+const PLATFORM_CAMPAIGN_STATUS: Record<string, string> = {
   live: "bg-emerald-500/15 text-emerald-300",
   scheduled: "bg-sky-500/15 text-sky-300",
   paused: "bg-amber-500/15 text-amber-300",
@@ -58,7 +58,7 @@ const AUDIENCE_PRIORITY: Record<string, string> = {
   nice_to_have: "bg-muted text-muted-foreground",
 };
 
-const INITIATIVE_STATUS: Record<string, string> = {
+const CAMPAIGN_STATUS: Record<string, string> = {
   active: "bg-emerald-500/15 text-emerald-300",
   planned: "bg-sky-500/15 text-sky-300",
   paused: "bg-amber-500/15 text-amber-300",
@@ -110,7 +110,8 @@ function CampaignRow({
             </Link>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
-                CAMPAIGN_STATUS[c.status] ?? CAMPAIGN_STATUS.draft
+                PLATFORM_CAMPAIGN_STATUS[c.status] ??
+                PLATFORM_CAMPAIGN_STATUS.draft
               }`}
             >
               {platformLabel(c.platform)} · {c.status}
@@ -123,7 +124,10 @@ function CampaignRow({
               : c.startAt
                 ? `from ${fmtDate(c.startAt)}`
                 : "—"}{" "}
-            · {spots.length} spot{spots.length === 1 ? "" : "s"}
+            · {spots.length} ad{spots.length === 1 ? "" : "s"}
+            {spots.length === 1 && spots[0]?.status
+              ? ` · ${spots[0].status}`
+              : ""}
           </div>
         </div>
         <div className="text-right">
@@ -154,7 +158,9 @@ function CampaignRow({
           suggestedName={c.name}
         />
       )}
-      {spots.length > 0 && (
+      {/* The hero above is already this campaign's creative. A strip of one
+          repeats it; a strip of several is the ad set, which is worth seeing. */}
+      {spots.length > 1 && (
         <div className="flex gap-2 overflow-x-auto">
           {spots.map((s) => (
             <div
@@ -231,13 +237,13 @@ export default async function BrandAdsPage({
   const channels = await db.query.channelTable.findMany({
     where: and(eq(channelTable.brandId, brand.id), eq(channelTable.kind, "ad")),
   });
-  const campaigns = await db.query.platformCampaignTable.findMany({
+  const platformCampaigns = await db.query.platformCampaignTable.findMany({
     where: eq(platformCampaignTable.brandId, brand.id),
   });
   const audiences = await db.query.audienceTable.findMany({
     where: eq(audienceTable.brandId, brand.id),
   });
-  const initiatives = await db.query.campaignTable.findMany({
+  const campaigns = await db.query.campaignTable.findMany({
     where: eq(campaignTable.brandId, brand.id),
   });
   const adSpots = await db.query.adSpotTable.findMany({
@@ -247,45 +253,45 @@ export default async function BrandAdsPage({
   // mirrored per platform. Same service the /app/audiences strategy view uses.
   const audienceTargets = await computeAudienceAlignment([brand.id]);
 
-  // Group campaigns under initiatives; track which campaigns have no parent.
-  const campaignsByInitiative = new Map<string, typeof campaigns>();
-  const ungroupedCampaigns: typeof campaigns = [];
-  for (const c of campaigns) {
+  // Group platform campaigns under their campaign; track the orphans.
+  const platformByCampaign = new Map<string, typeof platformCampaigns>();
+  const ungroupedPlatformCampaigns: typeof platformCampaigns = [];
+  for (const c of platformCampaigns) {
     if (c.campaignId) {
-      const list = campaignsByInitiative.get(c.campaignId) ?? [];
+      const list = platformByCampaign.get(c.campaignId) ?? [];
       list.push(c);
-      campaignsByInitiative.set(c.campaignId, list);
+      platformByCampaign.set(c.campaignId, list);
     } else {
-      ungroupedCampaigns.push(c);
+      ungroupedPlatformCampaigns.push(c);
     }
   }
   // Drafted ads have no campaign until the push creates one; they show on
   // the draft page, not here.
-  const spotsByCampaign = new Map<string, typeof adSpots>();
+  const spotsByPlatformCampaign = new Map<string, typeof adSpots>();
   for (const s of adSpots) {
     if (!s.platformCampaignId) continue;
-    const list = spotsByCampaign.get(s.platformCampaignId) ?? [];
+    const list = spotsByPlatformCampaign.get(s.platformCampaignId) ?? [];
     list.push(s);
-    spotsByCampaign.set(s.platformCampaignId, list);
+    spotsByPlatformCampaign.set(s.platformCampaignId, list);
   }
-  const initiativeSpend = (initId: string) =>
-    (campaignsByInitiative.get(initId) ?? []).reduce(
+  const campaignSpend = (campaignId: string) =>
+    (platformByCampaign.get(campaignId) ?? []).reduce(
       (n, c) => n + (c.spend ?? 0),
       0,
     );
-  const initiativeChannels = (initId: string) =>
+  const campaignChannels = (campaignId: string) =>
     new Set<string>(
-      (campaignsByInitiative.get(initId) ?? []).map((c) => c.platform),
+      (platformByCampaign.get(campaignId) ?? []).map((c) => c.platform),
     );
 
   const chanPlatform = new Map(channels.map((c) => [c.id, c.platform]));
-  const totalSpend = campaigns.reduce((n, c) => n + (c.spend ?? 0), 0);
+  const totalSpend = platformCampaigns.reduce((n, c) => n + (c.spend ?? 0), 0);
   const channelSpend = (id: string) =>
-    campaigns
+    platformCampaigns
       .filter((c) => c.channelId === id)
       .reduce((n, c) => n + (c.spend ?? 0), 0);
   const channelCampaigns = (id: string) =>
-    campaigns.filter((c) => c.channelId === id).length;
+    platformCampaigns.filter((c) => c.channelId === id).length;
 
   // Mirrored platform audiences with no target are the audience floaters —
   // the same shape as a platform campaign that is not in a campaign yet.
@@ -320,24 +326,24 @@ export default async function BrandAdsPage({
     brand.brandFingerprint?.fingerprintText
       ? `\n**Voice:** ${brand.brandFingerprint.fingerprintText}`
       : "",
-    `\n## Campaigns (${initiatives.length})`,
-    ...initiatives.map((init) => {
-      const impl = initiativeChannels(init.id);
+    `\n## Campaigns (${campaigns.length})`,
+    ...campaigns.map((init) => {
+      const impl = campaignChannels(init.id);
       const targets = init.targetChannels ?? [];
       const verify = targets
         .map(
           (ch) => `${platformLabel(ch)}${impl.has(ch) ? " ✓" : " ⚠ missing"}`,
         )
         .join(", ");
-      return `- ${init.name} — goal: ${init.goal ?? "—"} · ${money(initiativeSpend(init.id))} of ${money(init.budget)} · channels: ${verify || "none"}`;
+      return `- ${init.name} — goal: ${init.goal ?? "—"} · ${money(campaignSpend(init.id))} of ${money(init.budget)} · channels: ${verify || "none"}`;
     }),
     `\n## Ad channels (${channels.length})`,
     ...channels.map(
       (c) =>
         `- ${platformLabel(c.platform)} (${c.handle ?? "—"}) — ${c.connectionStatus} · ${money(channelSpend(c.id))}/30d · ${channelCampaigns(c.id)} campaigns`,
     ),
-    `\n## Platform campaigns (${campaigns.length})`,
-    ...campaigns.map(
+    `\n## Platform campaigns (${platformCampaigns.length})`,
+    ...platformCampaigns.map(
       (c) =>
         `- [${platformLabel(c.platform)}] ${c.name} — ${c.status}${
           c.startAt && c.endAt
@@ -348,7 +354,9 @@ export default async function BrandAdsPage({
     `\n## Audiences (${audienceTargets.length})`,
     ...audienceTargets.map((t) => {
       const channels = [
-        ...t.channels.map((ch) => `${platformLabel(ch.platform)} ${ch.verdict}`),
+        ...t.channels.map(
+          (ch) => `${platformLabel(ch.platform)} ${ch.verdict}`,
+        ),
         ...t.unplannedPlatforms.map(
           (platform) => `${platformLabel(platform)} not intended`,
         ),
@@ -388,9 +396,9 @@ export default async function BrandAdsPage({
             happens in each platform&apos;s portal.
           </p>
           <p className="text-muted-foreground mt-2 text-xs">
-            {plural(initiatives.length, "campaign")} ·{" "}
+            {plural(campaigns.length, "campaign")} ·{" "}
             {plural(channels.length, "ad channel")} ·{" "}
-            {plural(campaigns.length, "platform campaign")} ·{" "}
+            {plural(platformCampaigns.length, "platform campaign")} ·{" "}
             {plural(audienceTargets.length, "audience")} · {money(totalSpend)} /
             30d
           </p>
@@ -401,27 +409,43 @@ export default async function BrandAdsPage({
         </div>
       </div>
 
-      {/* initiatives → per-channel campaigns */}
+      {/* campaigns → per-channel campaigns */}
       <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
-        Campaigns · {initiatives.length} · one push, verified across its
-        channels
+        Campaigns · {campaigns.length} · one push, verified across its channels
       </h2>
       <div className="flex flex-col gap-4">
-        {initiatives.map((init) => {
-          const initCampaigns = campaignsByInitiative.get(init.id) ?? [];
-          const spend = initiativeSpend(init.id);
-          const implemented = initiativeChannels(init.id);
+        {campaigns.map((init) => {
+          const initCampaigns = platformByCampaign.get(init.id) ?? [];
+          const spend = campaignSpend(init.id);
+          const implemented = campaignChannels(init.id);
           const targets = init.targetChannels ?? [];
           const pct = init.budget ? Math.min(1, spend / init.budget) : 0;
           const color = init.color ?? "#94a3b8";
+          // A campaign looks like its creative before it looks like anything
+          // else. Prefer what it will actually run with — its ads — and fall
+          // back to the shared pool it was drafted from.
+          const hero =
+            adSpots
+              .filter((spot) => spot.campaignId === init.id)
+              .map(spotImage)
+              .find(Boolean) ?? init.creativePool?.[0]?.url;
           return (
             <div key={init.id} className="bg-card rounded-2xl border p-4">
-              {/* initiative header */}
+              {/* campaign header */}
               <div className="flex items-start gap-3">
-                <span
-                  className="mt-1.5 size-2.5 shrink-0 rounded-full"
-                  style={{ background: color }}
-                />
+                {hero ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={hero}
+                    alt=""
+                    className="size-10 shrink-0 rounded-lg border object-cover"
+                  />
+                ) : (
+                  <span
+                    className="mt-1.5 size-2.5 shrink-0 rounded-full"
+                    style={{ background: color }}
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
@@ -432,8 +456,7 @@ export default async function BrandAdsPage({
                     </Link>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
-                        INITIATIVE_STATUS[init.status] ??
-                        INITIATIVE_STATUS.planned
+                        CAMPAIGN_STATUS[init.status] ?? CAMPAIGN_STATUS.planned
                       }`}
                     >
                       {init.status}
@@ -505,7 +528,7 @@ export default async function BrandAdsPage({
                     <CampaignRow
                       key={c.id}
                       c={c}
-                      spots={spotsByCampaign.get(c.id) ?? []}
+                      spots={spotsByPlatformCampaign.get(c.id) ?? []}
                       brandSlug={brandSlug}
                     />
                   ))
@@ -516,21 +539,21 @@ export default async function BrandAdsPage({
         })}
       </div>
 
-      {ungroupedCampaigns.length > 0 && (
+      {ungroupedPlatformCampaigns.length > 0 && (
         <>
           <h3 className="text-muted-foreground mt-6 mb-1 text-xs font-semibold tracking-wider uppercase">
-            Not in a campaign yet · {ungroupedCampaigns.length}
+            Not in a campaign yet · {ungroupedPlatformCampaigns.length}
           </h3>
           <p className="text-muted-foreground mb-2 text-xs">
             Pulled from the ad account. They are fine unattached; attaching one
             just groups its spend under a campaign you author.
           </p>
           <div className="flex flex-col gap-2">
-            {ungroupedCampaigns.map((c) => (
+            {ungroupedPlatformCampaigns.map((c) => (
               <CampaignRow
                 key={c.id}
                 c={c}
-                spots={spotsByCampaign.get(c.id) ?? []}
+                spots={spotsByPlatformCampaign.get(c.id) ?? []}
                 brandSlug={brandSlug}
                 attachBrandId={brand.id}
               />

@@ -45,7 +45,7 @@ Object grain rises with the surface:
 | ad spot (creative) | 1,727 | drill-downs only (`/zernio/ads`, brand ads page) |
 | **campaign** | 118 | feed/calendar cards (campaign-level, hero creative) |
 | objective group | 3 | default rollup in overview surfaces |
-| **initiative** | human-authored | the throughline (paid ↔ organic intent) |
+| **campaign** | human-authored | the throughline (paid ↔ organic intent) |
 
 Three representations, picked per surface:
 
@@ -57,18 +57,18 @@ Three representations, picked per surface:
 
 ### Grouping decision
 
-**`platformObjective` is the floor; human-authored initiatives are the throughline.**
+**`platformObjective` is the floor; human-authored campaigns are the throughline.**
 
 - Objective (Sales/Leads/Traffic) honestly describes the always-on performance
   bulk (~95% of the account), which has no organic counterpart. It is a *paid
   performance rollup*, not a content throughline.
-- `initiative` is reserved for real shared intent (e.g. `FifaWorldCup`, the
+- `campaign` is reserved for real shared intent (e.g. `FifaWorldCup`, the
   `GTM-{Property}` launches) where a paid push lines up with an organic series and
   splices into a studio pillar lane. Intent is the one thing Meta's payload lacks,
   so it must be authored, not parsed.
 
 This means `objective` is a **campaign attribute** (drives default grouping); we do
-NOT mint fake "Sales/Leads/Traffic" initiative rows.
+NOT mint fake "Sales/Leads/Traffic" campaign rows.
 
 ## Per-surface plan
 
@@ -76,9 +76,9 @@ NOT mint fake "Sales/Leads/Traffic" initiative rows.
    (incl. "unlinked"). A flat campaign sync lights this up with **no UI change**.
    *This is the v1 target.*
 2. **`/studio`** — the throughline home (chosen direction). Campaigns lane shows
-   the objective rollup; human initiatives splice into the pillar lanes they back.
-   Note: studio's wheel + feed-v4 spines/rail key off `initiativeTable`, so they
-   stay empty until initiatives are authored — that's the deliberate throughline step.
+   the objective rollup; human campaigns splice into the pillar lanes they back.
+   Note: studio's wheel + feed-v4 spines/rail key off `campaignTable`, so they
+   stay empty until campaigns are authored — that's the deliberate throughline step.
 3. **`/feed`** — replace the stubbed `paid` filter (`FeedClient.tsx`, currently
    `return false`) with creative-launch events + a pinned "live paid" rail
    (active + spending campaigns, grouped by objective).
@@ -98,7 +98,7 @@ NOT mint fake "Sales/Leads/Traffic" initiative rows.
   `stats` (full metrics snapshot), `heroThumbnailUrl` (top-spend ad's thumbnail),
   `externalId`, `manageUrl` (deep-link into Ads Manager).
 - Filter junk: drop campaigns whose latest ad predates 2024.
-- `initiativeId` left null (human-authored later).
+- `campaignId` left null (human-authored later).
 - Ad spots (the 1,727) are NOT synced in v1 — only needed for drill-downs.
 
 Run: `bun --conditions react-server scripts/sync-ads.ts`.

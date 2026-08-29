@@ -141,7 +141,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
             (report) => report.cycleId === cycle.id,
           );
           const forCycle = {
-            ads: delivery.initiatives.filter(
+            ads: delivery.campaigns.filter(
               (row) => row.performanceCycleId === cycle.id,
             ),
             emails: delivery.lifecycleCampaigns.filter(
@@ -250,11 +250,12 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               {forCycle.ads.length > 0 && (
                 <AdGrid
                   ads={delivery.ads.filter((ad) =>
-                    delivery.campaigns.some(
-                      (campaign) =>
-                        campaign.id === ad.platformCampaignId &&
+                    delivery.platformCampaigns.some(
+                      (platformCampaign) =>
+                        platformCampaign.id === ad.platformCampaignId &&
                         forCycle.ads.some(
-                          (init) => init.id === campaign.campaignId,
+                          (campaign) =>
+                            campaign.id === platformCampaign.campaignId,
                         ),
                     ),
                   )}

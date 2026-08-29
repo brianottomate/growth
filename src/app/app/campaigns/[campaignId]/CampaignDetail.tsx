@@ -51,7 +51,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data: campaign } = useQuery(
-    trpc.initiative.get.queryOptions({ id: campaignId }),
+    trpc.campaign.get.queryOptions({ id: campaignId }),
   );
 
   const [editOpen, setEditOpen] = useState(false);
@@ -60,20 +60,20 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries(
-        trpc.initiative.get.queryOptions({ id: campaignId }),
+        trpc.campaign.get.queryOptions({ id: campaignId }),
       ),
-      queryClient.invalidateQueries(trpc.initiative.overview.queryOptions()),
+      queryClient.invalidateQueries(trpc.campaign.overview.queryOptions()),
       queryClient.invalidateQueries(
-        trpc.initiative.linkableContent.queryOptions({ campaignId }),
+        trpc.campaign.linkableContent.queryOptions({ campaignId }),
       ),
       queryClient.invalidateQueries(
-        trpc.initiative.alignment.queryOptions({ campaignId }),
+        trpc.campaign.alignment.queryOptions({ campaignId }),
       ),
     ]);
   };
 
   const unlink = useMutation(
-    trpc.initiative.unlinkContent.mutationOptions({
+    trpc.campaign.unlinkContent.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to unlink"),
     }),
@@ -244,7 +244,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
         {campaign.adCampaigns.length === 0 ? (
           <p className="text-muted-foreground mt-4 text-sm">
             No ad campaigns linked. Paid implementations sync in under this
-            initiative from the ads side.
+            campaign from the ads side.
           </p>
         ) : (
           <div className="mt-3 flex flex-col gap-1.5">
@@ -324,7 +324,7 @@ function LinkContentDialog({
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const { data: linkable, isLoading } = useQuery({
-    ...trpc.initiative.linkableContent.queryOptions({ campaignId }),
+    ...trpc.campaign.linkableContent.queryOptions({ campaignId }),
     enabled: open,
   });
 
@@ -336,7 +336,7 @@ function LinkContentDialog({
   }, [linkable, q]);
 
   const link = useMutation(
-    trpc.initiative.linkContent.mutationOptions({
+    trpc.campaign.linkContent.mutationOptions({
       onSuccess: async () => {
         await onLinked();
         setPicked(new Set());

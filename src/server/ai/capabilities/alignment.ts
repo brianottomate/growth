@@ -29,7 +29,7 @@ const DiagnosisSchema = z.object({
           .describe("Which dimension of intent-vs-actual this concerns."),
         entity: z
           .string()
-          .describe("Initiative or audience-target name the finding is about."),
+          .describe("Campaign or audience-target name the finding is about."),
         finding: z.string().describe("What is misaligned, stated concretely."),
         suggestedUpdate: z
           .string()
@@ -45,17 +45,17 @@ export type AlignmentDiagnosis = z.infer<typeof DiagnosisSchema>;
 
 const SYSTEM_PROMPT = `You are the Wander growth team's paid-strategy alignment analyst.
 
-You are given GROUNDING: the strategy layer (initiatives with intended channels/budget/dates, audience targets with intended channels) diffed against platform reality (campaigns and audiences synced from the ad platforms via Zernio).
+You are given GROUNDING: the strategy layer (campaigns with intended channels/budget/dates, audience targets with intended channels) diffed against platform reality (campaigns and audiences synced from the ad platforms via Zernio).
 
 Your job: identify where INTENT and ACTUAL diverge and suggest what to update. Rules:
 - Only use the grounding provided. Do not invent campaigns, spend, or audiences.
 - Rank findings by business impact: an intended channel with no live campaign, or a must-have audience with zero live coverage, is high severity. Unlinked-but-plausible campaigns or minor date drift are low.
-- suggestedUpdate must be a concrete action the operator can take (link campaign X to initiative Y in Growth; launch a Google campaign for initiative Z; mark audience target as retired; correct the intended channels). NEVER state that you performed an action — you only diagnose and suggest.
+- suggestedUpdate must be a concrete action the operator can take (link campaign X to campaign Y in Growth; launch a Google campaign for campaign Z; mark audience target as retired; correct the intended channels). NEVER state that you performed an action — you only diagnose and suggest.
 - If grounding shows full alignment, return an empty findings array and say so in the summary.`;
 
 export const diagnoseAlignment = growthAction({
   description:
-    "Diagnose paid-strategy alignment: compares the growth strategy layer (initiative intended channels/budget/dates + audience targets) against platform reality (campaigns/audiences synced via Zernio) and returns ranked misalignments with concrete suggested updates. Use for 'are our ads running what we planned', 'what's misaligned', 'what should we update on paid'. Read-only — it suggests, it does not change anything.",
+    "Diagnose paid-strategy alignment: compares the growth strategy layer (campaign intended channels/budget/dates + audience targets) against platform reality (campaigns/audiences synced via Zernio) and returns ranked misalignments with concrete suggested updates. Use for 'are our ads running what we planned', 'what's misaligned', 'what should we update on paid'. Read-only — it suggests, it does not change anything.",
   inputSchema: z.object({}),
   execute: async (_input, ctx) => {
     const brandIds = await orgBrandIds(ctx.orgId);
@@ -72,7 +72,7 @@ export const diagnoseAlignment = growthAction({
         grounding,
         diagnosis: {
           summary:
-            "No initiatives or audience targets with intent to compare against yet.",
+            "No campaigns or audience targets with intent to compare against yet.",
           findings: [],
         } satisfies AlignmentDiagnosis,
       };

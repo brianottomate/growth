@@ -83,7 +83,7 @@ function parseJsonLoose<T>(text: string): T {
 export const studioRouter = createTRPCRouter({
   /**
    * The year wheel: pillar-tagged organic series + planned main pieces, plus a
-   * paid lane of initiatives. Pillars themselves come from the static registry
+   * paid lane of campaigns. Pillars themselves come from the static registry
    * client-side; this returns only the time-positioned items.
    */
   wheel: protectedProcedure
@@ -152,14 +152,14 @@ export const studioRouter = createTRPCRouter({
         },
       });
 
-      // Paid lane: initiatives overlapping the year.
-      const allInitiatives = await ctx.db.query.campaignTable.findMany({
+      // Paid lane: campaigns overlapping the year.
+      const allCampaigns = await ctx.db.query.campaignTable.findMany({
         where: and(
           eq(campaignTable.brandId, input.brandId),
           isNull(campaignTable.deletedAt),
         ),
       });
-      const initiatives = allInitiatives
+      const campaigns = allCampaigns
         .filter((i) => {
           const start = i.startAt ?? null;
           const end = i.endAt ?? i.startAt ?? null;
@@ -175,7 +175,7 @@ export const studioRouter = createTRPCRouter({
           goal: i.goal,
         }));
 
-      return { year: input.year, series, pieces, initiatives };
+      return { year: input.year, series, pieces, campaigns };
     }),
 
   /** Social channels for the brand (fan-out targets in Produce). */

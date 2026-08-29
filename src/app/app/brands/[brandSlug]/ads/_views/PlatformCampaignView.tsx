@@ -16,10 +16,10 @@ import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
-import { InitiativeLink } from "./InitiativeLink";
+import { CampaignLink } from "./CampaignLink";
 
 /**
- * The campaign canvas: a view-only display of one campaign — its state, its
+ * One platform campaign: a view-only display of its state,
  * money, its ads. Nothing here is a form; edits happen in chat and this page
  * just renders current state. The one control is the delivery switch, because
  * launching by button click is a deliberate operator moment.
@@ -51,31 +51,31 @@ export async function PlatformCampaignView({
   });
   if (!brand) notFound();
 
-  const campaign = await db.query.platformCampaignTable.findFirst({
+  const platformCampaign = await db.query.platformCampaignTable.findFirst({
     where: and(
       eq(platformCampaignTable.id, platformCampaignId),
       eq(platformCampaignTable.brandId, brand.id),
     ),
   });
-  if (!campaign) notFound();
+  if (!platformCampaign) notFound();
 
-  const [spots, initiative] = await Promise.all([
+  const [spots, campaign] = await Promise.all([
     db.query.adSpotTable.findMany({
-      where: eq(adSpotTable.platformCampaignId, campaign.id),
+      where: eq(adSpotTable.platformCampaignId, platformCampaign.id),
     }),
-    campaign.campaignId
+    platformCampaign.campaignId
       ? db.query.campaignTable.findFirst({
-          where: eq(campaignTable.id, campaign.campaignId),
+          where: eq(campaignTable.id, platformCampaign.campaignId),
           columns: { id: true, name: true },
         })
       : Promise.resolve(null),
   ]);
 
-  const stats = campaign.stats ?? {};
+  const stats = platformCampaign.stats ?? {};
   const statCards: { label: string; value: string }[] = [
-    { label: "Spend", value: money(stats.spend ?? campaign.spend) },
-    ...(campaign.budget != null
-      ? [{ label: "Budget", value: money(campaign.budget) }]
+    { label: "Spend", value: money(stats.spend ?? platformCampaign.spend) },
+    ...(platformCampaign.budget != null
+      ? [{ label: "Budget", value: money(platformCampaign.budget) }]
       : []),
     ...(stats.impressions != null
       ? [{ label: "Impressions", value: stats.impressions.toLocaleString() }]
@@ -121,36 +121,36 @@ export async function PlatformCampaignView({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <ChannelLogo platform={campaign.platform} className="size-6" />
+              <ChannelLogo platform={platformCampaign.platform} className="size-6" />
               <h1 className="truncate text-xl font-semibold tracking-tight">
-                {campaign.name}
+                {platformCampaign.name}
               </h1>
               <span
                 className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
-                  statusStyle(campaign.status)
+                  statusStyle(platformCampaign.status)
                 }`}
               >
-                {campaign.status}
+                {platformCampaign.status}
               </span>
             </div>
             <p className="text-muted-foreground mt-1 text-sm">
-              {platformLabel(campaign.platform)}
-              {campaign.objective ? ` · ${campaign.objective}` : ""} ·{" "}
-              {fmtDate(campaign.startAt) ?? "—"} – {fmtDate(campaign.endAt) ?? "—"}
+              {platformLabel(platformCampaign.platform)}
+              {platformCampaign.objective ? ` · ${platformCampaign.objective}` : ""} ·{" "}
+              {fmtDate(platformCampaign.startAt) ?? "—"} – {fmtDate(platformCampaign.endAt) ?? "—"}
             </p>
             <div className="mt-2">
-              <InitiativeLink
+              <CampaignLink
                 brandId={brand.id}
                 brandSlug={brandSlug}
-                platformCampaignId={campaign.id}
-                initiative={initiative ?? null}
+                platformCampaignId={platformCampaign.id}
+                campaign={campaign ?? null}
               />
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {campaign.manageUrl && (
+            {platformCampaign.manageUrl && (
               <a
-                href={campaign.manageUrl}
+                href={platformCampaign.manageUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:bg-accent rounded-md border px-3 py-1.5 text-sm font-medium"
@@ -159,19 +159,19 @@ export async function PlatformCampaignView({
               </a>
             )}
             <DeletePlatformCampaign
-              platformCampaignId={campaign.id}
-              campaignName={campaign.name}
+              platformCampaignId={platformCampaign.id}
+              campaignName={platformCampaign.name}
               brandSlug={brandSlug}
-              isLive={campaign.status === "live"}
-              spend={campaign.spend}
+              isLive={platformCampaign.status === "live"}
+              spend={platformCampaign.spend}
             />
             <DeliverySwitch
-              platformCampaignId={campaign.id}
-              status={campaign.status}
-              hasExternalId={Boolean(campaign.externalId)}
+              platformCampaignId={platformCampaign.id}
+              status={platformCampaign.status}
+              hasExternalId={Boolean(platformCampaign.externalId)}
               spendLine={
-                campaign.budget != null
-                  ? `${money(campaign.budget)} budget`
+                platformCampaign.budget != null
+                  ? `${money(platformCampaign.budget)} budget`
                   : "no stored budget"
               }
             />

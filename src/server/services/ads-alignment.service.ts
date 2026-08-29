@@ -11,7 +11,7 @@ import {
 } from "@/server/db/schema";
 
 // ---------------------------------------------------------------------------
-// Intent vs. actual — the diff between the strategy layer (initiative:
+// Intent vs. actual — the diff between the strategy layer (campaign:
 // targetChannels/budget/dates, authored by hand) and platform reality
 // (campaign rows synced from Zernio). Read-only: the fix for any drift is a
 // link/unlink mutation or a change made in the platform's own manager.
@@ -47,17 +47,17 @@ export type ChannelAlignment = {
 };
 
 export type CampaignSuggestion = AlignedCampaign & {
-  /** Name-token overlap with the initiative (0 = only platform/date matched). */
+  /** Name-token overlap with the campaign (0 = only platform/date matched). */
   score: number;
 };
 
-export type InitiativeAlignment = {
+export type CampaignAlignment = {
   campaignId: string;
   name: string;
   status: Campaign["status"];
   targetChannels: string[];
   channels: ChannelAlignment[];
-  /** Linked campaigns running on platforms the initiative never asked for. */
+  /** Linked campaigns running on platforms the campaign never asked for. */
   unplanned: AlignedCampaign[];
   budget: {
     intended: number | undefined;
@@ -67,9 +67,9 @@ export type InitiativeAlignment = {
     utilization: number | undefined;
     overIntended: boolean;
   };
-  /** Linked campaigns whose end date runs past the initiative's end date. */
+  /** Linked campaigns whose end date runs past the campaign's end date. */
   dateDrift: AlignedCampaign[];
-  /** Unlinked same-brand campaigns that plausibly implement this initiative. */
+  /** Unlinked same-brand campaigns that plausibly implement this campaign. */
   suggestions: CampaignSuggestion[];
 };
 
@@ -116,41 +116,42 @@ function windowsOverlap(
 }
 
 /**
- * Score an unlinked campaign as a candidate implementation of an initiative:
- * platform must be intended, date windows must overlap; ranked by how many
- * of the initiative's name/goal/slug tokens appear in the campaign name.
+ * Score an unlinked platform campaign as a candidate implementation of a
+ * campaign: platform must be intended, date windows must overlap; ranked by
+ * how many of the campaign's name/goal/slug tokens appear in the platform
+ * campaign's name.
  */
 export function scoreSuggestion(
-  initiative: Pick<
+  campaign: Pick<
     Campaign,
     "name" | "slug" | "goal" | "targetChannels" | "startAt" | "endAt"
   >,
-  campaign: PlatformCampaign,
+  platformCampaign: PlatformCampaign,
 ): number | undefined {
-  const intended = initiative.targetChannels ?? [];
-  if (!intended.includes(campaign.platform)) return undefined;
+  const intended = campaign.targetChannels ?? [];
+  if (!intended.includes(platformCampaign.platform)) return undefined;
   if (
     !windowsOverlap(
-      initiative.startAt,
-      initiative.endAt,
       campaign.startAt,
       campaign.endAt,
+      platformCampaign.startAt,
+      platformCampaign.endAt,
     )
   ) {
     return undefined;
   }
-  const tokens = nameTokens(initiative.name, initiative.slug, initiative.goal);
-  const haystack = campaign.name.toLowerCase();
+  const tokens = nameTokens(campaign.name, campaign.slug, campaign.goal);
+  const haystack = platformCampaign.name.toLowerCase();
   return tokens.filter((t) => haystack.includes(t)).length;
 }
 
 /** The pure diff: intent + linked reality + unlinked candidates → alignment. */
-export function diffInitiative(
-  initiative: Campaign,
+export function diffCampaign(
+  campaign: Campaign,
   linked: PlatformCampaign[],
   unlinkedCandidates: PlatformCampaign[],
-): InitiativeAlignment {
-  const targetChannels = initiative.targetChannels ?? [];
+): CampaignAlignment {
+  const targetChannels = campaign.targetChannels ?? [];
 
   const channels: ChannelAlignment[] = targetChannels.map((platform) => {
     const mine = linked.filter((c) => c.platform === platform);
@@ -169,21 +170,21 @@ export function diffInitiative(
 
   const linkedBudget = linked.reduce((s, c) => s + (c.budget ?? 0), 0);
   const linkedSpend = linked.reduce((s, c) => s + (campaignSpend(c) ?? 0), 0);
-  const intended = initiative.budget ?? undefined;
+  const intended = campaign.budget ?? undefined;
 
-  const dateDrift = initiative.endAt
+  const dateDrift = campaign.endAt
     ? linked
         .filter(
           (c) =>
             FULFILLING_STATUSES.has(c.status) &&
             c.endAt !== null &&
-            c.endAt > initiative.endAt!,
+            c.endAt > campaign.endAt!,
         )
         .map(toAligned)
     : [];
 
   const suggestions = unlinkedCandidates
-    .map((c) => ({ campaign: c, score: scoreSuggestion(initiative, c) }))
+    .map((c) => ({ campaign: c, score: scoreSuggestion(campaign, c) }))
     .filter(
       (s): s is { campaign: PlatformCampaign; score: number } => s.score !== undefined,
     )
@@ -196,9 +197,9 @@ export function diffInitiative(
     .map((s) => ({ ...toAligned(s.campaign), score: s.score }));
 
   return {
-    campaignId: initiative.id,
-    name: initiative.name,
-    status: initiative.status,
+    campaignId: campaign.id,
+    name: campaign.name,
+    status: campaign.status,
     targetChannels,
     channels,
     unplanned,
@@ -217,17 +218,17 @@ export function diffInitiative(
 
 // ---- db-backed entry points ------------------------------------------------
 
-/** Full alignment for one initiative (detail page / capability). */
-export async function computeInitiativeAlignment(
+/** Full alignment for one campaign (detail page / capability). */
+export async function computeCampaignAlignment(
   campaignId: string,
-): Promise<InitiativeAlignment> {
-  const initiative = await db.query.campaignTable.findFirst({
+): Promise<CampaignAlignment> {
+  const campaign = await db.query.campaignTable.findFirst({
     where: and(
       eq(campaignTable.id, campaignId),
       isNull(campaignTable.deletedAt),
     ),
   });
-  if (!initiative) throw new Error(`Campaign ${campaignId} not found`);
+  if (!campaign) throw new Error(`Campaign ${campaignId} not found`);
 
   const [linked, unlinked] = await Promise.all([
     db.query.platformCampaignTable.findMany({
@@ -235,13 +236,13 @@ export async function computeInitiativeAlignment(
     }),
     db.query.platformCampaignTable.findMany({
       where: and(
-        eq(platformCampaignTable.brandId, initiative.brandId),
+        eq(platformCampaignTable.brandId, campaign.brandId),
         isNull(platformCampaignTable.campaignId),
       ),
     }),
   ]);
 
-  return diffInitiative(initiative, linked, unlinked);
+  return diffCampaign(campaign, linked, unlinked);
 }
 
 export type AlignmentOverviewRow = {
@@ -256,31 +257,31 @@ export type AlignmentOverviewRow = {
   suggestionCount: number;
 };
 
-/** Compact per-initiative rollup for the /app/campaigns index. */
+/** Compact per-campaign rollup for the /app/campaigns index. */
 export async function computeAlignmentOverview(
   brandIds: string[],
 ): Promise<AlignmentOverviewRow[]> {
   if (brandIds.length === 0) return [];
 
-  const initiatives = await db.query.campaignTable.findMany({
+  const campaigns = await db.query.campaignTable.findMany({
     where: and(
       inArray(campaignTable.brandId, brandIds),
       isNull(campaignTable.deletedAt),
       inArray(campaignTable.status, ["planned", "active", "paused"]),
     ),
   });
-  if (initiatives.length === 0) return [];
+  if (campaigns.length === 0) return [];
 
-  const campaigns = await db.query.platformCampaignTable.findMany({
+  const platformCampaigns = await db.query.platformCampaignTable.findMany({
     where: inArray(platformCampaignTable.brandId, brandIds),
   });
-  const linkedByInitiative = new Map<string, PlatformCampaign[]>();
+  const linkedByCampaign = new Map<string, PlatformCampaign[]>();
   const unlinkedByBrand = new Map<string, PlatformCampaign[]>();
-  for (const c of campaigns) {
+  for (const c of platformCampaigns) {
     if (c.campaignId) {
-      const arr = linkedByInitiative.get(c.campaignId) ?? [];
+      const arr = linkedByCampaign.get(c.campaignId) ?? [];
       arr.push(c);
-      linkedByInitiative.set(c.campaignId, arr);
+      linkedByCampaign.set(c.campaignId, arr);
     } else {
       const arr = unlinkedByBrand.get(c.brandId) ?? [];
       arr.push(c);
@@ -288,10 +289,10 @@ export async function computeAlignmentOverview(
     }
   }
 
-  return initiatives.map((i) => {
-    const alignment = diffInitiative(
+  return campaigns.map((i) => {
+    const alignment = diffCampaign(
       i,
-      linkedByInitiative.get(i.id) ?? [],
+      linkedByCampaign.get(i.id) ?? [],
       unlinkedByBrand.get(i.brandId) ?? [],
     );
     return {

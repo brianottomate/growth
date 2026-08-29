@@ -38,7 +38,7 @@ called out in their tool descriptions and approval payloads.
 
 ## Strategy ↔ reality alignment (shipped 2026-07-16)
 
-The `ads-schema` intent layer (`initiative.targetChannels/budget/dates`) is the source of strategy; Zernio-synced `campaign` rows are reality. `ads-alignment.core.ts` diffs them (per-channel ok/inactive/missing, unplanned + date drift, budget pacing, suggested links); surfaced on the campaign detail page and via `initiative.alignment` / `alignmentOverview`. Next iterations: audience_target ↔ audience alignment (same pattern), and a periodic "drift digest" the agent can narrate.
+The `ads-schema` intent layer (`campaign.targetChannels/budget/dates`) is the source of strategy; Zernio-synced `campaign` rows are reality. `ads-alignment.core.ts` diffs them (per-channel ok/inactive/missing, unplanned + date drift, budget pacing, suggested links); surfaced on the campaign detail page and via `campaign.alignment` / `alignmentOverview`. Next iterations: audience_target ↔ audience alignment (same pattern), and a periodic "drift digest" the agent can narrate.
 
 ---
 

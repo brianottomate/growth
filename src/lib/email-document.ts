@@ -123,7 +123,7 @@ export type EmailHandoffInput = EmailDocumentDraft & {
   format: EmailDocumentFormat;
   revision: number;
   seriesName?: string | null;
-  initiativeName?: string | null;
+  campaignName?: string | null;
   plannedAt?: string | null;
   scheduledAt?: string | null;
   purpose?: string | null;
@@ -189,7 +189,7 @@ export function formatEmailImplementationHandoff(
 
   lines.push("", "## Planning context", "");
   lines.push(`Series: ${input.seriesName || "None"}`);
-  lines.push(`Initiative: ${input.initiativeName || "None"}`);
+  lines.push(`Campaign: ${input.campaignName || "None"}`);
   lines.push(`Template: ${input.templateKey}`);
 
   if (assets.length) {

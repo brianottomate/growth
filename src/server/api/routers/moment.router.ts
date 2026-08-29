@@ -113,11 +113,11 @@ export const momentRouter = createTRPCRouter({
   get: protectedProcedure
     .input(z.object({ campaignId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const initiative = await ctx.db.query.campaignTable.findFirst({
+      const campaign = await ctx.db.query.campaignTable.findFirst({
         where: eq(campaignTable.id, input.campaignId),
       });
-      if (!initiative) return null;
-      await assertOwnedBrandAccess(ctx, initiative.brandId);
+      if (!campaign) return null;
+      await assertOwnedBrandAccess(ctx, campaign.brandId);
       const slots = await ctx.db.query.contentPostTable.findMany({
         where: and(
           eq(contentPostTable.campaignId, input.campaignId),
@@ -125,7 +125,7 @@ export const momentRouter = createTRPCRouter({
         ),
         orderBy: [asc(contentPostTable.plannedAt)],
       });
-      // Targets hang off platform posts now; roll up across the initiative's
+      // Targets hang off platform posts now; roll up across the campaign's
       // content items.
       const contents = await ctx.db.query.contentPostTable.findMany({
         where: eq(contentPostTable.campaignId, input.campaignId),
@@ -149,6 +149,6 @@ export const momentRouter = createTRPCRouter({
             with: { amplifier: true },
           })
         : [];
-      return { initiative, slots, targets };
+      return { campaign, slots, targets };
     }),
 });

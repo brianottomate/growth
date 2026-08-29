@@ -11,20 +11,21 @@ import { Input } from "@/components/ui/input";
 import { useTRPC } from "@/trpc/react";
 
 /**
- * The unlinked→first-party mapping: attach this campaign to an initiative,
+ * The unlinked→first-party mapping: attach this platform campaign to a
+ * campaign,
  * or mint one by name. Shown as quiet text when already linked — relinking
  * is rare and unlinking is a chat job.
  */
-export function InitiativeLink({
+export function CampaignLink({
   brandId,
   brandSlug,
   platformCampaignId,
-  initiative,
+  campaign,
 }: {
   brandId: string;
   brandSlug: string;
   platformCampaignId: string;
-  initiative: { id: string; name: string } | null;
+  campaign: { id: string; name: string } | null;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -44,15 +45,15 @@ export function InitiativeLink({
     }),
   );
 
-  if (initiative) {
+  if (campaign) {
     return (
       <span className="text-muted-foreground text-sm">
         Campaign:{" "}
         <Link
-          href={`/app/brands/${brandSlug}/ads/${initiative.id}`}
+          href={`/app/brands/${brandSlug}/ads/${campaign.id}`}
           className="text-foreground hover:underline"
         >
-          {initiative.name}
+          {campaign.name}
         </Link>
       </span>
     );

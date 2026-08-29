@@ -19,7 +19,7 @@ import {
 
 // Performance accounts — property managers paying to be featured on Wander's
 // marketing surfaces. Commercial layer only: delivery stays in the existing
-// initiative / lifecycle / amplification tables and attaches to a cycle via
+// campaign / lifecycle / amplification tables and attaches to a cycle via
 // their nullable performanceCycleId FK (see db/performance-schema.ts).
 
 export type PerformanceActor = { orgId: string };
@@ -167,6 +167,39 @@ async function requireCycle(actor: PerformanceActor, cycleId: string) {
   return cycle;
 }
 
+/** One `{ cycleId }` row per delivered thing, tallied by kind. */
+export type DeliveryRow = { cycleId: string | null };
+
+/**
+ * Three separate queries destructured in one statement, each feeding a
+ * different tally. A rename once pointed the emails tally at the ads array and
+ * typechecked, because every row is `{ cycleId }` — so the wiring is pulled
+ * out here where a test can hold it.
+ */
+export function countDeliveryByCycle(sources: {
+  campaigns: DeliveryRow[];
+  lifecycleCampaigns: DeliveryRow[];
+  amplifications: DeliveryRow[];
+}) {
+  const delivery = new Map<
+    string,
+    { ads: number; emails: number; influencers: number }
+  >();
+  const bump = (
+    cycleId: string | null,
+    key: "ads" | "emails" | "influencers",
+  ) => {
+    if (!cycleId) return;
+    const row = delivery.get(cycleId) ?? { ads: 0, emails: 0, influencers: 0 };
+    row[key] += 1;
+    delivery.set(cycleId, row);
+  };
+  sources.campaigns.forEach((row) => bump(row.cycleId, "ads"));
+  sources.lifecycleCampaigns.forEach((row) => bump(row.cycleId, "emails"));
+  sources.amplifications.forEach((row) => bump(row.cycleId, "influencers"));
+  return delivery;
+}
+
 export async function listPerformanceAccounts(actor: PerformanceActor) {
   const accounts = await db.query.performanceAccountTable.findMany({
     where: and(
@@ -202,22 +235,12 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
   const cycleIds = accounts.flatMap((account) =>
     account.cycles.map((cycle) => cycle.id),
   );
-  const delivery = new Map<
+  let delivery = new Map<
     string,
     { ads: number; emails: number; influencers: number }
   >();
   if (cycleIds.length > 0) {
-    const bump = (
-      cycleId: string | null,
-      key: "ads" | "emails" | "influencers",
-    ) => {
-      if (!cycleId) return;
-      const row =
-        delivery.get(cycleId) ?? { ads: 0, emails: 0, influencers: 0 };
-      row[key] += 1;
-      delivery.set(cycleId, row);
-    };
-    const [initiatives, campaigns, amplifications] = await Promise.all([
+    const [campaigns, lifecycleCampaigns, amplifications] = await Promise.all([
       db
         .select({ cycleId: campaignTable.performanceCycleId })
         .from(campaignTable)
@@ -231,9 +254,11 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
         .from(amplificationTargetTable)
         .where(inArray(amplificationTargetTable.performanceCycleId, cycleIds)),
     ]);
-    initiatives.forEach((row) => bump(row.cycleId, "ads"));
-    campaigns.forEach((row) => bump(row.cycleId, "emails"));
-    amplifications.forEach((row) => bump(row.cycleId, "influencers"));
+    delivery = countDeliveryByCycle({
+      campaigns,
+      lifecycleCampaigns,
+      amplifications,
+    });
   }
 
   return {
@@ -290,7 +315,7 @@ export async function getPerformanceAccount(
 
   // The delivery attached to each cycle, so one read answers "what ran".
   const cycleIds = account.cycles.map((cycle) => cycle.id);
-  const [initiatives, lifecycleCampaigns, amplificationTargets] =
+  const [campaigns, lifecycleCampaigns, amplificationTargets] =
     cycleIds.length === 0
       ? [[], [], []]
       : await Promise.all([
@@ -331,9 +356,9 @@ export async function getPerformanceAccount(
 
   // The ads themselves, so "is the right creative running" is answerable here
   // rather than only in Ads Manager.
-  const initiativeIds = initiatives.map((row) => row.id);
-  const campaigns =
-    initiativeIds.length === 0
+  const campaignIds = campaigns.map((row) => row.id);
+  const platformCampaigns =
+    campaignIds.length === 0
       ? []
       : await db
           .select({
@@ -348,10 +373,10 @@ export async function getPerformanceAccount(
             campaignId: platformCampaignTable.campaignId,
           })
           .from(platformCampaignTable)
-          .where(inArray(platformCampaignTable.campaignId, initiativeIds));
-  const campaignIds = campaigns.map((row) => row.id);
+          .where(inArray(platformCampaignTable.campaignId, campaignIds));
+  const platformCampaignIds = platformCampaigns.map((row) => row.id);
   const ads =
-    campaignIds.length === 0
+    platformCampaignIds.length === 0
       ? []
       : await db
           .select({
@@ -367,15 +392,15 @@ export async function getPerformanceAccount(
             businessKey: adSpotTable.businessKey,
           })
           .from(adSpotTable)
-          .where(inArray(adSpotTable.platformCampaignId, campaignIds));
+          .where(inArray(adSpotTable.platformCampaignId, platformCampaignIds));
 
   return {
     account,
     delivery: {
-      initiatives,
+      campaigns,
       lifecycleCampaigns,
       amplificationTargets,
-      campaigns,
+      platformCampaigns,
       ads,
     },
   };
@@ -483,15 +508,15 @@ export async function updatePerformanceCycle(
 }
 
 /**
- * Attach one delivery row (initiative, lifecycle campaign, or amplification
+ * Attach one delivery row (campaign, lifecycle campaign, or amplification
  * target) to a cycle, or detach with cycleId null. The write targets tables
  * without org scoping of their own, so the cycle's account is the boundary
  * checked here; a detach revalidates via the row's current cycle.
  */
 /**
  * Campaigns that could be attached to a cycle: platform campaigns that either
- * have no initiative at all (the shape every synced campaign arrives in) or
- * whose initiative is not already on a cycle. Ordered by platform start date,
+ * have no campaign at all (the shape every synced campaign arrives in) or
+ * whose campaign is not already on a cycle. Ordered by platform start date,
  * because sync stamps `createdAt` with the ingest time and that sorts useless.
  */
 export async function searchAttachableCampaigns(
@@ -510,7 +535,7 @@ export async function searchAttachableCampaigns(
       externalId: platformCampaignTable.externalId,
       heroThumbnailUrl: platformCampaignTable.heroThumbnailUrl,
       campaignId: platformCampaignTable.campaignId,
-      initiativeCycleId: campaignTable.performanceCycleId,
+      campaignCycleId: campaignTable.performanceCycleId,
     })
     .from(platformCampaignTable)
     .leftJoin(campaignTable, eq(campaignTable.id, platformCampaignTable.campaignId))
@@ -532,7 +557,7 @@ export async function searchAttachableCampaigns(
 
 /**
  * Sum observed spend for every campaign under the cycle's attached
- * initiatives, in cents.
+ * campaigns, in cents.
  *
  * Reads `stats.spend` (unrounded) in preference to `campaign.spend`, which the
  * schema documents as a coarse whole-dollar rollup — $24.66 is stored there as
@@ -594,8 +619,8 @@ export async function attachToPerformanceCycle(
   if (input.cycleId) await requireCycle(actor, input.cycleId);
 
   // A platform campaign has no cycle FK of its own — it reaches a cycle through
-  // its initiative. Synced campaigns have no initiative at all, so attaching
-  // one mints a wrapper initiative for the cycle and reuses it thereafter.
+  // its campaign. Synced campaigns have no campaign at all, so attaching
+  // one mints a wrapper campaign for the cycle and reuses it thereafter.
   if (input.kind === "platformCampaign") {
     return attachCampaignToCycle(actor, input.cycleId, input.id);
   }
@@ -643,7 +668,7 @@ export async function attachToPerformanceCycle(
   };
 }
 
-/** Wrapper-initiative slug for a cycle, so repeated attaches reuse one row. */
+/** Wrapper-campaign slug for a cycle, so repeated attaches reuse one row. */
 const cycleWrapperSlug = (cycleId: string) => `perf-cycle-${cycleId}`;
 
 async function attachCampaignToCycle(
@@ -669,8 +694,8 @@ async function attachCampaignToCycle(
   }
 
   // Detach: clear the campaign's link to a cycle-owned wrapper. A campaign
-  // whose initiative is a real strategic push is left alone — detaching must
-  // not silently orphan Wander's own campaign from its initiative.
+  // whose campaign is a real strategic push is left alone — detaching must
+  // not silently orphan Wander's own campaign from its campaign.
   if (!cycleId) {
     const current = campaign.campaignId
       ? await db.query.campaignTable.findFirst({
@@ -720,7 +745,7 @@ async function attachCampaignToCycle(
 
   const cycle = await requireCycle(actor, cycleId);
 
-  // Already has an initiative: put that initiative on the cycle rather than
+  // Already has a campaign: put that campaign on the cycle rather than
   // rewriting the campaign's parent, so an existing push keeps its grouping.
   if (campaign.campaignId) {
     await db
@@ -754,7 +779,7 @@ async function attachCampaignToCycle(
           slug,
           goal: "performance",
           description:
-            "Wrapper initiative created by attaching a platform campaign to a performance cycle. Campaigns reach a cycle through an initiative; a hand-built campaign has none.",
+            "Wrapper campaign created by attaching a platform campaign to a performance cycle. Platform campaigns reach a cycle through a campaign; a hand-built one has none.",
           status: "active",
           targetChannels: [campaign.platform],
           performanceCycleId: cycleId,

@@ -11,7 +11,7 @@ Do not add or keep a test solely to increase coverage or exercise mock wiring.
 Before adding a test, state the behavior in business terms. Good examples:
 
 - an operator cannot be redirected to an external callback after authentication;
-- a campaign outside an initiative's channel or active window is not suggested;
+- a platform campaign outside a campaign's channel or active window is not suggested;
 - recipient data and credentials never cross an email handoff boundary;
 - spend from overlapping sources is attributed once;
 - generated outreach cannot claim unsupported product behavior.

@@ -28,7 +28,7 @@ const fmtUsd = (n: number | undefined) =>
   n == null ? "—" : `$${Math.round(n).toLocaleString()}`;
 
 /**
- * Intent vs. actual for one initiative: does the strategy layer
+ * Intent vs. actual for one campaign: does the strategy layer
  * (targetChannels / budget / dates) match the Zernio-synced campaigns?
  * Read-only diagnostics — the only actions are link/unlink (relationship
  * fixes); campaign changes happen in the platform's own manager.
@@ -43,24 +43,24 @@ export function AlignmentPanel({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery(
-    trpc.initiative.alignment.queryOptions({ campaignId }),
+    trpc.campaign.alignment.queryOptions({ campaignId }),
   );
 
   const invalidate = async () => {
     await queryClient.invalidateQueries(
-      trpc.initiative.alignment.queryOptions({ campaignId }),
+      trpc.campaign.alignment.queryOptions({ campaignId }),
     );
     await onChanged();
   };
 
   const linkCampaigns = useMutation(
-    trpc.initiative.linkCampaigns.mutationOptions({
+    trpc.campaign.linkCampaigns.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to link"),
     }),
   );
   const unlinkCampaign = useMutation(
-    trpc.initiative.unlinkCampaign.mutationOptions({
+    trpc.campaign.unlinkCampaign.mutationOptions({
       onSuccess: invalidate,
       onError: (e) => toast.error(e.message || "Failed to unlink"),
     }),
@@ -90,7 +90,7 @@ export function AlignmentPanel({
 
       {!hasIntent && (
         <p className="text-muted-foreground mt-4 text-sm">
-          No intended channels or budget set on this initiative — add target
+          No intended channels or budget set on this campaign — add target
           channels to compare strategy against what&apos;s running.
         </p>
       )}
@@ -148,7 +148,7 @@ export function AlignmentPanel({
             {unplanned.length === 1 ? "" : "s"}
           </span>{" "}
           <span className="text-muted-foreground">
-            running on channels this initiative didn&apos;t target:{" "}
+            running on channels this campaign didn&apos;t target:{" "}
             {unplanned.map((c) => c.name).join(", ")}
           </span>
         </div>
@@ -157,7 +157,7 @@ export function AlignmentPanel({
         <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm">
           <span className="font-medium text-amber-700">
             {dateDrift.length} campaign{dateDrift.length === 1 ? "" : "s"} run
-            past the initiative end date
+            past the campaign end date
           </span>{" "}
           <span className="text-muted-foreground">
             {dateDrift.map((c) => c.name).join(", ")}

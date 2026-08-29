@@ -77,7 +77,7 @@ export async function requireOwnedEmailSpot(
     where: eq(platformPostTable.id, platformPostId),
     with: {
       brand: true,
-      contentPost: { with: { series: true, initiative: true } },
+      contentPost: { with: { series: true, campaign: true } },
     },
   });
   if (
@@ -239,10 +239,10 @@ export async function getEmailWorkspace(input: {
                 name: spot.contentPost.series.name,
               }
             : null,
-          initiative: spot.contentPost.initiative
+          campaign: spot.contentPost.campaign
             ? {
-                id: spot.contentPost.initiative.id,
-                name: spot.contentPost.initiative.name,
+                id: spot.contentPost.campaign.id,
+                name: spot.contentPost.campaign.name,
               }
             : null,
         }
@@ -314,7 +314,7 @@ export async function createEmailSlot(input: {
   campaignId?: string;
   plannedAt?: string;
 }) {
-  const [brand, series, initiative, newsletterChannel] = await Promise.all([
+  const [brand, series, campaign, newsletterChannel] = await Promise.all([
     db.query.brandTable.findFirst({
       where: and(
         eq(brandTable.id, input.brandId),
@@ -353,8 +353,8 @@ export async function createEmailSlot(input: {
   if (!brand) throw new Error("Brand not found in this workspace.");
   if (input.seriesId && !series)
     throw new Error("Series not found for this brand.");
-  if (input.campaignId && !initiative) {
-    throw new Error("Initiative not found for this brand.");
+  if (input.campaignId && !campaign) {
+    throw new Error("Campaign not found for this brand.");
   }
   const plannedAt = input.plannedAt ? new Date(input.plannedAt) : null;
   if (plannedAt && Number.isNaN(plannedAt.getTime())) {
@@ -373,10 +373,10 @@ export async function createEmailSlot(input: {
         ctaText: input.ctaText,
         pillar,
         seriesId: series?.id,
-        campaignId: initiative?.id,
+        campaignId: campaign?.id,
         plannedAt,
         status: "slot",
-        slotKind: series || initiative ? "anchored" : "freeflow",
+        slotKind: series || campaign ? "anchored" : "freeflow",
         origin: "human",
         ownerId: input.userId,
         createdById: input.userId,
@@ -512,7 +512,7 @@ export async function runEmailGenerationJob(jobId: string) {
       with: {
         brand: true,
         channel: true,
-        contentPost: { with: { series: true, initiative: true } },
+        contentPost: { with: { series: true, campaign: true } },
       },
     });
     if (!document || !spot?.brand || !isEmailFormat(spot.format)) {
@@ -549,7 +549,7 @@ export async function runEmailGenerationJob(jobId: string) {
       prompt: [
         content?.title ? `Working title: ${content.title}` : null,
         content?.series ? `Series: ${content.series.name}` : null,
-        content?.initiative ? `Initiative: ${content.initiative.name}` : null,
+        content?.campaign ? `Campaign: ${content.campaign.name}` : null,
         content?.pillar ? `Content pillar: ${content.pillar}` : null,
         content?.hook ? `Hook / premise: ${content.hook}` : null,
         content?.captionDirection
@@ -656,7 +656,7 @@ export async function exportEmailHandoff(input: {
     format: workspace.spot.format,
     revision: workspace.document.currentRevision,
     seriesName: workspace.content?.series?.name,
-    initiativeName: workspace.content?.initiative?.name,
+    campaignName: workspace.content?.campaign?.name,
     plannedAt: workspace.content?.plannedAt?.toISOString(),
     scheduledAt: workspace.spot.scheduledAt?.toISOString(),
     purpose: workspace.content?.purpose,

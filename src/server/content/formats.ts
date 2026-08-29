@@ -76,7 +76,7 @@ export type PlatformFormat = {
   surface?: "feed" | "reels" | "stories" | "explore" | "profile";
   ephemeral?: boolean;
   sequence?: boolean; // thread-like → expands into ordered child rows
-  // False for initiative-driven one-offs that share a publishing surface but
+  // False for campaign-driven one-offs that share a publishing surface but
   // must not satisfy its recurring cadence (for example an email blast).
   countsTowardCadence?: boolean;
   media: {

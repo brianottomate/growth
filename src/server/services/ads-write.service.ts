@@ -1160,7 +1160,7 @@ async function platformAudienceIdFor(
 // ---- DRAFT → PLATFORM --------------------------------------------------
 
 /**
- * Push a first-party draft (an initiative) to Meta: ONE campaign + ONE ad set
+ * Push a first-party draft to Meta: ONE platform campaign + ONE ad set
  * + its drafted ads, via Zernio's multi-creative shape, forced PAUSED. The
  * local `campaign` row is created FROM the platform response, so a campaign
  * row always means a real campaign on a real ad account. The operator's click

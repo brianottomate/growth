@@ -205,7 +205,7 @@ export const performanceRead = growthDomainTool({
 
 export const performanceWrite = growthDomainTool({
   description:
-    "Manage performance accounts: onboard customers, add sponsored properties, open and update billing cycles, and attach existing delivery (initiatives, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
+    "Manage performance accounts: onboard customers, add sponsored properties, open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
   actions: {
     createAccount: createPerformanceAccountAction,
     updateAccount: updatePerformanceAccountAction,

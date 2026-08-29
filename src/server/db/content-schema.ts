@@ -180,7 +180,7 @@ export const seriesTable = pgTable(
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
-    // The strategic "moment" this series ladders up to (the raised initiative —
+    // The strategic "moment" this series ladders up to (the raised campaign —
     // organic series + paid campaigns + amplification targets all reference it).
     campaignId: t
       .text()
@@ -217,7 +217,7 @@ export const seriesTable = pgTable(
   (table) => [
     index("series_brand_idx").on(table.brandId),
     index("series_status_idx").on(table.status),
-    index("series_initiative_idx").on(table.campaignId),
+    index("series_campaign_idx").on(table.campaignId),
     index("series_pillar_idx").on(table.brandId, table.pillar),
   ],
 );
@@ -252,8 +252,8 @@ export const contentPostTable = pgTable(
       .references(() => seriesTable.id, { onDelete: "set null" }),
 
     // Optional strategic push this content supports (the organic counterpart to
-    // a campaign living under the same initiative). Lets a slot be anchored to a
-    // goal-driven initiative as well as / instead of a series.
+    // a platform campaign under the same campaign). Lets a slot be anchored to a
+    // goal-driven campaign as well as / instead of a series.
     campaignId: t
       .text()
       .references(() => campaignTable.id, { onDelete: "set null" }),
@@ -296,7 +296,7 @@ export const contentPostTable = pgTable(
     // rather than stacking; a freeflow slot is intentionally left open for
     // execs to jam into). Soft text, like the format axes. Null for non-slots.
     //   cadence  → seeded from a cadence_target's BAU rhythm
-    //   anchored → tied to a calendar event / series / initiative (July 4th…)
+    //   anchored → tied to a calendar event / series / campaign (July 4th…)
     //   freeflow → reserved open placeholder
     slotKind: t.text(),
 
@@ -338,7 +338,7 @@ export const contentPostTable = pgTable(
     index("content_post_status_idx").on(table.status),
     index("content_post_pillar_idx").on(table.pillar),
     index("content_post_series_idx").on(table.seriesId),
-    index("content_post_initiative_idx").on(table.campaignId),
+    index("content_post_campaign_idx").on(table.campaignId),
     index("content_post_planned_at_idx").on(table.plannedAt),
   ],
 );
@@ -770,7 +770,7 @@ export const contentPostRelations = relations(
       fields: [contentPostTable.seriesId],
       references: [seriesTable.id],
     }),
-    initiative: one(campaignTable, {
+    campaign: one(campaignTable, {
       fields: [contentPostTable.campaignId],
       references: [campaignTable.id],
     }),
@@ -827,7 +827,7 @@ export const seriesRelations = relations(seriesTable, ({ one, many }) => ({
     fields: [seriesTable.brandId],
     references: [brandTable.id],
   }),
-  initiative: one(campaignTable, {
+  campaign: one(campaignTable, {
     fields: [seriesTable.campaignId],
     references: [campaignTable.id],
   }),

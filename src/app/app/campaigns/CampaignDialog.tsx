@@ -147,17 +147,17 @@ export function CampaignDialog({
 
   const invalidate = async () => {
     await queryClient.invalidateQueries(
-      trpc.initiative.overview.queryOptions(),
+      trpc.campaign.overview.queryOptions(),
     );
     if (initial?.id) {
       await queryClient.invalidateQueries(
-        trpc.initiative.get.queryOptions({ id: initial.id }),
+        trpc.campaign.get.queryOptions({ id: initial.id }),
       );
     }
   };
 
   const create = useMutation(
-    trpc.initiative.create.mutationOptions({
+    trpc.campaign.create.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);
@@ -166,7 +166,7 @@ export function CampaignDialog({
     }),
   );
   const update = useMutation(
-    trpc.initiative.update.mutationOptions({
+    trpc.campaign.update.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         onOpenChange(false);

@@ -27,7 +27,7 @@ import {
   listBrandAudienceTargets,
   setCampaignPlatformConfig,
   setCampaignCreativePool,
-  createDraftInitiative,
+  createDraftCampaign,
   listBrandCampaigns,
 } from "@/server/services/ads-draft.service";
 import { createId } from "@/server/db/utils";
@@ -141,7 +141,7 @@ export const adsRouter = {
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      createDraftInitiative({
+      createDraftCampaign({
         ...input,
         organizationId: await organizationIdFor(ctx),
       }),

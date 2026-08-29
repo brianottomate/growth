@@ -107,10 +107,10 @@ export const audienceSourceEnum = pgEnum("audience_source", [
 ]);
 export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
 
-// ---- INITIATIVE (top-level, goal-driven push across ad channels) ----
+// ---- CAMPAIGN (top-level, goal-driven push across ad channels) ----
 
 /**
- * Initiative — the CMO's strategic push ("drive leads to /list"). It declares a
+ * Campaign — the CMO's strategic push ("drive leads to /list"). It declares a
  * goal, the channels it *wants* to run on (`targetChannels`), dates, and a total
  * budget. The per-channel `campaign` rows are the implementations; the app
  * verifies them against `targetChannels`. The paid counterpart of a
@@ -202,7 +202,7 @@ export const campaignTable = pgTable(
 
     budget: t.integer(), // total intended (whole dollars)
 
-    // Sponsored delivery: the paid performance cycle this initiative fulfils.
+    // Sponsored delivery: the paid performance cycle this campaign fulfils.
     // Null for Wander's own pushes. Ads stay on Wander's brand/channels; this
     // FK is the only customer linkage (see performance-schema.ts).
     performanceCycleId: t
@@ -343,7 +343,7 @@ export const adSetTable = pgTable(
 
     /**
      * The first-party push this ad set belongs to. Drafts hang off the
-     * initiative alone; `platformCampaignId` is stamped when the push creates the
+     * campaign alone; `platformCampaignId` is stamped when the push creates the
      * per-platform campaign.
      */
     campaignId: t
@@ -394,8 +394,8 @@ export const adSetTable = pgTable(
       .$onUpdate(() => new Date()),
   }),
   (table) => [
-    index("ad_set_campaign_idx").on(table.platformCampaignId),
-    index("ad_set_initiative_idx").on(table.campaignId),
+    index("ad_set_platform_campaign_idx").on(table.platformCampaignId),
+    index("ad_set_campaign_idx").on(table.campaignId),
     index("ad_set_brand_idx").on(table.brandId),
     check(
       "ad_set_parent_check",
@@ -490,7 +490,7 @@ export const adSpotTable = pgTable(
       .notNull(),
   }),
   (table) => [
-    index("ad_spot_campaign_idx").on(table.platformCampaignId),
+    index("ad_spot_platform_campaign_idx").on(table.platformCampaignId),
     index("ad_spot_brand_idx").on(table.brandId),
     index("ad_spot_status_idx").on(table.status),
     uniqueIndex("ad_spot_business_key_idx")
@@ -754,24 +754,26 @@ export const audiencePlacementTable = pgTable(
   }),
   (table) => [
     index("audience_placement_audience_idx").on(table.audienceId),
-    index("audience_placement_campaign_idx").on(table.platformCampaignId),
+    index("audience_placement_platform_campaign_idx").on(table.platformCampaignId),
   ],
 );
 
 // ---- RELATIONS -----------------------------------------------------
 
-export const initiativeRelations = relations(
+export const campaignRelations = relations(
   campaignTable,
   ({ one, many }) => ({
     brand: one(brandTable, {
       fields: [campaignTable.brandId],
       references: [brandTable.id],
     }),
-    campaigns: many(platformCampaignTable),
+    platformCampaigns: many(platformCampaignTable),
   }),
 );
 
-export const campaignRelations = relations(platformCampaignTable, ({ one, many }) => ({
+export const platformCampaignRelations = relations(
+  platformCampaignTable,
+  ({ one, many }) => ({
   brand: one(brandTable, {
     fields: [platformCampaignTable.brandId],
     references: [brandTable.id],
@@ -780,7 +782,7 @@ export const campaignRelations = relations(platformCampaignTable, ({ one, many }
     fields: [platformCampaignTable.channelId],
     references: [channelTable.id],
   }),
-  initiative: one(campaignTable, {
+  campaign: one(campaignTable, {
     fields: [platformCampaignTable.campaignId],
     references: [campaignTable.id],
   }),
@@ -788,7 +790,7 @@ export const campaignRelations = relations(platformCampaignTable, ({ one, many }
 }));
 
 export const adSpotRelations = relations(adSpotTable, ({ one }) => ({
-  campaign: one(platformCampaignTable, {
+  platformCampaign: one(platformCampaignTable, {
     fields: [adSpotTable.platformCampaignId],
     references: [platformCampaignTable.id],
   }),

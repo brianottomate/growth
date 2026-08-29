@@ -34,7 +34,7 @@ import { protectedProcedure } from "../trpc";
 
 // Performance+ (/app/performance) — the customers paying for sponsored
 // placement on Wander's surfaces. Replaces the "Performance Dashboard" sheet.
-// Delivery itself stays in initiative / lifecycle / amplification; this is the
+// Delivery itself stays in campaign / lifecycle / amplification; this is the
 // commercial layer plus a read of what is attached to each cycle.
 
 type PerformanceContext = {

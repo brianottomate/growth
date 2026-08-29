@@ -55,12 +55,12 @@ export function CampaignsClient({
   brands: { id: string; name: string }[];
 }) {
   const trpc = useTRPC();
-  const { data } = useQuery(trpc.initiative.overview.queryOptions());
-  const initiatives = data?.initiatives ?? [];
+  const { data } = useQuery(trpc.campaign.overview.queryOptions());
+  const campaigns = data?.campaigns ?? [];
 
 
   const byStatus = (s: CampaignStatus) =>
-    initiatives
+    campaigns
       .filter((i) => i.status === s)
       .sort(
         (a, b) =>
@@ -90,7 +90,7 @@ export function CampaignsClient({
       {/* status summary */}
       <div className="mt-4 flex flex-wrap gap-2 border-b pb-4">
         {ORDER.map((s) => {
-          const n = initiatives.filter((i) => i.status === s).length;
+          const n = campaigns.filter((i) => i.status === s).length;
           if (!n) return null;
           const meta = STATUS_META[s];
           return (
@@ -106,7 +106,7 @@ export function CampaignsClient({
         })}
       </div>
 
-      {initiatives.length === 0 && (
+      {campaigns.length === 0 && (
         <p className="text-muted-foreground mt-10 text-sm">
           No campaigns yet. Create one here, or commit a moment from{" "}
           <Link href="/app/plan" className="underline underline-offset-2">

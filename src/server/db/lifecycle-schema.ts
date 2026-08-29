@@ -91,7 +91,7 @@ export type TouchpointChannel =
 // A `lifecycle_program` is the intent: the journey we *want* to exist
 // ("dormant hosts get a 30-day winback"). The `lifecycle_campaign` mirror is
 // the reality. A program is fulfilled by 0..n mirrored campaigns via the
-// nullable `programId` FK below — exactly like `initiative` → `campaign`.
+// nullable `programId` FK below — exactly like `campaign` → `platform_campaign`.
 // Coverage (covered / planned / drifted / gap) is derived, not stored.
 
 // Where a program is in our own planning, independent of any CIO run state.

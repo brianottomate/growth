@@ -15,7 +15,7 @@ import { createId } from "./utils";
 // A performance ACCOUNT is the commercial entity — deliberately NOT a brand.
 // The delivery work runs on Wander's channels under Wander's brand, so
 // campaigns keep brandId = Wander and attach to the customer through the
-// nullable performanceCycleId FK on initiative / lifecycle_campaign /
+// nullable performanceCycleId FK on campaign / lifecycle_campaign /
 // amplification_target. `brandId` here is the amplifier.promotedBrandId
 // graduation pattern: a brand row holding the customer's scraped identity
 // (List+ Firecrawl output), promotable to real connected channels later.
@@ -142,11 +142,11 @@ export type PerformanceCycleStatus =
 
 /**
  * One billed period ("2026-08"). Everything delivered for the customer —
- * initiatives, lifecycle campaigns, amplification targets — FKs to the cycle,
+ * campaigns, lifecycle campaigns, amplification targets — FKs to the cycle,
  * so the report is one query over its attachments.
  *
  * `billedAmount` and `mediaBudget` are BOTH stored (whole dollars, matching
- * initiative.budget): $500/mo billed with $400/mo of media is a take rate the
+ * campaign.budget): $500/mo billed with $400/mo of media is a take rate the
  * old spreadsheet had no column for, and reports must be honest about which
  * number spend is measured against.
  */

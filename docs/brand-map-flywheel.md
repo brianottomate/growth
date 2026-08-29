@@ -104,7 +104,7 @@ without duplicating business logic.
   owned history sync, website/blog sync, image analysis, grouping/series
   proposals, brand-map inspection, navigation URLs, and strategy learning.
 - Planning uses `draftMomentBlueprint` for a side-effect-free proposal and
-  `commitMomentPlan` for the approval-gated creation of initiatives and slots.
+  `commitMomentPlan` for the approval-gated creation of campaigns and slots.
 
 ### Phase 3 — deliverables and compounding learning
 

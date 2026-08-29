@@ -18,7 +18,7 @@ export default async function CampaignDetailPage({
   if (!session?.user) redirect("/signin");
   const { campaignId } = await params;
 
-  prefetch(trpc.initiative.get.queryOptions({ id: campaignId }));
+  prefetch(trpc.campaign.get.queryOptions({ id: campaignId }));
 
   return (
     <HydrateClient>

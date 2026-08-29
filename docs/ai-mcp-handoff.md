@@ -337,7 +337,7 @@ The global assistant is broad, but several areas are deliberately incomplete:
   trail of tools it called, so individual writes stay visible. It works in
   drafts only: `publishArticle` exists but refuses, because publishing is a
   human decision.
-- The initiative and campaign API needs another product pass before it becomes
+- The campaign and platform campaign API needs another product pass before it becomes
   a general `campaignRead` and `campaignWrite` contract.
 - The inbox does not expose provider reply actions to the global assistant.
 - Leads exposes a summary, not the full enrichment, merge, and outreach API.

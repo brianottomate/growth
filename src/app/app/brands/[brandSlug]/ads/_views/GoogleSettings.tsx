@@ -28,11 +28,17 @@ export function GoogleSettings({
   config,
   brandSlug,
   brandUrl,
+  compact = false,
 }: {
   campaignId: string;
   config: GoogleConfig | undefined;
   brandSlug: string;
   brandUrl: string | null;
+  /**
+   * Inside a platform section the surrounding row already says which platform
+   * this is and why it is blocked, so only the control is rendered.
+   */
+  compact?: boolean;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -77,25 +83,33 @@ export function GoogleSettings({
 
   return (
     <section className="space-y-3">
-      <div className="flex items-end justify-between">
-        <div>
-          <h2 className="text-base font-semibold">Google settings</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
-            {configured
-              ? `${config?.campaignType === "search" ? "Search" : "Display"} campaign${
-                  config?.campaignType === "search"
-                    ? ` · ${(config.keywords ?? []).length} keywords`
-                    : ""
-                }`
-              : "Not set — Google needs a campaign type before it can be pushed."}
-          </p>
-        </div>
-        {!open && (
+      {compact ? (
+        !open && (
           <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-            {configured ? "Edit" : "Set up Google"}
+            {configured ? "Edit Google settings" : "Set up Google"}
           </Button>
-        )}
-      </div>
+        )
+      ) : (
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Google settings</h2>
+            <p className="text-muted-foreground mt-0.5 text-sm">
+              {configured
+                ? `${config?.campaignType === "search" ? "Search" : "Display"} campaign${
+                    config?.campaignType === "search"
+                      ? ` · ${(config.keywords ?? []).length} keywords`
+                      : ""
+                  }`
+                : "Not set — Google needs a campaign type before it can be pushed."}
+            </p>
+          </div>
+          {!open && (
+            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+              {configured ? "Edit" : "Set up Google"}
+            </Button>
+          )}
+        </div>
+      )}
 
       {searchWithoutKeywords && !open && (
         <p className="text-xs text-amber-300">

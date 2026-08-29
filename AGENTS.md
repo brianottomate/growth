@@ -141,7 +141,7 @@ checklist.
 - Routers live in `src/server/api/routers/*.router.ts` and must be registered in
   `src/server/api/root.ts` (`appRouter`). Current routers: user, ads, amplifier,
   audience, brand, cadence, channel, channelSuggestion, content, conversion, inbox,
-  initiative, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
+  campaign, newsletter, org, outreach, planImport, instantly, leads, lifecycle,
   listening, media, composition, mention, moment, reddit, reschedule, spend, studio,
   twitter. Compositions save rendered PNGs through the existing R2-backed media
   service.
@@ -164,7 +164,7 @@ Schema is split by domain under `src/server/db/`:
 | `brand-schema.ts`         | brand, brand_inspiration, access (Notion-style grants)                                                                                                 |
 | `channel-schema.ts`       | channel (per-brand social/marketing channels), channel_suggestion                                                                                      |
 | `content-schema.ts`       | series, content_post (planned/internal), platform_post + platform_post_link (published, synced), content_assignee, content_comment, content_suggestion |
-| `ads-schema.ts`           | initiative, campaign, ad_spot, audience, audience_target (intent layer)                                                                                |
+| `ads-schema.ts`           | campaign, platform_campaign, ad_spot, audience, audience_target (intent layer)                                                                                |
 | `amplification-schema.ts` | amplifier (influencers/partners), amplification_target                                                                                                 |
 | `cadence-schema.ts`       | cadence_target, mix_target (observed/target cadence + format mix)                                                                                      |
 | `listening-schema.ts`     | mention (persisted social mentions), listening_source (evolvable per-channel config)                                                                   |

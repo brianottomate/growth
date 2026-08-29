@@ -290,12 +290,12 @@ export function StudioWheel({ brands }: { brands: Brand[] }) {
 
               {/* Paid lane */}
               <Lane label="Campaigns" color="#f59e0b" muted>
-                {(data?.initiatives ?? []).length === 0 ? (
+                {(data?.campaigns ?? []).length === 0 ? (
                   <span className="text-muted-foreground absolute top-1/2 left-2 -translate-y-1/2 text-[11px]">
                     No campaigns this year
                   </span>
                 ) : (
-                  (data?.initiatives ?? []).map((i) => {
+                  (data?.campaigns ?? []).map((i) => {
                     const a = frac(i.startAt);
                     const b = frac(i.endAt);
                     if (a == null || b == null) return null;

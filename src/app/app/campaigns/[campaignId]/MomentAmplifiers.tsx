@@ -61,7 +61,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   const [addOpen, setAddOpen] = useState(false);
 
   const { data, isLoading } = useQuery(
-    trpc.amplifier.targetsForInitiative.queryOptions({
+    trpc.amplifier.targetsForCampaign.queryOptions({
       campaignId: momentId,
     }),
   );
@@ -70,7 +70,7 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
 
   const invalidate = () =>
     queryClient.invalidateQueries(
-      trpc.amplifier.targetsForInitiative.queryOptions({
+      trpc.amplifier.targetsForCampaign.queryOptions({
         campaignId: momentId,
       }),
     );
@@ -223,14 +223,14 @@ export function MomentAmplifiers({ momentId }: { momentId: string }) {
   );
 }
 
-type InitiativePost = {
+type CampaignPost = {
   id: string;
   platform: string;
   title: string | null;
   scheduledAt: Date | string | null;
 };
 
-const postLabel = (post: InitiativePost) =>
+const postLabel = (post: CampaignPost) =>
   `${post.platform} · ${post.title ?? "Untitled"}${
     post.scheduledAt
       ? ` · ${new Date(post.scheduledAt).toLocaleDateString()}`
@@ -248,7 +248,7 @@ function AddAmplifierDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  posts: InitiativePost[];
+  posts: CampaignPost[];
   existingAmplifierIds: Set<string>;
   onAdded: () => Promise<void> | void;
 }) {

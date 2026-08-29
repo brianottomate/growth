@@ -56,29 +56,29 @@ async function requireOwnedBrand(input: {
   return brand;
 }
 
-async function requireOwnedInitiative(
+async function requireOwnedCampaign(
   campaignId: string,
   organizationId: string,
 ) {
-  const initiative = await db.query.campaignTable.findFirst({
+  const campaign = await db.query.campaignTable.findFirst({
     where: eq(campaignTable.id, campaignId),
   });
-  if (!initiative) throw new Error("Campaign draft not found");
+  if (!campaign) throw new Error("Campaign draft not found");
   const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, initiative.brandId),
+    where: eq(brandTable.id, campaign.brandId),
     columns: { id: true, slug: true, organizationId: true, website: true },
   });
   if (brand?.organizationId !== organizationId) {
     throw new Error("No access to this campaign draft");
   }
-  return { initiative, brand };
+  return { campaign, brand };
 }
 
 /**
- * Create the draft: an initiative, nothing else. Platforms are recorded as
+ * Create the draft: a campaign, nothing else. Platforms are recorded as
  * intent (`targetChannels`) and only become real campaigns at push time.
  */
-export async function createDraftInitiative(input: {
+export async function createDraftCampaign(input: {
   organizationId: string;
   brandId?: string;
   brandSlug?: string;
@@ -95,7 +95,7 @@ export async function createDraftInitiative(input: {
 }) {
   const brand = await requireOwnedBrand(input);
 
-  const [initiative] = await db
+  const [campaign] = await db
     .insert(campaignTable)
     .values({
       id: createId("camp"),
@@ -113,15 +113,15 @@ export async function createDraftInitiative(input: {
     .returning();
 
   return {
-    initiative: initiative!,
+    campaign: campaign!,
     brandSlug: brand.slug,
-    path: `/app/brands/${brand.slug}/ads/${initiative!.id}`,
+    path: `/app/brands/${brand.slug}/ads/${campaign!.id}`,
   };
 }
 
 /**
  * Add an ad set — the targeting + budget layer every platform has (Meta ad
- * set, Google ad group). One initiative can carry several, which is how a
+ * set, Google ad group). One campaign can carry several, which is how a
  * real prospecting build splits audiences.
  */
 export async function addDraftAdSet(input: {
@@ -135,7 +135,7 @@ export async function addDraftAdSet(input: {
   budgetType?: "daily" | "lifetime" | null;
   optimizationGoal?: string | null;
 }) {
-  const { initiative, brand } = await requireOwnedInitiative(
+  const { campaign, brand } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
   );
@@ -144,7 +144,7 @@ export async function addDraftAdSet(input: {
     .insert(adSetTable)
     .values({
       id: createId("adset"),
-      campaignId: initiative.id,
+      campaignId: campaign.id,
       brandId: brand.id,
       name: input.name.trim(),
       audienceTargetId: input.audienceTargetId ?? null,
@@ -159,7 +159,7 @@ export async function addDraftAdSet(input: {
 
 /**
  * Add a drafted ad. Creative comes from the media library (a MediaItem
- * carrying assetId) or a direct URL. Ads hang off the initiative, and
+ * carrying assetId) or a direct URL. Ads hang off the campaign, and
  * optionally off one of its ad sets.
  */
 export async function addDraftAd(input: {
@@ -173,7 +173,7 @@ export async function addDraftAd(input: {
   media?: MediaItem[] | null;
   businessKey?: string | null;
 }) {
-  const { initiative, brand } = await requireOwnedInitiative(
+  const { campaign, brand } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
   );
@@ -183,24 +183,24 @@ export async function addDraftAd(input: {
       where: eq(adSetTable.id, input.adSetId),
       columns: { campaignId: true },
     });
-    if (adSet?.campaignId !== initiative.id) {
+    if (adSet?.campaignId !== campaign.id) {
       throw new Error("That ad set belongs to a different campaign draft");
     }
   }
 
   const businessKey =
     input.businessKey ??
-    `${initiative.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
+    `${campaign.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
 
   const [spot] = await db
     .insert(adSpotTable)
     .values({
-      campaignId: initiative.id,
+      campaignId: campaign.id,
       adSetRowId: input.adSetId ?? null,
       brandId: brand.id,
       // Intent until the push decides; the campaign's first target channel is
       // a truer default than a hardcoded one for a Google-only draft.
-      platform: ((initiative.targetChannels?.[0] ??
+      platform: ((campaign.targetChannels?.[0] ??
         "meta_ads") as typeof adSpotTable.$inferInsert.platform),
       name: input.name.trim(),
       headline: input.headline ?? null,
@@ -214,23 +214,23 @@ export async function addDraftAd(input: {
 }
 
 /** The whole draft, for the draft page. */
-export async function getDraftInitiative(
+export async function getDraftCampaign(
   organizationId: string,
   campaignId: string,
 ) {
-  const { initiative, brand } = await requireOwnedInitiative(
+  const { campaign, brand } = await requireOwnedCampaign(
     campaignId,
     organizationId,
   );
   const [adSets, spots, campaigns] = await Promise.all([
     db.query.adSetTable.findMany({
-      where: eq(adSetTable.campaignId, initiative.id),
+      where: eq(adSetTable.campaignId, campaign.id),
     }),
     db.query.adSpotTable.findMany({
-      where: eq(adSpotTable.campaignId, initiative.id),
+      where: eq(adSpotTable.campaignId, campaign.id),
     }),
     db.query.platformCampaignTable.findMany({
-      where: eq(platformCampaignTable.campaignId, initiative.id),
+      where: eq(platformCampaignTable.campaignId, campaign.id),
     }),
   ]);
   // Ad sets carry the "who" via audienceTargetId; resolve the names so the
@@ -258,7 +258,7 @@ export async function getDraftInitiative(
   });
 
   return {
-    initiative,
+    campaign,
     brand,
     adSets,
     spots,
@@ -274,14 +274,14 @@ export async function setCampaignCreativePool(input: {
   campaignId: string;
   media: MediaItem[];
 }) {
-  const { initiative } = await requireOwnedInitiative(
+  const { campaign } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
   );
   const [updated] = await db
     .update(campaignTable)
     .set({ creativePool: input.media })
-    .where(eq(campaignTable.id, initiative.id))
+    .where(eq(campaignTable.id, campaign.id))
     .returning({ id: campaignTable.id });
   return updated!;
 }
@@ -293,14 +293,14 @@ export async function setCampaignPlatformConfig(input: {
   google?: CampaignPlatformConfig["google"] | null;
   meta?: CampaignPlatformConfig["meta"] | null;
 }) {
-  const { initiative } = await requireOwnedInitiative(
+  const { campaign } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
   );
   // Callers send the keys they are changing, so merge inside each platform
   // rather than replacing it — a budget-mode toggle must not drop the pixel
   // configured elsewhere on the same page. An explicit null still clears.
-  const current = initiative.platformConfig ?? {};
+  const current = campaign.platformConfig ?? {};
   const merge = <K extends keyof CampaignPlatformConfig>(
     key: K,
     value: CampaignPlatformConfig[K] | null | undefined,
@@ -318,7 +318,7 @@ export async function setCampaignPlatformConfig(input: {
   const [updated] = await db
     .update(campaignTable)
     .set({ platformConfig: next })
-    .where(eq(campaignTable.id, initiative.id))
+    .where(eq(campaignTable.id, campaign.id))
     .returning({ id: campaignTable.id });
   return updated!;
 }
@@ -344,7 +344,7 @@ export async function listBrandAudienceTargets(input: {
 
 /**
  * Adopt a campaign born on a platform into the first-party layer: attach it
- * to an initiative, minting one when a name is given instead of an id.
+ * to a campaign, minting one when a name is given instead of an id.
  */
 /**
  * Adopt a platform campaign (one born in Ads Manager and pulled in by sync)
@@ -459,12 +459,12 @@ export async function deleteDraftCampaign(input: {
   organizationId: string;
   campaignId: string;
 }) {
-  const { initiative } = await requireOwnedInitiative(
+  const { campaign } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
   );
   const live = await db.query.platformCampaignTable.findMany({
-    where: eq(platformCampaignTable.campaignId, initiative.id),
+    where: eq(platformCampaignTable.campaignId, campaign.id),
     columns: { id: true },
   });
   if (live.length > 0) {
@@ -472,9 +472,9 @@ export async function deleteDraftCampaign(input: {
       `This campaign has ${live.length} campaign(s) on a platform — delete those first, or they keep running without anything here describing them`,
     );
   }
-  await db.delete(adSpotTable).where(eq(adSpotTable.campaignId, initiative.id));
-  await db.delete(adSetTable).where(eq(adSetTable.campaignId, initiative.id));
-  await db.delete(campaignTable).where(eq(campaignTable.id, initiative.id));
+  await db.delete(adSpotTable).where(eq(adSpotTable.campaignId, campaign.id));
+  await db.delete(adSetTable).where(eq(adSetTable.campaignId, campaign.id));
+  await db.delete(campaignTable).where(eq(campaignTable.id, campaign.id));
   return { deleted: true };
 }
 
@@ -492,7 +492,7 @@ export async function deleteDraftAdSet(input: {
     );
   }
   if (!adSet.campaignId) throw new Error("Ad set has no campaign");
-  await requireOwnedInitiative(adSet.campaignId, input.organizationId);
+  await requireOwnedCampaign(adSet.campaignId, input.organizationId);
   // Its ads survive, unassigned, rather than disappearing with it.
   await db
     .update(adSpotTable)
@@ -516,7 +516,7 @@ export async function deleteDraftAd(input: {
     );
   }
   if (!spot.campaignId) throw new Error("Ad has no campaign");
-  await requireOwnedInitiative(spot.campaignId, input.organizationId);
+  await requireOwnedCampaign(spot.campaignId, input.organizationId);
   await db.delete(adSpotTable).where(eq(adSpotTable.id, spot.id));
   return { deleted: true };
 }

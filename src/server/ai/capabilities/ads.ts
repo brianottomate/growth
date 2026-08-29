@@ -24,11 +24,11 @@ import {
   addDraftAd,
   addDraftAdSet,
   attachPlatformCampaign,
-  createDraftInitiative,
+  createDraftCampaign,
   deleteDraftAd,
   deleteDraftAdSet,
   deleteDraftCampaign,
-  getDraftInitiative,
+  getDraftCampaign,
   listBrandAudienceTargets,
   listBrandCampaigns,
   setCampaignCreativePool,
@@ -149,7 +149,7 @@ export const listAdsDestinations = growthAction({
 
 export const draftCampaignAction = growthAction({
   description:
-    "Create a LOCAL campaign draft (an initiative) — the editable first-party object shown at /app/brands/{brandSlug}/ads/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
+    "Create a LOCAL campaign draft — the editable first-party object shown at /app/brands/{brandSlug}/ads/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     name: z.string().trim().min(1).max(300),
@@ -170,7 +170,7 @@ export const draftCampaignAction = growthAction({
     campaignId: z.string().trim().min(1).optional(),
   }),
   execute: async (input, ctx) =>
-    createDraftInitiative({
+    createDraftCampaign({
       ...input,
       organizationId: ctx.orgId,
     }),
@@ -465,7 +465,7 @@ export const openCampaignAction = growthAction({
       .describe("A camp_ id, from the campaign URL or adsRead.listCampaigns."),
   }),
   execute: async (input, ctx) =>
-    getDraftInitiative(ctx.orgId, input.campaignId),
+    getDraftCampaign(ctx.orgId, input.campaignId),
 });
 
 export const listCampaignsAction = growthAction({
