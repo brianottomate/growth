@@ -218,6 +218,9 @@ export const growthActionPolicies = {
     scope: read("provider-read"),
     top: read("provider-read"),
     listDestinations: read("provider-read"),
+    openCampaign: read(),
+    listCampaigns: read(),
+    listAudienceTargets: read(),
     diagnoseAlignment: read("model-read"),
     inspectConversions: read(),
   },
@@ -225,6 +228,51 @@ export const growthActionPolicies = {
     // Local DB rows only; no provider call, no spend. Push is separate.
     draftCampaign: write(),
     draftAd: write(),
+    addAdSet: write(),
+    setCreativePool: write({ idempotent: true }),
+    setGoogleSettings: write({ idempotent: true }),
+    attachCampaign: write({ idempotent: true }),
+    // Reads the provider's audiences; writes only Growth's mirror rows and
+    // changes nothing on the ad account.
+    pullPlatformAudiences: write({
+      consequence: "provider-read",
+      idempotent: true,
+    }),
+    // Draft deletes drop local rows and are refused once the thing exists on
+    // a platform, so they cannot destroy anything a provider knows about.
+    deleteCampaignDraft: write({ reversible: false }),
+    deleteAdSetDraft: write({ reversible: false }),
+    deleteAdDraft: write({ reversible: false }),
+    // Creates the campaign tree PAUSED, so approving the push does not start
+    // spend — setDelivery does, separately. Idempotency-Key makes a retry
+    // replay rather than duplicate.
+    push: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: true,
+      undoWith: "adsWrite.deletePlatformCampaign",
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    // The one action that starts money moving. Pausing is the same action
+    // with the opposite status, which is why it is reversible.
+    setDelivery: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: true,
+      reversible: true,
+      undoWith: "adsWrite.setDelivery",
+      surfaces: APPROVAL_PRODUCT,
+    }),
+    // Cascades to ad sets and ads on the platform and takes reporting history
+    // with it. Pausing is nearly always what was actually wanted.
+    deletePlatformCampaign: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: false,
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
     // Provider write, no spend. Zernio's create is NOT idempotent — never
     // auto-retry; surface failures to the operator.
     createAudience: write({

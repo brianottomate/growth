@@ -11,14 +11,28 @@ import {
   boostMetaPost,
   createGoogleAd,
   createMetaAdDraft,
+  deletePlatformCampaign,
   duplicateMetaCampaign,
   listAdsWriteDestinations,
   createAdAudience,
   addAdAudienceUsers,
+  pushDraftToPlatform,
+  setCampaignDelivery,
+  syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
 import {
   addDraftAd,
+  addDraftAdSet,
+  attachPlatformCampaign,
   createDraftInitiative,
+  deleteDraftAd,
+  deleteDraftAdSet,
+  deleteDraftCampaign,
+  getDraftInitiative,
+  listBrandAudienceTargets,
+  listBrandCampaigns,
+  setCampaignCreativePool,
+  setCampaignPlatformConfig,
 } from "@/server/services/ads-draft.service";
 import { growthAction } from "./types";
 
@@ -429,5 +443,260 @@ export const draftAdAction = growthAction({
         { url: input.imageUrl, type: "image", assetId: input.assetId },
       ],
       organizationId: ctx.orgId,
+    }),
+});
+
+// ---- READING AND FINISHING A CAMPAIGN -------------------------------
+//
+// Chat could start a campaign and add ads to it, then stopped: it could not
+// read back what it made, add the ad set that carries audience and budget,
+// push, or launch. Every one of those was a button in the UI only, which made
+// the campaign page's "Work in chat" open an assistant blind to the campaign
+// it was standing on. These close that.
+
+export const openCampaignAction = growthAction({
+  description:
+    "Read one first-party campaign in full: its brief, ad sets and their audiences, drafted and live ads, and any per-platform campaigns the push created. Use this before editing a campaign so you are working from its current state rather than what was said earlier in the conversation.",
+  inputSchema: z.object({
+    campaignId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("A camp_ id, from the campaign URL or adsRead.listCampaigns."),
+  }),
+  execute: async (input, ctx) =>
+    getDraftInitiative(ctx.orgId, input.campaignId),
+});
+
+export const listCampaignsAction = growthAction({
+  description:
+    "List a brand's per-platform campaigns, including ones sync pulled that are not attached to any first-party campaign. Use it to find a campaign id, or to see what is waiting to be attached.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+  }),
+  execute: async (input, ctx) =>
+    listBrandCampaigns({ brandId: input.brandId, organizationId: ctx.orgId }),
+});
+
+export const listAudienceTargetsAction = growthAction({
+  description:
+    "List a brand's first-party audience targets — the canonical 'who we want to reach', which an ad set names and the push compiles per platform.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  execute: async (input, ctx) =>
+    listBrandAudienceTargets({
+      brandId: input.brandId,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const addAdSetAction = growthAction({
+  description:
+    "Add an ad set to a LOCAL campaign draft. The ad set is where audience and budget live on every platform (Meta ad set, Google ad group), so several under one campaign is how a build splits audiences. Local only; the push creates them on the platform. Omit both audience fields for broad targeting, which is a legitimate and often correct choice.",
+  inputSchema: z.object({
+    campaignId: z.string().trim().min(1),
+    name: z.string().trim().min(1).max(300),
+    audienceTargetId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("A first-party target (audt_), resolved per platform at push."),
+    audienceId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "A mirrored platform audience (aud_) the client already built. Wins over audienceTargetId when both are set.",
+      ),
+    budget: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Whole dollars. Omit to inherit the campaign budget."),
+    budgetType: z.enum(["daily", "lifetime"]).optional(),
+  }),
+  execute: async (input, ctx) =>
+    addDraftAdSet({
+      ...input,
+      audienceTargetId: input.audienceTargetId ?? null,
+      audienceId: input.audienceId ?? null,
+      budget: input.budget ?? null,
+      budgetType: input.budgetType ?? null,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const setCreativePoolAction = growthAction({
+  description:
+    "Replace a campaign's shared creative pool — the images its ads draw from, picked once rather than per ad. Local only.",
+  inputSchema: z.object({
+    campaignId: z.string().trim().min(1),
+    media: z
+      .array(
+        z.object({
+          url: z.string().url(),
+          assetId: z.string().trim().min(1).optional(),
+        }),
+      )
+      .max(50),
+  }),
+  execute: async (input, ctx) =>
+    setCampaignCreativePool({
+      campaignId: input.campaignId,
+      media: input.media.map((item) => ({ ...item, type: "image" as const })),
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const setGoogleSettingsAction = growthAction({
+  description:
+    "Set the Google-specific configuration a campaign needs before it can be pushed to Google: campaign type is required, and a search campaign without keywords is rejected at push. Local only.",
+  inputSchema: z.object({
+    campaignId: z.string().trim().min(1),
+    campaignType: z.enum(["search", "display"]),
+    keywords: z.array(z.string().trim().min(1)).max(200).optional(),
+    negativeKeywords: z.array(z.string().trim().min(1)).max(200).optional(),
+    additionalHeadlines: z.array(z.string().trim().max(30)).max(14).optional(),
+    additionalDescriptions: z.array(z.string().trim().max(90)).max(4).optional(),
+    businessName: z.string().trim().max(25).optional(),
+  }),
+  execute: async ({ campaignId, ...google }, ctx) =>
+    setCampaignPlatformConfig({
+      campaignId,
+      google,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const attachCampaignAction = growthAction({
+  description:
+    "Attach a per-platform campaign that sync pulled to a first-party campaign, either an existing one or a new one minted from its name. This is how a campaign nobody authored here gets a parent so its spend rolls up. Local only.",
+  inputSchema: z.object({
+    platformCampaignId: z.string().trim().min(1),
+    campaignId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe("Attach to this existing campaign…"),
+    newCampaignName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .optional()
+      .describe("…or mint one with this name. Provide exactly one."),
+  }),
+  execute: async (input, ctx) =>
+    attachPlatformCampaign({
+      ...input,
+      campaignId: input.campaignId ?? null,
+      newCampaignName: input.newCampaignName ?? null,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const pullPlatformAudiencesAction = growthAction({
+  description:
+    "Mirror the custom audiences already sitting in a brand's allowlisted ad accounts into Growth, so ad sets can target what the client built before they connected. Reads the provider; writes only Growth's own mirror rows and changes nothing on the platform.",
+  inputSchema: z.object({ brandSlug: destinationSchema.brandSlug }),
+  execute: async (input, ctx) =>
+    syncBrandPlatformAudiences({
+      brandSlug: input.brandSlug,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const deleteCampaignDraftAction = growthAction({
+  description:
+    "Delete a LOCAL campaign draft with its ad sets and ads. Refused once a per-platform campaign exists for it — delete that on the platform first. Nothing on any ad platform is touched.",
+  inputSchema: z.object({ campaignId: z.string().trim().min(1) }),
+  execute: async (input, ctx) =>
+    deleteDraftCampaign({ ...input, organizationId: ctx.orgId }),
+});
+
+export const deleteAdSetDraftAction = growthAction({
+  description:
+    "Delete a drafted ad set. Refused once it exists on a platform. Local only.",
+  inputSchema: z.object({ adSetId: z.string().trim().min(1) }),
+  execute: async (input, ctx) =>
+    deleteDraftAdSet({ ...input, organizationId: ctx.orgId }),
+});
+
+export const deleteAdDraftAction = growthAction({
+  description:
+    "Delete a drafted ad. Refused once it is live on a platform. Local only.",
+  inputSchema: z.object({ adSpotId: z.string().trim().min(1) }),
+  execute: async (input, ctx) =>
+    deleteDraftAd({ ...input, organizationId: ctx.orgId }),
+});
+
+export const pushDraftAction = growthAction({
+  description:
+    "Push a LOCAL campaign draft to Meta or Google: creates the campaign, one ad set per drafted ad set (or a single one carrying the campaign budget), and its ads. Everything is created PAUSED, so approval does not start spend — adsWrite.setDelivery does that separately. Meta REQUIRES endDate when budgetType is lifetime. Set validateOnly for a dry run, which Meta supports only for a single-ad-set push. Call adsRead.listDestinations first for the account ids; never guess them.",
+  inputSchema: z.object({
+    campaignId: z.string().trim().min(1),
+    platform: z.enum(["meta_ads", "google_ads"]).optional(),
+    connectionAccountId: destinationSchema.connectionAccountId,
+    adAccountId: destinationSchema.adAccountId,
+    goal: z.enum([
+      "engagement",
+      "traffic",
+      "awareness",
+      "video_views",
+      "conversions",
+    ]),
+    budgetAmount: z
+      .number()
+      .positive()
+      .describe("Whole currency units, never cents."),
+    budgetType: budgetTypeSchema,
+    startDate: dateTimeSchema.optional(),
+    endDate: dateTimeSchema
+      .optional()
+      .describe("Required by Meta when budgetType is lifetime."),
+    validateOnly: z.boolean().optional(),
+    promotedObject: z
+      .object({
+        pixelId: z.string().trim().min(1).optional(),
+        customEventType: z.string().trim().min(1).optional(),
+      })
+      .optional()
+      .describe("Required for the conversions goal."),
+  }),
+  execute: async (input, ctx) =>
+    pushDraftToPlatform(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const setDeliveryAction = growthAction({
+  description:
+    "Start or pause delivery of a per-platform campaign. Setting status to active STARTS SPEND on the client's ad account immediately. Requires explicit operator approval, and pausing is the reverse of the same action.",
+  inputSchema: z.object({
+    platformCampaignId: z.string().trim().min(1),
+    status: z.enum(["active", "paused"]),
+  }),
+  execute: async (input, ctx) =>
+    setCampaignDelivery(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
+    }),
+});
+
+export const deletePlatformCampaignAction = growthAction({
+  description:
+    "Delete a campaign on the ad account itself, cascading to its ad sets and ads on the platform. Reporting history goes with it and this cannot be undone. Pausing via adsWrite.setDelivery is usually what is wanted instead. Requires explicit operator approval.",
+  inputSchema: z.object({
+    platformCampaignId: z.string().trim().min(1),
+    connectionAccountId: destinationSchema.connectionAccountId.optional(),
+  }),
+  execute: async (input, ctx) =>
+    deletePlatformCampaign(input, {
+      organizationId: ctx.orgId,
+      runId: ctx.runId,
     }),
 });
