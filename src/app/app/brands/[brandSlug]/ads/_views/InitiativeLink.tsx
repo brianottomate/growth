@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link2 } from "lucide-react";
@@ -16,10 +17,12 @@ import { useTRPC } from "@/trpc/react";
  */
 export function InitiativeLink({
   brandId,
+  brandSlug,
   platformCampaignId,
   initiative,
 }: {
   brandId: string;
+  brandSlug: string;
   platformCampaignId: string;
   initiative: { id: string; name: string } | null;
 }) {
@@ -44,7 +47,13 @@ export function InitiativeLink({
   if (initiative) {
     return (
       <span className="text-muted-foreground text-sm">
-        Campaign: <span className="text-foreground">{initiative.name}</span>
+        Campaign:{" "}
+        <Link
+          href={`/app/brands/${brandSlug}/ads/${initiative.id}`}
+          className="text-foreground hover:underline"
+        >
+          {initiative.name}
+        </Link>
       </span>
     );
   }

@@ -15,11 +15,14 @@ import {
   memberTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
+import { computeAudienceAlignment } from "@/server/services/audience-alignment.service";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { CopyButton } from "@/components/copy-button";
 
 import { AttachCampaign } from "./AttachCampaign";
 import { NewCampaignButton } from "./NewCampaignButton";
+
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n}`;
@@ -43,6 +46,18 @@ const AUDIENCE_LABEL: Record<string, string> = {
   custom: "Custom",
 };
 
+const AUDIENCE_VERDICT: Record<string, string> = {
+  live: "border-emerald-500/30 text-emerald-300",
+  planned: "border-border text-muted-foreground",
+  missing: "border-amber-500/30 text-amber-300",
+};
+
+const AUDIENCE_PRIORITY: Record<string, string> = {
+  must_have: "bg-red-500/15 text-red-300",
+  should_have: "bg-sky-500/15 text-sky-300",
+  nice_to_have: "bg-muted text-muted-foreground",
+};
+
 const INITIATIVE_STATUS: Record<string, string> = {
   active: "bg-emerald-500/15 text-emerald-300",
   planned: "bg-sky-500/15 text-sky-300",
@@ -50,6 +65,14 @@ const INITIATIVE_STATUS: Record<string, string> = {
   completed: "bg-muted text-muted-foreground",
   archived: "bg-muted text-muted-foreground",
 };
+
+/**
+ * An ad's creative image. First-party ads carry it in `media` (our R2 asset,
+ * with a webp thumb); ads mirrored from the platform carry a platform URL on
+ * `thumbnailUrl` and no media at all.
+ */
+const spotImage = (s: AdSpot) =>
+  s.media?.[0]?.thumbnail ?? s.media?.[0]?.url ?? s.thumbnailUrl ?? undefined;
 
 /** One per-channel campaign + its ad-spot creatives. */
 function CampaignRow({
@@ -63,7 +86,7 @@ function CampaignRow({
   attachBrandId?: string;
   brandSlug: string;
 }) {
-  const thumbnail = c.heroThumbnailUrl ?? spots.find((s) => s.media?.[0]?.url)?.media?.[0]?.url;
+  const thumbnail = c.heroThumbnailUrl ?? spots.map(spotImage).find(Boolean);
   return (
     <div className="bg-card flex flex-col gap-2 rounded-xl border p-3">
       <div className="flex items-center gap-3">
@@ -80,7 +103,7 @@ function CampaignRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Link
-              href={`/app/brands/${brandSlug}/ads/${c.id}`}
+              href={`/app/brands/${brandSlug}/ads/platform/${c.id}`}
               className="truncate text-sm font-medium hover:underline"
             >
               {c.name}
@@ -138,13 +161,22 @@ function CampaignRow({
               key={s.id}
               className="bg-background w-28 shrink-0 overflow-hidden rounded-lg border"
             >
-              <div className="bg-muted relative h-16">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={s.media?.[0]?.url ?? "/placeholder.svg"}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
+              <div className="bg-muted relative grid h-16 place-items-center">
+                {/* Ads we authored carry their creative in `media`; ads mirrored
+                    from the platform carry it on `thumbnailUrl` instead. */}
+                {spotImage(s) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={spotImage(s)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <ChannelLogo
+                    platform={c.platform}
+                    className="size-4 opacity-40"
+                  />
+                )}
                 {s.status && (
                   <span className="absolute top-1 right-1 rounded-full bg-black/40 px-1.5 py-0.5 text-[8px] font-medium text-white capitalize backdrop-blur-sm">
                     {s.status}
@@ -211,6 +243,9 @@ export default async function BrandAdsPage({
   const adSpots = await db.query.adSpotTable.findMany({
     where: eq(adSpotTable.brandId, brand.id),
   });
+  // The first-party "who" for this brand, diffed against what is actually
+  // mirrored per platform. Same service the /app/audiences strategy view uses.
+  const audienceTargets = await computeAudienceAlignment([brand.id]);
 
   // Group campaigns under initiatives; track which campaigns have no parent.
   const campaignsByInitiative = new Map<string, typeof campaigns>();
@@ -252,7 +287,9 @@ export default async function BrandAdsPage({
   const channelCampaigns = (id: string) =>
     campaigns.filter((c) => c.channelId === id).length;
 
-  // Dedupe audiences by name — the cross-channel view (one row, N platform badges).
+  // Mirrored platform audiences with no target are the audience floaters —
+  // the same shape as a platform campaign that is not in a campaign yet.
+  // Deduped by name, so one row carries N platform badges.
   const audGroups = new Map<
     string,
     {
@@ -263,6 +300,7 @@ export default async function BrandAdsPage({
     }
   >();
   for (const a of audiences) {
+    if (a.targetId) continue;
     const g = audGroups.get(a.name) ?? {
       name: a.name,
       type: a.type,
@@ -273,7 +311,7 @@ export default async function BrandAdsPage({
     if (plat) g.platforms.add(plat);
     audGroups.set(a.name, g);
   }
-  const audienceList = [...audGroups.values()];
+  const unmappedAudiences = [...audGroups.values()];
 
   // ---- markdown export for ChatGPT / Claude --------------------------------
   const md = [
@@ -282,7 +320,7 @@ export default async function BrandAdsPage({
     brand.brandFingerprint?.fingerprintText
       ? `\n**Voice:** ${brand.brandFingerprint.fingerprintText}`
       : "",
-    `\n## Initiatives (${initiatives.length})`,
+    `\n## Campaigns (${initiatives.length})`,
     ...initiatives.map((init) => {
       const impl = initiativeChannels(init.id);
       const targets = init.targetChannels ?? [];
@@ -298,7 +336,7 @@ export default async function BrandAdsPage({
       (c) =>
         `- ${platformLabel(c.platform)} (${c.handle ?? "—"}) — ${c.connectionStatus} · ${money(channelSpend(c.id))}/30d · ${channelCampaigns(c.id)} campaigns`,
     ),
-    `\n## Campaigns (${campaigns.length})`,
+    `\n## Platform campaigns (${campaigns.length})`,
     ...campaigns.map(
       (c) =>
         `- [${platformLabel(c.platform)}] ${c.name} — ${c.status}${
@@ -307,8 +345,20 @@ export default async function BrandAdsPage({
             : ""
         } · spend ${money(c.spend)} of ${money(c.budget)} · ${c.adSpots} ad spots`,
     ),
-    `\n## Audiences (${audienceList.length})`,
-    ...audienceList.map(
+    `\n## Audiences (${audienceTargets.length})`,
+    ...audienceTargets.map((t) => {
+      const channels = [
+        ...t.channels.map((ch) => `${platformLabel(ch.platform)} ${ch.verdict}`),
+        ...t.unplannedPlatforms.map(
+          (platform) => `${platformLabel(platform)} not intended`,
+        ),
+      ].join(", ");
+      return `- ${t.name} — ${t.priority} · ${channels || "no intended channels"}`;
+    }),
+    unmappedAudiences.length
+      ? `\n## Platform audiences not mapped to one of the above (${unmappedAudiences.length})`
+      : "",
+    ...unmappedAudiences.map(
       (a) =>
         `- ${a.name} (${AUDIENCE_LABEL[a.type] ?? a.type}) — ${a.sizeLabel ?? "—"} · on ${[...a.platforms].map(platformLabel).join(", ")}`,
     ),
@@ -338,23 +388,22 @@ export default async function BrandAdsPage({
             happens in each platform&apos;s portal.
           </p>
           <p className="text-muted-foreground mt-2 text-xs">
-            {initiatives.length} initiatives · {channels.length} ad channels ·{" "}
-            {campaigns.length} campaigns · {audienceList.length} audiences ·{" "}
-            {money(totalSpend)} / 30d
+            {plural(initiatives.length, "campaign")} ·{" "}
+            {plural(channels.length, "ad channel")} ·{" "}
+            {plural(campaigns.length, "platform campaign")} ·{" "}
+            {plural(audienceTargets.length, "audience")} · {money(totalSpend)} /
+            30d
           </p>
         </div>
         <div className="flex items-center gap-2">
           <CopyButton text={md} label="Copy for ChatGPT / Claude" />
-          <NewCampaignButton
-            brandId={brand.id}
-            brandWebsite={brand.website}
-          />
+          <NewCampaignButton brandId={brand.id} brandWebsite={brand.website} />
         </div>
       </div>
 
       {/* initiatives → per-channel campaigns */}
       <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
-        Initiatives · {initiatives.length} · a push, verified across its
+        Campaigns · {initiatives.length} · one push, verified across its
         channels
       </h2>
       <div className="flex flex-col gap-4">
@@ -449,7 +498,7 @@ export default async function BrandAdsPage({
               <div className="mt-3 flex flex-col gap-2 border-t pt-3">
                 {initCampaigns.length === 0 ? (
                   <p className="text-muted-foreground text-xs">
-                    No campaigns implement this initiative yet.
+                    Not on any platform yet.
                   </p>
                 ) : (
                   initCampaigns.map((c) => (
@@ -473,8 +522,8 @@ export default async function BrandAdsPage({
             Not in a campaign yet · {ungroupedCampaigns.length}
           </h3>
           <p className="text-muted-foreground mb-2 text-xs">
-            Pulled from the ad account. They run fine as they are; attaching
-            one just groups its spend under a campaign you author.
+            Pulled from the ad account. They are fine unattached; attaching one
+            just groups its spend under a campaign you author.
           </p>
           <div className="flex flex-col gap-2">
             {ungroupedCampaigns.map((c) => (
@@ -491,41 +540,138 @@ export default async function BrandAdsPage({
       )}
 
       {/* audiences */}
-      <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
-        Audiences · {audienceList.length} · defined per platform
+      <h2 className="text-muted-foreground mt-10 mb-1 text-xs font-semibold tracking-wider uppercase">
+        Audiences · {audienceTargets.length} · who we&apos;re trying to reach
       </h2>
-      <div className="grid gap-2.5 md:grid-cols-2">
-        {audienceList.map((a) => (
-          <div
-            key={a.name}
-            className="bg-card flex items-start justify-between rounded-xl border p-3.5"
+      <p className="text-muted-foreground mb-3 text-xs">
+        Defined once for {brand.name}, then activated per platform. The badges
+        say whether each intended platform actually has an audience mirrored
+        back.
+      </p>
+      {audienceTargets.length === 0 ? (
+        <div className="bg-card rounded-xl border p-6 text-center">
+          <p className="text-sm font-medium">No audiences yet</p>
+          <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
+            An audience is the &ldquo;who&rdquo; — a segment you define once and
+            activate on each platform, so ad sets target it instead of
+            re-picking interests in every ad account.
+          </p>
+          <Link
+            href="/app/audiences"
+            className="bg-primary text-primary-foreground mt-4 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium hover:opacity-90"
           >
-            <div>
-              <div className="text-sm font-medium">{a.name}</div>
-              <div className="text-muted-foreground mt-1 flex items-center gap-2 text-[11px]">
-                <span className="tabular-nums">{a.sizeLabel ?? "—"}</span>
-                <span>·</span>
-                <div className="flex items-center gap-1.5">
-                  {[...a.platforms].map((p) => (
-                    <span key={p} className="flex items-center gap-1">
-                      <ChannelLogo platform={p} className="size-3.5" />
-                      {platformLabel(p)}
-                    </span>
-                  ))}
+            Define an audience
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-2.5 md:grid-cols-2">
+          {audienceTargets.map((t) => (
+            <div key={t.targetId} className="bg-card rounded-xl border p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{t.name}</div>
+                  <div className="text-muted-foreground mt-0.5 text-[11px] capitalize">
+                    {t.status}
+                  </div>
                 </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    AUDIENCE_PRIORITY[t.priority] ??
+                    AUDIENCE_PRIORITY.nice_to_have
+                  }`}
+                >
+                  {t.priority.replace(/_/g, " ")}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {t.channels.length === 0 && !t.unplannedPlatforms.length ? (
+                  <span className="text-muted-foreground text-[11px]">
+                    No platforms intended yet.
+                  </span>
+                ) : (
+                  t.channels.map((ch) => (
+                    <span
+                      key={ch.platform}
+                      className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                        AUDIENCE_VERDICT[ch.verdict] ?? AUDIENCE_VERDICT.planned
+                      }`}
+                    >
+                      <ChannelLogo
+                        platform={ch.platform}
+                        className="size-3.5"
+                      />
+                      {platformLabel(ch.platform)}
+                      {ch.verdict === "live"
+                        ? " ✓ live"
+                        : ch.verdict === "planned"
+                          ? " · planned"
+                          : " · missing"}
+                    </span>
+                  ))
+                )}
+                {/* Mirrored on a platform this target never asked for. Without
+                    this it is in neither list: the unmapped group skips it for
+                    having a target, and the badges above only cover intended
+                    channels. */}
+                {t.unplannedPlatforms.map((platform) => (
+                  <span
+                    key={`unplanned-${platform}`}
+                    className="border-border text-muted-foreground flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-[11px] font-medium"
+                  >
+                    <ChannelLogo platform={platform} className="size-3.5" />
+                    {platformLabel(platform)} · not intended
+                  </span>
+                ))}
               </div>
             </div>
-            <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium">
-              {AUDIENCE_LABEL[a.type] ?? a.type}
-            </span>
+          ))}
+        </div>
+      )}
+
+      {unmappedAudiences.length > 0 && (
+        <>
+          <h3 className="text-muted-foreground mt-6 mb-1 text-xs font-semibold tracking-wider uppercase">
+            In an ad account, not mapped yet · {unmappedAudiences.length}
+          </h3>
+          <p className="text-muted-foreground mb-2 text-xs">
+            Mirrored from the platform. They target fine as they are; mapping
+            one to an audience is what makes it count as coverage above.
+          </p>
+          <div className="grid gap-2.5 md:grid-cols-2">
+            {unmappedAudiences.map((a) => (
+              <div
+                key={a.name}
+                className="bg-card flex items-start justify-between rounded-xl border p-3.5"
+              >
+                <div>
+                  <div className="text-sm font-medium">{a.name}</div>
+                  <div className="text-muted-foreground mt-1 flex items-center gap-2 text-[11px]">
+                    <span className="tabular-nums">{a.sizeLabel ?? "—"}</span>
+                    <span>·</span>
+                    <div className="flex items-center gap-1.5">
+                      {[...a.platforms].map((p) => (
+                        <span key={p} className="flex items-center gap-1">
+                          <ChannelLogo platform={p} className="size-3.5" />
+                          {platformLabel(p)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium">
+                  {AUDIENCE_LABEL[a.type] ?? a.type}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <p className="text-muted-foreground mt-6 text-[11px]">
-        Campaigns &amp; audiences are created and managed in each
-        platform&apos;s portal — mirrored here read-only. The same audience on
-        multiple platforms is shown once with all its badges.
+        Campaigns are created and managed in each platform&apos;s portal —
+        mirrored here read-only. Audiences are authored here and activated per
+        platform; the same one on multiple platforms is shown once with all its
+        badges.
       </p>
     </div>
   );

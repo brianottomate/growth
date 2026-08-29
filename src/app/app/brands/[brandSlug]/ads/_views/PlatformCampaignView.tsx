@@ -141,6 +141,7 @@ export async function PlatformCampaignView({
             <div className="mt-2">
               <InitiativeLink
                 brandId={brand.id}
+                brandSlug={brandSlug}
                 platformCampaignId={campaign.id}
                 initiative={initiative ?? null}
               />

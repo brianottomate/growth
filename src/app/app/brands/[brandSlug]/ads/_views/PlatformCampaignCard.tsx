@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import type { platformCampaignTable } from "@/server/db/schema";
 
@@ -6,11 +8,11 @@ import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 
 /**
- * One platform's run of this campaign, rendered where the campaign lives —
- * the ads-side counterpart to content's SpotCard. Everything that used to
- * need its own page is here: delivery, money, the link into Ads Manager, and
- * delete. A platform campaign is a projection of the campaign above it, so it
- * gets a card rather than a route of its own.
+ * One platform's run of this campaign, summarised where the campaign lives —
+ * the ads-side counterpart to content's SpotCard. Delivery, money, the link
+ * into Ads Manager and delete are all here, so the common case never leaves
+ * the campaign. The name opens the platform campaign's own page, which is
+ * where its ads and per-ad numbers live.
  */
 export function PlatformCampaignCard({
   campaign,
@@ -48,7 +50,12 @@ export function PlatformCampaignCard({
     <div className="bg-card space-y-3 rounded-xl border p-3">
       <div className="flex flex-wrap items-center gap-2.5">
         <ChannelLogo platform={campaign.platform} className="size-5" />
-        <span className="truncate text-sm font-medium">{campaign.name}</span>
+        <Link
+          href={`/app/brands/${brandSlug}/ads/platform/${campaign.id}`}
+          className="truncate text-sm font-medium hover:underline"
+        >
+          {campaign.name}
+        </Link>
         <span
           className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${statusStyle(
             campaign.status,

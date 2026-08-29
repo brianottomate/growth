@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   Copy,
@@ -22,7 +20,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { cn } from "@/lib/utils";
-import { MOBILE_APP_LANDING } from "@/lib/device";
 import { useTRPC } from "@/trpc/react";
 import {
   ASSISTANT_INTENT_EVENT,
@@ -48,7 +45,8 @@ import { shouldAutoOpenAssistant } from "@/lib/assistant-route-behavior";
  * Desktop: a full-height dock that participates in layout instead of covering
  * the surface the assistant is discussing. Mobile: an overlay. The chat stays
  * mounted while collapsed, preserving one conversation across route changes.
- * On `/app/next`, this same mounted instance expands into the primary surface.
+ * It is the same dock on every route including `/app/next` — the assistant sits
+ * beside the workspace rather than replacing it.
  */
 export function OverviewAssistantPopup({
   userName,
@@ -77,7 +75,6 @@ export function OverviewAssistantPopup({
   const activeBrand =
     brands.find((brand) => brand.id === queryBrandId) ??
     brands.find((brand) => brand.slug === brandSlug);
-  const visible = nextMode || open;
   const threadsQuery = useQuery(trpc.creativeWork.listThreads.queryOptions());
   const createThread = useMutation(
     trpc.creativeWork.createThread.mutationOptions({
@@ -99,6 +96,24 @@ export function OverviewAssistantPopup({
     }),
     enabled: !!activeThreadId,
   });
+
+  // The assistant home lists sessions as links; opening one selects it in this
+  // dock instead of routing to a second chat surface. An unknown id is ignored
+  // rather than handed to getThread, which would 404 into a permanent spinner.
+  //
+  // Applied once per URL change: listThreads refetches on every create and
+  // thread-finish, and re-running on its data would snap the dock back to the
+  // URL's thread and undo a session the operator just created or picked.
+  const requestedThreadId = searchParams.get("thread");
+  const appliedThreadId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requestedThreadId || !threadsQuery.data) return;
+    if (appliedThreadId.current === requestedThreadId) return;
+    if (threadsQuery.data.some((thread) => thread.id === requestedThreadId)) {
+      appliedThreadId.current = requestedThreadId;
+      setActiveThreadId(requestedThreadId);
+    }
+  }, [requestedThreadId, threadsQuery.data]);
 
   useEffect(() => {
     if (activeThreadId || !threadsQuery.data) return;
@@ -183,16 +198,11 @@ export function OverviewAssistantPopup({
       {/* One persistent chat instance: a reflowing dock on desktop, overlay below. */}
       <aside
         aria-label="Growth assistant"
-        aria-hidden={!visible}
+        aria-hidden={!open}
         className={cn(
           "bg-background fixed inset-3 z-50 flex flex-col overflow-hidden rounded-2xl border shadow-2xl transition-[width,opacity,transform] duration-200 xl:static xl:inset-auto xl:z-auto xl:h-svh xl:shrink-0 xl:rounded-none xl:border-y-0 xl:border-r-0 xl:shadow-none",
-          visible
-            ? cn(
-                "translate-y-0 opacity-100",
-                nextMode
-                  ? "xl:w-[calc(100vw-var(--sidebar-width))] xl:border-l-0"
-                  : "xl:w-[472px]",
-              )
+          open
+            ? "translate-y-0 opacity-100 xl:w-[472px]"
             : "pointer-events-none invisible translate-y-2 opacity-0 xl:visible xl:w-0 xl:translate-y-0 xl:border-l-0",
         )}
       >
@@ -285,33 +295,17 @@ export function OverviewAssistantPopup({
               <Plus className="size-4" />
             )}
           </Button>
-          {!nextMode && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={() => setVisible(false)}
-              aria-label="Collapse assistant"
-            >
-              <PanelRightClose className="hidden size-4 xl:block" />
-              <X className="size-4 xl:hidden" />
-            </Button>
-          )}
-          {nextMode && (
-            <Button
-              asChild
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 gap-1.5 px-2 xl:hidden"
-            >
-              <Link href={MOBILE_APP_LANDING} aria-label="Back to workspace">
-                <ArrowLeft className="size-4" />
-                Workspace
-              </Link>
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={() => setVisible(false)}
+            aria-label="Collapse assistant"
+          >
+            <PanelRightClose className="hidden size-4 xl:block" />
+            <X className="size-4 xl:hidden" />
+          </Button>
         </header>
         <div className="min-h-0 flex-1">
           {activeThreadId && threadQuery.data ? (
@@ -330,8 +324,7 @@ export function OverviewAssistantPopup({
                 );
               }}
               userName={userName}
-              variant={nextMode ? "page" : "popup"}
-              active={visible}
+              active={open}
               mode={nextMode ? "next" : "overview"}
               brandId={activeBrand?.id}
               brandName={activeBrand?.name}
@@ -348,7 +341,7 @@ export function OverviewAssistantPopup({
         </div>
       </aside>
 
-      {!visible && (
+      {!open && (
         <Button
           type="button"
           size="icon"

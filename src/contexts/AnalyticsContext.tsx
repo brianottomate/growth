@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -9,7 +8,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import { track as vercelTrack } from "@vercel/analytics/react";
 import posthog from "posthog-js";
@@ -22,20 +20,12 @@ import type {
 import { sanitizeForVercel } from "@/lib/utils/analytics.utils";
 import { env } from "@/env";
 import { authClient } from "@/server/better-auth/client";
-import { CookieBanner } from "@/components/analytics/CookieBanner";
 
 // =====================================================
 // TYPES
 // =====================================================
 
-interface QueuedEvent {
-  eventName: ClientAnalyticsEventName;
-  properties?: ClientEventPropertiesDefinition[ClientAnalyticsEventName];
-  meta?: AnalyticsMetadata;
-}
-
 interface AnalyticsContextType {
-  hasConsent: boolean;
   trackEvent: <T extends ClientAnalyticsEventName>(
     eventName: T,
     properties?: ClientEventPropertiesDefinition[T],
@@ -43,7 +33,6 @@ interface AnalyticsContextType {
   ) => void;
   identifyUser: () => void;
   reset: () => void;
-  reShowConsentBanner: () => void;
 }
 
 interface ClientAnalyticsProvider {
@@ -77,97 +66,26 @@ export const useAnalytics = () => {
 // PROVIDER COMPONENT
 // =====================================================
 
+/**
+ * Growth is an internal tool and the client-facing connect pages set no
+ * tracking cookies: PostHog is unkeyed in every environment and Vercel Web
+ * Analytics is cookieless. The consent banner was asking permission for
+ * cookies nothing writes, so it is gone along with the gate it drove.
+ */
 export function AnalyticsProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const session = authClient.useSession();
   const lastIdentifiedUserId = useRef<string | null>(null);
 
-  const [hasConsent, setHasConsent] = useState(false);
-  const [showBanner, setShowBanner] = useState(false);
-  const [eventQueue, setEventQueue] = useState<QueuedEvent[]>([]);
-
-  // PostHog is already initialized in instrumentation-client.ts
-  // No need to re-initialize here
-
-  // Auto-consent for logged-in users
+  // instrumentation-client.ts initializes PostHog with pageview capture off
+  // because consent used to switch it on. Session recording stays off: that
+  // was a consent-gated escalation, not the default.
   useEffect(() => {
-    if (session.data?.user) {
-      console.info("🔐 [Analytics] Auto-consent for logged-in user");
-      localStorage.setItem("cookieConsent", "true");
-      localStorage.setItem("cookieConsentTimestamp", Date.now().toString());
-      setHasConsent(true);
-      setShowBanner(false);
-
-      // Enable PostHog tracking for logged-in users
-      if (env.NEXT_PUBLIC_POSTHOG_KEY) {
-        posthog.set_config({
-          capture_pageview: "history_change",
-          capture_pageleave: true,
-          disable_session_recording: false,
-        });
-        // Capture initial pageview
-        posthog.capture("$pageview");
-      }
-    }
-  }, [session.data]);
-
-  // Check stored consent on mount
-  useEffect(() => {
-    if (!hasConsent && !session.isPending) {
-      const storedConsent = localStorage.getItem("cookieConsent");
-      const consentTimestamp = localStorage.getItem("cookieConsentTimestamp");
-
-      if (storedConsent === "true") {
-        setHasConsent(true);
-        setShowBanner(false);
-
-        // Enable PostHog tracking if user previously consented
-        if (env.NEXT_PUBLIC_POSTHOG_KEY) {
-          posthog.set_config({
-            capture_pageview: "history_change",
-            capture_pageleave: true,
-            disable_session_recording: false,
-          });
-          // Capture initial pageview
-          posthog.capture("$pageview");
-        }
-      } else if (storedConsent === null) {
-        // No previous decision - show banner
-        setShowBanner(true);
-      } else if (storedConsent === "false") {
-        // User previously declined - check if 7 days have passed
-        const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-        const now = Date.now();
-        const declineTime = consentTimestamp
-          ? parseInt(consentTimestamp, 10)
-          : 0;
-
-        if (now - declineTime > ONE_WEEK_MS) {
-          // Re-show banner after 1 week
-          console.debug(
-            "🔵 [Analytics] Re-showing banner after 1 week since decline",
-          );
-          setShowBanner(true);
-          localStorage.removeItem("cookieConsent");
-          localStorage.removeItem("cookieConsentTimestamp");
-        } else {
-          // Still within the week - respect their decline
-          setHasConsent(false);
-          setShowBanner(false);
-        }
-      }
-    }
-  }, [hasConsent, session.isPending]);
-
-  // Listen for custom event to re-show banner
-  useEffect(() => {
-    const handleReShow = () => {
-      setHasConsent(false);
-      setShowBanner(true);
-    };
-    window.addEventListener("reShowConsentBanner", handleReShow);
-    return () =>
-      window.removeEventListener("reShowConsentBanner", handleReShow);
+    if (!env.NEXT_PUBLIC_POSTHOG_KEY) return;
+    posthog.set_config({
+      capture_pageview: "history_change",
+      capture_pageleave: true,
+    });
+    posthog.capture("$pageview");
   }, []);
 
   // Analytics providers array
@@ -229,24 +147,17 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       properties?: ClientEventPropertiesDefinition[T],
       meta?: AnalyticsMetadata,
     ): void => {
-      if (!hasConsent) {
-        // Queue event for later
-        setEventQueue((prev) => [...prev, { eventName, properties, meta }]);
-        console.log("📦 [Analytics] Event queued:", eventName);
-        return;
-      }
-
       console.log("🔵 [Analytics] Client event:", { eventName, properties });
       providers.forEach((provider) =>
         provider.trackEvent(eventName, properties, meta),
       );
     },
-    [hasConsent, providers],
+    [providers],
   );
 
   // Identify user function
   const identifyUser = useCallback(() => {
-    if (!hasConsent || !session.data?.user) return;
+    if (!session.data?.user) return;
 
     const userId = session.data.user.id;
 
@@ -282,7 +193,7 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
     }
 
     lastIdentifiedUserId.current = userId;
-  }, [hasConsent, session.data, providers]);
+  }, [session.data, providers]);
 
   // Reset analytics
   const reset = useCallback(() => {
@@ -293,100 +204,15 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       }
     });
     lastIdentifiedUserId.current = null;
-    setEventQueue([]);
   }, [providers]);
 
-  // Flush queued events when consent is given
   useEffect(() => {
-    if (hasConsent && eventQueue.length > 0) {
-      console.info(
-        `📤 [Analytics] Flushing ${eventQueue.length} queued events`,
-      );
-      eventQueue.forEach((event, index) => {
-        console.debug(
-          `📤 [${index + 1}/${eventQueue.length}] Replaying queued event: ${event.eventName}`,
-        );
-        trackEvent(event.eventName, event.properties, event.meta);
-      });
-      setEventQueue([]);
-      console.info("✅ [Analytics] Event queue flushed successfully");
-    }
-  }, [hasConsent, eventQueue, trackEvent]);
-
-  // Initialize analytics system when consent is given
-  useEffect(() => {
-    if (hasConsent) {
-      console.info("🚀 [Analytics] Analytics system initialized with consent");
-
-      // Identify user if logged in
-      if (session.data?.user) {
-        identifyUser();
-      }
-    }
-  }, [hasConsent, session.data, identifyUser]);
-
-  // Handle consent acceptance
-  const handleAccept = useCallback(() => {
-    console.info("✅ [Analytics] Cookie consent accepted");
-    localStorage.setItem("cookieConsent", "true");
-    localStorage.setItem("cookieConsentTimestamp", Date.now().toString());
-    setHasConsent(true);
-    setShowBanner(false);
-
-    // Enable PostHog tracking features now that consent is given
-    if (env.NEXT_PUBLIC_POSTHOG_KEY) {
-      posthog.set_config({
-        capture_pageview: "history_change", // Track pageviews on navigation
-        capture_pageleave: true,
-        disable_session_recording: false,
-      });
-
-      // Manually capture the initial pageview that was missed before consent
-      posthog.capture("$pageview");
-      console.info(
-        "✅ [Analytics] PostHog tracking enabled, initial pageview captured",
-      );
-    }
-  }, []);
-
-  // Handle consent decline
-  const handleDecline = useCallback(() => {
-    console.info("❌ [Analytics] Cookie consent declined");
-    localStorage.setItem("cookieConsent", "false");
-    localStorage.setItem("cookieConsentTimestamp", Date.now().toString());
-    setHasConsent(false);
-    setShowBanner(false);
-    reset();
-    setEventQueue([]); // Clear any queued events
-  }, [reset]);
-
-  // Allow users to re-show the consent banner
-  const reShowConsentBanner = useCallback(() => {
-    console.info("🔵 [Analytics] Re-showing consent banner");
-    localStorage.removeItem("cookieConsent");
-    localStorage.removeItem("cookieConsentTimestamp");
-    setHasConsent(false);
-    setShowBanner(true);
-  }, []);
+    if (session.data?.user) identifyUser();
+  }, [session.data, identifyUser]);
 
   return (
-    <AnalyticsContext.Provider
-      value={{
-        hasConsent,
-        trackEvent,
-        identifyUser,
-        reset,
-        reShowConsentBanner,
-      }}
-    >
+    <AnalyticsContext.Provider value={{ trackEvent, identifyUser, reset }}>
       {children}
-      {!pathname.startsWith("/lab") ? (
-        <CookieBanner
-          isOpen={showBanner}
-          onAccept={handleAccept}
-          onDecline={handleDecline}
-        />
-      ) : null}
     </AnalyticsContext.Provider>
   );
 }

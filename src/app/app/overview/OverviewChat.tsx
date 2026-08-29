@@ -188,7 +188,6 @@ export function OverviewChat({
   initialMessages,
   onThreadFinish,
   userName,
-  variant = "page",
   active = true,
   mode = "overview",
   brandId,
@@ -202,7 +201,6 @@ export function OverviewChat({
   initialMessages: UIMessage[];
   onThreadFinish?: () => void;
   userName: string;
-  variant?: "page" | "popup";
   /** Lets the popup focus its composer only when it is actually opened. */
   active?: boolean;
   mode?: "overview" | "create" | "next";
@@ -725,10 +723,7 @@ export function OverviewChat({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={cn(
-        "relative flex min-h-0 flex-col",
-        variant === "page" ? "h-[calc(100vh-7rem)]" : "h-full",
-      )}
+      className="relative flex h-full min-h-0 flex-col"
     >
       <div className="relative min-h-0 flex-1">
         <div
@@ -739,16 +734,12 @@ export function OverviewChat({
           className="h-full scrollbar-thin overflow-x-hidden overflow-y-auto"
         >
           <div
-            className={cn(
-              "mx-auto w-full min-w-0 space-y-4 pb-4",
-              variant === "page" ? "max-w-3xl px-1" : "px-4",
-            )}
+            className="mx-auto w-full min-w-0 space-y-4 px-4 pb-4"
           >
             {isEmpty && (
               <div
                 className={cn(
-                  "animate-in fade-in slide-in-from-bottom-2 flex flex-col duration-500",
-                  variant === "page" ? "gap-6 pt-10" : "gap-4 pt-4",
+                  "animate-in fade-in slide-in-from-bottom-2 flex flex-col gap-4 pt-4 duration-500",
                 )}
               >
                 <div>
@@ -764,10 +755,7 @@ export function OverviewChat({
                   </p>
                 </div>
                 <div
-                  className={cn(
-                    "grid auto-rows-fr gap-2",
-                    variant === "page" && "sm:grid-cols-2",
-                  )}
+                  className="grid auto-rows-fr gap-2"
                 >
                   {starters.map(({ icon: Icon, text }) => (
                     <button
@@ -941,10 +929,7 @@ export function OverviewChat({
       </div>
 
       <div
-        className={cn(
-          "mx-auto w-full",
-          variant === "page" ? "max-w-3xl" : "border-t px-3 pb-3",
-        )}
+        className="mx-auto w-full border-t px-3 pb-3"
       >
         <form className="mt-3" onSubmit={submit}>
           <div
@@ -1078,11 +1063,6 @@ export function OverviewChat({
             </div>
           </div>
         </form>
-        {variant === "page" && (
-          <p className="text-muted-foreground/60 mt-1.5 text-center text-[11px]">
-            Reads live Growth context · asks before writing
-          </p>
-        )}
       </div>
     </div>
   );

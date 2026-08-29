@@ -1343,7 +1343,7 @@ export async function pushDraftToPlatform(
       validateOnly: false,
       platformCampaignRowId: created.id,
       adsCreated: spots.length,
-      path: `/app/brands/${brand.slug}/ads/${created.id}`,
+      path: `/app/brands/${brand.slug}/ads/platform/${created.id}`,
       provider: result,
     };
   }
@@ -1575,7 +1575,7 @@ export async function pushDraftToPlatform(
       validateOnly: false,
       platformCampaignRowId: created.id,
       adsCreated: (result.ads ?? (result.ad ? [result.ad] : [])).length,
-      path: `/app/brands/${brand.slug}/ads/${created.id}`,
+      path: `/app/brands/${brand.slug}/ads/platform/${created.id}`,
       provider: result,
     };
   }
@@ -1710,7 +1710,7 @@ export async function pushDraftToPlatform(
     platformCampaignRowId: created.id,
     adSetsCreated: perAdSet.length,
     adsCreated: perAdSet.reduce((n, entry) => n + entry.subset.length, 0),
-    path: `/app/brands/${brand.slug}/ads/${created.id}`,
+    path: `/app/brands/${brand.slug}/ads/platform/${created.id}`,
   };
 }
 

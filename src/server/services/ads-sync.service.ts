@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -36,13 +36,26 @@ function str(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
-// Zernio campaign status → our enum. The tree reports lowercase active/paused.
+// Zernio campaign status → our enum. The tree reports lowercase active/paused,
+// and Meta also reports completed/archived/deleted once a schedule runs out.
+// Those used to fall through to `draft`, which reads as "authored here, never
+// pushed" — so a Meta campaign that ran and finished showed up as a draft.
 function mapStatus(raw: unknown): PlatformCampaignStatus {
   switch (str(raw)?.toLowerCase()) {
     case "active":
       return "live";
     case "paused":
       return "paused";
+    case "scheduled":
+    case "pending":
+      return "scheduled";
+    case "completed":
+    case "archived":
+    case "deleted":
+    // Google's terminal status. It has no "completed": a Google campaign whose
+    // end date passed stays enabled, so only removal is terminal there.
+    case "removed":
+      return "ended";
     default:
       return "draft";
   }
@@ -750,8 +763,12 @@ export async function syncZernioAds(options?: {
         and(
           eq(platformCampaignTable.brandId, brand.id),
           eq(platformCampaignTable.channelId, channelId),
+          // Only rows that came from the platform can vanish from it. A
+          // campaign authored here and never pushed has no externalId, so it
+          // is not "gone" — it was never there.
+          isNotNull(platformCampaignTable.externalId),
           notInArray(platformCampaignTable.externalId, extIds),
-          inArray(platformCampaignTable.status, ["live", "scheduled"]),
+          ne(platformCampaignTable.status, "ended"),
         ),
       )
       .returning({ id: platformCampaignTable.id });

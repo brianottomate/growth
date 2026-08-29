@@ -52,10 +52,11 @@ export function NewBrandButton() {
         setName("");
         setWebsite("");
         setEnrichment(null);
-        // Land on the brand page: the next step (send the connect link,
-        // review channels) lives there, not on the list.
+        // Land on setup, not the brand overview: a brand created seconds ago
+        // has nothing to show, and the actual next step (send the connect
+        // link, allow the ad accounts) is what setup holds.
         if (brand?.slug) {
-          router.push(`/app/brands/${brand.slug}`);
+          router.push(`/app/brands/${brand.slug}/setup`);
         } else {
           router.refresh();
         }
@@ -130,11 +131,7 @@ export function NewBrandButton() {
 
             <div className="flex flex-col gap-1.5">
               <Label>Name</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Homi"
-              />
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
 
             {enrichment && (

@@ -179,7 +179,7 @@ export default async function BrandPage({
                 key={spot.id}
                 href={
                   spot.platformCampaignId
-                    ? `/app/brands/${brandSlug}/ads/${spot.platformCampaignId}`
+                    ? `/app/brands/${brandSlug}/ads/platform/${spot.platformCampaignId}`
                     : `/app/brands/${brandSlug}/ads`
                 }
                 className="bg-card w-40 shrink-0 overflow-hidden rounded-xl border transition-colors hover:border-white/20"
