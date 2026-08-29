@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +27,13 @@ type GoogleConfig = {
 export function GoogleSettings({
   campaignId,
   config,
+  brandSlug,
+  brandUrl,
 }: {
   campaignId: string;
   config: GoogleConfig | undefined;
+  brandSlug: string;
+  brandUrl: string | null;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -49,6 +54,17 @@ export function GoogleSettings({
       },
     }),
   );
+
+  // Read-only against Google: mines the brand's own site for terms and prices
+  // them. The cost number is what the Google budget should be capped at —
+  // beyond the point of owning the brand's terms, the money buys nothing.
+  const research = useMutation(trpc.ads.researchKeywords.mutationOptions());
+  const addKeyword = (keyword: string) =>
+    setKeywords((current) =>
+      lines(current).includes(keyword)
+        ? current
+        : [...lines(current), keyword].join("\n"),
+    );
 
   const lines = (value: string) =>
     value
@@ -137,6 +153,97 @@ export function GoogleSettings({
               landscape and a square image; the first ad&apos;s creative is
               used for both until sized variants exist.
             </p>
+          )}
+
+          {campaignType === "search" && (
+            <div className="border-border space-y-2 rounded-lg border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium">Keyword research</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={research.isPending}
+                  disabled={!brandUrl}
+                  onClick={() =>
+                    research.mutate({
+                      brandSlug,
+                      seedUrl: brandUrl ?? undefined,
+                      estimateKeywords: lines(keywords).slice(0, 200),
+                      countries: ["US"],
+                    })
+                  }
+                >
+                  <Search className="size-3.5" />
+                  {brandUrl ? "Mine the brand site" : "No brand URL set"}
+                </Button>
+                {research.data && (
+                  <span className="text-muted-foreground text-xs">
+                    ~${research.data.monthlyCost.dollars.toLocaleString()}/mo to
+                    buy these at {Math.round(
+                      research.data.monthlyCost.ctrAssumption * 100,
+                    )}% CTR
+                    {research.data.monthlyCost.unpriced > 0
+                      ? ` · ${research.data.monthlyCost.unpriced} unpriced`
+                      : ""}
+                  </span>
+                )}
+              </div>
+              {research.error && (
+                <p className="text-xs text-red-300">{research.error.message}</p>
+              )}
+              {research.data && (
+                <div className="max-h-56 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="text-muted-foreground sticky top-0 bg-[var(--card)] text-left">
+                      <tr>
+                        <th className="py-1 font-normal">Keyword</th>
+                        <th className="py-1 text-right font-normal">
+                          Searches/mo
+                        </th>
+                        <th className="py-1 text-right font-normal">
+                          Top bid
+                        </th>
+                        <th className="py-1" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...research.data.estimate, ...research.data.ideas]
+                        .slice(0, 100)
+                        .map((row) => (
+                          <tr key={row.keyword} className="border-t">
+                            <td className="py-1 pr-2">{row.keyword}</td>
+                            <td className="py-1 text-right tabular-nums">
+                              {row.avgMonthlySearches?.toLocaleString() ?? "—"}
+                            </td>
+                            <td className="py-1 text-right tabular-nums">
+                              {row.highTopOfPageBid != null
+                                ? `$${row.highTopOfPageBid.toFixed(2)}`
+                                : "—"}
+                            </td>
+                            <td className="py-1 pl-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => addKeyword(row.keyword)}
+                                className="text-muted-foreground hover:text-foreground"
+                              >
+                                add
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="text-muted-foreground text-[11px]">
+                Searches are not clicks. The monthly figure assumes{" "}
+                {Math.round(
+                  (research.data?.monthlyCost.ctrAssumption ?? 0.35) * 100,
+                )}
+                % of searches become clicks, which is a planning input for the
+                budget cap rather than a forecast.
+              </p>
+            </div>
           )}
 
           {save.error && (

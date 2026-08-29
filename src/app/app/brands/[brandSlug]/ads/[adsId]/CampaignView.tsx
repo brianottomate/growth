@@ -206,6 +206,8 @@ export async function CampaignView({
         <GoogleSettings
           campaignId={initiative.id}
           config={initiative.platformConfig?.google}
+          brandSlug={brandSlug}
+          brandUrl={initiative.landingUrl ?? draft.brand.website ?? null}
         />
       )}
 

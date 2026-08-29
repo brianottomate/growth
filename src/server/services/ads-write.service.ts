@@ -25,6 +25,8 @@ import {
   listZernioAccounts,
   listZernioAdAccounts,
   listZernioAdAudiences,
+  generateZernioKeywordIdeas,
+  generateZernioKeywordHistoricalMetrics,
   setZernioCampaignStatus,
   ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST,
   type CreateZernioStandaloneAdInput,
@@ -822,6 +824,110 @@ export async function syncBrandPlatformAudiences(input: {
   }
 
   return { mirrored, errors };
+}
+
+/**
+ * Keyword Planner for one brand's Google account.
+ *
+ * Read-only against Google: it creates nothing and spends nothing. Two jobs,
+ * both of which the Google plan needs before a campaign is worth building.
+ *
+ * `ideas` mines the brand's own site plus any seed terms, which is what tells
+ * you whether a given home has enough search volume to deserve its own ad
+ * group rather than riding the brand campaign.
+ *
+ * `estimate` prices a set of terms. Owning a brand's own terms is the whole
+ * point of the Google half, and the budget should be capped at what that
+ * actually costs rather than a fixed share of the total — anything above the
+ * cap buys nothing and is better spent on Meta.
+ */
+export async function researchGoogleKeywords(input: {
+  organizationId: string;
+  brandSlug: string;
+  seedKeywords?: string[];
+  seedUrl?: string;
+  /** Price these exact terms instead of mining for new ones. */
+  estimateKeywords?: string[];
+  countries?: string[];
+}) {
+  const listed = await listAdsWriteDestinations({
+    organizationId: input.organizationId,
+    brandSlug: input.brandSlug,
+    platform: "google",
+  });
+  const destination = listed.destinations[0];
+  if (!destination) {
+    throw new Error(
+      "No allowlisted Google ad account for this brand. Connect one, then allow it on the brand page.",
+    );
+  }
+
+  const shared = {
+    accountId: destination.connectionAccountId,
+    customerId: destination.adAccountId,
+    countries: input.countries,
+  };
+  const [ideas, estimate] = await Promise.all([
+    input.seedKeywords?.length || input.seedUrl
+      ? generateZernioKeywordIdeas({
+          ...shared,
+          seedKeywords: input.seedKeywords,
+          seedUrl: input.seedUrl,
+          pageSize: 100,
+        })
+      : Promise.resolve([]),
+    input.estimateKeywords?.length
+      ? generateZernioKeywordHistoricalMetrics({
+          ...shared,
+          keywords: input.estimateKeywords,
+          includeAverageCpc: true,
+        })
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    brand: listed.brand,
+    adAccountId: destination.adAccountId,
+    ideas,
+    estimate,
+    monthlyCost: estimateMonthlyKeywordCost(
+      estimate.length > 0 ? estimate : ideas,
+    ),
+  };
+}
+
+/**
+ * What it would cost per month to buy these terms.
+ *
+ * Searches are not clicks, so this is `searches × CTR × CPC` and the CTR is an
+ * ASSUMPTION, stated rather than buried: brand terms at the top of the page
+ * take a large share of clicks, and 35% is a conservative middle. The number
+ * is a planning input for the Google budget cap, not a forecast.
+ */
+export const BRAND_TERM_CTR_ASSUMPTION = 0.35;
+
+export function estimateMonthlyKeywordCost(
+  rows: {
+    avgMonthlySearches: number | null;
+    averageCpc: number | null;
+    highTopOfPageBid: number | null;
+  }[],
+  ctr = BRAND_TERM_CTR_ASSUMPTION,
+) {
+  let dollars = 0;
+  let priced = 0;
+  for (const row of rows) {
+    const cpc = row.averageCpc ?? row.highTopOfPageBid;
+    if (!row.avgMonthlySearches || !cpc) continue;
+    dollars += row.avgMonthlySearches * ctr * cpc;
+    priced += 1;
+  }
+  return {
+    dollars: Math.round(dollars),
+    priced,
+    unpriced: rows.length - priced,
+    ctrAssumption: ctr,
+  };
 }
 
 export async function createAdAudience(

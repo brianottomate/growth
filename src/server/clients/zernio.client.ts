@@ -1259,6 +1259,105 @@ export async function listZernioAdAudiences(input: {
   return response.audiences ?? response.data ?? [];
 }
 
+// ---- GOOGLE KEYWORD PLANNER (read-only) -----------------------------
+//
+// Two gotchas Zernio inherits from Google and does not smooth over:
+// counters come back as int64s ENCODED AS STRINGS, and every bid or CPC is
+// in MICROS of the account currency. Parse both here so nothing downstream
+// has to remember, and a stray string never reaches a chart as NaN.
+
+const microsToUnits = (value: unknown): number | null => {
+  const raw = typeof value === "string" ? Number(value) : value;
+  return typeof raw === "number" && Number.isFinite(raw) ? raw / 1_000_000 : null;
+};
+const textOf = (value: unknown): string =>
+  typeof value === "string" ? value : "";
+const countOf = (value: unknown): number | null => {
+  const raw = typeof value === "string" ? Number(value) : value;
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+};
+
+export type ZernioKeywordMetrics = {
+  keyword: string;
+  /** Averaged over the last 12 months, per Keyword Planner. */
+  avgMonthlySearches: number | null;
+  competition: string | null;
+  competitionIndex: number | null;
+  /** Whole currency units, converted from micros. */
+  lowTopOfPageBid: number | null;
+  highTopOfPageBid: number | null;
+  averageCpc: number | null;
+};
+
+function readKeywordRow(row: Record<string, unknown>): ZernioKeywordMetrics {
+  const metrics = (row.keywordMetrics ?? row.metrics ?? {}) as Record<
+    string,
+    unknown
+  >;
+  return {
+    keyword: textOf(row.text) || textOf(row.keyword),
+    avgMonthlySearches: countOf(metrics.avgMonthlySearches),
+    competition:
+      typeof metrics.competition === "string" ? metrics.competition : null,
+    competitionIndex: countOf(metrics.competitionIndex),
+    lowTopOfPageBid: microsToUnits(metrics.lowTopOfPageBidMicros),
+    highTopOfPageBid: microsToUnits(metrics.highTopOfPageBidMicros),
+    averageCpc: microsToUnits(metrics.averageCpcMicros),
+  };
+}
+
+/**
+ * Keyword Planner ideas from seed terms, a seed URL, or both. Google Ads only,
+ * and read-only: it creates nothing on the account.
+ * https://docs.zernio.com/ad-insights/generate-keyword-ideas
+ */
+export async function generateZernioKeywordIdeas(input: {
+  accountId: string;
+  customerId?: string;
+  seedKeywords?: string[];
+  seedUrl?: string;
+  countries?: string[];
+  pageSize?: number;
+}): Promise<ZernioKeywordMetrics[]> {
+  if (!input.seedKeywords?.length && !input.seedUrl) {
+    throw new Error("Keyword ideas need seed terms, a seed URL, or both");
+  }
+  const response = await zernioFetch<{
+    results?: Record<string, unknown>[];
+    data?: Record<string, unknown>[];
+  }>("/ads/keywords/ideas", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (response.results ?? response.data ?? [])
+    .map(readKeywordRow)
+    .filter((row) => row.keyword.length > 0);
+}
+
+/** Historical volume and bid ranges for keywords you already have in mind. */
+export async function generateZernioKeywordHistoricalMetrics(input: {
+  accountId: string;
+  keywords: string[];
+  customerId?: string;
+  countries?: string[];
+  includeAverageCpc?: boolean;
+}): Promise<ZernioKeywordMetrics[]> {
+  if (input.keywords.length === 0) return [];
+  if (input.keywords.length > 1_000) {
+    throw new Error("Keyword Planner takes at most 1,000 keywords per call");
+  }
+  const response = await zernioFetch<{
+    results?: Record<string, unknown>[];
+    data?: Record<string, unknown>[];
+  }>("/ads/keywords/historical-metrics", {
+    method: "POST",
+    body: JSON.stringify({ includeAverageCpc: true, ...input }),
+  });
+  return (response.results ?? response.data ?? [])
+    .map(readKeywordRow)
+    .filter((row) => row.keyword.length > 0);
+}
+
 /** Local audience record plus fresh platform data (Meta) when available. */
 export async function getZernioAdAudience(
   audienceId: string,

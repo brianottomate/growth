@@ -66,7 +66,7 @@ async function requireOwnedInitiative(
   if (!initiative) throw new Error("Campaign draft not found");
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, initiative.brandId),
-    columns: { id: true, slug: true, organizationId: true },
+    columns: { id: true, slug: true, organizationId: true, website: true },
   });
   if (brand?.organizationId !== organizationId) {
     throw new Error("No access to this campaign draft");
@@ -369,7 +369,7 @@ export async function attachPlatformCampaign(input: {
   if (!platformCampaign) throw new Error("Platform campaign not found");
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, platformCampaign.brandId),
-    columns: { id: true, slug: true, organizationId: true },
+    columns: { id: true, slug: true, organizationId: true, website: true },
   });
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this campaign");

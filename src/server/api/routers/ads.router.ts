@@ -14,6 +14,7 @@ import {
   listAdsWriteDestinations,
   pushDraftToPlatform,
   setCampaignDelivery,
+  researchGoogleKeywords,
   syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
 import {
@@ -256,6 +257,27 @@ export const adsRouter = {
       listBrandAudienceTargets({
         brandId: input.brandId,
         organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  /**
+   * Keyword Planner for the brand's Google account. Read-only: it creates
+   * nothing and spends nothing, so it needs no approval gate.
+   */
+  researchKeywords: protectedProcedure
+    .input(
+      z.object({
+        brandSlug: z.string().min(1),
+        seedKeywords: z.array(z.string().trim().min(1)).max(20).optional(),
+        seedUrl: z.string().url().optional(),
+        estimateKeywords: z.array(z.string().trim().min(1)).max(200).optional(),
+        countries: z.array(z.string().length(2)).max(25).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      researchGoogleKeywords({
+        organizationId: await organizationIdFor(ctx),
+        ...input,
       }),
     ),
 

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import { assertMetaAdPayload } from "@/server/services/ads-write.service";
+import {
+  assertMetaAdPayload,
+  estimateMonthlyKeywordCost,
+} from "@/server/services/ads-write.service";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 
 /**
@@ -122,5 +125,43 @@ describe("assertMetaAdPayload", () => {
     expect(() =>
       assertMetaAdPayload({ ...base, budgetAmount: 5 }, account),
     ).toThrow(/at least 10 USD/);
+  });
+});
+
+/**
+ * This number caps the Google budget, so a wrong one either starves the brand
+ * campaign or spends past the point of owning the terms.
+ */
+describe("estimateMonthlyKeywordCost", () => {
+  const row = (
+    avgMonthlySearches: number | null,
+    averageCpc: number | null,
+    highTopOfPageBid: number | null = null,
+  ) => ({ avgMonthlySearches, averageCpc, highTopOfPageBid });
+
+  it("prices searches as clicks, not as impressions", () => {
+    // 1,000 searches at 35% CTR is 350 clicks, at $2 each.
+    expect(estimateMonthlyKeywordCost([row(1_000, 2)]).dollars).toBe(700);
+  });
+
+  it("falls back to the top-of-page bid when there is no average CPC", () => {
+    expect(estimateMonthlyKeywordCost([row(1_000, null, 4)]).dollars).toBe(1_400);
+  });
+
+  it("reports what it could not price rather than treating it as free", () => {
+    const result = estimateMonthlyKeywordCost([
+      row(1_000, 2),
+      row(null, 2),
+      row(500, null),
+    ]);
+    expect(result.priced).toBe(1);
+    expect(result.unpriced).toBe(2);
+    expect(result.dollars).toBe(700);
+  });
+
+  it("carries the CTR assumption out with the number", () => {
+    const result = estimateMonthlyKeywordCost([row(1_000, 2)], 0.5);
+    expect(result.dollars).toBe(1_000);
+    expect(result.ctrAssumption).toBe(0.5);
   });
 });
