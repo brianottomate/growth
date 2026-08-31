@@ -1,3 +1,5 @@
+import { streamErrorMessage } from "@/server/ai/kernel/stream-error";
+
 import { anthropic } from "@ai-sdk/anthropic";
 import {
   convertToModelMessages,
@@ -508,6 +510,7 @@ export async function POST(req: Request): Promise<Response> {
   })();
 
   return result.toUIMessageStreamResponse({
+    onError: streamErrorMessage,
     originalMessages: history,
     generateMessageId: () => createId("amsg_ui"),
     onFinish: async ({ messages: updatedMessages }) => {

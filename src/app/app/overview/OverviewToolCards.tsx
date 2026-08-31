@@ -1,5 +1,6 @@
 "use client";
 
+import { ThinkingOrb, type OrbState } from "@/components/thinking-orb";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -389,7 +390,11 @@ export function ProductionPacketCard({
         )}
         {activeRun && ["queued", "processing"].includes(activeRun.status) && (
           <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <Loader2 className="size-3.5 animate-spin" />
+            <ThinkingOrb
+              state="composing"
+              size={20}
+              aria-label="Producing a candidate"
+            />
             The selected provider is producing one candidate. You can leave this
             session; the run is durable.
           </p>
@@ -717,10 +722,17 @@ export interface AdsRankedOutput {
 // ── Shared primitives ──────────────────────────────────────────────────────
 
 /** The dashed "running…" placeholder shown while a tool call is in flight. */
-export function ToolCallPending({ label }: { label: string }) {
+export function ToolCallPending({
+  label,
+  state = "working",
+}: {
+  label: string;
+  /** Reads scan, writes orbit, authoring composes. See capabilityOrbState. */
+  state?: OrbState;
+}) {
   return (
     <div className="text-muted-foreground flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs">
-      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      <ThinkingOrb state={state} size={20} aria-label={label} />
       {label}
     </div>
   );

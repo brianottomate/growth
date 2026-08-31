@@ -179,77 +179,92 @@ export const draftCampaignAction = growthAction({
 export const createMetaAdDraftAction = growthAction({
   description:
     "Create a complete Meta campaign, ad set, and ad through Zernio — single-image via imageUrl, or a 2–10 card carousel via carouselCards. The campaign is forced to PAUSED so it cannot spend until activated in a separate operator step. Set validateOnly to check Meta's tree without creating it. Requires explicit operator approval even for validation because Meta uploads referenced media during dry runs.",
-  inputSchema: z.object({
-    ...destinationSchema,
-    name: z.string().trim().min(1).max(255),
-    campaignName: z.string().trim().min(1).max(255).optional(),
-    adSetName: z.string().trim().min(1).max(255).optional(),
-    adName: z.string().trim().min(1).max(255).optional(),
-    goal: z.enum([
-      "engagement",
-      "traffic",
-      "awareness",
-      "video_views",
-      "lead_generation",
-      "lead_conversion",
-      "conversions",
-      "app_promotion",
-      "catalog_sales",
-    ]),
-    budgetAmount: z
-      .number()
-      .positive()
-      .describe("Budget in whole currency units, never cents."),
-    budgetType: budgetTypeSchema,
-    headline: z.string().trim().min(1).max(255),
-    body: z.string().trim().min(1).max(2_200),
-    description: z.string().trim().min(1).max(255).optional(),
-    callToAction: z.string().trim().min(1).max(64),
-    linkUrl: z.string().url(),
-    imageUrl: z
-      .string()
-      .url()
-      .optional()
-      .describe(
-        "Single-image creative. Provide this or carouselCards (except for catalog_sales, where Meta renders items).",
-      ),
-    carouselCards: z
-      .array(
-        z.object({
-          imageUrl: z.string().url(),
-          headline: z.string().trim().min(1).max(255).optional(),
-          description: z.string().trim().min(1).max(255).optional(),
-          linkUrl: z.string().url().optional(),
-          callToAction: z.string().trim().min(1).max(64).optional(),
-        }),
-      )
-      .min(2)
-      .max(10)
-      .optional()
-      .describe(
-        "Hand-built carousel, 2–10 cards rendered in this exact order. Card linkUrl/callToAction fall back to the ad-level values. Mutually exclusive with imageUrl.",
-      ),
-    leadGenFormId: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe("Required for lead_generation."),
-    targeting: targetingSchema.optional(),
-    ...schedulingSchema,
-    validateOnly: z.boolean().optional().default(false),
-    promotedObject: z
-      .object({
-        pixelId: z.string().min(1).optional(),
-        customEventType: z.string().min(1).optional(),
-        customConversionId: z.string().min(1).optional(),
-        productSetId: z.string().min(1).optional(),
-        pageId: z.string().min(1).optional(),
-        applicationId: z.string().min(1).optional(),
-        objectStoreUrl: z.string().url().optional(),
-      })
-      .optional(),
-  }),
+  inputSchema: z
+    .object({
+      ...destinationSchema,
+      name: z.string().trim().min(1).max(255),
+      campaignName: z.string().trim().min(1).max(255).optional(),
+      adSetName: z.string().trim().min(1).max(255).optional(),
+      adName: z.string().trim().min(1).max(255).optional(),
+      goal: z.enum([
+        "engagement",
+        "traffic",
+        "awareness",
+        "video_views",
+        "lead_generation",
+        "lead_conversion",
+        "conversions",
+        "app_promotion",
+        "catalog_sales",
+      ]),
+      budgetAmount: z
+        .number()
+        .positive()
+        .describe("Budget in whole currency units, never cents."),
+      budgetType: budgetTypeSchema,
+      headline: z.string().trim().min(1).max(255),
+      body: z.string().trim().min(1).max(2_200),
+      description: z.string().trim().min(1).max(255).optional(),
+      callToAction: z.string().trim().min(1).max(64),
+      linkUrl: z.string().url(),
+      imageUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          "Single-image creative. Provide this or carouselCards (except for catalog_sales, where Meta renders items). When the operator attached an image this turn, pass the url that mediaLibraryWrite.saveChatMedia returned for it rather than the raw attachment.",
+        ),
+      carouselCards: z
+        .array(
+          z.object({
+            imageUrl: z.string().url(),
+            headline: z.string().trim().min(1).max(255).optional(),
+            description: z.string().trim().min(1).max(255).optional(),
+            linkUrl: z.string().url().optional(),
+            callToAction: z.string().trim().min(1).max(64).optional(),
+          }),
+        )
+        .min(2)
+        .max(10)
+        .optional()
+        .describe(
+          "Hand-built carousel, 2–10 cards rendered in this exact order. Card linkUrl/callToAction fall back to the ad-level values. Mutually exclusive with imageUrl.",
+        ),
+      leadGenFormId: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Required for lead_generation."),
+      targeting: targetingSchema.optional(),
+      ...schedulingSchema,
+      validateOnly: z.boolean().optional().default(false),
+      promotedObject: z
+        .object({
+          pixelId: z.string().min(1).optional(),
+          customEventType: z.string().min(1).optional(),
+          customConversionId: z.string().min(1).optional(),
+          productSetId: z.string().min(1).optional(),
+          pageId: z.string().min(1).optional(),
+          applicationId: z.string().min(1).optional(),
+          objectStoreUrl: z.string().url().optional(),
+        })
+        .optional(),
+    })
+    // assertMetaAdPayload enforces this too, but only inside execute — which
+    // is AFTER the approval prompt. A call that cannot succeed should never
+    // reach a human for authorization, and rejecting it here lets the model
+    // add the creative instead of asking someone to approve a failure.
+    .refine(
+      (input) =>
+        input.goal === "catalog_sales" ||
+        Boolean(input.imageUrl) ||
+        Boolean(input.carouselCards?.length),
+      {
+        error:
+          "A Meta ad needs a creative: set imageUrl, or carouselCards with 2-10 cards.",
+      },
+    ),
   execute: async (input, ctx) =>
     createMetaAdDraft(input, {
       organizationId: ctx.orgId,
@@ -259,7 +274,7 @@ export const createMetaAdDraftAction = growthAction({
 
 export const createGoogleAdAction = growthAction({
   description:
-    "Create one Google Search or Display campaign tree through Zernio, then pause it. Google's create call has no validate-only and no paused option, so the pause is a second call — the result carries a warning, and a status of \"live\", if it did not land. Use traffic for click-optimized delivery; conversion-goal creation is unsupported. Requires explicit operator approval.",
+    'Create one Google Search or Display campaign tree through Zernio, then pause it. Google\'s create call has no validate-only and no paused option, so the pause is a second call — the result carries a warning, and a status of "live", if it did not land. Use traffic for click-optimized delivery; conversion-goal creation is unsupported. Requires explicit operator approval.',
   inputSchema: z.object({
     ...destinationSchema,
     name: z.string().trim().min(1).max(255),
@@ -439,9 +454,7 @@ export const draftAdAction = growthAction({
       headline: input.headline ?? null,
       body: input.body ?? null,
       linkUrl: input.linkUrl,
-      media: [
-        { url: input.imageUrl, type: "image", assetId: input.assetId },
-      ],
+      media: [{ url: input.imageUrl, type: "image", assetId: input.assetId }],
       organizationId: ctx.orgId,
     }),
 });
@@ -464,8 +477,7 @@ export const openCampaignAction = growthAction({
       .min(1)
       .describe("A camp_ id, from the campaign URL or adsRead.listCampaigns."),
   }),
-  execute: async (input, ctx) =>
-    getDraftCampaign(ctx.orgId, input.campaignId),
+  execute: async (input, ctx) => getDraftCampaign(ctx.orgId, input.campaignId),
 });
 
 export const listCampaignsAction = growthAction({
@@ -559,7 +571,10 @@ export const setGoogleSettingsAction = growthAction({
     keywords: z.array(z.string().trim().min(1)).max(200).optional(),
     negativeKeywords: z.array(z.string().trim().min(1)).max(200).optional(),
     additionalHeadlines: z.array(z.string().trim().max(30)).max(14).optional(),
-    additionalDescriptions: z.array(z.string().trim().max(90)).max(4).optional(),
+    additionalDescriptions: z
+      .array(z.string().trim().max(90))
+      .max(4)
+      .optional(),
     businessName: z.string().trim().max(25).optional(),
   }),
   execute: async ({ campaignId, ...google }, ctx) =>

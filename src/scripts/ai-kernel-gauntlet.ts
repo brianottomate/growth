@@ -85,8 +85,13 @@ function actionValuesFromSchema(schema: JsonSchemaObject): string[] {
       }
     }
   }
+  // Two shapes reach here: the validation union, whose variants are objects
+  // carrying an `action` property, and the flattened model schema, whose
+  // `action` is itself a union of described string consts.
   return variants.flatMap((variant) =>
-    actionValuesFromSchema(variant.properties?.action ?? {}),
+    actionValuesFromSchema(
+      variant.properties?.action ?? variant,
+    ),
   );
 }
 

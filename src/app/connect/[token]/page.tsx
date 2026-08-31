@@ -78,8 +78,7 @@ export default async function ConnectPage({
   const status = (await getBrandConnectStatus(brand.id)).filter(
     (row) => row.offered,
   );
-  const done = status.filter((row) => row.connected).length;
-  const allDone = done === status.length;
+  const allDone = status.every((row) => row.connected);
   const contactName = brand.connectTokenIssuedByName?.split(" ")[0] || null;
   const contactEmail = brand.connectTokenIssuedByEmail;
 
@@ -150,21 +149,6 @@ export default async function ConnectPage({
           <h1 className="mt-6 text-2xl font-semibold tracking-tight">
             Connect your accounts
           </h1>
-
-          <div
-            className="mt-5 flex gap-1.5"
-            role="img"
-            aria-label={`${done} of ${status.length} accounts connected`}
-          >
-            {status.map((row) => (
-              <span
-                key={row.key}
-                className={`h-1 flex-1 rounded-full ${
-                  row.connected ? "bg-emerald-400" : "bg-white/10"
-                }`}
-              />
-            ))}
-          </div>
 
           <div className="border-border mt-6 divide-y divide-white/5 rounded-xl border">
             {status.map((row) => (

@@ -1,3 +1,5 @@
+import { streamErrorMessage } from "@/server/ai/kernel/stream-error";
+
 import { anthropic } from "@ai-sdk/anthropic";
 import {
   convertToModelMessages,
@@ -51,5 +53,5 @@ export async function POST(req: Request): Promise<Response> {
     stopWhen: stepCountIs(8),
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({ onError: streamErrorMessage });
 }

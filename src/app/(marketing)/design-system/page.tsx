@@ -1,5 +1,6 @@
 "use client";
 
+import { ThinkingOrb, type OrbState } from "@/components/thinking-orb";
 import { Button } from "@wandercom/design-system-web/ui/button";
 import { Badge } from "@wandercom/design-system-web/ui/badge";
 import { Input } from "@wandercom/design-system-web/ui/input";
@@ -48,6 +49,18 @@ import {
 // icon; heart-wishlist is now plain heart.
 import { IconHeart } from "@wandercom/design-system-icons/heart";
 import { useState } from "react";
+
+const ORB_STATES: OrbState[] = [
+  "working",
+  "searching",
+  "solving",
+  "listening",
+  "connecting",
+  "weaving",
+  "composing",
+  "breathing",
+  "shaping",
+];
 
 export default function DesignSystemPage() {
   const [switchChecked, setSwitchChecked] = useState(false);
@@ -469,6 +482,37 @@ export default function DesignSystemPage() {
             <div className="space-y-2">
               <Label>Loading Spinner</Label>
               <Spinner />
+            </div>
+          </div>
+
+          <div className="mt-8 space-y-3">
+            <Label>Thinking orbs</Label>
+            <p className="text-muted-foreground max-w-2xl text-sm">
+              Nine canvas states from thinking-orbs. Growth picks one by what
+              the work is: a read scans, a write orbits, an authoring
+              capability composes. Two tuned sizes ship, 64 and 20, which are
+              separate designs rather than one scaled.
+            </p>
+            <div className="flex flex-wrap gap-6">
+              {ORB_STATES.map((state) => (
+                <div key={state} className="flex flex-col items-center gap-2">
+                  <ThinkingOrb state={state} size={64} />
+                  <span className="text-muted-foreground font-mono text-xs">
+                    {state}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 pt-2">
+              {ORB_STATES.map((state) => (
+                <span
+                  key={state}
+                  className="text-muted-foreground flex items-center gap-1.5 text-xs"
+                >
+                  <ThinkingOrb state={state} size={20} />
+                  {state}
+                </span>
+              ))}
             </div>
           </div>
         </section>

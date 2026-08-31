@@ -39,6 +39,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMediaQuery } from "@/components/ui/hooks/use-media-query";
 import { toast } from "@/components/ui/toast";
+import {
+  ThinkingOrb,
+  capabilityOrbState,
+} from "@/components/thinking-orb";
 import { useTRPC } from "@/trpc/react";
 import { CHAT_MARKDOWN_LAYOUT } from "@/lib/chat-markdown";
 import { isApprovalSuperseded } from "@/lib/chat-approval-state";
@@ -893,7 +897,7 @@ export function OverviewChat({
 
             {showWorking && (
               <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <ThinkingOrb state="solving" size={20} aria-label="Thinking" />
                 Thinking…
               </div>
             )}
@@ -1189,7 +1193,13 @@ function renderToolPart(
   }
 
   if (part.state === "input-streaming" || part.state === "input-available") {
-    return <ToolCallPending key={key} label={pendingLabel(toolName, action)} />;
+    return (
+      <ToolCallPending
+        key={key}
+        label={pendingLabel(toolName, action)}
+        state={capabilityOrbState(toolName)}
+      />
+    );
   }
   if (part.state === "output-error") {
     return (

@@ -31,7 +31,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
 
   const url = status.data?.url ?? null;
   const channels = status.data?.channels ?? [];
-  const connectedCount = channels.filter((row) => row.connected).length;
+  const visible = channels.filter((row) => row.offered || row.connected);
 
   const copy = async () => {
     if (!url) return;
@@ -71,7 +71,6 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
               loading={regenerate.isPending}
               onClick={() => {
                 if (
-                  connectedCount > 0 ||
                   window.confirm(
                     "Regenerate the link? The one you already sent stops working.",
                   )
@@ -100,39 +99,36 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
           </p>
         )}
 
-        {channels.length > 0 && (
-          <div className="mt-4 grid gap-1.5 sm:grid-cols-2">
+        {visible.length > 0 && (
+          <ul className="border-border mt-4 border-t text-sm">
             {/* A parked channel is hidden from the client but not from us, and
                 only while nothing is connected on it. One a brand already has
                 still shows, because it is still syncing. */}
-            {channels
-              .filter((row) => row.offered || row.connected)
-              .map((row) => (
-                <div
-                  key={row.key}
-                  className="flex items-center justify-between gap-2 text-sm"
-                >
-                  <span className="text-muted-foreground">
-                    {row.label}
-                    {!row.offered && (
-                      <span className="text-muted-foreground/60">
-                        {" "}
-                        · not offered
-                      </span>
-                    )}
-                  </span>
-                  {row.connected ? (
-                    <span className="truncate text-emerald-400">
-                      {row.accounts.filter(Boolean).join(", ") || "Connected"}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground/60">
-                      Not connected
+            {visible.map((row) => (
+              <li
+                key={row.key}
+                className="grid grid-cols-[max-content_1fr] items-baseline gap-x-4 border-b border-white/5 py-2"
+              >
+                <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+                  <span>{row.label}</span>
+                  {!row.offered && (
+                    <span className="text-muted-foreground/60 text-xs">
+                      hidden from client
                     </span>
                   )}
-                </div>
-              ))}
-          </div>
+                </span>
+                {row.connected ? (
+                  <span className="truncate text-emerald-400">
+                    {row.accounts.filter(Boolean).join(", ") || "Connected"}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground/60">
+                    Not connected
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </section>

@@ -3,16 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DownloadCloud, Plus } from "lucide-react";
+import { DownloadCloud, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { useTRPC } from "@/trpc/react";
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -20,11 +14,26 @@ const PLATFORM_LABEL: Record<string, string> = {
   google: "Google",
 };
 
+type Row = {
+  platform: "facebook" | "google";
+  externalId: string;
+  name: string | null;
+  allowed: boolean | null;
+  ownedByBrand: string | null;
+  discovered: boolean;
+};
+
 /**
- * The allowlist's UI. The page itself shows only what is allowed — the
- * decision surface (everything the client's OAuth can reach, allow/deny)
- * lives in a dialog, because it is visited once per onboarding and the live
- * Zernio enumeration it needs is too slow to run on every page view.
+ * The allowlist's UI.
+ *
+ * Deciding which accounts a brand may consume IS this page's job, so the
+ * decision is on the page rather than behind a dialog. `allowed: null` and
+ * `allowed: false` both deny, so one switch says everything a row's state
+ * means; flipping it off writes an explicit deny, which is better provenance
+ * than leaving the row undecided.
+ *
+ * Two reads of the same procedure: the registry-only one paints immediately,
+ * the live Zernio enumeration is slow and merges in behind it.
  */
 export function AdAccountsCard({
   brandId,
@@ -35,33 +44,43 @@ export function AdAccountsCard({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [showForeign, setShowForeign] = useState(false);
 
-  // Cheap registry-only read for the page; live discovery only in the dialog.
-  const allowedQuery = useQuery(
+  const registryQuery = useQuery(
     trpc.brand.adAccounts.queryOptions({ brandId, discover: false }),
   );
-  const discoveredQuery = useQuery(
-    trpc.brand.adAccounts.queryOptions(
-      { brandId, discover: true },
-      { enabled: open },
-    ),
+  const discoverQuery = useQuery(
+    trpc.brand.adAccounts.queryOptions({ brandId, discover: true }),
   );
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({
-      queryKey: trpc.brand.adAccounts.queryKey({ brandId }),
-    });
-
   const decide = useMutation(
-    trpc.brand.setAdAccountAllowed.mutationOptions({ onSuccess: invalidate }),
+    trpc.brand.setAdAccountAllowed.mutationOptions({
+      onSuccess: () =>
+        queryClient.invalidateQueries({
+          queryKey: trpc.brand.adAccounts.queryKey({ brandId }),
+        }),
+    }),
   );
   const sync = useMutation(trpc.brand.syncRecentAds.mutationOptions());
 
-  const allowed = (allowedQuery.data ?? []).filter(
-    (row) => row.allowed === true,
+  // Discovery is the fuller answer once it lands; until then the registry is
+  // what we know. `discovered` is meaningless on the registry-only read (it
+  // skips the enumeration, so every row comes back false) — hence the flag,
+  // rather than reading the field off whichever query answered.
+  const enumerated = discoverQuery.data !== undefined;
+  const rows: Row[] = discoverQuery.data ?? registryQuery.data ?? [];
+  const mine = rows.filter((row) => !row.ownedByBrand);
+  const foreign = rows.filter((row) => row.ownedByBrand);
+  const allowedCount = mine.filter((row) => row.allowed === true).length;
+
+  // Allowed first, then the ones still to decide, then the refused.
+  const rank = (row: Row) =>
+    row.allowed === true ? 0 : row.allowed === null ? 1 : 2;
+  const ordered = [...mine].sort(
+    (a, b) => rank(a) - rank(b) || (a.name ?? "").localeCompare(b.name ?? ""),
   );
-  const discovered = discoveredQuery.data ?? [];
+
+  const loading = registryQuery.isPending && discoverQuery.isPending;
 
   return (
     <section className="space-y-3">
@@ -69,66 +88,114 @@ export function AdAccountsCard({
         <div>
           <h2 className="text-base font-semibold">Ad accounts</h2>
           <p className="text-muted-foreground mt-0.5 text-sm">
-            The accounts this brand&apos;s reporting and sync may consume.
+            Everything this brand&apos;s ad connections can reach. A
+            client&apos;s login often sees accounts that aren&apos;t theirs, so
+            nothing is consumed until you switch it on.
           </p>
         </div>
-        {allowed.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-              Manage
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              loading={sync.isPending}
-              onClick={() => sync.mutate({ brandId, limit: 10 })}
-            >
-              <DownloadCloud className="size-3.5" />
-              Pull recent ads
-            </Button>
-          </div>
+        {allowedCount > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            loading={sync.isPending}
+            onClick={() => sync.mutate({ brandId, limit: 10 })}
+          >
+            <DownloadCloud className="size-3.5" />
+            Pull recent ads
+          </Button>
         )}
       </div>
 
       <div className="border-border rounded-xl border">
-        {allowedQuery.isPending ? (
+        {loading ? (
           <p className="text-muted-foreground p-4 text-sm">Loading…</p>
-        ) : allowed.length === 0 ? (
-          <div className="flex flex-col items-start gap-2 p-4">
-            <p className="text-muted-foreground text-sm">
-              No ad accounts allowed yet. Once the client connects Meta or
-              Google Ads, pick which of their accounts belong to this brand.
-            </p>
-            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-              <Plus className="size-3.5" />
-              Choose ad accounts
-            </Button>
-          </div>
+        ) : ordered.length === 0 ? (
+          <p className="text-muted-foreground p-4 text-sm">
+            {enumerated
+              ? "Nothing to allow yet. Accounts appear here once the client connects Meta Ads or Google Ads through the link above."
+              : "Asking the connections what they can see…"}
+          </p>
         ) : (
           <div className="divide-y divide-white/5">
-            {allowed.map((row) => (
-              <div
-                key={`${row.platform}:${row.externalId}`}
-                className="flex items-center justify-between gap-3 px-4 py-2.5"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {row.name ?? row.externalId}
-                  </p>
-                  <p className="text-muted-foreground font-mono text-xs">
-                    {PLATFORM_LABEL[row.platform] ?? row.platform} ·{" "}
-                    {row.externalId}
-                  </p>
+            {ordered.map((row) => {
+              const id = `allow-${row.platform}-${row.externalId}`;
+              return (
+                <div
+                  key={`${row.platform}:${row.externalId}`}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5"
+                >
+                  <label htmlFor={id} className="min-w-0 cursor-pointer">
+                    <p className="truncate text-sm font-medium">
+                      {row.name ?? row.externalId}
+                    </p>
+                    <p className="text-muted-foreground font-mono text-xs">
+                      {PLATFORM_LABEL[row.platform] ?? row.platform} ·{" "}
+                      {row.externalId}
+                    </p>
+                  </label>
+                  <div className="flex shrink-0 items-center gap-2.5">
+                    {/* Allowed, but no live connection can see it any more —
+                        the sync is quietly buying nothing. */}
+                    {row.allowed === true && enumerated && !row.discovered && (
+                      <span className="flex items-center gap-1 text-xs text-amber-400">
+                        <TriangleAlert className="size-3.5" />
+                        no connection sees it
+                      </span>
+                    )}
+                    <Switch
+                      id={id}
+                      checked={row.allowed === true}
+                      disabled={decide.isPending}
+                      onCheckedChange={(next) =>
+                        decide.mutate({
+                          brandId,
+                          platform: row.platform,
+                          externalId: row.externalId,
+                          name: row.name,
+                          isAllowed: next,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
-                <span className="shrink-0 text-xs font-medium text-emerald-400">
-                  Allowed
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
+      {!enumerated && ordered.length > 0 && (
+        <p className="text-muted-foreground text-xs">
+          Asking the connections what else they can see…
+        </p>
+      )}
+
+      {foreign.length > 0 && (
+        <div className="text-muted-foreground text-xs">
+          <button
+            type="button"
+            className="hover:text-foreground underline"
+            onClick={() => setShowForeign((open) => !open)}
+          >
+            {foreign.length} account{foreign.length === 1 ? "" : "s"} registered
+            to another brand
+          </button>
+          {showForeign && (
+            <ul className="mt-1.5 space-y-1">
+              {foreign.map((row) => (
+                <li key={`${row.platform}:${row.externalId}`}>
+                  <span className="font-mono">{row.externalId}</span>{" "}
+                  {row.name ?? "unnamed"} · {row.ownedByBrand}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {decide.error && (
+        <p className="text-xs text-red-300">{decide.error.message}</p>
+      )}
       {sync.data && (
         <p className="text-muted-foreground text-xs">
           Pulled {sync.data.inserted} new and updated {sync.data.updated}{" "}
@@ -142,111 +209,6 @@ export function AdAccountsCard({
       {sync.error && (
         <p className="text-xs text-red-300">{sync.error.message}</p>
       )}
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Choose ad accounts</DialogTitle>
-            <DialogDescription>
-              Everything this brand&apos;s ad connections can reach. A
-              client&apos;s login often sees accounts that aren&apos;t theirs —
-              allow only the ones that belong to this brand.
-            </DialogDescription>
-          </DialogHeader>
-
-          {discoveredQuery.isPending ? (
-            <p className="text-muted-foreground py-4 text-sm">
-              Asking the connections what they can see…
-            </p>
-          ) : discovered.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-sm">
-              Nothing visible yet. Accounts appear here once Meta Ads or Google
-              Ads is connected via the client link.
-            </p>
-          ) : (
-            <div className="divide-y divide-white/5">
-              {discovered.map((row) => (
-                <div
-                  key={`${row.platform}:${row.externalId}`}
-                  className="flex items-center justify-between gap-3 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {row.name ?? row.externalId}
-                      {!row.discovered && (
-                        <span className="text-muted-foreground/60 ml-2 text-xs">
-                          not visible to any connection
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-muted-foreground font-mono text-xs">
-                      {PLATFORM_LABEL[row.platform] ?? row.platform} ·{" "}
-                      {row.externalId}
-                    </p>
-                  </div>
-                  {row.ownedByBrand ? (
-                    <span className="text-muted-foreground shrink-0 text-xs">
-                      registered to {row.ownedByBrand}
-                    </span>
-                  ) : (
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      {row.allowed === true ? (
-                        <span className="text-xs font-medium text-emerald-400">
-                          Allowed
-                        </span>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7"
-                          disabled={decide.isPending}
-                          onClick={() =>
-                            decide.mutate({
-                              brandId,
-                              platform: row.platform,
-                              externalId: row.externalId,
-                              name: row.name,
-                              isAllowed: true,
-                            })
-                          }
-                        >
-                          Allow
-                        </Button>
-                      )}
-                      {row.allowed !== false ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-muted-foreground h-7"
-                          disabled={decide.isPending}
-                          onClick={() =>
-                            decide.mutate({
-                              brandId,
-                              platform: row.platform,
-                              externalId: row.externalId,
-                              name: row.name,
-                              isAllowed: false,
-                            })
-                          }
-                        >
-                          Deny
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground/60 text-xs">
-                          Denied
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {decide.error && (
-            <p className="text-xs text-red-300">{decide.error.message}</p>
-          )}
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }

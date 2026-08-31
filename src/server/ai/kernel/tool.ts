@@ -98,8 +98,32 @@ function providerRootObjectSchema<Input>(
       fields.set(name, [...(fields.get(name) ?? []), schema]);
     }
   }
+  // The action literals carry each action's description. A bare
+  // `z.enum(actions)` drops every one of them, which leaves the model
+  // choosing between names — and the guidance that says which action is the
+  // local draft and which one writes to the provider never reaches it.
+  const describedActions = variants.map((variant) => {
+    const shape_: Record<string, z.ZodTypeAny> = variant.shape;
+    const literal = shape_.action!;
+    const required = Object.entries(shape_)
+      .filter(
+        ([name, schema]) =>
+          name !== "action" && !schema.safeParse(undefined).success,
+      )
+      .map(([name]) => name);
+    if (required.length === 0) return literal;
+    const described = literal.description ?? "";
+    return literal.describe(
+      `${described}${described ? " " : ""}Requires: ${required.join(", ")}.`,
+    );
+  });
   const shape: Record<string, z.ZodTypeAny> = {
-    action: z.enum(actions as [string, ...string[]]),
+    action:
+      describedActions.length === 1
+        ? describedActions[0]!
+        : z.union(
+            describedActions as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]],
+          ),
   };
   for (const [name, schemas] of fields) {
     const unique = [
