@@ -11,7 +11,8 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  adSpotTable,
+  platformAdTable,
+  platformAudienceTable,
   audienceTable,
   brandInspirationTable,
   brandTable,
@@ -1295,7 +1296,6 @@ async function main() {
       landingUrl: "https://wander.com/list",
       color: "#34d399",
       status: "active",
-      targetChannels: ["meta_ads", "google_ads"],
       budget: 30000,
       startAt: daysFromNow(-10),
     },
@@ -1308,7 +1308,6 @@ async function main() {
       landingUrl: "https://wander.com",
       color: "#38bdf8",
       status: "active",
-      targetChannels: ["meta_ads", "google_ads", "openai_ads"],
       budget: 60000,
       startAt: daysFromNow(-25),
     },
@@ -1321,7 +1320,6 @@ async function main() {
       landingUrl: "https://wander.com",
       color: "#a78bfa",
       status: "active",
-      targetChannels: ["meta_ads"],
       budget: 15000,
       startAt: daysFromNow(-60),
     },
@@ -1335,7 +1333,6 @@ async function main() {
       landingUrl: "https://os.wander.com",
       color: "#f59e0b",
       status: "active",
-      targetChannels: ["meta_ads", "google_ads"],
       budget: 30000,
       startAt: daysFromNow(-18),
     },
@@ -1359,7 +1356,7 @@ async function main() {
       startAt: daysFromNow(-10),
       budget: 16000,
       spend: 5200,
-      adSpots: 3,
+      adCount: 3,
       manageUrl: "https://adsmanager.facebook.com",
     },
     {
@@ -1374,7 +1371,7 @@ async function main() {
       startAt: daysFromNow(-8),
       budget: 14000,
       spend: 4100,
-      adSpots: 4,
+      adCount: 4,
       manageUrl: "https://ads.google.com",
     },
     // --- Demand (bookings) ---
@@ -1391,7 +1388,7 @@ async function main() {
       endAt: daysFromNow(32),
       budget: 40000,
       spend: 3600,
-      adSpots: 4,
+      adCount: 4,
       manageUrl: "https://adsmanager.facebook.com",
     },
     {
@@ -1407,7 +1404,7 @@ async function main() {
       endAt: daysFromNow(37),
       budget: 15000,
       spend: 0,
-      adSpots: 1,
+      adCount: 1,
       manageUrl: "https://adsmanager.facebook.com",
     },
     {
@@ -1422,7 +1419,7 @@ async function main() {
       startAt: daysFromNow(-20),
       budget: 12000,
       spend: 880,
-      adSpots: 3,
+      adCount: 3,
       manageUrl: "https://ads.google.com",
     },
     {
@@ -1438,7 +1435,7 @@ async function main() {
       endAt: daysFromNow(-3),
       budget: 5000,
       spend: 4760,
-      adSpots: 6,
+      adCount: 6,
       manageUrl: "https://ads.google.com",
     },
     {
@@ -1453,7 +1450,7 @@ async function main() {
       startAt: daysFromNow(-12),
       budget: 2250,
       spend: 0,
-      adSpots: 4,
+      adCount: 4,
       manageUrl: "https://platform.openai.com",
     },
     {
@@ -1468,7 +1465,7 @@ async function main() {
       startAt: daysFromNow(5),
       budget: 1500,
       spend: 0,
-      adSpots: 2,
+      adCount: 2,
       manageUrl: "https://platform.openai.com",
     },
     // --- Brand ---
@@ -1485,7 +1482,7 @@ async function main() {
       endAt: daysFromNow(12),
       budget: 9000,
       spend: 4100,
-      adSpots: 3,
+      adCount: 3,
       manageUrl: "https://adsmanager.facebook.com",
     },
     {
@@ -1500,7 +1497,7 @@ async function main() {
       startAt: daysFromNow(-60),
       budget: 6000,
       spend: 5200,
-      adSpots: 2,
+      adCount: 2,
       manageUrl: "https://adsmanager.facebook.com",
     },
     // --- SaaS (/os) ---
@@ -1516,7 +1513,7 @@ async function main() {
       startAt: daysFromNow(-18),
       budget: 18000,
       spend: 7400,
-      adSpots: 5,
+      adCount: 5,
       manageUrl: "https://adsmanager.facebook.com",
     },
     {
@@ -1532,7 +1529,7 @@ async function main() {
       endAt: daysFromNow(34),
       budget: 8000,
       spend: 0,
-      adSpots: 2,
+      adCount: 2,
       manageUrl: "https://adsmanager.facebook.com",
     },
     {
@@ -1548,7 +1545,7 @@ async function main() {
       endAt: daysFromNow(-15),
       budget: 4000,
       spend: 3900,
-      adSpots: 3,
+      adCount: 3,
       manageUrl: "https://adsmanager.facebook.com",
     },
   ]);
@@ -1573,7 +1570,9 @@ async function main() {
     name: body.length > 30 ? `${body.slice(0, 30)}…` : body,
     status,
     adSetName: "Prospecting · US",
-    media: [{ url: adImg(`ad-${platformCampaignId}-${i}`), type: "image" as const }],
+    media: [
+      { url: adImg(`ad-${platformCampaignId}-${i}`), type: "image" as const },
+    ],
     body,
     linkUrl: link,
     thumbnailUrl: adImg(`ad-${platformCampaignId}-${i}`),
@@ -1584,7 +1583,7 @@ async function main() {
     manageUrl: "https://adsmanager.facebook.com",
   });
   await db
-    .insert(adSpotTable)
+    .insert(platformAdTable)
     .values([
       spot(
         campBecomeHost,
@@ -1665,9 +1664,9 @@ async function main() {
       ),
     ]);
   // "CA Remote Workers" exists on both Meta + Google → two rows, deduped by name in the UI.
-  await db.insert(audienceTable).values([
+  await db.insert(platformAudienceTable).values([
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wander,
       channelId: metaCh,
       name: "CA Remote Workers · 28–45",
@@ -1675,7 +1674,7 @@ async function main() {
       sizeLabel: "~1.2M",
     },
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wander,
       channelId: googleCh,
       name: "CA Remote Workers · 28–45",
@@ -1683,7 +1682,7 @@ async function main() {
       sizeLabel: "~1.2M",
     },
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wander,
       channelId: googleCh,
       name: "Monthly-stay search intent",
@@ -1691,7 +1690,7 @@ async function main() {
       sizeLabel: "~40K/mo",
     },
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wander,
       channelId: openaiCh,
       name: "Luxury Travel Audience",
@@ -1699,7 +1698,7 @@ async function main() {
       sizeLabel: "high-income · 30–65",
     },
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wander,
       channelId: metaCh,
       name: "Lookalike · past bookers",
@@ -1707,7 +1706,7 @@ async function main() {
       sizeLabel: "~2.1M",
     },
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wanderos,
       channelId: osMetaCh,
       name: "STR operators · 5+ units",
@@ -1715,7 +1714,7 @@ async function main() {
       sizeLabel: "~320K",
     },
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wanderos,
       channelId: osMetaCh,
       name: "Lookalike · trial signups",
@@ -1723,7 +1722,7 @@ async function main() {
       sizeLabel: "~1.8M",
     },
     {
-      id: createId("aud"),
+      id: createId("paud"),
       brandId: wanderos,
       channelId: osMetaCh,
       name: "Property-management intent",

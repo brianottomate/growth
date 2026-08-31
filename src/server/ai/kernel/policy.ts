@@ -118,7 +118,7 @@ export const growthActionPolicies = {
     }),
     removeReference: write({ reversible: false }),
   },
-  audienceRead: { list: read() },
+  personaRead: { list: read() },
   performanceRead: {
     list: read(),
     get: read(),
@@ -148,11 +148,10 @@ export const growthActionPolicies = {
       idempotent: true,
     }),
   },
-  audienceWrite: {
-    createTarget: write(),
-    saveTargets: write({ idempotent: true }),
-    updateTarget: write({ idempotent: true }),
-    updateActivation: write({ idempotent: true }),
+  personaWrite: {
+    create: write(),
+    update: write({ idempotent: true }),
+    delete: write({ reversible: true }),
   },
   researchRead: {
     search: read("provider-read", PRODUCT),
@@ -231,7 +230,6 @@ export const growthActionPolicies = {
     listDestinations: read("provider-read"),
     openCampaign: read(),
     listCampaigns: read(),
-    listAudienceTargets: read(),
     diagnoseAlignment: read("model-read"),
     inspectConversions: read(),
   },
@@ -239,9 +237,10 @@ export const growthActionPolicies = {
     // Local DB rows only; no provider call, no spend. Push is separate.
     draftCampaign: write(),
     draftAd: write(),
-    addAdSet: write(),
+    addAudience: write(),
+    planPlatform: write({ idempotent: true }),
     setCreativePool: write({ idempotent: true }),
-    setGoogleSettings: write({ idempotent: true }),
+    setPlatformDraft: write({ idempotent: true }),
     attachCampaign: write({ idempotent: true }),
     // Reads the provider's audiences; writes only Growth's mirror rows and
     // changes nothing on the ad account.
@@ -252,7 +251,7 @@ export const growthActionPolicies = {
     // Draft deletes drop local rows and are refused once the thing exists on
     // a platform, so they cannot destroy anything a provider knows about.
     deleteCampaignDraft: write({ reversible: false }),
-    deleteAdSetDraft: write({ reversible: false }),
+    deleteAudience: write({ reversible: false }),
     deleteAdDraft: write({ reversible: false }),
     // Creates the campaign tree PAUSED, so approving the push does not start
     // spend — setDelivery does, separately. Idempotency-Key makes a retry

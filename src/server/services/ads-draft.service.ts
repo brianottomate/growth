@@ -1,34 +1,40 @@
 import "server-only";
 
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  adSetTable,
-  adSpotTable,
+  adTable,
   audienceTable,
-  audienceTargetTable,
   brandTable,
+  channelTable,
+  personaTable,
+  platformAdSetTable,
+  platformAudienceTable,
   platformCampaignTable,
   campaignTable,
-  type CampaignPlatformConfig,
+  type AdContent,
+  type AudienceGeographyPlan,
+  type AudienceType,
   type MediaItem,
+  type PlatformCampaignSettings,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 
-// ---- FIRST-PARTY AD DRAFTS --------------------------------------------
+// ---- THE PLAN'S CRUD ---------------------------------------------------
 //
-// The thing you author is a CAMPAIGN: one push, brand-scoped, carrying its
-// ad sets (targeting + budget) and ads (creative + copy). Per-platform
-// `platform_campaign` rows are created by the push, from the platform's own
-// response — which is why `platform_campaign` means "a real campaign on a
-// real ad account" and why a draft never needs a placeholder channel.
-//
-// Same canonical/per-surface split the organic side uses
-// (content_post → platform_post); `campaign` is the shared layer, referenced
-// by content_post and series as well as platform_campaign.
+// Everything here writes LOCAL rows only — the plan layer. Platforms are
+// planned by creating a draft `platform_campaign` row (which is also where
+// the authoritative budget and per-platform settings live); nothing reaches
+// a provider until the push compiles the plan.
 
-export type DraftAdPlatform = "meta_ads" | "google_ads";
+export type DraftAdPlatform = "meta_ads" | "google_ads" | "openai_ads";
+
+const PLATFORM_LABELS: Record<DraftAdPlatform, string> = {
+  meta_ads: "Meta Ads",
+  google_ads: "Google Ads",
+  openai_ads: "OpenAI Ads",
+};
 
 async function requireOwnedBrand(input: {
   organizationId: string;
@@ -56,27 +62,63 @@ async function requireOwnedBrand(input: {
   return brand;
 }
 
-async function requireOwnedCampaign(
+export async function requireOwnedCampaign(
   campaignId: string,
   organizationId: string,
 ) {
   const campaign = await db.query.campaignTable.findFirst({
     where: eq(campaignTable.id, campaignId),
   });
-  if (!campaign) throw new Error("Campaign draft not found");
+  if (!campaign) throw new Error("Campaign not found");
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, campaign.brandId),
-    columns: { id: true, slug: true, organizationId: true, website: true },
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      organizationId: true,
+      website: true,
+    },
   });
   if (brand?.organizationId !== organizationId) {
-    throw new Error("No access to this campaign draft");
+    throw new Error("No access to this campaign");
   }
   return { campaign, brand };
 }
 
 /**
- * Create the draft: a campaign, nothing else. Platforms are recorded as
- * intent (`targetChannels`) and only become real campaigns at push time.
+ * The brand's ads channel for a platform, created if missing. A planned
+ * platform needs somewhere to hang its draft row; the channel is that
+ * somewhere, and it is a lightweight local row.
+ */
+async function ensureAdsChannel(brandId: string, platform: DraftAdPlatform) {
+  const existing = await db.query.channelTable.findFirst({
+    where: and(
+      eq(channelTable.brandId, brandId),
+      eq(channelTable.platform, platform),
+      isNull(channelTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  if (existing) return existing;
+  const [created] = await db
+    .insert(channelTable)
+    .values({
+      id: createId("chan"),
+      brandId,
+      kind: "ad",
+      platform,
+      handle: PLATFORM_LABELS[platform],
+      connectionStatus: "disconnected",
+    })
+    .returning({ id: channelTable.id });
+  return created!;
+}
+
+/**
+ * Create the plan: a campaign, plus one draft platform_campaign row per
+ * platform the operator picked. The drafts are where budget and platform
+ * settings live; they are not on any provider yet.
  */
 export async function createDraftCampaign(input: {
   organizationId: string;
@@ -86,9 +128,8 @@ export async function createDraftCampaign(input: {
   goal?: string | null;
   landingUrl?: string | null;
   description?: string | null;
-  /** Intended platforms; the push decides what actually ships. */
-  targetChannels?: DraftAdPlatform[];
-  /** Whole dollars for the whole push. */
+  platforms?: DraftAdPlatform[];
+  /** ADVISORY total, whole dollars. Seeds the platform drafts. */
   budget?: number | null;
   startAt?: Date | null;
   endAt?: Date | null;
@@ -105,12 +146,19 @@ export async function createDraftCampaign(input: {
       goal: input.goal ?? null,
       landingUrl: input.landingUrl ?? null,
       description: input.description ?? null,
-      targetChannels: input.targetChannels ?? ["meta_ads"],
       budget: input.budget ?? null,
       startAt: input.startAt ?? null,
       endAt: input.endAt ?? null,
     })
     .returning();
+
+  for (const platform of input.platforms ?? ["meta_ads" as const]) {
+    await planPlatformInternal({
+      campaign: campaign!,
+      brandId: brand.id,
+      platform,
+    });
+  }
 
   return {
     campaign: campaign!,
@@ -119,18 +167,144 @@ export async function createDraftCampaign(input: {
   };
 }
 
+async function planPlatformInternal(input: {
+  campaign: typeof campaignTable.$inferSelect;
+  brandId: string;
+  platform: DraftAdPlatform;
+}) {
+  const existing = await db.query.platformCampaignTable.findFirst({
+    where: and(
+      eq(platformCampaignTable.campaignId, input.campaign.id),
+      eq(platformCampaignTable.platform, input.platform),
+    ),
+    columns: { id: true },
+  });
+  if (existing) return existing;
+  const channel = await ensureAdsChannel(input.brandId, input.platform);
+  const [created] = await db
+    .insert(platformCampaignTable)
+    .values({
+      id: createId("pcamp"),
+      channelId: channel.id,
+      brandId: input.brandId,
+      platform: input.platform,
+      campaignId: input.campaign.id,
+      name: input.campaign.name,
+      status: "draft",
+      // Seeded from the plan's advisory number; authoritative once edited.
+      budget: input.campaign.budget,
+      budgetType: "daily",
+      startAt: input.campaign.startAt,
+      endAt: input.campaign.endAt,
+    })
+    .returning({ id: platformCampaignTable.id });
+  return created!;
+}
+
+/** Plan a platform: create its draft row. Idempotent per platform. */
+export async function planPlatform(input: {
+  organizationId: string;
+  campaignId: string;
+  platform: DraftAdPlatform;
+}) {
+  const { campaign, brand } = await requireOwnedCampaign(
+    input.campaignId,
+    input.organizationId,
+  );
+  const row = await planPlatformInternal({
+    campaign,
+    brandId: brand.id,
+    platform: input.platform,
+  });
+  return { platformCampaignId: row.id };
+}
+
+/** Unplan a platform. Only a draft can go — a pushed campaign is real. */
+export async function unplanPlatform(input: {
+  organizationId: string;
+  platformCampaignId: string;
+}) {
+  const row = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
+  });
+  if (!row) throw new Error("Platform campaign not found");
+  if (!row.campaignId) throw new Error("Not attached to a plan");
+  await requireOwnedCampaign(row.campaignId, input.organizationId);
+  if (row.status !== "draft" || row.externalId) {
+    throw new Error(
+      "This campaign exists on the platform — delete it there instead",
+    );
+  }
+  await db
+    .delete(platformCampaignTable)
+    .where(eq(platformCampaignTable.id, row.id));
+  return { deleted: true };
+}
+
 /**
- * Add an ad set — the targeting + budget layer every platform has (Meta ad
- * set, Google ad group). One campaign can carry several, which is how a
- * real prospecting build splits audiences.
+ * The authoritative pre-push numbers and settings on a platform draft.
+ * Callers send the keys they are changing; merge per platform, explicit null
+ * clears.
  */
-export async function addDraftAdSet(input: {
+export async function setPlatformDraft(input: {
+  organizationId: string;
+  platformCampaignId: string;
+  budget?: number | null;
+  budgetType?: "daily" | "lifetime" | null;
+  google?: PlatformCampaignSettings["google"] | null;
+  meta?: PlatformCampaignSettings["meta"] | null;
+}) {
+  const row = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
+  });
+  if (!row) throw new Error("Platform campaign not found");
+  if (!row.campaignId) throw new Error("Not attached to a plan");
+  await requireOwnedCampaign(row.campaignId, input.organizationId);
+
+  const current = row.settings ?? {};
+  const merge = <K extends keyof PlatformCampaignSettings>(
+    key: K,
+    value: PlatformCampaignSettings[K] | null | undefined,
+  ) =>
+    value === undefined
+      ? {}
+      : value === null
+        ? { [key]: undefined }
+        : { [key]: { ...(current[key] ?? {}), ...value } };
+
+  const [updated] = await db
+    .update(platformCampaignTable)
+    .set({
+      ...(input.budget !== undefined ? { budget: input.budget } : {}),
+      ...(input.budgetType !== undefined
+        ? { budgetType: input.budgetType }
+        : {}),
+      settings: {
+        ...current,
+        ...merge("google", input.google),
+        ...merge("meta", input.meta),
+      },
+    })
+    .where(eq(platformCampaignTable.id, row.id))
+    .returning({ id: platformCampaignTable.id });
+  return updated!;
+}
+
+/**
+ * Add an audience — one buyable narrowing, which compiles to one ad set per
+ * platform. Wanting two age ranges means two audiences.
+ */
+export async function addAudience(input: {
   organizationId: string;
   campaignId: string;
   name: string;
-  audienceTargetId?: string | null;
-  /** A mirrored platform audience, when the client already built one. */
-  audienceId?: string | null;
+  personaId?: string | null;
+  description?: string | null;
+  type?: AudienceType | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
+  geography?: AudienceGeographyPlan | null;
+  keywords?: string[] | null;
   budget?: number | null;
   budgetType?: "daily" | "lifetime" | null;
   optimizationGoal?: string | null;
@@ -139,81 +313,95 @@ export async function addDraftAdSet(input: {
     input.campaignId,
     input.organizationId,
   );
-
-  const [adSet] = await db
-    .insert(adSetTable)
+  if (input.personaId) {
+    const persona = await db.query.personaTable.findFirst({
+      where: eq(personaTable.id, input.personaId),
+      columns: { brandId: true },
+    });
+    if (persona?.brandId !== brand.id) {
+      throw new Error("That persona belongs to a different brand");
+    }
+  }
+  const [audience] = await db
+    .insert(audienceTable)
     .values({
-      id: createId("adset"),
+      id: createId("aud"),
       campaignId: campaign.id,
       brandId: brand.id,
+      personaId: input.personaId ?? null,
       name: input.name.trim(),
-      audienceTargetId: input.audienceTargetId ?? null,
-      audienceId: input.audienceId ?? null,
+      description: input.description ?? null,
+      type: input.type ?? "segment",
+      ageMin: input.ageMin ?? null,
+      ageMax: input.ageMax ?? null,
+      geography: input.geography ?? null,
+      keywords: input.keywords ?? null,
       budget: input.budget ?? null,
       budgetType: input.budgetType ?? null,
       optimizationGoal: input.optimizationGoal ?? null,
     })
     .returning();
-  return adSet!;
+  return audience!;
 }
 
-/**
- * Add a drafted ad. Creative comes from the media library (a MediaItem
- * carrying assetId) or a direct URL. Ads hang off the campaign, and
- * optionally off one of its ad sets.
- */
+export async function updateAudience(input: {
+  organizationId: string;
+  audienceId: string;
+  name?: string;
+  description?: string | null;
+  ageMin?: number | null;
+  ageMax?: number | null;
+  geography?: AudienceGeographyPlan | null;
+  keywords?: string[] | null;
+  budget?: number | null;
+  budgetType?: "daily" | "lifetime" | null;
+}) {
+  const audience = await db.query.audienceTable.findFirst({
+    where: eq(audienceTable.id, input.audienceId),
+  });
+  if (!audience) throw new Error("Audience not found");
+  await requireOwnedCampaign(audience.campaignId, input.organizationId);
+  const { organizationId: _org, audienceId: _id, ...patch } = input;
+  const [updated] = await db
+    .update(audienceTable)
+    .set(patch)
+    .where(eq(audienceTable.id, audience.id))
+    .returning();
+  return updated!;
+}
+
+/** Add a drafted ad: a suggestion the push transforms per platform. */
 export async function addDraftAd(input: {
   organizationId: string;
   campaignId: string;
-  adSetId?: string | null;
   name: string;
-  headline?: string | null;
-  body?: string | null;
-  linkUrl?: string | null;
-  media?: MediaItem[] | null;
+  type?: "creative" | "text";
+  content: AdContent;
   businessKey?: string | null;
 }) {
   const { campaign, brand } = await requireOwnedCampaign(
     input.campaignId,
     input.organizationId,
   );
-
-  if (input.adSetId) {
-    const adSet = await db.query.adSetTable.findFirst({
-      where: eq(adSetTable.id, input.adSetId),
-      columns: { campaignId: true },
-    });
-    if (adSet?.campaignId !== campaign.id) {
-      throw new Error("That ad set belongs to a different campaign draft");
-    }
-  }
-
   const businessKey =
     input.businessKey ??
     `${campaign.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
-
-  const [spot] = await db
-    .insert(adSpotTable)
+  const [ad] = await db
+    .insert(adTable)
     .values({
+      id: createId("ad"),
       campaignId: campaign.id,
-      adSetRowId: input.adSetId ?? null,
       brandId: brand.id,
-      // Intent until the push decides; the campaign's first target channel is
-      // a truer default than a hardcoded one for a Google-only draft.
-      platform: ((campaign.targetChannels?.[0] ??
-        "meta_ads") as typeof adSpotTable.$inferInsert.platform),
       name: input.name.trim(),
-      headline: input.headline ?? null,
-      body: input.body ?? null,
-      linkUrl: input.linkUrl ?? null,
-      media: input.media ?? null,
+      type: input.type ?? "creative",
+      content: input.content,
       businessKey,
     })
     .returning();
-  return spot!;
+  return ad!;
 }
 
-/** The whole draft, for the draft page. */
+/** The whole plan, for the campaign page. */
 export async function getDraftCampaign(
   organizationId: string,
   campaignId: string,
@@ -222,48 +410,40 @@ export async function getDraftCampaign(
     campaignId,
     organizationId,
   );
-  const [adSets, spots, campaigns] = await Promise.all([
-    db.query.adSetTable.findMany({
-      where: eq(adSetTable.campaignId, campaign.id),
-    }),
-    db.query.adSpotTable.findMany({
-      where: eq(adSpotTable.campaignId, campaign.id),
-    }),
-    db.query.platformCampaignTable.findMany({
-      where: eq(platformCampaignTable.campaignId, campaign.id),
-    }),
-  ]);
-  // Ad sets carry the "who" via audienceTargetId; resolve the names so the
-  // page can show the audience rather than an opaque id.
-  const targetIds = [
-    ...new Set(
-      adSets
-        .map((row) => row.audienceTargetId)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const audienceTargets =
-    targetIds.length > 0
-      ? await db.query.audienceTargetTable.findMany({
-          where: inArray(audienceTargetTable.id, targetIds),
-          columns: { id: true, name: true, geography: true },
-        })
-      : [];
-
-  // Mirrored platform audiences an ad set may point at directly. Listed for
-  // the whole brand rather than per ad set so the picker can offer them.
-  const platformAudiences = await db.query.audienceTable.findMany({
-    where: eq(audienceTable.brandId, brand.id),
-    columns: { id: true, name: true, type: true, sizeLabel: true },
-  });
+  const [audiences, ads, platformCampaigns, personas, platformAudiences] =
+    await Promise.all([
+      db.query.audienceTable.findMany({
+        where: eq(audienceTable.campaignId, campaign.id),
+        with: { persona: { columns: { id: true, name: true } } },
+      }),
+      db.query.adTable.findMany({
+        where: eq(adTable.campaignId, campaign.id),
+        orderBy: [desc(adTable.createdAt)],
+      }),
+      db.query.platformCampaignTable.findMany({
+        where: eq(platformCampaignTable.campaignId, campaign.id),
+        with: { adSets: true, ads: true },
+      }),
+      db.query.personaTable.findMany({
+        where: and(
+          eq(personaTable.brandId, brand.id),
+          isNull(personaTable.deletedAt),
+        ),
+        columns: { id: true, name: true, ageRanges: true, geographies: true },
+      }),
+      db.query.platformAudienceTable.findMany({
+        where: eq(platformAudienceTable.brandId, brand.id),
+        columns: { id: true, name: true, type: true, sizeLabel: true },
+      }),
+    ]);
 
   return {
     campaign,
     brand,
-    adSets,
-    spots,
-    campaigns,
-    audienceTargets,
+    audiences,
+    ads,
+    platformCampaigns,
+    personas,
     platformAudiences,
   };
 }
@@ -286,81 +466,15 @@ export async function setCampaignCreativePool(input: {
   return updated!;
 }
 
-/** Per-platform campaign settings (Google type/keywords, Meta pixel). */
-export async function setCampaignPlatformConfig(input: {
-  organizationId: string;
-  campaignId: string;
-  google?: CampaignPlatformConfig["google"] | null;
-  meta?: CampaignPlatformConfig["meta"] | null;
-}) {
-  const { campaign } = await requireOwnedCampaign(
-    input.campaignId,
-    input.organizationId,
-  );
-  // Callers send the keys they are changing, so merge inside each platform
-  // rather than replacing it — a budget-mode toggle must not drop the pixel
-  // configured elsewhere on the same page. An explicit null still clears.
-  const current = campaign.platformConfig ?? {};
-  const merge = <K extends keyof CampaignPlatformConfig>(
-    key: K,
-    value: CampaignPlatformConfig[K] | null | undefined,
-  ) =>
-    value === undefined
-      ? {}
-      : value === null
-        ? { [key]: undefined }
-        : { [key]: { ...(current[key] ?? {}), ...value } };
-  const next: CampaignPlatformConfig = {
-    ...current,
-    ...merge("google", input.google),
-    ...merge("meta", input.meta),
-  };
-  const [updated] = await db
-    .update(campaignTable)
-    .set({ platformConfig: next })
-    .where(eq(campaignTable.id, campaign.id))
-    .returning({ id: campaignTable.id });
-  return updated!;
-}
-
-/** The brand's audience targets — the ad-set picker's options. */
-export async function listBrandAudienceTargets(input: {
-  organizationId: string;
-  brandId: string;
-}) {
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, input.brandId),
-    columns: { organizationId: true },
-  });
-  if (brand?.organizationId !== input.organizationId) {
-    throw new Error("No access to this brand");
-  }
-  return db.query.audienceTargetTable.findMany({
-    where: eq(audienceTargetTable.brandId, input.brandId),
-    orderBy: [desc(audienceTargetTable.createdAt)],
-    columns: { id: true, name: true, description: true, geography: true },
-  });
-}
-
 /**
- * Adopt a campaign born on a platform into the first-party layer: attach it
- * to a campaign, minting one when a name is given instead of an id.
- */
-/**
- * Adopt a platform campaign (one born in Ads Manager and pulled in by sync)
- * into the first-party layer: attach it to a campaign, minting one when a
- * name is given instead of an id.
- *
- * A minted campaign inherits what the platform already knows — budget, dates,
- * and the platform itself as a target channel — so the umbrella starts out
- * describing reality instead of an empty shell the operator has to retype.
+ * Adopt a platform campaign (born in Ads Manager, pulled in by sync) into
+ * the plan layer: attach it to a campaign, minting one when a name is given
+ * instead of an id.
  */
 export async function attachPlatformCampaign(input: {
   organizationId: string;
   platformCampaignId: string;
-  /** Attach to this existing campaign… */
   campaignId?: string | null;
-  /** …or mint one with this name. */
   newCampaignName?: string | null;
 }) {
   const platformCampaign = await db.query.platformCampaignTable.findFirst({
@@ -369,7 +483,7 @@ export async function attachPlatformCampaign(input: {
   if (!platformCampaign) throw new Error("Platform campaign not found");
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, platformCampaign.brandId),
-    columns: { id: true, slug: true, organizationId: true, website: true },
+    columns: { id: true, slug: true, organizationId: true },
   });
   if (brand?.organizationId !== input.organizationId) {
     throw new Error("No access to this campaign");
@@ -379,19 +493,10 @@ export async function attachPlatformCampaign(input: {
   if (campaignId) {
     const existing = await db.query.campaignTable.findFirst({
       where: eq(campaignTable.id, campaignId),
-      columns: { brandId: true, targetChannels: true },
+      columns: { brandId: true },
     });
     if (existing?.brandId !== brand.id) {
       throw new Error("That campaign does not belong to this brand");
-    }
-    // Widen the umbrella's platform list if this adds a new surface.
-    const targets = new Set(existing.targetChannels ?? []);
-    if (!targets.has(platformCampaign.platform)) {
-      targets.add(platformCampaign.platform);
-      await db
-        .update(campaignTable)
-        .set({ targetChannels: [...targets] })
-        .where(eq(campaignTable.id, campaignId));
     }
   }
 
@@ -406,7 +511,6 @@ export async function attachPlatformCampaign(input: {
         name,
         // Adopting something that already ran means the push is underway.
         status: "active",
-        targetChannels: [platformCampaign.platform],
         budget: platformCampaign.budget,
         startAt: platformCampaign.startAt,
         endAt: platformCampaign.endAt,
@@ -451,9 +555,9 @@ export async function listBrandCampaigns(input: {
 
 // ---- DELETE (local only) ----------------------------------------------
 //
-// These remove first-party rows and never touch a platform. A campaign that
-// has already produced platform campaigns refuses to delete: those are real
-// objects still spending, and forgetting them here would not stop them.
+// These remove plan rows and never touch a platform. Anything with a live
+// counterpart refuses: those are real objects still spending, and forgetting
+// them here would not stop them.
 
 export async function deleteDraftCampaign(input: {
   organizationId: string;
@@ -463,60 +567,59 @@ export async function deleteDraftCampaign(input: {
     input.campaignId,
     input.organizationId,
   );
-  const live = await db.query.platformCampaignTable.findMany({
+  const pushed = await db.query.platformCampaignTable.findMany({
     where: eq(platformCampaignTable.campaignId, campaign.id),
-    columns: { id: true },
+    columns: { id: true, externalId: true, status: true },
   });
+  const live = pushed.filter((row) => row.externalId);
   if (live.length > 0) {
     throw new Error(
       `This campaign has ${live.length} campaign(s) on a platform — delete those first, or they keep running without anything here describing them`,
     );
   }
-  await db.delete(adSpotTable).where(eq(adSpotTable.campaignId, campaign.id));
-  await db.delete(adSetTable).where(eq(adSetTable.campaignId, campaign.id));
+  // Draft platform rows die with the plan; audiences and ads cascade.
+  for (const row of pushed) {
+    await db
+      .delete(platformCampaignTable)
+      .where(eq(platformCampaignTable.id, row.id));
+  }
   await db.delete(campaignTable).where(eq(campaignTable.id, campaign.id));
   return { deleted: true };
 }
 
-export async function deleteDraftAdSet(input: {
+export async function deleteAudience(input: {
   organizationId: string;
-  adSetId: string;
+  audienceId: string;
 }) {
-  const adSet = await db.query.adSetTable.findFirst({
-    where: eq(adSetTable.id, input.adSetId),
+  const audience = await db.query.audienceTable.findFirst({
+    where: eq(audienceTable.id, input.audienceId),
   });
-  if (!adSet) throw new Error("Ad set not found");
-  if (adSet.externalId) {
+  if (!audience) throw new Error("Audience not found");
+  await requireOwnedCampaign(audience.campaignId, input.organizationId);
+  const compiled = await db.query.platformAdSetTable.findFirst({
+    where: eq(platformAdSetTable.audienceId, audience.id),
+    columns: { id: true },
+  });
+  if (compiled) {
     throw new Error(
-      "This ad set exists on a platform — delete it there, or delete the whole platform campaign",
+      "This audience is compiled to a live ad set — pause or delete the platform campaign first",
     );
   }
-  if (!adSet.campaignId) throw new Error("Ad set has no campaign");
-  await requireOwnedCampaign(adSet.campaignId, input.organizationId);
-  // Its ads survive, unassigned, rather than disappearing with it.
-  await db
-    .update(adSpotTable)
-    .set({ adSetRowId: null })
-    .where(eq(adSpotTable.adSetRowId, adSet.id));
-  await db.delete(adSetTable).where(eq(adSetTable.id, adSet.id));
+  await db.delete(audienceTable).where(eq(audienceTable.id, audience.id));
   return { deleted: true };
 }
 
 export async function deleteDraftAd(input: {
   organizationId: string;
-  adSpotId: string;
+  adId: string;
 }) {
-  const spot = await db.query.adSpotTable.findFirst({
-    where: eq(adSpotTable.id, input.adSpotId),
+  const ad = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
   });
-  if (!spot) throw new Error("Ad not found");
-  if (spot.externalId) {
-    throw new Error(
-      "This ad is live on a platform — delete it there, or delete the whole platform campaign",
-    );
-  }
-  if (!spot.campaignId) throw new Error("Ad has no campaign");
-  await requireOwnedCampaign(spot.campaignId, input.organizationId);
-  await db.delete(adSpotTable).where(eq(adSpotTable.id, spot.id));
+  if (!ad) throw new Error("Ad not found");
+  await requireOwnedCampaign(ad.campaignId, input.organizationId);
+  // Plan rows carry no externalId by design; the platform_ad children keep
+  // their nullable lineage, so deleting the draft never touches a platform.
+  await db.delete(adTable).where(eq(adTable.id, ad.id));
   return { deleted: true };
 }

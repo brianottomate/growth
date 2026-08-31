@@ -5,7 +5,7 @@ import { and, count, eq, inArray, isNull, max } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  audienceTargetTable,
+  personaTable,
   brandInspirationTable,
   brandTable,
   channelSuggestionTable,
@@ -15,7 +15,6 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { BrandChannels, type ChannelLite } from "./BrandChannels";
-import { BrandAudiences } from "./BrandAudiences";
 import { BrandLinks } from "./BrandLinks";
 import { BrandActions } from "./BrandActions";
 import { NewBrandButton } from "./NewBrandButton";
@@ -57,7 +56,7 @@ function BrandCard({
     channels.length > 0 && `${channels.length} channels`,
     adCount > 0 && `${adCount} ad ${adCount === 1 ? "account" : "accounts"}`,
     audienceCount > 0 &&
-      `${audienceCount} ${audienceCount === 1 ? "audience" : "audiences"}`,
+      `${audienceCount} ${audienceCount === 1 ? "persona" : "personas"}`,
     postCount > 0 && `${compactFmt.format(postCount)} posts`,
   ].filter(Boolean) as string[];
 
@@ -150,8 +149,6 @@ function BrandCard({
       />
 
       <BrandLinks brandId={brand.id} links={brand.links ?? []} />
-
-      <BrandAudiences brandId={brand.id} brandName={brand.name} />
 
       <TrackedBrands ownerBrandId={brand.id} tracked={tracked} />
     </div>
@@ -360,18 +357,18 @@ export default async function BrandsPage() {
       })
     : [];
 
-  // Audience-target counts per owned brand for the card summary line.
-  const audienceTargets = brandIds.length
-    ? await db.query.audienceTargetTable.findMany({
+  // Persona counts per owned brand for the card summary line.
+  const personas = brandIds.length
+    ? await db.query.personaTable.findMany({
         where: and(
-          inArray(audienceTargetTable.brandId, brandIds),
-          isNull(audienceTargetTable.deletedAt),
+          inArray(personaTable.brandId, brandIds),
+          isNull(personaTable.deletedAt),
         ),
         columns: { brandId: true },
       })
     : [];
   const audienceCountByBrand = new Map<string, number>();
-  for (const t of audienceTargets) {
+  for (const t of personas) {
     audienceCountByBrand.set(
       t.brandId,
       (audienceCountByBrand.get(t.brandId) ?? 0) + 1,

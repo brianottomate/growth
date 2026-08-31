@@ -4,9 +4,9 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { AudienceStrategy } from "./AudienceStrategy";
+import { PersonasClient } from "./PersonasClient";
 
-export default async function AudiencesPage() {
+export default async function PersonasPage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -27,5 +27,5 @@ export default async function AudiencesPage() {
     columns: { id: true, name: true },
   });
 
-  return <AudienceStrategy brands={brands} />;
+  return <PersonasClient brands={brands} />;
 }

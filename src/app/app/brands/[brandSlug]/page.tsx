@@ -6,7 +6,7 @@ import { desc, eq as eqOp } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  adSpotTable,
+  platformAdTable,
   brandInspirationTable,
   brandTable,
   memberTable,
@@ -70,9 +70,9 @@ export default async function BrandPage({
 
   // Latest synced ads across the brand's allowed ad accounts — an overview
   // strip only; management lives on the ads pages.
-  const latestSpots = await db.query.adSpotTable.findMany({
-    where: eqOp(adSpotTable.brandId, brand.id),
-    orderBy: [desc(adSpotTable.createdAt)],
+  const latestSpots = await db.query.platformAdTable.findMany({
+    where: eqOp(platformAdTable.brandId, brand.id),
+    orderBy: [desc(platformAdTable.createdAt)],
     limit: 12,
   });
   const spotCampaignIds = [

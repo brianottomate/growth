@@ -2,7 +2,7 @@ import { userRouter } from "@/server/api/routers/user.router";
 import { adsRouter } from "@/server/api/routers/ads.router";
 import { affiliateRouter } from "@/server/api/routers/affiliate.router";
 import { amplifierRouter } from "@/server/api/routers/amplifier.router";
-import { audienceRouter } from "@/server/api/routers/audience.router";
+import { personaRouter } from "@/server/api/routers/persona.router";
 import { googleDriveRouter } from "@/server/api/routers/googleDrive.router";
 import { brandRouter } from "@/server/api/routers/brand.router";
 import { blogRouter } from "@/server/api/routers/blog.router";
@@ -52,7 +52,7 @@ export const appRouter = createTRPCRouter({
   ads: adsRouter,
   affiliate: affiliateRouter,
   amplifier: amplifierRouter,
-  audience: audienceRouter,
+  persona: personaRouter,
   brand: brandRouter,
   blog: blogRouter,
   cadence: cadenceRouter,

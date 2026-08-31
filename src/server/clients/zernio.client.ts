@@ -900,9 +900,7 @@ export async function deleteZernioCampaign(input: {
 }): Promise<Record<string, unknown>> {
   return zernioFetch(`/ads/campaigns/${input.campaignId}`, {
     method: "DELETE",
-    body: JSON.stringify(
-      input.accountId ? { accountId: input.accountId } : {},
-    ),
+    body: JSON.stringify(input.accountId ? { accountId: input.accountId } : {}),
   });
 }
 
@@ -950,11 +948,45 @@ export async function setZernioCampaignStatus(input: {
 
 export type ZernioAdTargeting = {
   countries?: string[];
+  /** Region keys from GET /v1/ads/targeting/search — ids, never names. */
+  regions?: Array<{ key: string }>;
   ageMin?: number;
   ageMax?: number;
   languages?: string[];
   audienceId?: string;
 };
+
+export type ZernioTargetingSearchResult = {
+  /** Platform-opaque id; use as a geo key or entity id in TargetingSpec. */
+  id: string;
+  name: string;
+  type: string; // city | region | country | zip | metro | location | interest | …
+  path?: string[];
+  audienceSize?: number | null;
+};
+
+/**
+ * Resolve a human-readable query into platform targeting ids.
+ * https://docs.zernio.com/ads/targeting-search
+ */
+export async function searchZernioTargeting(input: {
+  accountId: string;
+  q: string;
+  dimension?: "geo" | "interest" | "behavior" | "income";
+  geoType?: "all" | "country" | "region" | "city" | "zip" | "metro";
+  countryCode?: string;
+  limit?: number;
+}): Promise<{ results: ZernioTargetingSearchResult[] }> {
+  const params = new URLSearchParams({
+    accountId: input.accountId,
+    q: input.q,
+  });
+  if (input.dimension) params.set("dimension", input.dimension);
+  if (input.geoType) params.set("geoType", input.geoType);
+  if (input.countryCode) params.set("countryCode", input.countryCode);
+  if (input.limit) params.set("limit", String(input.limit));
+  return zernioFetch(`/ads/targeting/search?${params.toString()}`);
+}
 
 /**
  * One hand-built carousel card (Meta). Cards render in the order given —
@@ -1075,7 +1107,9 @@ export async function createZernioAdCampaign(
     status?: "PAUSED";
   },
   options: { idempotencyKey: string },
-): Promise<{ campaign?: { id?: string; platformCampaignId?: string; objective?: string } }> {
+): Promise<{
+  campaign?: { id?: string; platformCampaignId?: string; objective?: string };
+}> {
   return zernioFetch("/ads/campaigns", {
     method: "POST",
     headers: { "Idempotency-Key": options.idempotencyKey },
@@ -1290,7 +1324,9 @@ export async function listZernioAdAudiences(input: {
 
 const microsToUnits = (value: unknown): number | null => {
   const raw = typeof value === "string" ? Number(value) : value;
-  return typeof raw === "number" && Number.isFinite(raw) ? raw / 1_000_000 : null;
+  return typeof raw === "number" && Number.isFinite(raw)
+    ? raw / 1_000_000
+    : null;
 };
 const textOf = (value: unknown): string =>
   typeof value === "string" ? value : "";

@@ -80,7 +80,7 @@ export function AddAdButton({
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="bg-muted hover:border-white/25 flex h-24 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border"
+                className="bg-muted flex h-24 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border hover:border-white/25"
               >
                 {media ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -160,6 +160,8 @@ export function AddAdButton({
                 add.mutate({
                   campaignId,
                   name: name.trim(),
+                  type: "creative",
+                  headline: name.trim(),
                   body: body.trim() || null,
                   linkUrl: linkUrl.trim() || null,
                   media: media

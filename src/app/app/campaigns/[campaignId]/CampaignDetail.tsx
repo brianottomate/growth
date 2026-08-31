@@ -142,9 +142,13 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               {campaign.description}
             </p>
           )}
-          {(campaign.targetChannels ?? []).length > 0 && (
+          {campaign.adCampaigns.length > 0 && (
             <div className="mt-2.5 flex items-center gap-1.5">
-              {(campaign.targetChannels ?? []).map((p) => (
+              {[
+                ...new Set(
+                  campaign.adCampaigns.map((row) => row.channel.platform),
+                ),
+              ].map((p) => (
                 <ChannelLogo key={p} platform={p} className="size-4" />
               ))}
             </div>
@@ -290,7 +294,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           status: campaign.status,
           landingUrl: campaign.landingUrl,
           color: campaign.color,
-          targetChannels: campaign.targetChannels,
           budget: campaign.budget,
           startAt: campaign.startAt,
           endAt: campaign.endAt,

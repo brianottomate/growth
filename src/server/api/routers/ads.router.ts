@@ -19,13 +19,15 @@ import {
 } from "@/server/services/ads-write.service";
 import {
   addDraftAd,
-  addDraftAdSet,
+  addAudience,
   deleteDraftAd,
-  deleteDraftAdSet,
+  deleteAudience,
   deleteDraftCampaign,
   attachPlatformCampaign,
-  listBrandAudienceTargets,
-  setCampaignPlatformConfig,
+  planPlatform,
+  setPlatformDraft,
+  unplanPlatform,
+  updateAudience,
   setCampaignCreativePool,
   createDraftCampaign,
   listBrandCampaigns,
@@ -129,10 +131,10 @@ export const adsRouter = {
       z.object({
         brandId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
-        targetChannels: z
-          .array(z.enum(["meta_ads", "google_ads"]))
+        platforms: z
+          .array(z.enum(["meta_ads", "google_ads", "openai_ads"]))
           .min(1)
-          .max(2)
+          .max(3)
           .default(["meta_ads"]),
         goal: z.string().trim().max(200).nullish(),
         landingUrl: z.string().url().nullish(),
@@ -147,19 +149,94 @@ export const adsRouter = {
       }),
     ),
 
-  addDraftAdSet: protectedProcedure
+  addAudience: protectedProcedure
     .input(
       z.object({
         campaignId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
-        audienceTargetId: z.string().nullish(),
-        audienceId: z.string().nullish(),
+        personaId: z.string().nullish(),
+        ageMin: z.number().int().min(13).max(100).nullish(),
+        ageMax: z.number().int().min(13).max(100).nullish(),
+        countries: z.array(z.string().length(2)).max(20).nullish(),
+        regions: z.array(z.string().trim().min(1).max(100)).max(20).nullish(),
+        keywords: z.array(z.string().trim().min(1).max(80)).max(50).nullish(),
         budget: z.number().int().min(0).nullish(),
         budgetType: z.enum(["daily", "lifetime"]).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      addDraftAdSet({
+      addAudience({
+        campaignId: input.campaignId,
+        name: input.name,
+        personaId: input.personaId ?? null,
+        ageMin: input.ageMin ?? null,
+        ageMax: input.ageMax ?? null,
+        geography:
+          input.countries?.length || input.regions?.length
+            ? {
+                countries: input.countries ?? undefined,
+                regions: input.regions ?? undefined,
+              }
+            : null,
+        keywords: input.keywords ?? null,
+        budget: input.budget ?? null,
+        budgetType: input.budgetType ?? null,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  updateAudience: protectedProcedure
+    .input(
+      z.object({
+        audienceId: z.string().min(1),
+        name: z.string().trim().min(1).max(300).optional(),
+        ageMin: z.number().int().min(13).max(100).nullish(),
+        ageMax: z.number().int().min(13).max(100).nullish(),
+        countries: z.array(z.string().length(2)).max(20).nullish(),
+        regions: z.array(z.string().trim().min(1).max(100)).max(20).nullish(),
+        keywords: z.array(z.string().trim().min(1).max(80)).max(50).nullish(),
+        budget: z.number().int().min(0).nullish(),
+        budgetType: z.enum(["daily", "lifetime"]).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      updateAudience({
+        audienceId: input.audienceId,
+        name: input.name,
+        ageMin: input.ageMin,
+        ageMax: input.ageMax,
+        geography:
+          input.countries !== undefined || input.regions !== undefined
+            ? {
+                countries: input.countries ?? undefined,
+                regions: input.regions ?? undefined,
+              }
+            : undefined,
+        keywords: input.keywords,
+        budget: input.budget,
+        budgetType: input.budgetType,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  planPlatform: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        platform: z.enum(["meta_ads", "google_ads", "openai_ads"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      planPlatform({
+        ...input,
+        organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  unplanPlatform: protectedProcedure
+    .input(z.object({ platformCampaignId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      unplanPlatform({
         ...input,
         organizationId: await organizationIdFor(ctx),
       }),
@@ -187,10 +264,12 @@ export const adsRouter = {
       }),
     ),
 
-  setCampaignPlatformConfig: protectedProcedure
+  setPlatformDraft: protectedProcedure
     .input(
       z.object({
-        campaignId: z.string().min(1),
+        platformCampaignId: z.string().min(1),
+        budget: z.number().int().positive().nullish(),
+        budgetType: z.enum(["daily", "lifetime"]).nullish(),
         google: z
           .object({
             campaignType: z.enum(["search", "display"]).optional(),
@@ -220,7 +299,7 @@ export const adsRouter = {
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      setCampaignPlatformConfig({
+      setPlatformDraft({
         ...input,
         organizationId: await organizationIdFor(ctx),
       }),
@@ -247,15 +326,6 @@ export const adsRouter = {
     .mutation(async ({ ctx, input }) =>
       setCampaignCreativePool({
         ...input,
-        organizationId: await organizationIdFor(ctx),
-      }),
-    ),
-
-  audienceTargets: protectedProcedure
-    .input(z.object({ brandId: z.string().min(1) }))
-    .query(async ({ ctx, input }) =>
-      listBrandAudienceTargets({
-        brandId: input.brandId,
         organizationId: await organizationIdFor(ctx),
       }),
     ),
@@ -303,16 +373,21 @@ export const adsRouter = {
       }),
     ),
 
-  /** Drafted ad on a draft campaign; creative comes from the media library. */
+  /** Drafted ad on a campaign; creative comes from the media library. */
   addDraftAd: protectedProcedure
     .input(
       z.object({
         campaignId: z.string().min(1),
-        adSetId: z.string().nullish(),
         name: z.string().trim().min(1).max(300),
+        type: z.enum(["creative", "text"]).default("creative"),
         headline: z.string().trim().max(255).nullish(),
         body: z.string().trim().max(2_200).nullish(),
         linkUrl: z.string().url().nullish(),
+        headlines: z.array(z.string().trim().min(1).max(30)).max(15).nullish(),
+        descriptions: z
+          .array(z.string().trim().min(1).max(90))
+          .max(4)
+          .nullish(),
         media: z
           .array(
             z.object({
@@ -324,16 +399,32 @@ export const adsRouter = {
               height: z.number().optional(),
             }),
           )
-          .max(1)
+          .max(10)
           .nullish(),
       }),
     )
-    .mutation(async ({ ctx, input }) =>
-      addDraftAd({
-        ...input,
+    .mutation(async ({ ctx, input }) => {
+      const content =
+        input.type === "text"
+          ? {
+              headlines: input.headlines ?? [],
+              descriptions: input.descriptions ?? [],
+              linkUrl: input.linkUrl ?? undefined,
+            }
+          : {
+              headline: input.headline ?? input.name,
+              body: input.body ?? "",
+              linkUrl: input.linkUrl ?? undefined,
+              media: input.media ?? [],
+            };
+      return addDraftAd({
+        campaignId: input.campaignId,
+        name: input.name,
+        type: input.type,
+        content,
         organizationId: await organizationIdFor(ctx),
-      }),
-    ),
+      });
+    }),
 
   /** The allowlisted destinations for the push dialog. */
   destinations: protectedProcedure
@@ -369,10 +460,7 @@ export const adsRouter = {
           "video_views",
           "conversions",
         ]),
-        budgetAmount: z.number().positive(),
-        budgetType: z.enum(["daily", "lifetime"]),
-        startDate: z.string().optional(),
-        endDate: z.string().optional(),
+        // Budget, dates and settings come from the platform draft row.
         validateOnly: z.boolean().optional(),
       }),
     )
@@ -415,17 +503,17 @@ export const adsRouter = {
       }),
     ),
 
-  deleteDraftAdSet: protectedProcedure
-    .input(z.object({ adSetId: z.string().min(1) }))
+  deleteAudience: protectedProcedure
+    .input(z.object({ audienceId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) =>
-      deleteDraftAdSet({
+      deleteAudience({
         ...input,
         organizationId: await organizationIdFor(ctx),
       }),
     ),
 
   deleteDraftAd: protectedProcedure
-    .input(z.object({ adSpotId: z.string().min(1) }))
+    .input(z.object({ adId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) =>
       deleteDraftAd({
         ...input,

@@ -142,8 +142,8 @@ export function NewCampaignButton({
             />
             <p className="text-muted-foreground text-xs">
               Where the ads send people. Every ad inherits this unless it
-              overrides it. Point it at the specific property or offer page —
-              a homepage converts far worse on paid traffic.
+              overrides it. Point it at the specific property or offer page — a
+              homepage converts far worse on paid traffic.
             </p>
           </div>
           <div className="space-y-1.5">
@@ -169,7 +169,7 @@ export function NewCampaignButton({
               create.mutate({
                 brandId,
                 name: name.trim(),
-                targetChannels: platforms,
+                platforms,
                 landingUrl: landingUrl.trim() || null,
                 description: description.trim() || null,
                 budget:

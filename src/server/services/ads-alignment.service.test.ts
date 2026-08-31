@@ -15,9 +15,7 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
     description: null,
     color: null,
     status: "active",
-    targetChannels: ["meta_ads", "google_ads"],
     creativePool: [],
-    platformConfig: {},
     budget: 10_000,
     performanceCycleId: null,
     startAt: new Date("2026-07-01"),
@@ -44,8 +42,10 @@ function platformCampaign(
     startAt: new Date("2026-07-05"),
     endAt: null,
     budget: 4_000,
+    budgetType: "daily",
     spend: 1_200,
-    adSpots: 0,
+    adCount: 0,
+    settings: {},
     stats: null,
     heroThumbnailUrl: null,
     externalId: null,
@@ -57,15 +57,10 @@ function platformCampaign(
 }
 
 describe("scoreSuggestion", () => {
-  it("does not suggest a campaign on a channel outside the campaign", () => {
-    expect(
-      scoreSuggestion(campaign(), platformCampaign({ platform: "x_ads" })),
-    ).toBeUndefined();
-  });
-
   it("does not suggest a campaign that ran outside the campaign window", () => {
     expect(
-      scoreSuggestion(campaign(),
+      scoreSuggestion(
+        campaign(),
         platformCampaign({
           startAt: new Date("2026-01-01"),
           endAt: new Date("2026-02-01"),
@@ -77,18 +72,23 @@ describe("scoreSuggestion", () => {
   it("ranks eligible campaigns by meaningful campaign-name overlap", () => {
     expect(scoreSuggestion(campaign(), platformCampaign())).toBe(1); // "supply"
     expect(
-      scoreSuggestion(campaign(),
+      scoreSuggestion(
+        campaign(),
         platformCampaign({ name: "SUPPLY push retargeting" }),
       ),
     ).toBe(2);
     expect(
-      scoreSuggestion(campaign(), platformCampaign({ name: "Brand awareness" })),
+      scoreSuggestion(
+        campaign(),
+        platformCampaign({ name: "Brand awareness" }),
+      ),
     ).toBe(0);
   });
 
   it("keeps open-ended campaigns eligible when their active dates overlap", () => {
     expect(
-      scoreSuggestion(campaign(),
+      scoreSuggestion(
+        campaign(),
         platformCampaign({
           name: "Supply expansion",
           startAt: new Date("2026-08-01"),
@@ -100,11 +100,16 @@ describe("scoreSuggestion", () => {
 });
 
 describe("diffCampaign", () => {
-  it("verdicts: ok / inactive / missing per intended channel", () => {
-    const a = diffCampaign(campaign(),
+  it("verdicts: ok when live, inactive when pushed but paused", () => {
+    const a = diffCampaign(
+      campaign(),
       [
         platformCampaign({ id: "c1", platform: "meta_ads", status: "live" }),
-        platformCampaign({ id: "c2", platform: "google_ads", status: "paused" }),
+        platformCampaign({
+          id: "c2",
+          platform: "google_ads",
+          status: "paused",
+        }),
       ],
       [],
     );
@@ -114,18 +119,20 @@ describe("diffCampaign", () => {
     ]);
   });
 
-  it("missing channel when nothing is linked", () => {
-    const a = diffCampaign(campaign(), [], []);
-    expect(a.channels.map((c) => c.verdict)).toEqual(["missing", "missing"]);
-  });
-
-  it("flags unplanned platforms", () => {
-    const a = diffCampaign(campaign(),
-      [platformCampaign({ platform: "x_ads", status: "live" })],
+  it("missing when a platform is planned but every row is still a draft", () => {
+    const a = diffCampaign(
+      campaign(),
+      [platformCampaign({ id: "c1", platform: "meta_ads", status: "draft" })],
       [],
     );
-    expect(a.unplanned).toHaveLength(1);
-    expect(a.unplanned[0]?.platform).toBe("x_ads");
+    expect(a.channels.map((c) => [c.platform, c.verdict])).toEqual([
+      ["meta_ads", "missing"],
+    ]);
+  });
+
+  it("no channels at all when nothing is planned", () => {
+    const a = diffCampaign(campaign(), [], []);
+    expect(a.channels).toEqual([]);
   });
 
   it("budget rollup prefers the precise stats snapshot and flags overrun", () => {
@@ -143,13 +150,18 @@ describe("diffCampaign", () => {
   });
 
   it("no utilization without an intended budget", () => {
-    const a = diffCampaign(campaign({ budget: null }), [platformCampaign()], []);
+    const a = diffCampaign(
+      campaign({ budget: null }),
+      [platformCampaign()],
+      [],
+    );
     expect(a.budget.utilization).toBeUndefined();
     expect(a.budget.overIntended).toBe(false);
   });
 
   it("date drift: live campaigns ending after the campaign end", () => {
-    const a = diffCampaign(campaign(),
+    const a = diffCampaign(
+      campaign(),
       [
         platformCampaign({ id: "runs-long", endAt: new Date("2026-12-01") }),
         platformCampaign({
@@ -165,7 +177,11 @@ describe("diffCampaign", () => {
 
   it("suggestions ranked by score then spend, capped at 10", () => {
     const candidates = [
-      platformCampaign({ id: "s1", campaignId: null, name: "Supply push exact" }),
+      platformCampaign({
+        id: "s1",
+        campaignId: null,
+        name: "Supply push exact",
+      }),
       platformCampaign({
         id: "s2",
         campaignId: null,
@@ -173,7 +189,12 @@ describe("diffCampaign", () => {
         stats: { spend: 9_999 },
       }),
       platformCampaign({ id: "s3", campaignId: null, name: "Unrelated name" }),
-      platformCampaign({ id: "off-platform", campaignId: null, platform: "x_ads" }),
+      platformCampaign({
+        id: "off-window",
+        campaignId: null,
+        startAt: new Date("2026-01-01"),
+        endAt: new Date("2026-02-01"),
+      }),
     ];
     const a = diffCampaign(campaign(), [], candidates);
     expect(a.suggestions.map((s) => s.id)).toEqual(["s1", "s2", "s3"]);

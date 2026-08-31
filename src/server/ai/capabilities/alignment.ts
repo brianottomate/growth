@@ -5,7 +5,6 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { computeAlignmentOverview } from "@/server/services/ads-alignment.service";
-import { computeAudienceAlignment } from "@/server/services/audience-alignment.service";
 import { orgBrandIds } from "./brands";
 import { growthAction } from "./types";
 
@@ -55,24 +54,20 @@ Your job: identify where INTENT and ACTUAL diverge and suggest what to update. R
 
 export const diagnoseAlignment = growthAction({
   description:
-    "Diagnose paid-strategy alignment: compares the growth strategy layer (campaign intended channels/budget/dates + audience targets) against platform reality (campaigns/audiences synced via Zernio) and returns ranked misalignments with concrete suggested updates. Use for 'are our ads running what we planned', 'what's misaligned', 'what should we update on paid'. Read-only — it suggests, it does not change anything.",
+    "Diagnose paid-strategy alignment: compares each campaign's planned platforms (draft platform campaigns), budget and dates against platform reality synced via Zernio, and returns ranked misalignments with concrete suggested updates. Use for 'are our ads running what we planned', 'what's misaligned', 'what should we update on paid'. Read-only — it suggests, it does not change anything.",
   inputSchema: z.object({}),
   execute: async (_input, ctx) => {
     const brandIds = await orgBrandIds(ctx.orgId);
-    const [campaigns, audiences] = await Promise.all([
-      computeAlignmentOverview(brandIds),
-      computeAudienceAlignment(brandIds),
-    ]);
+    const campaigns = await computeAlignmentOverview(brandIds);
 
-    const grounding = { campaigns, audiences };
+    const grounding = { campaigns };
 
     // Nothing to reason about — return the (empty) grounding without a model call.
-    if (campaigns.length === 0 && audiences.length === 0) {
+    if (campaigns.length === 0) {
       return {
         grounding,
         diagnosis: {
-          summary:
-            "No campaigns or audience targets with intent to compare against yet.",
+          summary: "No campaigns with intent to compare against yet.",
           findings: [],
         } satisfies AlignmentDiagnosis,
       };

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { db } from "@/server/db";
 import {
-  adSpotTable,
+  platformAdTable,
   amplificationTargetTable,
   platformCampaignTable,
   funnelStateTable,
@@ -269,9 +269,11 @@ export async function listPerformanceAccounts(actor: PerformanceActor) {
         currentCycle: current
           ? {
               ...current,
-              delivery:
-                delivery.get(current.id) ??
-                { ads: 0, emails: 0, influencers: 0 },
+              delivery: delivery.get(current.id) ?? {
+                ads: 0,
+                emails: 0,
+                influencers: 0,
+              },
               hasReport: account.reports.some(
                 (report) => report.cycleId === current.id,
               ),
@@ -345,8 +347,7 @@ export async function getPerformanceAccount(
               id: amplificationTargetTable.id,
               ask: amplificationTargetTable.ask,
               actionKind: amplificationTargetTable.actionKind,
-              performanceCycleId:
-                amplificationTargetTable.performanceCycleId,
+              performanceCycleId: amplificationTargetTable.performanceCycleId,
             })
             .from(amplificationTargetTable)
             .where(
@@ -380,19 +381,21 @@ export async function getPerformanceAccount(
       ? []
       : await db
           .select({
-            id: adSpotTable.id,
-            platformCampaignId: adSpotTable.platformCampaignId,
-            name: adSpotTable.name,
-            status: adSpotTable.status,
-            adSetName: adSpotTable.adSetName,
-            thumbnailUrl: adSpotTable.thumbnailUrl,
-            media: adSpotTable.media,
-            stats: adSpotTable.stats,
-            externalId: adSpotTable.externalId,
-            businessKey: adSpotTable.businessKey,
+            id: platformAdTable.id,
+            platformCampaignId: platformAdTable.platformCampaignId,
+            name: platformAdTable.name,
+            status: platformAdTable.status,
+            adSetName: platformAdTable.adSetName,
+            thumbnailUrl: platformAdTable.thumbnailUrl,
+            media: platformAdTable.media,
+            stats: platformAdTable.stats,
+            externalId: platformAdTable.externalId,
+            businessKey: platformAdTable.businessKey,
           })
-          .from(adSpotTable)
-          .where(inArray(adSpotTable.platformCampaignId, platformCampaignIds));
+          .from(platformAdTable)
+          .where(
+            inArray(platformAdTable.platformCampaignId, platformCampaignIds),
+          );
 
   return {
     account,
@@ -538,7 +541,10 @@ export async function searchAttachableCampaigns(
       campaignCycleId: campaignTable.performanceCycleId,
     })
     .from(platformCampaignTable)
-    .leftJoin(campaignTable, eq(campaignTable.id, platformCampaignTable.campaignId))
+    .leftJoin(
+      campaignTable,
+      eq(campaignTable.id, platformCampaignTable.campaignId),
+    )
     .where(
       and(
         isNull(campaignTable.performanceCycleId),
@@ -566,7 +572,10 @@ export async function searchAttachableCampaigns(
  */
 export async function recomputePerformanceCycleSpend(cycleId: string) {
   const campaigns = await db
-    .select({ spend: platformCampaignTable.spend, stats: platformCampaignTable.stats })
+    .select({
+      spend: platformCampaignTable.spend,
+      stats: platformCampaignTable.stats,
+    })
     .from(platformCampaignTable)
     .innerJoin(
       campaignTable,
@@ -690,7 +699,10 @@ async function attachCampaignToCycle(
     },
   });
   if (!campaign) {
-    throw new PerformanceError("NOT_FOUND", `Campaign not found: ${platformCampaignId}`);
+    throw new PerformanceError(
+      "NOT_FOUND",
+      `Campaign not found: ${platformCampaignId}`,
+    );
   }
 
   // Detach: clear the campaign's link to a cycle-owned wrapper. A campaign
@@ -781,7 +793,6 @@ async function attachCampaignToCycle(
           description:
             "Wrapper campaign created by attaching a platform campaign to a performance cycle. Platform campaigns reach a cycle through a campaign; a hand-built one has none.",
           status: "active",
-          targetChannels: [campaign.platform],
           performanceCycleId: cycleId,
           startAt: campaign.startAt,
           endAt: campaign.endAt,
@@ -877,11 +888,17 @@ export async function listSponsoredAbandonment(
 
   const unresolved = properties.filter((row) => !row.propertyId);
   const byPropertyId = new Map(
-    properties.filter((row) => row.propertyId).map((row) => [row.propertyId!, row]),
+    properties
+      .filter((row) => row.propertyId)
+      .map((row) => [row.propertyId!, row]),
   );
   const ids = [...byPropertyId.keys()];
   if (ids.length === 0) {
-    return { events: [], unresolvedProperties: unresolved, matchedProperties: 0 };
+    return {
+      events: [],
+      unresolvedProperties: unresolved,
+      matchedProperties: 0,
+    };
   }
 
   const stageColumn =
@@ -914,7 +931,9 @@ export async function listSponsoredAbandonment(
       and(
         inArray(stageColumn, ids),
         gte(stageTs, since),
-        input.includeConverted ? undefined : isNull(funnelStateTable.lastPurchaseTs),
+        input.includeConverted
+          ? undefined
+          : isNull(funnelStateTable.lastPurchaseTs),
       ),
     )
     .orderBy(desc(stageTs))
@@ -922,7 +941,9 @@ export async function listSponsoredAbandonment(
 
   const events = rows.map((row) => {
     const matchId =
-      input.stage === "wishlist" ? row.wishlistPropertyId : row.checkoutPropertyId;
+      input.stage === "wishlist"
+        ? row.wishlistPropertyId
+        : row.checkoutPropertyId;
     const property = matchId ? byPropertyId.get(matchId) : undefined;
     // Payment submitted with no purchase is the hottest state there is: the
     // guest tried to pay and something stopped them.

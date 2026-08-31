@@ -4,10 +4,12 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  type AdSpot,
-  adSpotTable,
   audienceTable,
   brandTable,
+  personaTable,
+  type PlatformAd,
+  platformAdTable,
+  platformAudienceTable,
   type PlatformCampaign,
   platformCampaignTable,
   channelTable,
@@ -15,7 +17,6 @@ import {
   memberTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { computeAudienceAlignment } from "@/server/services/audience-alignment.service";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { CopyButton } from "@/components/copy-button";
 
@@ -71,7 +72,7 @@ const CAMPAIGN_STATUS: Record<string, string> = {
  * with a webp thumb); ads mirrored from the platform carry a platform URL on
  * `thumbnailUrl` and no media at all.
  */
-const spotImage = (s: AdSpot) =>
+const spotImage = (s: PlatformAd) =>
   s.media?.[0]?.thumbnail ?? s.media?.[0]?.url ?? s.thumbnailUrl ?? undefined;
 
 /** One per-channel campaign + its ad-spot creatives. */
@@ -82,7 +83,7 @@ function CampaignRow({
   attachBrandId,
 }: {
   c: PlatformCampaign;
-  spots: AdSpot[];
+  spots: PlatformAd[];
   attachBrandId?: string;
   brandSlug: string;
 }) {
@@ -240,18 +241,27 @@ export default async function BrandAdsPage({
   const platformCampaigns = await db.query.platformCampaignTable.findMany({
     where: eq(platformCampaignTable.brandId, brand.id),
   });
-  const audiences = await db.query.audienceTable.findMany({
-    where: eq(audienceTable.brandId, brand.id),
-  });
   const campaigns = await db.query.campaignTable.findMany({
     where: eq(campaignTable.brandId, brand.id),
   });
-  const adSpots = await db.query.adSpotTable.findMany({
-    where: eq(adSpotTable.brandId, brand.id),
-  });
-  // The first-party "who" for this brand, diffed against what is actually
-  // mirrored per platform. Same service the /app/audiences strategy view uses.
-  const audienceTargets = await computeAudienceAlignment([brand.id]);
+  const [planAudiences, personas, platformAudiences, platformAds] =
+    await Promise.all([
+      db.query.audienceTable.findMany({
+        where: eq(audienceTable.brandId, brand.id),
+      }),
+      db.query.personaTable.findMany({
+        where: and(
+          eq(personaTable.brandId, brand.id),
+          isNull(personaTable.deletedAt),
+        ),
+      }),
+      db.query.platformAudienceTable.findMany({
+        where: eq(platformAudienceTable.brandId, brand.id),
+      }),
+      db.query.platformAdTable.findMany({
+        where: eq(platformAdTable.brandId, brand.id),
+      }),
+    ]);
 
   // Group platform campaigns under their campaign; track the orphans.
   const platformByCampaign = new Map<string, typeof platformCampaigns>();
@@ -267,9 +277,8 @@ export default async function BrandAdsPage({
   }
   // Drafted ads have no campaign until the push creates one; they show on
   // the draft page, not here.
-  const spotsByPlatformCampaign = new Map<string, typeof adSpots>();
-  for (const s of adSpots) {
-    if (!s.platformCampaignId) continue;
+  const spotsByPlatformCampaign = new Map<string, typeof platformAds>();
+  for (const s of platformAds) {
     const list = spotsByPlatformCampaign.get(s.platformCampaignId) ?? [];
     list.push(s);
     spotsByPlatformCampaign.set(s.platformCampaignId, list);
@@ -278,10 +287,6 @@ export default async function BrandAdsPage({
     (platformByCampaign.get(campaignId) ?? []).reduce(
       (n, c) => n + (c.spend ?? 0),
       0,
-    );
-  const campaignChannels = (campaignId: string) =>
-    new Set<string>(
-      (platformByCampaign.get(campaignId) ?? []).map((c) => c.platform),
     );
 
   const chanPlatform = new Map(channels.map((c) => [c.id, c.platform]));
@@ -305,8 +310,8 @@ export default async function BrandAdsPage({
       platforms: Set<string>;
     }
   >();
-  for (const a of audiences) {
-    if (a.targetId) continue;
+  for (const a of platformAudiences) {
+    if (a.audienceId) continue;
     const g = audGroups.get(a.name) ?? {
       name: a.name,
       type: a.type,
@@ -328,14 +333,14 @@ export default async function BrandAdsPage({
       : "",
     `\n## Campaigns (${campaigns.length})`,
     ...campaigns.map((init) => {
-      const impl = campaignChannels(init.id);
-      const targets = init.targetChannels ?? [];
-      const verify = targets
+      const rows = platformByCampaign.get(init.id) ?? [];
+      const verify = rows
         .map(
-          (ch) => `${platformLabel(ch)}${impl.has(ch) ? " ✓" : " ⚠ missing"}`,
+          (row) =>
+            `${platformLabel(row.platform)}${row.externalId ? " ✓" : " · planned"}`,
         )
         .join(", ");
-      return `- ${init.name} · goal: ${init.goal ?? "—"} · ${money(campaignSpend(init.id))} of ${money(init.budget)} · channels: ${verify || "none"}`;
+      return `- ${init.name} · goal: ${init.goal ?? "—"} · ${money(campaignSpend(init.id))} of ${money(init.budget)} · platforms: ${verify || "none"}`;
     }),
     `\n## Ad channels (${channels.length})`,
     ...channels.map(
@@ -349,19 +354,18 @@ export default async function BrandAdsPage({
           c.startAt && c.endAt
             ? ` · ${fmtDate(c.startAt)}–${fmtDate(c.endAt)}`
             : ""
-        } · spend ${money(c.spend)} of ${money(c.budget)} · ${c.adSpots} ad spots`,
+        } · spend ${money(c.spend)} of ${money(c.budget)} · ${c.adCount} ads`,
     ),
-    `\n## Audiences (${audienceTargets.length})`,
-    ...audienceTargets.map((t) => {
-      const channels = [
-        ...t.channels.map(
-          (ch) => `${platformLabel(ch.platform)} ${ch.verdict}`,
-        ),
-        ...t.unplannedPlatforms.map(
-          (platform) => `${platformLabel(platform)} not intended`,
-        ),
-      ].join(", ");
-      return `- ${t.name} · ${t.priority} · ${channels || "no intended channels"}`;
+    `\n## Personas (${personas.length})`,
+    ...personas.map(
+      (persona) =>
+        `- ${persona.name}${persona.ageRanges?.length ? ` · ${persona.ageRanges.join(", ")}` : ""}${persona.geographies?.length ? ` · ${persona.geographies.join(", ")}` : ""}`,
+    ),
+    `\n## Campaign audiences (${planAudiences.length})`,
+    ...planAudiences.map((aud) => {
+      const campaignName =
+        campaigns.find((row) => row.id === aud.campaignId)?.name ?? "?";
+      return `- ${aud.name} (in ${campaignName})${aud.ageMin != null || aud.ageMax != null ? ` · ${aud.ageMin ?? "13"}-${aud.ageMax ?? "65+"}` : ""}${aud.geography?.regions?.length ? ` · ${aud.geography.regions.join(", ")}` : ""}`;
     }),
     unmappedAudiences.length
       ? `\n## Platform audiences not mapped to one of the above (${unmappedAudiences.length})`
@@ -399,8 +403,7 @@ export default async function BrandAdsPage({
             {plural(campaigns.length, "campaign")} ·{" "}
             {plural(channels.length, "ad channel")} ·{" "}
             {plural(platformCampaigns.length, "platform campaign")} ·{" "}
-            {plural(audienceTargets.length, "audience")} · {money(totalSpend)} /
-            30d
+            {plural(personas.length, "persona")} · {money(totalSpend)} / 30d
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -417,18 +420,18 @@ export default async function BrandAdsPage({
         {campaigns.map((init) => {
           const initCampaigns = platformByCampaign.get(init.id) ?? [];
           const spend = campaignSpend(init.id);
-          const implemented = campaignChannels(init.id);
-          const targets = init.targetChannels ?? [];
           const pct = init.budget ? Math.min(1, spend / init.budget) : 0;
           const color = init.color ?? "#94a3b8";
           // A campaign looks like its creative before it looks like anything
           // else. Prefer what it will actually run with — its ads — and fall
           // back to the shared pool it was drafted from.
           const hero =
-            adSpots
-              .filter((spot) => spot.campaignId === init.id)
+            initCampaigns
+              .flatMap((row) => spotsByPlatformCampaign.get(row.id) ?? [])
               .map(spotImage)
-              .find(Boolean) ?? init.creativePool?.[0]?.url;
+              .find(Boolean) ??
+            initCampaigns.map((row) => row.heroThumbnailUrl).find(Boolean) ??
+            init.creativePool?.[0]?.url;
           return (
             <div key={init.id} className="bg-card rounded-2xl border p-4">
               {/* campaign header */}
@@ -489,29 +492,37 @@ export default async function BrandAdsPage({
                 </div>
               </div>
 
-              {/* channel verify: target vs implemented */}
+              {/* platforms: planned drafts vs pushed reality */}
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <span className="text-muted-foreground mr-1 text-[10px] tracking-wide uppercase">
-                  Channels
+                  Platforms
                 </span>
-                {targets.length === 0 && (
+                {initCampaigns.length === 0 && (
                   <span className="text-muted-foreground text-[11px]">
-                    none specified
+                    none planned
                   </span>
                 )}
-                {targets.map((ch) => {
-                  const ok = implemented.has(ch);
+                {initCampaigns.map((row) => {
+                  const ok = Boolean(row.externalId);
                   return (
                     <span
-                      key={ch}
+                      key={row.id}
                       className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                        ok
+                        ok && row.status === "live"
                           ? "border-emerald-500/30 text-emerald-300"
                           : "border-border text-muted-foreground"
                       }`}
                     >
-                      <ChannelLogo platform={ch} className="size-3.5" />
-                      {platformLabel(ch)} {ok ? "✓ running" : "· planned"}
+                      <ChannelLogo
+                        platform={row.platform}
+                        className="size-3.5"
+                      />
+                      {platformLabel(row.platform)}{" "}
+                      {row.status === "live"
+                        ? "✓ live"
+                        : ok
+                          ? `· ${row.status}`
+                          : "· planned"}
                     </span>
                   );
                 })}
@@ -562,92 +573,54 @@ export default async function BrandAdsPage({
         </>
       )}
 
-      {/* audiences */}
+      {/* personas */}
       <h2 className="text-muted-foreground mt-10 mb-1 text-xs font-semibold tracking-wider uppercase">
-        Audiences · {audienceTargets.length} · who we&apos;re trying to reach
+        Personas · {personas.length} · who {brand.name} talks to
       </h2>
       <p className="text-muted-foreground mb-3 text-xs">
-        Defined once for {brand.name}, then activated per platform. The badges
-        say whether each intended platform actually has an audience mirrored
-        back.
+        The stable brand-level layer. A campaign narrows a persona into a
+        buyable audience — age window, geography, budget — on its own page.
       </p>
-      {audienceTargets.length === 0 ? (
+      {personas.length === 0 ? (
         <div className="bg-card rounded-xl border p-6 text-center">
-          <p className="text-sm font-medium">No audiences yet</p>
+          <p className="text-sm font-medium">No personas yet</p>
           <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
-            An audience is the &ldquo;who&rdquo;: a segment you define once and
-            activate on each platform, so ad sets target it instead of
-            re-picking interests in every ad account.
+            A persona is the durable &ldquo;who&rdquo; — &ldquo;first-time
+            homebuyers&rdquo; — that inspires campaign audiences and content
+            alike. Few and stable, like pillars.
           </p>
           <Link
             href="/app/audiences"
             className="bg-primary text-primary-foreground mt-4 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium hover:opacity-90"
           >
-            Define an audience
+            Define personas
           </Link>
         </div>
       ) : (
         <div className="grid gap-2.5 md:grid-cols-2">
-          {audienceTargets.map((t) => (
-            <div key={t.targetId} className="bg-card rounded-xl border p-3.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{t.name}</div>
-                  <div className="text-muted-foreground mt-0.5 text-[11px] capitalize">
-                    {t.status}
-                  </div>
+          {personas.map((persona) => {
+            const derived = planAudiences.filter(
+              (aud) => aud.personaId === persona.id,
+            );
+            return (
+              <div key={persona.id} className="bg-card rounded-xl border p-3.5">
+                <div className="text-sm font-medium">{persona.name}</div>
+                <div className="text-muted-foreground mt-0.5 text-[11px]">
+                  {[
+                    persona.ageRanges?.join(", "),
+                    persona.geographies?.join(", "),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "No planning metadata yet"}
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    AUDIENCE_PRIORITY[t.priority] ??
-                    AUDIENCE_PRIORITY.nice_to_have
-                  }`}
-                >
-                  {t.priority.replace(/_/g, " ")}
-                </span>
+                <div className="text-muted-foreground mt-2 text-[11px]">
+                  {derived.length > 0
+                    ? `${plural(derived.length, "campaign audience")} derived from this`
+                    : "No campaign audience derived yet"}
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {t.channels.length === 0 && !t.unplannedPlatforms.length ? (
-                  <span className="text-muted-foreground text-[11px]">
-                    No platforms intended yet.
-                  </span>
-                ) : (
-                  t.channels.map((ch) => (
-                    <span
-                      key={ch.platform}
-                      className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                        AUDIENCE_VERDICT[ch.verdict] ?? AUDIENCE_VERDICT.planned
-                      }`}
-                    >
-                      <ChannelLogo
-                        platform={ch.platform}
-                        className="size-3.5"
-                      />
-                      {platformLabel(ch.platform)}
-                      {ch.verdict === "live"
-                        ? " ✓ live"
-                        : ch.verdict === "planned"
-                          ? " · planned"
-                          : " · missing"}
-                    </span>
-                  ))
-                )}
-                {/* Mirrored on a platform this target never asked for. Without
-                    this it is in neither list: the unmapped group skips it for
-                    having a target, and the badges above only cover intended
-                    channels. */}
-                {t.unplannedPlatforms.map((platform) => (
-                  <span
-                    key={`unplanned-${platform}`}
-                    className="border-border text-muted-foreground flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-[11px] font-medium"
-                  >
-                    <ChannelLogo platform={platform} className="size-3.5" />
-                    {platformLabel(platform)} · not intended
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

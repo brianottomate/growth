@@ -26,12 +26,12 @@ const SPEND_CAPABLE = [
 const LOCAL_ONLY = [
   "draftCampaign",
   "draftAd",
-  "addAdSet",
+  "addAudience",
   "setCreativePool",
-  "setGoogleSettings",
+  "setPlatformDraft",
   "attachCampaign",
   "deleteCampaignDraft",
-  "deleteAdSetDraft",
+  "deleteAudience",
   "deleteAdDraft",
 ] as const satisfies readonly AdsWriteAction[];
 
@@ -65,8 +65,6 @@ describe("ads action policy", () => {
 
   it("reading a campaign needs no approval and reaches every surface", () => {
     expect(growthActionPolicies.adsRead.openCampaign.approval).toBe("none");
-    expect(growthActionPolicies.adsRead.openCampaign.surfaces).toContain(
-      "mcp",
-    );
+    expect(growthActionPolicies.adsRead.openCampaign.surfaces).toContain("mcp");
   });
 });

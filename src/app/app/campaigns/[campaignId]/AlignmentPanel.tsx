@@ -29,7 +29,7 @@ const fmtUsd = (n: number | undefined) =>
 
 /**
  * Intent vs. actual for one campaign: does the strategy layer
- * (targetChannels / budget / dates) match the Zernio-synced campaigns?
+ * (planned platforms / budget / dates) match the Zernio-synced campaigns?
  * Read-only diagnostics — the only actions are link/unlink (relationship
  * fixes); campaign changes happen in the platform's own manager.
  */
@@ -79,7 +79,7 @@ export function AlignmentPanel({
     );
   }
 
-  const { channels, unplanned, budget, dateDrift, suggestions } = data;
+  const { channels, budget, dateDrift, suggestions } = data;
   const hasIntent = channels.length > 0 || budget.intended != null;
 
   return (
@@ -90,8 +90,9 @@ export function AlignmentPanel({
 
       {!hasIntent && (
         <p className="text-muted-foreground mt-4 text-sm">
-          No intended channels or budget set on this campaign. Add target
-          channels to compare strategy against what&apos;s running.
+          No planned platforms or budget set on this campaign yet — plan a
+          platform on the campaign to compare strategy against what&apos;s
+          running.
         </p>
       )}
 
@@ -141,18 +142,6 @@ export function AlignmentPanel({
       )}
 
       {/* Drift callouts. */}
-      {unplanned.length > 0 && (
-        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm">
-          <span className="font-medium text-amber-700">
-            {unplanned.length} unplanned campaign
-            {unplanned.length === 1 ? "" : "s"}
-          </span>{" "}
-          <span className="text-muted-foreground">
-            running on channels this campaign didn&apos;t target:{" "}
-            {unplanned.map((c) => c.name).join(", ")}
-          </span>
-        </div>
-      )}
       {dateDrift.length > 0 && (
         <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm">
           <span className="font-medium text-amber-700">
@@ -240,7 +229,10 @@ export function AlignmentPanel({
                     variant="ghost"
                     disabled={unlinkCampaign.isPending}
                     onClick={() =>
-                      unlinkCampaign.mutate({ campaignId, platformCampaignId: c.id })
+                      unlinkCampaign.mutate({
+                        campaignId,
+                        platformCampaignId: c.id,
+                      })
                     }
                   >
                     Unlink

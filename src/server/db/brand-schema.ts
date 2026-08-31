@@ -331,6 +331,62 @@ export const accessTable = pgTable(
 export type Access = typeof accessTable.$inferSelect;
 export type AccessInsert = typeof accessTable.$inferInsert;
 
+// ---- PERSONA (who the brand talks to) --------------------------------
+
+/**
+ * The stable brand-level "who" — the people counterpart of a content pillar
+ * ("what we talk about" / "who hears it"). Few per brand, curated, and
+ * PLANNING-MODE ONLY: the metadata here is loose prose arrays that inspire
+ * campaign audiences and content, never ad targeting by itself. The strict,
+ * compilable narrowing ("CA homebuyers 30-50, $5/day") is a campaign-scoped
+ * `audience` row that may point back here via personaId.
+ */
+export const personaTable = pgTable(
+  "persona",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("pers")),
+
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    name: t.text().notNull(), // "First-time homebuyers"
+    description: t.text(),
+
+    /** Loose prose, e.g. ["30-50", "retirement age"]. Not targeting. */
+    ageRanges: t.jsonb().$type<string[]>(),
+    /** Loose prose, e.g. ["California", "big US cities"]. Not targeting. */
+    geographies: t.jsonb().$type<string[]>(),
+    notes: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+    deletedAt: t.timestamp(),
+  }),
+  (table) => [index("persona_brand_idx").on(table.brandId)],
+);
+
+export type Persona = typeof personaTable.$inferSelect;
+export type PersonaInsert = typeof personaTable.$inferInsert;
+
+export const personaRelations = relations(personaTable, ({ one }) => ({
+  brand: one(brandTable, {
+    fields: [personaTable.brandId],
+    references: [brandTable.id],
+  }),
+}));
+
 // ---- RELATIONS -----------------------------------------------------
 
 export const brandRelations = relations(brandTable, ({ one, many }) => ({

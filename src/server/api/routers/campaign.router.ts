@@ -85,7 +85,6 @@ const campaignFields = {
   status: statusSchema.optional(),
   landingUrl: z.string().max(2000).nullish(),
   color: z.string().max(20).nullish(),
-  targetChannels: z.array(platformSchema).optional(),
   budget: z.number().int().min(0).nullish(),
   startAt: z.date().nullish(),
   endAt: z.date().nullish(),
@@ -147,8 +146,7 @@ export const campaignRouter = createTRPCRouter({
           publishedCount: mine
             .filter((c) => c.status === "published")
             .reduce((s, c) => s + c.n, 0),
-          adCampaignCount:
-            adCounts.find((c) => c.campaignId === i.id)?.n ?? 0,
+          adCampaignCount: adCounts.find((c) => c.campaignId === i.id)?.n ?? 0,
         };
       }),
     };

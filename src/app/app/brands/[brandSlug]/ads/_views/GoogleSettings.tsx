@@ -24,13 +24,14 @@ type GoogleConfig = {
  * time so the decision is reviewable before anyone spends.
  */
 export function GoogleSettings({
-  campaignId,
+  platformCampaignId,
   config,
   brandSlug,
   brandUrl,
   compact = false,
 }: {
-  campaignId: string;
+  /** The Google platform DRAFT row the settings live on. */
+  platformCampaignId: string;
   config: GoogleConfig | undefined;
   brandSlug: string;
   brandUrl: string | null;
@@ -52,7 +53,7 @@ export function GoogleSettings({
   );
 
   const save = useMutation(
-    trpc.ads.setCampaignPlatformConfig.mutationOptions({
+    trpc.ads.setPlatformDraft.mutationOptions({
       onSuccess: () => {
         setOpen(false);
         router.refresh();
@@ -144,7 +145,9 @@ export function GoogleSettings({
                   rows={4}
                   value={keywords}
                   onChange={(event) => setKeywords(event.target.value)}
-                  placeholder={"vacation rental pawleys island\nbeach house rental sc"}
+                  placeholder={
+                    "vacation rental pawleys island\nbeach house rental sc"
+                  }
                   className="text-xs"
                 />
               </div>
@@ -163,8 +166,8 @@ export function GoogleSettings({
           ) : (
             <p className="text-muted-foreground text-xs">
               Display uses the campaign&apos;s creative. Google needs a
-              landscape and a square image; the first ad&apos;s creative is
-              used for both until sized variants exist.
+              landscape and a square image; the first ad&apos;s creative is used
+              for both until sized variants exist.
             </p>
           )}
 
@@ -192,9 +195,9 @@ export function GoogleSettings({
                 {research.data && (
                   <span className="text-muted-foreground text-xs">
                     ~${research.data.monthlyCost.dollars.toLocaleString()}/mo to
-                    buy these at {Math.round(
-                      research.data.monthlyCost.ctrAssumption * 100,
-                    )}% CTR
+                    buy these at{" "}
+                    {Math.round(research.data.monthlyCost.ctrAssumption * 100)}%
+                    CTR
                     {research.data.monthlyCost.unpriced > 0
                       ? ` · ${research.data.monthlyCost.unpriced} unpriced`
                       : ""}
@@ -213,9 +216,7 @@ export function GoogleSettings({
                         <th className="py-1 text-right font-normal">
                           Searches/mo
                         </th>
-                        <th className="py-1 text-right font-normal">
-                          Top bid
-                        </th>
+                        <th className="py-1 text-right font-normal">Top bid</th>
                         <th className="py-1" />
                       </tr>
                     </thead>
@@ -268,7 +269,7 @@ export function GoogleSettings({
               loading={save.isPending}
               onClick={() =>
                 save.mutate({
-                  campaignId,
+                  platformCampaignId,
                   google: {
                     campaignType,
                     keywords:

@@ -5,8 +5,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import {
   adAccountTable,
-  adSpotTable,
+  adTable,
   audienceTable,
+  personaTable,
+  platformAdTable,
   brandTable,
   campaignTable,
   channelTable,
@@ -209,8 +211,10 @@ export async function previewBrandPurge(brandId: string) {
     channels: number;
     campaigns: number;
     platform_campaigns: number;
-    ad_spots: number;
+    ads: number;
+    platform_ads: number;
     audiences: number;
+    personas: number;
     content_posts: number;
     media_assets: number;
     ad_accounts: number;
@@ -221,8 +225,10 @@ export async function previewBrandPurge(brandId: string) {
       (select count(*) from ${channelTable} where brand_id = ${brand.id})::int as channels,
       (select count(*) from ${campaignTable} where brand_id = ${brand.id})::int as campaigns,
       (select count(*) from ${platformCampaignTable} where brand_id = ${brand.id})::int as platform_campaigns,
-      (select count(*) from ${adSpotTable} where brand_id = ${brand.id})::int as ad_spots,
+      (select count(*) from ${adTable} where brand_id = ${brand.id})::int as ads,
+      (select count(*) from ${platformAdTable} where brand_id = ${brand.id})::int as platform_ads,
       (select count(*) from ${audienceTable} where brand_id = ${brand.id})::int as audiences,
+      (select count(*) from ${personaTable} where brand_id = ${brand.id})::int as personas,
       (select count(*) from ${contentPostTable} where brand_id = ${brand.id})::int as content_posts,
       (select count(*) from ${mediaAssetTable} where brand_id = ${brand.id})::int as media_assets,
       (select count(*) from ${adAccountTable} where brand_id = ${brand.id})::int as ad_accounts,

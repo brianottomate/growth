@@ -11,21 +11,21 @@ import {
 } from "@/server/db/schema";
 
 // ---------------------------------------------------------------------------
-// Intent vs. actual — the diff between the strategy layer (campaign:
-// targetChannels/budget/dates, authored by hand) and platform reality
-// (campaign rows synced from Zernio). Read-only: the fix for any drift is a
-// link/unlink mutation or a change made in the platform's own manager.
+// Intent vs. actual. Planned platforms ARE the linked platform_campaign rows
+// now (a draft row = planned, not pushed), so the diff reads one axis: per
+// platform, is anything actually delivering? Read-only: the fix for drift is
+// a push, a link/unlink, or a change in the platform's own manager.
 // ---------------------------------------------------------------------------
 
 /** PlatformCampaign statuses that count as "delivering on the intent". */
 const FULFILLING_STATUSES = new Set(["live", "scheduled"]);
 
 export type ChannelVerdict =
-  /** At least one linked campaign is live/scheduled on the intended channel. */
+  /** At least one linked campaign is live/scheduled on this platform. */
   | "ok"
-  /** No linked campaign exists on an intended channel. */
+  /** Planned only: every linked row is still a draft — nothing was pushed. */
   | "missing"
-  /** Linked campaigns exist but none are live/scheduled (paused/ended/draft). */
+  /** Pushed but not delivering (paused/ended). */
   | "inactive";
 
 export type AlignedCampaign = {
@@ -55,10 +55,9 @@ export type CampaignAlignment = {
   campaignId: string;
   name: string;
   status: Campaign["status"];
+  /** Platforms with a linked platform campaign (draft or real). */
   targetChannels: string[];
   channels: ChannelAlignment[];
-  /** Linked campaigns running on platforms the campaign never asked for. */
-  unplanned: AlignedCampaign[];
   budget: {
     intended: number | undefined;
     linkedBudget: number;
@@ -122,14 +121,9 @@ function windowsOverlap(
  * campaign's name.
  */
 export function scoreSuggestion(
-  campaign: Pick<
-    Campaign,
-    "name" | "slug" | "goal" | "targetChannels" | "startAt" | "endAt"
-  >,
+  campaign: Pick<Campaign, "name" | "slug" | "goal" | "startAt" | "endAt">,
   platformCampaign: PlatformCampaign,
 ): number | undefined {
-  const intended = campaign.targetChannels ?? [];
-  if (!intended.includes(platformCampaign.platform)) return undefined;
   if (
     !windowsOverlap(
       campaign.startAt,
@@ -151,22 +145,19 @@ export function diffCampaign(
   linked: PlatformCampaign[],
   unlinkedCandidates: PlatformCampaign[],
 ): CampaignAlignment {
-  const targetChannels = campaign.targetChannels ?? [];
+  const targetChannels = [...new Set(linked.map((c) => c.platform))];
 
   const channels: ChannelAlignment[] = targetChannels.map((platform) => {
     const mine = linked.filter((c) => c.platform === platform);
-    const verdict: ChannelVerdict =
-      mine.length === 0
+    const verdict: ChannelVerdict = mine.some((c) =>
+      FULFILLING_STATUSES.has(c.status),
+    )
+      ? "ok"
+      : mine.every((c) => c.status === "draft")
         ? "missing"
-        : mine.some((c) => FULFILLING_STATUSES.has(c.status))
-          ? "ok"
-          : "inactive";
+        : "inactive";
     return { platform, verdict, campaigns: mine.map(toAligned) };
   });
-
-  const unplanned = linked
-    .filter((c) => !targetChannels.includes(c.platform))
-    .map(toAligned);
 
   const linkedBudget = linked.reduce((s, c) => s + (c.budget ?? 0), 0);
   const linkedSpend = linked.reduce((s, c) => s + (campaignSpend(c) ?? 0), 0);
@@ -186,7 +177,8 @@ export function diffCampaign(
   const suggestions = unlinkedCandidates
     .map((c) => ({ campaign: c, score: scoreSuggestion(campaign, c) }))
     .filter(
-      (s): s is { campaign: PlatformCampaign; score: number } => s.score !== undefined,
+      (s): s is { campaign: PlatformCampaign; score: number } =>
+        s.score !== undefined,
     )
     .sort(
       (a, b) =>
@@ -202,7 +194,6 @@ export function diffCampaign(
     status: campaign.status,
     targetChannels,
     channels,
-    unplanned,
     budget: {
       intended,
       linkedBudget,
@@ -251,7 +242,6 @@ export type AlignmentOverviewRow = {
   status: Campaign["status"];
   missingChannels: string[];
   inactiveChannels: string[];
-  unplannedCount: number;
   budgetUtilization: number | undefined;
   overIntended: boolean;
   suggestionCount: number;
@@ -305,7 +295,6 @@ export async function computeAlignmentOverview(
       inactiveChannels: alignment.channels
         .filter((c) => c.verdict === "inactive")
         .map((c) => c.platform),
-      unplannedCount: alignment.unplanned.length,
       budgetUtilization: alignment.budget.utilization,
       overIntended: alignment.budget.overIntended,
       suggestionCount: alignment.suggestions.length,

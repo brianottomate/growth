@@ -66,12 +66,13 @@ export function BrandSurfaceMap({
       state: summary.channels > 0 ? "mapped" : "empty",
     },
     {
-      title: "Audiences",
-      description: "Confirmed people to reach, evidence, and activation gaps.",
+      title: "Personas",
+      description:
+        "Who the brand talks to — the stable layer campaigns narrow.",
       href: "/app/audiences",
       icon: Target,
-      facts: [fact(summary.audienceTargets, "target")],
-      state: summary.audienceTargets > 0 ? "mapped" : "partial",
+      facts: [fact(summary.personas, "persona")],
+      state: summary.personas > 0 ? "mapped" : "partial",
     },
     {
       title: "Owned surfaces",

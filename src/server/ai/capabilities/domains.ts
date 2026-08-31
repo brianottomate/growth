@@ -1,41 +1,40 @@
 import "server-only";
 
 import {
-  addAdSetAction,
+  addAudienceAction,
+  addAudienceUsersAction,
   adsScope,
   attachCampaignAction,
   boostMetaPostAction,
-  createGoogleAdAction,
-  addAudienceUsersAction,
   createAudienceAction,
+  createGoogleAdAction,
   createMetaAdDraftAction,
   deleteAdDraftAction,
-  deleteAdSetDraftAction,
+  deleteAudienceAction,
   deleteCampaignDraftAction,
   deletePlatformCampaignAction,
   draftAdAction,
   draftCampaignAction,
   duplicateMetaCampaignAction,
   listAdsDestinations,
-  listAudienceTargetsAction,
   listCampaignsAction,
   openCampaignAction,
+  planPlatformAction,
   pullPlatformAudiencesAction,
   pushDraftAction,
   setCreativePoolAction,
   setDeliveryAction,
-  setGoogleSettingsAction,
+  setPlatformDraftAction,
   topAds,
 } from "./ads";
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
 import {
-  createAudienceTarget,
-  listAudienceTargets,
-  saveAudienceTargets,
-  updateAudienceActivation,
-  updateAudienceTarget,
-} from "./audiences";
+  createPersona,
+  deletePersona,
+  listPersonas,
+  updatePersona,
+} from "./personas";
 import { getBrandMap } from "./brand-map";
 import {
   createBrandAction,
@@ -228,18 +227,19 @@ export const performanceWrite = growthDomainTool({
   },
 });
 
-export const audienceRead = growthDomainTool({
-  description: "Read strategic audience targets and activation state.",
-  actions: { list: listAudienceTargets },
+export const personaRead = growthDomainTool({
+  description:
+    "Read a brand's personas — the stable 'who we talk to' layer that inspires campaign audiences and content.",
+  actions: { list: listPersonas },
 });
 
-export const audienceWrite = growthDomainTool({
-  description: "Create or update audience targets and planned activations.",
+export const personaWrite = growthDomainTool({
+  description:
+    "Create, update, or soft-delete brand personas. Personas are few and stable; a geo or age variant belongs on a campaign audience instead.",
   actions: {
-    createTarget: createAudienceTarget,
-    saveTargets: saveAudienceTargets,
-    updateTarget: updateAudienceTarget,
-    updateActivation: updateAudienceActivation,
+    create: createPersona,
+    update: updatePersona,
+    delete: deletePersona,
   },
 });
 
@@ -346,7 +346,6 @@ export const adsRead = growthDomainTool({
     listDestinations: listAdsDestinations,
     openCampaign: openCampaignAction,
     listCampaigns: listCampaignsAction,
-    listAudienceTargets: listAudienceTargetsAction,
     diagnoseAlignment,
     inspectConversions: inspectConversionReality,
   },
@@ -358,13 +357,14 @@ export const adsWrite = growthDomainTool({
   actions: {
     draftCampaign: draftCampaignAction,
     draftAd: draftAdAction,
-    addAdSet: addAdSetAction,
+    addAudience: addAudienceAction,
+    planPlatform: planPlatformAction,
     setCreativePool: setCreativePoolAction,
-    setGoogleSettings: setGoogleSettingsAction,
+    setPlatformDraft: setPlatformDraftAction,
     attachCampaign: attachCampaignAction,
     pullPlatformAudiences: pullPlatformAudiencesAction,
     deleteCampaignDraft: deleteCampaignDraftAction,
-    deleteAdSetDraft: deleteAdSetDraftAction,
+    deleteAudience: deleteAudienceAction,
     deleteAdDraft: deleteAdDraftAction,
     push: pushDraftAction,
     setDelivery: setDeliveryAction,
@@ -521,8 +521,8 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   productAtlasWrite,
   storefrontRead,
   storefrontWrite,
-  audienceRead,
-  audienceWrite,
+  personaRead,
+  personaWrite,
   performanceRead,
   performanceWrite,
   researchRead,

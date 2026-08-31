@@ -38,7 +38,6 @@ export type CampaignDraft = {
   status: CampaignStatus;
   landingUrl?: string | null;
   color?: string | null;
-  targetChannels?: string[] | null;
   budget?: number | null;
   startAt?: Date | null;
   endAt?: Date | null;
@@ -120,9 +119,6 @@ export function CampaignDialog({
   );
   const [landingUrl, setLandingUrl] = useState(initial?.landingUrl ?? "");
   const [color, setColor] = useState(initial?.color ?? "");
-  const [channels, setChannels] = useState<string[]>(
-    initial?.targetChannels ?? [],
-  );
   const [budget, setBudget] = useState(
     initial?.budget != null ? String(initial.budget) : "",
   );
@@ -139,16 +135,13 @@ export function CampaignDialog({
     setStatus(initial?.status ?? "planned");
     setLandingUrl(initial?.landingUrl ?? "");
     setColor(initial?.color ?? "");
-    setChannels(initial?.targetChannels ?? []);
     setBudget(initial?.budget != null ? String(initial.budget) : "");
     setStart(toDateInput(initial?.startAt));
     setEnd(toDateInput(initial?.endAt));
   }, [open, initial, brands]);
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries(
-      trpc.campaign.overview.queryOptions(),
-    );
+    await queryClient.invalidateQueries(trpc.campaign.overview.queryOptions());
     if (initial?.id) {
       await queryClient.invalidateQueries(
         trpc.campaign.get.queryOptions({ id: initial.id }),
@@ -192,7 +185,6 @@ export function CampaignDialog({
       status,
       landingUrl: landingUrl.trim() || null,
       color: color || null,
-      targetChannels: channels as ChannelPlatform[],
       budget: budget ? Number(budget) : null,
       startAt,
       endAt,
@@ -202,12 +194,6 @@ export function CampaignDialog({
     } else {
       create.mutate({ brandId, ...shared });
     }
-  }
-
-  function toggleChannel(c: string) {
-    setChannels((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
-    );
   }
 
   return (
@@ -328,29 +314,6 @@ export function CampaignDialog({
                 onChange={(e) => setLandingUrl(e.target.value)}
                 placeholder="https://wander.com/ski"
               />
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Target channels</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {CHANNELS.map((c) => {
-                const on = channels.includes(c);
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => toggleChannel(c)}
-                    className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                      on
-                        ? "border-primary bg-primary/15 text-primary"
-                        : "border-border text-muted-foreground hover:bg-accent/40"
-                    }`}
-                  >
-                    {platformLabel(c)}
-                  </button>
-                );
-              })}
             </div>
           </div>
 

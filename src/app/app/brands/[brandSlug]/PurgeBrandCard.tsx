@@ -13,8 +13,10 @@ const ROWS: { key: string; label: string }[] = [
   { key: "channels", label: "Channels" },
   { key: "campaigns", label: "Campaigns" },
   { key: "platform_campaigns", label: "Platform campaigns" },
-  { key: "ad_spots", label: "Ads" },
+  { key: "ads", label: "Drafted ads" },
+  { key: "platform_ads", label: "Platform ads" },
   { key: "audiences", label: "Audiences" },
+  { key: "personas", label: "Personas" },
   { key: "content_posts", label: "Content" },
   { key: "media_assets", label: "Media" },
   { key: "ad_accounts", label: "Allowed ad accounts" },
@@ -131,7 +133,9 @@ export function PurgeBrandCard({
                 className="h-8"
                 disabled={typed.trim() !== brandName || purge.isPending}
                 loading={purge.isPending}
-                onClick={() => purge.mutate({ brandId, confirmName: typed.trim() })}
+                onClick={() =>
+                  purge.mutate({ brandId, confirmName: typed.trim() })
+                }
               >
                 Purge permanently
               </Button>

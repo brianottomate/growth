@@ -21,18 +21,19 @@ import {
   syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
 import {
+  addAudience,
   addDraftAd,
-  addDraftAdSet,
   attachPlatformCampaign,
   createDraftCampaign,
+  deleteAudience,
   deleteDraftAd,
-  deleteDraftAdSet,
   deleteDraftCampaign,
   getDraftCampaign,
-  listBrandAudienceTargets,
   listBrandCampaigns,
+  planPlatform,
   setCampaignCreativePool,
-  setCampaignPlatformConfig,
+  setPlatformDraft,
+  updateAudience,
 } from "@/server/services/ads-draft.service";
 import { growthAction } from "./types";
 
@@ -153,12 +154,14 @@ export const draftCampaignAction = growthAction({
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     name: z.string().trim().min(1).max(300),
-    targetChannels: z
-      .array(z.enum(["meta_ads", "google_ads"]))
+    platforms: z
+      .array(z.enum(["meta_ads", "google_ads", "openai_ads"]))
       .min(1)
-      .max(2)
+      .max(3)
       .optional()
-      .describe("Intended platforms; the push decides what actually ships."),
+      .describe(
+        "Platforms to plan: each gets a local draft platform campaign holding its budget and settings. Default meta_ads.",
+      ),
     landingUrl: z.string().url().optional(),
     goal: z.string().trim().max(200).optional(),
     budget: z
@@ -390,7 +393,7 @@ export const createAudienceAction = growthAction({
       .max(0.2)
       .optional()
       .describe("Lookalike breadth: 0.01 = top 1% of the country."),
-    audienceTargetId: z
+    planAudienceId: z
       .string()
       .trim()
       .min(1)
@@ -430,31 +433,92 @@ export const addAudienceUsersAction = growthAction({
 
 export const draftAdAction = growthAction({
   description:
-    "Add a drafted ad to a LOCAL campaign draft (one created with adsWrite.draftCampaign). Local only — nothing touches the platform until the operator pushes the draft. The creative is an image URL, ideally a media-library asset URL.",
-  inputSchema: z.object({
-    campaignId: z.string().trim().min(1),
-    adSetId: z.string().trim().min(1).optional(),
-    name: z.string().trim().min(1).max(300),
-    headline: z.string().trim().max(255).optional(),
-    body: z.string().trim().max(2_200).optional(),
-    linkUrl: z.string().url(),
-    imageUrl: z.string().url(),
-    assetId: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe("media_asset id when the image comes from the library."),
-  }),
+    "Add a drafted ad to a LOCAL campaign — a suggestion the push transforms per platform. Local only. Type creative (default) is an image or carousel with copy, for Meta; when the operator attached an image this turn, pass the url mediaLibraryWrite.saveChatMedia returned, or pick one with mediaLibraryRead.list. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
+  inputSchema: z
+    .object({
+      campaignId: z.string().trim().min(1),
+      name: z.string().trim().min(1).max(300),
+      type: z.enum(["creative", "text"]).default("creative"),
+      headline: z
+        .string()
+        .trim()
+        .max(255)
+        .optional()
+        .describe("creative only; required for it."),
+      body: z
+        .string()
+        .trim()
+        .max(2_200)
+        .optional()
+        .describe("creative only; required for it."),
+      imageUrls: z
+        .array(z.string().url())
+        .max(10)
+        .optional()
+        .describe(
+          "creative only: one url = static image, several = carousel cards in this order.",
+        ),
+      headlines: z
+        .array(z.string().trim().min(1).max(30))
+        .max(15)
+        .optional()
+        .describe("text only; required for it."),
+      descriptions: z
+        .array(z.string().trim().min(1).max(90))
+        .max(4)
+        .optional()
+        .describe("text only; required for it."),
+      linkUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe("Falls back to the campaign landing URL."),
+      assetId: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("media_asset id when the image comes from the library."),
+    })
+    .refine(
+      (input) =>
+        input.type === "text" ||
+        (Boolean(input.headline) &&
+          Boolean(input.body) &&
+          (input.imageUrls?.length ?? 0) > 0),
+      {
+        error: "A creative ad needs headline, body, and at least one imageUrl.",
+      },
+    )
+    .refine(
+      (input) =>
+        input.type === "creative" ||
+        ((input.headlines?.length ?? 0) > 0 &&
+          (input.descriptions?.length ?? 0) > 0),
+      { error: "A text ad needs headlines and descriptions." },
+    ),
   execute: async (input, ctx) =>
     addDraftAd({
       campaignId: input.campaignId,
-      adSetId: input.adSetId ?? null,
       name: input.name,
-      headline: input.headline ?? null,
-      body: input.body ?? null,
-      linkUrl: input.linkUrl,
-      media: [{ url: input.imageUrl, type: "image", assetId: input.assetId }],
+      type: input.type,
+      content:
+        input.type === "text"
+          ? {
+              headlines: input.headlines!,
+              descriptions: input.descriptions!,
+              linkUrl: input.linkUrl,
+            }
+          : {
+              headline: input.headline!,
+              body: input.body!,
+              linkUrl: input.linkUrl,
+              media: input.imageUrls!.map((url) => ({
+                url,
+                type: "image" as const,
+                assetId: input.assetId,
+              })),
+            },
       organizationId: ctx.orgId,
     }),
 });
@@ -490,54 +554,76 @@ export const listCampaignsAction = growthAction({
     listBrandCampaigns({ brandId: input.brandId, organizationId: ctx.orgId }),
 });
 
-export const listAudienceTargetsAction = growthAction({
+export const addAudienceAction = growthAction({
   description:
-    "List a brand's first-party audience targets — the canonical 'who we want to reach', which an ad set names and the push compiles per platform.",
-  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
-  execute: async (input, ctx) =>
-    listBrandAudienceTargets({
-      brandId: input.brandId,
-      organizationId: ctx.orgId,
-    }),
-});
-
-export const addAdSetAction = growthAction({
-  description:
-    "Add an ad set to a LOCAL campaign draft. The ad set is where audience and budget live on every platform (Meta ad set, Google ad group), so several under one campaign is how a build splits audiences. Local only; the push creates them on the platform. Omit both audience fields for broad targeting, which is a legitimate and often correct choice.",
+    "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Wanting two age ranges means two audiences. Local only; budgets here are advisory splits. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     name: z.string().trim().min(1).max(300),
-    audienceTargetId: z
+    personaId: z
       .string()
       .trim()
       .min(1)
       .optional()
-      .describe("A first-party target (audt_), resolved per platform at push."),
-    audienceId: z
-      .string()
-      .trim()
-      .min(1)
+      .describe("The brand persona (pers_) this audience narrows."),
+    ageMin: z.number().int().min(13).max(100).optional(),
+    ageMax: z.number().int().min(13).max(100).optional(),
+    countries: z
+      .array(z.string().length(2))
+      .max(20)
+      .optional()
+      .describe('ISO country codes, e.g. ["US"].'),
+    regions: z
+      .array(z.string().trim().min(1).max(100))
+      .max(20)
       .optional()
       .describe(
-        "A mirrored platform audience (aud_) the client already built. Wins over audienceTargetId when both are set.",
+        'Region/state names, e.g. ["California"] — resolved to platform geo keys at push.',
+      ),
+    keywords: z
+      .array(z.string().trim().min(1).max(80))
+      .max(50)
+      .optional()
+      .describe(
+        "Loose suggestions. The Google compile derives keywords from these; Meta ignores them.",
       ),
     budget: z
       .number()
       .int()
       .min(0)
       .optional()
-      .describe("Whole dollars. Omit to inherit the campaign budget."),
+      .describe(
+        "Advisory split, whole dollars. Authoritative budget is on the platform draft.",
+      ),
     budgetType: z.enum(["daily", "lifetime"]).optional(),
   }),
   execute: async (input, ctx) =>
-    addDraftAdSet({
-      ...input,
-      audienceTargetId: input.audienceTargetId ?? null,
-      audienceId: input.audienceId ?? null,
+    addAudience({
+      campaignId: input.campaignId,
+      name: input.name,
+      personaId: input.personaId ?? null,
+      ageMin: input.ageMin ?? null,
+      ageMax: input.ageMax ?? null,
+      geography:
+        input.countries?.length || input.regions?.length
+          ? { countries: input.countries, regions: input.regions }
+          : null,
+      keywords: input.keywords ?? null,
       budget: input.budget ?? null,
       budgetType: input.budgetType ?? null,
       organizationId: ctx.orgId,
     }),
+});
+
+export const planPlatformAction = growthAction({
+  description:
+    "Plan a platform for a LOCAL campaign: creates the draft platform campaign row that holds that platform's authoritative budget and settings. Local only; idempotent per platform.",
+  inputSchema: z.object({
+    campaignId: z.string().trim().min(1),
+    platform: z.enum(["meta_ads", "google_ads", "openai_ads"]),
+  }),
+  execute: async (input, ctx) =>
+    planPlatform({ ...input, organizationId: ctx.orgId }),
 });
 
 export const setCreativePoolAction = growthAction({
@@ -562,27 +648,48 @@ export const setCreativePoolAction = growthAction({
     }),
 });
 
-export const setGoogleSettingsAction = growthAction({
+export const setPlatformDraftAction = growthAction({
   description:
-    "Set the Google-specific configuration a campaign needs before it can be pushed to Google: campaign type is required, and a search campaign without keywords is rejected at push. Local only.",
+    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel and budget mode. Local only.",
   inputSchema: z.object({
-    campaignId: z.string().trim().min(1),
-    campaignType: z.enum(["search", "display"]),
-    keywords: z.array(z.string().trim().min(1)).max(200).optional(),
-    negativeKeywords: z.array(z.string().trim().min(1)).max(200).optional(),
-    additionalHeadlines: z.array(z.string().trim().max(30)).max(14).optional(),
-    additionalDescriptions: z
-      .array(z.string().trim().max(90))
-      .max(4)
+    platformCampaignId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The pcamp_ draft row, from openCampaign."),
+    budget: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Whole currency units — the number the push will send."),
+    budgetType: z.enum(["daily", "lifetime"]).optional(),
+    google: z
+      .object({
+        campaignType: z.enum(["search", "display"]).optional(),
+        keywords: z.array(z.string().trim().min(1)).max(200).optional(),
+        negativeKeywords: z.array(z.string().trim().min(1)).max(200).optional(),
+        additionalHeadlines: z
+          .array(z.string().trim().max(30))
+          .max(14)
+          .optional(),
+        additionalDescriptions: z
+          .array(z.string().trim().max(90))
+          .max(4)
+          .optional(),
+        businessName: z.string().trim().max(25).optional(),
+      })
       .optional(),
-    businessName: z.string().trim().max(25).optional(),
+    meta: z
+      .object({
+        pixelId: z.string().trim().min(1).optional(),
+        customEventType: z.string().trim().min(1).optional(),
+        budgetMode: z.enum(["cbo", "abo"]).optional(),
+      })
+      .optional(),
   }),
-  execute: async ({ campaignId, ...google }, ctx) =>
-    setCampaignPlatformConfig({
-      campaignId,
-      google,
-      organizationId: ctx.orgId,
-    }),
+  execute: async (input, ctx) =>
+    setPlatformDraft({ ...input, organizationId: ctx.orgId }),
 });
 
 export const attachCampaignAction = growthAction({
@@ -632,25 +739,25 @@ export const deleteCampaignDraftAction = growthAction({
     deleteDraftCampaign({ ...input, organizationId: ctx.orgId }),
 });
 
-export const deleteAdSetDraftAction = growthAction({
+export const deleteAudienceAction = growthAction({
   description:
-    "Delete a drafted ad set. Refused once it exists on a platform. Local only.",
-  inputSchema: z.object({ adSetId: z.string().trim().min(1) }),
+    "Delete a campaign audience. Refused once it is compiled to a live ad set. Local only.",
+  inputSchema: z.object({ audienceId: z.string().trim().min(1) }),
   execute: async (input, ctx) =>
-    deleteDraftAdSet({ ...input, organizationId: ctx.orgId }),
+    deleteAudience({ ...input, organizationId: ctx.orgId }),
 });
 
 export const deleteAdDraftAction = growthAction({
   description:
-    "Delete a drafted ad. Refused once it is live on a platform. Local only.",
-  inputSchema: z.object({ adSpotId: z.string().trim().min(1) }),
+    "Delete a drafted ad. Local only — the platform ads it compiled to keep running and keep their history.",
+  inputSchema: z.object({ adId: z.string().trim().min(1) }),
   execute: async (input, ctx) =>
     deleteDraftAd({ ...input, organizationId: ctx.orgId }),
 });
 
 export const pushDraftAction = growthAction({
   description:
-    "Push a LOCAL campaign draft to Meta or Google: creates the campaign, one ad set per drafted ad set (or a single one carrying the campaign budget), and its ads. Everything is created PAUSED, so approval does not start spend — adsWrite.setDelivery does that separately. Meta REQUIRES endDate when budgetType is lifetime. Set validateOnly for a dry run, which Meta supports only for a single-ad-set push. Call adsRead.listDestinations first for the account ids; never guess them.",
+    "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. Call adsRead.listDestinations first for the account ids; never guess them.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     platform: z.enum(["meta_ads", "google_ads"]).optional(),
@@ -663,23 +770,7 @@ export const pushDraftAction = growthAction({
       "video_views",
       "conversions",
     ]),
-    budgetAmount: z
-      .number()
-      .positive()
-      .describe("Whole currency units, never cents."),
-    budgetType: budgetTypeSchema,
-    startDate: dateTimeSchema.optional(),
-    endDate: dateTimeSchema
-      .optional()
-      .describe("Required by Meta when budgetType is lifetime."),
     validateOnly: z.boolean().optional(),
-    promotedObject: z
-      .object({
-        pixelId: z.string().trim().min(1).optional(),
-        customEventType: z.string().trim().min(1).optional(),
-      })
-      .optional()
-      .describe("Required for the conversions goal."),
   }),
   execute: async (input, ctx) =>
     pushDraftToPlatform(input, {

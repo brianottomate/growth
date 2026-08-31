@@ -15,9 +15,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTRPC } from "@/trpc/react";
+
+import { money } from "./format";
 
 const GOALS = [
   "traffic",
@@ -28,39 +29,34 @@ const GOALS = [
 ] as const;
 
 /**
- * Create the draft on Meta, PAUSED — one campaign, one ad set, all drafted
- * ads, through the allowlisted destination. Spend starts only when the
- * delivery switch is flipped afterwards, so this click creates structure,
- * not cost.
+ * Compile the plan onto one platform, PAUSED. Budget, dates and settings come
+ * from the platform draft, so this dialog asks only for the destination and
+ * the goal — the click is the approval, and spend starts only when the
+ * delivery switch is flipped afterwards.
  */
 export function PushToPlatform({
   campaignId,
   brandSlug,
-  spotCount,
-  defaultBudget,
-  platform = "meta_ads",
-  adSetCount = 0,
+  platform,
+  draftAdCount,
+  audienceCount,
+  budget,
+  budgetType,
 }: {
   campaignId: string;
   brandSlug: string;
-  spotCount: number;
-  defaultBudget: number | null;
-  platform?: "meta_ads" | "google_ads";
-  adSetCount?: number;
+  platform: "meta_ads" | "google_ads";
+  draftAdCount: number;
+  audienceCount: number;
+  budget: number | null;
+  budgetType: string | null;
 }) {
   const isMeta = platform === "meta_ads";
-  const platformLabel = isMeta ? "Meta" : "Google";
+  const platformName = isMeta ? "Meta" : "Google";
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [goal, setGoal] = useState<(typeof GOALS)[number]>("traffic");
-  const [budget, setBudget] = useState(
-    defaultBudget != null ? String(defaultBudget) : "",
-  );
-  const [budgetType, setBudgetType] = useState<"daily" | "lifetime">("daily");
-  // Meta rejects a lifetime budget with no end date, so ask for it here
-  // rather than letting the platform bounce the push.
-  const [endDate, setEndDate] = useState("");
   const [destinationKey, setDestinationKey] = useState("");
 
   const destinations = useQuery(
@@ -83,48 +79,47 @@ export function PushToPlatform({
     trpc.ads.pushDraftToPlatform.mutationOptions({
       onSuccess: (result) => {
         // A dry run stays open to show its result; a real push lands on the
-        // campaign the platform just created.
+        // platform campaign it just made real.
         if (!result.validateOnly) {
           setOpen(false);
-          if (result.path) router.push(result.path);
+          if ("path" in result && result.path) router.push(result.path);
           else router.refresh();
         }
       },
     }),
   );
 
-  const budgetNumber = Number(budget);
-  const canPush =
-    Boolean(chosen) &&
-    Number.isFinite(budgetNumber) &&
-    budgetNumber > 0 &&
-    (budgetType !== "lifetime" || Boolean(endDate)) &&
-    !push.isPending;
+  const canPush = Boolean(chosen) && budget != null && !push.isPending;
+  const setSummary =
+    audienceCount === 0
+      ? "1 broad ad set"
+      : `${audienceCount} ad set${audienceCount === 1 ? "" : "s"}`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm">
           <UploadCloud className="size-3.5" />
-          Push to {platformLabel}
+          Push to {platformName}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Push this draft to {platformLabel}?</DialogTitle>
+          <DialogTitle>Push this plan to {platformName}?</DialogTitle>
           <DialogDescription>
-            Creates the campaign,{" "}
-            {adSetCount > 1 ? `${adSetCount} ad sets` : "one ad set"}, and{" "}
-            {spotCount} ad{spotCount === 1 ? "" : "s"} on {platformLabel} — all
-            PAUSED. Nothing spends until you hit Launch on the campaign
-            afterwards.
+            Compiles {setSummary} × {draftAdCount} ad
+            {draftAdCount === 1 ? "" : "s"} at{" "}
+            {budget != null
+              ? `${money(budget)}${budgetType === "lifetime" ? " lifetime" : "/day"}`
+              : "no budget"}{" "}
+            — all PAUSED. Nothing spends until you hit Launch afterwards.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="push-dest">Ad account</Label>
+            <Label htmlFor="push-destination">Ad account</Label>
             <select
-              id="push-dest"
+              id="push-destination"
               value={chosen?.key ?? ""}
               onChange={(event) => setDestinationKey(event.target.value)}
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
@@ -133,8 +128,8 @@ export function PushToPlatform({
                 {destinations.isPending
                   ? "Loading destinations…"
                   : options.length === 0
-                    ? "No allowlisted destination — allow an ad account first"
-                    : "Pick the destination"}
+                    ? "No allowlisted destination"
+                    : "Pick the ad account"}
               </option>
               {options.map((option) => (
                 <option key={option.key} value={option.key}>
@@ -143,61 +138,26 @@ export function PushToPlatform({
               ))}
             </select>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="push-goal">Goal</Label>
-              <select
-                id="push-goal"
-                value={goal}
-                onChange={(event) => setGoal(event.target.value as typeof goal)}
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              >
-                {GOALS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="push-budget">Budget ($)</Label>
-              <Input
-                id="push-budget"
-                type="number"
-                min={1}
-                value={budget}
-                onChange={(event) => setBudget(event.target.value)}
-                placeholder="2"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="push-budget-type">Type</Label>
-              <select
-                id="push-budget-type"
-                value={budgetType}
-                onChange={(event) =>
-                  setBudgetType(event.target.value as typeof budgetType)
-                }
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-              >
-                <option value="daily">daily</option>
-                <option value="lifetime">lifetime</option>
-              </select>
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="push-goal">Goal</Label>
+            <select
+              id="push-goal"
+              value={goal}
+              onChange={(event) => setGoal(event.target.value as typeof goal)}
+              className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
+            >
+              {GOALS.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
           </div>
-          {budgetType === "lifetime" && (
-            <div className="space-y-1.5">
-              <Label htmlFor="push-end">End date</Label>
-              <Input
-                id="push-end"
-                type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-              />
-              <p className="text-muted-foreground text-xs">
-                Required for a lifetime budget — it is the date the spend stops.
-              </p>
-            </div>
+          {budget == null && (
+            <p className="text-xs text-amber-400">
+              Set the budget on the {platformName} draft first — the push sends
+              that number.
+            </p>
           )}
           {push.error && (
             <p className="text-xs text-red-300">{push.error.message}</p>
@@ -210,11 +170,11 @@ export function PushToPlatform({
             title={
               !isMeta
                 ? "Only Meta has a dry run — Zernio's validate-only is Meta's own"
-                : adSetCount > 1
-                  ? "Meta has no dry run for the multi-ad-set shape"
+                : audienceCount > 1
+                  ? "Meta has no dry run for the multi-audience shape"
                   : undefined
             }
-            disabled={!canPush || !isMeta || adSetCount > 1}
+            disabled={!canPush || !isMeta || audienceCount > 1}
             loading={push.isPending}
             onClick={() =>
               chosen &&
@@ -224,9 +184,6 @@ export function PushToPlatform({
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,
-                budgetAmount: budgetNumber,
-                budgetType,
-                endDate: endDate ? new Date(endDate).toISOString() : undefined,
                 validateOnly: true,
               })
             }
@@ -245,9 +202,6 @@ export function PushToPlatform({
                 connectionAccountId: chosen.connectionAccountId,
                 adAccountId: chosen.adAccountId,
                 goal,
-                budgetAmount: budgetNumber,
-                budgetType,
-                endDate: endDate ? new Date(endDate).toISOString() : undefined,
               })
             }
           >

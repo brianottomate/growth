@@ -1,28 +1,25 @@
 import { relations, sql } from "drizzle-orm";
-import {
-  check,
-  index,
-  pgEnum,
-  pgTable,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 
-import { brandTable } from "./brand-schema";
+import { brandTable, personaTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { MediaItem } from "./content-schema";
 import { performanceCycleTable } from "./performance-schema";
 import { createId } from "./utils";
-import type {
-  AudienceActiveWindow,
-  AudienceContext,
-  AudienceDemographics,
-  AudienceGeography,
-} from "@/lib/audience-model";
 
-// NOTE: this is a read-only "launchpad" mirror — campaigns & audiences are
-// created/managed in each platform's portal (Meta/Google/OpenAI ads managers)
-// and surfaced here for overview + link-out. CRUD-from-our-app comes later.
-// Individual ad spots are not modeled yet; `campaign.adSpots` is a count.
+// ---- THE ADS DOMAIN --------------------------------------------------
+//
+// Two layers, same split as content (content_post → platform_post):
+//
+//   PLAN (our words)          campaign → audience, ad
+//   MIRROR (their words)      platform_campaign → platform_ad_set → platform_ad
+//                             platform_audience (per ad account)
+//
+// The invariant that keeps them honest: no plan table carries an externalId,
+// and no mirror table carries an opinion about intent. Plan budgets are
+// advisory; the authoritative budget lives on the platform row that spends
+// it. Every mirror row has a NULLABLE pointer to its plan parent — null means
+// backfilled/orphaned, which is a first-class state, not an error.
 
 // ---- ENUMS ---------------------------------------------------------
 
@@ -33,7 +30,8 @@ export const platformCampaignStatusEnum = pgEnum("platform_campaign_status", [
   "paused",
   "ended",
 ]);
-export type PlatformCampaignStatus = (typeof platformCampaignStatusEnum.enumValues)[number];
+export type PlatformCampaignStatus =
+  (typeof platformCampaignStatusEnum.enumValues)[number];
 
 export const audienceTypeEnum = pgEnum("audience_type", [
   "segment",
@@ -44,60 +42,8 @@ export const audienceTypeEnum = pgEnum("audience_type", [
 ]);
 export type AudienceType = (typeof audienceTypeEnum.enumValues)[number];
 
-// Strategic layer for audiences — the canonical "who we want to reach"
-// (e.g. "CA remote workers"). Per-channel `audience` rows are the reality and
-// link up via the nullable `targetId` FK. Mirrors lifecycle_program.
-export const audienceTargetStatusEnum = pgEnum("audience_target_status", [
-  "idea",
-  "planned",
-  "active",
-  "retired",
-]);
-export type AudienceTargetStatus =
-  (typeof audienceTargetStatusEnum.enumValues)[number];
-
-export const audienceTargetPriorityEnum = pgEnum("audience_target_priority", [
-  "must_have",
-  "should_have",
-  "nice_to_have",
-]);
-export type AudienceTargetPriority =
-  (typeof audienceTargetPriorityEnum.enumValues)[number];
-
-export const audienceProfileScopeEnum = pgEnum("audience_profile_scope", [
-  "core",
-  "segment",
-  "experimental",
-]);
-export type AudienceProfileScope =
-  (typeof audienceProfileScopeEnum.enumValues)[number];
-
-export const audienceMarketSideEnum = pgEnum("audience_market_side", [
-  "consumer",
-  "professional",
-  "business",
-  "partner",
-]);
-export type AudienceMarketSide =
-  (typeof audienceMarketSideEnum.enumValues)[number];
-
-export const audienceResearchMaturityEnum = pgEnum(
-  "audience_research_maturity",
-  ["hypothesis", "researched", "validated"],
-);
-export type AudienceResearchMaturity =
-  (typeof audienceResearchMaturityEnum.enumValues)[number];
-
-export const audienceActivationStatusEnum = pgEnum(
-  "audience_activation_status",
-  ["draft", "planned", "active", "paused", "retired"],
-);
-export type AudienceActivationStatus =
-  (typeof audienceActivationStatusEnum.enumValues)[number];
-
-// Provenance of an audience — makes retargeting (pixel_event = logged-out,
-// customer_list = logged-in) and hyper-segmentation (amplitude_cohort) explicit
-// instead of implied by campaign names. Keep in sync with audienceSourceSchema.
+// Provenance for a platform audience asset, so lists and lookalikes are typed
+// instead of implied by names. Keep in sync with audienceSourceSchema.
 export const audienceSourceEnum = pgEnum("audience_source", [
   "manual",
   "pixel_event",
@@ -107,15 +53,6 @@ export const audienceSourceEnum = pgEnum("audience_source", [
 ]);
 export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
 
-// ---- CAMPAIGN (top-level, goal-driven push across ad channels) ----
-
-/**
- * Campaign — the CMO's strategic push ("drive leads to /list"). It declares a
- * goal, the channels it *wants* to run on (`targetChannels`), dates, and a total
- * budget. The per-channel `campaign` rows are the implementations; the app
- * verifies them against `targetChannels`. The paid counterpart of a
- * `content_post` (one intent → many platform executions).
- */
 export const campaignStatusEnum = pgEnum("campaign_status", [
   "planned",
   "active",
@@ -125,15 +62,73 @@ export const campaignStatusEnum = pgEnum("campaign_status", [
 ]);
 export type CampaignStatus = (typeof campaignStatusEnum.enumValues)[number];
 
+export const adTypeEnum = pgEnum("ad_type", ["creative", "text"]);
+export type AdType = (typeof adTypeEnum.enumValues)[number];
+
+// ---- SHARED VALUE TYPES ---------------------------------------------
+
+/** Inline performance snapshot for an ad/campaign (latest, not time-series). */
+export type AdStats = {
+  spend?: number;
+  impressions?: number;
+  reach?: number;
+  clicks?: number;
+  ctr?: number;
+  conversions?: number;
+  cpc?: number;
+  cpm?: number;
+  roas?: number;
+  purchaseValue?: number;
+  costPerConversion?: number;
+};
+
 /**
- * Per-platform campaign settings. Only what the platform demands and the
- * first-party layer cannot express generically.
+ * Where a plan audience buys. Strict enough to compile (country codes,
+ * platform-resolvable region names), unlike a persona's loose prose arrays.
  */
-export type CampaignPlatformConfig = {
+export type AudienceGeographyPlan = {
+  /** ISO country codes, e.g. ["US"]. */
+  countries?: string[];
+  /** Region/state names the platform's geo search can resolve, e.g. ["California"]. */
+  regions?: string[];
+  cities?: string[];
+};
+
+/** Content of a `creative` ad: one image/carousel plus its copy. */
+export type AdCreativeContent = {
+  headline: string;
+  body: string;
+  /** Falls back to the campaign's landing URL. */
+  linkUrl?: string;
+  callToAction?: string;
+  /** One item = static image; several = carousel, in this order. */
+  media: MediaItem[];
+};
+
+/** Content of a `text` ad: the asset pool Google/OpenAI render from. */
+export type AdTextContent = {
+  headlines: string[];
+  descriptions: string[];
+  linkUrl?: string;
+};
+
+export type AdContent = AdCreativeContent | AdTextContent;
+
+/**
+ * Per-platform settings on the platform campaign row itself. Typed JSONB
+ * rather than per-platform tables because these are payload we read whole and
+ * never filter or join on — and platforms change shapes faster than a
+ * migration cadence. Anything we DO query (budget, status, externalId) is a
+ * column.
+ */
+export type PlatformCampaignSettings = {
   google?: {
     /** Zernio supports search and display; the type decides everything else. */
     campaignType?: "search" | "display";
-    /** Search only, and required by it — a Search campaign with no keywords buys nothing. */
+    /**
+     * Structured keywords the compile derived (or the operator overrode).
+     * Seeded from the plan audiences' keyword suggestions.
+     */
     keywords?: string[];
     negativeKeywords?: string[];
     additionalHeadlines?: string[];
@@ -146,14 +141,22 @@ export type CampaignPlatformConfig = {
     customEventType?: string;
     /**
      * Where the budget lives. CBO puts it on the campaign and lets Meta move
-     * it between ad sets, which is what you want when testing audiences
-     * against each other. ABO gives each ad set its own fixed budget, which
-     * is what you want when a split must be held. Defaults to CBO.
+     * it between ad sets; ABO gives each ad set its own fixed budget.
+     * Defaults to CBO.
      */
     budgetMode?: "cbo" | "abo";
   };
 };
 
+// ---- CAMPAIGN (the plan) ---------------------------------------------
+
+/**
+ * The first-party plan — the paid counterpart of a content_post. It carries
+ * the shared substance (name, goal, landing page, copy context, creative
+ * pool) and an ADVISORY budget. Platforms are planned by creating a draft
+ * platform_campaign row; audiences and ads hang off this row and are
+ * compiled per platform at push time.
+ */
 export const campaignTable = pgTable(
   "campaign",
   (t) => ({
@@ -170,41 +173,29 @@ export const campaignTable = pgTable(
     name: t.text().notNull(),
     slug: t.text(),
 
-    // Goal intent as a slug for now (e.g. "supply", "saas", "brand"). Promote to
-    // a `goal` table when organic content links to the same axis.
+    // Goal intent as a slug for now (e.g. "supply", "saas", "brand").
     goal: t.text(),
-    landingUrl: t.text(), // where it drives (e.g. https://wander.com/list)
+    landingUrl: t.text(),
     description: t.text(),
     color: t.text(), // UI accent (hex), used for feed bands
 
     status: campaignStatusEnum().default("active").notNull(),
 
-    // Channels the CMO wants this to run on (platform slugs). The per-channel
-    // `campaign` rows are the implementations we verify against this list.
-    targetChannels: t.jsonb().$type<string[]>(),
-
     /**
-     * Per-platform intent that has no cross-platform meaning: Google needs a
-     * campaign type and keywords, Meta needs a pixel and event. Typed JSONB
-     * rather than per-platform extension tables because these are payload we
-     * read whole and never filter, join, or aggregate on — and because ad
-     * platforms change their shapes far faster than a migration cadence.
-     * Anything we DO query (budget, status, externalId) stays a column.
-     */
-    platformConfig: t.jsonb().$type<CampaignPlatformConfig>().default({}),
-
-    /**
-     * Shared creative for this campaign's ads — the paid counterpart of the
-     * content post's media pool. Picked once from the brand's media library
-     * so an ad references it rather than re-picking per ad.
+     * Shared creative for this campaign's ads — picked once from the brand's
+     * media library so an ad references it rather than re-picking per ad.
      */
     creativePool: t.jsonb().$type<MediaItem[]>().default([]),
 
-    budget: t.integer(), // total intended (whole dollars)
+    /**
+     * ADVISORY total (whole dollars): what the operator intends to spend
+     * across platforms. Nothing spends this number — it seeds the platform
+     * drafts, and the campaign page shows it next to the authoritative
+     * per-platform budgets and actual spend.
+     */
+    budget: t.integer(),
 
     // Sponsored delivery: the paid performance cycle this campaign fulfils.
-    // Null for Wander's own pushes. Ads stay on Wander's brand/channels; this
-    // FK is the only customer linkage (see performance-schema.ts).
     performanceCycleId: t
       .text()
       .references(() => performanceCycleTable.id, { onDelete: "set null" }),
@@ -233,8 +224,145 @@ export const campaignTable = pgTable(
 export type Campaign = typeof campaignTable.$inferSelect;
 export type CampaignInsert = typeof campaignTable.$inferInsert;
 
-// ---- CAMPAIGN ------------------------------------------------------
+// ---- AUDIENCE (the plan's "who", with the money) ----------------------
 
+/**
+ * One buyable narrowing under a campaign: a coherent targeting cell (one age
+ * window, one geography) plus its optional budget split. The row IS the
+ * allocation — each one compiles to a Meta ad set / Google ad group. Wanting
+ * two age ranges means two audiences, by design.
+ *
+ * Reuse lives on `persona` (the stable brand-level "who"), not here: these
+ * rows are campaign working data, allowed to be many and disposable.
+ */
+export const audienceTable = pgTable(
+  "audience",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("aud")),
+
+    campaignId: t
+      .text()
+      .references(() => campaignTable.id, { onDelete: "cascade" })
+      .notNull(),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+    /** The stable persona this audience narrows, when derived from one. */
+    personaId: t
+      .text()
+      .references(() => personaTable.id, { onDelete: "set null" }),
+
+    name: t.text().notNull(),
+    description: t.text(),
+    type: audienceTypeEnum().default("segment").notNull(),
+
+    ageMin: t.integer(),
+    ageMax: t.integer(),
+    geography: t.jsonb().$type<AudienceGeographyPlan>(),
+    /**
+     * Keyword SUGGESTIONS (loose). The Google compile derives its structured
+     * keyword object from these; the Meta compile ignores them. Platform
+     * overrides live on the platform campaign's settings.
+     */
+    keywords: t.jsonb().$type<string[]>(),
+
+    /** ADVISORY split (whole dollars). Authoritative budget is platform-side. */
+    budget: t.integer(),
+    budgetType: t.text(), // "daily" | "lifetime"
+    optimizationGoal: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("audience_campaign_idx").on(table.campaignId),
+    index("audience_brand_idx").on(table.brandId),
+    index("audience_persona_idx").on(table.personaId),
+  ],
+);
+
+export type PlanAudience = typeof audienceTable.$inferSelect;
+export type PlanAudienceInsert = typeof audienceTable.$inferInsert;
+
+// ---- AD (the plan's creative suggestion) ------------------------------
+
+/**
+ * A drafted creative combo under a campaign — a SUGGESTION the push
+ * transforms into platform ads. `type` picks the content shape: `creative`
+ * (Meta image/carousel and friends) or `text` (Google/OpenAI asset pools).
+ * Ads belong to the campaign, not to an audience: at push, every ad runs
+ * under every ad set. Per-audience ad scoping is a later column, not a table.
+ */
+export const adTable = pgTable(
+  "ad",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("ad")),
+
+    campaignId: t
+      .text()
+      .references(() => campaignTable.id, { onDelete: "cascade" })
+      .notNull(),
+    brandId: t
+      .text()
+      .references(() => brandTable.id, { onDelete: "cascade" })
+      .notNull(),
+
+    name: t.text().notNull(),
+    type: adTypeEnum().default("creative").notNull(),
+    content: t.jsonb().$type<AdContent>().notNull(),
+
+    /**
+     * Deterministic key carried to the provider as the idempotency key, and
+     * what links this draft to the platform ads it became — externalIds only
+     * exist after the platform accepts, so without this a relaunch cannot
+     * tell a duplicate from a new ad.
+     */
+    businessKey: t.text(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("ad_campaign_idx").on(table.campaignId),
+    index("ad_brand_idx").on(table.brandId),
+    uniqueIndex("ad_business_key_idx")
+      .on(table.businessKey)
+      .where(sql`${table.businessKey} IS NOT NULL`),
+  ],
+);
+
+export type Ad = typeof adTable.$inferSelect;
+export type AdInsert = typeof adTable.$inferInsert;
+
+// ---- PLATFORM CAMPAIGN (mirror) ---------------------------------------
+
+/**
+ * One campaign as a platform knows it — or will: `draft` status means
+ * "planned for this platform", created when the operator plans the platform,
+ * holding its settings and the AUTHORITATIVE budget. The push fills in
+ * externalId and flips the status.
+ */
 export const platformCampaignTable = pgTable(
   "platform_campaign",
   (t) => ({
@@ -243,8 +371,7 @@ export const platformCampaignTable = pgTable(
       .primaryKey()
       .$defaultFn(() => createId("pcamp")),
 
-    // Canonical parent: the ad account it runs on. brandId is a denormalized
-    // convenience for brand-scoped queries (a channel's brand never changes).
+    // Canonical parent: the ad account it runs on. brandId is denormalized.
     channelId: t
       .text()
       .references(() => channelTable.id, { onDelete: "cascade" })
@@ -255,7 +382,7 @@ export const platformCampaignTable = pgTable(
       .notNull(),
     platform: channelPlatformEnum().notNull(), // badge; denormalized from channel
 
-    // Optional parent push this per-channel campaign implements.
+    /** Plan parent. NULL = discovered by sync, not born here. */
     campaignId: t
       .text()
       .references(() => campaignTable.id, { onDelete: "set null" }),
@@ -267,19 +394,25 @@ export const platformCampaignTable = pgTable(
     startAt: t.timestamp({ withTimezone: true }),
     endAt: t.timestamp({ withTimezone: true }),
 
-    // Coarse launchpad rollups (whole dollars). Precise figures live in-platform.
+    /**
+     * AUTHORITATIVE budget (whole units of the ad account's currency): what
+     * the push sends. Seeded from the plan's advisory numbers, editable on
+     * the draft before pushing.
+     */
     budget: t.integer(),
+    budgetType: t.text(), // "daily" | "lifetime"
     spend: t.integer(),
-    adSpots: t.integer().default(0).notNull(),
+    adCount: t.integer().default(0).notNull(),
 
-    // Latest metrics snapshot (rolled up from the campaign's ads) + one hero
-    // creative thumbnail, so feed/calendar can render a campaign card without
-    // touching `ad_spot`. Snapshot, not time-series.
+    settings: t.jsonb().$type<PlatformCampaignSettings>().default({}),
+
+    // Latest metrics snapshot + one hero creative thumbnail, so feed/calendar
+    // can render a campaign card without touching platform_ad.
     stats: t.jsonb().$type<AdStats>(),
     heroThumbnailUrl: t.text(),
 
-    externalId: t.text(), // platform campaign id
-    manageUrl: t.text(), // deep-link into the platform's manager
+    externalId: t.text(), // platform campaign id; null while draft
+    manageUrl: t.text(),
 
     createdAt: t
       .timestamp()
@@ -302,181 +435,135 @@ export const platformCampaignTable = pgTable(
 export type PlatformCampaign = typeof platformCampaignTable.$inferSelect;
 export type PlatformCampaignInsert = typeof platformCampaignTable.$inferInsert;
 
-// ---- AD SPOT (one creative under a campaign; mirrors a Zernio Ad) ----
+// ---- PLATFORM AD SET (mirror: the middle tier every platform has) ------
 
-/** Inline performance snapshot for an ad/campaign (latest, not time-series). */
-export type AdStats = {
-  spend?: number;
-  impressions?: number;
-  reach?: number;
-  clicks?: number;
-  ctr?: number;
-  conversions?: number;
-  cpc?: number;
-  cpm?: number;
-  // Value/return signals — present in Zernio's metrics; useful at campaign level.
-  roas?: number;
-  purchaseValue?: number;
-  costPerConversion?: number;
-};
-
-
-// ---- AD SET: the targeting + budget layer ---------------------------
-//
-// Every ad platform puts targeting, audience, and budget on the ad set (Meta
-// ad set, Google ad group, LinkedIn campaign), NOT on the campaign or the ad.
-// Modeling it first-party is what lets a draft express "this audience at this
-// budget in these places" before it exists on any platform — and what lets one
-// campaign carry several audiences, which is how a real prospecting build is
-// structured.
-//
-// `audienceTargetId` is the join into the first-party audience layer
-// (audience_target → audience_activation → the mirrored platform audience), so
-// the who is defined once and compiled per platform rather than retyped here.
-export const adSetTable = pgTable(
-  "ad_set",
+/**
+ * Meta ad set, Google ad group, TikTok ad group, LinkedIn "campaign" (its
+ * top level is "campaign group"). Different names, same job everywhere:
+ * this tier owns targeting, placement, schedule, and bid — the campaign owns
+ * objective and money strategy, the ad owns creative. One generic table;
+ * `platform` on the parent campaign says which dialect you are reading.
+ *
+ * A physical ad lives in exactly ONE ad set on every platform, so the mirror
+ * is a strict tree. Reuse across ad sets happens one level up: a plan `ad`
+ * fans out to one platform_ad per set at compile time.
+ */
+export const platformAdSetTable = pgTable(
+  "platform_ad_set",
   (t) => ({
     id: t
       .text()
       .primaryKey()
-      .$defaultFn(() => createId("adset")),
+      .$defaultFn(() => createId("pas")),
 
-    /**
-     * The first-party push this ad set belongs to. Drafts hang off the
-     * campaign alone; `platformCampaignId` is stamped when the push creates the
-     * per-platform campaign.
-     */
-    campaignId: t
-      .text()
-      .references(() => campaignTable.id, { onDelete: "cascade" }),
-    /** The per-platform campaign, once this ad set exists on a platform. */
     platformCampaignId: t
       .text()
-      .references(() => platformCampaignTable.id, { onDelete: "cascade" }),
+      .references(() => platformCampaignTable.id, { onDelete: "cascade" })
+      .notNull(),
     brandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
-    name: t.text().notNull(),
-    /** Raw platform status (active/paused/…); null while local-only. */
-    status: t.text(),
-
-    /** The first-party "who" this ad set is buying. */
-    audienceTargetId: t
-      .text()
-      .references(() => audienceTargetTable.id, { onDelete: "set null" }),
-    /** The mirrored platform audience asset, once one exists. */
+    /** The plan audience this was compiled from. NULL = discovered by sync. */
     audienceId: t
       .text()
       .references(() => audienceTable.id, { onDelete: "set null" }),
 
-    /** Whole currency units, matching campaign.budget. */
-    budget: t.integer(),
-    budgetType: t.text(), // "daily" | "lifetime"
-    optimizationGoal: t.text(),
-    bidStrategy: t.text(),
-
-    /** Where this ad set buys, when it overrides the audience's own geography. */
-    geography: t.jsonb().$type<AudienceGeography>(),
-    /** Compiled platform targeting spec, as sent to (or read from) the platform. */
+    name: t.text().notNull(),
+    status: t.text(), // raw platform status, ingested as-is
+    /** What was actually sent to / read from the platform. */
     targetingSpec: t.jsonb(),
+    budget: t.integer(),
+    budgetType: t.text(),
+    optimizationGoal: t.text(),
 
-    externalId: t.text(), // platform ad set id
-    startAt: t.timestamp({ withTimezone: true }),
-    endAt: t.timestamp({ withTimezone: true }),
+    externalId: t.text(), // platform ad set / ad group id
+    stats: t.jsonb().$type<AdStats>(),
 
-    createdAt: t.timestamp({ withTimezone: true }).notNull().defaultNow(),
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
     updatedAt: t
-      .timestamp({ withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
   }),
   (table) => [
-    index("ad_set_platform_campaign_idx").on(table.platformCampaignId),
-    index("ad_set_campaign_idx").on(table.campaignId),
-    index("ad_set_brand_idx").on(table.brandId),
-    check(
-      "ad_set_parent_check",
-      sql`${table.campaignId} IS NOT NULL OR ${table.platformCampaignId} IS NOT NULL`,
-    ),
-    index("ad_set_audience_target_idx").on(table.audienceTargetId),
-    uniqueIndex("ad_set_external_id_idx")
+    index("platform_ad_set_campaign_idx").on(table.platformCampaignId),
+    index("platform_ad_set_audience_idx").on(table.audienceId),
+    uniqueIndex("platform_ad_set_external_id_idx")
       .on(table.externalId)
       .where(sql`${table.externalId} IS NOT NULL`),
   ],
 );
 
-export type AdSet = typeof adSetTable.$inferSelect;
+export type PlatformAdSet = typeof platformAdSetTable.$inferSelect;
+export type PlatformAdSetInsert = typeof platformAdSetTable.$inferInsert;
 
-export const adSpotTable = pgTable(
-  "ad_spot",
+// ---- PLATFORM AD (mirror) ----------------------------------------------
+
+/**
+ * One physical ad on one platform. A drafted `ad` fans out to N of these
+ * (platforms × ad sets), each with its own externalId, review status and
+ * metrics. `adId` is nullable lineage: null = discovered by sync, or a shape
+ * the platform refused 1:1 (one Google RSA can absorb several text drafts).
+ */
+export const platformAdTable = pgTable(
+  "platform_ad",
   (t) => ({
     id: t
       .text()
       .primaryKey()
-      .$defaultFn(() => createId("ad")),
+      .$defaultFn(() => createId("pad")),
 
-    /** First-party push, for ads drafted before any platform campaign exists. */
-    campaignId: t
-      .text()
-      .references(() => campaignTable.id, { onDelete: "cascade" }),
-    /** Per-platform campaign; stamped by the push, set by sync. */
+    // Denormalized alongside the true parent below, like brandId: an ad's
+    // set row may not exist yet when sync first sees it. When both are set
+    // they must agree; compiler and sync construct them together.
     platformCampaignId: t
       .text()
-      .references(() => platformCampaignTable.id, { onDelete: "cascade" }),
-    channelId: t
+      .references(() => platformCampaignTable.id, { onDelete: "cascade" })
+      .notNull(),
+    /** The true parent (one ad set per ad, on every platform); sync backfills. */
+    platformAdSetId: t
       .text()
-      .references(() => channelTable.id, { onDelete: "set null" }),
+      .references(() => platformAdSetTable.id, { onDelete: "set null" }),
     brandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
+    channelId: t
+      .text()
+      .references(() => channelTable.id, { onDelete: "set null" }),
     platform: channelPlatformEnum().notNull(),
 
+    /** Plan lineage. NULL = discovered by sync or fuzzy mapping. */
+    adId: t.text().references(() => adTable.id, { onDelete: "set null" }),
+
     name: t.text(),
-    /**
-     * The short punch line above/below the creative. First-party because every
-     * platform has the same {headline, body} pair (Meta headline + primary
-     * text, Google headline + description, LinkedIn headline + intro); the
-     * per-platform quirks (Google's headline arrays) stay in platform payloads.
-     */
     headline: t.text(),
-    status: t.text(), // raw platform status (active/paused/…); ingested as-is
-
-    // Ad set denormalized (Zernio's AdWithContext flattens it onto the ad).
-    /** Platform ad set id (mirrored from sync). See adSetRowId for the FK. */
-    adSetId: t.text(),
-    adSetName: t.text(),
-    /** First-party ad set this ad belongs to. */
-    adSetRowId: t
-      .text()
-      .references(() => adSetTable.id, { onDelete: "set null" }),
-
-    // Creative — maps Zernio creative (image/video/thumb + body + link).
-    media: t.jsonb().$type<MediaItem[]>(),
     body: t.text(),
     linkUrl: t.text(),
+    media: t.jsonb().$type<MediaItem[]>(),
     thumbnailUrl: t.text(),
 
-    // Bidding / objective context.
+    status: t.text(), // raw platform status (active/paused/rejected/…)
     platformObjective: t.text(),
     optimizationGoal: t.text(),
     bidStrategy: t.text(),
 
-    stats: t.jsonb().$type<AdStats>(),
+    // Ad set context as Zernio flattens it onto the ad; platformAdSetId is
+    // resolved from these when the set row exists.
+    externalAdSetId: t.text(),
+    adSetName: t.text(),
 
+    stats: t.jsonb().$type<AdStats>(),
     externalId: t.text(), // platform ad id
     manageUrl: t.text(),
 
-    /**
-     * Deterministic key for the ad this row represents, set when Growth drafts
-     * it and carried through to the provider as the Zernio idempotency key.
-     * It is what links a drafted ad to the live ad it became: `externalId`
-     * only exists after the platform accepts it, so without this a relaunch
-     * cannot tell a duplicate from a new ad. Null for rows discovered by sync.
-     */
+    /** Idempotency key echoed from the plan ad that produced this. */
     businessKey: t.text(),
 
     createdAt: t
@@ -490,192 +577,36 @@ export const adSpotTable = pgTable(
       .notNull(),
   }),
   (table) => [
-    index("ad_spot_platform_campaign_idx").on(table.platformCampaignId),
-    index("ad_spot_brand_idx").on(table.brandId),
-    index("ad_spot_status_idx").on(table.status),
-    uniqueIndex("ad_spot_business_key_idx")
-      .on(table.businessKey)
-      .where(sql`${table.businessKey} IS NOT NULL`),
+    index("platform_ad_campaign_idx").on(table.platformCampaignId),
+    index("platform_ad_set_idx").on(table.platformAdSetId),
+    index("platform_ad_brand_idx").on(table.brandId),
+    index("platform_ad_status_idx").on(table.status),
+    index("platform_ad_plan_idx").on(table.adId),
+    uniqueIndex("platform_ad_external_id_idx")
+      .on(table.externalId)
+      .where(sql`${table.externalId} IS NOT NULL`),
   ],
 );
 
-export type AdSpot = typeof adSpotTable.$inferSelect;
-export type AdSpotInsert = typeof adSpotTable.$inferInsert;
+export type PlatformAd = typeof platformAdTable.$inferSelect;
+export type PlatformAdInsert = typeof platformAdTable.$inferInsert;
 
-// ---- AUDIENCE TARGET (the intended "who" — "what we want") ----------
+// ---- PLATFORM AUDIENCE (mirror: assets in an ad account) ---------------
 
-export const audienceTargetTable = pgTable(
-  "audience_target",
+/**
+ * An audience ASSET as an ad account holds it: custom list, pixel audience,
+ * lookalike. Lives under a channel. `sourceId` is the platform-side ancestry
+ * ("customer list → lookalike 1%"), which is where lookalike depth actually
+ * exists. `audienceId` links the plan audience it fulfils, when one does.
+ */
+export const platformAudienceTable = pgTable(
+  "platform_audience",
   (t) => ({
     id: t
       .text()
       .primaryKey()
-      .$defaultFn(() => createId("audt")),
+      .$defaultFn(() => createId("paud")),
 
-    brandId: t
-      .text()
-      .references(() => brandTable.id, { onDelete: "cascade" })
-      .notNull(),
-
-    name: t.text().notNull(), // canonical "who", e.g. "CA remote workers"
-    slug: t.text().notNull(), // stable, idempotent key within a brand
-    description: t.text(), // why we want to reach them
-
-    // Durable audience / ICP semantics. Platform targeting mechanics live on
-    // audience_activation and the mirrored audience object below.
-    profileScope: audienceProfileScopeEnum().default("segment").notNull(),
-    marketSide: audienceMarketSideEnum().default("consumer").notNull(),
-    researchMaturity: audienceResearchMaturityEnum()
-      .default("hypothesis")
-      .notNull(),
-    // `geography` = where the audience IS (origin). For travel intent, the place
-    // we want to send them lives on `destinationGeography` — e.g. origin =
-    // Pacific NW, destination = California. "California for California" is the
-    // degenerate case where the two are equal.
-    geography: t.jsonb().$type<AudienceGeography>(),
-    destinationGeography: t.jsonb().$type<AudienceGeography>(),
-    demographics: t.jsonb().$type<AudienceDemographics>(),
-    context: t.jsonb().$type<AudienceContext>(),
-
-    // Provenance + optional external handle (pixel event name, Amplitude cohort
-    // id, seed audience id). Drives how this target is effectuated downstream.
-    source: audienceSourceEnum().default("manual").notNull(),
-    sourceRef: t.text(),
-    // Seasonal/temporal intent — when this audience is worth reaching.
-    activeWindow: t.jsonb().$type<AudienceActiveWindow>(),
-
-    type: audienceTypeEnum().notNull(),
-    status: audienceTargetStatusEnum().default("planned").notNull(),
-    priority: audienceTargetPriorityEnum().default("should_have").notNull(),
-
-    // Ad platforms we intend this audience to be live on (channelPlatform
-    // slugs). Compared against the linked `audience` rows to spot gaps.
-    intendedChannels: t.jsonb().$type<string[]>(),
-    sizeGoalLabel: t.text(), // aspirational reach, e.g. "~500K"
-
-    definition: t.jsonb(), // geo / interest hints, shared with the platform rows
-    metadata: t.jsonb(),
-
-    createdAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-    deletedAt: t.timestamp(),
-  }),
-  (table) => [
-    index("audience_target_brand_idx").on(table.brandId),
-    index("audience_target_type_idx").on(table.type),
-    index("audience_target_status_idx").on(table.status),
-    uniqueIndex("audience_target_brand_slug_uq").on(table.brandId, table.slug),
-  ],
-);
-
-export type AudienceTarget = typeof audienceTargetTable.$inferSelect;
-export type AudienceTargetInsert = typeof audienceTargetTable.$inferInsert;
-
-// ---- AUDIENCE ACTIVATION (planned per-platform targeting) ----------
-
-export const audienceActivationTable = pgTable(
-  "audience_activation",
-  (t) => ({
-    id: t
-      .text()
-      .primaryKey()
-      .$defaultFn(() => createId("aact")),
-    targetId: t
-      .text()
-      .references(() => audienceTargetTable.id, { onDelete: "cascade" })
-      .notNull(),
-    platform: channelPlatformEnum().notNull(),
-    type: audienceTypeEnum().default("segment").notNull(),
-    status: audienceActivationStatusEnum().default("planned").notNull(),
-
-    // Null geography/demographics plus the corresponding mode is deliberate:
-    // inherit/narrow/replace and none/inherit_descriptive/override are distinct.
-    geographyMode: t.text().default("inherit").notNull(),
-    geography: t.jsonb().$type<AudienceGeography>(),
-    demographicsMode: t.text().default("none").notNull(),
-    demographics: t.jsonb().$type<AudienceDemographics>(),
-
-    targetingSpec: t.jsonb(),
-    prompt: t.text(),
-    exclusions: t.jsonb().$type<string[]>(),
-    specialAdCategory: t.text(),
-    complianceNotes: t.text(),
-    reachEstimateLabel: t.text(),
-    metadata: t.jsonb(),
-    createdAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-  }),
-  (table) => [
-    uniqueIndex("audience_activation_target_platform_uq").on(
-      table.targetId,
-      table.platform,
-    ),
-    index("audience_activation_status_idx").on(table.status),
-  ],
-);
-
-export type AudienceActivation = typeof audienceActivationTable.$inferSelect;
-export type AudienceActivationInsert =
-  typeof audienceActivationTable.$inferInsert;
-
-// ---- AUDIENCE EVIDENCE (why we believe the profile) ----------------
-
-export const audienceEvidenceTable = pgTable(
-  "audience_evidence",
-  (t) => ({
-    id: t
-      .text()
-      .primaryKey()
-      .$defaultFn(() => createId("aevd")),
-    targetId: t
-      .text()
-      .references(() => audienceTargetTable.id, { onDelete: "cascade" })
-      .notNull(),
-    url: t.text(),
-    title: t.text(),
-    claim: t.text().notNull(),
-    sourceType: t.text().default("research").notNull(),
-    observedAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .notNull(),
-    createdAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .notNull(),
-  }),
-  (table) => [index("audience_evidence_target_idx").on(table.targetId)],
-);
-
-export type AudienceEvidence = typeof audienceEvidenceTable.$inferSelect;
-
-// ---- AUDIENCE ------------------------------------------------------
-
-export const audienceTable = pgTable(
-  "audience",
-  (t) => ({
-    id: t
-      .text()
-      .primaryKey()
-      .$defaultFn(() => createId("aud")),
-
-    // An audience lives in ONE ad account (channel). The brand-level view
-    // ("CA Remote Workers on Meta + Google") is N rows with the same name,
-    // deduped by name in the UI — that's the cross-channel view.
     channelId: t
       .text()
       .references(() => channelTable.id, { onDelete: "cascade" })
@@ -685,18 +616,20 @@ export const audienceTable = pgTable(
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
-    // The strategic target this mirrored audience fulfils, if any.
-    targetId: t
+    /** Plan lineage. NULL = pre-existing asset discovered in the account. */
+    audienceId: t
       .text()
-      .references(() => audienceTargetTable.id, { onDelete: "set null" }),
+      .references(() => audienceTable.id, { onDelete: "set null" }),
+    /** The asset this one was derived from (lookalike seed, etc.). */
+    sourceId: t.text(),
 
     name: t.text().notNull(),
     type: audienceTypeEnum().notNull(),
     source: audienceSourceEnum().default("manual").notNull(),
-    externalId: t.text(), // the platform's audience id (parity with campaign.externalId)
-    sizeLabel: t.text(), // "~1.2M", "~40K/mo" — coarse, mirrored from platform
+    externalId: t.text(),
+    sizeLabel: t.text(), // "~1.2M" — coarse, mirrored from platform
 
-    definition: t.jsonb(), // loose source data for later (context hints, geo, etc.)
+    definition: t.jsonb(),
     manageUrl: t.text(),
 
     createdAt: t
@@ -710,158 +643,131 @@ export const audienceTable = pgTable(
       .notNull(),
   }),
   (table) => [
-    index("audience_brand_idx").on(table.brandId),
-    index("audience_channel_idx").on(table.channelId),
-    index("audience_type_idx").on(table.type),
-    index("audience_target_idx").on(table.targetId),
+    index("platform_audience_brand_idx").on(table.brandId),
+    index("platform_audience_channel_idx").on(table.channelId),
+    index("platform_audience_plan_idx").on(table.audienceId),
+    uniqueIndex("platform_audience_external_id_idx")
+      .on(table.channelId, table.externalId)
+      .where(sql`${table.externalId} IS NOT NULL`),
   ],
 );
 
-export type Audience = typeof audienceTable.$inferSelect;
-export type AudienceInsert = typeof audienceTable.$inferInsert;
-
-// ---- AUDIENCE PLACEMENT (where a platform audience is running) -----
-
-export const audiencePlacementTable = pgTable(
-  "audience_placement",
-  (t) => ({
-    id: t
-      .text()
-      .primaryKey()
-      .$defaultFn(() => createId("aplc")),
-    audienceId: t
-      .text()
-      .references(() => audienceTable.id, { onDelete: "cascade" })
-      .notNull(),
-    platformCampaignId: t
-      .text()
-      .references(() => platformCampaignTable.id, { onDelete: "cascade" })
-      .notNull(),
-    adSetId: t.text(),
-    adSetName: t.text(),
-    status: t.text(),
-    stats: t.jsonb().$type<AdStats>(),
-    externalId: t.text(),
-    createdAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .notNull(),
-    updatedAt: t
-      .timestamp()
-      .$defaultFn(() => new Date())
-      .$onUpdate(() => new Date())
-      .notNull(),
-  }),
-  (table) => [
-    index("audience_placement_audience_idx").on(table.audienceId),
-    index("audience_placement_platform_campaign_idx").on(table.platformCampaignId),
-  ],
-);
+export type PlatformAudience = typeof platformAudienceTable.$inferSelect;
+export type PlatformAudienceInsert = typeof platformAudienceTable.$inferInsert;
 
 // ---- RELATIONS -----------------------------------------------------
 
-export const campaignRelations = relations(
-  campaignTable,
-  ({ one, many }) => ({
-    brand: one(brandTable, {
-      fields: [campaignTable.brandId],
-      references: [brandTable.id],
-    }),
-    platformCampaigns: many(platformCampaignTable),
-  }),
-);
-
-export const platformCampaignRelations = relations(
-  platformCampaignTable,
-  ({ one, many }) => ({
+export const campaignRelations = relations(campaignTable, ({ one, many }) => ({
   brand: one(brandTable, {
-    fields: [platformCampaignTable.brandId],
+    fields: [campaignTable.brandId],
     references: [brandTable.id],
   }),
-  channel: one(channelTable, {
-    fields: [platformCampaignTable.channelId],
-    references: [channelTable.id],
-  }),
+  audiences: many(audienceTable),
+  ads: many(adTable),
+  platformCampaigns: many(platformCampaignTable),
+}));
+
+export const audienceRelations = relations(audienceTable, ({ one, many }) => ({
   campaign: one(campaignTable, {
-    fields: [platformCampaignTable.campaignId],
+    fields: [audienceTable.campaignId],
     references: [campaignTable.id],
   }),
-  adSpots: many(adSpotTable),
-}));
-
-export const adSpotRelations = relations(adSpotTable, ({ one }) => ({
-  platformCampaign: one(platformCampaignTable, {
-    fields: [adSpotTable.platformCampaignId],
-    references: [platformCampaignTable.id],
-  }),
-  brand: one(brandTable, {
-    fields: [adSpotTable.brandId],
-    references: [brandTable.id],
-  }),
-  channel: one(channelTable, {
-    fields: [adSpotTable.channelId],
-    references: [channelTable.id],
-  }),
-}));
-
-export const audienceTargetRelations = relations(
-  audienceTargetTable,
-  ({ one, many }) => ({
-    brand: one(brandTable, {
-      fields: [audienceTargetTable.brandId],
-      references: [brandTable.id],
-    }),
-    audiences: many(audienceTable),
-    activations: many(audienceActivationTable),
-    evidence: many(audienceEvidenceTable),
-  }),
-);
-
-export const audienceActivationRelations = relations(
-  audienceActivationTable,
-  ({ one }) => ({
-    target: one(audienceTargetTable, {
-      fields: [audienceActivationTable.targetId],
-      references: [audienceTargetTable.id],
-    }),
-  }),
-);
-
-export const audienceEvidenceRelations = relations(
-  audienceEvidenceTable,
-  ({ one }) => ({
-    target: one(audienceTargetTable, {
-      fields: [audienceEvidenceTable.targetId],
-      references: [audienceTargetTable.id],
-    }),
-  }),
-);
-
-export const audienceRelations = relations(audienceTable, ({ one }) => ({
   brand: one(brandTable, {
     fields: [audienceTable.brandId],
     references: [brandTable.id],
   }),
-  channel: one(channelTable, {
-    fields: [audienceTable.channelId],
-    references: [channelTable.id],
+  persona: one(personaTable, {
+    fields: [audienceTable.personaId],
+    references: [personaTable.id],
   }),
-  target: one(audienceTargetTable, {
-    fields: [audienceTable.targetId],
-    references: [audienceTargetTable.id],
+  platformAdSets: many(platformAdSetTable),
+  platformAudiences: many(platformAudienceTable),
+}));
+
+export const adRelations = relations(adTable, ({ one, many }) => ({
+  campaign: one(campaignTable, {
+    fields: [adTable.campaignId],
+    references: [campaignTable.id],
+  }),
+  brand: one(brandTable, {
+    fields: [adTable.brandId],
+    references: [brandTable.id],
+  }),
+  platformAds: many(platformAdTable),
+}));
+
+export const platformCampaignRelations = relations(
+  platformCampaignTable,
+  ({ one, many }) => ({
+    brand: one(brandTable, {
+      fields: [platformCampaignTable.brandId],
+      references: [brandTable.id],
+    }),
+    channel: one(channelTable, {
+      fields: [platformCampaignTable.channelId],
+      references: [channelTable.id],
+    }),
+    campaign: one(campaignTable, {
+      fields: [platformCampaignTable.campaignId],
+      references: [campaignTable.id],
+    }),
+    adSets: many(platformAdSetTable),
+    ads: many(platformAdTable),
+  }),
+);
+
+export const platformAdSetRelations = relations(
+  platformAdSetTable,
+  ({ one, many }) => ({
+    platformCampaign: one(platformCampaignTable, {
+      fields: [platformAdSetTable.platformCampaignId],
+      references: [platformCampaignTable.id],
+    }),
+    audience: one(audienceTable, {
+      fields: [platformAdSetTable.audienceId],
+      references: [audienceTable.id],
+    }),
+    ads: many(platformAdTable),
+  }),
+);
+
+export const platformAdRelations = relations(platformAdTable, ({ one }) => ({
+  platformCampaign: one(platformCampaignTable, {
+    fields: [platformAdTable.platformCampaignId],
+    references: [platformCampaignTable.id],
+  }),
+  adSet: one(platformAdSetTable, {
+    fields: [platformAdTable.platformAdSetId],
+    references: [platformAdSetTable.id],
+  }),
+  ad: one(adTable, {
+    fields: [platformAdTable.adId],
+    references: [adTable.id],
+  }),
+  brand: one(brandTable, {
+    fields: [platformAdTable.brandId],
+    references: [brandTable.id],
+  }),
+  channel: one(channelTable, {
+    fields: [platformAdTable.channelId],
+    references: [channelTable.id],
   }),
 }));
 
-export const audiencePlacementRelations = relations(
-  audiencePlacementTable,
+export const platformAudienceRelations = relations(
+  platformAudienceTable,
   ({ one }) => ({
-    audience: one(audienceTable, {
-      fields: [audiencePlacementTable.audienceId],
-      references: [audienceTable.id],
+    brand: one(brandTable, {
+      fields: [platformAudienceTable.brandId],
+      references: [brandTable.id],
     }),
-    campaign: one(platformCampaignTable, {
-      fields: [audiencePlacementTable.platformCampaignId],
-      references: [platformCampaignTable.id],
+    channel: one(channelTable, {
+      fields: [platformAudienceTable.channelId],
+      references: [channelTable.id],
+    }),
+    audience: one(audienceTable, {
+      fields: [platformAudienceTable.audienceId],
+      references: [audienceTable.id],
     }),
   }),
 );

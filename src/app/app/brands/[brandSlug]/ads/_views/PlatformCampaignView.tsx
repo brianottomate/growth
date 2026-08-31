@@ -4,7 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  adSpotTable,
+  platformAdTable,
   brandTable,
   platformCampaignTable,
   campaignTable,
@@ -60,8 +60,8 @@ export async function PlatformCampaignView({
   if (!platformCampaign) notFound();
 
   const [spots, campaign] = await Promise.all([
-    db.query.adSpotTable.findMany({
-      where: eq(adSpotTable.platformCampaignId, platformCampaign.id),
+    db.query.platformAdTable.findMany({
+      where: eq(platformAdTable.platformCampaignId, platformCampaign.id),
     }),
     platformCampaign.campaignId
       ? db.query.campaignTable.findFirst({
@@ -90,13 +90,8 @@ export async function PlatformCampaignView({
       : []),
   ];
 
-  // The ads sort drafted-first so a build in progress reads top to bottom.
   const sortedSpots = [...spots].sort((a, b) =>
-    (a.externalId ? 1 : 0) - (b.externalId ? 1 : 0) === 0
-      ? (a.name ?? "").localeCompare(b.name ?? "")
-      : a.externalId
-        ? 1
-        : -1,
+    (a.name ?? "").localeCompare(b.name ?? ""),
   );
 
   return (
@@ -121,22 +116,28 @@ export async function PlatformCampaignView({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <ChannelLogo platform={platformCampaign.platform} className="size-6" />
+              <ChannelLogo
+                platform={platformCampaign.platform}
+                className="size-6"
+              />
               <h1 className="truncate text-xl font-semibold tracking-tight">
                 {platformCampaign.name}
               </h1>
               <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
-                  statusStyle(platformCampaign.status)
-                }`}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${statusStyle(
+                  platformCampaign.status,
+                )}`}
               >
                 {platformCampaign.status}
               </span>
             </div>
             <p className="text-muted-foreground mt-1 text-sm">
               {platformLabel(platformCampaign.platform)}
-              {platformCampaign.objective ? ` · ${platformCampaign.objective}` : ""} ·{" "}
-              {fmtDate(platformCampaign.startAt) ?? "—"} – {fmtDate(platformCampaign.endAt) ?? "—"}
+              {platformCampaign.objective
+                ? ` · ${platformCampaign.objective}`
+                : ""}{" "}
+              · {fmtDate(platformCampaign.startAt) ?? "—"} –{" "}
+              {fmtDate(platformCampaign.endAt) ?? "—"}
             </p>
             <div className="mt-2">
               <CampaignLink
@@ -230,7 +231,7 @@ export async function PlatformCampaignView({
                     className="h-full w-full object-cover"
                   />
                   <span className="absolute top-1.5 right-1.5 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white capitalize backdrop-blur-sm">
-                    {spot.externalId ? (spot.status ?? "live") : "drafted"}
+                    {spot.status ?? "live"}
                   </span>
                 </div>
                 <div className="space-y-1 p-3">

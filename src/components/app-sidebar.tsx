@@ -97,7 +97,7 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Website", href: "/app/website", icon: Globe },
       { label: "Apps & marketplaces", href: "/app/apps", icon: AppWindow },
       { label: "Product Atlas", href: "/app/product-atlas", icon: Map },
-      { label: "Audiences", href: "/app/audiences", icon: Target },
+      { label: "Personas", href: "/app/audiences", icon: Target },
     ],
   },
   {

@@ -4,8 +4,8 @@ import { and, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  adSetTable,
-  adSpotTable,
+  platformAdSetTable,
+  platformAdTable,
   type AdStats,
   platformCampaignTable,
   type PlatformCampaignStatus,
@@ -209,7 +209,6 @@ export type AdsSyncFilters = {
   limit?: number;
 };
 
-
 /**
  * Whether the tree we just fetched was complete enough to conclude that a
  * campaign missing from it was deleted on the platform.
@@ -264,12 +263,12 @@ async function syncCampaignChildren(input: {
 }) {
   type PendingSet = {
     externalId: string;
-    values: typeof adSetTable.$inferInsert;
+    values: typeof platformAdSetTable.$inferInsert;
   };
   type PendingAd = {
     externalId: string;
     adSetExternalId: string | undefined;
-    values: typeof adSpotTable.$inferInsert;
+    values: typeof platformAdTable.$inferInsert;
   };
   const sets: PendingSet[] = [];
   const ads: PendingAd[] = [];
@@ -295,10 +294,11 @@ async function syncCampaignChildren(input: {
             platformCampaignId: rowId,
             name: adSet.name ?? setExternalId,
             status: adSet.status ?? null,
-            budget: num(
-              (setObj.budget as { amount?: unknown } | undefined)?.amount ??
-                setObj.budget,
-            ) ?? null,
+            budget:
+              num(
+                (setObj.budget as { amount?: unknown } | undefined)?.amount ??
+                  setObj.budget,
+              ) ?? null,
             budgetType:
               str((setObj.budget as { type?: unknown } | undefined)?.type) ??
               null,
@@ -316,7 +316,9 @@ async function syncCampaignChildren(input: {
           ? [
               {
                 url: image,
-                type: creative.videoUrl ? ("video" as const) : ("image" as const),
+                type: creative.videoUrl
+                  ? ("video" as const)
+                  : ("image" as const),
               },
             ]
           : null;
@@ -330,7 +332,7 @@ async function syncCampaignChildren(input: {
             platform: input.platform,
             name: ad.name ?? adExternalId,
             status: ad.status ?? null,
-            adSetId: ad.platformAdSetId ?? setExternalId ?? null,
+            externalAdSetId: ad.platformAdSetId ?? setExternalId ?? null,
             adSetName: adSet.name ?? null,
             media,
             body: creative.body ?? null,
@@ -350,11 +352,14 @@ async function syncCampaignChildren(input: {
   const setRowIdByExternalId = new Map<string, string>();
   if (sets.length) {
     const existing = await db
-      .select({ id: adSetTable.id, externalId: adSetTable.externalId })
-      .from(adSetTable)
+      .select({
+        id: platformAdSetTable.id,
+        externalId: platformAdSetTable.externalId,
+      })
+      .from(platformAdSetTable)
       .where(
         inArray(
-          adSetTable.externalId,
+          platformAdSetTable.externalId,
           sets.map((row) => row.externalId),
         ),
       );
@@ -364,15 +369,18 @@ async function syncCampaignChildren(input: {
     for (const pending of sets) {
       const known = setRowIdByExternalId.get(pending.externalId);
       if (known) {
+        // Never null out plan lineage the push stamped: sync updates what the
+        // platform reports, not what the plan meant.
+        const { audienceId: _audienceId, ...values } = pending.values;
         await db
-          .update(adSetTable)
-          .set(pending.values)
-          .where(eq(adSetTable.id, known));
+          .update(platformAdSetTable)
+          .set(values)
+          .where(eq(platformAdSetTable.id, known));
       } else {
         const [inserted] = await db
-          .insert(adSetTable)
+          .insert(platformAdSetTable)
           .values(pending.values)
-          .returning({ id: adSetTable.id });
+          .returning({ id: platformAdSetTable.id });
         if (inserted) setRowIdByExternalId.set(pending.externalId, inserted.id);
       }
     }
@@ -381,35 +389,42 @@ async function syncCampaignChildren(input: {
   let adsWritten = 0;
   if (ads.length) {
     const existing = await db
-      .select({ id: adSpotTable.id, externalId: adSpotTable.externalId })
-      .from(adSpotTable)
+      .select({
+        id: platformAdTable.id,
+        externalId: platformAdTable.externalId,
+      })
+      .from(platformAdTable)
       .where(
         and(
-          eq(adSpotTable.brandId, input.brandId),
+          eq(platformAdTable.brandId, input.brandId),
           inArray(
-            adSpotTable.externalId,
+            platformAdTable.externalId,
             ads.map((row) => row.externalId),
           ),
         ),
       );
     const adRowIdByExternalId = new Map(
-      existing.flatMap((row) => (row.externalId ? [[row.externalId, row.id]] : [])),
+      existing.flatMap((row) =>
+        row.externalId ? [[row.externalId, row.id]] : [],
+      ),
     );
     for (const pending of ads) {
       const values = {
         ...pending.values,
-        adSetRowId: pending.adSetExternalId
+        platformAdSetId: pending.adSetExternalId
           ? (setRowIdByExternalId.get(pending.adSetExternalId) ?? null)
           : null,
       };
       const known = adRowIdByExternalId.get(pending.externalId);
       if (known) {
+        // Same rule as ad sets: the push's adId lineage survives re-syncs.
+        const { adId: _adId, ...update } = values;
         await db
-          .update(adSpotTable)
-          .set(values)
-          .where(eq(adSpotTable.id, known));
+          .update(platformAdTable)
+          .set(update)
+          .where(eq(platformAdTable.id, known));
       } else {
-        await db.insert(adSpotTable).values(values);
+        await db.insert(platformAdTable).values(values);
       }
       adsWritten++;
     }
@@ -418,13 +433,15 @@ async function syncCampaignChildren(input: {
   return { adSets: setRowIdByExternalId.size, ads: adsWritten };
 }
 
-export async function syncZernioAds(options?: {
-  brandSlug?: string;
-  /** channel_platform ad value; default "meta_ads" (original behavior). */
-  platform?: ChannelPlatform;
-  /** Scope to one platform ad account (e.g. a Google customer id). */
-  adAccountId?: string;
-} & AdsSyncFilters): Promise<{
+export async function syncZernioAds(
+  options?: {
+    brandSlug?: string;
+    /** channel_platform ad value; default "meta_ads" (original behavior). */
+    platform?: ChannelPlatform;
+    /** Scope to one platform ad account (e.g. a Google customer id). */
+    adAccountId?: string;
+  } & AdsSyncFilters,
+): Promise<{
   brandId: string;
   channelId: string;
   candidates: number;
@@ -482,7 +499,8 @@ export async function syncZernioAds(options?: {
       ? null
       : (options?.sinceDays ?? ADS_SYNC_DEFAULT_SINCE_DAYS);
   const minSpend = options?.minSpend ?? null;
-  const statuses = options?.statuses?.map((value) => value.toLowerCase()) ?? null;
+  const statuses =
+    options?.statuses?.map((value) => value.toLowerCase()) ?? null;
   const limit = options?.limit ?? null;
   const cutoff =
     sinceDays === null ? null : Date.now() - sinceDays * 24 * 60 * 60 * 1000;
@@ -644,7 +662,7 @@ export async function syncZernioAds(options?: {
           ? undefined
           : new Date(lastMs),
       spend: stats.spend !== undefined ? Math.round(stats.spend) : undefined,
-      adSpots: ads.length,
+      adCount: ads.length,
       stats,
       heroThumbnailUrl: pickHeroThumbnail(ads),
       externalId,
@@ -662,7 +680,10 @@ export async function syncZernioAds(options?: {
     .filter((x): x is string => !!x);
   const existing = extIds.length
     ? await db
-        .select({ id: platformCampaignTable.id, externalId: platformCampaignTable.externalId })
+        .select({
+          id: platformCampaignTable.id,
+          externalId: platformCampaignTable.externalId,
+        })
         .from(platformCampaignTable)
         .where(
           and(
@@ -687,7 +708,7 @@ export async function syncZernioAds(options?: {
           startAt: c.startAt,
           endAt: c.endAt,
           spend: c.spend,
-          adSpots: c.adSpots,
+          adCount: c.adCount,
           stats: c.stats,
           heroThumbnailUrl: c.heroThumbnailUrl,
           channelId: c.channelId,

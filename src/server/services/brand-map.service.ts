@@ -4,7 +4,7 @@ import { and, count, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
-  audienceTargetTable,
+  personaTable,
   brandInspirationTable,
   cadenceTargetTable,
   channelTable,
@@ -19,7 +19,7 @@ import {
 
 export type BrandSurfaceSummary = {
   channels: number;
-  audienceTargets: number;
+  personas: number;
   webPages: number;
   blogPosts: number;
   mediaAssets: number;
@@ -48,8 +48,8 @@ export async function getBrandSurfaceSummary(
       ),
     db
       .select({ value: count() })
-      .from(audienceTargetTable)
-      .where(eq(audienceTargetTable.brandId, brandId)),
+      .from(personaTable)
+      .where(eq(personaTable.brandId, brandId)),
     db
       .select({ value: count() })
       .from(webPageTable)
@@ -125,7 +125,7 @@ export async function getBrandSurfaceSummary(
 
   return {
     channels: countValue(counts[0]),
-    audienceTargets: countValue(counts[1]),
+    personas: countValue(counts[1]),
     webPages: countValue(counts[2]),
     blogPosts: countValue(counts[3]),
     mediaAssets: countValue(counts[4]),

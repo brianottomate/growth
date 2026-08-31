@@ -4,28 +4,27 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
-import type { ChannelPlatform } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
 
 import { AddAdButton } from "./AddAdButton";
-import { AdSets } from "./AdSets";
+import { Audiences } from "./Audiences";
 import { money } from "./format";
+import { PlanPlatformButton } from "./PlanPlatformButton";
 import { PlatformSection } from "./PlatformSection";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
- * The campaign: one plan, run on one or more platforms.
+ * The campaign: one plan, compiled onto one or more platforms.
  *
- * The page is in two halves, because that is what the model is. Everything
- * picked once — creative, landing page, audience and budget split — sits in
- * the shared half. Below it, one section per platform carries only what that
- * platform did with the plan. Settings that gate a push (Google's campaign
- * type) live in that platform's section rather than beside the creative pool,
- * where they read as another shared choice.
+ * Two halves, because that is what the model is. The plan half carries what
+ * is shared — creative pool, drafted ads, audiences with their advisory
+ * splits. Below it, one section per planned platform holds that platform's
+ * authoritative budget and settings while it is a draft, and what the
+ * platform is actually doing once pushed.
  */
 export async function CampaignView({
   brandSlug,
@@ -47,32 +46,15 @@ export async function CampaignView({
   const draft = await getDraftCampaign(org.id, campaignId).catch(() => null);
   if (draft?.brand.slug !== brandSlug) notFound();
 
-  const {
-    campaign,
-    adSets,
-    spots,
-    campaigns,
-    audienceTargets,
-    platformAudiences,
-  } = draft;
-  // Platforms the plan intends, plus any it already runs on — a campaign
-  // pulled from an ad account can be live somewhere nobody planned for.
-  const targets = [
-    ...new Set([
-      ...((campaign.targetChannels ?? []) as ChannelPlatform[]),
-      ...campaigns.map((row) => row.platform),
-    ]),
-  ];
-  const byPlatform = new Map(campaigns.map((row) => [row.platform, row]));
-  const adsFor = (platformCampaignId: string) =>
-    spots.filter((spot) => spot.platformCampaignId === platformCampaignId);
-  // `ad_spot.platform` is not null: an ad is drafted FOR a platform, so it
-  // belongs in that platform's section rather than a shared bucket.
-  const draftedFor = (platform: string) =>
-    spots.filter(
-      (spot) => !spot.platformCampaignId && spot.platform === platform,
-    );
-  const totals = campaigns.reduce(
+  const { campaign, audiences, ads, platformCampaigns, personas } = draft;
+
+  const planned = [...platformCampaigns].sort((a, b) =>
+    a.platform.localeCompare(b.platform),
+  );
+  const plannedPlatforms = planned.map((row) => row.platform);
+  const anyPushed = planned.some((row) => row.externalId);
+
+  const totals = planned.reduce(
     (acc, row) => {
       const stats = row.stats ?? {};
       acc.spend += stats.spend ?? row.spend ?? 0;
@@ -86,6 +68,10 @@ export async function CampaignView({
     totals.impressions > 0
       ? `${((totals.clicks / totals.impressions) * 100).toFixed(2)}%`
       : "—";
+
+  const budgetMode =
+    planned.find((row) => row.platform === "meta_ads")?.settings?.meta
+      ?.budgetMode ?? "cbo";
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
@@ -113,12 +99,13 @@ export async function CampaignView({
                 {campaign.name}
               </h1>
               <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
-                draft
+                {anyPushed ? campaign.status : "draft"}
               </span>
             </div>
             <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
               <span>Planned for</span>
-              {targets.map((platform) => (
+              {plannedPlatforms.length === 0 && <span>no platforms yet</span>}
+              {plannedPlatforms.map((platform) => (
                 <span key={platform} className="flex items-center gap-1">
                   <ChannelLogo platform={platform} className="size-4" />
                   {platformLabel(platform)}
@@ -139,14 +126,16 @@ export async function CampaignView({
               campaignId={campaign.id}
               campaignName={campaign.name}
               brandSlug={brandSlug}
-              livePlatformCampaigns={campaigns.length}
+              livePlatformCampaigns={
+                planned.filter((row) => row.externalId).length
+              }
             />
             <WorkInChatButton
               brandId={draft.brand.id}
               brandName={draft.brand.slug ?? brandSlug}
               campaignId={campaign.id}
               campaignName={campaign.name}
-              hasAds={spots.length > 0}
+              hasAds={ads.length > 0}
             />
             <AddAdButton
               campaignId={campaign.id}
@@ -160,9 +149,11 @@ export async function CampaignView({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label="Spend"
-          value={campaigns.length === 0 ? "—" : money(totals.spend)}
+          value={anyPushed ? money(totals.spend) : "—"}
           sub={
-            campaign.budget != null ? `of ${money(campaign.budget)}` : undefined
+            campaign.budget != null
+              ? `of ${money(campaign.budget)} planned`
+              : undefined
           }
         />
         <Stat
@@ -178,10 +169,10 @@ export async function CampaignView({
 
       <section className="space-y-3">
         <div>
-          <h2 className="text-base font-semibold">Shared across platforms</h2>
+          <h2 className="text-base font-semibold">The plan</h2>
           <p className="text-muted-foreground text-xs">
-            Creative, landing page, audience and budget split, picked once
-            here and used by every platform below.
+            Creative, ads and audiences, picked once here. Each platform below
+            compiles this into its own shape when you push.
           </p>
         </div>
 
@@ -191,44 +182,108 @@ export async function CampaignView({
           pool={campaign.creativePool ?? []}
         />
 
-        <AdSets
+        <DraftedAds ads={ads} />
+
+        <Audiences
           campaignId={campaign.id}
-          brandId={draft.brand.id}
-          brandSlug={brandSlug}
-          adSets={adSets}
-          audienceTargets={audienceTargets}
-          platformAudiences={platformAudiences}
-          budgetMode={campaign.platformConfig?.meta?.budgetMode ?? "cbo"}
+          audiences={audiences}
+          personas={personas}
+          budgetMode={budgetMode}
         />
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-base font-semibold">On each platform</h2>
-        {targets.length === 0 ? (
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">On each platform</h2>
+          <PlanPlatformButton
+            campaignId={campaign.id}
+            planned={plannedPlatforms}
+          />
+        </div>
+        {planned.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No platforms chosen yet. Pick them in chat and they show up here.
+            No platforms planned yet. Planning one creates its local draft —
+            budget and settings live there, and nothing reaches the platform
+            until you push.
           </p>
         ) : (
-          targets.map((platform) => {
-            const platformCampaign = byPlatform.get(platform) ?? null;
-            return (
-              <PlatformSection
-                key={platform}
-                platform={platform}
-                brandSlug={brandSlug}
-                campaignId={campaign.id}
-                platformCampaign={platformCampaign}
-                ads={platformCampaign ? adsFor(platformCampaign.id) : []}
-                draftedAds={draftedFor(platform)}
-                adSetCount={adSets.length}
-                defaultBudget={campaign.budget}
-                googleConfig={campaign.platformConfig?.google}
-                brandUrl={campaign.landingUrl ?? draft.brand.website ?? null}
-              />
-            );
-          })
+          planned.map((platformCampaign) => (
+            <PlatformSection
+              key={platformCampaign.id}
+              brandSlug={brandSlug}
+              campaignId={campaign.id}
+              platformCampaign={platformCampaign}
+              draftAdCount={ads.length}
+              audienceCount={audiences.length}
+              brandUrl={campaign.landingUrl ?? draft.brand.website ?? null}
+            />
+          ))
         )}
       </section>
+    </div>
+  );
+}
+
+/** The plan's drafted ads: suggestions every platform compiles from. */
+function DraftedAds({
+  ads,
+}: {
+  ads: Array<{
+    id: string;
+    name: string;
+    type: "creative" | "text";
+    content: unknown;
+  }>;
+}) {
+  if (ads.length === 0) return null;
+  return (
+    <div className="bg-card rounded-xl border p-3.5">
+      <p className="text-sm font-semibold">
+        Drafted ads
+        <span className="text-muted-foreground ml-1.5 font-normal">
+          {ads.length}
+        </span>
+      </p>
+      <div className="mt-2 flex w-full gap-2 overflow-x-auto">
+        {ads.map((ad) => {
+          const content = ad.content as {
+            headline?: string;
+            media?: Array<{ url: string; thumbnail?: string }>;
+            headlines?: string[];
+          };
+          const image =
+            content.media?.[0]?.thumbnail ?? content.media?.[0]?.url;
+          return (
+            <div
+              key={ad.id}
+              className="bg-background w-32 shrink-0 overflow-hidden rounded-lg border"
+            >
+              <div className="bg-muted relative h-20">
+                {image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={image}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="text-muted-foreground flex h-full items-center justify-center p-2 text-center text-[10px]">
+                    {content.headlines?.[0] ?? "Text ad"}
+                  </div>
+                )}
+                <span className="absolute top-1 right-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
+                  {ad.type}
+                </span>
+              </div>
+              <div className="p-2">
+                <p className="truncate text-[11px] font-medium">
+                  {content.headline ?? ad.name}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

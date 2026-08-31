@@ -4,6 +4,7 @@ import {
   assertMetaAdPayload,
   estimateMonthlyKeywordCost,
   googlePauseOutcome,
+  matchResponseAdsToPlan,
 } from "@/server/services/ads-write.service";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 
@@ -205,5 +206,64 @@ describe("googlePauseOutcome", () => {
     expect(outcome.status).toBe("live");
     expect(outcome.warnings[0]).toContain("429 rate limited");
     expect(outcome.warnings[0]).toMatch(/pause it in Google Ads/);
+  });
+});
+
+/**
+ * The response-to-plan mapping is where a compile records lineage. Its
+ * failure mode is stamping one externalId on several rows, which the unique
+ * index rejects AFTER the campaign already exists on the platform.
+ */
+describe("matchResponseAdsToPlan", () => {
+  const plan = (id: string, name: string) => ({ id, name });
+
+  it("matches by exact name, out of order", () => {
+    const out = matchResponseAdsToPlan(
+      [
+        { name: "B", platformAdId: "ext-b" },
+        { name: "A", platformAdId: "ext-a" },
+      ],
+      [plan("ad_1", "A"), plan("ad_2", "B")],
+    );
+    expect(out.get("ad_1")).toBe("ext-a");
+    expect(out.get("ad_2")).toBe("ext-b");
+  });
+
+  it("never assigns the same response ad twice", () => {
+    const out = matchResponseAdsToPlan(
+      [{ name: "A", platformAdId: "ext-a" }],
+      [plan("ad_1", "A"), plan("ad_2", "A")],
+    );
+    expect(out.get("ad_1")).toBe("ext-a");
+    expect(out.get("ad_2")).toBeNull();
+  });
+
+  it("single-to-single pairs even when names differ", () => {
+    const out = matchResponseAdsToPlan(
+      [{ name: "Meta renamed it", id: "ext-x" }],
+      [plan("ad_1", "Our name")],
+    );
+    expect(out.get("ad_1")).toBe("ext-x");
+  });
+
+  it("one response and several plan ads does NOT fan the id out", () => {
+    const out = matchResponseAdsToPlan(
+      [{ name: "only", platformAdId: "ext-1" }],
+      [plan("ad_1", "first"), plan("ad_2", "second")],
+    );
+    expect(out.get("ad_1")).toBeNull();
+    expect(out.get("ad_2")).toBeNull();
+  });
+
+  it("unmatched plan ads map to null, not to a guess", () => {
+    const out = matchResponseAdsToPlan(
+      [
+        { name: "A", platformAdId: "ext-a" },
+        { name: "Z", platformAdId: "ext-z" },
+      ],
+      [plan("ad_1", "A"), plan("ad_2", "B")],
+    );
+    expect(out.get("ad_1")).toBe("ext-a");
+    expect(out.get("ad_2")).toBeNull();
   });
 });

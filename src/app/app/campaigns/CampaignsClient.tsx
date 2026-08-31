@@ -58,7 +58,6 @@ export function CampaignsClient({
   const { data } = useQuery(trpc.campaign.overview.queryOptions());
   const campaigns = data?.campaigns ?? [];
 
-
   const byStatus = (s: CampaignStatus) =>
     campaigns
       .filter((i) => i.status === s)
@@ -74,9 +73,9 @@ export function CampaignsClient({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Every brand&apos;s campaigns in one place. A campaign is created
-            on the brand it belongs to and opens there; this is the index
-            across all of them.
+            Every brand&apos;s campaigns in one place. A campaign is created on
+            the brand it belongs to and opens there; this is the index across
+            all of them.
           </p>
         </div>
         <Button variant="outline" asChild>
@@ -180,17 +179,6 @@ export function CampaignsClient({
                         )}
                       </div>
                     </div>
-                    {(i.targetChannels ?? []).length > 0 && (
-                      <div className="flex items-center gap-1">
-                        {(i.targetChannels ?? []).slice(0, 5).map((p) => (
-                          <ChannelLogo
-                            key={p}
-                            platform={p}
-                            className="text-muted-foreground size-3.5"
-                          />
-                        ))}
-                      </div>
-                    )}
                   </Link>
                 );
               })}
@@ -198,7 +186,6 @@ export function CampaignsClient({
           </section>
         );
       })}
-
     </div>
   );
 }

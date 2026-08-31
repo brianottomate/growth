@@ -13,7 +13,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getSession } from "@/server/better-auth/server";
 import { db } from "@/server/db";
 import {
-  audienceTargetTable,
+  personaTable,
   brandInspirationTable,
   brandTable,
   channelSuggestionTable,
@@ -151,7 +151,7 @@ export default async function ReviewPage() {
     channelSuggestions,
     ownedPosts,
     mediaAssets,
-    audienceTargets,
+    personas,
   ] = await Promise.all([
     db.query.contentSuggestionTable.findMany({
       where: and(
@@ -201,8 +201,11 @@ export default async function ReviewPage() {
       ),
       columns: { brandId: true, metadata: true },
     }),
-    db.query.audienceTargetTable.findMany({
-      where: inArray(audienceTargetTable.brandId, brandIds),
+    db.query.personaTable.findMany({
+      where: and(
+        inArray(personaTable.brandId, brandIds),
+        isNull(personaTable.deletedAt),
+      ),
       columns: { brandId: true },
     }),
   ]);
@@ -218,9 +221,7 @@ export default async function ReviewPage() {
     );
   });
   const brandsWithoutAudiences = brands
-    .filter(
-      (brand) => !audienceTargets.some((target) => target.brandId === brand.id),
-    )
+    .filter((brand) => !personas.some((row) => row.brandId === brand.id))
     .map((brand) => ({ brandId: brand.id }));
 
   const decisions: ReviewItem[] = [
@@ -288,9 +289,9 @@ export default async function ReviewPage() {
       kind: "gap",
     },
     {
-      title: "Audience strategy gaps",
+      title: "Persona gaps",
       description:
-        "Owned brands that do not yet have a confirmed audience target for planning and activation.",
+        "Owned brands with no personas yet — nothing says who their content and campaigns are for.",
       href: "/app/audiences",
       icon: Target,
       total: brandsWithoutAudiences.length,

@@ -27,6 +27,7 @@ import {
   listZernioAdAudiences,
   generateZernioKeywordIdeas,
   generateZernioKeywordHistoricalMetrics,
+  searchZernioTargeting,
   setZernioCampaignStatus,
   ZERNIO_AUDIENCE_USERS_MAX_PER_REQUEST,
   type CreateZernioStandaloneAdInput,
@@ -39,12 +40,21 @@ import {
 import { db } from "@/server/db";
 import {
   adAccountTable,
-  adSetTable,
-  adSpotTable,
+  adTable,
   audienceTable,
-  audienceTargetTable,
+  platformAdSetTable,
+  platformAdTable,
+  platformAudienceTable,
+  type Ad,
+  type AdCreativeContent,
+  type AdTextContent,
   type AudienceSource,
   type AudienceType,
+  type Campaign,
+  type MediaItem,
+  type PlanAudience,
+  type PlatformCampaign,
+  type PlatformCampaignSettings,
   brandTable,
   platformCampaignTable,
   channelTable,
@@ -558,7 +568,12 @@ export async function createGoogleAd(
     endDate: input.endDate,
   };
   const result = await createZernioStandaloneAd(payload, {
-    idempotencyKey: idempotencyKey(context, "create-google", payload, input.businessKey),
+    idempotencyKey: idempotencyKey(
+      context,
+      "create-google",
+      payload,
+      input.businessKey,
+    ),
   });
   // Google's create call takes no status, so the campaign can be delivering the
   // moment the provider accepts it. Pausing is a second, documented call.
@@ -635,7 +650,12 @@ export async function boostMetaPost(
     targeting: input.targeting,
   };
   const result = await boostZernioMetaPost(payload, {
-    idempotencyKey: idempotencyKey(context, "boost-meta", payload, input.businessKey),
+    idempotencyKey: idempotencyKey(
+      context,
+      "boost-meta",
+      payload,
+      input.businessKey,
+    ),
   });
   return {
     brand: destination.brand,
@@ -691,7 +711,10 @@ export async function duplicateMetaCampaign(input: {
       idempotencyKey: idempotencyKey(
         { organizationId: input.organizationId, runId: input.runId },
         "duplicate-meta",
-        { platformCampaignId: input.platformCampaignId, renameSuffix: input.renameSuffix },
+        {
+          platformCampaignId: input.platformCampaignId,
+          renameSuffix: input.renameSuffix,
+        },
         input.businessKey,
       ),
     },
@@ -716,11 +739,11 @@ export type CreateAdAudienceInput = {
   country?: string;
   ratio?: number;
   /**
-   * The first-party audience_target this platform asset fulfils. Stamping it
-   * is what keeps "who we are buying" defined once and compiled per platform,
-   * rather than the platform asset becoming its own orphan definition.
+   * The plan audience this platform asset fulfils. Stamping it is what keeps
+   * "who we are buying" defined once and compiled per platform, rather than
+   * the platform asset becoming its own orphan definition.
    */
-  audienceTargetId?: string;
+  planAudienceId?: string;
 };
 
 /**
@@ -788,10 +811,10 @@ export async function syncBrandPlatformAudiences(input: {
         const externalId =
           audience.platformAudienceId ?? audience.id ?? audience._id;
         if (!externalId || !audience.name) continue;
-        const existing = await db.query.audienceTable.findFirst({
+        const existing = await db.query.platformAudienceTable.findFirst({
           where: and(
-            eq(audienceTable.brandId, listed.brand.id),
-            eq(audienceTable.externalId, externalId),
+            eq(platformAudienceTable.channelId, channel.id),
+            eq(platformAudienceTable.externalId, externalId),
           ),
           columns: { id: true },
         });
@@ -818,11 +841,11 @@ export async function syncBrandPlatformAudiences(input: {
         };
         if (existing) {
           await db
-            .update(audienceTable)
+            .update(platformAudienceTable)
             .set(values)
-            .where(eq(audienceTable.id, existing.id));
+            .where(eq(platformAudienceTable.id, existing.id));
         } else {
-          await db.insert(audienceTable).values(values);
+          await db.insert(platformAudienceTable).values(values);
         }
         mirrored++;
       }
@@ -958,13 +981,13 @@ export async function createAdAudience(
   if (input.ratio !== undefined && (input.ratio < 0.01 || input.ratio > 0.2)) {
     throw new Error("Lookalike ratio must be between 0.01 and 0.20");
   }
-  if (input.audienceTargetId) {
-    const target = await db.query.audienceTargetTable.findFirst({
-      where: eq(audienceTargetTable.id, input.audienceTargetId),
+  if (input.planAudienceId) {
+    const planAudience = await db.query.audienceTable.findFirst({
+      where: eq(audienceTable.id, input.planAudienceId),
       columns: { brandId: true },
     });
-    if (target?.brandId !== destination.brand.id) {
-      throw new Error("That audience target belongs to a different brand");
+    if (planAudience?.brandId !== destination.brand.id) {
+      throw new Error("That audience belongs to a different brand");
     }
   }
 
@@ -996,15 +1019,17 @@ export async function createAdAudience(
   let mirrored = null;
   if (channel) {
     [mirrored] = await db
-      .insert(audienceTable)
+      .insert(platformAudienceTable)
       .values({
-        id: createId("aud"),
+        id: createId("paud"),
         channelId: channel.id,
         brandId: destination.brand.id,
-        targetId: input.audienceTargetId ?? null,
+        audienceId: input.planAudienceId ?? null,
+        // A lookalike remembers its seed — that chain is platform-side.
+        sourceId: input.sourceAudienceId ?? null,
         name: input.name,
         type: input.type === "lookalike" ? "lookalike" : "custom",
-        source: "manual",
+        source: input.type === "lookalike" ? "lookalike_seed" : "customer_list",
         externalId,
       })
       .returning();
@@ -1013,8 +1038,8 @@ export async function createAdAudience(
   return {
     brand: destination.brand,
     adAccount: destination.adAccount,
-    audienceId: mirrored?.id ?? null,
-    audienceTargetId: input.audienceTargetId ?? null,
+    platformAudienceId: mirrored?.id ?? null,
+    planAudienceId: input.planAudienceId ?? null,
     provider,
   };
 }
@@ -1049,673 +1074,6 @@ export async function addAdAudienceUsers(input: {
     );
   }
   return { audienceId: input.audienceId, uploaded, total: input.users.length };
-}
-
-// ---- DELIVERY SWITCH -------------------------------------------------
-
-const DELIVERY_PLATFORMS: Record<string, string> = {
-  meta_ads: "facebook",
-  google_ads: "google",
-};
-
-/**
- * Pause or resume a synced campaign — the Launch button on the campaign
- * page. This is the moment money starts (or stops) moving, so it is only
- * reachable from an authenticated operator action; the click IS the
- * approval. Local status is updated only after the provider confirms.
- */
-export async function setCampaignDelivery(
-  input: { platformCampaignId: string; status: "active" | "paused" },
-  context: AdsWriteContext,
-) {
-  const campaign = await db.query.platformCampaignTable.findFirst({
-    where: eq(platformCampaignTable.id, input.platformCampaignId),
-  });
-  if (!campaign) throw new Error("Campaign not found");
-  if (!campaign.brandId) throw new Error("Campaign has no brand");
-
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, campaign.brandId),
-    columns: { organizationId: true, name: true },
-  });
-  if (brand?.organizationId !== context.organizationId) {
-    throw new Error("No access to this campaign");
-  }
-  if (!campaign.externalId) {
-    throw new Error(
-      "This campaign has no platform id yet — it was never synced or launched on the provider",
-    );
-  }
-  const platform = DELIVERY_PLATFORMS[campaign.platform];
-  if (!platform) {
-    throw new Error(`Delivery toggle not supported for ${campaign.platform}`);
-  }
-
-  const provider = await setZernioCampaignStatus({
-    platformCampaignId: campaign.externalId,
-    status: input.status,
-    platform,
-  });
-
-  const [updated] = await db
-    .update(platformCampaignTable)
-    .set({ status: input.status === "active" ? "live" : "paused" })
-    .where(eq(platformCampaignTable.id, campaign.id))
-    .returning({ id: platformCampaignTable.id, status: platformCampaignTable.status });
-
-  return { campaign: updated, provider };
-}
-
-
-/**
- * The platform id of the audience an ad set buys. Our first-party
- * `audience_target` is the "who"; the mirrored `audience` row carries the
- * platform's own id, which is what targeting actually accepts. Returns null
- * when the target has never been compiled to this platform — the ad set then
- * runs on its geo/demographic targeting alone rather than failing the push.
- */
-/**
- * The platform audience id an ad set should target, or null for broad.
- *
- * An ad set can name its audience two ways: `audienceId` points straight at a
- * mirrored platform audience (what the client already built in their ad
- * account), while `audienceTargetId` names our first-party intent and has to
- * be resolved to whichever platform audience fulfils it. The direct pointer
- * wins when both are set, because it is the more specific instruction.
- */
-async function platformAudienceIdFor(
-  adSet: { audienceId: string | null; audienceTargetId: string | null },
-  brandId: string,
-  platform: "meta_ads" | "google_ads",
-): Promise<string | null> {
-  if (adSet.audienceId) {
-    const [direct] = await db
-      .select({ externalId: audienceTable.externalId })
-      .from(audienceTable)
-      .innerJoin(channelTable, eq(channelTable.id, audienceTable.channelId))
-      .where(
-        and(
-          eq(audienceTable.id, adSet.audienceId),
-          eq(audienceTable.brandId, brandId),
-          // An audience lives in one ad account. Targeting a Meta audience
-          // from a Google push would send a meaningless id to the platform.
-          eq(channelTable.platform, platform),
-          isNotNull(audienceTable.externalId),
-        ),
-      )
-      .limit(1);
-    if (direct?.externalId) return direct.externalId;
-  }
-  if (!adSet.audienceTargetId) return null;
-  const rows = await db
-    .select({ externalId: audienceTable.externalId })
-    .from(audienceTable)
-    .innerJoin(channelTable, eq(channelTable.id, audienceTable.channelId))
-    .where(
-      and(
-        eq(audienceTable.targetId, adSet.audienceTargetId),
-        eq(audienceTable.brandId, brandId),
-        eq(channelTable.platform, platform),
-        isNotNull(audienceTable.externalId),
-      ),
-    )
-    .limit(1);
-  return rows[0]?.externalId ?? null;
-}
-
-// ---- DRAFT → PLATFORM --------------------------------------------------
-
-/**
- * Push a first-party draft to Meta: ONE platform campaign + ONE ad set
- * + its drafted ads, via Zernio's multi-creative shape, forced PAUSED. The
- * local `campaign` row is created FROM the platform response, so a campaign
- * row always means a real campaign on a real ad account. The operator's click
- * is the approval; spend starts only when the delivery switch is flipped.
- */
-export async function pushDraftToPlatform(
-  input: {
-    campaignId: string;
-    platform?: "meta_ads" | "google_ads";
-    connectionAccountId: string;
-    adAccountId: string;
-    goal:
-      | "engagement"
-      | "traffic"
-      | "awareness"
-      | "video_views"
-      | "conversions";
-    budgetAmount: number;
-    budgetType: "daily" | "lifetime";
-    /** ISO dates. Meta REQUIRES an end date for lifetime budgets. */
-    startDate?: string;
-    endDate?: string;
-    validateOnly?: boolean;
-    promotedObject?: { pixelId?: string; customEventType?: string };
-  },
-  context: AdsWriteContext,
-) {
-  const platform = input.platform ?? "meta_ads";
-  const campaign = await db.query.campaignTable.findFirst({
-    where: eq(campaignTable.id, input.campaignId),
-  });
-  if (!campaign) throw new Error("Campaign draft not found");
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.id, campaign.brandId),
-  });
-  if (brand?.organizationId !== context.organizationId) {
-    throw new Error("No access to this campaign draft");
-  }
-  if (!brand.slug) throw new Error("Brand has no slug");
-
-  const alreadyLive = await db.query.platformCampaignTable.findFirst({
-    where: and(
-      eq(platformCampaignTable.campaignId, campaign.id),
-      eq(platformCampaignTable.platform, platform),
-    ),
-    columns: { id: true },
-  });
-  if (alreadyLive) {
-    throw new Error(
-      `This campaign already exists on ${platform === "meta_ads" ? "Meta" : "Google"} — edit it there, or draft a new push`,
-    );
-  }
-
-  const destination = await requireAdDestination({
-    organizationId: context.organizationId,
-    brandSlug: brand.slug,
-    platform: platform === "meta_ads" ? "meta" : "google",
-    connectionAccountId: input.connectionAccountId,
-    adAccountId: input.adAccountId,
-  });
-
-  const spots = await db.query.adSpotTable.findMany({
-    where: and(
-      eq(adSpotTable.campaignId, campaign.id),
-      isNull(adSpotTable.externalId),
-    ),
-  });
-  if (spots.length === 0) {
-    throw new Error("This draft has no ads to push — add ads first");
-  }
-  const missingCreative = spots.filter(
-    (spot) => !spot.media?.[0]?.url || spot.media[0].type !== "image",
-  );
-  if (missingCreative.length > 0) {
-    throw new Error(
-      `${missingCreative.length} drafted ad(s) need an image creative: ${missingCreative
-        .map((spot) => spot.name ?? spot.id)
-        .join(", ")}`,
-    );
-  }
-  const linkUrl =
-    spots.find((spot) => spot.linkUrl)?.linkUrl ?? campaign.landingUrl;
-  if (!linkUrl) {
-    throw new Error(
-      "Set a landing URL on the campaign, or a link URL on at least one ad",
-    );
-  }
-
-  const adSets = await db.query.adSetTable.findMany({
-    where: eq(adSetTable.campaignId, campaign.id),
-  });
-
-  // A lifetime budget has to know when it stops; Meta rejects it otherwise.
-  // Fall back to the campaign's own schedule before asking the operator.
-  const startDate =
-    input.startDate ?? campaign.startAt?.toISOString() ?? undefined;
-  const endDate = input.endDate ?? campaign.endAt?.toISOString() ?? undefined;
-  if (input.budgetType === "lifetime" && !endDate) {
-    throw new Error(
-      "A lifetime budget needs an end date — set one on the campaign, or switch to a daily budget",
-    );
-  }
-
-  // ---- GOOGLE ---------------------------------------------------------
-  // Google's hierarchy is campaign → ad group, and its campaign TYPE decides
-  // everything (Search needs keywords, Display needs sized images). One call
-  // builds the whole tree; multi-ad-group is not modelled yet.
-  if (platform === "google_ads") {
-    // Zernio's validate-only IS Meta's own `execution_options: validate_only`.
-    // Google has no equivalent, so a "dry run" here would build the campaign
-    // for real and then return as though nothing had happened.
-    if (input.validateOnly) {
-      throw new Error(
-        "Google has no dry run — Zernio's validate-only is Meta's own. Review the draft, then push for real",
-      );
-    }
-    const google = campaign.platformConfig?.google;
-    const campaignType = google?.campaignType;
-    if (!campaignType) {
-      throw new Error(
-        "Set the Google campaign type (search or display) on the campaign first",
-      );
-    }
-    if (campaignType === "search" && (google?.keywords ?? []).length === 0) {
-      throw new Error(
-        "A Google Search campaign needs keywords — it buys nothing without them",
-      );
-    }
-    if (input.goal === "conversions") {
-      throw new Error("Google push supports traffic, engagement, awareness, and video_views");
-    }
-    const hero = spots[0]!;
-    const result = await createGoogleAd(
-      {
-        businessKey: `push:${campaign.id}:google`,
-        brandSlug: brand.slug,
-        connectionAccountId: input.connectionAccountId,
-        adAccountId: destination.adAccount.id,
-        name: campaign.name,
-        campaignType,
-        goal: input.goal,
-        budgetAmount: input.budgetAmount,
-        budgetType: input.budgetType,
-        headline: hero.headline ?? hero.name ?? campaign.name,
-        body: hero.body ?? campaign.description ?? campaign.name,
-        linkUrl,
-        keywords: google?.keywords,
-        negativeKeywords: google?.negativeKeywords,
-        additionalHeadlines: google?.additionalHeadlines,
-        additionalDescriptions: google?.additionalDescriptions,
-        businessName: google?.businessName ?? brand.name,
-        startDate,
-        endDate,
-        images:
-          campaignType === "display"
-            ? { landscape: hero.media![0]!.url, square: hero.media![0]!.url }
-            : undefined,
-      },
-      context,
-    );
-    const provider = result.provider as ZernioAdWriteResponse | undefined;
-    const created = await recordPlatformCampaign({
-      campaign,
-      brand,
-      platform,
-      goal: input.goal,
-      budgetAmount: input.budgetAmount,
-      platformCampaignId: provider?.platformCampaignId ?? null,
-      spots,
-      adSets,
-      platformAdSetId: provider?.platformAdSetId ?? null,
-      status: result.status,
-    });
-    return {
-      campaignId: campaign.id,
-      platform,
-      validateOnly: false,
-      platformCampaignRowId: created.id,
-      adsCreated: spots.length,
-      path: `/app/brands/${brand.slug}/ads/platform/${created.id}`,
-      warnings: result.warnings,
-      provider: result,
-    };
-  }
-
-  // ---- META -----------------------------------------------------------
-  // Goal and creative requirements are enforced in assertMetaAdPayload, which
-  // every create below goes through. A throw from inside the multi-ad-set
-  // loop is caught by the rollback, so nothing is left half-built.
-
-  // Two or more images on one ad IS a carousel. `ad_spot.media` is already an
-  // array, so nothing new has to be modelled: an ad either carries one image
-  // (a static) or several (cards, in the order they were added).
-  const isCarousel = (spot: (typeof spots)[number]) =>
-    (spot.media?.length ?? 0) >= 2;
-
-  const useCbo = (campaign.platformConfig?.meta?.budgetMode ?? "cbo") === "cbo";
-
-  const carouselCardsFor = (spot: (typeof spots)[number]) =>
-    spot.media!.slice(0, 10).map((item, index) => ({
-      imageUrl: item.url,
-      headline:
-        index === 0
-          ? (spot.headline ?? spot.name ?? campaign.name)
-          : (spot.headline ?? campaign.name),
-      linkUrl: spot.linkUrl ?? linkUrl,
-    }));
-
-  const creativesFor = (subset: typeof spots) =>
-    subset.map((spot) => ({
-      name: spot.name ?? campaign.name,
-      // Every creative carries its own headline and body in the
-      // multi-creative shape. The top-level ones seed the ad set; Meta does
-      // not fall back to them per creative.
-      headline: spot.headline ?? spot.name ?? campaign.name,
-      body: spot.body ?? campaign.description ?? campaign.name,
-      imageUrl: spot.media![0]!.url,
-      linkUrl: spot.linkUrl ?? linkUrl,
-    }));
-
-  /**
-   * One Meta ad set as the API sees it: its budget, its targeting, and the
-   * ads inside it. Minting a campaign and slotting into an existing shell are
-   * the same request bar `existingCampaignId`, so both pushes build it here.
-   */
-  const adSetPayload = (args: {
-    adSet?: (typeof adSets)[number];
-    subset: typeof spots;
-    audienceId: string | null;
-    existingCampaignId?: string;
-    validateOnly: boolean;
-  }): CreateZernioStandaloneAdInput => ({
-    accountId: input.connectionAccountId,
-    adAccountId: destination.adAccount.id,
-    ...(args.existingCampaignId
-      ? { existingCampaignId: args.existingCampaignId }
-      : { campaignName: campaign.name }),
-    name: args.existingCampaignId
-      ? (args.adSet?.name ?? campaign.name)
-      : campaign.name,
-    adSetName: args.adSet?.name,
-    goal: input.goal,
-    // Under CBO the campaign owns the money; an ad set that also sends a
-    // budget is fighting the thing that makes CBO worth using.
-    ...(useCbo && args.existingCampaignId
-      ? {}
-      : {
-          budgetAmount: args.adSet?.budget ?? input.budgetAmount,
-          budgetType:
-            (args.adSet?.budgetType as "daily" | "lifetime") ??
-            input.budgetType,
-        }),
-    // Top-level headline and body seed the ad set; each creative carries its
-    // own below.
-    headline: args.subset[0]!.headline ?? args.subset[0]!.name ?? campaign.name,
-    body: args.subset[0]!.body ?? campaign.description ?? campaign.name,
-    linkUrl,
-    creatives: creativesFor(args.subset),
-    targeting: args.audienceId ? { audienceId: args.audienceId } : undefined,
-    startDate,
-    endDate,
-    promotedObject: input.promotedObject,
-    ...metaDraftProviderControls(args.validateOnly),
-  });
-
-  /**
-   * Create one ad set and everything inside it.
-   *
-   * Meta's create endpoint takes ONE creative shape per call: N statics via
-   * `creatives[]`, or a single carousel via `carouselCards`. A campaign that
-   * mixes both needs more than one call, so the first makes the ad set and
-   * each leftover carousel attaches to it with `adSetId`, inheriting its
-   * budget, targeting and schedule (which must not be resent).
-   */
-  const createAdSetWithSpots = async (args: {
-    adSet?: (typeof adSets)[number];
-    subset: typeof spots;
-    audienceId: string | null;
-    existingCampaignId?: string;
-    validateOnly: boolean;
-    keyScope: string;
-  }) => {
-    const statics = args.subset.filter((spot) => !isCarousel(spot));
-    const carousels = args.subset.filter(isCarousel);
-    // Whichever shape opens the ad set; the rest attach to it afterwards.
-    const leading = statics.length > 0 ? undefined : carousels[0];
-    const trailing = leading ? carousels.slice(1) : carousels;
-
-    const payload: CreateZernioStandaloneAdInput = {
-      ...adSetPayload({
-        adSet: args.adSet,
-        subset: args.subset,
-        audienceId: args.audienceId,
-        existingCampaignId: args.existingCampaignId,
-        validateOnly: args.validateOnly,
-      }),
-      ...(leading
-        ? { creatives: undefined, carouselCards: carouselCardsFor(leading) }
-        : { creatives: creativesFor(statics) }),
-    };
-    const result = await createMetaAd(payload, {
-      idempotencyKey: idempotencyKey(
-        context,
-        "push-adset",
-        payload,
-        args.keyScope,
-      ),
-      adAccount: destination.adAccount,
-    });
-
-    // A dry run validates the opening call only; there is no ad set id to
-    // attach the rest to until something is really created.
-    if (args.validateOnly || result.validateOnly) {
-      return { result, attached: [], spotsCreated: args.subset.length };
-    }
-
-    // Once the opening call lands, the campaign exists on Meta. A later
-    // attach failing would leave it half-built and mostly invisible, so undo
-    // it here rather than stranding it. The multi-ad-set path rolls back its
-    // own shell; this covers the single-ad-set path, which owns the campaign
-    // the opening call just created.
-    const rollbackCampaignId = args.existingCampaignId
-      ? null
-      : (result.platformCampaignId ?? null);
-    const attached = [];
-    try {
-    for (const spot of trailing) {
-      const attachPayload: CreateZernioStandaloneAdInput = {
-        accountId: input.connectionAccountId,
-        adAccountId: destination.adAccount.id,
-        adSetId: result.platformAdSetId!,
-        name: spot.name ?? campaign.name,
-        goal: input.goal,
-        headline: spot.headline ?? spot.name ?? campaign.name,
-        body: spot.body ?? campaign.description ?? campaign.name,
-        linkUrl: spot.linkUrl ?? linkUrl,
-        carouselCards: carouselCardsFor(spot),
-        ...metaDraftProviderControls(false),
-      };
-      attached.push({
-        spot,
-        result: await createMetaAd(attachPayload, {
-          idempotencyKey: idempotencyKey(
-            context,
-            "push-attach",
-            attachPayload,
-            `${args.keyScope}:${spot.id}`,
-          ),
-          adAccount: destination.adAccount,
-        }),
-      });
-    }
-    } catch (error) {
-      if (rollbackCampaignId) {
-        await deleteZernioCampaign({
-          campaignId: rollbackCampaignId,
-          accountId: input.connectionAccountId,
-        }).catch((cleanupError) => {
-          console.error("attach rollback failed", rollbackCampaignId, cleanupError);
-        });
-      }
-      throw new Error(
-        `Push failed while attaching carousel ${attached.length + 1} of ${trailing.length}${
-          rollbackCampaignId
-            ? " — the campaign was removed from Meta so nothing is half-built"
-            : ""
-        }. ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-    return { result, attached, spotsCreated: args.subset.length };
-  };
-
-  // One ad set (or none defined) is a single call — fewer moving parts and
-  // nothing to clean up if Meta rejects it.
-  if (adSets.length <= 1) {
-    const only = adSets[0];
-    const audienceId = only
-      ? await platformAudienceIdFor(only, brand.id, platform)
-      : null;
-    const { result } = await createAdSetWithSpots({
-      adSet: only,
-      subset: spots,
-      audienceId,
-      validateOnly: input.validateOnly ?? false,
-      keyScope: `push:${campaign.id}:meta`,
-    });
-    if (input.validateOnly || result.validateOnly) {
-      return {
-        campaignId: campaign.id,
-        platform,
-        validateOnly: true,
-        adsCreated: 0,
-        provider: result,
-      };
-    }
-    const created = await recordPlatformCampaign({
-      campaign,
-      brand,
-      platform,
-      goal: input.goal,
-      budgetAmount: input.budgetAmount,
-      platformCampaignId: result.platformCampaignId ?? null,
-      spots,
-      adSets,
-      platformAdSetId: result.platformAdSetId ?? null,
-    });
-    return {
-      campaignId: campaign.id,
-      platform,
-      validateOnly: false,
-      platformCampaignRowId: created.id,
-      adsCreated: (result.ads ?? (result.ad ? [result.ad] : [])).length,
-      path: `/app/brands/${brand.slug}/ads/platform/${created.id}`,
-      provider: result,
-    };
-  }
-
-  // Several ad sets: create the campaign shell once, then one create per ad
-  // set carrying its audience and the ads assigned to it.
-  //
-  // Under CBO (the default) the budget sits on the shell and Meta moves it to
-  // whichever ad set is working, which is the point of running two audiences
-  // against each other. Under ABO the shell carries no budget and each ad set
-  // brings its own fixed amount, for when a split has to be held.
-  if (input.validateOnly) {
-    throw new Error(
-      "Dry run covers single-ad-set pushes only; Meta has no dry run for the two-step shape",
-    );
-  }
-  const shell = await createZernioAdCampaign(
-    {
-      accountId: input.connectionAccountId,
-      adAccountId: destination.adAccount.id,
-      name: campaign.name,
-      goal: input.goal,
-      ...(useCbo
-        ? { budgetAmount: input.budgetAmount, budgetType: input.budgetType }
-        : {}),
-      status: "PAUSED",
-    },
-    {
-      idempotencyKey: idempotencyKey(
-        context,
-        "push-shell",
-        { campaignId: campaign.id },
-        `shell:${campaign.id}:meta`,
-      ),
-    },
-  );
-  const shellId =
-    shell.campaign?.platformCampaignId ?? shell.campaign?.id ?? null;
-  if (!shellId) throw new Error("Zernio returned no campaign id for the shell");
-
-  const perAdSet = [];
-  // If any ad set fails, the shell is a campaign with no ads: invisible to
-  // the tree, unreachable from the UI, and impossible to clean up by hand
-  // without the accountId escape hatch. Delete it here rather than stranding
-  // it, and surface which ad set failed.
-  try {
-  for (const adSet of adSets) {
-    const assigned = spots.filter((spot) => spot.adSetRowId === adSet.id);
-    // Ads with no ad set assigned ride with the first one rather than being
-    // silently dropped.
-    const subset =
-      assigned.length > 0
-        ? assigned
-        : adSet.id === adSets[0]!.id
-          ? spots.filter((spot) => !spot.adSetRowId)
-          : [];
-    if (subset.length === 0) continue;
-    const audienceId = await platformAudienceIdFor(adSet, brand.id, platform);
-    const { result } = await createAdSetWithSpots({
-      adSet,
-      subset,
-      audienceId,
-      existingCampaignId: shellId,
-      validateOnly: false,
-      keyScope: `push:${campaign.id}:${adSet.id}`,
-    });
-    perAdSet.push({ adSet, result, subset });
-  }
-  } catch (error) {
-    await deleteZernioCampaign({
-      campaignId: shellId,
-      accountId: input.connectionAccountId,
-    }).catch((cleanupError) => {
-      console.error("push rollback failed", shellId, cleanupError);
-    });
-    const built = perAdSet.length;
-    throw new Error(
-      `Push failed after ${built} of ${adSets.length} ad sets — the campaign was removed from Meta so nothing is half-built. ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
-
-  const created = await recordPlatformCampaign({
-    campaign,
-    brand,
-    platform,
-    goal: input.goal,
-    budgetAmount: input.budgetAmount,
-    platformCampaignId: shellId,
-    spots: [],
-    adSets: [],
-    platformAdSetId: null,
-  });
-
-  for (const { adSet, result, subset } of perAdSet) {
-    await db
-      .update(adSetTable)
-      .set({
-        platformCampaignId: created.id,
-        externalId: result.platformAdSetId ?? null,
-        status: "paused",
-      })
-      .where(eq(adSetTable.id, adSet.id));
-    const responseAds = result.ads ?? (result.ad ? [result.ad] : []);
-    for (const spot of subset) {
-      const match =
-        responseAds.find((ad) => ad.name === spot.name) ??
-        (responseAds.length === 1 ? responseAds[0] : undefined);
-      await db
-        .update(adSpotTable)
-        .set({
-          platformCampaignId: created.id,
-          externalId:
-            (typeof match?.platformAdId === "string"
-              ? match.platformAdId
-              : null) ??
-            match?.id ??
-            match?._id ??
-            null,
-          adSetId: result.platformAdSetId ?? null,
-          status: "paused",
-        })
-        .where(eq(adSpotTable.id, spot.id));
-    }
-  }
-
-  return {
-    campaignId: campaign.id,
-    platform,
-    validateOnly: false,
-    platformCampaignRowId: created.id,
-    adSetsCreated: perAdSet.length,
-    adsCreated: perAdSet.reduce((n, entry) => n + entry.subset.length, 0),
-    path: `/app/brands/${brand.slug}/ads/platform/${created.id}`,
-  };
 }
 
 /**
@@ -1768,79 +1126,1066 @@ export function googlePauseOutcome(
   };
 }
 
+// ---- DELIVERY SWITCH -------------------------------------------------
+
+const DELIVERY_PLATFORMS: Record<string, string> = {
+  meta_ads: "facebook",
+  google_ads: "google",
+};
+
 /**
- * Mirror what the platform created: the platform_campaign row plus the
- * externalIds on the ads and ad sets it produced.
+ * Pause or resume a synced campaign — the Launch button on the campaign
+ * page. This is the moment money starts (or stops) moving, so it is only
+ * reachable from an authenticated operator action; the click IS the
+ * approval. Local status is updated only after the provider confirms.
  */
-async function recordPlatformCampaign(input: {
-  campaign: typeof campaignTable.$inferSelect;
-  brand: Brand;
-  platform: "meta_ads" | "google_ads";
-  goal: string;
-  budgetAmount: number;
-  platformCampaignId: string | null;
-  spots: (typeof adSpotTable.$inferSelect)[];
-  adSets: (typeof adSetTable.$inferSelect)[];
-  platformAdSetId: string | null;
-  /** What the platform is actually doing. Meta creates paused; Google may not. */
-  status?: PlatformCampaignStatus;
-}) {
-  const status = input.status ?? "paused";
-  const channel = await db.query.channelTable.findFirst({
-    where: and(
-      eq(channelTable.brandId, input.brand.id),
-      eq(channelTable.platform, input.platform),
-      isNull(channelTable.deletedAt),
-    ),
-    columns: { id: true },
+export async function setCampaignDelivery(
+  input: { platformCampaignId: string; status: "active" | "paused" },
+  context: AdsWriteContext,
+) {
+  const campaign = await db.query.platformCampaignTable.findFirst({
+    where: eq(platformCampaignTable.id, input.platformCampaignId),
   });
-  if (!channel) {
+  if (!campaign) throw new Error("Campaign not found");
+  if (!campaign.brandId) throw new Error("Campaign has no brand");
+
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, campaign.brandId),
+    columns: { organizationId: true, name: true },
+  });
+  if (brand?.organizationId !== context.organizationId) {
+    throw new Error("No access to this campaign");
+  }
+  if (!campaign.externalId) {
     throw new Error(
-      "The ads were created but no local channel exists to file them under — run Pull recent ads",
+      "This campaign has no platform id yet — it was never synced or launched on the provider",
     );
   }
-  const [created] = await db
-    .insert(platformCampaignTable)
-    .values({
-      id: createId("pcamp"),
-      channelId: channel.id,
-      brandId: input.brand.id,
-      platform: input.platform,
-      campaignId: input.campaign.id,
-      name: input.campaign.name,
-      status,
-      objective: input.goal,
-      budget: Math.round(input.budgetAmount),
-      externalId: input.platformCampaignId,
+  const platform = DELIVERY_PLATFORMS[campaign.platform];
+  if (!platform) {
+    throw new Error(`Delivery toggle not supported for ${campaign.platform}`);
+  }
+
+  const provider = await setZernioCampaignStatus({
+    platformCampaignId: campaign.externalId,
+    status: input.status,
+    platform,
+  });
+
+  const [updated] = await db
+    .update(platformCampaignTable)
+    .set({ status: input.status === "active" ? "live" : "paused" })
+    .where(eq(platformCampaignTable.id, campaign.id))
+    .returning({
+      id: platformCampaignTable.id,
+      status: platformCampaignTable.status,
+    });
+
+  return { campaign: updated, provider };
+}
+
+/**
+ * The platform audience asset a plan audience should target, or null for
+ * demographic-only targeting. Resolution is via lineage: a platform_audience
+ * row pointing at the plan audience, in an ad account on this platform.
+ */
+async function platformAudienceExternalIdFor(
+  planAudienceId: string,
+  brandId: string,
+  platform: "meta_ads" | "google_ads",
+): Promise<string | null> {
+  const rows = await db
+    .select({ externalId: platformAudienceTable.externalId })
+    .from(platformAudienceTable)
+    .innerJoin(
+      channelTable,
+      eq(channelTable.id, platformAudienceTable.channelId),
+    )
+    .where(
+      and(
+        eq(platformAudienceTable.audienceId, planAudienceId),
+        eq(platformAudienceTable.brandId, brandId),
+        eq(channelTable.platform, platform),
+        isNotNull(platformAudienceTable.externalId),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.externalId ?? null;
+}
+
+/**
+ * Compile one plan audience into the targeting spec the platform accepts.
+ *
+ * Region names are the part that must not be guessed: the plan stores prose
+ * ("California"), the platform wants opaque keys, and GET
+ * /v1/ads/targeting/search is the documented bridge. A name that fails to
+ * resolve is reported, never silently dropped — an unresolved region
+ * silently widening to a whole country is the expensive failure mode.
+ */
+async function compileAudienceTargeting(input: {
+  audience: PlanAudience;
+  connectionAccountId: string;
+  brandId: string;
+  platform: "meta_ads" | "google_ads";
+}): Promise<{ spec: ZernioAdTargeting | undefined; warnings: string[] }> {
+  const { audience } = input;
+  const warnings: string[] = [];
+  const spec: ZernioAdTargeting = {};
+
+  const geography = audience.geography ?? {};
+  if (geography.countries?.length) spec.countries = geography.countries;
+  if (audience.ageMin != null) spec.ageMin = audience.ageMin;
+  if (audience.ageMax != null) spec.ageMax = audience.ageMax;
+
+  const regionNames = [
+    ...(geography.regions ?? []),
+    // Cities ride the same resolution; Zernio's create takes them as region
+    // keys of type city via the same search. Modeled coarsely until a real
+    // city campaign needs radius targeting.
+    ...(geography.cities ?? []),
+  ];
+  if (regionNames.length > 0) {
+    const resolved: Array<{ key: string }> = [];
+    for (const name of regionNames) {
+      try {
+        const { results } = await searchZernioTargeting({
+          accountId: input.connectionAccountId,
+          q: name,
+          dimension: "geo",
+          geoType: "all",
+          countryCode: geography.countries?.[0],
+          limit: 5,
+        });
+        const match =
+          results.find(
+            (row) => row.name.toLowerCase() === name.toLowerCase(),
+          ) ?? results[0];
+        if (match) resolved.push({ key: match.id });
+        else
+          warnings.push(
+            `"${name}" did not resolve to a targetable location on ${input.platform} — it was left out`,
+          );
+      } catch (error) {
+        warnings.push(
+          `Resolving "${name}" failed (${error instanceof Error ? error.message : String(error)}) — it was left out`,
+        );
+      }
+    }
+    if (resolved.length > 0) spec.regions = resolved;
+    if (resolved.length === 0 && !spec.countries?.length) {
+      warnings.push(
+        `${audience.name}: no location resolved and no countries set — this targets WORLDWIDE`,
+      );
+    }
+  }
+
+  const assetId = await platformAudienceExternalIdFor(
+    audience.id,
+    input.brandId,
+    input.platform,
+  );
+  if (assetId) spec.audienceId = assetId;
+
+  const empty = Object.keys(spec).length === 0;
+  if (empty) {
+    warnings.push(
+      `${audience.name}: no compilable targeting — this ad set runs broad`,
+    );
+  }
+  return { spec: empty ? undefined : spec, warnings };
+}
+
+// ---- DRAFT → PLATFORM --------------------------------------------------
+
+/**
+ * Map the ads a create call returned back to the plan ads it was sent.
+ *
+ * Match by exact name, never reusing a response ad; fall back to pairing only
+ * when both sides have exactly one. The fallback must not fire per-ad: with
+ * one response and several plan ads, assigning that response to each of them
+ * would stamp the same externalId on every row — which the unique index then
+ * rejects AFTER the campaign already exists on the platform.
+ */
+export function matchResponseAdsToPlan(
+  responseAds: Array<{
+    name?: string;
+    platformAdId?: unknown;
+    id?: string;
+    _id?: string;
+  }>,
+  planAds: Array<{ id: string; name: string }>,
+): Map<string, string | null> {
+  const used = new Set<number>();
+  const externalIdOf = (row: (typeof responseAds)[number]) =>
+    (typeof row.platformAdId === "string" ? row.platformAdId : null) ??
+    row.id ??
+    row._id ??
+    null;
+  const out = new Map<string, string | null>();
+  for (const plan of planAds) {
+    const index = responseAds.findIndex(
+      (row, i) => !used.has(i) && row.name === plan.name,
+    );
+    const fallback =
+      planAds.length === 1 && responseAds.length === 1 && !used.has(0) ? 0 : -1;
+    const chosen = index >= 0 ? index : fallback;
+    if (chosen >= 0) {
+      used.add(chosen);
+      out.set(plan.id, externalIdOf(responseAds[chosen]!));
+    } else {
+      out.set(plan.id, null);
+    }
+  }
+  return out;
+}
+
+/** The plan's creative-type ads, shaped for Meta payload builders. */
+function creativeAds(ads: Ad[]) {
+  return ads.flatMap((ad) => {
+    if (ad.type !== "creative") return [];
+    const content = ad.content as AdCreativeContent;
+    if (!content.media?.[0]?.url) return [];
+    return [{ ad, content }];
+  });
+}
+
+function textAds(ads: Ad[]) {
+  return ads.flatMap((ad) =>
+    ad.type === "text" ? [{ ad, content: ad.content as AdTextContent }] : [],
+  );
+}
+
+/**
+ * Push the plan to one platform: COMPILE the campaign, its audiences and its
+ * ads into that platform's shape, through the draft platform_campaign row —
+ * which is where the authoritative budget and settings live, so the push
+ * takes no numbers of its own. Everything is created PAUSED; spend starts
+ * only when setCampaignDelivery flips it, separately.
+ */
+export async function pushDraftToPlatform(
+  input: {
+    campaignId: string;
+    platform?: "meta_ads" | "google_ads";
+    connectionAccountId: string;
+    adAccountId: string;
+    goal:
+      | "engagement"
+      | "traffic"
+      | "awareness"
+      | "video_views"
+      | "conversions";
+    validateOnly?: boolean;
+  },
+  context: AdsWriteContext,
+) {
+  const platform = input.platform ?? "meta_ads";
+  const campaign = await db.query.campaignTable.findFirst({
+    where: eq(campaignTable.id, input.campaignId),
+  });
+  if (!campaign) throw new Error("Campaign not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, campaign.brandId),
+  });
+  if (brand?.organizationId !== context.organizationId) {
+    throw new Error("No access to this campaign");
+  }
+  if (!brand.slug) throw new Error("Brand has no slug");
+
+  // The draft row is the contract: planned platform, authoritative budget,
+  // per-platform settings. No draft, no push.
+  const draft = await db.query.platformCampaignTable.findFirst({
+    where: and(
+      eq(platformCampaignTable.campaignId, campaign.id),
+      eq(platformCampaignTable.platform, platform),
+    ),
+  });
+  if (!draft) {
+    throw new Error(
+      `${platform === "meta_ads" ? "Meta" : "Google"} is not planned for this campaign — plan it on the campaign page first`,
+    );
+  }
+  if (draft.externalId) {
+    throw new Error(
+      `This campaign already exists on ${platform === "meta_ads" ? "Meta" : "Google"} — edit it there, or draft a new campaign`,
+    );
+  }
+  if (!draft.budget || draft.budget <= 0) {
+    throw new Error(
+      "Set the budget on the platform draft first — the push sends that number, not a guess",
+    );
+  }
+  const budgetAmount = draft.budget;
+  const budgetType = (draft.budgetType ?? "daily") as "daily" | "lifetime";
+  const settings = draft.settings ?? {};
+
+  const destination = await requireAdDestination({
+    organizationId: context.organizationId,
+    brandSlug: brand.slug,
+    platform: platform === "meta_ads" ? "meta" : "google",
+    connectionAccountId: input.connectionAccountId,
+    adAccountId: input.adAccountId,
+  });
+
+  const [audiences, ads] = await Promise.all([
+    db.query.audienceTable.findMany({
+      where: eq(audienceTable.campaignId, campaign.id),
+    }),
+    db.query.adTable.findMany({
+      where: eq(adTable.campaignId, campaign.id),
+    }),
+  ]);
+  if (ads.length === 0) {
+    throw new Error("This campaign has no drafted ads — add ads first");
+  }
+
+  const startDate = (draft.startAt ?? campaign.startAt)?.toISOString();
+  const endDate = (draft.endAt ?? campaign.endAt)?.toISOString();
+  if (budgetType === "lifetime" && !endDate) {
+    throw new Error(
+      "A lifetime budget needs an end date — set one on the campaign, or switch the draft to a daily budget",
+    );
+  }
+
+  const warnings: string[] = [];
+
+  // Compile every audience's targeting up front, so a resolution failure
+  // surfaces before anything is created.
+  const compiled = [];
+  for (const audience of audiences) {
+    const { spec, warnings: audienceWarnings } = await compileAudienceTargeting(
+      {
+        audience,
+        connectionAccountId: input.connectionAccountId,
+        brandId: brand.id,
+        platform,
+      },
+    );
+    warnings.push(...audienceWarnings);
+    compiled.push({ audience, spec });
+  }
+
+  if (platform === "google_ads") {
+    return pushToGoogle({
+      input,
+      context,
+      campaign,
+      brand,
+      draft,
+      destination,
+      compiled,
+      ads,
+      budgetAmount,
+      budgetType,
+      settings,
+      startDate,
+      endDate,
+      warnings,
+    });
+  }
+  return pushToMeta({
+    input,
+    context,
+    campaign,
+    brand,
+    draft,
+    destination,
+    compiled,
+    ads,
+    budgetAmount,
+    budgetType,
+    settings,
+    startDate,
+    endDate,
+    warnings,
+  });
+}
+
+type PushArgs = {
+  input: {
+    campaignId: string;
+    connectionAccountId: string;
+    adAccountId: string;
+    goal:
+      | "engagement"
+      | "traffic"
+      | "awareness"
+      | "video_views"
+      | "conversions";
+    validateOnly?: boolean;
+  };
+  context: AdsWriteContext;
+  campaign: Campaign;
+  brand: Brand;
+  draft: PlatformCampaign;
+  destination: AdDestination;
+  compiled: Array<{
+    audience: PlanAudience;
+    spec: ZernioAdTargeting | undefined;
+  }>;
+  ads: Ad[];
+  budgetAmount: number;
+  budgetType: "daily" | "lifetime";
+  settings: PlatformCampaignSettings;
+  startDate?: string;
+  endDate?: string;
+  warnings: string[];
+};
+
+// ---- GOOGLE COMPILE ---------------------------------------------------
+//
+// Google's hierarchy is campaign → ad group, and the campaign TYPE decides
+// everything (Search needs keywords, Display needs sized images). One call
+// builds the whole tree; multi-ad-group is not modelled, so the first
+// audience carries the targeting and the rest are reported, not dropped
+// silently.
+async function pushToGoogle(args: PushArgs) {
+  const {
+    input,
+    context,
+    campaign,
+    brand,
+    draft,
+    destination,
+    compiled,
+    ads,
+    budgetAmount,
+    budgetType,
+    settings,
+    startDate,
+    endDate,
+    warnings,
+  } = args;
+
+  // Zernio's validate-only IS Meta's own execution_options; Google has no
+  // equivalent, so a "dry run" here would build the campaign for real.
+  if (input.validateOnly) {
+    throw new Error(
+      "Google has no dry run — Zernio's validate-only is Meta's own. Review the draft, then push for real",
+    );
+  }
+  const google = settings.google ?? {};
+  const campaignType = google.campaignType;
+  if (!campaignType) {
+    throw new Error(
+      "Set the Google campaign type (search or display) on the platform draft first",
+    );
+  }
+  if (input.goal === "conversions") {
+    throw new Error(
+      "Google push supports traffic, engagement, awareness, and video_views",
+    );
+  }
+
+  // Keywords: the operator's structured override wins; otherwise derive from
+  // the audiences' suggestions — that is the whole point of the loose field.
+  const keywords = google.keywords ?? [
+    ...new Set(compiled.flatMap(({ audience }) => audience.keywords ?? [])),
+  ];
+  if (campaignType === "search" && keywords.length === 0) {
+    throw new Error(
+      "A Google Search campaign needs keywords — add suggestions on an audience, or set them on the Google draft",
+    );
+  }
+
+  const text = textAds(ads)[0];
+  const creative = creativeAds(ads)[0];
+  if (!text && !creative) {
+    throw new Error(
+      "No usable ad: add a text ad (headlines + descriptions), or a creative ad with an image",
+    );
+  }
+  const headline =
+    text?.content.headlines[0] ?? creative?.content.headline ?? campaign.name;
+  const body =
+    text?.content.descriptions[0] ??
+    creative?.content.body ??
+    campaign.description ??
+    campaign.name;
+  const linkUrl =
+    text?.content.linkUrl ??
+    creative?.content.linkUrl ??
+    campaign.landingUrl ??
+    null;
+  if (!linkUrl) {
+    throw new Error(
+      "Set a landing URL on the campaign, or a link URL on an ad",
+    );
+  }
+  if (campaignType === "display" && !creative) {
+    throw new Error("A Google Display campaign needs a creative ad's image");
+  }
+
+  const first = compiled[0];
+  if (compiled.length > 1) {
+    warnings.push(
+      `Google push compiles ONE audience (${first!.audience.name}); the other ${compiled.length - 1} were not sent — multi-ad-group is not modelled yet`,
+    );
+  }
+
+  const result = await createGoogleAd(
+    {
+      businessKey: `push:${campaign.id}:google`,
+      brandSlug: brand.slug!,
+      connectionAccountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      name: campaign.name,
+      campaignType,
+      goal: input.goal,
+      budgetAmount,
+      budgetType,
+      headline,
+      body,
+      linkUrl,
+      keywords,
+      negativeKeywords: google.negativeKeywords,
+      additionalHeadlines:
+        google.additionalHeadlines ?? text?.content.headlines.slice(1),
+      additionalDescriptions:
+        google.additionalDescriptions ?? text?.content.descriptions.slice(1),
+      businessName: google.businessName ?? brand.name,
+      targeting: first?.spec,
+      startDate,
+      endDate,
+      images:
+        campaignType === "display" && creative
+          ? {
+              landscape: creative.content.media[0]!.url,
+              square: creative.content.media[0]!.url,
+            }
+          : undefined,
+    },
+    context,
+  );
+  warnings.push(...(result.warnings ?? []));
+
+  const provider = result.provider;
+  await recordCompiledCampaign({
+    draft,
+    campaign,
+    status: result.status,
+    budgetAmount,
+    budgetType,
+    externalCampaignId: provider.platformCampaignId ?? null,
+    heroThumbnailUrl: creative?.content.media[0]?.url ?? null,
+    sets: [
+      {
+        audience: first?.audience ?? null,
+        name: first?.audience.name ?? campaign.name,
+        externalId: provider.platformAdSetId ?? null,
+        targetingSpec: first?.spec ?? null,
+        budget: budgetAmount,
+        budgetType,
+        ads: [
+          {
+            planAd: (text ?? creative)!.ad,
+            externalId: null,
+            headline,
+            body,
+            linkUrl,
+            media: creative ? creative.content.media : null,
+          },
+        ],
+      },
+    ],
+  });
+
+  return {
+    campaignId: campaign.id,
+    platform: "google_ads" as const,
+    validateOnly: false,
+    platformCampaignRowId: draft.id,
+    adSetsCreated: 1,
+    adsCreated: 1,
+    path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
+    warnings,
+    provider,
+  };
+}
+
+// ---- META COMPILE ------------------------------------------------------
+//
+// Each plan audience becomes an ad set; every creative ad runs under every
+// ad set. One audience (or none) is a single create; several use the
+// shell-then-attach shape with rollback so nothing is left half-built.
+async function pushToMeta(args: PushArgs) {
+  const {
+    input,
+    context,
+    campaign,
+    brand,
+    draft,
+    destination,
+    compiled,
+    ads,
+    budgetAmount,
+    budgetType,
+    settings,
+    startDate,
+    endDate,
+    warnings,
+  } = args;
+
+  const usable = creativeAds(ads);
+  if (usable.length === 0) {
+    throw new Error(
+      "Meta needs at least one creative ad with an image — text ads compile to Google only",
+    );
+  }
+  const skippedText = textAds(ads).length;
+  if (skippedText > 0) {
+    warnings.push(
+      `${skippedText} text ad(s) were not sent to Meta — they compile to Google`,
+    );
+  }
+  const linkUrl =
+    usable.find(({ content }) => content.linkUrl)?.content.linkUrl ??
+    campaign.landingUrl;
+  if (!linkUrl) {
+    throw new Error(
+      "Set a landing URL on the campaign, or a link URL on at least one ad",
+    );
+  }
+
+  const meta = settings.meta ?? {};
+  const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
+  const promotedObject =
+    meta.pixelId || meta.customEventType
+      ? { pixelId: meta.pixelId, customEventType: meta.customEventType }
+      : undefined;
+
+  const isCarousel = (content: AdCreativeContent) =>
+    (content.media?.length ?? 0) >= 2;
+
+  const carouselCardsFor = (content: AdCreativeContent) =>
+    content.media.slice(0, 10).map((item, index) => ({
+      imageUrl: item.url,
+      headline:
+        index === 0 ? content.headline : (content.headline ?? campaign.name),
+      linkUrl: content.linkUrl ?? linkUrl,
+    }));
+
+  const creativesFor = (subset: typeof usable) =>
+    subset.map(({ ad, content }) => ({
+      name: ad.name,
+      // Every creative carries its own headline and body in the
+      // multi-creative shape; Meta does not fall back per creative.
+      headline: content.headline,
+      body: content.body,
+      imageUrl: content.media[0]!.url,
+      linkUrl: content.linkUrl ?? linkUrl,
+    }));
+
+  /** One ad set as the API sees it. */
+  const adSetPayload = (setArgs: {
+    audience: PlanAudience | null;
+    spec: ZernioAdTargeting | undefined;
+    existingCampaignId?: string;
+    validateOnly: boolean;
+  }): CreateZernioStandaloneAdInput => ({
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+    ...(setArgs.existingCampaignId
+      ? { existingCampaignId: setArgs.existingCampaignId }
+      : { campaignName: campaign.name }),
+    name: setArgs.existingCampaignId
+      ? (setArgs.audience?.name ?? campaign.name)
+      : campaign.name,
+    adSetName: setArgs.audience?.name,
+    goal: input.goal,
+    // Under CBO the campaign owns the money; an ad set that also sends a
+    // budget is fighting the thing that makes CBO worth using.
+    ...(useCbo && setArgs.existingCampaignId
+      ? {}
+      : {
+          budgetAmount: setArgs.audience?.budget ?? budgetAmount,
+          budgetType:
+            (setArgs.audience?.budgetType as "daily" | "lifetime") ??
+            budgetType,
+        }),
+    headline: usable[0]!.content.headline,
+    body: usable[0]!.content.body,
+    linkUrl,
+    creatives: creativesFor(usable),
+    targeting: setArgs.spec,
+    startDate,
+    endDate,
+    promotedObject,
+    ...metaDraftProviderControls(setArgs.validateOnly),
+  });
+
+  /**
+   * Create one ad set and everything inside it. Meta's create takes ONE
+   * creative shape per call: N statics via creatives[], or one carousel via
+   * carouselCards — a mix needs the attach shape for the leftovers, and a
+   * failed attach rolls the campaign back rather than stranding it.
+   */
+  const createAdSetWithAds = async (setArgs: {
+    audience: PlanAudience | null;
+    spec: ZernioAdTargeting | undefined;
+    existingCampaignId?: string;
+    validateOnly: boolean;
+    keyScope: string;
+  }) => {
+    const statics = usable.filter(({ content }) => !isCarousel(content));
+    const carousels = usable.filter(({ content }) => isCarousel(content));
+    const leading = statics.length > 0 ? undefined : carousels[0];
+    const trailing = leading ? carousels.slice(1) : carousels;
+
+    const payload: CreateZernioStandaloneAdInput = {
+      ...adSetPayload(setArgs),
+      ...(leading
+        ? {
+            creatives: undefined,
+            carouselCards: carouselCardsFor(leading.content),
+          }
+        : { creatives: creativesFor(statics) }),
+    };
+    const result = await createMetaAd(payload, {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-adset",
+        payload,
+        setArgs.keyScope,
+      ),
+      adAccount: destination.adAccount,
+    });
+
+    if (setArgs.validateOnly || result.validateOnly) {
+      return {
+        result,
+        attached: [] as Array<{ planAd: Ad; result: ZernioAdWriteResponse }>,
+      };
+    }
+
+    const rollbackCampaignId = setArgs.existingCampaignId
+      ? null
+      : (result.platformCampaignId ?? null);
+    const attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }> = [];
+    try {
+      for (const { ad, content } of trailing) {
+        const attachPayload: CreateZernioStandaloneAdInput = {
+          accountId: input.connectionAccountId,
+          adAccountId: destination.adAccount.id,
+          adSetId: result.platformAdSetId!,
+          name: ad.name,
+          goal: input.goal,
+          headline: content.headline,
+          body: content.body,
+          linkUrl: content.linkUrl ?? linkUrl,
+          carouselCards: carouselCardsFor(content),
+          ...metaDraftProviderControls(false),
+        };
+        attached.push({
+          planAd: ad,
+          result: await createMetaAd(attachPayload, {
+            idempotencyKey: idempotencyKey(
+              context,
+              "push-attach",
+              attachPayload,
+              `${setArgs.keyScope}:${ad.id}`,
+            ),
+            adAccount: destination.adAccount,
+          }),
+        });
+      }
+    } catch (error) {
+      if (rollbackCampaignId) {
+        await deleteZernioCampaign({
+          campaignId: rollbackCampaignId,
+          accountId: input.connectionAccountId,
+        }).catch((cleanupError) => {
+          console.error(
+            "attach rollback failed",
+            rollbackCampaignId,
+            cleanupError,
+          );
+        });
+      }
+      throw new Error(
+        `Push failed while attaching carousel ${attached.length + 1} of ${trailing.length}${
+          rollbackCampaignId
+            ? " — the campaign was removed from Meta so nothing is half-built"
+            : ""
+        }. ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return { result, attached };
+  };
+
+  /**
+   * Map Meta's returned ads back to plan ads for lineage. The opening call
+   * carries the statics (or the lone leading carousel); the attach results
+   * are exact per plan ad. The two sets are disjoint by construction.
+   */
+  const setAdsFor = (
+    set: {
+      result: ZernioAdWriteResponse;
+      attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }>;
+    },
+    subset: typeof usable,
+  ) => {
+    const statics = subset.filter(({ content }) => !isCarousel(content));
+    const carousels = subset.filter(({ content }) => isCarousel(content));
+    const opening = statics.length > 0 ? statics : carousels.slice(0, 1);
+    const responseAds =
+      set.result.ads ?? (set.result.ad ? [set.result.ad] : []);
+    const byPlanId = matchResponseAdsToPlan(
+      responseAds,
+      opening.map(({ ad }) => ({ id: ad.id, name: ad.name })),
+    );
+    const fromOpening = opening.map(({ ad, content }) => ({
+      planAd: ad,
+      externalId: byPlanId.get(ad.id) ?? null,
+      headline: content.headline,
+      body: content.body,
+      linkUrl: content.linkUrl ?? linkUrl,
+      media: content.media,
+    }));
+    const fromAttach = set.attached.map(({ planAd, result }) => {
+      const row = result.ad ?? result.ads?.[0];
+      const content = planAd.content as AdCreativeContent;
+      return {
+        planAd,
+        externalId:
+          (typeof row?.platformAdId === "string" ? row.platformAdId : null) ??
+          row?.id ??
+          row?._id ??
+          null,
+        headline: content.headline,
+        body: content.body,
+        linkUrl: content.linkUrl ?? linkUrl,
+        media: content.media,
+      };
+    });
+    return [...fromOpening, ...fromAttach];
+  };
+
+  // ---- one (or no) audience: a single create --------------------------
+  if (compiled.length <= 1) {
+    const only = compiled[0] ?? null;
+    const set = await createAdSetWithAds({
+      audience: only?.audience ?? null,
+      spec: only?.spec,
+      validateOnly: input.validateOnly ?? false,
+      keyScope: `push:${campaign.id}:meta`,
+    });
+    if (input.validateOnly || set.result.validateOnly) {
+      return {
+        campaignId: campaign.id,
+        platform: "meta_ads" as const,
+        validateOnly: true,
+        adsCreated: 0,
+        warnings,
+        provider: set.result,
+      };
+    }
+    await recordCompiledCampaign({
+      draft,
+      campaign,
+      status: "paused",
+      budgetAmount,
+      budgetType,
+      externalCampaignId: set.result.platformCampaignId ?? null,
+      heroThumbnailUrl: usable[0]!.content.media[0]?.url ?? null,
+      sets: [
+        {
+          audience: only?.audience ?? null,
+          name: only?.audience.name ?? campaign.name,
+          externalId: set.result.platformAdSetId ?? null,
+          targetingSpec: only?.spec ?? null,
+          budget: only?.audience.budget ?? budgetAmount,
+          budgetType,
+          ads: setAdsFor(set, usable),
+        },
+      ],
+    });
+    return {
+      campaignId: campaign.id,
+      platform: "meta_ads" as const,
+      validateOnly: false,
+      platformCampaignRowId: draft.id,
+      adSetsCreated: 1,
+      adsCreated: usable.length,
+      path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
+      warnings,
+    };
+  }
+
+  // ---- several audiences: shell, then one create per audience ---------
+  if (input.validateOnly) {
+    throw new Error(
+      "Dry run covers single-audience pushes only; Meta has no dry run for the two-step shape",
+    );
+  }
+  const shell = await createZernioAdCampaign(
+    {
+      accountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      name: campaign.name,
+      goal: input.goal,
+      ...(useCbo ? { budgetAmount, budgetType } : {}),
+      status: "PAUSED",
+    },
+    {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-shell",
+        { campaignId: campaign.id },
+        `shell:${campaign.id}:meta`,
+      ),
+    },
+  );
+  const shellId =
+    shell.campaign?.platformCampaignId ?? shell.campaign?.id ?? null;
+  if (!shellId) throw new Error("Zernio returned no campaign id for the shell");
+
+  const perSet = [];
+  // If any audience fails, the shell is a campaign with no ads: invisible to
+  // the tree and impossible to clean up by hand. Delete it rather than
+  // stranding it, and surface which audience failed.
+  try {
+    for (const { audience, spec } of compiled) {
+      const set = await createAdSetWithAds({
+        audience,
+        spec,
+        existingCampaignId: shellId,
+        validateOnly: false,
+        keyScope: `push:${campaign.id}:${audience.id}`,
+      });
+      perSet.push({ audience, spec, set });
+    }
+  } catch (error) {
+    await deleteZernioCampaign({
+      campaignId: shellId,
+      accountId: input.connectionAccountId,
+    }).catch((cleanupError) => {
+      console.error("push rollback failed", shellId, cleanupError);
+    });
+    throw new Error(
+      `Push failed after ${perSet.length} of ${compiled.length} audiences — the campaign was removed from Meta so nothing is half-built. ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  await recordCompiledCampaign({
+    draft,
+    campaign,
+    status: "paused",
+    budgetAmount,
+    budgetType,
+    externalCampaignId: shellId,
+    heroThumbnailUrl: usable[0]!.content.media[0]?.url ?? null,
+    sets: perSet.map(({ audience, spec, set }) => ({
+      audience,
+      name: audience.name,
+      externalId: set.result.platformAdSetId ?? null,
+      targetingSpec: spec ?? null,
+      budget: useCbo ? null : (audience.budget ?? budgetAmount),
+      budgetType,
+      ads: setAdsFor(set, usable),
+    })),
+  });
+
+  return {
+    campaignId: campaign.id,
+    platform: "meta_ads" as const,
+    validateOnly: false,
+    platformCampaignRowId: draft.id,
+    adSetsCreated: perSet.length,
+    adsCreated: perSet.length * usable.length,
+    path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
+    warnings,
+  };
+}
+
+/**
+ * Record what the compile created: the draft platform_campaign becomes real
+ * (externalId, status), and mirror rows are written for every ad set and ad
+ * with their plan lineage. The mirror describes what the platform now holds.
+ */
+async function recordCompiledCampaign(input: {
+  draft: PlatformCampaign;
+  campaign: Campaign;
+  status: PlatformCampaignStatus;
+  budgetAmount: number;
+  budgetType: "daily" | "lifetime";
+  externalCampaignId: string | null;
+  heroThumbnailUrl: string | null;
+  sets: Array<{
+    audience: PlanAudience | null;
+    name: string;
+    externalId: string | null;
+    targetingSpec: ZernioAdTargeting | null;
+    budget: number | null;
+    budgetType: string | null;
+    ads: Array<{
+      planAd: Ad;
+      externalId: string | null;
+      headline: string | null;
+      body: string | null;
+      linkUrl: string | null;
+      media: MediaItem[] | null;
+    }>;
+  }>;
+}) {
+  const adCount = input.sets.reduce((n, set) => n + set.ads.length, 0);
+  await db
+    .update(platformCampaignTable)
+    .set({
+      externalId: input.externalCampaignId,
+      status: input.status,
+      budget: input.budgetAmount,
+      budgetType: input.budgetType,
+      adCount,
+      heroThumbnailUrl: input.heroThumbnailUrl,
     })
-    .returning();
+    .where(eq(platformCampaignTable.id, input.draft.id));
 
   await db
     .update(campaignTable)
     .set({ status: "active" })
     .where(eq(campaignTable.id, input.campaign.id));
 
-  for (const spot of input.spots) {
-    await db
-      .update(adSpotTable)
-      .set({
-        platformCampaignId: created!.id,
-        channelId: channel.id,
-        adSetId: input.platformAdSetId,
-        status,
+  for (const set of input.sets) {
+    const [setRow] = await db
+      .insert(platformAdSetTable)
+      .values({
+        id: createId("pas"),
+        platformCampaignId: input.draft.id,
+        brandId: input.draft.brandId,
+        audienceId: set.audience?.id ?? null,
+        name: set.name,
+        status: input.status,
+        targetingSpec: set.targetingSpec,
+        budget: set.budget,
+        budgetType: set.budgetType,
+        externalId: set.externalId,
       })
-      .where(eq(adSpotTable.id, spot.id));
+      .returning({ id: platformAdSetTable.id });
+    for (const ad of set.ads) {
+      await db.insert(platformAdTable).values({
+        id: createId("pad"),
+        platformCampaignId: input.draft.id,
+        platformAdSetId: setRow!.id,
+        brandId: input.draft.brandId,
+        channelId: input.draft.channelId,
+        platform: input.draft.platform,
+        adId: ad.planAd.id,
+        name: ad.planAd.name,
+        headline: ad.headline,
+        body: ad.body,
+        linkUrl: ad.linkUrl,
+        media: ad.media,
+        thumbnailUrl: ad.media?.[0]?.url ?? null,
+        status: input.status,
+        externalAdSetId: set.externalId,
+        adSetName: set.name,
+        externalId: ad.externalId,
+        businessKey: ad.planAd.businessKey,
+      });
+    }
   }
-  for (const adSet of input.adSets) {
-    await db
-      .update(adSetTable)
-      .set({
-        platformCampaignId: created!.id,
-        externalId: input.platformAdSetId,
-      })
-      .where(eq(adSetTable.id, adSet.id));
-  }
-  return created!;
 }
 
 // ---- DELETE ------------------------------------------------------------
@@ -1880,16 +2225,15 @@ export async function deletePlatformCampaign(
     });
   }
 
-  await db
-    .delete(adSpotTable)
-    .where(eq(adSpotTable.platformCampaignId, platformCampaign.id));
-  await db
-    .update(adSetTable)
-    .set({ platformCampaignId: null, externalId: null, status: null })
-    .where(eq(adSetTable.platformCampaignId, platformCampaign.id));
+  // platform_ad_set and platform_ad cascade with the campaign row; the plan
+  // rows (campaign, audiences, ads) are untouched — they can push again.
   await db
     .delete(platformCampaignTable)
     .where(eq(platformCampaignTable.id, platformCampaign.id));
 
-  return { deleted: true, hadExternalId: Boolean(platformCampaign.externalId), provider };
+  return {
+    deleted: true,
+    hadExternalId: Boolean(platformCampaign.externalId),
+    provider,
+  };
 }
