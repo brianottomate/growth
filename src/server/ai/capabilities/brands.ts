@@ -8,6 +8,8 @@ import { brandTable } from "@/server/db/schema";
 import {
   createOwnedBrand,
   enrichBrandById,
+  previewBrandPurge,
+  purgeBrand,
 } from "@/server/services/brand-ops.service";
 import { growthAction } from "./types";
 
@@ -93,5 +95,42 @@ export const enrichBrandAction = growthAction({
       description: result.brand.description,
       logo: result.brand.logo,
     };
+  },
+});
+
+/** Brand ownership check shared by the purge pair. */
+async function assertOwnedBrand(brandId: string, orgId: string) {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(eq(brandTable.id, brandId), eq(brandTable.organizationId, orgId)),
+    columns: { id: true, name: true },
+  });
+  if (!brand) throw new Error("Brand not found in this organization.");
+  return brand;
+}
+
+export const previewBrandPurgeAction = growthAction({
+  description:
+    "Show exactly what purging a brand would destroy: row counts per table, plus anything that blocks the purge (Performance+ accounts and partner programs are financial records and must be detached first). Read-only. Always call this before brandWrite.purge and show the operator the counts.",
+  inputSchema: z.object({ brandId: z.string().trim().min(1) }),
+  execute: async (input, ctx) => {
+    await assertOwnedBrand(input.brandId, ctx.orgId);
+    return previewBrandPurge(input.brandId);
+  },
+});
+
+export const purgeBrandAction = growthAction({
+  description:
+    "Permanently delete a brand and everything under it: channels, campaigns, ads, audiences, content, media bytes in R2, the ad-account allowlist, and the Zernio profile with its connected accounts. This is offboarding, not archiving, and it CANNOT be undone. `confirmName` must match the brand's name exactly. Call brandWrite.previewPurge first and show the operator what will go. Never call this on your own initiative.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+    confirmName: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("Must equal the brand's name exactly, typed by the operator."),
+  }),
+  execute: async (input, ctx) => {
+    await assertOwnedBrand(input.brandId, ctx.orgId);
+    return purgeBrand(input);
   },
 });

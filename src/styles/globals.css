@@ -674,7 +674,7 @@
   --color-primary-foreground: var(--color-surface-primary);
   --color-border: var(--color-border-primary);
   --color-input: var(--color-border-primary);
-  --color-ring: var(--color-border-blue);
+  --color-ring: var(--color-border-accent);
 
   /* shadcn sidebar -> wandercom surfaces (theme-aware) */
   --color-sidebar: var(--color-surface-secondary);
@@ -684,7 +684,7 @@
   --color-sidebar-accent: var(--color-surface-tertiary);
   --color-sidebar-accent-foreground: var(--color-primary);
   --color-sidebar-border: var(--color-border-primary);
-  --color-sidebar-ring: var(--color-border-blue);
+  --color-sidebar-ring: var(--color-border-accent);
 }
 
 /* ---- dark-mode legibility: lift muted text ---------------------------

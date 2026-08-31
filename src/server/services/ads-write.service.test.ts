@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   assertMetaAdPayload,
   estimateMonthlyKeywordCost,
+  googlePauseOutcome,
 } from "@/server/services/ads-write.service";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 
@@ -87,14 +88,19 @@ describe("assertMetaAdPayload", () => {
   it("lets an ad set inherit its budget rather than restating it", () => {
     const { budgetAmount: _a, budgetType: _b, ...noBudget } = base;
     // Standalone: nothing owns the money, so this is a mistake.
-    expect(() => assertMetaAdPayload(noBudget, account)).toThrow(/needs a budget/);
+    expect(() => assertMetaAdPayload(noBudget, account)).toThrow(
+      /needs a budget/,
+    );
     // Attaching to an existing ad set, and joining a CBO campaign, both have
     // an owner above them.
     expect(() =>
       assertMetaAdPayload({ ...noBudget, adSetId: "1202500" }, account),
     ).not.toThrow();
     expect(() =>
-      assertMetaAdPayload({ ...noBudget, existingCampaignId: "23850" }, account),
+      assertMetaAdPayload(
+        { ...noBudget, existingCampaignId: "23850" },
+        account,
+      ),
     ).not.toThrow();
   });
 
@@ -145,7 +151,9 @@ describe("estimateMonthlyKeywordCost", () => {
   });
 
   it("falls back to the top-of-page bid when there is no average CPC", () => {
-    expect(estimateMonthlyKeywordCost([row(1_000, null, 4)]).dollars).toBe(1_400);
+    expect(estimateMonthlyKeywordCost([row(1_000, null, 4)]).dollars).toBe(
+      1_400,
+    );
   });
 
   it("reports what it could not price rather than treating it as free", () => {
@@ -163,5 +171,39 @@ describe("estimateMonthlyKeywordCost", () => {
     const result = estimateMonthlyKeywordCost([row(1_000, 2)], 0.5);
     expect(result.dollars).toBe(1_000);
     expect(result.ctrAssumption).toBe(0.5);
+  });
+});
+
+/**
+ * Google's create call has no paused option, so growth pauses in a second
+ * call. If that call does not land, the row has to say so: a stored `paused`
+ * over a delivering campaign is spend nobody is looking at.
+ */
+describe("googlePauseOutcome", () => {
+  it("records paused only when the pause actually landed", () => {
+    expect(googlePauseOutcome({ paused: true })).toEqual({
+      status: "paused",
+      warnings: [],
+    });
+  });
+
+  it("records live, with a warning, when there was no id to pause", () => {
+    const outcome = googlePauseOutcome({
+      paused: false,
+      reason: "no-campaign-id",
+    });
+    expect(outcome.status).toBe("live");
+    expect(outcome.warnings[0]).toMatch(/before it spends/);
+  });
+
+  it("carries the provider's reason out when the pause failed", () => {
+    const outcome = googlePauseOutcome({
+      paused: false,
+      reason: "pause-failed",
+      message: "429 rate limited",
+    });
+    expect(outcome.status).toBe("live");
+    expect(outcome.warnings[0]).toContain("429 rate limited");
+    expect(outcome.warnings[0]).toMatch(/pause it in Google Ads/);
   });
 });

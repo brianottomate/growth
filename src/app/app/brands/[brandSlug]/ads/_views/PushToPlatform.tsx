@@ -149,9 +149,7 @@ export function PushToPlatform({
               <select
                 id="push-goal"
                 value={goal}
-                onChange={(event) =>
-                  setGoal(event.target.value as typeof goal)
-                }
+                onChange={(event) => setGoal(event.target.value as typeof goal)}
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
               >
                 {GOALS.map((value) => (
@@ -210,11 +208,13 @@ export function PushToPlatform({
             size="sm"
             variant="outline"
             title={
-              adSetCount > 1
-                ? "Meta has no dry run for the multi-ad-set shape"
-                : undefined
+              !isMeta
+                ? "Only Meta has a dry run — Zernio's validate-only is Meta's own"
+                : adSetCount > 1
+                  ? "Meta has no dry run for the multi-ad-set shape"
+                  : undefined
             }
-            disabled={!canPush || (isMeta && adSetCount > 1)}
+            disabled={!canPush || !isMeta || adSetCount > 1}
             loading={push.isPending}
             onClick={() =>
               chosen &&
@@ -259,6 +259,13 @@ export function PushToPlatform({
             Dry run passed — Meta validated the whole tree without creating it.
           </p>
         )}
+        {push.isSuccess &&
+          "warnings" in push.data &&
+          (push.data.warnings ?? []).map((warning) => (
+            <p key={warning} className="text-xs text-amber-400">
+              {warning}
+            </p>
+          ))}
       </DialogContent>
     </Dialog>
   );

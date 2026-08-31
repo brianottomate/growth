@@ -68,6 +68,24 @@ export const BRAND_CONNECT_CHANNELS = [
 export type BrandConnectChannelKey =
   (typeof BRAND_CONNECT_CHANNELS)[number]["key"];
 
+/**
+ * Which kinds of connection a client is asked for.
+ *
+ * Posting is parked while Performance by Wander focuses on paid. The channel
+ * definitions above stay exactly as they are: turning social back on is adding
+ * "posting" to this list, not rebuilding the flow, the OAuth routes or the
+ * sync. Nothing here disconnects anything — a brand that already has Instagram
+ * keeps it, and content sync keeps reading it. This decides what we ASK for.
+ */
+export const OFFERED_CONNECT_KINDS: readonly ZernioConnectPlatform["kind"][] = [
+  "ads",
+];
+
+export function isOfferedConnectChannel(key: string): boolean {
+  const channel = BRAND_CONNECT_CHANNELS.find((row) => row.key === key);
+  return Boolean(channel && OFFERED_CONNECT_KINDS.includes(channel.target.kind));
+}
+
 /** Exported so brand creation can stamp a token at insert (no Zernio call). */
 export function newConnectToken(): string {
   return randomBytes(24).toString("base64url");
@@ -92,7 +110,12 @@ export async function getBrandByConnectToken(token: string) {
  * Zernio profile is created lazily on the client's first Connect click
  * (ensureBrandZernioProfile), so a link exists the moment a brand does.
  */
-export async function ensureBrandConnect(brandId: string) {
+export type ConnectIssuer = { name: string | null; email: string | null };
+
+export async function ensureBrandConnect(
+  brandId: string,
+  issuedBy?: ConnectIssuer,
+) {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
   });
@@ -100,16 +123,25 @@ export async function ensureBrandConnect(brandId: string) {
     throw new Error("Only owned brands can have a connect link");
   }
 
+  // Owned brands are minted with a token at creation (brand-ops.service), so
+  // the issuer cannot be stamped there — nobody has asked for the link yet.
+  // Whoever first reaches for it is the person the client should reply to.
   let token = brand.connectToken;
-  if (!token) {
-    token = newConnectToken();
+  const needsToken = !token;
+  if (needsToken) token = newConnectToken();
+  if (needsToken || (issuedBy && !brand.connectTokenIssuedAt)) {
     await db
       .update(brandTable)
-      .set({ connectToken: token })
+      .set({
+        connectToken: token,
+        connectTokenIssuedByName: issuedBy?.name ?? null,
+        connectTokenIssuedByEmail: issuedBy?.email ?? null,
+        connectTokenIssuedAt: new Date(),
+      })
       .where(eq(brandTable.id, brandId));
   }
 
-  return { token, url: brandConnectUrl(token) };
+  return { token: token!, url: brandConnectUrl(token!) };
 }
 
 /**
@@ -141,11 +173,19 @@ async function ensureBrandZernioProfile(brand: {
 }
 
 /** Revoke the sent link by replacing it. The old URL stops resolving. */
-export async function regenerateBrandConnectToken(brandId: string) {
+export async function regenerateBrandConnectToken(
+  brandId: string,
+  issuedBy?: ConnectIssuer,
+) {
   const token = newConnectToken();
   const [updated] = await db
     .update(brandTable)
-    .set({ connectToken: token })
+    .set({
+      connectToken: token,
+      connectTokenIssuedByName: issuedBy?.name ?? null,
+      connectTokenIssuedByEmail: issuedBy?.email ?? null,
+      connectTokenIssuedAt: new Date(),
+    })
     .where(eq(brandTable.id, brandId))
     .returning({ id: brandTable.id });
   if (!updated) throw new Error("Brand not found");
@@ -191,7 +231,12 @@ export async function getBrandConnectStatus(brandId: string) {
       // ad-account id, but it is connected the moment the client authorises.
       isNull(channelTable.deletedAt),
     ),
-    columns: { platform: true, handle: true, displayName: true },
+    columns: {
+      platform: true,
+      handle: true,
+      displayName: true,
+      externalId: true,
+    },
   });
   return BRAND_CONNECT_CHANNELS.map((channel) => {
     const connected = channels.filter(
@@ -200,8 +245,18 @@ export async function getBrandConnectStatus(brandId: string) {
     return {
       key: channel.key,
       label: channel.label,
+      // Every channel is returned so the internal card can still show a
+      // parked-but-connected account. The client page renders only what we
+      // currently offer.
+      offered: OFFERED_CONNECT_KINDS.includes(channel.target.kind),
       connected: connected.length > 0,
       accounts: connected.map((row) => row.handle ?? row.displayName ?? ""),
+      // An ad channel carries the platform's own account id once sync learns
+      // it. Showing it back is how a client confirms they granted the right
+      // account rather than a personal one.
+      externalIds: connected
+        .map((row) => row.externalId)
+        .filter((id): id is string => Boolean(id)),
     };
   });
 }

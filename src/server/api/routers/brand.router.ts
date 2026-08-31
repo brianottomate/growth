@@ -28,6 +28,8 @@ import {
 import {
   createOwnedBrand,
   enrichBrandById,
+  previewBrandPurge,
+  purgeBrand,
 } from "@/server/services/brand-ops.service";
 import { suggestNameFromEnrichment } from "@/server/services/brand-enrichment.service";
 import {
@@ -437,6 +439,26 @@ export const brandRouter = createTRPCRouter({
       return { id: input.id };
     }),
 
+  /** What a purge would destroy, and anything blocking it. Read-only. */
+  previewPurge: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      return previewBrandPurge(input.brandId);
+    }),
+
+  /**
+   * Offboarding: hard-delete the brand, its Zernio connection and its stored
+   * bytes. `delete` above only stamps deletedAt; this is the one that actually
+   * removes a client's data when they ask.
+   */
+  purge: protectedProcedure
+    .input(z.object({ brandId: z.string(), confirmName: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      return purgeBrand(input);
+    }),
+
   /** Stop tracking a reference brand (deletes the link, not the brand). */
   untrack: protectedProcedure
     .input(z.object({ inspirationId: z.string() }))
@@ -540,7 +562,10 @@ export const brandRouter = createTRPCRouter({
     .input(z.object({ brandId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
-      const result = await ensureBrandConnect(input.brandId);
+      const result = await ensureBrandConnect(input.brandId, {
+        name: ctx.session.user.name ?? null,
+        email: ctx.session.user.email ?? null,
+      });
       return { url: result.url };
     }),
 
@@ -548,7 +573,10 @@ export const brandRouter = createTRPCRouter({
     .input(z.object({ brandId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
-      const result = await regenerateBrandConnectToken(input.brandId);
+      const result = await regenerateBrandConnectToken(input.brandId, {
+        name: ctx.session.user.name ?? null,
+        email: ctx.session.user.email ?? null,
+      });
       return { url: result.url };
     }),
 

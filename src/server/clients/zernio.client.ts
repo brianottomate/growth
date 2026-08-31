@@ -118,6 +118,28 @@ export async function listZernioProfiles(
 }
 
 /**
+ * Disconnect one connected account. Zernio removes the connection and its
+ * cached stats; the platform-side app authorisation is the client's to revoke,
+ * which is why the connect page tells them they can.
+ */
+export async function deleteZernioAccount(accountId: string): Promise<void> {
+  await zernioFetch(`/accounts/${encodeURIComponent(accountId)}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Delete a profile. Disconnect its accounts first: a profile delete does not
+ * cascade to them, and orphaned accounts are invisible in our brand mapping
+ * but still authorised on the platform.
+ */
+export async function deleteZernioProfile(profileId: string): Promise<void> {
+  await zernioFetch(`/profiles/${encodeURIComponent(profileId)}`, {
+    method: "DELETE",
+  });
+}
+
+/**
  * Create a Zernio profile (workspace grouping). Names must be unique within
  * the team. NOT idempotent — callers must check for an existing profile first
  * and must never auto-retry a create.

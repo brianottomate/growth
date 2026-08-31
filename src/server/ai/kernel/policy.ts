@@ -90,6 +90,17 @@ export const growthActionPolicies = {
     create: write(),
     // Re-running refreshes the same fields from the same site.
     enrich: write({ idempotent: true }),
+    previewPurge: read(),
+    // Offboarding. Deletes rows, R2 bytes and the Zernio connection, none of
+    // which come back, so it is approval-gated and kept off MCP: a hard delete
+    // of a client's data should happen where a person is watching.
+    purge: write({
+      consequence: "provider-write",
+      approval: "user",
+      idempotent: false,
+      reversible: false,
+      surfaces: APPROVAL_PRODUCT,
+    }),
   },
   productAtlasRead: { list: read(), get: read() },
   productAtlasWrite: { create: write(), update: write({ idempotent: true }) },

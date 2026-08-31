@@ -102,23 +102,36 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
 
         {channels.length > 0 && (
           <div className="mt-4 grid gap-1.5 sm:grid-cols-2">
-            {channels.map((row) => (
-              <div
-                key={row.key}
-                className="flex items-center justify-between gap-2 text-sm"
-              >
-                <span className="text-muted-foreground">{row.label}</span>
-                {row.connected ? (
-                  <span className="truncate text-emerald-400">
-                    {row.accounts.filter(Boolean).join(", ") || "Connected"}
+            {/* A parked channel is hidden from the client but not from us, and
+                only while nothing is connected on it. One a brand already has
+                still shows, because it is still syncing. */}
+            {channels
+              .filter((row) => row.offered || row.connected)
+              .map((row) => (
+                <div
+                  key={row.key}
+                  className="flex items-center justify-between gap-2 text-sm"
+                >
+                  <span className="text-muted-foreground">
+                    {row.label}
+                    {!row.offered && (
+                      <span className="text-muted-foreground/60">
+                        {" "}
+                        · not offered
+                      </span>
+                    )}
                   </span>
-                ) : (
-                  <span className="text-muted-foreground/60">
-                    Not connected
-                  </span>
-                )}
-              </div>
-            ))}
+                  {row.connected ? (
+                    <span className="truncate text-emerald-400">
+                      {row.accounts.filter(Boolean).join(", ") || "Connected"}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/60">
+                      Not connected
+                    </span>
+                  )}
+                </div>
+              ))}
           </div>
         )}
       </div>

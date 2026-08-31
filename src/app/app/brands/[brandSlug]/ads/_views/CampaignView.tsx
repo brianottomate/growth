@@ -180,8 +180,8 @@ export async function CampaignView({
         <div>
           <h2 className="text-base font-semibold">Shared across platforms</h2>
           <p className="text-muted-foreground text-xs">
-            Creative, landing page, audience and budget split — picked once
-            here, used by every platform below.
+            Creative, landing page, audience and budget split, picked once
+            here and used by every platform below.
           </p>
         </div>
 

@@ -177,6 +177,13 @@ export const brandTable = pgTable(
     // connects their own accounts into this brand's Zernio profile. The link
     // is the credential: regenerating it is how a sent link is revoked.
     connectToken: t.text(),
+    // Who at Wander issued the link. The connect page is the only surface a
+    // client sees, so it names a person and gives them somewhere to ask —
+    // stamped at mint rather than read live, because the page has no session
+    // and the issuer is a fact about the link, not about the brand.
+    connectTokenIssuedByName: t.text(),
+    connectTokenIssuedByEmail: t.text(),
+    connectTokenIssuedAt: t.timestamp({ withTimezone: true }),
 
     // Cached aggregate (sum of channel followers) for overview cards.
     followerCount: t.integer(),

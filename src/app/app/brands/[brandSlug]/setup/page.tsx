@@ -8,6 +8,7 @@ import { getSession } from "@/server/better-auth/server";
 
 import { AdAccountsCard } from "../AdAccountsCard";
 import { ClientConnectCard } from "../ClientConnectCard";
+import { PurgeBrandCard } from "../PurgeBrandCard";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +80,8 @@ export default async function BrandSetupPage({
       <ClientConnectCard brandId={brand.id} />
 
       <AdAccountsCard brandId={brand.id} brandSlug={brand.slug ?? brandSlug} />
+
+      <PurgeBrandCard brandId={brand.id} brandName={brand.name} />
     </div>
   );
 }

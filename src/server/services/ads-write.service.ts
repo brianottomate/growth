@@ -50,6 +50,7 @@ import {
   channelTable,
   campaignTable,
   type Brand,
+  type PlatformCampaignStatus,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 
@@ -559,10 +560,15 @@ export async function createGoogleAd(
   const result = await createZernioStandaloneAd(payload, {
     idempotencyKey: idempotencyKey(context, "create-google", payload, input.businessKey),
   });
+  // Google's create call takes no status, so the campaign can be delivering the
+  // moment the provider accepts it. Pausing is a second, documented call.
+  const pause = await pauseFreshGoogleCampaign(result.platformCampaignId);
   return {
     brand: destination.brand,
     connectionAccountId: input.connectionAccountId,
     adAccount: destination.adAccount,
+    status: pause.status,
+    warnings: pause.warnings,
     provider: result,
   };
 }
@@ -1269,6 +1275,14 @@ export async function pushDraftToPlatform(
   // everything (Search needs keywords, Display needs sized images). One call
   // builds the whole tree; multi-ad-group is not modelled yet.
   if (platform === "google_ads") {
+    // Zernio's validate-only IS Meta's own `execution_options: validate_only`.
+    // Google has no equivalent, so a "dry run" here would build the campaign
+    // for real and then return as though nothing had happened.
+    if (input.validateOnly) {
+      throw new Error(
+        "Google has no dry run — Zernio's validate-only is Meta's own. Review the draft, then push for real",
+      );
+    }
     const google = campaign.platformConfig?.google;
     const campaignType = google?.campaignType;
     if (!campaignType) {
@@ -1313,29 +1327,18 @@ export async function pushDraftToPlatform(
       },
       context,
     );
-    if (input.validateOnly) {
-      return {
-        campaignId: campaign.id,
-        platform,
-        validateOnly: true,
-        adsCreated: 0,
-        provider: result,
-      };
-    }
+    const provider = result.provider as ZernioAdWriteResponse | undefined;
     const created = await recordPlatformCampaign({
       campaign,
       brand,
       platform,
       goal: input.goal,
       budgetAmount: input.budgetAmount,
-      platformCampaignId:
-        (result.provider as ZernioAdWriteResponse | undefined)
-          ?.platformCampaignId ?? null,
+      platformCampaignId: provider?.platformCampaignId ?? null,
       spots,
       adSets,
-      platformAdSetId:
-        (result.provider as ZernioAdWriteResponse | undefined)
-          ?.platformAdSetId ?? null,
+      platformAdSetId: provider?.platformAdSetId ?? null,
+      status: result.status,
     });
     return {
       campaignId: campaign.id,
@@ -1344,6 +1347,7 @@ export async function pushDraftToPlatform(
       platformCampaignRowId: created.id,
       adsCreated: spots.length,
       path: `/app/brands/${brand.slug}/ads/platform/${created.id}`,
+      warnings: result.warnings,
       provider: result,
     };
   }
@@ -1715,6 +1719,56 @@ export async function pushDraftToPlatform(
 }
 
 /**
+ * Pause a Google campaign that was just created.
+ *
+ * Meta's create call carries `status: PAUSED`; Google's does not, so the only
+ * way to keep the promise the push dialog makes is a second, documented call.
+ */
+async function pauseFreshGoogleCampaign(
+  platformCampaignId: string | null | undefined,
+): Promise<{ status: PlatformCampaignStatus; warnings: string[] }> {
+  if (!platformCampaignId) {
+    return googlePauseOutcome({ paused: false, reason: "no-campaign-id" });
+  }
+  try {
+    await setZernioCampaignStatus({
+      platformCampaignId,
+      status: "paused",
+      platform: DELIVERY_PLATFORMS.google_ads,
+    });
+    return googlePauseOutcome({ paused: true });
+  } catch (error) {
+    return googlePauseOutcome({
+      paused: false,
+      reason: "pause-failed",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * What a fresh Google campaign is, once the follow-up pause has or has not
+ * landed. Pure, because this is the rule worth pinning: growth never records
+ * `paused` for a campaign it did not actually manage to pause.
+ */
+export function googlePauseOutcome(
+  outcome:
+    | { paused: true }
+    | { paused: false; reason: "no-campaign-id" }
+    | { paused: false; reason: "pause-failed"; message: string },
+): { status: PlatformCampaignStatus; warnings: string[] } {
+  if (outcome.paused) return { status: "paused", warnings: [] };
+  return {
+    status: "live",
+    warnings: [
+      outcome.reason === "no-campaign-id"
+        ? "Google returned no campaign id, so the pause could not be sent — check the ad account before it spends"
+        : `Created on Google, but pausing it failed (${outcome.message}) — pause it in Google Ads now`,
+    ],
+  };
+}
+
+/**
  * Mirror what the platform created: the platform_campaign row plus the
  * externalIds on the ads and ad sets it produced.
  */
@@ -1728,7 +1782,10 @@ async function recordPlatformCampaign(input: {
   spots: (typeof adSpotTable.$inferSelect)[];
   adSets: (typeof adSetTable.$inferSelect)[];
   platformAdSetId: string | null;
+  /** What the platform is actually doing. Meta creates paused; Google may not. */
+  status?: PlatformCampaignStatus;
 }) {
+  const status = input.status ?? "paused";
   const channel = await db.query.channelTable.findFirst({
     where: and(
       eq(channelTable.brandId, input.brand.id),
@@ -1751,7 +1808,7 @@ async function recordPlatformCampaign(input: {
       platform: input.platform,
       campaignId: input.campaign.id,
       name: input.campaign.name,
-      status: "paused",
+      status,
       objective: input.goal,
       budget: Math.round(input.budgetAmount),
       externalId: input.platformCampaignId,
@@ -1770,7 +1827,7 @@ async function recordPlatformCampaign(input: {
         platformCampaignId: created!.id,
         channelId: channel.id,
         adSetId: input.platformAdSetId,
-        status: "paused",
+        status,
       })
       .where(eq(adSpotTable.id, spot.id));
   }

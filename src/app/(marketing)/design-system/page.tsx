@@ -44,7 +44,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@wandercom/design-system-web/ui/tooltip";
-import { Icon } from "@wandercom/design-system-icons";
+// 0.6.13 split the single <Icon name> component into one module per
+// icon; heart-wishlist is now plain heart.
+import { IconHeart } from "@wandercom/design-system-icons/heart";
 import { useState } from "react";
 
 export default function DesignSystemPage() {
@@ -349,16 +351,16 @@ export default function DesignSystemPage() {
               </h3>
               <div className="flex flex-wrap items-center gap-3">
                 <Button size="icon-xs" variant="outline">
-                  <Icon name="heart-wishlist" size="sm" />
+                  <IconHeart size="sm" />
                 </Button>
                 <Button size="icon-sm" variant="outline">
-                  <Icon name="heart-wishlist" size="sm" />
+                  <IconHeart size="sm" />
                 </Button>
                 <Button size="icon-md" variant="outline">
-                  <Icon name="heart-wishlist" size="md" />
+                  <IconHeart size="md" />
                 </Button>
                 <Button size="icon-lg" variant="outline">
-                  <Icon name="heart-wishlist" size="lg" />
+                  <IconHeart size="lg" />
                 </Button>
               </div>
             </div>
@@ -390,9 +392,9 @@ export default function DesignSystemPage() {
                 Sizes
               </h3>
               <div className="flex flex-wrap items-center gap-4">
-                <Icon name="heart-wishlist" size="sm" />
-                <Icon name="heart-wishlist" size="md" />
-                <Icon name="heart-wishlist" size="lg" />
+                <IconHeart size="sm" />
+                <IconHeart size="md" />
+                <IconHeart size="lg" />
               </div>
             </div>
             <div>
@@ -400,10 +402,10 @@ export default function DesignSystemPage() {
                 Colors
               </h3>
               <div className="flex flex-wrap items-center gap-4">
-                <Icon name="heart-wishlist" color="primary" size="md" />
-                <Icon name="heart-wishlist" color="secondary" size="md" />
-                <Icon name="heart-wishlist" color="tertiary" size="md" />
-                <Icon name="heart-wishlist" color="current" size="md" />
+                <IconHeart color="primary" size="md" />
+                <IconHeart color="secondary" size="md" />
+                <IconHeart color="tertiary" size="md" />
+                <IconHeart color="current" size="md" />
               </div>
             </div>
           </div>
@@ -508,7 +510,11 @@ export default function DesignSystemPage() {
             {/* Select */}
             <div className="space-y-2">
               <Label htmlFor="country">Country (Select)</Label>
-              <Select value={selectValue} onValueChange={setSelectValue}>
+              {/* 0.6.13 widened onValueChange to string | null (clearable). */}
+              <Select
+                value={selectValue}
+                onValueChange={(value) => setSelectValue(value ?? "")}
+              >
                 <SelectTrigger id="country">
                   <SelectValue placeholder="Select a country" />
                 </SelectTrigger>
@@ -558,7 +564,7 @@ export default function DesignSystemPage() {
                 onPressedChange={setTogglePressed}
                 aria-label="Toggle italic"
               >
-                <Icon name="heart-wishlist" size="sm" />
+                <IconHeart size="sm" />
               </Toggle>
             </div>
 

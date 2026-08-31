@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
 import {
-  BRAND_CONNECT_CHANNELS,
+  isOfferedConnectChannel,
   startBrandConnect,
   type BrandConnectChannelKey,
 } from "@/server/services/brand-connect.service";
@@ -19,7 +19,8 @@ export async function GET(
   context: { params: Promise<{ token: string; channel: string }> },
 ) {
   const { token, channel } = await context.params;
-  if (!BRAND_CONNECT_CHANNELS.some((row) => row.key === channel)) {
+  // Hiding a row is not enough: an old link still has the /start URL in it.
+  if (!isOfferedConnectChannel(channel)) {
     return NextResponse.json({ error: "Unknown channel" }, { status: 404 });
   }
 

@@ -335,7 +335,7 @@ export default async function BrandAdsPage({
           (ch) => `${platformLabel(ch)}${impl.has(ch) ? " ✓" : " ⚠ missing"}`,
         )
         .join(", ");
-      return `- ${init.name} — goal: ${init.goal ?? "—"} · ${money(campaignSpend(init.id))} of ${money(init.budget)} · channels: ${verify || "none"}`;
+      return `- ${init.name} · goal: ${init.goal ?? "—"} · ${money(campaignSpend(init.id))} of ${money(init.budget)} · channels: ${verify || "none"}`;
     }),
     `\n## Ad channels (${channels.length})`,
     ...channels.map(
@@ -361,7 +361,7 @@ export default async function BrandAdsPage({
           (platform) => `${platformLabel(platform)} not intended`,
         ),
       ].join(", ");
-      return `- ${t.name} — ${t.priority} · ${channels || "no intended channels"}`;
+      return `- ${t.name} · ${t.priority} · ${channels || "no intended channels"}`;
     }),
     unmappedAudiences.length
       ? `\n## Platform audiences not mapped to one of the above (${unmappedAudiences.length})`
@@ -575,7 +575,7 @@ export default async function BrandAdsPage({
         <div className="bg-card rounded-xl border p-6 text-center">
           <p className="text-sm font-medium">No audiences yet</p>
           <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
-            An audience is the &ldquo;who&rdquo; — a segment you define once and
+            An audience is the &ldquo;who&rdquo;: a segment you define once and
             activate on each platform, so ad sets target it instead of
             re-picking interests in every ad account.
           </p>
@@ -691,7 +691,7 @@ export default async function BrandAdsPage({
       )}
 
       <p className="text-muted-foreground mt-6 text-[11px]">
-        Campaigns are created and managed in each platform&apos;s portal —
+        Campaigns are created and managed in each platform&apos;s portal, then
         mirrored here read-only. Audiences are authored here and activated per
         platform; the same one on multiple platforms is shown once with all its
         badges.

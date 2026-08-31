@@ -12,7 +12,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   blogAgent: ["run"],
   newsletterAgent: ["run"],
   brandRead: ["list", "getMap", "next"],
-  brandWrite: ["create", "enrich"],
+  brandWrite: ["create", "enrich", "previewPurge", "purge"],
   productAtlasRead: ["list", "get"],
   productAtlasWrite: ["create", "update"],
   storefrontRead: ["list", "get", "listReferences"],

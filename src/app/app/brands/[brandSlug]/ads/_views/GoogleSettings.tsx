@@ -100,7 +100,7 @@ export function GoogleSettings({
                       ? ` · ${(config.keywords ?? []).length} keywords`
                       : ""
                   }`
-                : "Not set — Google needs a campaign type before it can be pushed."}
+                : "Not set. Google needs a campaign type before it can be pushed."}
             </p>
           </div>
           {!open && (
@@ -113,7 +113,7 @@ export function GoogleSettings({
 
       {searchWithoutKeywords && !open && (
         <p className="text-xs text-amber-300">
-          A Search campaign with no keywords buys nothing — add some before
+          A Search campaign with no keywords buys nothing. Add some before
           pushing.
         </p>
       )}
@@ -130,8 +130,8 @@ export function GoogleSettings({
               }
               className="border-input bg-background h-8 w-full rounded-md border px-2 text-xs sm:w-56"
             >
-              <option value="search">Search — buys keywords</option>
-              <option value="display">Display — buys placements</option>
+              <option value="search">Search · buys keywords</option>
+              <option value="display">Display · buys placements</option>
             </select>
           </div>
 

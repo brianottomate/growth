@@ -40,6 +40,8 @@ import { getBrandMap } from "./brand-map";
 import {
   createBrandAction,
   enrichBrandAction,
+  previewBrandPurgeAction,
+  purgeBrandAction,
   listBrands,
 } from "./brands";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
@@ -153,8 +155,13 @@ export const brandRead = growthDomainTool({
 
 export const brandWrite = growthDomainTool({
   description:
-    "Create an owned brand, or enrich one from its website (logo, tagline, description). Create first, enrich second — they are deliberately separate steps.",
-  actions: { create: createBrandAction, enrich: enrichBrandAction },
+    "Create an owned brand, enrich one from its website (logo, tagline, description), or purge one on offboarding. Create first, enrich second: they are deliberately separate steps. Purge is irreversible and needs previewPurge first.",
+  actions: {
+    create: createBrandAction,
+    enrich: enrichBrandAction,
+    previewPurge: previewBrandPurgeAction,
+    purge: purgeBrandAction,
+  },
 });
 
 export const productAtlasRead = growthDomainTool({

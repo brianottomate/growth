@@ -90,7 +90,7 @@ export function AlignmentPanel({
 
       {!hasIntent && (
         <p className="text-muted-foreground mt-4 text-sm">
-          No intended channels or budget set on this campaign — add target
+          No intended channels or budget set on this campaign. Add target
           channels to compare strategy against what&apos;s running.
         </p>
       )}

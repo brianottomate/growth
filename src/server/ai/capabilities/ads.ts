@@ -259,7 +259,7 @@ export const createMetaAdDraftAction = growthAction({
 
 export const createGoogleAdAction = growthAction({
   description:
-    "Create one Google Search or Display campaign tree through Zernio. Google creation has no documented validate-only or paused option and may begin spend after provider acceptance. Use traffic for click-optimized delivery; conversion-goal creation is unsupported. Requires explicit operator approval.",
+    "Create one Google Search or Display campaign tree through Zernio, then pause it. Google's create call has no validate-only and no paused option, so the pause is a second call — the result carries a warning, and a status of \"live\", if it did not land. Use traffic for click-optimized delivery; conversion-goal creation is unsupported. Requires explicit operator approval.",
   inputSchema: z.object({
     ...destinationSchema,
     name: z.string().trim().min(1).max(255),
