@@ -19,6 +19,7 @@ import { suggestTargets } from "@/server/services/cadence-suggest.service";
 import { db } from "@/server/db";
 import {
   assistantMessageTable,
+  assistantThreadTable,
   cadenceTargetTable,
   channelKindEnum,
   channelPlatformEnum,
@@ -435,6 +436,163 @@ export const analyzeTimelineVideo = growthAction({
       note: ready
         ? "The permanent analysis already exists."
         : "The durable source is ready; the operator's browser will render and persist the storyboard.",
+    };
+  },
+});
+
+/**
+ * Read one SHARED assistant session by id.
+ *
+ * Shared only, and inside the organization. A private session stays private
+ * even from an agent its owner is talking to, which is the whole point of the
+ * visibility flag — so this refuses rather than widening the rule that
+ * creativeWork.getThread applies for the owner's own UI.
+ */
+export const getSharedSession = growthAction({
+  description:
+    "Read one shared assistant session by its ath_ id: its title and the messages in order, with each tool call named. Use when the operator refers to another session by id. Private sessions are refused — only sessions explicitly shared inside the organization can be read.",
+  inputSchema: z.object({
+    sessionId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The ath_ id shown under the session title."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(200)
+      .default(50)
+      .describe("Most recent messages to return."),
+  }),
+  execute: async ({ sessionId, limit }, ctx) => {
+    const thread = await db.query.assistantThreadTable.findFirst({
+      where: and(
+        eq(assistantThreadTable.id, sessionId),
+        eq(assistantThreadTable.organizationId, ctx.orgId),
+        eq(assistantThreadTable.visibility, "shared"),
+      ),
+      columns: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+    if (!thread) {
+      throw new Error(
+        "No shared session with that id in this organization. A private session cannot be read; its owner has to share it first.",
+      );
+    }
+    const rows = await db.query.assistantMessageTable.findMany({
+      where: eq(assistantMessageTable.threadId, thread.id),
+      orderBy: [desc(assistantMessageTable.createdAt)],
+      limit,
+    });
+    return {
+      session: thread,
+      messages: rows.reverse().map((row) => {
+        const parts = (row.message.parts ?? []) as Array<{
+          type: string;
+          text?: string;
+          state?: string;
+        }>;
+        return {
+          role: row.message.role,
+          text: parts
+            .filter((part) => part.type === "text")
+            .map((part) => part.text ?? "")
+            .join("\n\n"),
+          // Named rather than dumped: the full tool payloads would swamp the
+          // conversation this is being read into.
+          toolCalls: parts
+            .filter((part) => part.type.startsWith("tool-"))
+            .map((part) => ({
+              tool: part.type.slice("tool-".length),
+              state: part.state ?? null,
+            })),
+        };
+      }),
+    };
+  },
+});
+
+/** How many recent assets an in-memory search scans. */
+const SEARCH_WINDOW = 200;
+
+/**
+ * The library as an operator sees it.
+ *
+ * mediaAnalysisRead.list is NOT this: it returns saved *analyses*, and its
+ * image branch filters to assets carrying `aiAnalysis` metadata. Analysis in
+ * saveChatMedia is best-effort, so an asset whose analysis failed is stored
+ * and then invisible — which is why "use the image from the media library"
+ * had nothing to reach for.
+ */
+export const listMediaLibrary = growthAction({
+  description:
+    "List the most recent media-library assets for an owned brand, newest first, each with the url an ad creative or content attachment takes. This is the library itself, not saved analyses — reach for it whenever the operator says to use, pick, or reuse something already saved. Search scans a recent window rather than the whole library; the result says so when it was truncated. Assets with no resolvable url are counted separately and left out, since they cannot be used.",
+  inputSchema: z.object({
+    brandId: z.string(),
+    kind: z
+      .enum(["image", "video", "gif", "audio", "file"])
+      .optional()
+      .describe("Narrow to one kind. Ad creatives want image."),
+    search: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .optional()
+      .describe("Case-insensitive match on title, alt text, or a tag."),
+    limit: z.number().int().min(1).max(50).default(20),
+  }),
+  execute: async ({ brandId, kind, search, limit }, ctx) => {
+    const brand = await requireOwnedBrand(brandId, ctx);
+    const rows = await db.query.mediaAssetTable.findMany({
+      where: and(
+        eq(mediaAssetTable.brandId, brand.id),
+        eq(mediaAssetTable.status, "ready"),
+        isNull(mediaAssetTable.deletedAt),
+        ...(kind ? [eq(mediaAssetTable.kind, kind)] : []),
+      ),
+      orderBy: [desc(mediaAssetTable.createdAt)],
+      // Search is applied in memory over the recent window: tags are jsonb and
+      // the library is small enough per brand that a LIKE across three shapes
+      // is not worth the query.
+      limit: search ? SEARCH_WINDOW : limit,
+    });
+    const needle = search?.toLowerCase();
+    const matched = needle
+      ? rows.filter((asset) =>
+          [asset.title, asset.alt, ...(asset.tags ?? [])]
+            .filter((value): value is string => Boolean(value))
+            .some((value) => value.toLowerCase().includes(needle)),
+        )
+      : rows;
+    // Legacy Cloudflare Stream rows carry a streamUid and neither url nor
+    // externalUrl. Handing one back would break the promise this capability
+    // exists to keep, so they are excluded — and counted, because silently
+    // dropping rows is how a list starts lying about the library.
+    const usable = matched.filter((asset) => asset.url ?? asset.externalUrl);
+    const assets = usable.slice(0, limit);
+    return {
+      brandId: brand.id,
+      returned: assets.length,
+      matchedInWindow: usable.length,
+      unusable: matched.length - usable.length,
+      // Search reads the newest SEARCH_WINDOW assets, not the whole library,
+      // so an older match can be missed. Say when that is possible.
+      searchTruncated: Boolean(needle) && rows.length === SEARCH_WINDOW,
+      assets: assets.map((asset) => ({
+        mediaAssetId: asset.id,
+        kind: asset.kind,
+        /** Pass this straight to an ad creative or content attachment. */
+        url: (asset.url ?? asset.externalUrl)!,
+        thumbnailUrl: asset.thumbnailUrl,
+        title: asset.title,
+        alt: asset.alt,
+        tags: asset.tags ?? [],
+        width: asset.width,
+        height: asset.height,
+        mimeType: asset.mimeType,
+        createdAt: asset.createdAt,
+      })),
     };
   },
 });

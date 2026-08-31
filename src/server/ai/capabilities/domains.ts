@@ -94,6 +94,8 @@ import {
   proposeContentGroupings,
   proposeStrategyTargets,
   registerBrandChannel,
+  getSharedSession,
+  listMediaLibrary,
   saveChatMediaToLibrary,
   scrapeBrandPosts,
   setSeriesCadence,
@@ -431,6 +433,18 @@ export const mediaLibraryWrite = growthDomainTool({
   actions: { saveChatMedia: saveChatMediaToLibrary },
 });
 
+export const sessionRead = growthDomainTool({
+  description:
+    "Read a shared assistant session by id, to see what another session already worked out. Shared sessions only.",
+  actions: { get: getSharedSession },
+});
+
+export const mediaLibraryRead = growthDomainTool({
+  description:
+    "Browse an owned brand's media library. Use this when the operator says to use, pick, or reuse something already saved, rather than asking them to re-attach it.",
+  actions: { list: listMediaLibrary },
+});
+
 export const strategyRead = growthDomainTool({
   description:
     "Read current targets or propose evidence-backed target changes.",
@@ -526,6 +540,8 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   sourceSyncWrite,
   mediaAnalysisRead,
   mediaAnalysisWrite,
+  mediaLibraryRead,
+  sessionRead,
   mediaLibraryWrite,
   strategyRead,
   strategyWrite,

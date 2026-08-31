@@ -396,6 +396,8 @@ export const growthActionPolicies = {
     analyzeImage: write({ consequence: "model-write" }),
     prepareVideo: write({ consequence: "model-write" }),
   },
+  mediaLibraryRead: { list: read() },
+  sessionRead: { get: read() },
   mediaLibraryWrite: {
     // Promotion dedups by URL, so re-saving the same paste is a no-op; the
     // model-write consequence covers the auto-tag analysis pass.
