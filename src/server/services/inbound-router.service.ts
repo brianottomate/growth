@@ -594,7 +594,7 @@ export async function osInboundLeadRouter({
       : numberOfProperties;
 
   // Determine the next AE in the appropriate round robin.
-  // Falls back to Kyle (ops) if the RR lookup throws or returns null (e.g. 500–599 portfolio gap).
+  // Falls back to Kyle (ops) if the RR lookup throws or returns null
   let aeForRR: string = HS_USER_IDS.KYLE;
   const isListedSource =
     source === "Wander Listed Application" || intentMeta === "WANDER_LISTED";

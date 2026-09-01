@@ -303,9 +303,20 @@ export function resolveHsLabel(
 // ROUND-ROBIN TABLES
 // =====================================================
 
+export const AE_ATLEAST_200_ROUND_ROBIN: Record<string, number> = {
+  "90936550": 0.5, // James Caswell
+  "663245691": 0.5, // Matt Tassello
+};
+
+export const AE_UNDER_200_ROUND_ROBIN: Record<string, number> = {
+  "76731285": 0.25, // Pierce Butler
+  "725103433": 0.25, // Chris Boley
+  "91455876": 0.25, // Kris Salguero
+  "94290553": 0.25, // Sean Kearney
+};
+
 export const AE_OTE_ROUND_ROBIN: Record<string, number> = {
   "82330443": 1.0, // Matt Montanti
-  //"94290553": 0.67, // Sean Kearney
 };
 
 export const AE_SMB_ROUND_ROBIN: Record<string, number> = {
@@ -335,8 +346,7 @@ export const UNDER_10_ROUND_ROBIN: Record<string, number> = {
 };
 
 export const BDR_OTE_ROUND_ROBIN: Record<string, number> = {
-  "93221525": 0.5, // Paige Madigan
-  "93243943": 0.5, // Nick Latham
+  "82330443": 1.0, // Matt Montanti
 };
 
 export const BDR_SMB_ROUND_ROBIN: Record<string, number> = {
@@ -1612,35 +1622,31 @@ function getRoundRobinForProperties(
   numProperties: number,
   role: "AE" | "BDR",
 ): { rr: Record<string, number>; sizeFilter: PortfolioSizeFilter } | null {
-  if (numProperties < 10)
+  if (!Number.isFinite(numProperties) || numProperties < 10)
     return { rr: UNDER_10_ROUND_ROBIN, sizeFilter: { max: 9 } };
-  if (numProperties < 17)
-    return {
-      rr: role === "BDR" ? BDR_OTE_ROUND_ROBIN : AE_OTE_ROUND_ROBIN,
-      sizeFilter: { min: 10, max: 16 },
-    };
+
+  // AEs run a single 200-unit split; BDRs keep the finer OTE/SMB/MM/
+  // Enterprise/Strategic bands.
+  if (role === "AE") {
+    if (numProperties < 15)
+      return { rr: AE_OTE_ROUND_ROBIN, sizeFilter: { min: 10, max: 14 } };
+    return numProperties < 200
+      ? { rr: AE_UNDER_200_ROUND_ROBIN, sizeFilter: { min: 15, max: 199 } }
+      : { rr: AE_ATLEAST_200_ROUND_ROBIN, sizeFilter: { min: 200 } };
+  }
+
+  if (numProperties < 15)
+    return { rr: BDR_OTE_ROUND_ROBIN, sizeFilter: { min: 10, max: 14 } };
   if (numProperties < 100)
-    return {
-      rr: role === "BDR" ? BDR_SMB_ROUND_ROBIN : AE_SMB_ROUND_ROBIN,
-      sizeFilter: { min: 17, max: 99 },
-    };
+    return { rr: BDR_SMB_ROUND_ROBIN, sizeFilter: { min: 15, max: 99 } };
   if (numProperties < 250)
-    return {
-      rr: role === "BDR" ? BDR_MM_ROUND_ROBIN : AE_MM_ROUND_ROBIN,
-      sizeFilter: { min: 100, max: 249 },
-    };
+    return { rr: BDR_MM_ROUND_ROBIN, sizeFilter: { min: 100, max: 249 } };
   if (numProperties < 500)
     return {
-      rr:
-        role === "BDR" ? BDR_ENTERPRISE_ROUND_ROBIN : AE_ENTERPRISE_ROUND_ROBIN,
+      rr: BDR_ENTERPRISE_ROUND_ROBIN,
       sizeFilter: { min: 250, max: 499 },
     };
-  if (numProperties >= 500)
-    return {
-      rr: role === "BDR" ? BDR_STRATEGIC_ROUND_ROBIN : AE_STRATEGIC_ROUND_ROBIN,
-      sizeFilter: { min: 500 },
-    };
-  return null;
+  return { rr: BDR_STRATEGIC_ROUND_ROBIN, sizeFilter: { min: 500 } };
 }
 
 /**
