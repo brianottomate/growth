@@ -67,7 +67,7 @@ describe("assertMetaAdPayload", () => {
     ).toThrow(/one creative shape/);
     expect(() =>
       assertMetaAdPayload({ ...base, imageUrl: undefined }, account),
-    ).toThrow(/image, a carousel, or a creatives array/);
+    ).toThrow(/image, a video, a carousel, or a creatives array/);
   });
 
   it("accepts a conversions goal backed by a custom conversion, not just an event", () => {
@@ -139,6 +139,65 @@ describe("assertMetaAdPayload", () => {
  * This number caps the Google budget, so a wrong one either starves the brand
  * campaign or spends past the point of owning the terms.
  */
+describe("assertMetaAdPayload video rules", () => {
+  it("accepts a top-level video as its own creative shape", () => {
+    expect(() =>
+      assertMetaAdPayload(
+        {
+          ...base,
+          imageUrl: undefined,
+          video: {
+            url: "https://cdn.example.com/a.mp4",
+            thumbnailUrl: "https://cdn.example.com/a.jpg",
+          },
+        },
+        account,
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects a creative carrying both an image and a video", () => {
+    expect(() =>
+      assertMetaAdPayload(
+        {
+          ...base,
+          imageUrl: undefined,
+          creatives: [
+            {
+              ...creative,
+              video: {
+                url: "https://cdn.example.com/a.mp4",
+                thumbnailUrl: "https://cdn.example.com/a.jpg",
+              },
+            },
+          ],
+        },
+        account,
+      ),
+    ).toThrow(/exactly one of imageUrl or video/);
+  });
+
+  it("requires the still thumbnail on a video creative", () => {
+    expect(() =>
+      assertMetaAdPayload(
+        {
+          ...base,
+          imageUrl: undefined,
+          creatives: [
+            {
+              name: "v",
+              headline: "V",
+              body: "clip",
+              video: { url: "https://cdn.example.com/a.mp4" },
+            },
+          ],
+        },
+        account,
+      ),
+    ).toThrow(/thumbnailUrl is required/);
+  });
+});
+
 describe("estimateMonthlyKeywordCost", () => {
   const row = (
     avgMonthlySearches: number | null,

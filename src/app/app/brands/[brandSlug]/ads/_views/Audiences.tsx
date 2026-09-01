@@ -19,8 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTRPC } from "@/trpc/react";
 
-import { money } from "./format";
-
 type AudienceRow = {
   id: string;
   name: string;
@@ -34,8 +32,6 @@ type AudienceRow = {
     cities?: string[];
   } | null;
   keywords: string[] | null;
-  budget: number | null;
-  budgetType: string | null;
 };
 
 type PersonaOption = {
@@ -54,12 +50,10 @@ export function Audiences({
   campaignId,
   audiences,
   personas,
-  budgetMode,
 }: {
   campaignId: string;
   audiences: AudienceRow[];
   personas: PersonaOption[];
-  budgetMode: "cbo" | "abo";
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -71,7 +65,6 @@ export function Audiences({
   const [countries, setCountries] = useState("US");
   const [regions, setRegions] = useState("");
   const [keywords, setKeywords] = useState("");
-  const [budget, setBudget] = useState("");
 
   const add = useMutation(
     trpc.ads.addAudience.mutationOptions({
@@ -80,7 +73,6 @@ export function Audiences({
         setName("");
         setRegions("");
         setKeywords("");
-        setBudget("");
         router.refresh();
       },
     }),
@@ -143,8 +135,8 @@ export function Audiences({
           )}
         </p>
         <span className="text-muted-foreground text-xs">
-          Who this campaign buys. Each becomes an ad set on Meta, an ad group
-          on Google.
+          Who this campaign buys. Each becomes an ad set on Meta, an ad group on
+          Google.
         </span>
         <div className="ml-auto">
           <Dialog open={open} onOpenChange={setOpen}>
@@ -251,18 +243,6 @@ export function Audiences({
                     these; Meta ignores them.
                   </p>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="aud-budget">
-                    Budget split ($, {budgetMode === "cbo" ? "advisory" : "per ad set"})
-                  </Label>
-                  <Input
-                    id="aud-budget"
-                    inputMode="numeric"
-                    value={budget}
-                    onChange={(event) => setBudget(event.target.value)}
-                    placeholder="Inherit from the platform draft"
-                  />
-                </div>
                 {add.error && (
                   <p className="text-xs text-red-300">{add.error.message}</p>
                 )}
@@ -282,7 +262,6 @@ export function Audiences({
                       countries: list(countries.toUpperCase()),
                       regions: list(regions),
                       keywords: list(keywords),
-                      budget: budget ? Number(budget) : null,
                     })
                   }
                 >
@@ -320,12 +299,6 @@ export function Audiences({
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {row.budget != null && (
-                  <span className="text-muted-foreground text-xs tabular-nums">
-                    {money(row.budget)}
-                    {row.budgetType === "lifetime" ? " lifetime" : "/day"}
-                  </span>
-                )}
                 <Button
                   size="sm"
                   variant="ghost"

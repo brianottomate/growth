@@ -20,10 +20,48 @@ export function streamErrorMessage(error: unknown): string {
     }`;
   }
   if (InvalidToolInputError.isInstance(error)) {
-    const cause =
-      error.cause instanceof Error ? error.cause.message : error.message;
-    return `Invalid input for ${error.toolName}: ${cause}`;
+    return `Invalid input for ${error.toolName}: ${compactValidationText(error)}`;
   }
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+type ZodishIssue = {
+  path?: Array<string | number>;
+  message?: string;
+};
+
+/** Walk the cause chain for a zod-shaped `issues` array. */
+function zodIssues(error: unknown): ZodishIssue[] | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && current; depth += 1) {
+    if (typeof current === "object" && current !== null) {
+      const candidate = (current as { issues?: unknown }).issues;
+      if (Array.isArray(candidate)) return candidate as ZodishIssue[];
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+/**
+ * The raw failure is a serialized zod error — pages of JSON around one useful
+ * sentence ("Invalid discriminator value. Expected 'draftCampaign' | …").
+ * Pull the sentences out; the model needs them and the human should not have
+ * to read past them.
+ */
+function compactValidationText(error: Error): string {
+  const issues = zodIssues(error);
+  if (issues?.length) {
+    const lines = issues.slice(0, 3).map((issue) => {
+      const path = (issue.path ?? []).join(".");
+      const message = (issue.message ?? "invalid").slice(0, 300);
+      return path ? `${path}: ${message}` : message;
+    });
+    const more = issues.length > 3 ? ` (+${issues.length - 3} more)` : "";
+    return lines.join(" | ") + more;
+  }
+  const cause =
+    error.cause instanceof Error ? error.cause.message : error.message;
+  return cause.length > 500 ? `${cause.slice(0, 500)}…` : cause;
 }

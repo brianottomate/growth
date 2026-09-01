@@ -26,6 +26,7 @@ import {
   setDeliveryAction,
   setPlatformDraftAction,
   topAds,
+  updateAudienceAction,
 } from "./ads";
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
@@ -358,6 +359,7 @@ export const adsWrite = growthDomainTool({
     draftCampaign: draftCampaignAction,
     draftAd: draftAdAction,
     addAudience: addAudienceAction,
+    updateAudience: updateAudienceAction,
     planPlatform: planPlatformAction,
     setCreativePool: setCreativePoolAction,
     setPlatformDraft: setPlatformDraftAction,

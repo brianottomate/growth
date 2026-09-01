@@ -946,6 +946,12 @@ export async function setZernioCampaignStatus(input: {
   });
 }
 
+/** Video creative payload: Meta wants the still thumbnail alongside the url. */
+export type ZernioAdVideo = {
+  url: string;
+  thumbnailUrl?: string;
+};
+
 export type ZernioAdTargeting = {
   countries?: string[];
   /** Region keys from GET /v1/ads/targeting/search — ids, never names. */
@@ -1027,6 +1033,8 @@ export type CreateZernioStandaloneAdInput = {
   body: string;
   linkUrl: string;
   imageUrl?: string;
+  /** Video creative: url + still thumbnail; replaces imageUrl on all shapes. */
+  video?: ZernioAdVideo;
   images?: { landscape: string; square: string };
   /** Meta only: 2–10 cards; mutually exclusive with imageUrl/images. */
   carouselCards?: ZernioCarouselCard[];
@@ -1041,7 +1049,10 @@ export type CreateZernioStandaloneAdInput = {
     // body — those seed the ad set, not the individual ads.
     headline: string;
     body: string;
-    imageUrl: string;
+    /** Image creative; mutually exclusive with `video`. */
+    imageUrl?: string;
+    /** Video creative: url + a still-image thumbnail. Replaces imageUrl. */
+    video?: ZernioAdVideo;
     linkUrl?: string;
     callToAction?: string;
   }[];

@@ -110,6 +110,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "draftCampaign",
     "draftAd",
     "addAudience",
+    "updateAudience",
     "planPlatform",
     "setCreativePool",
     "setPlatformDraft",

@@ -305,8 +305,6 @@ export async function addAudience(input: {
   ageMax?: number | null;
   geography?: AudienceGeographyPlan | null;
   keywords?: string[] | null;
-  budget?: number | null;
-  budgetType?: "daily" | "lifetime" | null;
   optimizationGoal?: string | null;
 }) {
   const { campaign, brand } = await requireOwnedCampaign(
@@ -336,8 +334,6 @@ export async function addAudience(input: {
       ageMax: input.ageMax ?? null,
       geography: input.geography ?? null,
       keywords: input.keywords ?? null,
-      budget: input.budget ?? null,
-      budgetType: input.budgetType ?? null,
       optimizationGoal: input.optimizationGoal ?? null,
     })
     .returning();
@@ -353,18 +349,34 @@ export async function updateAudience(input: {
   ageMax?: number | null;
   geography?: AudienceGeographyPlan | null;
   keywords?: string[] | null;
-  budget?: number | null;
-  budgetType?: "daily" | "lifetime" | null;
 }) {
   const audience = await db.query.audienceTable.findFirst({
     where: eq(audienceTable.id, input.audienceId),
   });
   if (!audience) throw new Error("Audience not found");
   await requireOwnedCampaign(audience.campaignId, input.organizationId);
-  const { organizationId: _org, audienceId: _id, ...patch } = input;
+  const { organizationId: _org, audienceId: _id, geography, ...patch } = input;
+  // Geography merges key-by-key: sending only countries must not clear the
+  // stored regions. Explicit null still clears the whole object.
+  const mergedGeography =
+    geography === undefined
+      ? undefined
+      : geography === null
+        ? null
+        : {
+            ...(audience.geography ?? {}),
+            ...Object.fromEntries(
+              Object.entries(geography).filter(
+                ([, value]) => value !== undefined,
+              ),
+            ),
+          };
   const [updated] = await db
     .update(audienceTable)
-    .set(patch)
+    .set({
+      ...patch,
+      ...(mergedGeography !== undefined ? { geography: mergedGeography } : {}),
+    })
     .where(eq(audienceTable.id, audience.id))
     .returning();
   return updated!;

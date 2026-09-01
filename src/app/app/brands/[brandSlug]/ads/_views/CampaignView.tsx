@@ -69,10 +69,6 @@ export async function CampaignView({
       ? `${((totals.clicks / totals.impressions) * 100).toFixed(2)}%`
       : "—";
 
-  const budgetMode =
-    planned.find((row) => row.platform === "meta_ads")?.settings?.meta
-      ?.budgetMode ?? "cbo";
-
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
       <header className="space-y-3">
@@ -188,7 +184,6 @@ export async function CampaignView({
           campaignId={campaign.id}
           audiences={audiences}
           personas={personas}
-          budgetMode={budgetMode}
         />
       </section>
 

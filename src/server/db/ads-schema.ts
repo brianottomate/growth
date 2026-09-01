@@ -270,9 +270,6 @@ export const audienceTable = pgTable(
      */
     keywords: t.jsonb().$type<string[]>(),
 
-    /** ADVISORY split (whole dollars). Authoritative budget is platform-side. */
-    budget: t.integer(),
-    budgetType: t.text(), // "daily" | "lifetime"
     optimizationGoal: t.text(),
 
     createdAt: t

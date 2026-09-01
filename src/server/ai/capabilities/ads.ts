@@ -433,7 +433,7 @@ export const addAudienceUsersAction = growthAction({
 
 export const draftAdAction = growthAction({
   description:
-    "Add a drafted ad to a LOCAL campaign — a suggestion the push transforms per platform. Local only. Type creative (default) is an image or carousel with copy, for Meta; when the operator attached an image this turn, pass the url mediaLibraryWrite.saveChatMedia returned, or pick one with mediaLibraryRead.list. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
+    "Add a drafted ad to a LOCAL campaign — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video with its thumbnail — for Meta. When the operator attached media this turn, pass the url mediaLibraryWrite.saveChatMedia returned, or pick one with mediaLibraryRead.list. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
   inputSchema: z
     .object({
       campaignId: z.string().trim().min(1),
@@ -458,6 +458,34 @@ export const draftAdAction = growthAction({
         .describe(
           "creative only: one url = static image, several = carousel cards in this order.",
         ),
+      imageUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          "creative only: shorthand for imageUrls with a single entry — the shape createMetaDraft uses.",
+        ),
+      videoUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          "creative only: a video ad instead of images. Mutually exclusive with imageUrls/imageUrl.",
+        ),
+      videoThumbnailUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          "Required with videoUrl — Meta wants a still image alongside the clip.",
+        ),
+      callToAction: z
+        .string()
+        .trim()
+        .min(1)
+        .max(64)
+        .optional()
+        .describe("creative only, e.g. SIGN_UP."),
       headlines: z
         .array(z.string().trim().min(1).max(30))
         .max(15)
@@ -485,11 +513,31 @@ export const draftAdAction = growthAction({
         input.type === "text" ||
         (Boolean(input.headline) &&
           Boolean(input.body) &&
-          (input.imageUrls?.length ?? 0) > 0),
+          ((input.imageUrls?.length ?? 0) > 0 ||
+            Boolean(input.imageUrl) ||
+            Boolean(input.videoUrl))),
       {
-        error: "A creative ad needs headline, body, and at least one imageUrl.",
+        // Name the actual fields: an error that says "imageUrl" teaches the
+        // model to resend the wrong shape.
+        error:
+          "A creative ad needs headline, body, and media: imageUrls (array, carousel-capable), imageUrl (single), or videoUrl.",
+        path: ["imageUrls"],
       },
     )
+    .refine(
+      (input) =>
+        !input.videoUrl ||
+        ((input.imageUrls?.length ?? 0) === 0 && !input.imageUrl),
+      {
+        error: "A creative ad is images OR a video, not both.",
+        path: ["videoUrl"],
+      },
+    )
+    .refine((input) => !input.videoUrl || Boolean(input.videoThumbnailUrl), {
+      error:
+        "videoThumbnailUrl is required with videoUrl — Meta wants a still image alongside the clip.",
+      path: ["videoThumbnailUrl"],
+    })
     .refine(
       (input) =>
         input.type === "creative" ||
@@ -513,11 +561,24 @@ export const draftAdAction = growthAction({
               headline: input.headline!,
               body: input.body!,
               linkUrl: input.linkUrl,
-              media: input.imageUrls!.map((url) => ({
-                url,
-                type: "image" as const,
-                assetId: input.assetId,
-              })),
+              callToAction: input.callToAction,
+              media: input.videoUrl
+                ? [
+                    {
+                      url: input.videoUrl,
+                      type: "video" as const,
+                      thumbnail: input.videoThumbnailUrl,
+                      assetId: input.assetId,
+                    },
+                  ]
+                : (input.imageUrls?.length
+                    ? input.imageUrls
+                    : [input.imageUrl!]
+                  ).map((url) => ({
+                    url,
+                    type: "image" as const,
+                    assetId: input.assetId,
+                  })),
             },
       organizationId: ctx.orgId,
     }),
@@ -556,7 +617,7 @@ export const listCampaignsAction = growthAction({
 
 export const addAudienceAction = growthAction({
   description:
-    "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Wanting two age ranges means two audiences. Local only; budgets here are advisory splits. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
+    "Add an audience to a LOCAL campaign: one buyable narrowing (one age window, one geography, optional keyword suggestions) that the push compiles to a Meta ad set / Google ad group. Wanting two age ranges means two audiences. Local only, and an audience carries NO money — budgets live on the platform draft. Omit everything but the name for broad targeting, which is a legitimate and often correct choice.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     name: z.string().trim().min(1).max(300),
@@ -587,15 +648,6 @@ export const addAudienceAction = growthAction({
       .describe(
         "Loose suggestions. The Google compile derives keywords from these; Meta ignores them.",
       ),
-    budget: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe(
-        "Advisory split, whole dollars. Authoritative budget is on the platform draft.",
-      ),
-    budgetType: z.enum(["daily", "lifetime"]).optional(),
   }),
   execute: async (input, ctx) =>
     addAudience({
@@ -609,8 +661,33 @@ export const addAudienceAction = growthAction({
           ? { countries: input.countries, regions: input.regions }
           : null,
       keywords: input.keywords ?? null,
-      budget: input.budget ?? null,
-      budgetType: input.budgetType ?? null,
+      organizationId: ctx.orgId,
+    }),
+});
+
+export const updateAudienceAction = growthAction({
+  description:
+    "Update a campaign audience's fields — name, age window, geography, or keyword suggestions. Only the fields sent are changed. Local only. Budgets live on the platform draft (setPlatformDraft), never on an audience.",
+  inputSchema: z.object({
+    audienceId: z.string().trim().min(1),
+    name: z.string().trim().min(1).max(300).optional(),
+    ageMin: z.number().int().min(13).max(100).nullish(),
+    ageMax: z.number().int().min(13).max(100).nullish(),
+    countries: z.array(z.string().length(2)).max(20).optional(),
+    regions: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+    keywords: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
+  }),
+  execute: async (input, ctx) =>
+    updateAudience({
+      audienceId: input.audienceId,
+      name: input.name,
+      ageMin: input.ageMin,
+      ageMax: input.ageMax,
+      geography:
+        input.countries !== undefined || input.regions !== undefined
+          ? { countries: input.countries, regions: input.regions }
+          : undefined,
+      keywords: input.keywords,
       organizationId: ctx.orgId,
     }),
 });

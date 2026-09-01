@@ -160,8 +160,6 @@ export const adsRouter = {
         countries: z.array(z.string().length(2)).max(20).nullish(),
         regions: z.array(z.string().trim().min(1).max(100)).max(20).nullish(),
         keywords: z.array(z.string().trim().min(1).max(80)).max(50).nullish(),
-        budget: z.number().int().min(0).nullish(),
-        budgetType: z.enum(["daily", "lifetime"]).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -179,8 +177,6 @@ export const adsRouter = {
               }
             : null,
         keywords: input.keywords ?? null,
-        budget: input.budget ?? null,
-        budgetType: input.budgetType ?? null,
         organizationId: await organizationIdFor(ctx),
       }),
     ),
@@ -195,8 +191,6 @@ export const adsRouter = {
         countries: z.array(z.string().length(2)).max(20).nullish(),
         regions: z.array(z.string().trim().min(1).max(100)).max(20).nullish(),
         keywords: z.array(z.string().trim().min(1).max(80)).max(50).nullish(),
-        budget: z.number().int().min(0).nullish(),
-        budgetType: z.enum(["daily", "lifetime"]).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -213,8 +207,6 @@ export const adsRouter = {
               }
             : undefined,
         keywords: input.keywords,
-        budget: input.budget,
-        budgetType: input.budgetType,
         organizationId: await organizationIdFor(ctx),
       }),
     ),

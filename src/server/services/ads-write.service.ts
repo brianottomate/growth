@@ -388,6 +388,7 @@ export function assertMetaAdPayload(
   // be there — except for catalog sales, where the product set is the creative.
   const shapes = [
     payload.imageUrl ? "imageUrl" : null,
+    payload.video ? "video" : null,
     payload.carouselCards ? "carouselCards" : null,
     payload.creatives?.length ? "creatives" : null,
   ].filter(Boolean);
@@ -398,7 +399,7 @@ export function assertMetaAdPayload(
   }
   if (shapes.length === 0 && goal !== "catalog_sales") {
     throw new Error(
-      "This Meta ad needs an image, a carousel, or a creatives array",
+      "This Meta ad needs an image, a video, a carousel, or a creatives array",
     );
   }
   if (
@@ -408,10 +409,22 @@ export function assertMetaAdPayload(
     throw new Error("Meta carousels take 2\u201310 cards");
   }
   payload.creatives?.forEach((creative, index) => {
-    for (const field of ["headline", "body", "imageUrl"] as const) {
+    for (const field of ["headline", "body"] as const) {
       if (!creative[field]?.trim()) {
         throw new Error(`creatives[${index}].${field} is required`);
       }
+    }
+    // One creative, one medium: an image url or a video object, never both.
+    if (Boolean(creative.imageUrl) === Boolean(creative.video)) {
+      throw new Error(
+        `creatives[${index}] needs exactly one of imageUrl or video`,
+      );
+    }
+    if (creative.video && !creative.video.thumbnailUrl) {
+      // Meta's video creative wants the still thumbnail alongside the url.
+      throw new Error(
+        `creatives[${index}].video.thumbnailUrl is required — Meta wants a still image with the clip`,
+      );
     }
   });
 
@@ -1349,6 +1362,26 @@ function creativeAds(ads: Ad[]) {
   });
 }
 
+/** A creative whose lead medium is a video compiles to Meta's video shape. */
+function isVideoContent(content: AdCreativeContent) {
+  return content.media[0]?.type === "video";
+}
+
+/**
+ * The `video` object Meta's create wants: the clip plus a still thumbnail.
+ * The thumbnail comes from the media item; refusing here (by name) beats a
+ * platform rejection after approval.
+ */
+function videoPayloadFor(adName: string, content: AdCreativeContent) {
+  const lead = content.media[0]!;
+  if (!lead.thumbnail) {
+    throw new Error(
+      `${adName}: a video ad needs a still thumbnail on its media item — Meta requires one alongside the clip`,
+    );
+  }
+  return { url: lead.url, thumbnailUrl: lead.thumbnail };
+}
+
 function textAds(ads: Ad[]) {
   return ads.flatMap((ad) =>
     ad.type === "text" ? [{ ad, content: ad.content as AdTextContent }] : [],
@@ -1588,7 +1621,11 @@ async function pushToGoogle(args: PushArgs) {
   }
 
   const text = textAds(ads)[0];
-  const creative = creativeAds(ads)[0];
+  // Google Display renders images; a video creative must never be the source
+  // of its landscape/square urls.
+  const creative = creativeAds(ads).find(
+    ({ content }) => !isVideoContent(content),
+  );
   if (!text && !creative) {
     throw new Error(
       "No usable ad: add a text ad (headlines + descriptions), or a creative ad with an image",
@@ -1754,7 +1791,7 @@ async function pushToMeta(args: PushArgs) {
       : undefined;
 
   const isCarousel = (content: AdCreativeContent) =>
-    (content.media?.length ?? 0) >= 2;
+    !isVideoContent(content) && (content.media?.length ?? 0) >= 2;
 
   const carouselCardsFor = (content: AdCreativeContent) =>
     content.media.slice(0, 10).map((item, index) => ({
@@ -1771,8 +1808,11 @@ async function pushToMeta(args: PushArgs) {
       // multi-creative shape; Meta does not fall back per creative.
       headline: content.headline,
       body: content.body,
-      imageUrl: content.media[0]!.url,
+      ...(isVideoContent(content)
+        ? { video: videoPayloadFor(ad.name, content) }
+        : { imageUrl: content.media[0]!.url }),
       linkUrl: content.linkUrl ?? linkUrl,
+      callToAction: content.callToAction,
     }));
 
   /** One ad set as the API sees it. */
@@ -1796,12 +1836,7 @@ async function pushToMeta(args: PushArgs) {
     // budget is fighting the thing that makes CBO worth using.
     ...(useCbo && setArgs.existingCampaignId
       ? {}
-      : {
-          budgetAmount: setArgs.audience?.budget ?? budgetAmount,
-          budgetType:
-            (setArgs.audience?.budgetType as "daily" | "lifetime") ??
-            budgetType,
-        }),
+      : { budgetAmount, budgetType }),
     headline: usable[0]!.content.headline,
     body: usable[0]!.content.body,
     linkUrl,
@@ -1826,6 +1861,8 @@ async function pushToMeta(args: PushArgs) {
     validateOnly: boolean;
     keyScope: string;
   }) => {
+    // "Statics" = anything the multi-creative shape carries directly: single
+    // images AND videos. Only carousels need the attach shape.
     const statics = usable.filter(({ content }) => !isCarousel(content));
     const carousels = usable.filter(({ content }) => isCarousel(content));
     const leading = statics.length > 0 ? undefined : carousels[0];
@@ -1872,6 +1909,7 @@ async function pushToMeta(args: PushArgs) {
           headline: content.headline,
           body: content.body,
           linkUrl: content.linkUrl ?? linkUrl,
+          callToAction: content.callToAction,
           carouselCards: carouselCardsFor(content),
           ...metaDraftProviderControls(false),
         };
@@ -1993,7 +2031,7 @@ async function pushToMeta(args: PushArgs) {
           name: only?.audience.name ?? campaign.name,
           externalId: set.result.platformAdSetId ?? null,
           targetingSpec: only?.spec ?? null,
-          budget: only?.audience.budget ?? budgetAmount,
+          budget: budgetAmount,
           budgetType,
           ads: setAdsFor(set, usable),
         },
@@ -2081,7 +2119,7 @@ async function pushToMeta(args: PushArgs) {
       name: audience.name,
       externalId: set.result.platformAdSetId ?? null,
       targetingSpec: spec ?? null,
-      budget: useCbo ? null : (audience.budget ?? budgetAmount),
+      budget: useCbo ? null : budgetAmount,
       budgetType,
       ads: setAdsFor(set, usable),
     })),

@@ -238,6 +238,7 @@ export const growthActionPolicies = {
     draftCampaign: write(),
     draftAd: write(),
     addAudience: write(),
+    updateAudience: write({ idempotent: true }),
     planPlatform: write({ idempotent: true }),
     setCreativePool: write({ idempotent: true }),
     setPlatformDraft: write({ idempotent: true }),
