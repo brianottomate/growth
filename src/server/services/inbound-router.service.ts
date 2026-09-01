@@ -32,6 +32,7 @@ import { envSelect } from "@/env";
 import { postOnSlack } from "@/server/clients/slack.client";
 import { mapPmsToHsValues } from "@/server/services/pms-mapping.service";
 import { getEmailDomain, isPersonalEmail } from "@/lib/email";
+import { resolveOnboardingSlackHeadline } from "@/lib/onboarding-slack";
 
 // =====================================================
 // INBOUND LEAD ROUTER
@@ -674,9 +675,7 @@ export async function osInboundLeadRouter({
 
   const slackText =
     source === "Onboarding"
-      ? onboardingComplete
-        ? `:wander: *New Onboarding Completed*`
-        : `:wander: *New Lead Stuck in Onboarding*`
+      ? resolveOnboardingSlackHeadline(onboardingComplete, orgId)
       : source === "Wander Listed Application"
         ? `:wander: *New Wander Listed Application*`
         : pmsMeta
