@@ -8,6 +8,8 @@ const ZERNIO_API_BASE = "https://zernio.com/api/v1";
 export const isZernioConfigured = Boolean(env.ZERNIO_API_KEY);
 
 export type ZernioAccount = {
+  /** Platform identity; Meta ads connections encode "<user>:page:<pageId>". */
+  platformUserId?: string;
   _id?: string;
   id?: string;
   platform: string;
@@ -943,6 +945,26 @@ export async function setZernioCampaignStatus(input: {
       status: input.status,
       ...(input.platform ? { platform: input.platform } : {}),
     }),
+  });
+}
+
+/**
+ * Render Meta's own pre-create previews for a creative that does not exist
+ * yet. Exactly one of existingCreativeId or creativeSpec; the spec is a raw
+ * Meta object_story_spec forwarded verbatim, and it requires the Facebook
+ * page id the ad would run as. Each preview is an embeddable <iframe>.
+ * https://docs.zernio.com/ads/preview
+ */
+export async function generateZernioAdPreviews(input: {
+  accountId: string;
+  adAccountId: string;
+  formats: string[];
+  existingCreativeId?: string;
+  creativeSpec?: Record<string, unknown>;
+}): Promise<Record<string, unknown>> {
+  return zernioFetch("/ads/preview", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

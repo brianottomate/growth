@@ -12,6 +12,7 @@ import {
 import {
   deletePlatformCampaign,
   listAdsWriteDestinations,
+  previewDraftAd,
   pushDraftToPlatform,
   setCampaignDelivery,
   researchGoogleKeywords,
@@ -417,6 +418,24 @@ export const adsRouter = {
         organizationId: await organizationIdFor(ctx),
       });
     }),
+
+  /** Meta's own pre-create previews of a drafted ad. Provider read. */
+  previewAd: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        connectionAccountId: z.string().min(1),
+        adAccountId: z.string().min(1),
+        pageId: z.string().trim().min(1).optional(),
+        formats: z.array(z.string().trim().min(1)).max(10).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      previewDraftAd(input, {
+        organizationId: await organizationIdFor(ctx),
+        runId: createId("run"),
+      }),
+    ),
 
   /** The allowlisted destinations for the push dialog. */
   destinations: protectedProcedure

@@ -12,6 +12,7 @@ import { AddAdButton } from "./AddAdButton";
 import { Audiences } from "./Audiences";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
+import { PreviewAdButton } from "./PreviewAdButton";
 import { PlatformSection } from "./PlatformSection";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
@@ -178,7 +179,7 @@ export async function CampaignView({
           pool={campaign.creativePool ?? []}
         />
 
-        <DraftedAds ads={ads} />
+        <DraftedAds ads={ads} brandSlug={brandSlug} />
 
         <Audiences
           campaignId={campaign.id}
@@ -222,6 +223,7 @@ export async function CampaignView({
 /** The plan's drafted ads: suggestions every platform compiles from. */
 function DraftedAds({
   ads,
+  brandSlug,
 }: {
   ads: Array<{
     id: string;
@@ -229,6 +231,7 @@ function DraftedAds({
     type: "creative" | "text";
     content: unknown;
   }>;
+  brandSlug: string;
 }) {
   if (ads.length === 0) return null;
   return (
@@ -243,17 +246,28 @@ function DraftedAds({
         {ads.map((ad) => {
           const content = ad.content as {
             headline?: string;
-            media?: Array<{ url: string; thumbnail?: string }>;
+            media?: Array<{ url: string; thumbnail?: string; type?: string }>;
             headlines?: string[];
           };
           const image =
             content.media?.[0]?.thumbnail ?? content.media?.[0]?.url;
+          const isVideo = content.media?.[0]?.type === "video";
           return (
             <div
               key={ad.id}
               className="bg-background w-32 shrink-0 overflow-hidden rounded-lg border"
             >
               <div className="bg-muted relative h-20">
+                {ad.type === "creative" && (
+                  <PreviewAdButton
+                    adId={ad.id}
+                    brandSlug={brandSlug}
+                    disabled={isVideo}
+                    disabledReason={
+                      isVideo ? "Video previews need a push first" : undefined
+                    }
+                  />
+                )}
                 {image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

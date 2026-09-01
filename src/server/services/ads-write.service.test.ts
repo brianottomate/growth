@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import {
   assertMetaAdPayload,
   estimateMonthlyKeywordCost,
+  extractPreviewFrames,
+  metaPageIdFromConnection,
   googlePauseOutcome,
   matchResponseAdsToPlan,
 } from "@/server/services/ads-write.service";
@@ -324,5 +326,56 @@ describe("matchResponseAdsToPlan", () => {
     );
     expect(out.get("ad_1")).toBe("ext-a");
     expect(out.get("ad_2")).toBeNull();
+  });
+});
+
+/**
+ * Meta's preview response shape is the part most likely to drift, so the
+ * extractor is pure and shape-agnostic: any string carrying an iframe counts.
+ */
+describe("extractPreviewFrames", () => {
+  it("finds iframes at any nesting and decodes the src", () => {
+    const frames = extractPreviewFrames({
+      previews: [
+        {
+          format: "DESKTOP_FEED_STANDARD",
+          body: '<iframe src="https://www.facebook.com/ads/api/preview_iframe.php?d=abc&amp;t=1" width="500"></iframe>',
+        },
+      ],
+      nested: {
+        deep: ['<iframe src="https://fb.com/x?a=1&amp;b=2"></iframe>'],
+      },
+    });
+    expect(frames).toHaveLength(2);
+    expect(frames[0]?.src).toBe(
+      "https://www.facebook.com/ads/api/preview_iframe.php?d=abc&t=1",
+    );
+    expect(frames[1]?.src).toBe("https://fb.com/x?a=1&b=2");
+  });
+
+  it("returns empty for a response with no iframes, never throws", () => {
+    expect(extractPreviewFrames({ error: "nope" })).toEqual([]);
+    expect(extractPreviewFrames(null)).toEqual([]);
+    expect(extractPreviewFrames("plain text")).toEqual([]);
+  });
+
+  it("keeps an iframe with no src, flagged by the null", () => {
+    const frames = extractPreviewFrames(["<iframe></iframe>"]);
+    expect(frames).toHaveLength(1);
+    expect(frames[0]?.src).toBeNull();
+  });
+});
+
+describe("metaPageIdFromConnection", () => {
+  it("mines the page id out of Zernio's composite identity", () => {
+    expect(
+      metaPageIdFromConnection("27501783656071882:page:774615929078512"),
+    ).toBe("774615929078512");
+  });
+
+  it("returns null rather than guessing when there is no page segment", () => {
+    expect(metaPageIdFromConnection("27501783656071882")).toBeNull();
+    expect(metaPageIdFromConnection(undefined)).toBeNull();
+    expect(metaPageIdFromConnection(null)).toBeNull();
   });
 });

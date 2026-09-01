@@ -230,6 +230,8 @@ export const growthActionPolicies = {
     listDestinations: read("provider-read"),
     openCampaign: read(),
     listCampaigns: read(),
+    // Renders via Meta's preview API; creates nothing.
+    previewAd: read("provider-read"),
     diagnoseAlignment: read("model-read"),
     inspectConversions: read(),
   },
@@ -249,6 +251,7 @@ export const growthActionPolicies = {
       consequence: "provider-read",
       idempotent: true,
     }),
+    linkAudience: write({ idempotent: true }),
     // Draft deletes drop local rows and are refused once the thing exists on
     // a platform, so they cannot destroy anything a provider knows about.
     deleteCampaignDraft: write({ reversible: false }),

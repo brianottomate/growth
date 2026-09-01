@@ -68,34 +68,38 @@ function adDateMs(a: ZernioAd): number | undefined {
 }
 
 // Pull a metrics snapshot (campaign-level if present, else rolled up from ads).
+/** One entity's metrics object → AdStats, shared by campaign/set/ad levels. */
+function statsFrom(metrics: unknown): AdStats | null {
+  if (!metrics || typeof metrics !== "object") return null;
+  const m = metrics as Record<string, unknown>;
+  const stats: AdStats = {
+    spend: num(m.spend),
+    impressions: num(m.impressions),
+    reach: num(m.reach),
+    clicks: num(m.clicks),
+    ctr: num(m.ctr),
+    cpc: num(m.cpc),
+    cpm: num(m.cpm),
+    conversions: num(m.conversions),
+    roas: num(m.roas),
+    purchaseValue: num(m.purchaseValue),
+    costPerConversion: num(m.costPerConversion),
+  };
+  return Object.values(stats).some((value) => value !== undefined)
+    ? stats
+    : null;
+}
+
 function buildStats(
   campaign: Record<string, unknown>,
   ads: ZernioAd[],
 ): AdStats {
-  const m =
-    campaign.metrics && typeof campaign.metrics === "object"
-      ? (campaign.metrics as Record<string, unknown>)
-      : undefined;
-  if (m) {
-    return {
-      spend: num(m.spend),
-      impressions: num(m.impressions),
-      reach: num(m.reach),
-      clicks: num(m.clicks),
-      ctr: num(m.ctr),
-      cpc: num(m.cpc),
-      cpm: num(m.cpm),
-      conversions: num(m.conversions),
-      roas: num(m.roas),
-      purchaseValue: num(m.purchaseValue),
-      costPerConversion: num(m.costPerConversion),
-    };
-  }
+  const own = statsFrom(campaign.metrics);
+  if (own) return own;
   // Fallback: sum the spend across ads (other rates aren't meaningfully summable).
   let spend = 0;
   for (const a of ads) {
-    const am = a.metrics;
-    spend += num(am?.spend) ?? 0;
+    spend += num(a.metrics?.spend) ?? 0;
   }
   return { spend };
 }
@@ -302,6 +306,17 @@ async function syncCampaignChildren(input: {
             budgetType:
               str((setObj.budget as { type?: unknown } | undefined)?.type) ??
               null,
+            // Set-level metrics when the tree carries them; otherwise the
+            // spend fallback below sums this set's ads.
+            stats:
+              statsFrom(setObj.metrics) ??
+              (() => {
+                let spend = 0;
+                for (const ad of adSet.ads ?? []) {
+                  spend += num(ad.metrics?.spend) ?? 0;
+                }
+                return spend > 0 ? { spend } : null;
+              })(),
             externalId: setExternalId,
           },
         });
@@ -341,6 +356,7 @@ async function syncCampaignChildren(input: {
             platformObjective: ad.platformObjective ?? null,
             optimizationGoal: ad.optimizationGoal ?? null,
             bidStrategy: ad.bidStrategy ?? null,
+            stats: statsFrom(ad.metrics),
             externalId: adExternalId,
           },
         });

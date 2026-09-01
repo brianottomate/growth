@@ -565,6 +565,83 @@ export async function listBrandCampaigns(input: {
   });
 }
 
+/**
+ * Link (or unlink) a platform audience asset to the plan audience it fulfils.
+ *
+ * This is the adoption step for assets that predate us — the client's
+ * two-year-old lookalike, a synced customer list. Once linked, the compile
+ * resolves the plan audience to this asset's externalId and the ad set
+ * targets it. Same-brand only: an asset cannot fulfil another brand's plan.
+ */
+export async function linkPlatformAudience(input: {
+  organizationId: string;
+  platformAudienceId: string;
+  /** Plan audience to link, or null to unlink. */
+  audienceId: string | null;
+}) {
+  const asset = await db.query.platformAudienceTable.findFirst({
+    where: eq(platformAudienceTable.id, input.platformAudienceId),
+  });
+  if (!asset) throw new Error("Platform audience not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, asset.brandId),
+    columns: { organizationId: true },
+  });
+  if (brand?.organizationId !== input.organizationId) {
+    throw new Error("No access to this audience");
+  }
+  if (input.audienceId) {
+    const planAudience = await db.query.audienceTable.findFirst({
+      where: eq(audienceTable.id, input.audienceId),
+      columns: { brandId: true },
+    });
+    if (planAudience?.brandId !== asset.brandId) {
+      throw new Error("That audience belongs to a different brand");
+    }
+    // One asset per platform fulfils a plan audience — the compile resolves
+    // one externalId per platform, so a second link on the same platform
+    // would make the targeted asset arbitrary. Linking here supersedes any
+    // same-platform sibling. Links on OTHER platforms stay: the same plan
+    // audience legitimately maps to one Meta asset and one Google asset.
+    const channel = await db.query.channelTable.findFirst({
+      where: eq(channelTable.id, asset.channelId),
+      columns: { platform: true },
+    });
+    if (channel) {
+      const siblings = await db
+        .select({ id: platformAudienceTable.id })
+        .from(platformAudienceTable)
+        .innerJoin(
+          channelTable,
+          eq(channelTable.id, platformAudienceTable.channelId),
+        )
+        .where(
+          and(
+            eq(platformAudienceTable.audienceId, input.audienceId),
+            eq(channelTable.platform, channel.platform),
+          ),
+        );
+      for (const sibling of siblings) {
+        if (sibling.id === asset.id) continue;
+        await db
+          .update(platformAudienceTable)
+          .set({ audienceId: null })
+          .where(eq(platformAudienceTable.id, sibling.id));
+      }
+    }
+  }
+  const [updated] = await db
+    .update(platformAudienceTable)
+    .set({ audienceId: input.audienceId })
+    .where(eq(platformAudienceTable.id, asset.id))
+    .returning({
+      id: platformAudienceTable.id,
+      audienceId: platformAudienceTable.audienceId,
+      name: platformAudienceTable.name,
+    });
+  return updated!;
+}
+
 // ---- DELETE (local only) ----------------------------------------------
 //
 // These remove plan rows and never touch a platform. Anything with a live

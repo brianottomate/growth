@@ -17,6 +17,7 @@ import {
   createAdAudience,
   addAdAudienceUsers,
   pushDraftToPlatform,
+  previewDraftAd,
   setCampaignDelivery,
   syncBrandPlatformAudiences,
 } from "@/server/services/ads-write.service";
@@ -29,6 +30,7 @@ import {
   deleteDraftAd,
   deleteDraftCampaign,
   getDraftCampaign,
+  linkPlatformAudience,
   listBrandCampaigns,
   planPlatform,
   setCampaignCreativePool,
@@ -603,6 +605,53 @@ export const openCampaignAction = growthAction({
       .describe("A camp_ id, from the campaign URL or adsRead.listCampaigns."),
   }),
   execute: async (input, ctx) => getDraftCampaign(ctx.orgId, input.campaignId),
+});
+
+export const previewAdAction = growthAction({
+  description:
+    "Render Meta's own previews of a DRAFTED creative ad before anything exists on the platform — real iframes from Meta's preview API. The Facebook page the ad runs as resolves from the connection automatically; pass pageId only to override. Returns preview URLs to open; nothing is created and nothing spends. Image and carousel ads only; video previews need a push first.",
+  inputSchema: z.object({
+    adId: z.string().trim().min(1),
+    connectionAccountId: destinationSchema.connectionAccountId,
+    adAccountId: destinationSchema.adAccountId,
+    pageId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "Override the Facebook page the ad runs as; resolved from the connection otherwise.",
+      ),
+    formats: z
+      .array(z.string().trim().min(1))
+      .max(10)
+      .optional()
+      .describe(
+        "Meta preview formats; default DESKTOP_FEED_STANDARD + INSTAGRAM_STORY.",
+      ),
+  }),
+  execute: async (input, ctx) =>
+    previewDraftAd(input, { organizationId: ctx.orgId, runId: ctx.runId }),
+});
+
+export const linkAudienceAction = growthAction({
+  description:
+    "Link a platform audience asset (a synced lookalike, customer list, or pixel audience) to the plan audience it fulfils, so the push targets that asset. This is how a pre-existing asset — including one seeded from Wander's own lists in the same ad account — becomes targetable by a campaign. Pass audienceId null to unlink. Local rows only.",
+  inputSchema: z.object({
+    platformAudienceId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The paud_ mirror row, from openCampaign or the ads page."),
+    audienceId: z
+      .string()
+      .trim()
+      .min(1)
+      .nullable()
+      .describe("The plan audience (aud_) it fulfils; null unlinks."),
+  }),
+  execute: async (input, ctx) =>
+    linkPlatformAudience({ ...input, organizationId: ctx.orgId }),
 });
 
 export const listCampaignsAction = growthAction({

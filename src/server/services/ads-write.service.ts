@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import {
   adWriteIdempotencyKey,
@@ -25,6 +25,7 @@ import {
   listZernioAccounts,
   listZernioAdAccounts,
   listZernioAdAudiences,
+  generateZernioAdPreviews,
   generateZernioKeywordIdeas,
   generateZernioKeywordHistoricalMetrics,
   searchZernioTargeting,
@@ -1139,6 +1140,180 @@ export function googlePauseOutcome(
   };
 }
 
+// ---- PREVIEW -----------------------------------------------------------
+
+/**
+ * Pull every embeddable preview out of Meta's response, whatever nesting the
+ * shape uses: any string containing an iframe yields its src. Pure, because
+ * the response shape is the part most likely to drift.
+ */
+export function extractPreviewFrames(
+  payload: unknown,
+): Array<{ iframe: string; src: string | null }> {
+  const found: Array<{ iframe: string; src: string | null }> = [];
+  const walk = (value: unknown) => {
+    if (typeof value === "string") {
+      if (value.includes("<iframe")) {
+        const src = /src="([^"]+)"/.exec(value)?.[1] ?? null;
+        found.push({
+          iframe: value,
+          src: src ? src.replaceAll("&amp;", "&") : null,
+        });
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.values(value).forEach(walk);
+    }
+  };
+  walk(payload);
+  return found;
+}
+
+/**
+ * The Facebook page a Meta ads connection runs as, mined from the
+ * connection's own identity: Zernio encodes it as "<user>:page:<pageId>" on
+ * platformUserId. Derived, never stored — the connection is already fetched
+ * wherever this is needed, so a stored copy could only go stale.
+ */
+export function metaPageIdFromConnection(
+  platformUserId: string | null | undefined,
+): string | null {
+  const match = /:page:(\d+)/.exec(platformUserId ?? "");
+  return match?.[1] ?? null;
+}
+
+/**
+ * Render Meta's own previews for a DRAFTED ad, before anything exists.
+ *
+ * The creative spec is Meta's object_story_spec built from the plan ad. The
+ * Facebook page id it runs as resolves from the connection itself; pass
+ * pageId only to override. Image and carousel ads only in v1; video preview
+ * needs an uploaded video id, which pre-create drafts do not have.
+ */
+export async function previewDraftAd(
+  input: {
+    adId: string;
+    connectionAccountId: string;
+    adAccountId: string;
+    /** Override the page the ad runs as; resolved from the connection otherwise. */
+    pageId?: string;
+    formats?: string[];
+  },
+  context: AdsWriteContext,
+) {
+  const ad = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
+    with: { campaign: { columns: { landingUrl: true } } },
+  });
+  if (!ad) throw new Error("Ad not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, ad.brandId),
+    columns: { slug: true, organizationId: true },
+  });
+  if (brand?.organizationId !== context.organizationId || !brand.slug) {
+    throw new Error("No access to this ad");
+  }
+  if (ad.type !== "creative") {
+    throw new Error(
+      "Preview covers creative ads; text ads render as Google formats only after push",
+    );
+  }
+  const content = ad.content as AdCreativeContent;
+  if (content.media[0]?.type === "video") {
+    throw new Error(
+      "Video preview needs an uploaded video id, which a pre-push draft does not have — push paused and preview from Ads Manager",
+    );
+  }
+  const link = content.linkUrl ?? ad.campaign.landingUrl;
+  if (!link) {
+    // Same rule as the push: a preview of a link the push would refuse is a
+    // preview of an ad that cannot exist.
+    throw new Error(
+      "Set a landing URL on the campaign, or a link URL on the ad",
+    );
+  }
+  const destination = await requireAdDestination({
+    organizationId: context.organizationId,
+    brandSlug: brand.slug,
+    platform: "meta",
+    connectionAccountId: input.connectionAccountId,
+    adAccountId: input.adAccountId,
+  });
+
+  const pageId =
+    input.pageId ??
+    metaPageIdFromConnection(
+      (destination.connection as { platformUserId?: string }).platformUserId,
+    );
+  if (!pageId) {
+    throw new Error(
+      "Could not resolve the Facebook page from this connection — pass pageId explicitly",
+    );
+  }
+
+  // Meta's documented story shapes: link_data for a static, link_data with
+  // child_attachments for a carousel. Forwarded verbatim by Zernio.
+  const linkData: Record<string, unknown> =
+    content.media.length > 1
+      ? {
+          link,
+          message: content.body,
+          child_attachments: content.media.slice(0, 10).map((item) => ({
+            link,
+            picture: item.url,
+            name: content.headline,
+            ...(content.callToAction
+              ? {
+                  call_to_action: {
+                    type: content.callToAction,
+                    value: { link },
+                  },
+                }
+              : {}),
+          })),
+        }
+      : {
+          link,
+          message: content.body,
+          name: content.headline,
+          picture: content.media[0]!.url,
+          ...(content.callToAction
+            ? {
+                call_to_action: {
+                  type: content.callToAction,
+                  value: { link },
+                },
+              }
+            : {}),
+        };
+
+  const response = await generateZernioAdPreviews({
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+    formats: input.formats ?? ["DESKTOP_FEED_STANDARD", "INSTAGRAM_STORY"],
+    creativeSpec: {
+      object_story_spec: {
+        page_id: pageId,
+        link_data: linkData,
+      },
+    },
+  });
+  const frames = extractPreviewFrames(response);
+  return {
+    adId: ad.id,
+    adName: ad.name,
+    formats: input.formats ?? ["DESKTOP_FEED_STANDARD", "INSTAGRAM_STORY"],
+    previews: frames,
+    /** Open these directly; chat cannot embed the iframes. */
+    previewUrls: frames.flatMap((frame) => (frame.src ? [frame.src] : [])),
+  };
+}
+
 // ---- DELIVERY SWITCH -------------------------------------------------
 
 const DELIVERY_PLATFORMS: Record<string, string> = {
@@ -1222,6 +1397,9 @@ async function platformAudienceExternalIdFor(
         isNotNull(platformAudienceTable.externalId),
       ),
     )
+    // Deterministic when several assets are linked: newest wins. linkAudience
+    // also unlinks same-platform siblings, so this is the backstop.
+    .orderBy(desc(platformAudienceTable.updatedAt))
     .limit(1);
   return rows[0]?.externalId ?? null;
 }
