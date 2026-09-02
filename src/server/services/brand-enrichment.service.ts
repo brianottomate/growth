@@ -2,6 +2,7 @@ import "server-only";
 
 import { scrapeUrl } from "@/server/clients/firecrawl.client";
 import type { BrandWebsiteMeta } from "@/server/db/brand-schema";
+import { selectBrandLogo } from "@/server/services/brand-enrichment-meta";
 
 /** Pull the first non-empty string from a metadata blob across candidate keys. */
 function pick(
@@ -57,7 +58,7 @@ export async function enrichBrandFromWebsite(
   return {
     tagline: title,
     description,
-    logo: ogImage ?? favicon,
+    logo: selectBrandLogo({ favicon, ogImage }),
     websiteMeta: {
       title,
       description,
