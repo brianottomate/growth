@@ -27,6 +27,8 @@ import {
   type PerformanceActor,
 } from "@/server/services/performance.service";
 
+import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
+
 import { syncZernioAds } from "@/server/services/ads-sync.service";
 
 import { growthAction } from "./types";
@@ -47,6 +49,13 @@ export const getPerformanceAccountAction = growthAction({
     "Read one performance account completely: contact, plan, sponsored properties, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
   inputSchema: z.object({ accountId: z.string().min(1) }),
   execute: (input, ctx) => getPerformanceAccount(actorFrom(ctx), input.accountId),
+});
+
+export const clientCampaignContextAction = growthAction({
+  description:
+    "What a Performance+ client agreed to and what we would advertise for them: the monthly media budget, whether they asked for every home, the property URLs on the record, and where those homes are (countries, state codes, resolvable region names, cities). Read this before proposing campaigns or audiences for a client brand — the geography is a fact about their portfolio, not a recommendation about who to target.",
+  inputSchema: z.object({ brandId: z.string().min(1) }),
+  execute: (input, ctx) => campaignPrefillFromIntake(actorFrom(ctx), input),
 });
 
 export const createPerformanceAccountAction = growthAction({

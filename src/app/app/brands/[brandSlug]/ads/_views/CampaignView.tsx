@@ -50,12 +50,16 @@ export async function CampaignView({
 
   const { campaign, audiences, ads, platformCampaigns, personas } = draft;
 
-  // Where this client's homes actually are, so the first audience opens on
-  // their own states instead of an empty field.
-  const prefill = await campaignPrefillFromIntake(
-    { orgId: org.id },
-    { brandId: draft.brand.id },
-  ).catch(() => null);
+  // Where this client's homes are, offered to the audience form as a starting
+  // point. Only a paying client has an intake behind them; for Wander's own
+  // brands this would be a query that can only answer "nothing".
+  const prefill =
+    draft.brand.relationship === "client"
+      ? await campaignPrefillFromIntake(
+          { orgId: org.id },
+          { brandId: draft.brand.id },
+        ).catch(() => null)
+      : null;
 
   const planned = [...platformCampaigns].sort((a, b) =>
     a.platform.localeCompare(b.platform),

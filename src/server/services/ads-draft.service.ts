@@ -82,6 +82,9 @@ export async function requireOwnedCampaign(
       logo: true,
       organizationId: true,
       website: true,
+      // Whether there is a paying client behind the brand, which decides
+      // whether the campaign page has an intake to read from.
+      relationship: true,
     },
   });
   if (brand?.organizationId !== organizationId) {

@@ -124,6 +124,7 @@ export const growthActionPolicies = {
     get: read(),
     searchAttachableCampaigns: read(),
     sponsoredAbandonment: read(),
+    clientCampaignContext: read(),
   },
   // Commercial bookkeeping in our own tables. `attach` tags existing delivery
   // rows with a cycle id (undo = attach with cycleId null); nothing here

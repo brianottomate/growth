@@ -246,8 +246,20 @@ export function ProspectDetail({ domain }: { domain: string }) {
   );
   // Promote a row in the mirror into a brand a rep can actually pitch. The
   // mirror stays a mirror; this is the moment a human picks one out of it.
+  //
+  // Two calls on purpose. The scrape that fills in their logo and tagline runs
+  // as its own mutation rather than as background work on the first one, so
+  // the rep watches it finish instead of finding out by reloading the brand
+  // page later.
+  const enrichBrand = useMutation(trpc.brand.enrich.mutationOptions());
   const createProspect = useMutation(
-    trpc.leads.createProspect.mutationOptions(),
+    trpc.leads.createProspect.mutationOptions({
+      onSuccess: (result) => {
+        if (result.enrichable) {
+          enrichBrand.mutate({ id: result.brandId });
+        }
+      },
+    }),
   );
 
   const retire = useMutation(
@@ -429,9 +441,15 @@ export function ProspectDetail({ domain }: { domain: string }) {
           ) : null}
           <span className="bg-border mx-1 h-6 w-px" />
           {createProspect.data?.slug ? (
-            <Button size="sm" variant="outline" asChild>
-              <Link href={`/app/brands/${createProspect.data.slug}`}>
-                {createProspect.data.created ? "Brand created ↗" : "Open brand ↗"}
+            <Button size="sm" variant="outline" asChild disabled={enrichBrand.isPending}>
+              {/* Straight to setup: that page holds the pitch, intake and
+                  connect links, which is the next thing a rep needs. */}
+              <Link href={`/app/brands/${createProspect.data.slug}/setup`}>
+                {enrichBrand.isPending
+                  ? "Reading their site…"
+                  : createProspect.data.created
+                    ? "Brand ready ↗"
+                    : "Open brand ↗"}
               </Link>
             </Button>
           ) : (

@@ -32,6 +32,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "get",
     "searchAttachableCampaigns",
     "sponsoredAbandonment",
+    "clientCampaignContext",
   ],
   performanceWrite: [
     "createAccount",

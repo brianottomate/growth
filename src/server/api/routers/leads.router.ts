@@ -1,4 +1,3 @@
-import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import {
   and,
@@ -35,7 +34,6 @@ import {
   SETTLED_PROSPECT_STATUSES,
 } from "@/server/clients/wander.client";
 import { memberTable } from "@/server/db/auth-schema";
-import { enrichBrandById } from "@/server/services/brand-ops.service";
 import { createProspectFromLead } from "@/server/services/brand-relationship.service";
 import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
 import { capturePreviewVisual } from "@/server/services/pregen/preview-visual";
@@ -944,8 +942,8 @@ export const leadsRouter = createTRPCRouter({
    *
    * The mirror is 200k+ rows of census data and stays that way; this is the
    * point a human decides one of them is worth a pitch page, a strategy, and
-   * eventually a campaign. Enrichment runs after the response so the click is
-   * instant and the logo lands when the scrape does.
+   * eventually a campaign. Returns `enrichable` so the caller can run the
+   * website scrape as its own call and show it happening.
    */
   createProspect: protectedProcedure
     .input(z.object({ domainId: z.string().min(1) }))
@@ -967,15 +965,16 @@ export const leadsRouter = createTRPCRouter({
         domainId: input.domainId,
       });
 
-      if (created && brand.website) {
-        waitUntil(
-          enrichBrandById(brand.id).catch((error) => {
-            console.error("prospect enrichment failed", brand.id, error);
-          }),
-        );
-      }
-
-      return { brandId: brand.id, slug: brand.slug, name: brand.name, created };
+      // Enrichment is the caller's second call rather than a background task
+      // here: a scrape that finishes after the response can only be seen by
+      // reloading, and the rep is looking at the button they just pressed.
+      return {
+        brandId: brand.id,
+        slug: brand.slug,
+        name: brand.name,
+        created,
+        enrichable: created && Boolean(brand.website),
+      };
     }),
 
   requestPregenSite: protectedProcedure

@@ -149,6 +149,7 @@ import {
   updatePerformanceAccountAction,
   updatePerformanceCycleAction,
   updatePerformancePropertyAction,
+  clientCampaignContextAction,
 } from "./performance";
 import { readWebPage, webSearch } from "./research";
 import { growthDomainTool } from "./types";
@@ -212,6 +213,7 @@ export const performanceRead = growthDomainTool({
     get: getPerformanceAccountAction,
     searchAttachableCampaigns: searchAttachableCampaignsAction,
     sponsoredAbandonment: listSponsoredAbandonmentAction,
+    clientCampaignContext: clientCampaignContextAction,
   },
 });
 

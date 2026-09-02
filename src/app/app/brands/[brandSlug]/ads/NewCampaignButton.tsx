@@ -28,9 +28,12 @@ import { useTRPC } from "@/trpc/react";
 export function NewCampaignButton({
   brandId,
   brandWebsite,
+  isClient = false,
 }: {
   brandId: string;
   brandWebsite?: string | null;
+  /** Only a paying client has an intake to prefill from. */
+  isClient?: boolean;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -51,7 +54,9 @@ export function NewCampaignButton({
   // campaign drifts from the number they agreed to.
   const prefill = useQuery({
     ...trpc.performance.campaignPrefill.queryOptions({ brandId }),
-    enabled: open,
+    // Wander's own brands have no intake behind them, so this would be a
+    // round trip to be told nothing.
+    enabled: open && isClient,
   });
   const prefilled = prefill.data ?? null;
 

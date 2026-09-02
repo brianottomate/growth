@@ -74,13 +74,25 @@ export function Audiences({
   // Narrowing is a decision someone makes on purpose, in the field.
   const [ageMin, setAgeMin] = useState("18");
   const [ageMax, setAgeMax] = useState("");
-  const [countries, setCountries] = useState(
-    (geoPrefill?.countries ?? ["US"]).join(", "),
-  );
-  const [states, setStates] = useState((geoPrefill?.states ?? []).join(", "));
-  const [regions, setRegions] = useState((geoPrefill?.regions ?? []).join(", "));
-  const [cities, setCities] = useState((geoPrefill?.cities ?? []).join(", "));
+  const [countries, setCountries] = useState("US");
+  const [states, setStates] = useState("");
+  const [regions, setRegions] = useState("");
+  const [cities, setCities] = useState("");
   const [keywords, setKeywords] = useState("");
+
+  /**
+   * Offered, not applied. Where a client's homes are is a fact worth having on
+   * the page, and "advertise where the houses are" is a guess about strategy —
+   * a lot of guests fly in from somewhere else entirely. So it sits behind a
+   * button, and the agent gets the same numbers to reason about.
+   */
+  const applyTheirMarkets = () => {
+    if (!geoPrefill) return;
+    setCountries((geoPrefill.countries ?? ["US"]).join(", "));
+    setStates((geoPrefill.states ?? []).join(", "));
+    setRegions((geoPrefill.regions ?? []).join(", "));
+    setCities((geoPrefill.cities ?? []).join(", "));
+  };
 
   const add = useMutation(
     trpc.ads.addAudience.mutationOptions({
@@ -277,10 +289,19 @@ export function Audiences({
                   </div>
                 </div>
                 {geoPrefill?.states?.length ? (
-                  <p className="text-muted-foreground text-[11px]">
-                    Prefilled from where their homes are:{" "}
-                    {(geoPrefill.regions ?? geoPrefill.states).join(", ")}.
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-muted-foreground text-[11px]">
+                      Their homes are in{" "}
+                      {(geoPrefill.regions ?? geoPrefill.states).join(", ")}.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={applyTheirMarkets}
+                      className="border-border text-muted-foreground hover:text-foreground rounded-full border px-2 py-0.5 text-[11px]"
+                    >
+                      Use their markets
+                    </button>
+                  </div>
                 ) : null}
                 <div className="space-y-1.5">
                   <Label htmlFor="aud-keywords">Keyword suggestions</Label>
