@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
@@ -80,6 +82,48 @@ export function propertyRowsFromAnswers(
   return rows;
 }
 
+/**
+ * A stable fingerprint of a submission, so a repeat of the same answers is
+ * recognisable. Keys are sorted, because object order is not meaningful and a
+ * form that serialises them differently is still the same submission.
+ */
+export function answersFingerprint(answers: PerformanceIntakeAnswers): string {
+  const stable = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, entry]) => [key, stable(entry)]),
+      );
+    }
+    return value;
+  };
+  return createHash("sha256").update(JSON.stringify(stable(answers))).digest("hex");
+}
+
+/** How long an identical resubmission is treated as the same one. */
+export const DUPLICATE_SUBMIT_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Whether a submission is a repeat of one we already hold.
+ *
+ * A double-clicked button, a retried request or a refreshed tab should not
+ * file the same answers twice. Genuinely revised answers hash differently and
+ * file as their own receipt, which is the point of keeping receipts.
+ *
+ * Pure so the window and the matching rule stay testable.
+ */
+export function isDuplicateSubmission(
+  fingerprint: string,
+  previous: { answersFingerprint: string | null; submittedAt: Date } | undefined,
+  now = new Date(),
+): boolean {
+  if (!previous?.answersFingerprint) return false;
+  if (previous.answersFingerprint !== fingerprint) return false;
+  return now.getTime() - previous.submittedAt.getTime() < DUPLICATE_SUBMIT_WINDOW_MS;
+}
+
 export const submitIntakeSchema = z
   .object({
     token: z.string().min(16).optional(),
@@ -133,6 +177,17 @@ export async function submitPerformanceIntake(input: {
   const answers = input.answers;
   const now = new Date();
   const budgetIsRecommendation = answers.budget === "recommend";
+  const fingerprint = answersFingerprint(answers);
+
+  // A double-clicked button or a retried request must not file twice.
+  const previous = await db.query.performanceIntakeTable.findFirst({
+    where: eq(performanceIntakeTable.accountId, account.id),
+    orderBy: desc(performanceIntakeTable.submittedAt),
+    columns: { id: true, answersFingerprint: true, submittedAt: true },
+  });
+  if (isDuplicateSubmission(fingerprint, previous, now)) {
+    return { intakeId: previous!.id };
+  }
 
   const [intake] = await db
     .insert(performanceIntakeTable)
@@ -140,6 +195,7 @@ export async function submitPerformanceIntake(input: {
       accountId: account.id,
       brandId: brand.id,
       brandSlug: brand.slug,
+      answersFingerprint: fingerprint,
       status: "submitted",
       submittedByName: brand.connectTokenIssuedByName,
       submittedByEmail: brand.connectTokenIssuedByEmail,

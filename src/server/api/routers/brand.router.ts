@@ -555,9 +555,12 @@ export const brandRouter = createTRPCRouter({
       const brand = await assertBrandManageable(ctx, input.brandId);
       return {
         url: brand.connectToken ? brandConnectUrl(brand.connectToken) : null,
-        intakeUrl: brand.connectToken
-          ? brandIntakeUrl(brand.connectToken)
-          : null,
+        // Slug reads better in a link a rep sends, and resolves the same.
+        intakeUrl: brand.slug
+          ? brandIntakeUrl(brand.slug)
+          : brand.connectToken
+            ? brandIntakeUrl(brand.connectToken)
+            : null,
         channels: await getBrandConnectStatus(input.brandId),
       };
     }),

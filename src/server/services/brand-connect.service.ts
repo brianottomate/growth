@@ -96,12 +96,19 @@ export function brandConnectUrl(token: string): string {
 }
 
 /**
- * The Performance+ intake, on the same token. One credential covers both
- * surfaces, so regenerating revokes the intake link as well as the connect
- * one and a client only ever holds a single Wander URL.
+ * The Performance+ intake, on the same token.
+ *
+ * Points at wander.com, because that is where the form lives. It used to
+ * build this app's own origin, which meant an operator copying the link off
+ * a brand page sent a client the internal back-office domain and a stale copy
+ * of the form. One credential still covers both surfaces, so regenerating
+ * revokes this and the connect link together.
+ *
+ * A brand slug reads better than a token and resolves the same, so it is
+ * preferred when the brand has one.
  */
-export function brandIntakeUrl(token: string): string {
-  return `${env.NEXT_PUBLIC_BASE_URL}/intake/${token}`;
+export function brandIntakeUrl(handle: string): string {
+  return `${env.WANDER_COM_BASE_URL}/internal/intake/${handle}`;
 }
 
 export async function getBrandByConnectToken(token: string) {

@@ -25,6 +25,12 @@ export const env = createEnv({
     GOOGLE_DRIVE_CLIENT_ID: z.string().optional(),
     GOOGLE_DRIVE_CLIENT_SECRET: z.string().optional(),
     ADMIN_TOKEN: z.string().min(32), // Require strong token (32+ chars)
+    /**
+     * Where the client-facing surfaces live. The intake form moved to
+     * wander.com, so a link handed to a client must point there and not at
+     * this app's own origin, which is the internal back-office.
+     */
+    WANDER_COM_BASE_URL: z.string().url().default("https://www.wander.com"),
     OPENAI_API_KEY: z.string().min(1), // Required for voice chat
     ANTHROPIC_API_KEY: z.string().optional(), // For Claude AI features
     FAL_AI_API_KEY: z.string().optional(), // fal.ai image/video generation
@@ -254,6 +260,7 @@ export const env = createEnv({
     R2_BUCKET: process.env.R2_BUCKET,
     R2_PREFIX: process.env.R2_PREFIX,
     R2_PUBLIC_BASE_URL: process.env.R2_PUBLIC_BASE_URL,
+    WANDER_COM_BASE_URL: process.env.WANDER_COM_BASE_URL,
     CLOUDFLARE_STREAM_TOKEN: process.env.CLOUDFLARE_STREAM_TOKEN,
     CLOUDFLARE_STREAM_WEBHOOK_SECRET:
       process.env.CLOUDFLARE_STREAM_WEBHOOK_SECRET,
