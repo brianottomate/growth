@@ -30,6 +30,7 @@ import {
   setPlatformDraftAction,
   topAds,
   updateAudienceAction,
+  draftAdsFromHomesAction,
 } from "./ads";
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
@@ -46,6 +47,8 @@ import {
   previewBrandPurgeAction,
   purgeBrandAction,
   listBrands,
+  createProspectAction,
+  setBrandRelationshipAction,
 } from "./brands";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
 import { inspectConversionReality } from "./conversions";
@@ -150,6 +153,11 @@ import {
   updatePerformanceCycleAction,
   updatePerformancePropertyAction,
   clientCampaignContextAction,
+  listIntakesAction,
+  previewIntakeApplyAction,
+  applyIntakeAction,
+  verifyIntakeAccessAction,
+  promoteToClientAction,
 } from "./performance";
 import { readWebPage, webSearch } from "./research";
 import { growthDomainTool } from "./types";
@@ -164,6 +172,8 @@ export const brandWrite = growthDomainTool({
     "Create an owned brand, enrich one from its website (logo, tagline, description), or purge one on offboarding. Create first, enrich second: they are deliberately separate steps. Purge is irreversible and needs previewPurge first.",
   actions: {
     create: createBrandAction,
+    createProspect: createProspectAction,
+    setRelationship: setBrandRelationshipAction,
     enrich: enrichBrandAction,
     previewPurge: previewBrandPurgeAction,
     purge: purgeBrandAction,
@@ -214,6 +224,8 @@ export const performanceRead = growthDomainTool({
     searchAttachableCampaigns: searchAttachableCampaignsAction,
     sponsoredAbandonment: listSponsoredAbandonmentAction,
     clientCampaignContext: clientCampaignContextAction,
+    intakes: listIntakesAction,
+    previewIntakeApply: previewIntakeApplyAction,
   },
 });
 
@@ -230,6 +242,9 @@ export const performanceWrite = growthDomainTool({
     attach: attachToPerformanceCycleAction,
     refreshSpend: refreshPerformanceCycleSpendAction,
     syncCampaigns: syncAdCampaignsAction,
+    promoteToClient: promoteToClientAction,
+    applyIntake: applyIntakeAction,
+    verifyIntakeAccess: verifyIntakeAccessAction,
   },
 });
 
@@ -364,6 +379,7 @@ export const adsWrite = growthDomainTool({
   actions: {
     draftCampaign: draftCampaignAction,
     draftAd: draftAdAction,
+    draftAdsFromHomes: draftAdsFromHomesAction,
     addAudience: addAudienceAction,
     updateAudience: updateAudienceAction,
     planPlatform: planPlatformAction,

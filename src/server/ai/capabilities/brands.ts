@@ -11,6 +11,10 @@ import {
   previewBrandPurge,
   purgeBrand,
 } from "@/server/services/brand-ops.service";
+import {
+  createProspectFromLead,
+  setBrandRelationship,
+} from "@/server/services/brand-relationship.service";
 import { growthAction } from "./types";
 
 /** Brand ids for the org — shared by other org-scoped capabilities. */
@@ -63,6 +67,33 @@ export const createBrandAction = growthAction({
       name: brand.name,
       path: `/app/brands/${brand.slug}`,
     };
+  },
+});
+
+export const createProspectAction = growthAction({
+  description:
+    "Turn a row in the leads mirror into a prospect brand a rep can pitch, keyed on its domain so calling twice returns the brand that already exists. The mirror stays untouched. Follow with brandWrite.enrich to read their site for a logo and a tagline.",
+  inputSchema: z.object({ domainId: z.string().min(1) }),
+  execute: async (input, ctx) => {
+    const { brand, created } = await createProspectFromLead({
+      organizationId: ctx.orgId,
+      ownerId: ctx.userId,
+      domainId: input.domainId,
+    });
+    return { brandId: brand.id, slug: brand.slug, name: brand.name, created };
+  },
+});
+
+export const setBrandRelationshipAction = growthAction({
+  description:
+    "Set Wander's relationship to a brand: internal (one of ours), prospect (being pitched), client (paying), or reference (watched only). Use performanceWrite.promoteToClient instead when a customer has actually signed — that one also opens their commercial record.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    relationship: z.enum(["internal", "client", "prospect", "reference"]),
+  }),
+  execute: async (input, ctx) => {
+    const brand = await setBrandRelationship({ orgId: ctx.orgId }, input);
+    return { brandId: brand.id, relationship: brand.relationship };
   },
 });
 

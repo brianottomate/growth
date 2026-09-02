@@ -28,6 +28,11 @@ export type WanderOsListing = {
   state?: string;
   /** ISO-3166 alpha-2, e.g. "US". */
   country?: string;
+  /**
+   * Cheapest nightly rate in whole dollars, before fees. The feed quotes cents
+   * for a sample stay, so this is the base rate rather than the total.
+   */
+  nightlyFrom?: number;
 };
 
 /**
@@ -36,6 +41,13 @@ export type WanderOsListing = {
  * Returns null rather than throwing for anything that is not a WanderOS site,
  * which is the common case for a brand we have not built for.
  */
+/** The feed quotes money in cents; nothing downstream wants cents. */
+export function centsToDollars(value: number | undefined): number | undefined {
+  return typeof value === "number" && value > 0
+    ? Math.round(value / 100)
+    : undefined;
+}
+
 export async function wanderOsWebsiteId(siteUrl: string): Promise<string | null> {
   try {
     const response = await fetch(siteUrl, {
@@ -97,6 +109,9 @@ export async function listWanderOsListings(input: {
           country?: string;
           countryShortCode?: string;
         };
+        // Absent whenever the home has no bookable dates in the sampled
+        // window, which is ordinary rather than an error.
+        cheapestPrice?: { nightPrice?: number; baseNightPrice?: number } | null;
       }[];
       pagination?: { has_more?: boolean };
     };
@@ -115,6 +130,9 @@ export async function listWanderOsListings(input: {
         city: row.address?.city,
         state: row.address?.state,
         country: row.address?.countryShortCode ?? row.address?.country,
+        nightlyFrom: centsToDollars(
+          row.cheapestPrice?.baseNightPrice ?? row.cheapestPrice?.nightPrice,
+        ),
       });
     }
 

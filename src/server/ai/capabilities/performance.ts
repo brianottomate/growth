@@ -27,7 +27,14 @@ import {
   type PerformanceActor,
 } from "@/server/services/performance.service";
 
-import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
+import {
+  applyPerformanceIntake,
+  campaignPrefillFromIntake,
+  listPerformanceIntakes,
+  previewIntakeApply,
+  verifyIntakeAccess,
+} from "@/server/services/performance-intake.service";
+import { promoteBrandToClient } from "@/server/services/brand-relationship.service";
 
 import { syncZernioAds } from "@/server/services/ads-sync.service";
 
@@ -56,6 +63,47 @@ export const clientCampaignContextAction = growthAction({
     "What a Performance+ client agreed to and what we would advertise for them: the monthly media budget, whether they asked for every home, the property URLs on the record, and where those homes are (countries, state codes, resolvable region names, cities). Read this before proposing campaigns or audiences for a client brand — the geography is a fact about their portfolio, not a recommendation about who to target.",
   inputSchema: z.object({ brandId: z.string().min(1) }),
   execute: (input, ctx) => campaignPrefillFromIntake(actorFrom(ctx), input),
+});
+
+export const listIntakesAction = growthAction({
+  description:
+    "List the onboarding forms a Performance+ client has filed for one account, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified.",
+  inputSchema: z.object({ accountId: z.string().min(1) }),
+  execute: (input, ctx) => listPerformanceIntakes(actorFrom(ctx), input.accountId),
+});
+
+export const previewIntakeApplyAction = growthAction({
+  description:
+    "Show exactly what applying an intake would write: the billing period and budget, which homes are new, and anything blocking it. Read-only. Always call this before applyIntake and show the operator the result.",
+  inputSchema: z.object({ intakeId: z.string().min(1) }),
+  execute: (input, ctx) => previewIntakeApply(actorFrom(ctx), input.intakeId),
+});
+
+export const applyIntakeAction = growthAction({
+  description:
+    "Promote a filed intake into the records that own each fact: the account's status and notes, the month's media budget on its cycle, and the client's homes as property rows with their locations. Applies once per intake and refuses a second run. Growth's own tables only; nothing reaches an ad platform.",
+  inputSchema: z.object({
+    intakeId: z.string().min(1),
+    mediaBudgetDollars: z.number().int().min(0).nullable().optional(),
+  }),
+  execute: (input, ctx) => applyPerformanceIntake(actorFrom(ctx), input),
+});
+
+export const verifyIntakeAccessAction = growthAction({
+  description:
+    "Check whether the client's Leadsie grant has landed: reads the Pages and ad accounts Wander's Meta connection can now manage and records the match when exactly one Page name looks like theirs. Reads the provider and writes only Growth's own verification stamps.",
+  inputSchema: z.object({ intakeId: z.string().min(1) }),
+  execute: (input, ctx) => verifyIntakeAccess(actorFrom(ctx), input.intakeId),
+});
+
+export const promoteToClientAction = growthAction({
+  description:
+    "Record that a brand signed: marks it a client and opens its commercial record with today's date, creating the performance account if the deal closed before they filled the form. Safe to repeat — a re-run keeps the original signing date.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    plan: z.string().min(1).nullable().optional(),
+  }),
+  execute: (input, ctx) => promoteBrandToClient(actorFrom(ctx), input),
 });
 
 export const createPerformanceAccountAction = growthAction({

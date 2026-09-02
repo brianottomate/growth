@@ -88,6 +88,13 @@ export const growthActionPolicies = {
   },
   brandWrite: {
     create: write(),
+    // Idempotent on the lead's domain: a second call returns the brand the
+    // first one made rather than a duplicate with a suffixed slug.
+    createProspect: write({ idempotent: true }),
+    setRelationship: write({
+      idempotent: true,
+      undoWith: "brandWrite.setRelationship",
+    }),
     // Re-running refreshes the same fields from the same site.
     enrich: write({ idempotent: true }),
     previewPurge: read(),
@@ -125,6 +132,8 @@ export const growthActionPolicies = {
     searchAttachableCampaigns: read(),
     sponsoredAbandonment: read(),
     clientCampaignContext: read(),
+    intakes: read(),
+    previewIntakeApply: read(),
   },
   // Commercial bookkeeping in our own tables. `attach` tags existing delivery
   // rows with a cycle id (undo = attach with cycleId null); nothing here
@@ -142,6 +151,16 @@ export const growthActionPolicies = {
     }),
     // Derived from campaign rows already in our DB; safe to re-run.
     refreshSpend: write({ idempotent: true }),
+    // The signature. Re-running keeps the original signing date, so it is safe
+    // to repeat and cannot move a contract date by accident.
+    promoteToClient: write({ idempotent: true }),
+    // Writes the client's own answers into the records that own each fact.
+    // Refuses a second run on the same intake, because re-applying would
+    // reopen a cycle an operator may have since corrected.
+    applyIntake: write(),
+    // Reads Zernio and stamps our own verification columns. No provider
+    // mutation and no spend; re-running just re-checks.
+    verifyIntakeAccess: write({ idempotent: true }),
     // Reads Zernio and upserts our own mirror rows. No provider mutation and
     // no spend, so it needs no approval, but it is a background-weight call.
     syncCampaigns: write({
@@ -240,6 +259,10 @@ export const growthActionPolicies = {
     // Local DB rows only; no provider call, no spend. Push is separate.
     draftCampaign: write(),
     draftAd: write(),
+    // Renders one image per home and drafts two ads. Local rows and our own
+    // R2 bytes, no provider call, but it is a heavier call than the rest of
+    // this domain and re-running adds another pair of drafts.
+    draftAdsFromHomes: write(),
     addAudience: write(),
     updateAudience: write({ idempotent: true }),
     planPlatform: write({ idempotent: true }),

@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
+import { DraftFromHomesButton } from "./DraftFromHomesButton";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
 
@@ -177,12 +178,18 @@ export async function CampaignView({
       </div>
 
       <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold">The plan</h2>
-          <p className="text-muted-foreground text-xs">
-            Creative, ads and audiences, picked once here. Each platform below
-            compiles this into its own shape when you push.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">The plan</h2>
+            <p className="text-muted-foreground text-xs">
+              Creative, ads and audiences, picked once here. Each platform below
+              compiles this into its own shape when you push.
+            </p>
+          </div>
+          {/* Only a client has homes of their own to build from. */}
+          {draft.brand.relationship === "client" && (
+            <DraftFromHomesButton campaignId={campaign.id} />
+          )}
         </div>
 
         <CreativePool

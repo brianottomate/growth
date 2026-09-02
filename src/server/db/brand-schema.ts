@@ -176,6 +176,18 @@ export const brandTable = pgTable(
 
     relationship: brandRelationshipEnum().default("internal").notNull(),
 
+    /**
+     * The brand's WanderOS site, when they have one.
+     *
+     * The id is discovered by reading their own homepage, which is a fetch of
+     * their site plus a regex, so it is cached here rather than repeated on
+     * every listing read. NULL with `wanderOsCheckedAt` set means we looked
+     * and they are not on WanderOS, which is the common case and is worth
+     * remembering just as much as a hit.
+     */
+    wanderOsWebsiteId: t.text(),
+    wanderOsCheckedAt: t.timestamp({ withTimezone: true }),
+
     // The domain of the `leads.lead_domain` row a prospect came from. A text
     // column rather than a foreign key on purpose: `leads` lives in its own
     // Postgres schema so it stays droppable, and a cross-schema FK would take

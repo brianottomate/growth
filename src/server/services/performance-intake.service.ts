@@ -16,13 +16,12 @@ import {
   type PerformanceIntake,
   type PerformanceIntakeAnswers,
 } from "@/server/db/schema";
-import { intakeBrandRef } from "@/lib/intake-ref";
 import { usStateName } from "@/lib/us-states";
 import { zernioConnectionMatchesPlatform } from "@/lib/zernio-ads";
 import {
-  listWanderOsListings,
-  wanderOsWebsiteId,
-} from "@/server/clients/wanderos-site.client";
+  brandListings,
+  normalizeListingUrl,
+} from "@/server/services/wanderos-listings.service";
 import {
   isZernioConfigured,
   listZernioAccounts,
@@ -86,11 +85,6 @@ export function propertyRowsFromAnswers(
     rows.push({ accountId, siteUrl, title: null });
   }
   return rows;
-}
-
-/** Compare listing URLs the way the property dedupe does. */
-function normalizeListingUrl(url: string): string {
-  return url.trim().toLowerCase().replace(/\/+$/, "");
 }
 
 export type PropertyAddress = {
@@ -421,15 +415,7 @@ export async function intakeListings(handle: {
   slug?: string;
 }): Promise<{ supported: boolean; listings: WanderOsListingSummary[] }> {
   const { brand } = await brandForHandle(handle);
-  if (!brand.website) return { supported: false, listings: [] };
-
-  const websiteId = await wanderOsWebsiteId(brand.website);
-  if (!websiteId) return { supported: false, listings: [] };
-
-  const listings = await listWanderOsListings({
-    websiteId,
-    siteUrl: brand.website,
-  });
+  const listings = await brandListings(brand);
   return {
     supported: listings.length > 0,
     listings: listings.map((row) => ({
@@ -448,24 +434,17 @@ export async function intakeListings(handle: {
  * a failed fetch: an address layer is an improvement on the property rows, not
  * a precondition for writing them.
  */
-export async function listingAddressMap(
-  website: string | null,
-): Promise<Map<string, PropertyAddress>> {
+export async function listingAddressMap(brand: {
+  id: string;
+  website: string | null;
+}): Promise<Map<string, PropertyAddress>> {
   const addresses = new Map<string, PropertyAddress>();
-  if (!website) return addresses;
-  try {
-    const websiteId = await wanderOsWebsiteId(website);
-    if (!websiteId) return addresses;
-    const listings = await listWanderOsListings({ websiteId, siteUrl: website });
-    for (const listing of listings) {
-      addresses.set(normalizeListingUrl(listing.url), {
-        city: listing.city ?? null,
-        state: listing.state ?? null,
-        country: listing.country ?? null,
-      });
-    }
-  } catch (error) {
-    console.error("listing address lookup failed", error);
+  for (const listing of await brandListings(brand)) {
+    addresses.set(normalizeListingUrl(listing.url), {
+      city: listing.city ?? null,
+      state: listing.state ?? null,
+      country: listing.country ?? null,
+    });
   }
   return addresses;
 }
@@ -640,7 +619,9 @@ export async function applyPerformanceIntake(
   //    Their city and state come from the client's own listing feed, which is
   //    what the campaign audience's geography is later rolled up from.
   if (preview.newProperties.length > 0) {
-    const addresses = await listingAddressMap(intake.brand?.website ?? null);
+    const addresses = intake.brand
+      ? await listingAddressMap(intake.brand)
+      : new Map<string, PropertyAddress>();
     const rows = withPropertyAddresses(preview.newProperties, addresses);
     await db.insert(performancePropertyTable).values(rows);
     const located = rows.filter((row) => row.state !== null).length;
@@ -905,29 +886,18 @@ export async function performancePitch(handle: {
 }): Promise<PerformancePitch> {
   const { brand } = await brandForHandle(handle);
 
-  let homes: PerformancePitchHome[] = [];
-  if (brand.website) {
-    try {
-      const websiteId = await wanderOsWebsiteId(brand.website);
-      if (websiteId) {
-        const listings = await listWanderOsListings({
-          websiteId,
-          siteUrl: brand.website,
-        });
-        homes = listings.map((row) => ({
-          name: row.name,
-          url: row.url,
-          imageUrl: row.imageUrl ?? null,
-          bedrooms: row.bedrooms ?? null,
-          city: row.city ?? null,
-          state: row.state ?? null,
-        }));
-      }
-    } catch (error) {
-      // A pitch page with no homes is still a pitch page.
-      console.error("pitch listings failed", error);
-    }
-  }
+  // A pitch page with no homes is still a pitch page, which is what an empty
+  // list from here means.
+  const homes: PerformancePitchHome[] = (await brandListings(brand)).map(
+    (row) => ({
+      name: row.name,
+      url: row.url,
+      imageUrl: row.imageUrl ?? null,
+      bedrooms: row.bedrooms ?? null,
+      city: row.city ?? null,
+      state: row.state ?? null,
+    }),
+  );
 
   return {
     brand: {

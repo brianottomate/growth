@@ -34,6 +34,7 @@ import {
   createDraftCampaign,
   listBrandCampaigns,
 } from "@/server/services/ads-draft.service";
+import { draftAdsFromHomes } from "@/server/services/property-ads.service";
 import { createId } from "@/server/db/utils";
 
 import { protectedProcedure } from "../trpc";
@@ -148,6 +149,24 @@ export const adsRouter = {
       createDraftCampaign({
         ...input,
         organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  // Experiment: build a static and a carousel from the client's own homes.
+  // Drafts only; the push is still what decides whether any of it runs.
+  draftAdsFromHomes: protectedProcedure
+    .input(
+      z.object({
+        campaignId: z.string().min(1),
+        carouselSize: z.number().int().min(1).max(8).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      draftAdsFromHomes({
+        organizationId: await organizationIdFor(ctx),
+        userId: ctx.session.user.id,
+        campaignId: input.campaignId,
+        carouselSize: input.carouselSize,
       }),
     ),
 
