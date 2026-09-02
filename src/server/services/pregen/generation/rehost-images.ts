@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 import { env } from "@/env";
 import {
@@ -192,7 +192,7 @@ async function prepareImage(
   // metadata() too, so a limited read throws before the dimensions can be
   // inspected and the oversized original would sail through the catch. A header
   // parse decodes no pixels, so an unlimited read is safe at any declared size.
-  let metadata: sharp.Metadata;
+  let metadata: Metadata;
   try {
     metadata = await sharp(buffer).metadata();
   } catch {
