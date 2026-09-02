@@ -82,7 +82,9 @@ export async function listWanderOsListings(input: {
         slug?: string;
         name?: string;
         bedrooms?: number;
-        medias?: { url?: string }[];
+        // Media carries sized variants, not a bare `url`: lowResUrl is 640px
+        // and mediumResUrl 1200px, both webp on assets.wander.com.
+        medias?: { lowResUrl?: string; mediumResUrl?: string; type?: string }[];
       }[];
       pagination?: { has_more?: boolean };
     };
@@ -97,7 +99,7 @@ export async function listWanderOsListings(input: {
         // The shape the site's own links use: /property/<id>/<slug>.
         url: `${origin}/property/${id}/${row.slug}`,
         bedrooms: row.bedrooms,
-        imageUrl: row.medias?.[0]?.url,
+        imageUrl: row.medias?.[0]?.lowResUrl ?? row.medias?.[0]?.mediumResUrl,
       });
     }
 
