@@ -18,6 +18,10 @@ import {
 import { intakeBrandRef } from "@/lib/intake-ref";
 import { zernioConnectionMatchesPlatform } from "@/lib/zernio-ads";
 import {
+  listWanderOsListings,
+  wanderOsWebsiteId,
+} from "@/server/clients/wanderos-site.client";
+import {
   isZernioConfigured,
   listZernioAccounts,
   listZernioFacebookPages,
@@ -330,6 +334,44 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
     repEmail: brand.connectTokenIssuedByEmail,
   };
 }
+
+/**
+ * The homes on the client's booking site, for the intake form to offer.
+ *
+ * `supported: false` covers every reason we cannot list them — no website on
+ * the brand, not a WanderOS site, the search unreachable — because the form's
+ * response to all of those is the same: fall back to pasting URLs. Reporting
+ * them separately would be detail nobody acts on.
+ */
+export async function intakeListings(handle: {
+  token?: string;
+  slug?: string;
+}): Promise<{ supported: boolean; listings: WanderOsListingSummary[] }> {
+  const { brand } = await brandForHandle(handle);
+  if (!brand.website) return { supported: false, listings: [] };
+
+  const websiteId = await wanderOsWebsiteId(brand.website);
+  if (!websiteId) return { supported: false, listings: [] };
+
+  const listings = await listWanderOsListings({
+    websiteId,
+    siteUrl: brand.website,
+  });
+  return {
+    supported: listings.length > 0,
+    listings: listings.map((row) => ({
+      name: row.name,
+      url: row.url,
+      bedrooms: row.bedrooms ?? null,
+    })),
+  };
+}
+
+export type WanderOsListingSummary = {
+  name: string;
+  url: string;
+  bedrooms: number | null;
+};
 
 async function requireIntake(actor: PerformanceActor, intakeId: string) {
   const intake = await db.query.performanceIntakeTable.findFirst({
