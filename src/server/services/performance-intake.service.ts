@@ -30,8 +30,8 @@ import {
 //
 // The client fills one form at /intake/[token] and we write a RECEIPT. Nothing
 // downstream reads that receipt as state: `applyPerformanceIntake` promotes it
-// into the tables that own each fact — contact on the account, money on the
-// cycle, homes on performance_property, logo on the brand — and after that the
+// into the tables that own each fact: contact on the account, money on the
+// cycle, homes on performance_property, logo on the brand. After that the
 // receipt is history. This is the same draft-then-apply shape as the content
 // loop and the ads plan/compile split, for the same reason: a form that stays
 // authoritative goes stale the first time a client changes their mind.
@@ -85,7 +85,7 @@ export const submitIntakeSchema = z.object({
 /**
  * Record a submission against the brand's connect token.
  *
- * The token is the whole credential, exactly as on /connect/[token] — this is
+ * The token is the whole credential, exactly as on /connect/[token]. This is
  * a public endpoint, so it must never accept an accountId or brandId from the
  * caller. The account is derived, or created in `onboarding` when a brand
  * reaches intake before anyone opened a commercial record for them.
@@ -229,18 +229,19 @@ export async function previewIntakeApply(
 export function applyBlockers(intake: {
   status: string;
   guestListConsentAt: Date | null;
-  answers: PerformanceIntakeAnswers;
 }): string[] {
   const blockers: string[] = [];
   if (intake.status === "applied") {
     blockers.push("This intake has already been applied.");
   }
-  // Meta's Custom Audience terms require the attestation from the person who
-  // holds the list. Uploading without it risks the shared ad account, which
-  // under one account means every client, so this is a hard stop.
-  if (intake.answers.guestListName && !intake.guestListConsentAt) {
+  // We build the audience from booking data we already hold, so the client
+  // never uploads a list. What they still owe us is the attestation, because
+  // Meta's Custom Audience terms require it from the advertiser. Without it,
+  // building an audience risks the shared ad account, and under one account
+  // that means every client rather than this one.
+  if (!intake.guestListConsentAt) {
     blockers.push(
-      "A guest list was submitted without the consent attestation. Do not upload it.",
+      "No guest-audience consent on this intake. Do not build a custom audience from their guest data.",
     );
   }
   return blockers;
@@ -298,7 +299,7 @@ export async function applyPerformanceIntake(
       written.push(`Opened cycle ${preview.period} at $${budget}`);
     }
   } else {
-    written.push("No budget set — client asked for a recommendation");
+    written.push("No budget set, client asked for a recommendation");
   }
 
   // 3. Homes as rows, because ads fan out over them and reporting needs ids.
@@ -341,8 +342,8 @@ export function normalizePageName(name: string): string {
  *
  * Exact normalized equality only. A containment or prefix match would happily
  * bind "Wander" to "WanderOS", and the cost of a wrong match here is a client's
- * ads running under someone else's identity — worse than asking an operator to
- * choose from the candidates.
+ * ads running under someone else's identity, which is worse than asking an
+ * operator to choose from the candidates.
  */
 export function matchBrandPage(
   brandName: string,

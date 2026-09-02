@@ -95,6 +95,15 @@ export function brandConnectUrl(token: string): string {
   return `${env.NEXT_PUBLIC_BASE_URL}/connect/${token}`;
 }
 
+/**
+ * The Performance+ intake, on the same token. One credential covers both
+ * surfaces, so regenerating revokes the intake link as well as the connect
+ * one and a client only ever holds a single Wander URL.
+ */
+export function brandIntakeUrl(token: string): string {
+  return `${env.NEXT_PUBLIC_BASE_URL}/intake/${token}`;
+}
+
 export async function getBrandByConnectToken(token: string) {
   if (!token || token.length < 16) return null;
   return db.query.brandTable.findFirst({

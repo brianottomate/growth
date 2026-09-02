@@ -37,37 +37,26 @@ describe("intake budget parsing", () => {
 });
 
 describe("apply blockers", () => {
-  const base = {
-    status: "submitted",
-    guestListConsentAt: null,
-    answers: {},
-  };
-
-  it("passes a clean submission", () => {
-    expect(applyBlockers(base)).toHaveLength(0);
-  });
-
-  it("refuses a guest list that arrived without the attestation", () => {
-    // Meta's Custom Audience terms require it, and under one shared ad account
-    // an unlawful upload risks every client's delivery, not just this one.
+  it("passes once the attestation is timestamped", () => {
     expect(
-      applyBlockers({ ...base, answers: { guestListName: "guests.csv" } }),
-    ).toHaveLength(1);
-  });
-
-  it("allows a guest list once the attestation is timestamped", () => {
-    expect(
-      applyBlockers({
-        ...base,
-        guestListConsentAt: new Date(),
-        answers: { guestListName: "guests.csv" },
-      }),
+      applyBlockers({ status: "submitted", guestListConsentAt: new Date() }),
     ).toHaveLength(0);
+  });
+
+  it("refuses without guest-audience consent", () => {
+    // We hold the booking data, so nothing is uploaded, but Meta's Custom
+    // Audience terms still need the advertiser's attestation. Under one shared
+    // ad account an unlawful audience risks every client, not just this one.
+    expect(
+      applyBlockers({ status: "submitted", guestListConsentAt: null }),
+    ).toHaveLength(1);
   });
 
   it("refuses to apply twice", () => {
     // Re-applying would reopen a cycle an operator may have since adjusted.
-    expect(applyBlockers({ ...base, status: "applied" })).toHaveLength(1);
+    expect(
+      applyBlockers({ status: "applied", guestListConsentAt: new Date() }),
+    ).toHaveLength(1);
   });
 });
 

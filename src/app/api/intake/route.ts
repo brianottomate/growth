@@ -9,7 +9,7 @@ import {
 /**
  * Public intake submission. The connect token in the body is the whole
  * credential, the same one /connect/[token] uses, so this route must never
- * accept an accountId or brandId from the caller — both are derived from it.
+ * accept an accountId or brandId from the caller. Both are derived from it.
  *
  * Failures are deliberately vague to the client. A token probe should not be
  * able to tell "no such brand" apart from "brand not eligible", and the

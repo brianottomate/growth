@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
 
 /**
- * The internal side of /connect/[token]: mint the share link, copy it, see
- * which channels the client has connected, and revoke by regenerating.
+ * The internal side of the client-facing links: mint the shared token, copy
+ * either surface, see which channels the client has connected, and revoke
+ * both by regenerating.
  */
 export function ClientConnectCard({ brandId }: { brandId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"connect" | "intake" | null>(null);
 
   const status = useQuery(trpc.brand.connectStatus.queryOptions({ brandId }));
   const invalidate = () =>
@@ -30,14 +31,14 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
   );
 
   const url = status.data?.url ?? null;
+  const intakeUrl = status.data?.intakeUrl ?? null;
   const channels = status.data?.channels ?? [];
   const visible = channels.filter((row) => row.offered || row.connected);
 
-  const copy = async () => {
-    if (!url) return;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  const copy = async (which: "connect" | "intake", value: string) => {
+    await navigator.clipboard.writeText(value);
+    setCopied(which);
+    setTimeout(() => setCopied(null), 1500);
   };
 
   return (
@@ -45,25 +46,68 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
       <div>
         <h2 className="text-base font-semibold">Client connect</h2>
         <p className="text-muted-foreground mt-0.5 text-sm">
-          A no-login link the client uses to connect their own social and ad
-          accounts into this brand. The link is the credential — regenerate it
-          to revoke one you have already sent.
+          Two no-login surfaces on one token: the intake form the client fills
+          in, and the connect page they use to authorise accounts. The token is
+          the credential, so regenerating it revokes both links you have
+          already sent.
         </p>
       </div>
 
       <div className="border-border rounded-xl border p-4">
+        {intakeUrl && (
+          <div className="mb-3">
+            <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+              Intake form
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
+                {intakeUrl}
+              </code>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void copy("intake", intakeUrl)}
+              >
+                {copied === "intake" ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+                {copied === "intake" ? "Copied" : "Copy"}
+              </Button>
+              <a
+                href={intakeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                Open ↗
+              </a>
+            </div>
+          </div>
+        )}
+
+        {url && (
+          <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+            Connect page
+          </p>
+        )}
         {url ? (
           <div className="flex flex-wrap items-center gap-2">
             <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
               {url}
             </code>
-            <Button size="sm" variant="outline" onClick={copy}>
-              {copied ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void copy("connect", url)}
+            >
+              {copied === "connect" ? (
                 <Check className="size-3.5" />
               ) : (
                 <Copy className="size-3.5" />
               )}
-              {copied ? "Copied" : "Copy"}
+              {copied === "connect" ? "Copied" : "Copy"}
             </Button>
             <Button
               size="sm"

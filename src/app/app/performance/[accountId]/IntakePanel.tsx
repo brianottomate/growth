@@ -184,7 +184,7 @@ function IntakeDetail({
             <li>
               {data.willCreateCycle ? "Opens" : "Updates"} cycle {data.period}
               {data.needsBudgetDecision
-                ? " — set the media budget below"
+                ? ", budget needs setting below"
                 : ` at $${data.mediaBudgetDollars}`}
             </li>
             {data.newProperties.length > 0 && (
@@ -307,7 +307,7 @@ function VerifyAccess({
         <div className="space-y-1.5">
           <p className="text-muted-foreground text-xs">
             No Page named like &ldquo;{result.brandName}&rdquo;. Either the
-            grant has not landed, or their Page is named differently — pick it
+            grant has not landed, or their Page is named differently. Pick it
             if you recognise it.
           </p>
           <div className="flex flex-wrap gap-1.5">

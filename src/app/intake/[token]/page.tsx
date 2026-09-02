@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * The real intake, addressed by the brand's connect token — the same
+ * The real intake, addressed by the brand's connect token. That is the same
  * credential /connect/[token] uses, so one link per client covers both and
  * revoking it revokes both.
  *

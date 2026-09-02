@@ -27,9 +27,7 @@ type Answers = {
   budgetFlexible: "" | "fixed" | "flexible";
   billingAcknowledged: boolean;
   invoiceEmail: string;
-  guestListName: string;
   guestConsent: boolean;
-  logoName: string;
   ugcPermission: "" | "yes" | "unsure" | "no";
   avoid: string;
   anythingElse: string;
@@ -47,9 +45,7 @@ const EMPTY: Answers = {
   budgetFlexible: "",
   billingAcknowledged: false,
   invoiceEmail: "",
-  guestListName: "",
   guestConsent: false,
-  logoName: "",
   ugcPermission: "",
   avoid: "",
   anythingElse: "",
@@ -66,9 +62,9 @@ const DRAFT_KEY = "wander-intake-draft-v1";
  *
  * Stepped rather than one long scroll, because this gets filled in live on a
  * call and one question at a time keeps both people looking at the same
- * thing. Nothing is submitted anywhere — the last step renders the answers as
- * text to copy, which is what makes the preview useful before there is a
- * backend to receive them.
+ * thing. When there is no token the form submits nowhere and the last step
+ * renders the answers as text to copy, which is what makes a preview link
+ * useful without minting one against a real client.
  */
 export function IntakeForm({
   seed,
@@ -405,7 +401,7 @@ function buildSteps(
           <Check
             checked={a.billingAcknowledged}
             onChange={(v) => set("billingAcknowledged", v)}
-            label="Got it — ad spend is invoiced monthly in advance, separate from the management fee."
+            label="Got it. Ad spend is invoiced monthly in advance, separate from the management fee."
             required
           />
           <Field
@@ -424,27 +420,25 @@ function buildSteps(
     },
     {
       label: "Past guests",
-      title: "Upload your past guest list",
-      help: "Name and email is all we need. Most booking systems export this under Guests, Contacts or Reservations.",
-      complete: Boolean(a.guestListName) && a.guestConsent,
+      title: "Your past guests",
+      help: "No export needed. Your booking site already holds this, so we build the list ourselves.",
+      complete: a.guestConsent,
       body: (
         <>
           <p className="text-muted-foreground text-sm leading-relaxed">
             We use it two ways: to find more people who look like your best
             guests, and to stop spending money advertising to people who have
-            already stayed with you. Uploaded securely, never shared, never
+            already stayed with you. Handled securely, never shared, never
             sold.
           </p>
-          <FilePick
-            accept=".csv,text/csv"
-            hint="Drop a .csv here, or browse"
-            fileName={a.guestListName}
-            onPick={(name) => set("guestListName", name)}
-          />
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Meta requires the advertiser to confirm this before we can build an
+            audience from it, so we need this one from you.
+          </p>
           <Check
             checked={a.guestConsent}
             onChange={(v) => set("guestConsent", v)}
-            label="I have the right to share this list, and these guests agreed to hear from us."
+            label="These guests booked with us and agreed to hear from us, and Wander may use their details to build ad audiences."
             required
           />
         </>
@@ -452,39 +446,26 @@ function buildSteps(
     },
     {
       label: "Creative",
-      title: "Logo and creative",
-      complete: Boolean(a.logoName) && a.ugcPermission !== "",
+      title: "Creative",
+      help: "We build the ads themselves from your booking site: your photography, your homes, your logo. One question here.",
+      complete: a.ugcPermission !== "",
       body: (
-        <>
-          <Field
-            label="Upload your logo"
-            required
-            hint="A PNG with a transparent background, or an SVG. Google needs a real logo file to run search and display ads. No logo to hand? Skip it and we'll pull what we can from your site."
-          >
-            <FilePick
-              accept=".png,.svg,image/png,image/svg+xml"
-              hint="Drop a .png or .svg here, or browse"
-              fileName={a.logoName}
-              onPick={(name) => set("logoName", name)}
-            />
-          </Field>
-          <Field
-            label="Do you have guest or creator content you're allowed to use in ads?"
-            required
-            hint="Reels, tagged photos, anything a creator made for you. With permission, it usually outperforms everything else we make."
-          >
-            <Radio
-              name="ugc"
-              value={a.ugcPermission}
-              onChange={(v) => set("ugcPermission", v as Answers["ugcPermission"])}
-              options={[
-                { value: "yes", label: "Yes, and I have permission" },
-                { value: "unsure", label: "Yes, but I'm not sure about permission" },
-                { value: "no", label: "No" },
-              ]}
-            />
-          </Field>
-        </>
+        <Field
+          label="Do you have guest or creator content you're allowed to use in ads?"
+          required
+          hint="Reels, tagged photos, anything a creator made for you. With permission, it usually outperforms everything else we make."
+        >
+          <Radio
+            name="ugc"
+            value={a.ugcPermission}
+            onChange={(v) => set("ugcPermission", v as Answers["ugcPermission"])}
+            options={[
+              { value: "yes", label: "Yes, and I have permission" },
+              { value: "unsure", label: "Yes, but I'm not sure about permission" },
+              { value: "no", label: "No" },
+            ]}
+          />
+        </Field>
       ),
     },
     {
@@ -775,44 +756,6 @@ function PropertyPicker({
 }
 
 /**
- * Records the chosen file's name only. Nothing is read or uploaded, because
- * there is nowhere to put it yet, and the label says so rather than implying
- * a transfer that did not happen.
- */
-function FilePick({
-  accept,
-  hint,
-  fileName,
-  onPick,
-}: {
-  accept: string;
-  hint: string;
-  fileName: string;
-  onPick: (name: string) => void;
-}) {
-  return (
-    <label className="border-border hover:border-foreground/40 block cursor-pointer rounded-xl border border-dashed px-4 py-6 text-center transition-colors">
-      <input
-        type="file"
-        accept={accept}
-        className="sr-only"
-        onChange={(e) => onPick(e.target.files?.[0]?.name ?? "")}
-      />
-      {fileName ? (
-        <>
-          <p className="text-sm font-medium">{fileName}</p>
-          <p className="text-muted-foreground mt-1 text-xs">
-            Recorded for the walkthrough. This preview does not upload files.
-          </p>
-        </>
-      ) : (
-        <p className="text-muted-foreground text-sm">{hint}</p>
-      )}
-    </label>
-  );
-}
-
-/**
  * The stand-in for a backend. Renders the answers as plain text so whoever
  * ran the call can paste them into Slack or a ticket until there is a table
  * to write them to.
@@ -891,7 +834,7 @@ function Summary({
           </button>
         ) : (
           <span className="text-muted-foreground text-xs">
-            Preview link — this form has nowhere to submit to.
+            Preview link. This form has nowhere to submit to.
           </span>
         )}
         <button
@@ -914,7 +857,7 @@ function Summary({
 
 function summaryText(seed: IntakeSeed, a: Answers): string {
   const lines: (string | null)[] = [
-    `Performance+ intake — ${seed.brand}`,
+    `Performance+ intake for ${seed.brand}`,
     `Contact: ${seed.contact} <${seed.email}> · ${seed.site}`,
     "",
     `Details confirmed: ${a.detailsConfirmed ? "yes" : "no"}`,
@@ -929,9 +872,7 @@ function summaryText(seed: IntakeSeed, a: Answers): string {
     `Billing acknowledged: ${a.billingAcknowledged ? "yes" : "no"}`,
     a.invoiceEmail ? `Invoices to: ${a.invoiceEmail}` : null,
     "",
-    `Guest list: ${a.guestListName || "not provided"}`,
-    `Guest consent given: ${a.guestConsent ? "yes" : "no"}`,
-    `Logo: ${a.logoName || "not provided"}`,
+    `Guest-audience consent: ${a.guestConsent ? "given" : "not given"}`,
     `Guest/creator content: ${a.ugcPermission || "not set"}`,
     "",
     a.avoid ? `Avoid: ${a.avoid}` : null,
@@ -951,7 +892,7 @@ function summaryText(seed: IntakeSeed, a: Answers): string {
  * reads as broken where a button that says "not yet, try again" does not.
  *
  * Never blocks. A grant can be real and not visible to us yet, and someone who
- * did their part must be able to finish the form regardless — we resolve any
+ * did their part must be able to finish the form regardless. We resolve any
  * disagreement on our side.
  */
 function AccessCheck({ token, brandName }: { token: string; brandName: string }) {
@@ -1004,7 +945,7 @@ function AccessCheck({ token, brandName }: { token: string; brandName: string })
       {state === "waiting" && (
         <p className="text-muted-foreground text-xs leading-relaxed">
           Not seeing it yet. That is usually just a delay on Meta&apos;s side.
-          Carry on and finish — we&apos;ll confirm from our end.
+          Carry on and finish. We&apos;ll confirm from our end.
         </p>
       )}
       {state === "throttled" && (
