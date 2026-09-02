@@ -344,7 +344,6 @@ export type PerformanceIntakeAnswers = {
   allProperties?: boolean;
   propertyNotes?: string;
   budget?: string;
-  budgetFlexible?: string;
   billingAcknowledged?: boolean;
   invoiceEmail?: string;
   ugcPermission?: string;
