@@ -10,10 +10,10 @@ import {
 /**
  * Record a Performance+ intake. POST /api/intake/v1/submit
  *
- * Called by wander.com, which hosts the form. The body's connect token
+ * Called by wander.com, which hosts the form. The body's token or slug
  * resolves the brand, so this route must never accept an accountId or
- * brandId from the caller. The gateway bearer is what stops the open
- * internet from filing submissions with a token it happened to see.
+ * brandId from the caller. The gateway bearer is what stops the open internet
+ * from filing submissions directly.
  */
 export async function POST(request: NextRequest) {
   const unauthorized = requireGatewayAuth(request);

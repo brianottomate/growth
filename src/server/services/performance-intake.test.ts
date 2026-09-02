@@ -10,6 +10,7 @@ import {
   matchBrandPage,
   normalizePageName,
   parseBudgetDollars,
+  prefillContact,
   propertyRowsFromAnswers,
 } from "./performance-intake.service";
 
@@ -167,5 +168,25 @@ describe("public access-check throttle", () => {
   it("allows again once the window has passed", () => {
     const earlier = new Date(now.getTime() - ACCESS_CHECK_INTERVAL_MS);
     expect(accessCheckAllowed(earlier, now)).toBe(true);
+  });
+});
+
+describe("prefill contact fields", () => {
+  it("uses the commercial record when a token addressed the form", () => {
+    expect(
+      prefillContact(true, { contactName: "Cynthia", contactEmail: "c@wpe.com" }),
+    ).toEqual({ contact: "Cynthia", email: "c@wpe.com" });
+  });
+
+  it("returns null rather than the Wander rep when no account exists", () => {
+    // The rep who minted the link must never stand in for the client, or the
+    // form asks a client to confirm their own rep's name and email.
+    expect(prefillContact(true, null)).toEqual({ contact: null, email: null });
+  });
+
+  it("withholds contact details from a guessable slug link", () => {
+    expect(
+      prefillContact(false, { contactName: "Cynthia", contactEmail: "c@wpe.com" }),
+    ).toEqual({ contact: null, email: null });
   });
 });

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
@@ -77,29 +77,34 @@ export function propertyRowsFromAnswers(
 
 export { intakeBrandRef };
 
-export const submitIntakeSchema = z.object({
-  token: z.string().min(16),
-  answers: z.record(z.string(), z.unknown()),
-});
+export const submitIntakeSchema = z
+  .object({
+    token: z.string().min(16).optional(),
+    slug: z.string().min(1).max(200).optional(),
+    answers: z.record(z.string(), z.unknown()),
+  })
+  .refine((value) => Boolean(value.token ?? value.slug), {
+    message: "A token or a slug is required",
+  });
 
 /**
  * Record a submission against the brand's connect token.
  *
- * The token is the whole credential, exactly as on /connect/[token]. This is
- * a public endpoint, so it must never accept an accountId or brandId from the
- * caller. The account is derived, or created in `onboarding` when a brand
- * reaches intake before anyone opened a commercial record for them.
+ * Addressed by token or slug, never by an id from the caller: this is reached
+ * from a public form, so the account is derived rather than supplied, or
+ * created in `onboarding` when a brand reaches intake before anyone opened a
+ * commercial record for them.
+ *
+ * A slug can be guessed, so a submission is a claim rather than proof of who
+ * filed it. That is why apply is an operator step with a preview, and why
+ * nothing here marks the access verified.
  */
 export async function submitPerformanceIntake(input: {
-  token: string;
+  token?: string;
+  slug?: string;
   answers: PerformanceIntakeAnswers;
 }): Promise<{ intakeId: string }> {
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.connectToken, input.token),
-  });
-  if (!brand?.organizationId) {
-    throw new PerformanceError("NOT_FOUND", "Unknown intake link");
-  }
+  const { brand } = await brandForHandle(input);
 
   let account = await db.query.performanceAccountTable.findFirst({
     where: and(
@@ -151,29 +156,89 @@ export async function submitPerformanceIntake(input: {
 }
 
 /**
- * Everything the client-facing form needs to render, resolved from the token.
+ * The client's own contact details for the form, or nulls.
  *
- * Read-only and deliberately narrow. This crosses a repo boundary to
- * wander.com, so it returns the fields the form displays and nothing else:
- * no ids, no commercial state, no billing. Adding a field here puts it on a
- * public page.
+ * Only ever from the commercial record. `brand.connectTokenIssuedBy*` is the
+ * WANDER rep who minted the link, and using it as a fallback here put their
+ * name and email in the client's "is this still right?" box on any brand
+ * without a performance_account. Null means the form asks, which is the right
+ * answer when we do not know.
+ *
+ * Withheld entirely from a slug link, because a guessable URL should not
+ * hand out an email address.
  */
-export async function intakePrefill(token: string) {
-  const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.connectToken, token),
-    columns: {
-      id: true,
-      name: true,
-      slug: true,
-      website: true,
-      connectTokenIssuedByName: true,
-      connectTokenIssuedByEmail: true,
-      organizationId: true,
-    },
-  });
-  if (!brand?.organizationId) {
-    throw new PerformanceError("NOT_FOUND", "Unknown intake link");
+export function prefillContact(
+  byToken: boolean,
+  account: { contactName: string | null; contactEmail: string | null } | null,
+): { contact: string | null; email: string | null } {
+  if (!byToken) return { contact: null, email: null };
+  return {
+    contact: account?.contactName ?? null,
+    email: account?.contactEmail ?? null,
+  };
+}
+
+/**
+ * Resolve a brand from either handle the client-facing form is addressed by.
+ *
+ * A token is unguessable and identifies one brand. A slug is readable, so it
+ * is what goes in a link someone reads out loud, and it is guessable by
+ * design. `byToken` tells the caller which one it got, because the answer
+ * decides what is safe to put on the page.
+ */
+async function brandForHandle(handle: { token?: string; slug?: string }) {
+  const columns = {
+    id: true,
+    name: true,
+    slug: true,
+    website: true,
+    connectTokenIssuedByName: true,
+    connectTokenIssuedByEmail: true,
+    organizationId: true,
+  } as const;
+
+  if (handle.token) {
+    const brand = await db.query.brandTable.findFirst({
+      where: eq(brandTable.connectToken, handle.token),
+      columns,
+    });
+    // Restated in the return type: the null check does not survive the
+    // function boundary, and callers insert with organizationId.
+    if (brand?.organizationId) {
+      return { brand: { ...brand, organizationId: brand.organizationId }, byToken: true };
+    }
   }
+  if (handle.slug) {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.slug, handle.slug),
+        isNotNull(brandTable.organizationId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns,
+    });
+    if (brand?.organizationId) {
+      return { brand: { ...brand, organizationId: brand.organizationId }, byToken: false };
+    }
+  }
+  throw new PerformanceError("NOT_FOUND", "Unknown intake link");
+}
+
+/**
+ * Everything the client-facing form needs to render.
+ *
+ * Read-only and deliberately narrow: this crosses a repo boundary onto a
+ * public page, so it returns the fields the form displays and nothing else.
+ * No ids, no commercial state, no billing.
+ *
+ * A slug-addressed link is guessable, so it gets only what is already on the
+ * client's own public booking site: their name, their domain, their homes. The
+ * contact name and email come back for a token link and not for a slug one,
+ * and the form asks for them instead. Same form either way; the readable URL
+ * just costs two fields.
+ */
+export async function intakePrefill(handle: { token?: string; slug?: string }) {
+  const { brand, byToken } = await brandForHandle(handle);
 
   const account = await db.query.performanceAccountTable.findFirst({
     where: and(
@@ -196,8 +261,7 @@ export async function intakePrefill(token: string) {
   return {
     brand: brand.name,
     slug: brand.slug,
-    contact: account?.contactName ?? brand.connectTokenIssuedByName ?? null,
-    email: account?.contactEmail ?? brand.connectTokenIssuedByEmail ?? null,
+    ...prefillContact(byToken, account ?? null),
     site: brand.website,
     properties: properties
       .map((row) => row.title)
@@ -527,13 +591,17 @@ export function accessCheckAllowed(
  * simply not have propagated, and blocking someone who did their part is a
  * worse outcome than a stale record we resolve on our side.
  */
-export async function checkAccessByToken(token: string): Promise<{
+export async function checkAccessByToken(handle: {
+  token?: string;
+  slug?: string;
+}): Promise<{
   found: boolean;
   pageName: string | null;
   throttled: boolean;
 }> {
+  const { brand: resolved } = await brandForHandle(handle);
   const brand = await db.query.brandTable.findFirst({
-    where: eq(brandTable.connectToken, token),
+    where: eq(brandTable.id, resolved.id),
     columns: {
       id: true,
       name: true,

@@ -5,7 +5,12 @@ import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
 import { PerformanceError } from "@/server/services/performance.service";
 import { checkAccessByToken } from "@/server/services/performance-intake.service";
 
-const schema = z.object({ token: z.string().min(16) });
+const schema = z
+  .object({
+    token: z.string().min(16).optional(),
+    slug: z.string().min(1).max(200).optional(),
+  })
+  .refine((value) => Boolean(value.token ?? value.slug));
 
 /**
  * Has the client's Leadsie grant reached us yet? POST /api/intake/v1/check
@@ -25,7 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return NextResponse.json(await checkAccessByToken(parsed.data.token));
+    return NextResponse.json(await checkAccessByToken(parsed.data));
   } catch (error) {
     if (error instanceof PerformanceError) {
       return NextResponse.json({ error: "Unknown link" }, { status: 404 });

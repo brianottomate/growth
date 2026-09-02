@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await checkAccessByToken(parsed.data.token);
+    const result = await checkAccessByToken({ token: parsed.data.token });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof PerformanceError) {
