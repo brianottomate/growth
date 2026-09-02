@@ -363,6 +363,7 @@ export async function intakeListings(handle: {
       name: row.name,
       url: row.url,
       bedrooms: row.bedrooms ?? null,
+      imageUrl: row.imageUrl ?? null,
     })),
   };
 }
@@ -371,6 +372,8 @@ export type WanderOsListingSummary = {
   name: string;
   url: string;
   bedrooms: number | null;
+  /** First media on the listing, so the form can show what it is. */
+  imageUrl: string | null;
 };
 
 async function requireIntake(actor: PerformanceActor, intakeId: string) {
