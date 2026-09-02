@@ -1,0 +1,39 @@
+import { NextResponse, type NextRequest } from "next/server";
+
+import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
+import { PerformanceError } from "@/server/services/performance.service";
+import {
+  submitIntakeSchema,
+  submitPerformanceIntake,
+} from "@/server/services/performance-intake.service";
+
+/**
+ * Record a Performance+ intake. POST /api/intake/v1/submit
+ *
+ * Called by wander.com, which hosts the form. The body's connect token
+ * resolves the brand, so this route must never accept an accountId or
+ * brandId from the caller. The gateway bearer is what stops the open
+ * internet from filing submissions with a token it happened to see.
+ */
+export async function POST(request: NextRequest) {
+  const unauthorized = requireGatewayAuth(request);
+  if (unauthorized) return unauthorized;
+
+  const parsed = submitIntakeSchema.safeParse(
+    await request.json().catch(() => null),
+  );
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  try {
+    const { intakeId } = await submitPerformanceIntake(parsed.data);
+    return NextResponse.json({ ok: true, intakeId });
+  } catch (error) {
+    if (error instanceof PerformanceError) {
+      return NextResponse.json({ error: "Unknown link" }, { status: 404 });
+    }
+    console.error("intake submission failed", error);
+    return NextResponse.json({ error: "Submission failed" }, { status: 500 });
+  }
+}

@@ -150,6 +150,63 @@ export async function submitPerformanceIntake(input: {
   return { intakeId: intake!.id };
 }
 
+/**
+ * Everything the client-facing form needs to render, resolved from the token.
+ *
+ * Read-only and deliberately narrow. This crosses a repo boundary to
+ * wander.com, so it returns the fields the form displays and nothing else:
+ * no ids, no commercial state, no billing. Adding a field here puts it on a
+ * public page.
+ */
+export async function intakePrefill(token: string) {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.connectToken, token),
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      website: true,
+      connectTokenIssuedByName: true,
+      connectTokenIssuedByEmail: true,
+      organizationId: true,
+    },
+  });
+  if (!brand?.organizationId) {
+    throw new PerformanceError("NOT_FOUND", "Unknown intake link");
+  }
+
+  const account = await db.query.performanceAccountTable.findFirst({
+    where: and(
+      eq(performanceAccountTable.brandId, brand.id),
+      isNull(performanceAccountTable.deletedAt),
+    ),
+    columns: { id: true, contactName: true, contactEmail: true },
+  });
+
+  const properties = account
+    ? await db.query.performancePropertyTable.findMany({
+        where: and(
+          eq(performancePropertyTable.accountId, account.id),
+          isNull(performancePropertyTable.deletedAt),
+        ),
+        columns: { title: true },
+      })
+    : [];
+
+  return {
+    brand: brand.name,
+    slug: brand.slug,
+    contact: account?.contactName ?? brand.connectTokenIssuedByName ?? null,
+    email: account?.contactEmail ?? brand.connectTokenIssuedByEmail ?? null,
+    site: brand.website,
+    properties: properties
+      .map((row) => row.title)
+      .filter((title): title is string => Boolean(title)),
+    repName: brand.connectTokenIssuedByName?.split(" ")[0] ?? null,
+    repEmail: brand.connectTokenIssuedByEmail,
+  };
+}
+
 async function requireIntake(actor: PerformanceActor, intakeId: string) {
   const intake = await db.query.performanceIntakeTable.findFirst({
     where: eq(performanceIntakeTable.id, intakeId),
