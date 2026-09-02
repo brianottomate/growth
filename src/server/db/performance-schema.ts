@@ -69,6 +69,10 @@ export const performanceAccountTable = pgTable(
 
     notes: t.text(),
 
+    // When the customer signed. `status` alone loses the date, and the date is
+    // what a cohort report gets built from.
+    signedAt: t.timestamp({ withTimezone: true }),
+
     createdAt: t
       .timestamp()
       .$defaultFn(() => new Date())
@@ -83,7 +87,12 @@ export const performanceAccountTable = pgTable(
   (table) => [
     index("performance_account_org_idx").on(table.organizationId),
     index("performance_account_status_idx").on(table.status),
-    index("performance_account_brand_idx").on(table.brandId),
+    // One live account per brand. Intake does a find-or-create on this pair,
+    // so without the constraint a second row would silently split a client's
+    // intakes across two accounts with nothing raising a hand.
+    uniqueIndex("performance_account_brand_live_idx")
+      .on(table.brandId)
+      .where(sql`${table.deletedAt} is null`),
   ],
 );
 
@@ -128,6 +137,13 @@ export const performancePropertyTable = pgTable(
     siteUrl: t.text(), // https://<client-domain>/... (Performance+)
     propertyId: t.text(), // monolith id; backfilled, see doc above
     title: t.text(), // display name for cards/reports
+
+    // Where the home is, copied from the listing feed rather than inferred.
+    // The campaign audience's geography is rolled up from these.
+    city: t.text(),
+    state: t.text(), // two-letter code, e.g. "CO"
+    country: t.text(), // ISO-3166 alpha-2, e.g. "US"
+
     notes: t.text(),
 
     createdAt: t

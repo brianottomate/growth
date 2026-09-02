@@ -76,7 +76,21 @@ export function AccountDetail({ accountId }: { accountId: string }) {
         </div>
         <p className="text-muted-foreground text-sm">
           {account.plan ?? "no plan set"} · {account.status}
-          {account.brand ? ` · brand: ${account.brand.name}` : ""}
+          {account.brand?.slug ? (
+            <>
+              {" · "}
+              <Link
+                href={`/app/brands/${account.brand.slug}`}
+                className="text-foreground hover:underline"
+              >
+                {account.brand.name} ↗
+              </Link>
+            </>
+          ) : account.brand ? (
+            ` · brand: ${account.brand.name}`
+          ) : (
+            ""
+          )}
         </p>
         {account.notes && (
           <p className="text-muted-foreground max-w-3xl text-sm">

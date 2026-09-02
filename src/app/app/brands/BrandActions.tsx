@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { MoreHorizontal, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Handshake, MoreHorizontal, Pencil, Sparkles, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,7 @@ export type BrandLite = {
   description: string | null;
   website: string | null;
   logo: string | null;
+  relationship: "internal" | "client" | "prospect" | "reference";
 };
 
 export function BrandActions({ brand }: { brand: BrandLite }) {
@@ -57,6 +58,13 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
       },
     }),
   );
+  // The signature event: marks the brand a client and opens the commercial
+  // record, so a deal closed on a call stops depending on the client getting
+  // round to the intake form.
+  const promoteM = useMutation(
+    trpc.performance.promoteToClient.mutationOptions({ onSuccess: refresh }),
+  );
+
   const deleteM = useMutation(
     trpc.brand.delete.mutationOptions({ onSuccess: refresh }),
   );
@@ -88,6 +96,15 @@ export function BrandActions({ brand }: { brand: BrandLite }) {
             <Sparkles className="size-3.5" />
             {enrichM.isPending ? "Enriching…" : "Enrich from website"}
           </DropdownMenuItem>
+          {brand.relationship !== "client" && (
+            <DropdownMenuItem
+              disabled={promoteM.isPending}
+              onClick={() => promoteM.mutate({ brandId: brand.id })}
+            >
+              <Handshake className="size-3.5" />
+              {promoteM.isPending ? "Marking…" : "Mark as client"}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => setEditing(true)}>
             <Pencil className="size-3.5" />
             Edit

@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
+import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
 
@@ -48,6 +49,13 @@ export async function CampaignView({
   if (draft?.brand.slug !== brandSlug) notFound();
 
   const { campaign, audiences, ads, platformCampaigns, personas } = draft;
+
+  // Where this client's homes actually are, so the first audience opens on
+  // their own states instead of an empty field.
+  const prefill = await campaignPrefillFromIntake(
+    { orgId: org.id },
+    { brandId: draft.brand.id },
+  ).catch(() => null);
 
   const planned = [...platformCampaigns].sort((a, b) =>
     a.platform.localeCompare(b.platform),
@@ -191,6 +199,7 @@ export async function CampaignView({
           campaignId={campaign.id}
           audiences={audiences}
           personas={personas}
+          geoPrefill={prefill?.geography ?? null}
         />
       </section>
 

@@ -22,6 +22,7 @@ import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.servi
 import {
   brandConnectUrl,
   brandIntakeUrl,
+  brandPitchUrl,
   ensureBrandConnect,
   getBrandConnectStatus,
   regenerateBrandConnectToken,
@@ -143,6 +144,26 @@ function slugify(name: string): string {
 }
 
 export const brandRouter = createTRPCRouter({
+  /**
+   * Every owned brand, name and slug only.
+   *
+   * For pickers that have to attach something to a brand. Deliberately thin:
+   * the brands page does its own richer query, and a picker that pulled the
+   * whole row would ship logos and fingerprints to render a dropdown.
+   */
+  listLite: protectedProcedure.query(async ({ ctx }) => {
+    const [orgId] = await userOrgIds(ctx);
+    if (!orgId) return [];
+    return ctx.db.query.brandTable.findMany({
+      where: and(
+        eq(brandTable.organizationId, orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true, name: true, slug: true, relationship: true },
+      orderBy: (t, { asc }) => asc(t.name),
+    });
+  }),
+
   /**
    * Create a brand. Two scopes:
    * - `owned`: a top-level brand for the user's org (company/personal).
@@ -561,6 +582,9 @@ export const brandRouter = createTRPCRouter({
           : brand.connectToken
             ? brandIntakeUrl(brand.connectToken)
             : null,
+        // Slug only: the pitch goes out before anything is signed and gets
+        // read out loud, and the page shows nothing a token would protect.
+        pitchUrl: brand.slug ? brandPitchUrl(brand.slug) : null,
         channels: await getBrandConnectStatus(input.brandId),
       };
     }),

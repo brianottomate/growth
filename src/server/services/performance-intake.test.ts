@@ -4,6 +4,8 @@ import { intakeBrandRef } from "@/lib/intake-ref";
 
 import {
   accessCheckAllowed,
+  geographyFromProperties,
+  withPropertyAddresses,
   ACCESS_CHECK_INTERVAL_MS,
   answersFingerprint,
   applyBlockers,
@@ -244,5 +246,75 @@ describe("duplicate submissions", () => {
       isDuplicateSubmission(fp, { answersFingerprint: null, submittedAt: now }, now),
     ).toBe(false);
     expect(isDuplicateSubmission(fp, undefined, now)).toBe(false);
+  });
+});
+
+describe("property addresses", () => {
+  const addresses = new Map([
+    [
+      "https://winterparkescapes.com/property/12/arrow",
+      { city: "Winter Park", state: "CO", country: "US" },
+    ],
+  ]);
+
+  it("matches through case and a trailing slash", () => {
+    // The dedupe key and the feed's URL are normalized the same way, or a home
+    // the client picked from our own list would come back unlocated.
+    expect(
+      withPropertyAddresses(
+        [{ siteUrl: "https://WinterParkEscapes.com/property/12/arrow/" }],
+        addresses,
+      ),
+    ).toEqual([
+      {
+        siteUrl: "https://WinterParkEscapes.com/property/12/arrow/",
+        city: "Winter Park",
+        state: "CO",
+        country: "US",
+      },
+    ]);
+  });
+
+  it("leaves a hand-pasted URL unlocated rather than guessing", () => {
+    expect(
+      withPropertyAddresses([{ siteUrl: "https://elsewhere.com/cabin" }], addresses),
+    ).toEqual([
+      { siteUrl: "https://elsewhere.com/cabin", city: null, state: null, country: null },
+    ]);
+  });
+});
+
+describe("audience geography from the homes", () => {
+  it("rolls up codes, names and cities without repeating any", () => {
+    expect(
+      geographyFromProperties([
+        { city: "Winter Park", state: "CO", country: "US" },
+        { city: "Winter Park", state: "co", country: "us" },
+        { city: "Aspen", state: "CO", country: "US" },
+      ]),
+    ).toEqual({
+      countries: ["US"],
+      states: ["CO"],
+      regions: ["Colorado"],
+      cities: ["Aspen", "Winter Park"],
+    });
+  });
+
+  it("keeps a state we cannot name out of regions and in states", () => {
+    // `regions` is what a platform gets asked for, so a name we cannot resolve
+    // has to drop out of it rather than travel as a code the geo search will
+    // fail on. The fact itself stays visible in `states`.
+    expect(geographyFromProperties([{ state: "XX", country: "US" }])).toEqual({
+      countries: ["US"],
+      states: ["XX"],
+    });
+  });
+
+  it("returns nothing for homes with no location", () => {
+    // An empty plan means "no geography layer", which is a broad buy. A plan
+    // with empty arrays would compile into a targeting spec that asks for
+    // nowhere.
+    expect(geographyFromProperties([{ city: null, state: null, country: null }])).toEqual({});
+    expect(geographyFromProperties([])).toEqual({});
   });
 });

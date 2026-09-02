@@ -18,6 +18,7 @@ import {
   performanceAccountTable,
   platformCampaignTable,
   type Brand,
+  type BrandRelationship,
   type BrandWebsiteMeta,
   type brandTypeEnum,
 } from "@/server/db/schema";
@@ -72,6 +73,10 @@ export async function createOwnedBrand(input: {
   name: string;
   website?: string | null;
   brandType?: (typeof brandTypeEnum.enumValues)[number];
+  /** Wander's relationship to it. Defaults to one of ours. */
+  relationship?: BrandRelationship;
+  /** The `leads.domain` row this came from, when a rep created it from /leads. */
+  leadDomain?: string | null;
   /** Pre-fetched enrichment (the dialog's preview) — saved inline. */
   enrichment?: BrandEnrichmentValues | null;
 }): Promise<Brand> {
@@ -93,6 +98,8 @@ export async function createOwnedBrand(input: {
       organizationId: input.organizationId,
       ownerId: input.ownerId,
       type: input.brandType ?? "company",
+      relationship: input.relationship ?? "internal",
+      leadDomain: input.leadDomain ?? null,
       name: input.name,
       slug,
       website,

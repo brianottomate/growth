@@ -22,6 +22,12 @@ export type WanderOsListing = {
   url: string;
   bedrooms?: number;
   imageUrl?: string;
+  /** Where the home is, as the feed states it. */
+  city?: string;
+  /** Two-letter state code, e.g. "CO". */
+  state?: string;
+  /** ISO-3166 alpha-2, e.g. "US". */
+  country?: string;
 };
 
 /**
@@ -85,6 +91,12 @@ export async function listWanderOsListings(input: {
         // Media carries sized variants, not a bare `url`: lowResUrl is 640px
         // and mediumResUrl 1200px, both webp on assets.wander.com.
         medias?: { lowResUrl?: string; mediumResUrl?: string; type?: string }[];
+        address?: {
+          city?: string;
+          state?: string;
+          country?: string;
+          countryShortCode?: string;
+        };
       }[];
       pagination?: { has_more?: boolean };
     };
@@ -100,6 +112,9 @@ export async function listWanderOsListings(input: {
         url: `${origin}/property/${id}/${row.slug}`,
         bedrooms: row.bedrooms,
         imageUrl: row.medias?.[0]?.lowResUrl ?? row.medias?.[0]?.mediumResUrl,
+        city: row.address?.city,
+        state: row.address?.state,
+        country: row.address?.countryShortCode ?? row.address?.country,
       });
     }
 

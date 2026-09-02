@@ -12,10 +12,12 @@ import {
   performanceCycleTable,
   performanceIntakeTable,
   performancePropertyTable,
+  type AudienceGeographyPlan,
   type PerformanceIntake,
   type PerformanceIntakeAnswers,
 } from "@/server/db/schema";
 import { intakeBrandRef } from "@/lib/intake-ref";
+import { usStateName } from "@/lib/us-states";
 import { zernioConnectionMatchesPlatform } from "@/lib/zernio-ads";
 import {
   listWanderOsListings,
@@ -84,6 +86,76 @@ export function propertyRowsFromAnswers(
     rows.push({ accountId, siteUrl, title: null });
   }
   return rows;
+}
+
+/** Compare listing URLs the way the property dedupe does. */
+function normalizeListingUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, "");
+}
+
+export type PropertyAddress = {
+  city: string | null;
+  state: string | null;
+  country: string | null;
+};
+
+/**
+ * Attach each home's city and state from the client's own listing feed.
+ *
+ * Best-effort by design: an unreachable site or a home pasted by hand leaves
+ * the columns null, and the campaign audience simply gets a thinner geography
+ * layer. Guessing a location from a URL would put a place on the record that
+ * the client never said.
+ */
+export function withPropertyAddresses<T extends { siteUrl: string }>(
+  rows: T[],
+  addresses: Map<string, PropertyAddress>,
+): (T & PropertyAddress)[] {
+  return rows.map((row) => ({
+    ...row,
+    ...(addresses.get(normalizeListingUrl(row.siteUrl)) ?? {
+      city: null,
+      state: null,
+      country: null,
+    }),
+  }));
+}
+
+/**
+ * The campaign audience's geography, rolled up from where the homes are.
+ *
+ * `states` carries the codes the feed gave us and `regions` the names a
+ * platform can be asked for, so a code we cannot name drops out of `regions`
+ * and stays visible in `states`. Cities come along because a metro layer is
+ * sometimes the right buy, and the operator prunes.
+ */
+export function geographyFromProperties(
+  rows: { city?: string | null; state?: string | null; country?: string | null }[],
+): AudienceGeographyPlan {
+  const countries = new Set<string>();
+  const states = new Set<string>();
+  const cities = new Set<string>();
+
+  for (const row of rows) {
+    const country = row.country?.trim().toUpperCase();
+    if (country) countries.add(country);
+    const state = row.state?.trim().toUpperCase();
+    if (state) states.add(state);
+    const city = row.city?.trim();
+    if (city) cities.add(city);
+  }
+
+  const plan: AudienceGeographyPlan = {};
+  if (countries.size > 0) plan.countries = [...countries].sort();
+  if (states.size > 0) {
+    plan.states = [...states].sort();
+    const regions = plan.states
+      .map((code) => usStateName(code))
+      .filter((name): name is string => name !== null);
+    if (regions.length > 0) plan.regions = regions;
+  }
+  if (cities.size > 0) plan.cities = [...cities].sort();
+  return plan;
 }
 
 /**
@@ -254,6 +326,8 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
     name: true,
     slug: true,
     website: true,
+    logo: true,
+    tagline: true,
     connectTokenIssuedByName: true,
     connectTokenIssuedByEmail: true,
     organizationId: true,
@@ -365,6 +439,35 @@ export async function intakeListings(handle: {
       imageUrl: row.imageUrl ?? null,
     })),
   };
+}
+
+/**
+ * Where each home on a client's booking site is, keyed by listing URL.
+ *
+ * Returns an empty map for anything that is not a WanderOS site, and swallows
+ * a failed fetch: an address layer is an improvement on the property rows, not
+ * a precondition for writing them.
+ */
+export async function listingAddressMap(
+  website: string | null,
+): Promise<Map<string, PropertyAddress>> {
+  const addresses = new Map<string, PropertyAddress>();
+  if (!website) return addresses;
+  try {
+    const websiteId = await wanderOsWebsiteId(website);
+    if (!websiteId) return addresses;
+    const listings = await listWanderOsListings({ websiteId, siteUrl: website });
+    for (const listing of listings) {
+      addresses.set(normalizeListingUrl(listing.url), {
+        city: listing.city ?? null,
+        state: listing.state ?? null,
+        country: listing.country ?? null,
+      });
+    }
+  } catch (error) {
+    console.error("listing address lookup failed", error);
+  }
+  return addresses;
 }
 
 export type WanderOsListingSummary = {
@@ -534,9 +637,16 @@ export async function applyPerformanceIntake(
   }
 
   // 3. Homes as rows, because ads fan out over them and reporting needs ids.
+  //    Their city and state come from the client's own listing feed, which is
+  //    what the campaign audience's geography is later rolled up from.
   if (preview.newProperties.length > 0) {
-    await db.insert(performancePropertyTable).values(preview.newProperties);
-    written.push(`Added ${preview.newProperties.length} home(s)`);
+    const addresses = await listingAddressMap(intake.brand?.website ?? null);
+    const rows = withPropertyAddresses(preview.newProperties, addresses);
+    await db.insert(performancePropertyTable).values(rows);
+    const located = rows.filter((row) => row.state !== null).length;
+    written.push(
+      `Added ${rows.length} home(s)${located > 0 ? `, ${located} with a location` : ""}`,
+    );
   }
 
   await db
@@ -756,4 +866,166 @@ export async function checkAccessByToken(handle: {
   // Only the Page NAME goes back: the id is an internal handle and this
   // response is public.
   return { found: Boolean(match), pageName: match?.name ?? null, throttled: false };
+}
+
+// ---- THE PITCH PAGE --------------------------------------------------------
+//
+// A rep sends a prospect a readable link before anything is signed. The page
+// is on wander.com and reads through the gateway, so this is the one place
+// that decides what a guessable URL may show: the brand's own public identity
+// and the homes already listed on their own booking site. No commercial
+// state, no contact details, no ids.
+
+export type PerformancePitchHome = {
+  name: string;
+  url: string;
+  imageUrl: string | null;
+  bedrooms: number | null;
+  city: string | null;
+  state: string | null;
+};
+
+export type PerformancePitch = {
+  brand: {
+    name: string;
+    website: string | null;
+    logo: string | null;
+    tagline: string | null;
+  };
+  homes: PerformancePitchHome[];
+  /** Rolled up from the homes, so the pitch can say where the ads would run. */
+  geography: AudienceGeographyPlan;
+  /** Where the same link takes them once they say yes. */
+  intakePath: string;
+};
+
+export async function performancePitch(handle: {
+  token?: string;
+  slug?: string;
+}): Promise<PerformancePitch> {
+  const { brand } = await brandForHandle(handle);
+
+  let homes: PerformancePitchHome[] = [];
+  if (brand.website) {
+    try {
+      const websiteId = await wanderOsWebsiteId(brand.website);
+      if (websiteId) {
+        const listings = await listWanderOsListings({
+          websiteId,
+          siteUrl: brand.website,
+        });
+        homes = listings.map((row) => ({
+          name: row.name,
+          url: row.url,
+          imageUrl: row.imageUrl ?? null,
+          bedrooms: row.bedrooms ?? null,
+          city: row.city ?? null,
+          state: row.state ?? null,
+        }));
+      }
+    } catch (error) {
+      // A pitch page with no homes is still a pitch page.
+      console.error("pitch listings failed", error);
+    }
+  }
+
+  return {
+    brand: {
+      name: brand.name,
+      website: brand.website,
+      logo: brand.logo,
+      tagline: brand.tagline,
+    },
+    homes,
+    geography: geographyFromProperties(homes),
+    // The slug, never the token: this payload can reach a guessable page.
+    intakePath: brand.slug ? `/internal/intake/${brand.slug}` : "",
+  };
+}
+
+// ---- CAMPAIGN PREFILL -----------------------------------------------------
+
+export type CampaignPrefill = {
+  accountId: string | null;
+  /** Whole dollars the client agreed to, or null when they asked us to advise. */
+  mediaBudgetDollars: number | null;
+  landingUrl: string | null;
+  /** The homes on the record, which is what the ads fan out over. */
+  propertyUrls: string[];
+  /** True when the client asked for everything rather than naming homes. */
+  allProperties: boolean;
+  geography: AudienceGeographyPlan;
+};
+
+/**
+ * What a new campaign draft should open with for a Performance+ client.
+ *
+ * Reads the promoted rows rather than the receipt wherever both exist, since
+ * an operator may have corrected a home or a budget after apply. The budget
+ * falls back to the intake's own number when no cycle has been opened yet.
+ */
+export async function campaignPrefillFromIntake(
+  actor: PerformanceActor,
+  input: { brandId: string },
+): Promise<CampaignPrefill> {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, input.brandId),
+      eq(brandTable.organizationId, actor.orgId),
+    ),
+    columns: { id: true, website: true },
+  });
+  if (!brand) throw new PerformanceError("NOT_FOUND", "Brand not found");
+
+  const account = await db.query.performanceAccountTable.findFirst({
+    where: and(
+      eq(performanceAccountTable.brandId, brand.id),
+      eq(performanceAccountTable.organizationId, actor.orgId),
+      isNull(performanceAccountTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  if (!account) {
+    return {
+      accountId: null,
+      mediaBudgetDollars: null,
+      landingUrl: brand.website,
+      propertyUrls: [],
+      allProperties: false,
+      geography: {},
+    };
+  }
+
+  const [intake, properties, cycle] = await Promise.all([
+    db.query.performanceIntakeTable.findFirst({
+      where: eq(performanceIntakeTable.accountId, account.id),
+      orderBy: desc(performanceIntakeTable.submittedAt),
+      columns: { answers: true, mediaBudgetDollars: true },
+    }),
+    db.query.performancePropertyTable.findMany({
+      where: and(
+        eq(performancePropertyTable.accountId, account.id),
+        isNull(performancePropertyTable.deletedAt),
+      ),
+      columns: { siteUrl: true, wanderUrl: true, city: true, state: true, country: true },
+    }),
+    db.query.performanceCycleTable.findFirst({
+      where: and(
+        eq(performanceCycleTable.accountId, account.id),
+        eq(performanceCycleTable.period, currentPeriod()),
+      ),
+      columns: { mediaBudget: true },
+    }),
+  ]);
+
+  return {
+    accountId: account.id,
+    mediaBudgetDollars: cycle?.mediaBudget ?? intake?.mediaBudgetDollars ?? null,
+    landingUrl: brand.website,
+    propertyUrls: properties
+      .map((row) => row.siteUrl ?? row.wanderUrl)
+      .filter((url): url is string => Boolean(url)),
+    allProperties: intake?.answers.allProperties === true,
+    geography: geographyFromProperties(properties),
+  };
 }

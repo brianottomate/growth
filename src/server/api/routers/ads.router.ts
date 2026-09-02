@@ -160,7 +160,12 @@ export const adsRouter = {
         ageMin: z.number().int().min(13).max(100).nullish(),
         ageMax: z.number().int().min(13).max(100).nullish(),
         countries: z.array(z.string().length(2)).max(20).nullish(),
-        regions: z.array(z.string().trim().min(1).max(100)).max(20).nullish(),
+        // Codes as the source states them; `regions` are the names a platform
+        // can be asked for. Both travel, because a code round-trips and a
+        // display name is a lookup that can fail.
+        states: z.array(z.string().trim().length(2)).max(60).nullish(),
+        regions: z.array(z.string().trim().min(1).max(100)).max(60).nullish(),
+        cities: z.array(z.string().trim().min(1).max(120)).max(100).nullish(),
         keywords: z.array(z.string().trim().min(1).max(80)).max(50).nullish(),
       }),
     )
@@ -172,10 +177,15 @@ export const adsRouter = {
         ageMin: input.ageMin ?? null,
         ageMax: input.ageMax ?? null,
         geography:
-          input.countries?.length || input.regions?.length
+          input.countries?.length ||
+          input.states?.length ||
+          input.regions?.length ||
+          input.cities?.length
             ? {
                 countries: input.countries ?? undefined,
+                states: input.states?.map((code) => code.toUpperCase()),
                 regions: input.regions ?? undefined,
+                cities: input.cities ?? undefined,
               }
             : null,
         keywords: input.keywords ?? null,
@@ -191,7 +201,9 @@ export const adsRouter = {
         ageMin: z.number().int().min(13).max(100).nullish(),
         ageMax: z.number().int().min(13).max(100).nullish(),
         countries: z.array(z.string().length(2)).max(20).nullish(),
-        regions: z.array(z.string().trim().min(1).max(100)).max(20).nullish(),
+        states: z.array(z.string().trim().length(2)).max(60).nullish(),
+        regions: z.array(z.string().trim().min(1).max(100)).max(60).nullish(),
+        cities: z.array(z.string().trim().min(1).max(120)).max(100).nullish(),
         keywords: z.array(z.string().trim().min(1).max(80)).max(50).nullish(),
       }),
     )
@@ -202,10 +214,15 @@ export const adsRouter = {
         ageMin: input.ageMin,
         ageMax: input.ageMax,
         geography:
-          input.countries !== undefined || input.regions !== undefined
+          input.countries !== undefined ||
+          input.states !== undefined ||
+          input.regions !== undefined ||
+          input.cities !== undefined
             ? {
                 countries: input.countries ?? undefined,
+                states: input.states?.map((code) => code.toUpperCase()),
                 regions: input.regions ?? undefined,
+                cities: input.cities ?? undefined,
               }
             : undefined,
         keywords: input.keywords,

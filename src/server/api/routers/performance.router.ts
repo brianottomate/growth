@@ -31,11 +31,16 @@ import {
 } from "@/server/services/performance.service";
 import {
   applyPerformanceIntake,
+  campaignPrefillFromIntake,
   listPerformanceIntakes,
   previewIntakeApply,
   setIntakeVerifiedPage,
   verifyIntakeAccess,
 } from "@/server/services/performance-intake.service";
+import {
+  promoteBrandToClient,
+  setBrandRelationship,
+} from "@/server/services/brand-relationship.service";
 
 import { protectedProcedure } from "../trpc";
 
@@ -195,5 +200,39 @@ export const performanceRouter = {
     )
     .mutation(async ({ ctx, input }) =>
       setIntakeVerifiedPage(await actorFor(ctx), input),
+    ),
+
+  // ---- relationship -------------------------------------------------------
+
+  // The signature event. Creates the commercial record if a client signed
+  // before ever filling the form, which is the ordinary case for a deal an AE
+  // closed on a call.
+  promoteToClient: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        plan: z.string().min(1).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      promoteBrandToClient(await actorFor(ctx), input),
+    ),
+
+  setBrandRelationship: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        relationship: z.enum(["internal", "client", "prospect", "reference"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setBrandRelationship(await actorFor(ctx), input),
+    ),
+
+  // What a new campaign draft opens with for a Performance+ client.
+  campaignPrefill: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      campaignPrefillFromIntake(await actorFor(ctx), input),
     ),
 } satisfies TRPCRouterRecord;

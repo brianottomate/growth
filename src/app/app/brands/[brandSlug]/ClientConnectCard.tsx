@@ -15,7 +15,9 @@ import { useTRPC } from "@/trpc/react";
 export function ClientConnectCard({ brandId }: { brandId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [copied, setCopied] = useState<"connect" | "intake" | null>(null);
+  const [copied, setCopied] = useState<"connect" | "intake" | "pitch" | null>(
+    null,
+  );
 
   const status = useQuery(trpc.brand.connectStatus.queryOptions({ brandId }));
   const invalidate = () =>
@@ -32,10 +34,14 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
 
   const url = status.data?.url ?? null;
   const intakeUrl = status.data?.intakeUrl ?? null;
+  const pitchUrl = status.data?.pitchUrl ?? null;
   const channels = status.data?.channels ?? [];
   const visible = channels.filter((row) => row.offered || row.connected);
 
-  const copy = async (which: "connect" | "intake", value: string) => {
+  const copy = async (
+    which: "connect" | "intake" | "pitch",
+    value: string,
+  ) => {
     await navigator.clipboard.writeText(value);
     setCopied(which);
     setTimeout(() => setCopied(null), 1500);
@@ -46,14 +52,49 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
       <div>
         <h2 className="text-base font-semibold">Client connect</h2>
         <p className="text-muted-foreground mt-0.5 text-sm">
-          Two no-login surfaces on one token: the intake form the client fills
-          in, and the connect page they use to authorise accounts. The token is
-          the credential, so regenerating it revokes both links you have
-          already sent.
+          Three no-login surfaces for one brand: the pitch a rep sends before
+          anything is signed, the intake form the client fills in, and the
+          connect page they use to authorise accounts. The token is the
+          credential for the last two, so regenerating it revokes those links
+          you have already sent. The pitch reads off the slug and shows only
+          what is already public on the client&rsquo;s own site.
         </p>
       </div>
 
       <div className="border-border rounded-xl border p-4">
+        {pitchUrl && (
+          <div className="mb-3">
+            <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+              Sales pitch
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
+                {pitchUrl}
+              </code>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void copy("pitch", pitchUrl)}
+              >
+                {copied === "pitch" ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+                {copied === "pitch" ? "Copied" : "Copy"}
+              </Button>
+              <a
+                href={pitchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                Open ↗
+              </a>
+            </div>
+          </div>
+        )}
+
         {intakeUrl && (
           <div className="mb-3">
             <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">

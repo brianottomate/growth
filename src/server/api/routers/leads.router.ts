@@ -1,3 +1,4 @@
+import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import {
   and,
@@ -33,6 +34,9 @@ import {
   listWebsiteProspects,
   SETTLED_PROSPECT_STATUSES,
 } from "@/server/clients/wander.client";
+import { memberTable } from "@/server/db/auth-schema";
+import { enrichBrandById } from "@/server/services/brand-ops.service";
+import { createProspectFromLead } from "@/server/services/brand-relationship.service";
 import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
 import { capturePreviewVisual } from "@/server/services/pregen/preview-visual";
 import { discoverDomain } from "@/server/services/lead-discovery.service";
@@ -935,6 +939,45 @@ export const leadsRouter = createTRPCRouter({
    * Returns once the prospect record exists. The build is async and reports back
    * over /api/webhooks/pregen; the returned status means "accepted", not "built".
    */
+  /**
+   * Turn a row in the mirror into a prospect brand a rep can pitch.
+   *
+   * The mirror is 200k+ rows of census data and stays that way; this is the
+   * point a human decides one of them is worth a pitch page, a strategy, and
+   * eventually a campaign. Enrichment runs after the response so the click is
+   * instant and the logo lands when the scrape does.
+   */
+  createProspect: protectedProcedure
+    .input(z.object({ domainId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await ctx.db.query.memberTable.findFirst({
+        where: eq(memberTable.userId, ctx.session.user.id),
+        columns: { organizationId: true },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must belong to an organization to create a prospect",
+        });
+      }
+
+      const { brand, created } = await createProspectFromLead({
+        organizationId: membership.organizationId,
+        ownerId: ctx.session.user.id,
+        domainId: input.domainId,
+      });
+
+      if (created && brand.website) {
+        waitUntil(
+          enrichBrandById(brand.id).catch((error) => {
+            console.error("prospect enrichment failed", brand.id, error);
+          }),
+        );
+      }
+
+      return { brandId: brand.id, slug: brand.slug, name: brand.name, created };
+    }),
+
   requestPregenSite: protectedProcedure
     .input(z.object({ domainId: z.string() }))
     .mutation(async ({ ctx, input }) => {

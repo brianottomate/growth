@@ -39,6 +39,7 @@ import {
   type ZernioCarouselCard,
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
+import { usStateName } from "@/lib/us-states";
 import {
   adAccountTable,
   adTable,
@@ -1434,13 +1435,30 @@ async function compileAudienceTargeting(input: {
   if (audience.ageMin != null) spec.ageMin = audience.ageMin;
   if (audience.ageMax != null) spec.ageMax = audience.ageMax;
 
+  // `states` holds codes and `regions` the names the geo search takes, so a
+  // state that has no name in `regions` is named here rather than dropped. A
+  // plan that carried only codes would otherwise compile to a country-wide
+  // buy with nothing saying so.
+  const namedStates = (geography.states ?? [])
+    .map((code) => usStateName(code))
+    .filter((name): name is string => name !== null);
   const regionNames = [
-    ...(geography.regions ?? []),
-    // Cities ride the same resolution; Zernio's create takes them as region
-    // keys of type city via the same search. Modeled coarsely until a real
-    // city campaign needs radius targeting.
-    ...(geography.cities ?? []),
+    ...new Set([
+      ...(geography.regions ?? []),
+      ...namedStates,
+      // Cities ride the same resolution; Zernio's create takes them as region
+      // keys of type city via the same search. Modeled coarsely until a real
+      // city campaign needs radius targeting.
+      ...(geography.cities ?? []),
+    ]),
   ];
+  for (const code of geography.states ?? []) {
+    if (usStateName(code) === null) {
+      warnings.push(
+        `State code "${code}" is not one we can name, so it was left out of the location targeting`,
+      );
+    }
+  }
   if (regionNames.length > 0) {
     const resolved: Array<{ key: string }> = [];
     for (const name of regionNames) {

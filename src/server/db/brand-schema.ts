@@ -16,6 +16,19 @@ import { createId } from "./utils";
 export const brandTypeEnum = pgEnum("brand_type", ["company", "personal"]);
 export type BrandType = (typeof brandTypeEnum.enumValues)[number];
 
+// Wander's relationship to a brand, which is a different question from what
+// the brand IS (`type`). Wander's own brands, paying Performance+ clients,
+// targets a rep is pitching, and competitors we merely watch all belong in
+// one table and none of them belong in the same list.
+export const brandRelationshipEnum = pgEnum("brand_relationship", [
+  "internal",
+  "client",
+  "prospect",
+  "reference",
+]);
+export type BrandRelationship =
+  (typeof brandRelationshipEnum.enumValues)[number];
+
 // Why an owned brand tracks a reference brand.
 export const inspirationPurposeEnum = pgEnum("inspiration_purpose", [
   "competitor", // defensive analysis
@@ -160,6 +173,14 @@ export const brandTable = pgTable(
     ownerId: t.text().references(() => userTable.id),
 
     type: brandTypeEnum().default("company").notNull(),
+
+    relationship: brandRelationshipEnum().default("internal").notNull(),
+
+    // The domain of the `leads.lead_domain` row a prospect came from. A text
+    // column rather than a foreign key on purpose: `leads` lives in its own
+    // Postgres schema so it stays droppable, and a cross-schema FK would take
+    // that away.
+    leadDomain: t.text(),
 
     // Basic info
     name: t.text().notNull(),

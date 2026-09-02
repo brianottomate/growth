@@ -28,6 +28,7 @@ type AudienceRow = {
   ageMax: number | null;
   geography: {
     countries?: string[];
+    states?: string[];
     regions?: string[];
     cities?: string[];
   } | null;
@@ -50,20 +51,35 @@ export function Audiences({
   campaignId,
   audiences,
   personas,
+  geoPrefill,
 }: {
   campaignId: string;
   audiences: AudienceRow[];
   personas: PersonaOption[];
+  /** Where this client's homes are, rolled up from their property rows. */
+  geoPrefill?: {
+    countries?: string[];
+    states?: string[];
+    regions?: string[];
+    cities?: string[];
+  } | null;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [personaId, setPersonaId] = useState("");
-  const [ageMin, setAgeMin] = useState("");
+  // Broad by default: 18 to 65+ with a geography layer is the shape that
+  // reaches enough people to leave the learning phase at these budgets.
+  // Narrowing is a decision someone makes on purpose, in the field.
+  const [ageMin, setAgeMin] = useState("18");
   const [ageMax, setAgeMax] = useState("");
-  const [countries, setCountries] = useState("US");
-  const [regions, setRegions] = useState("");
+  const [countries, setCountries] = useState(
+    (geoPrefill?.countries ?? ["US"]).join(", "),
+  );
+  const [states, setStates] = useState((geoPrefill?.states ?? []).join(", "));
+  const [regions, setRegions] = useState((geoPrefill?.regions ?? []).join(", "));
+  const [cities, setCities] = useState((geoPrefill?.cities ?? []).join(", "));
   const [keywords, setKeywords] = useState("");
 
   const add = useMutation(
@@ -71,7 +87,6 @@ export function Audiences({
       onSuccess: () => {
         setOpen(false);
         setName("");
-        setRegions("");
         setKeywords("");
         router.refresh();
       },
@@ -112,7 +127,11 @@ export function Audiences({
       row.ageMin != null || row.ageMax != null
         ? `${row.ageMin ?? "13"}–${row.ageMax ?? "65+"}`
         : null,
-      [...(row.geography?.regions ?? []), ...(row.geography?.countries ?? [])]
+      [
+        ...(row.geography?.cities ?? []),
+        ...(row.geography?.regions ?? row.geography?.states ?? []),
+        ...(row.geography?.countries ?? []),
+      ]
         .slice(0, 3)
         .join(", ") || null,
       row.keywords?.length
@@ -218,18 +237,51 @@ export function Audiences({
                     </p>
                   </div>
                   <div className="space-y-1.5">
+                    <Label htmlFor="aud-states">States</Label>
+                    <Input
+                      id="aud-states"
+                      value={states}
+                      onChange={(event) => setStates(event.target.value)}
+                      placeholder="CO"
+                    />
+                    <p className="text-muted-foreground text-[11px]">
+                      Two-letter codes, as the client&rsquo;s listings state
+                      them.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
                     <Label htmlFor="aud-regions">Regions</Label>
                     <Input
                       id="aud-regions"
                       value={regions}
                       onChange={(event) => setRegions(event.target.value)}
-                      placeholder="California"
+                      placeholder="Colorado"
                     />
                     <p className="text-muted-foreground text-[11px]">
                       Resolved to real platform geo keys at push.
                     </p>
                   </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="aud-cities">Cities</Label>
+                    <Input
+                      id="aud-cities"
+                      value={cities}
+                      onChange={(event) => setCities(event.target.value)}
+                      placeholder="Winter Park"
+                    />
+                    <p className="text-muted-foreground text-[11px]">
+                      A metro layer, when the state is too wide a buy.
+                    </p>
+                  </div>
                 </div>
+                {geoPrefill?.states?.length ? (
+                  <p className="text-muted-foreground text-[11px]">
+                    Prefilled from where their homes are:{" "}
+                    {(geoPrefill.regions ?? geoPrefill.states).join(", ")}.
+                  </p>
+                ) : null}
                 <div className="space-y-1.5">
                   <Label htmlFor="aud-keywords">Keyword suggestions</Label>
                   <Input
@@ -260,7 +312,9 @@ export function Audiences({
                       ageMin: ageMin ? Number(ageMin) : null,
                       ageMax: ageMax ? Number(ageMax) : null,
                       countries: list(countries.toUpperCase()),
+                      states: list(states.toUpperCase()),
                       regions: list(regions),
+                      cities: list(cities),
                       keywords: list(keywords),
                     })
                   }

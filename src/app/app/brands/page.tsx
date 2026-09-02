@@ -11,6 +11,10 @@ import {
   channelSuggestionTable,
   channelTable,
   memberTable,
+  performanceAccountTable,
+  performanceCycleTable,
+  performanceIntakeTable,
+  performancePropertyTable,
   platformPostTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
@@ -31,6 +35,57 @@ const compactFmt = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
+/**
+ * What still has to happen before a client's ads can run. Every item is a
+ * column we already store, so this is a read of the record rather than a new
+ * kind of state to keep in step with it.
+ */
+export type BrandReadiness = {
+  accountId: string;
+  intake: boolean;
+  access: boolean;
+  page: boolean;
+  adAccount: boolean;
+  homes: number;
+  budget: number | null;
+  creative: boolean;
+};
+
+function ReadinessStrip({ readiness }: { readiness: BrandReadiness }) {
+  const items: [string, boolean][] = [
+    ["Intake", readiness.intake],
+    ["Access", readiness.access],
+    ["Page", readiness.page],
+    ["Ad account", readiness.adAccount],
+    [
+      readiness.homes > 0 ? `${readiness.homes} homes` : "Homes",
+      readiness.homes > 0,
+    ],
+    [
+      readiness.budget != null ? `$${readiness.budget}/mo` : "Budget",
+      readiness.budget != null,
+    ],
+    ["Creative", readiness.creative],
+  ];
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
+      {items.map(([label, done]) => (
+        <span
+          key={label}
+          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+            done
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+              : "border-border text-muted-foreground"
+          }`}
+        >
+          {done ? "✓ " : ""}
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function BrandCard({
   brand,
   channels,
@@ -39,6 +94,7 @@ function BrandCard({
   audienceCount,
   postCount,
   postCountByPlatform,
+  readiness,
 }: {
   brand: typeof brandTable.$inferSelect;
   channels: ChannelLite[];
@@ -47,6 +103,7 @@ function BrandCard({
   audienceCount: number;
   postCount: number;
   postCountByPlatform: Record<string, number>;
+  readiness: BrandReadiness | null;
 }) {
   const socialReach = channels
     .filter((c) => c.kind === "social")
@@ -115,6 +172,14 @@ function BrandCard({
                 >
                   Ads ↗
                 </Link>
+                {readiness && (
+                  <Link
+                    href={`/app/performance/${readiness.accountId}`}
+                    className="text-foreground text-xs hover:underline"
+                  >
+                    Performance+ ↗
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -137,6 +202,7 @@ function BrandCard({
             description: brand.description,
             website: brand.website,
             logo: brand.logo,
+            relationship: brand.relationship,
           }}
         />
       </div>
@@ -152,6 +218,8 @@ function BrandCard({
       <BrandLinks brandId={brand.id} links={brand.links ?? []} />
 
       <TrackedBrands ownerBrandId={brand.id} tracked={tracked} />
+
+      {readiness && <ReadinessStrip readiness={readiness} />}
     </div>
   );
 }
@@ -358,6 +426,65 @@ export default async function BrandsPage() {
       })
     : [];
 
+  // Performance+ readiness. Only brands with a commercial record get a strip,
+  // so this is a handful of rows however many brands the org has.
+  const perfAccounts = brandIds.length
+    ? await db.query.performanceAccountTable.findMany({
+        where: and(
+          inArray(performanceAccountTable.brandId, brandIds),
+          isNull(performanceAccountTable.deletedAt),
+        ),
+        columns: { id: true, brandId: true },
+      })
+    : [];
+  const perfAccountIds = perfAccounts.map((row) => row.id);
+  const [perfIntakes, perfProperties, perfCycles] = perfAccountIds.length
+    ? await Promise.all([
+        db.query.performanceIntakeTable.findMany({
+          where: inArray(performanceIntakeTable.accountId, perfAccountIds),
+          orderBy: (t, { desc }) => desc(t.submittedAt),
+          columns: {
+            accountId: true,
+            answers: true,
+            zernioVerifiedAt: true,
+            verifiedPageId: true,
+            verifiedAdAccountId: true,
+            mediaBudgetDollars: true,
+          },
+        }),
+        db.query.performancePropertyTable.findMany({
+          where: and(
+            inArray(performancePropertyTable.accountId, perfAccountIds),
+            isNull(performancePropertyTable.deletedAt),
+          ),
+          columns: { accountId: true },
+        }),
+        db.query.performanceCycleTable.findMany({
+          where: inArray(performanceCycleTable.accountId, perfAccountIds),
+          columns: { accountId: true, mediaBudget: true },
+          orderBy: (t, { desc }) => desc(t.period),
+        }),
+      ])
+    : [[], [], []];
+
+  const readinessByBrand = new Map<string, BrandReadiness>();
+  for (const account of perfAccounts) {
+    if (!account.brandId) continue;
+    // Ordered newest-first above, so the first hit is the latest.
+    const intake = perfIntakes.find((row) => row.accountId === account.id);
+    const cycle = perfCycles.find((row) => row.accountId === account.id);
+    readinessByBrand.set(account.brandId, {
+      accountId: account.id,
+      intake: intake != null,
+      access: intake?.zernioVerifiedAt != null,
+      page: intake?.verifiedPageId != null,
+      adAccount: intake?.verifiedAdAccountId != null,
+      homes: perfProperties.filter((row) => row.accountId === account.id).length,
+      budget: cycle?.mediaBudget ?? intake?.mediaBudgetDollars ?? null,
+      creative: Boolean(intake?.answers?.creativeDriveUrl),
+    });
+  }
+
   // Persona counts per owned brand for the card summary line.
   const personas = brandIds.length
     ? await db.query.personaTable.findMany({
@@ -479,6 +606,7 @@ export default async function BrandsPage() {
       audienceCount={audienceCountByBrand.get(brand.id) ?? 0}
       postCount={postCountByBrand.get(brand.id) ?? 0}
       postCountByPlatform={postCountsForBrand(brand.id)}
+      readiness={readinessByBrand.get(brand.id) ?? null}
     />
   );
 
@@ -511,17 +639,39 @@ export default async function BrandsPage() {
       .join(" ")
       .toLowerCase();
 
-  const company = brands.filter((b) => b.type === "company");
-  const personal = brands.filter((b) => b.type === "personal");
+  // Relationship decides the group, and the brand's own type stays the badge
+  // on its card. A client that is also a company brand belongs in one list, so
+  // relationship is checked first and the type split only covers our own.
+  const clients = brands.filter((b) => b.relationship === "client");
+  const prospects = brands.filter((b) => b.relationship === "prospect");
+  const ours = brands.filter(
+    (b) => b.relationship !== "client" && b.relationship !== "prospect",
+  );
 
   const searchGroups = [
-    { label: "Company brands", brands: company, render: renderBrand },
-    { label: "Personal brands", brands: personal, render: renderBrand },
+    { label: "Clients", brands: clients, render: renderBrand },
+    {
+      label: "Prospects",
+      brands: prospects,
+      render: renderBrand,
+      defaultHidden: true,
+    },
+    {
+      label: "Company brands",
+      brands: ours.filter((b) => b.type === "company"),
+      render: renderBrand,
+    },
+    {
+      label: "Personal brands",
+      brands: ours.filter((b) => b.type === "personal"),
+      render: renderBrand,
+    },
     { label: "Tracked brands", brands: peerBrands, render: renderPeerBrand },
   ]
     .filter((group) => group.brands.length > 0)
     .map((group) => ({
       label: group.label,
+      defaultHidden: group.defaultHidden,
       entries: group.brands.map((brand) => ({
         key: brand.id,
         search: searchKey(brand),
@@ -535,7 +685,9 @@ export default async function BrandsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Brands</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {brands.length} owned · {distinctTracked} tracked
+            {clients.length} client{clients.length === 1 ? "" : "s"} ·{" "}
+            {prospects.length} prospect{prospects.length === 1 ? "" : "s"} ·{" "}
+            {ours.length} ours · {distinctTracked} tracked
           </p>
         </div>
         <div className="flex items-center gap-2">

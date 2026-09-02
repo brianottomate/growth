@@ -111,6 +111,17 @@ export function brandIntakeUrl(handle: string): string {
   return `${env.WANDER_COM_BASE_URL}/internal/intake/${handle}`;
 }
 
+/**
+ * The sales pitch page for a brand, on wander.com.
+ *
+ * Slug only. A rep sends this before anything is signed and reads it out over
+ * a call, so it has to be readable, and the page it addresses shows only what
+ * is already public on the client's own site.
+ */
+export function brandPitchUrl(slug: string): string {
+  return `${env.WANDER_COM_BASE_URL}/internal/performance/${slug}`;
+}
+
 export async function getBrandByConnectToken(token: string) {
   if (!token || token.length < 16) return null;
   return db.query.brandTable.findFirst({

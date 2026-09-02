@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Gift, Loader2 } from "lucide-react";
 
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { useTRPC } from "@/trpc/react";
 import { sendAssistantIntent } from "@/lib/assistant-events";
@@ -242,6 +244,12 @@ export function ProspectDetail({ domain }: { domain: string }) {
   const startSequence = useMutation(
     trpc.leads.startPregenSequence.mutationOptions({ onSuccess: invalidate }),
   );
+  // Promote a row in the mirror into a brand a rep can actually pitch. The
+  // mirror stays a mirror; this is the moment a human picks one out of it.
+  const createProspect = useMutation(
+    trpc.leads.createProspect.mutationOptions(),
+  );
+
   const retire = useMutation(
     trpc.leads.retireLeadContact.mutationOptions({ onSuccess: invalidate }),
   );
@@ -420,6 +428,22 @@ export function ProspectDetail({ domain }: { domain: string }) {
             </a>
           ) : null}
           <span className="bg-border mx-1 h-6 w-px" />
+          {createProspect.data?.slug ? (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/app/brands/${createProspect.data.slug}`}>
+                {createProspect.data.created ? "Brand created ↗" : "Open brand ↗"}
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={createProspect.isPending}
+              onClick={() => createProspect.mutate({ domainId: row.id })}
+            >
+              {createProspect.isPending ? "Creating…" : "Create prospect brand"}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"

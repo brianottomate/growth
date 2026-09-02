@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,29 @@ export function NewCampaignButton({
   // the specific property or offer page.
   const [landingUrl, setLandingUrl] = useState(brandWebsite ?? "");
   const [description, setDescription] = useState("");
+
+  // A Performance+ client already told us their budget and which homes they
+  // are advertising, on the intake form. Retyping it is how the number in the
+  // campaign drifts from the number they agreed to.
+  const prefill = useQuery({
+    ...trpc.performance.campaignPrefill.queryOptions({ brandId }),
+    enabled: open,
+  });
+  const prefilled = prefill.data ?? null;
+
+  useEffect(() => {
+    if (!prefilled) return;
+    setBudget((current) =>
+      current === "" && prefilled.mediaBudgetDollars != null
+        ? String(prefilled.mediaBudgetDollars)
+        : current,
+    );
+    setLandingUrl((current) => current || prefilled.landingUrl || "");
+  }, [prefilled]);
+
+  const geoSummary = prefilled?.geography.regions?.length
+    ? prefilled.geography.regions.join(", ")
+    : null;
 
   const create = useMutation(
     trpc.ads.createDraft.mutationOptions({
@@ -156,6 +179,20 @@ export function NewCampaignButton({
               placeholder="The audience, the season, the goal — context chat and the team read later."
             />
           </div>
+          {prefilled?.accountId && (
+            <p className="text-muted-foreground text-xs">
+              From their intake:{" "}
+              {prefilled.mediaBudgetDollars != null
+                ? `$${prefilled.mediaBudgetDollars}/mo`
+                : "no budget agreed"}
+              {prefilled.allProperties
+                ? " · all their homes"
+                : prefilled.propertyUrls.length > 0
+                  ? ` · ${prefilled.propertyUrls.length} homes on the record`
+                  : ""}
+              {geoSummary ? ` · ${geoSummary}` : ""}
+            </p>
+          )}
           {create.error && (
             <p className="text-xs text-red-300">{create.error.message}</p>
           )}

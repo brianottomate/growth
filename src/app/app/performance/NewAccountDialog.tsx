@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,12 @@ export function NewAccountDialog() {
   const [website, setWebsite] = useState("");
   const [plan, setPlan] = useState<string>(PLANS[0]);
   const [notes, setNotes] = useState("");
+  const [brandId, setBrandId] = useState("");
+
+  // An account with no brand has no pitch page, no intake link and no connect
+  // link, because all three are addressed by the brand. Attaching one here is
+  // what keeps a hand-created customer reachable.
+  const brands = useQuery(trpc.brand.listLite.queryOptions());
 
   const create = useMutation(
     trpc.performance.createAccount.mutationOptions({
@@ -54,7 +60,7 @@ export function NewAccountDialog() {
       website: website.trim() || null,
       plan: plan || null,
       status: "onboarding",
-      brandId: null,
+      brandId: brandId || null,
       notes: notes.trim() || null,
     });
 
@@ -76,6 +82,33 @@ export function NewAccountDialog() {
               onChange={(event) => setName(event.target.value)}
               placeholder="Away & Stay"
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="perf-brand">Brand</Label>
+            <select
+              id="perf-brand"
+              value={brandId}
+              onChange={(event) => {
+                setBrandId(event.target.value);
+                const picked = brands.data?.find(
+                  (row) => row.id === event.target.value,
+                );
+                if (picked && name.trim() === "") setName(picked.name);
+              }}
+              className="border-border bg-background focus:ring-ring w-full rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
+            >
+              <option value="">No brand yet</option>
+              {(brands.data ?? []).map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                  {row.relationship === "prospect" ? " (prospect)" : ""}
+                </option>
+              ))}
+            </select>
+            <p className="text-muted-foreground text-xs">
+              The pitch, intake and connect links all hang off the brand, so an
+              account without one cannot be sent to the customer.
+            </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">

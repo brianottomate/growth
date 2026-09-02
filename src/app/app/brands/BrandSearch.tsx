@@ -12,6 +12,11 @@ export type BrandSearchEntry = {
 export type BrandSearchGroup = {
   label: string;
   entries: BrandSearchEntry[];
+  /**
+   * Off until asked for. Prospects are the group that grows without bound, and
+   * they are reached by searching for one rather than by scrolling past them.
+   */
+  defaultHidden?: boolean;
 };
 
 /**
@@ -21,38 +26,67 @@ export type BrandSearchGroup = {
  */
 export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
   const [query, setQuery] = useState("");
+  const [hidden, setHidden] = useState<string[]>(() =>
+    groups.filter((group) => group.defaultHidden).map((group) => group.label),
+  );
+
+  const shown = groups.filter((group) => !hidden.includes(group.label));
 
   const matched = useMemo(() => {
     // Space-separated terms all have to hit, so "winter escapes" narrows
     // rather than widening the way an OR would.
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    if (terms.length === 0) return groups;
-    return groups.map((group) => ({
+    if (terms.length === 0) return shown;
+    return shown.map((group) => ({
       ...group,
       entries: group.entries.filter((entry) =>
         terms.every((term) => entry.search.includes(term)),
       ),
     }));
-  }, [groups, query]);
+  }, [shown, query]);
 
-  const total = matched.reduce(
-    (count, group) => count + group.entries.length,
-    0,
-  );
+  const total = matched.reduce((count, group) => count + group.entries.length, 0);
+
+  const toggle = (label: string) =>
+    setHidden((current) =>
+      current.includes(label)
+        ? current.filter((row) => row !== label)
+        : [...current, label],
+    );
 
   return (
     <>
-      <input
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search brands by name, URL or handle…"
-        aria-label="Search brands"
-        className="border-border bg-background focus:ring-ring mt-6 w-72 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
-      />
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search brands by name, URL or handle…"
+          aria-label="Search brands"
+          className="border-border bg-background focus:ring-ring w-72 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
+        />
+        {groups.map((group) => {
+          const on = !hidden.includes(group.label);
+          return (
+            <button
+              key={group.label}
+              type="button"
+              onClick={() => toggle(group.label)}
+              aria-pressed={on}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                on
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {group.label} {group.entries.length}
+            </button>
+          );
+        })}
+      </div>
 
       {query.trim() !== "" && total === 0 && (
         <p className="text-muted-foreground mt-10 text-sm">
-          No brands match “{query}”.
+          No brands match “{query}” in the groups you have on.
         </p>
       )}
 

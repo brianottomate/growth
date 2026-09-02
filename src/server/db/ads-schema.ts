@@ -89,6 +89,13 @@ export type AdStats = {
 export type AudienceGeographyPlan = {
   /** ISO country codes, e.g. ["US"]. */
   countries?: string[];
+  /**
+   * Two-letter state codes as the source gives them, e.g. ["CO"]. This is the
+   * fact ("their homes are in Colorado"); `regions` is what a platform can be
+   * asked for. Both are kept because a code round-trips and a display name is
+   * a lookup that can fail.
+   */
+  states?: string[];
   /** Region/state names the platform's geo search can resolve, e.g. ["California"]. */
   regions?: string[];
   cities?: string[];
