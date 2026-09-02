@@ -179,7 +179,7 @@ export function Audiences({
                     id="aud-name"
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="CA homebuyers 30-50"
+                    placeholder="Northeast travelers 28-45"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -236,7 +236,7 @@ export function Audiences({
                     id="aud-keywords"
                     value={keywords}
                     onChange={(event) => setKeywords(event.target.value)}
-                    placeholder="house hunting app, when to make an offer"
+                    placeholder="luxury vacation rentals, monthly stays"
                   />
                   <p className="text-muted-foreground text-[11px]">
                     Loose, comma-separated. Google derives its keywords from

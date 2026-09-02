@@ -6,7 +6,12 @@ import { brandTable, memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { MediaLibrary } from "./MediaLibrary";
 
-export default async function MediaPage() {
+export default async function MediaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ brand?: string }>;
+}) {
+  const { brand: requestedBrand } = await searchParams;
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -25,7 +30,7 @@ export default async function MediaPage() {
       eq(brandTable.organizationId, org.id),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, logo: true },
+    columns: { id: true, name: true, logo: true, slug: true },
   });
 
   if (brands.length === 0) {
@@ -36,5 +41,25 @@ export default async function MediaPage() {
     );
   }
 
-  return <MediaLibrary brands={brands} />;
+  // ?brand= takes a slug (the linkable form) or an id. An unknown value
+  // redirects to the bare page rather than silently showing the first brand
+  // under a URL that claims otherwise.
+  const requested = requestedBrand
+    ? brands.find(
+        (row) => row.slug === requestedBrand || row.id === requestedBrand,
+      )
+    : undefined;
+  if (requestedBrand && !requested) redirect("/app/media");
+
+  const initialBrandId = requested?.id ?? null;
+
+  return (
+    // Keyed so client-side navigation to a different ?brand= remounts with
+    // the right library instead of keeping the mounted state.
+    <MediaLibrary
+      key={initialBrandId ?? "default"}
+      brands={brands}
+      initialBrandId={initialBrandId}
+    />
+  );
 }

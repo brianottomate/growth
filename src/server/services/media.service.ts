@@ -748,6 +748,59 @@ export async function cacheBrandPostMedia(brandId: string) {
   return { processed, cached, failed };
 }
 
+/**
+ * Resolve uploads the browser abandoned.
+ *
+ * A direct-to-R2 upload is finalized by the tab that started it, so a closed
+ * tab, a dead network, or a blocked request leaves the row on `uploading`
+ * with nothing left to move it. listMedia hides those after
+ * STALE_UPLOAD_MINUTES, which keeps the grid clean but means a real failure
+ * is invisible and a SUCCESSFUL upload whose finalize never ran is lost
+ * entirely.
+ *
+ * So ask R2 what actually happened: bytes present means the PUT landed and
+ * only the finalize was missed — promote it. Bytes absent means the upload
+ * genuinely failed — mark it, so it can be reported rather than vanishing.
+ */
+export async function reconcileStaleUploads(brandId: string) {
+  const stale = await db.query.mediaAssetTable.findMany({
+    where: and(
+      eq(mediaAssetTable.brandId, brandId),
+      eq(mediaAssetTable.status, "uploading"),
+      isNull(mediaAssetTable.deletedAt),
+      sql<boolean>`${mediaAssetTable.createdAt} <= now() - make_interval(mins => ${STALE_UPLOAD_MINUTES})`,
+    ),
+    columns: { id: true, r2Key: true },
+    limit: 50,
+  });
+  let recovered = 0;
+  let failed = 0;
+  for (const asset of stale) {
+    if (!asset.r2Key) continue;
+    const landed = await R2.head(asset.r2Key).catch(() => null);
+    if (landed?.size) {
+      await db
+        .update(mediaAssetTable)
+        .set({ status: "ready", size: landed.size })
+        .where(eq(mediaAssetTable.id, asset.id));
+      recovered += 1;
+    } else {
+      await db
+        .update(mediaAssetTable)
+        .set({
+          status: "error",
+          metadata: {
+            uploadError:
+              "The browser never delivered the bytes — the tab closed, the network dropped, or the request was blocked.",
+          },
+        })
+        .where(eq(mediaAssetTable.id, asset.id));
+      failed += 1;
+    }
+  }
+  return { recovered, failed };
+}
+
 export async function listMedia(input: {
   brandId: string;
   kind?: MediaKind;
@@ -1037,6 +1090,7 @@ export const MediaService = {
   cacheBrandPostMedia,
   updateExternal,
   list: listMedia,
+  reconcileStaleUploads,
   get: getMedia,
   updateMeta: updateMediaMeta,
   delete: deleteMedia,

@@ -25,6 +25,7 @@ import {
   deleteAudience,
   deleteDraftCampaign,
   attachPlatformCampaign,
+  importPlatformAdCreative,
   planPlatform,
   setPlatformDraft,
   unplanPlatform,
@@ -209,6 +210,16 @@ export const adsRouter = {
             : undefined,
         keywords: input.keywords,
         organizationId: await organizationIdFor(ctx),
+      }),
+    ),
+
+  importAdCreative: protectedProcedure
+    .input(z.object({ platformAdId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      importPlatformAdCreative({
+        platformAdId: input.platformAdId,
+        organizationId: await organizationIdFor(ctx),
+        userId: ctx.session.user.id,
       }),
     ),
 

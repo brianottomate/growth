@@ -1295,7 +1295,13 @@ export async function previewDraftAd(
   const response = await generateZernioAdPreviews({
     accountId: input.connectionAccountId,
     adAccountId: destination.adAccount.id,
-    formats: input.formats ?? ["DESKTOP_FEED_STANDARD", "INSTAGRAM_STORY"],
+    // Feed formats render from a raw `picture` url, which is all a pre-push
+    // draft has. Story and Reels formats need the image in the ad account's
+    // library (an image_hash), so Meta answers those with "Image Not Found" —
+    // a broken frame, not a useful preview. Story shape is covered by the
+    // local preview instead; ask for those formats explicitly if you want
+    // Meta's own attempt.
+    formats: input.formats ?? ["DESKTOP_FEED_STANDARD", "MOBILE_FEED_STANDARD"],
     creativeSpec: {
       object_story_spec: {
         page_id: pageId,
@@ -1307,7 +1313,7 @@ export async function previewDraftAd(
   return {
     adId: ad.id,
     adName: ad.name,
-    formats: input.formats ?? ["DESKTOP_FEED_STANDARD", "INSTAGRAM_STORY"],
+    formats: input.formats ?? ["DESKTOP_FEED_STANDARD", "MOBILE_FEED_STANDARD"],
     previews: frames,
     /** Open these directly; chat cannot embed the iframes. */
     previewUrls: frames.flatMap((frame) => (frame.src ? [frame.src] : [])),

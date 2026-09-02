@@ -252,6 +252,8 @@ export const growthActionPolicies = {
       idempotent: true,
     }),
     linkAudience: write({ idempotent: true }),
+    // Downloads from the platform CDN into R2; dedupes by source url.
+    importCreative: write({ idempotent: true, reversible: true }),
     // Draft deletes drop local rows and are refused once the thing exists on
     // a platform, so they cannot destroy anything a provider knows about.
     deleteCampaignDraft: write({ reversible: false }),

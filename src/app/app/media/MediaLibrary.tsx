@@ -118,7 +118,12 @@ const ACCEPT: Accept = {
 };
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
-type Brand = { id: string; name: string; logo: string | null };
+type Brand = {
+  id: string;
+  name: string;
+  logo: string | null;
+  slug: string | null;
+};
 type LibraryAsset = RouterOutputs["media"]["list"][number];
 
 const KIND_FILTERS: { value: string; label: string }[] = [
@@ -136,11 +141,25 @@ function formatBytes(bytes: number | null): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-export function MediaLibrary({ brands }: { brands: Brand[] }) {
+export function MediaLibrary({
+  brands,
+  initialBrandId,
+}: {
+  brands: Brand[];
+  initialBrandId?: string | null;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const [brandId, setBrandId] = useState(brands[0]!.id);
+  const [brandId, setBrandIdState] = useState(initialBrandId ?? brands[0]!.id);
+  // Keep ?brand= in the URL so the current library is always linkable.
+  const setBrandId = (id: string) => {
+    setBrandIdState(id);
+    const brand = brands.find((row) => row.id === id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("brand", brand?.slug ?? id);
+    window.history.replaceState(null, "", url);
+  };
   const [filter, setFilter] = useState<string>("all");
   const [folderFilter, setFolderFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all");

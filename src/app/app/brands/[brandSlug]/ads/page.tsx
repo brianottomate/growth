@@ -21,6 +21,7 @@ import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { CopyButton } from "@/components/copy-button";
 
 import { AttachCampaign } from "./AttachCampaign";
+import { ImportCreativeButton } from "./_views/ImportCreativeButton";
 import { NewCampaignButton } from "./NewCampaignButton";
 
 const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
@@ -169,6 +170,7 @@ function CampaignRow({
               className="bg-background w-28 shrink-0 overflow-hidden rounded-lg border"
             >
               <div className="bg-muted relative grid h-16 place-items-center">
+                {spotImage(s) && <ImportCreativeButton platformAdId={s.id} />}
                 {/* Ads we authored carry their creative in `media`; ads mirrored
                     from the platform carry it on `thumbnailUrl` instead. */}
                 {spotImage(s) ? (
@@ -585,8 +587,8 @@ export default async function BrandAdsPage({
         <div className="bg-card rounded-xl border p-6 text-center">
           <p className="text-sm font-medium">No personas yet</p>
           <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
-            A persona is the durable &ldquo;who&rdquo; — &ldquo;first-time
-            homebuyers&rdquo; — that inspires campaign audiences and content
+            A persona is the durable &ldquo;who&rdquo; — &ldquo;remote workers
+            who travel&rdquo; — that inspires campaign audiences and content
             alike. Few and stable, like pillars.
           </p>
           <Link

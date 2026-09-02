@@ -281,6 +281,12 @@ export const mediaRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       await assertBrandAccess(ctx, input.brandId);
+      // Settle abandoned uploads first: a successful PUT whose finalize never
+      // ran should appear, and a genuine failure should say so rather than
+      // silently disappearing from the grid.
+      await MediaService.reconcileStaleUploads(input.brandId).catch(
+        () => undefined,
+      );
       return MediaService.list(input);
     }),
 
@@ -478,7 +484,9 @@ export const mediaRouter = createTRPCRouter({
 
   /** Record an upload whose bytes never arrived, so it stops reading as pending. */
   failUpload: protectedProcedure
-    .input(z.object({ mediaId: z.string(), reason: z.string().max(500).optional() }))
+    .input(
+      z.object({ mediaId: z.string(), reason: z.string().max(500).optional() }),
+    )
     .mutation(async ({ ctx, input }) => {
       await assertMediaAccess(ctx, input.mediaId);
       return MediaService.failR2Upload(input.mediaId, input.reason);

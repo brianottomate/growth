@@ -1,15 +1,17 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
   adTable,
   audienceTable,
+  mediaAssetTable,
   brandTable,
   channelTable,
   personaTable,
   platformAdSetTable,
+  platformAdTable,
   platformAudienceTable,
   platformCampaignTable,
   campaignTable,
@@ -20,6 +22,7 @@ import {
   type PlatformCampaignSettings,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import { importRemoteImage } from "@/server/services/media.service";
 
 // ---- THE PLAN'S CRUD ---------------------------------------------------
 //
@@ -76,6 +79,7 @@ export async function requireOwnedCampaign(
       id: true,
       name: true,
       slug: true,
+      logo: true,
       organizationId: true,
       website: true,
     },
@@ -640,6 +644,111 @@ export async function linkPlatformAudience(input: {
       name: platformAudienceTable.name,
     });
   return updated!;
+}
+
+/**
+ * A stable identity for a creative file behind a platform CDN url.
+ *
+ * Meta signs its urls (`oh`/`oe` expire) AND rotates the edge subdomain, so
+ * the same image comes back as a different string on every sync. Keying
+ * dedupe on the raw url would therefore import a fresh copy each time.
+ * Query and hash go; the host collapses to its registrable suffix, which
+ * survives edge rotation while keeping providers distinct; the path — which
+ * carries the platform's own asset id — does the identifying.
+ */
+export function creativeSourceKey(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    const labels = url.hostname.toLowerCase().split(".");
+    const suffix = labels.slice(-2).join(".");
+    return `${suffix}${url.pathname}`;
+  } catch {
+    // Not a url we can parse: the raw string is still a consistent key.
+    return rawUrl;
+  }
+}
+
+/**
+ * Import a live ad's creative into the brand's media library.
+ *
+ * Mirror rows hold platform CDN urls, and Meta's are signed and EXPIRE — a
+ * proven creative is unusable for new drafts until it lives in R2. Dedupes
+ * by source url, so re-clicking returns the existing asset. A video ad
+ * imports its poster only: the clip itself is not on a fetchable public url.
+ */
+export async function importPlatformAdCreative(input: {
+  organizationId: string;
+  userId: string;
+  platformAdId: string;
+}) {
+  const ad = await db.query.platformAdTable.findFirst({
+    where: eq(platformAdTable.id, input.platformAdId),
+  });
+  if (!ad) throw new Error("Platform ad not found");
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, ad.brandId),
+    columns: { id: true, organizationId: true },
+  });
+  if (brand?.organizationId !== input.organizationId) {
+    throw new Error("No access to this ad");
+  }
+
+  const lead = ad.media?.[0];
+  const isVideo = lead?.type === "video";
+  const sourceUrl = isVideo
+    ? (lead?.thumbnail ?? ad.thumbnailUrl)
+    : (lead?.url ?? ad.thumbnailUrl);
+  if (!sourceUrl) {
+    throw new Error(
+      isVideo
+        ? "This video ad has no poster image to import"
+        : "This ad carries no creative url to import",
+    );
+  }
+
+  // Two ads sharing one creative file dedupe to one library asset, which is
+  // the point: the library holds creatives, not ad rows.
+  const sourceKey = creativeSourceKey(sourceUrl);
+  const existing = await db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.brandId, brand.id),
+      sql`${mediaAssetTable.metadata} ->> 'sourceKey' = ${sourceKey}`,
+    ),
+    columns: { id: true, url: true, title: true },
+  });
+  if (existing) {
+    return { asset: existing, deduped: true, videoPosterOnly: isVideo };
+  }
+
+  const asset = await importRemoteImage({
+    brandId: brand.id,
+    uploadedBy: input.userId,
+    url: sourceUrl,
+    title:
+      (ad.name ?? ad.headline ?? "Imported ad creative") +
+      (isVideo ? " (video poster)" : ""),
+  });
+  // Provenance beyond the generic remote_import marker: which live ad this
+  // creative came from, so performance context is one join away.
+  await db
+    .update(mediaAssetTable)
+    .set({
+      metadata: {
+        ...(asset.metadata as Record<string, unknown>),
+        source: "ad_import",
+        platformAdId: ad.id,
+        // The dedupe key, stored because the raw sourceUrl it came from is
+        // signed and will not match itself on the next sync.
+        sourceKey,
+      },
+    })
+    .where(eq(mediaAssetTable.id, asset.id));
+
+  return {
+    asset: { id: asset.id, url: asset.url, title: asset.title },
+    deduped: false,
+    videoPosterOnly: isVideo,
+  };
 }
 
 // ---- DELETE (local only) ----------------------------------------------

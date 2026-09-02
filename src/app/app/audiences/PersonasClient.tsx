@@ -107,9 +107,9 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Personas</h1>
           <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            Who each brand talks to — the people counterpart of pillars. Few
-            and stable. Campaigns narrow a persona into a buyable audience
-            with real targeting and budget.
+            Who each brand talks to — the people counterpart of pillars. Few and
+            stable. Campaigns narrow a persona into a buyable audience with real
+            targeting and budget.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -141,8 +141,8 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
           <p className="mt-2 text-sm font-medium">No personas yet</p>
           <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
             Start with the two or three kinds of people this brand exists for.
-            &ldquo;First-time homebuyers&rdquo;, not &ldquo;CA homebuyers
-            30-50&rdquo; — the narrowing happens per campaign.
+            &ldquo;Remote workers who travel&rdquo;, not &ldquo;CA remote
+            workers 28-45&rdquo; — the narrowing happens per campaign.
           </p>
         </div>
       ) : (
@@ -223,7 +223,7 @@ export function PersonasClient({ brands }: { brands: Brand[] }) {
                   onChange={(event) =>
                     setForm({ ...form, name: event.target.value })
                   }
-                  placeholder="First-time homebuyers"
+                  placeholder="Remote workers who travel"
                 />
               </div>
               <div className="space-y-1.5">

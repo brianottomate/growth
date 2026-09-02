@@ -17,6 +17,7 @@ import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { CampaignLink } from "./CampaignLink";
+import { ImportCreativeButton } from "./ImportCreativeButton";
 
 /**
  * One platform campaign: a view-only display of its state,
@@ -220,6 +221,7 @@ export async function PlatformCampaignView({
                 className="bg-card overflow-hidden rounded-xl border"
               >
                 <div className="bg-muted relative aspect-video">
+                  <ImportCreativeButton platformAdId={spot.id} />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={

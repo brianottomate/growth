@@ -72,6 +72,9 @@ export function MediaLightbox({
             <video
               src={videoUrl}
               controls
+              // The full file streams only when playback starts; opening the
+              // lightbox alone fetches headers, not a 9MB clip.
+              preload="metadata"
               className="max-h-full max-w-full object-contain"
             />
           ) : (

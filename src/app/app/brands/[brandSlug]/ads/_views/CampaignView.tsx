@@ -12,7 +12,7 @@ import { AddAdButton } from "./AddAdButton";
 import { Audiences } from "./Audiences";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
-import { PreviewAdButton } from "./PreviewAdButton";
+import { DraftedAds } from "./DraftedAds";
 import { PlatformSection } from "./PlatformSection";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
@@ -179,7 +179,13 @@ export async function CampaignView({
           pool={campaign.creativePool ?? []}
         />
 
-        <DraftedAds ads={ads} brandSlug={brandSlug} />
+        <DraftedAds
+          ads={ads}
+          brandSlug={brandSlug}
+          brandName={draft.brand.name}
+          brandLogo={draft.brand.logo}
+          landingUrl={campaign.landingUrl}
+        />
 
         <Audiences
           campaignId={campaign.id}
@@ -216,83 +222,6 @@ export async function CampaignView({
           ))
         )}
       </section>
-    </div>
-  );
-}
-
-/** The plan's drafted ads: suggestions every platform compiles from. */
-function DraftedAds({
-  ads,
-  brandSlug,
-}: {
-  ads: Array<{
-    id: string;
-    name: string;
-    type: "creative" | "text";
-    content: unknown;
-  }>;
-  brandSlug: string;
-}) {
-  if (ads.length === 0) return null;
-  return (
-    <div className="bg-card rounded-xl border p-3.5">
-      <p className="text-sm font-semibold">
-        Drafted ads
-        <span className="text-muted-foreground ml-1.5 font-normal">
-          {ads.length}
-        </span>
-      </p>
-      <div className="mt-2 flex w-full gap-2 overflow-x-auto">
-        {ads.map((ad) => {
-          const content = ad.content as {
-            headline?: string;
-            media?: Array<{ url: string; thumbnail?: string; type?: string }>;
-            headlines?: string[];
-          };
-          const image =
-            content.media?.[0]?.thumbnail ?? content.media?.[0]?.url;
-          const isVideo = content.media?.[0]?.type === "video";
-          return (
-            <div
-              key={ad.id}
-              className="bg-background w-32 shrink-0 overflow-hidden rounded-lg border"
-            >
-              <div className="bg-muted relative h-20">
-                {ad.type === "creative" && (
-                  <PreviewAdButton
-                    adId={ad.id}
-                    brandSlug={brandSlug}
-                    disabled={isVideo}
-                    disabledReason={
-                      isVideo ? "Video previews need a push first" : undefined
-                    }
-                  />
-                )}
-                {image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={image}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="text-muted-foreground flex h-full items-center justify-center p-2 text-center text-[10px]">
-                    {content.headlines?.[0] ?? "Text ad"}
-                  </div>
-                )}
-                <span className="absolute top-1 right-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-sm">
-                  {ad.type}
-                </span>
-              </div>
-              <div className="p-2">
-                <p className="truncate text-[11px] font-medium">
-                  {content.headline ?? ad.name}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

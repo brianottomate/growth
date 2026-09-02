@@ -118,6 +118,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "attachCampaign",
     "pullPlatformAudiences",
     "linkAudience",
+    "importCreative",
     "deleteCampaignDraft",
     "deleteAudience",
     "deleteAdDraft",

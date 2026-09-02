@@ -30,6 +30,7 @@ import {
   deleteDraftAd,
   deleteDraftCampaign,
   getDraftCampaign,
+  importPlatformAdCreative,
   linkPlatformAudience,
   listBrandCampaigns,
   planPlatform,
@@ -632,6 +633,24 @@ export const previewAdAction = growthAction({
   }),
   execute: async (input, ctx) =>
     previewDraftAd(input, { organizationId: ctx.orgId, runId: ctx.runId }),
+});
+
+export const importCreativeAction = growthAction({
+  description:
+    "Import a live ad's creative into the brand media library, durably (R2). Platform CDN urls expire, so a proven creative must be imported before drafts can reuse it. Dedupes by source url; a video ad imports its poster only.",
+  inputSchema: z.object({
+    platformAdId: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The pad_ mirror row, from openCampaign or the ads page."),
+  }),
+  execute: async (input, ctx) =>
+    importPlatformAdCreative({
+      platformAdId: input.platformAdId,
+      organizationId: ctx.orgId,
+      userId: ctx.userId,
+    }),
 });
 
 export const linkAudienceAction = growthAction({
