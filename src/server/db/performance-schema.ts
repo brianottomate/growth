@@ -1,5 +1,11 @@
-import { relations } from "drizzle-orm";
-import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+  check,
+  index,
+  pgEnum,
+  pgTable,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { organizationTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
@@ -13,13 +19,20 @@ import { createId } from "./utils";
 // Customer/Onboarded/Properties/Ads/Emails/Billing per customer.
 //
 // A performance ACCOUNT is the commercial entity — deliberately NOT a brand.
-// The delivery work runs on Wander's channels under Wander's brand, so
-// campaigns keep brandId = Wander and attach to the customer through the
-// nullable performanceCycleId FK on campaign / lifecycle_campaign /
-// amplification_target. `brandId` here is the amplifier.promotedBrandId
-// graduation pattern: a brand row holding the customer's scraped identity
-// (List+ Firecrawl output), promotable to real connected channels later.
-// The ad_account allowlist stays 1:1 brand↔account; sponsorship never widens it.
+// It attaches to delivery through the nullable performanceCycleId FK on
+// campaign / lifecycle_campaign / amplification_target, and the spend rollup
+// never filters on brand, so the same commercial layer serves both products:
+//
+//   List+          delivery on WANDER's channels; campaigns carry
+//                  brandId = Wander and the customer is a sponsor.
+//   Performance+   delivery as the CLIENT; campaigns carry the client's own
+//                  brandId, run from Wander's shared ad account, and appear
+//                  under the client's own Page.
+//
+// `brandId` here is the amplifier.promotedBrandId graduation pattern: a brand
+// row holding the customer's identity, promotable to real connected channels.
+// Performance+ is that promotion, which is why ad_account is a per-brand
+// allowlist rather than a 1:1 brand↔account map.
 
 export const performanceAccountStatusEnum = pgEnum(
   "performance_account_status",
@@ -81,11 +94,23 @@ export type PerformanceAccountInsert =
 // ---- PROPERTY (one wander.com listing the account sponsors) ----------------
 
 /**
+ * One home the account wants promoted, on whichever surface it is bookable.
+ *
+ * `wanderUrl` is a wander.com listing (List+, where Wander holds the
+ * inventory relationship). `siteUrl` is a listing on the customer's own
+ * WanderOS booking site (Performance+). Both are nullable because intake
+ * collects home NAMES and we refuse to guess a URL from a title — a
+ * fabricated link 404s inside a live ad. So a row is identified by a title
+ * OR a URL (`performance_property_identified` enforces that much), and the
+ * URL requirement belongs where it actually bites: nothing can be advertised
+ * until someone resolves the home against its booking site.
+ *
  * `propertyId` is the monolith's property identifier — the join key for
  * booking attribution (Order Completed webhook) and traffic rollups. It is
- * nullable because sales enters properties by wander.com URL first; the
- * resolver that maps a URL to its canonical id backfills it, and reports must
- * treat rows without it as "no attribution yet", never as zero.
+ * nullable because sales enters properties by URL first; the resolver that
+ * maps a URL to its canonical id backfills it, and reports must treat rows
+ * without it as "no attribution yet", never as zero. Performance+ homes live
+ * on the customer's own domain and may never get one.
  */
 export const performancePropertyTable = pgTable(
   "performance_property",
@@ -99,7 +124,8 @@ export const performancePropertyTable = pgTable(
       .references(() => performanceAccountTable.id, { onDelete: "cascade" })
       .notNull(),
 
-    wanderUrl: t.text().notNull(), // https://www.wander.com/property/...
+    wanderUrl: t.text(), // https://www.wander.com/property/... (List+)
+    siteUrl: t.text(), // https://<client-domain>/... (Performance+)
     propertyId: t.text(), // monolith id; backfilled, see doc above
     title: t.text(), // display name for cards/reports
     notes: t.text(),
@@ -117,9 +143,20 @@ export const performancePropertyTable = pgTable(
   }),
   (table) => [
     index("performance_property_account_idx").on(table.accountId),
+    // Postgres treats NULLs as distinct in a unique index, so each URL column
+    // dedupes only the rows that actually carry it. That is the behaviour we
+    // want: a List+ row and a Performance+ row never collide with each other.
     uniqueIndex("performance_property_account_url_idx").on(
       table.accountId,
       table.wanderUrl,
+    ),
+    uniqueIndex("performance_property_account_site_url_idx").on(
+      table.accountId,
+      table.siteUrl,
+    ),
+    check(
+      "performance_property_identified",
+      sql`${table.wanderUrl} is not null or ${table.siteUrl} is not null or ${table.title} is not null`,
     ),
     index("performance_property_property_idx").on(table.propertyId),
   ],
@@ -287,6 +324,145 @@ export type PerformanceReport = typeof performanceReportTable.$inferSelect;
 export type PerformanceReportInsert =
   typeof performanceReportTable.$inferInsert;
 
+// ---- INTAKE (the client's onboarding submission) ----------------------------
+
+export const performanceIntakeStatusEnum = pgEnum("performance_intake_status", [
+  "submitted",
+  "verified",
+  "applied",
+]);
+export type PerformanceIntakeStatus =
+  (typeof performanceIntakeStatusEnum.enumValues)[number];
+
+/** What the client typed, verbatim. Never edited after submission. */
+export type PerformanceIntakeAnswers = {
+  detailsConfirmed?: boolean;
+  detailsCorrection?: string;
+  reportEmails?: string;
+  properties?: string[];
+  propertyNotes?: string;
+  budget?: string;
+  budgetFlexible?: string;
+  billingAcknowledged?: boolean;
+  invoiceEmail?: string;
+  guestListName?: string;
+  guestConsent?: boolean;
+  logoName?: string;
+  ugcPermission?: string;
+  avoid?: string;
+  anythingElse?: string;
+  instagramLinked?: boolean;
+  accountsConnected?: boolean;
+  [key: string]: unknown;
+};
+
+/**
+ * A completed Performance+ intake: the RECEIPT, not the state.
+ *
+ * `answers` holds the submission verbatim and is never rewritten, because the
+ * questions will change and a receipt that mutates with the form is worthless.
+ * Live state belongs in the tables that own it — contact on the account,
+ * money on the cycle, homes on performance_property, logo on the brand — and
+ * `applyIntake` is what promotes one into the other. Reading a budget off this
+ * row after the first month would read a stale number.
+ *
+ * Only four things are typed out of the blob, and each earns it:
+ *
+ *   mediaBudgetDollars   sets the campaign spending limit and the invoice, so
+ *                        it has to be queryable and enforceable, not parsed
+ *                        out of prose at spend time.
+ *   guestListConsentAt   Meta's Custom Audience terms require the attestation;
+ *                        producing it later means a timestamp, not a blob.
+ *   billingAcknowledgedAt  the client's agreement to be pre-billed.
+ *   verified*            observed from Zernio AFTER the grant, so these are
+ *                        facts rather than claims, and push code reads them.
+ *
+ * Everything qualitative stays in `answers` for the agent to read whole.
+ * Columns should follow queries; they are cheap to backfill from the blob and
+ * expensive to guess at now.
+ */
+export const performanceIntakeTable = pgTable(
+  "performance_intake",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("perfintake")),
+    accountId: t
+      .text()
+      .references(() => performanceAccountTable.id, { onDelete: "cascade" })
+      .notNull(),
+    // The brand whose Page the ads will run under. Nullable because an intake
+    // can arrive before the brand row exists; apply resolves it.
+    brandId: t.text().references(() => brandTable.id, { onDelete: "set null" }),
+    /**
+     * The brand's slug AS IT WAS at submission, for reading a row without a
+     * join. A snapshot, like everything else on a receipt: a later rename does
+     * not rewrite it, and it survives the brand row being deleted, which is
+     * the point. Nullable because `brand.slug` is (reference brands carry
+     * none), so anything displaying it falls back to `brandId`. Never resolve
+     * a write through this column — `brandId` is the key.
+     */
+    brandSlug: t.text(),
+
+    status: performanceIntakeStatusEnum().default("submitted").notNull(),
+
+    submittedAt: t
+      .timestamp({ withTimezone: true })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    submittedByName: t.text(),
+    submittedByEmail: t.text(),
+
+    answers: t.jsonb().$type<PerformanceIntakeAnswers>().notNull(),
+
+    /** Whole dollars per month that reach the ad platforms. */
+    mediaBudgetDollars: t.integer(),
+    /** Null when the client asked us to recommend one instead of naming it. */
+    budgetIsRecommendation: t.boolean().default(false).notNull(),
+
+    guestListConsentAt: t.timestamp({ withTimezone: true }),
+    billingAcknowledgedAt: t.timestamp({ withTimezone: true }),
+    instagramLinkConfirmedAt: t.timestamp({ withTimezone: true }),
+
+    /**
+     * The client SAID they granted access. Deliberately separate from
+     * `zernioVerifiedAt`, which is us seeing it: the gap between the two is
+     * the most common onboarding failure, and collapsing them into one flag
+     * hides exactly the case worth chasing.
+     */
+    accessClaimedAt: t.timestamp({ withTimezone: true }),
+    zernioVerifiedAt: t.timestamp({ withTimezone: true }),
+    verifiedPageId: t.text(),
+    verifiedAdAccountId: t.text(),
+    verifiedPixelId: t.text(),
+
+    appliedAt: t.timestamp({ withTimezone: true }),
+    appliedBy: t.text(),
+    /** What apply actually wrote, so a re-read explains itself. */
+    appliedSummary: t.jsonb().$type<string[]>(),
+
+    createdAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: t
+      .timestamp()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date())
+      .notNull(),
+  }),
+  (table) => [
+    index("performance_intake_account_idx").on(table.accountId),
+    index("performance_intake_status_idx").on(table.status),
+    index("performance_intake_brand_idx").on(table.brandId),
+  ],
+);
+
+export type PerformanceIntake = typeof performanceIntakeTable.$inferSelect;
+export type PerformanceIntakeInsert =
+  typeof performanceIntakeTable.$inferInsert;
+
 // ---- RELATIONS ---------------------------------------------------------------
 
 export const performanceAccountRelations = relations(
@@ -303,6 +479,7 @@ export const performanceAccountRelations = relations(
     properties: many(performancePropertyTable),
     cycles: many(performanceCycleTable),
     reports: many(performanceReportTable),
+    intakes: many(performanceIntakeTable),
   }),
 );
 
@@ -337,6 +514,20 @@ export const performanceReportRelations = relations(
     account: one(performanceAccountTable, {
       fields: [performanceReportTable.accountId],
       references: [performanceAccountTable.id],
+    }),
+  }),
+);
+
+export const performanceIntakeRelations = relations(
+  performanceIntakeTable,
+  ({ one }) => ({
+    account: one(performanceAccountTable, {
+      fields: [performanceIntakeTable.accountId],
+      references: [performanceAccountTable.id],
+    }),
+    brand: one(brandTable, {
+      fields: [performanceIntakeTable.brandId],
+      references: [brandTable.id],
     }),
   }),
 );

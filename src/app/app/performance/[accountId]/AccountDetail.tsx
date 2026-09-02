@@ -15,6 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTRPC } from "@/trpc/react";
+
+import { IntakePanel } from "./IntakePanel";
 import {
   AddPropertyForm,
   CycleStatusPicker,
@@ -98,17 +100,19 @@ export function AccountDetail({ accountId }: { accountId: string }) {
             >
               <div>
                 <div className="font-medium">
-                  {property.title ?? property.wanderUrl}
+                  {property.title ?? propertyUrl(property) ?? "Untitled home"}
                 </div>
-                <a
-                  href={property.wanderUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"
-                >
-                  {property.wanderUrl.replace("https://www.wander.com", "")}
-                  <ExternalLink className="size-3" />
-                </a>
+                {propertyUrl(property) && (
+                  <a
+                    href={propertyUrl(property)!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"
+                  >
+                    {shortPropertyUrl(propertyUrl(property)!)}
+                    <ExternalLink className="size-3" />
+                  </a>
+                )}
               </div>
               <div className="text-muted-foreground">
                 <PropertyIdField
@@ -125,6 +129,8 @@ export function AccountDetail({ accountId }: { accountId: string }) {
           )}
         </div>
       </section>
+
+      <IntakePanel accountId={accountId} />
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -648,4 +654,21 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
       </p>
     </section>
   );
+}
+
+/**
+ * A home is bookable on wander.com (List+) or on the client's own WanderOS
+ * site (Performance+). Either column can be null, so read whichever is set
+ * rather than assuming the List+ shape.
+ */
+function propertyUrl(property: {
+  wanderUrl: string | null;
+  siteUrl: string | null;
+}): string | null {
+  return property.wanderUrl ?? property.siteUrl;
+}
+
+/** Drop the scheme and any www so the row shows the part that differs. */
+function shortPropertyUrl(url: string): string {
+  return url.replace(/^https?:\/\/(www\.)?/, "");
 }

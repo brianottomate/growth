@@ -184,6 +184,13 @@ export const brandTable = pgTable(
     connectTokenIssuedByName: t.text(),
     connectTokenIssuedByEmail: t.text(),
     connectTokenIssuedAt: t.timestamp({ withTimezone: true }),
+    /**
+     * Last time anyone hit the public access check for this brand. The only
+     * rate limit that survives serverless: an in-memory counter is per
+     * instance, and this endpoint reaches Zernio and then Meta, so an
+     * unthrottled public route is someone else's outage.
+     */
+    lastAccessCheckAt: t.timestamp({ withTimezone: true }),
 
     // Cached aggregate (sum of channel followers) for overview cards.
     followerCount: t.integer(),

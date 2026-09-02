@@ -869,6 +869,43 @@ export type ZernioAdAccount = {
   [key: string]: unknown;
 };
 
+export type ZernioFacebookPage = {
+  id: string;
+  name?: string;
+  category?: string;
+  fan_count?: number;
+};
+
+/**
+ * The Facebook Pages one connected account can manage, plus which is selected.
+ *
+ * `refresh` is not optional in practice. Zernio caches this list per social
+ * account, so a Page that a partner granted minutes ago is absent from the
+ * default response and a grant that DID land reads as one that did not. Pass
+ * refresh whenever the answer is being used to decide something.
+ * https://docs.zernio.com/accounts/list-facebook-pages
+ */
+export async function listZernioFacebookPages(options: {
+  accountId: string;
+  refresh?: boolean;
+}): Promise<{ pages: ZernioFacebookPage[]; selectedPageId: string | null }> {
+  const params = new URLSearchParams();
+  if (options.refresh) params.set("refresh", "true");
+  const query = params.toString();
+  const data = await zernioFetch<{
+    pages?: ZernioFacebookPage[];
+    selectedPageId?: string | null;
+  }>(
+    `/accounts/${encodeURIComponent(options.accountId)}/facebook-page${
+      query ? `?${query}` : ""
+    }`,
+  );
+  return {
+    pages: data.pages ?? [],
+    selectedPageId: data.selectedPageId ?? null,
+  };
+}
+
 /**
  * Enumerate the platform ad accounts one connected Zernio account can reach.
  * Callers must still apply Growth's brand-scoped default-deny allowlist.

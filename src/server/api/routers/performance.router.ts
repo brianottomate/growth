@@ -29,6 +29,13 @@ import {
   updatePerformanceProperty,
   updatePerformancePropertySchema,
 } from "@/server/services/performance.service";
+import {
+  applyPerformanceIntake,
+  listPerformanceIntakes,
+  previewIntakeApply,
+  setIntakeVerifiedPage,
+  verifyIntakeAccess,
+} from "@/server/services/performance-intake.service";
 
 import { protectedProcedure } from "../trpc";
 
@@ -145,5 +152,48 @@ export const performanceRouter = {
     .input(z.object({ cycleId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) =>
       refreshPerformanceCycleSpend(await actorFor(ctx), input.cycleId),
+    ),
+
+  // ---- intake -------------------------------------------------------------
+
+  intakes: protectedProcedure
+    .input(z.object({ accountId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      listPerformanceIntakes(await actorFor(ctx), input.accountId),
+    ),
+
+  previewIntake: protectedProcedure
+    .input(z.object({ intakeId: z.string().min(1) }))
+    .query(async ({ ctx, input }) =>
+      previewIntakeApply(await actorFor(ctx), input.intakeId),
+    ),
+
+  applyIntake: protectedProcedure
+    .input(
+      z.object({
+        intakeId: z.string().min(1),
+        // The operator's number wins: a client who asked us to recommend one
+        // has no budget to promote, and apply must not invent it.
+        mediaBudgetDollars: z.number().int().min(0).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      applyPerformanceIntake(await actorFor(ctx), input),
+    ),
+
+  // Read-only against Zernio: asks whether the Leadsie grant landed and
+  // records the Page when exactly one name matches.
+  verifyIntakeAccess: protectedProcedure
+    .input(z.object({ intakeId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) =>
+      verifyIntakeAccess(await actorFor(ctx), input.intakeId),
+    ),
+
+  setIntakeVerifiedPage: protectedProcedure
+    .input(
+      z.object({ intakeId: z.string().min(1), pageId: z.string().min(1) }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setIntakeVerifiedPage(await actorFor(ctx), input),
     ),
 } satisfies TRPCRouterRecord;
