@@ -73,9 +73,6 @@ export function IntakePanel({ accountId }: { accountId: string }) {
               <Signal ok={Boolean(intake.guestListConsentAt)}>
                 Guest-list consent
               </Signal>
-              <Signal ok={Boolean(intake.instagramLinkConfirmedAt)}>
-                Instagram linked
-              </Signal>
               {/* Two separate facts on purpose: what they said, and what we
                   saw. The gap is the failure worth chasing. */}
               <Signal ok={Boolean(intake.accessClaimedAt)}>

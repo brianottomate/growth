@@ -352,7 +352,6 @@ export type PerformanceIntakeAnswers = {
   creativeDriveUrl?: string;
   guestListDriveUrl?: string;
   anythingElse?: string;
-  instagramLinked?: string;
   accountsConnected?: boolean;
   [key: string]: unknown;
 };
@@ -431,6 +430,12 @@ export const performanceIntakeTable = pgTable(
 
     guestListConsentAt: t.timestamp({ withTimezone: true }),
     billingAcknowledgedAt: t.timestamp({ withTimezone: true }),
+    /**
+     * No longer asked. The Leadsie grant either includes the Instagram
+     * account or it does not, and the client's answer never told us which,
+     * so asking was a question whose answer we then ignored. Kept because
+     * rows written while it was asked still carry it.
+     */
     instagramLinkConfirmedAt: t.timestamp({ withTimezone: true }),
 
     /**

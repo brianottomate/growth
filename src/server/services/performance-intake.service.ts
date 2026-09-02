@@ -210,7 +210,6 @@ export async function submitPerformanceIntake(input: {
       budgetIsRecommendation,
       guestListConsentAt: answers.guestConsent ? now : null,
       billingAcknowledgedAt: answers.billingAcknowledged ? now : null,
-      instagramLinkConfirmedAt: answers.instagramLinked ? now : null,
       accessClaimedAt: answers.accountsConnected ? now : null,
     })
     .returning({ id: performanceIntakeTable.id });
