@@ -30,8 +30,7 @@ import {
  * Lives in a service, not the script, because this becomes an API route. The
  * script wrapper (scripts/rank-leads.ts) is a loop; the route will be a handler.
  *
- * Four inputs, none of which the retired ranker v1 (`scripts/enrich-batch.ts`,
- * removed 2026-09-02) had:
+ * Four inputs, all of which the ranker v1 (`scripts/enrich-batch.ts`) lacked:
  * - the rendered page, as a screenshot the model actually looks at
  * - the page's image URLs, to judge whether they own real photography
  * - the page copy
@@ -75,30 +74,9 @@ export const LeadRankSchema = z.object({
   brandStrength: ScoreSchema.describe(
     "Is there a coherent brand worth carrying over — name, voice, identity?",
   ),
-  /**
-   * The headline, and the only number that ranks. Deliberately NOT an average of
-   * the dimensions above: averaging seven descriptive scores rewards a good site,
-   * which is the opposite of a good target, and it drags every result toward the
-   * mean. The 16 scores the weighted version produced spanned 38-66 and put
-   * charlestonian.com (upside 35, a site we cannot improve on) second from top.
-   */
-  targetScore: ScoreSchema.describe(
-    "How good a pregen TARGET is this company? High means a weak current site sitting on strong raw material we can rebuild with. A polished site scores LOW no matter how good it is, because there is nothing to improve. A weak site with no usable photography also scores low, because there is nothing to build from.",
+  pregenUpside: ScoreSchema.describe(
+    "How much would a WanderOS site plausibly improve on what they have today? High means weak current site plus strong assets to work with.",
   ),
-  redFlags: z
-    .array(
-      z.enum([
-        "aggregator",
-        "single_property",
-        "not_a_property_manager",
-        "site_already_strong",
-        "no_usable_imagery",
-        "site_unreachable",
-      ]),
-    )
-    .describe(
-      "Structured disqualifiers, empty when none apply. These gate a build; `concerns` is the prose alongside them.",
-    ),
   assetNotes: z
     .array(z.string())
     .max(6)
@@ -137,19 +115,7 @@ Two things decide a good target, and they pull in opposite directions:
 1. Their current site is weak — dated design, thin or generic copy, buried booking path.
 2. They have strong raw material — real photography of real properties, a coherent brand, genuine inventory.
 
-A weak site with no assets is a BAD target: there is nothing to build with. A strong site with great assets is also a bad target: we cannot improve on it. The best target is a weak site sitting on good assets. That is what targetScore measures, and it is the only number that ranks anything.
-
-Score targetScore against these anchors, taken from real assessments. USE THE FULL RANGE. Most of the list should not land between 40 and 60.
-
-- 85 — Real photography of real properties, a name and voice worth keeping, and a site that squanders both: no written copy beyond listing titles, template design, booking buried. Everything to gain.
-- 70 — Good imagery, some genuine local specificity in the copy, dated or generic presentation. A clear improvement is available.
-- 50 — Mixed. Decent bones and decent assets, and a rebuild would be a lateral move as much as an upgrade.
-- 30 — Competent current site. Professional design, coherent brand, working booking path. We could match it; we would not obviously beat it.
-- 10 — Either a polished site we cannot improve on, or a site so thin there is no photography, no inventory and no brand to carry across. Both are wasted builds, for opposite reasons.
-
-The dimension scores above are DESCRIPTIVE: they record what the site is like. targetScore is a JUDGEMENT and does not have to track them. A site scoring 85 on assetQuality and 80 on designQuality should get a LOW targetScore, because a good site is a bad target.
-
-Judge the imagery yourself. The attached images are whatever the page loads, unfiltered, so some will be logos, icons, badges, sprites or tracking pixels. Ignore those when scoring assetQuality and say so in assetNotes; the question is whether they own real photography of their own properties.
+A weak site with no assets is a BAD target: there is nothing to build with. A strong site with great assets is also a bad target: we cannot improve on it. The best target is a weak site sitting on good assets, which is what pregenUpside should capture.
 
 Judge only what the evidence shows. The screenshot is the rendered page; the image list is what the page loads; the markdown is the copy. Do not infer traffic, revenue, or conversion — you cannot see those. If imagery is absent from the evidence, say so rather than assuming it is bad.
 
@@ -208,23 +174,13 @@ async function fetchImageBytes(
 }
 
 /** A scrape failure degrades the judgement rather than losing the CRM half. */
-/**
- * A rank with no page behind it is not a rank.
- *
- * This used to swallow the error and return `{}`, and the model would dutifully
- * score seven dimensions off "(no copy could be scraped)" and zero images. Those
- * scores persisted as `lead-ranker-v2` with a timestamp, indistinguishable from
- * a real judgement. Over a 400-domain batch nobody reads the warnings, so the
- * only safe behaviour is to fail the domain and let the runner record it.
- */
-async function requireScrape(url: string): Promise<EnrichmentScrape> {
-  const scrape = await scrapeForEnrichment(url);
-  if (!scrape.screenshot && !(scrape.markdown ?? "").trim()) {
-    throw new Error(
-      `scrape returned neither a screenshot nor copy for ${url}; refusing to score blind`,
-    );
+async function safeScrape(url: string): Promise<EnrichmentScrape> {
+  try {
+    return await scrapeForEnrichment(url);
+  } catch (error) {
+    console.warn(`⚠️ [ranker] scrape failed for ${url}`, error);
+    return {};
   }
-  return scrape;
 }
 
 export type LeadRankResult = {
@@ -240,10 +196,28 @@ export type LeadRankResult = {
   activitiesSeen: number;
   drift: ReturnType<typeof detectLeadDataDrift>;
   rank: LeadRank;
-  /** The model's own 0-100 target judgement, copied out so a batch sorts without re-reading. */
+  /** Weighted 0-100 headline, so a batch can be sorted without re-reading. */
   overall: number;
 };
 
+/** Weights: upside dominates, then the raw material, then presentation. */
+const WEIGHTS = {
+  pregenUpside: 0.3,
+  assetQuality: 0.2,
+  brandStrength: 0.15,
+  copySpecificity: 0.12,
+  copyQuality: 0.1,
+  designQuality: 0.08,
+  bookingClarity: 0.05,
+} as const;
+
+function weightedOverall(rank: LeadRank): number {
+  const total = Object.entries(WEIGHTS).reduce(
+    (sum, [key, weight]) => sum + rank[key as keyof typeof WEIGHTS] * weight,
+    0,
+  );
+  return Math.round(total);
+}
 
 /**
  * Rank one domain. Persists unless `persist: false`.
@@ -268,7 +242,7 @@ export async function rankLeadDomain(
       : await findCompanyByDomain(normalized);
 
   const [scrape, emails, activity] = await Promise.all([
-    requireScrape(`https://${normalized}`),
+    safeScrape(`https://${normalized}`),
     company
       ? readHubspotCompanyEmailHistory(company.id, {
           limit: 40,
@@ -283,21 +257,12 @@ export async function rankLeadDomain(
       : null,
   ]);
 
-  // Spread the sample across the page rather than taking the first N. A
-  // gallery-heavy site's leading images are often one property shot six ways,
-  // which tells you nothing about the breadth of their photography.
-  //
-  // There is no chrome regex any more. It dropped every URL containing "badge"
-  // or "icon", which eats real filenames, and it was guessing at something the
-  // model can see directly — the system prompt now tells it to ignore logos and
-  // sprites itself.
-  const maxImages = options.maxImages ?? 8;
-  const candidates = (scrape.images ?? []).filter((url) =>
-    /^https?:\/\//i.test(url),
-  );
-  const stride = Math.max(1, Math.floor(candidates.length / maxImages));
-  const sampledImages = candidates
-    .filter((_, index) => index % stride === 0)
+  const maxImages = options.maxImages ?? 6;
+  const sampledImages = (scrape.images ?? [])
+    .filter((url) => /^https?:\/\//i.test(url))
+    // Skip the obvious chrome: logos, icons, sprites, tracking pixels. They are
+    // not what "do they have good photography" is asking about.
+    .filter((url) => !/(logo|icon|sprite|favicon|pixel|badge)/i.test(url))
     .slice(0, maxImages);
 
   const copy = (scrape.markdown ?? "").slice(0, 12_000);
@@ -340,7 +305,7 @@ ${emailText}
 OUR NOTES, CALLS AND MEETINGS (confidential; each names the rep who logged it):
 ${activityText}
 
-Score every dimension, then set targetScore against the anchors. Ground assetQuality and designQuality in the screenshot and images actually attached, not in assumptions. Attached images are unfiltered page assets, so disregard logos, icons and sprites when judging photography. Set redFlags to [] when nothing applies.`;
+Score every dimension. Ground assetQuality and designQuality in the screenshot and images actually attached, not in assumptions.`;
 
   const generated = await generateText({
     model: anthropic(MODEL),
@@ -369,7 +334,7 @@ Score every dimension, then set targetScore against the anchors. Ground assetQua
   });
 
   const rank = generated.output;
-  const overall = rank.targetScore;
+  const overall = weightedOverall(rank);
 
   // Cheap deterministic check alongside the judgement: does what we discovered
   // disagree with what HubSpot says? The heavyweight reconciliation still lives

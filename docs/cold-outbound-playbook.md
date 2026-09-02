@@ -35,24 +35,11 @@ use _mid-tier_ prospects (don't burn the best) and Kristian as a proxy AE.
 
 ## Enrichment SOP (what's valuable)
 
-Pipeline: `scripts/rank-leads.ts` → `lead-ranker.service.ts` (scrape + screenshot
-+ vision + our HubSpot correspondence, writes back to `leads.domain`).
+Pipeline: `scripts/enrich-batch.ts` (discovery → extraction + triangulated unit
+estimate, writes back to `leads.domain`). Findings from 100 enriched net-new:
 
-`scripts/enrich-batch.ts` (ranker v1, `score_version = enrich-batch-v1`) was
-retired 2026-09-02 and its 198 scores cleared: two incompatible scales in one
-sortable column made `score_pregen_potential` meaningless to sort by. The v1
-judgements survive under `enrichment.extraction` on each row. Discovery,
-extraction and unit estimation were never lost with it — they live in
-`lead-discovery`, `lead-extraction` and `lead-unit-estimate` services and are
-still reachable from the leads router's enrich drawer.
-
-Findings from the 100 net-new enriched under v1, which still hold:
-
-- ✅ **`pregenFit`** — v1's targeting signal (0–78). Superseded by v2's
-  weighted `overall`; the idea survives, the numbers do not.
+- ✅ **`pregenFit`** — the targeting signal (0–78). The cut.
 - ✅ **`redFlags`** — disqualifier gate (aggregator / single-property / not-a-PM).
-  **v2 has no structured equivalent**, only a free-text `concerns` array. Porting
-  this back is the biggest open gap in the ranker.
 - ✅ **`unit_estimate` + confidence** — the size axis; ~60% high-confidence, 40% null.
 - ❌ **stored `unit_count`** — NOISE. Wrong on ~19/20, 30–150× off (it's HubSpot's
   distrusted `portfolio_size` / a `property_count` CSV column; airvillage 1524→10).
