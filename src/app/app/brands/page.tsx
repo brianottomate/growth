@@ -23,6 +23,7 @@ import { TrackedBrands, type TrackedLite } from "./TrackedBrands";
 import { SuggestedChannels, type SuggestionLite } from "./SuggestedChannels";
 import { PeerScrapeButton } from "./PeerScrapeButton";
 import { AmplifierRolodex } from "./AmplifierRolodex";
+import { BrandSearch } from "./BrandSearch";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 
 const compactFmt = new Intl.NumberFormat("en-US", {
@@ -481,8 +482,52 @@ export default async function BrandsPage() {
     />
   );
 
+  const renderPeerBrand = (brand: typeof brandTable.$inferSelect) => (
+    <PeerBrandCard
+      key={brand.id}
+      brand={brand}
+      channels={channels.filter((c) => c.brandId === brand.id).map(toLite)}
+      trackedByLabel={(peerTrackedBy.get(brand.id) ?? []).join(" · ")}
+      suggestions={suggestionsFor(brand.id)}
+      postCount={postCountByBrand.get(brand.id) ?? 0}
+      lastScraped={lastScrapedByBrand.get(brand.id)?.toISOString() ?? null}
+      postCountByPlatform={postCountsForBrand(brand.id)}
+    />
+  );
+
+  // What a teammate would type to find a brand: its name, the URL they know it
+  // by, or a handle they saw on a post.
+  const searchKey = (brand: typeof brandTable.$inferSelect) =>
+    [
+      brand.name,
+      brand.slug,
+      brand.website,
+      brand.tagline,
+      ...channels
+        .filter((c) => c.brandId === brand.id)
+        .flatMap((c) => [c.handle, c.platform]),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
   const company = brands.filter((b) => b.type === "company");
   const personal = brands.filter((b) => b.type === "personal");
+
+  const searchGroups = [
+    { label: "Company brands", brands: company, render: renderBrand },
+    { label: "Personal brands", brands: personal, render: renderBrand },
+    { label: "Tracked brands", brands: peerBrands, render: renderPeerBrand },
+  ]
+    .filter((group) => group.brands.length > 0)
+    .map((group) => ({
+      label: group.label,
+      entries: group.brands.map((brand) => ({
+        key: brand.id,
+        search: searchKey(brand),
+        node: group.render(brand),
+      })),
+    }));
 
   return (
     <div>
@@ -505,49 +550,7 @@ export default async function BrandsPage() {
         </p>
       )}
 
-      {company.length > 0 && (
-        <>
-          <h2 className="text-muted-foreground mt-8 mb-3 text-xs font-semibold tracking-wider uppercase">
-            Company brands
-          </h2>
-          <div className="flex flex-col gap-4">{company.map(renderBrand)}</div>
-        </>
-      )}
-
-      {personal.length > 0 && (
-        <>
-          <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
-            Personal brands
-          </h2>
-          <div className="flex flex-col gap-4">{personal.map(renderBrand)}</div>
-        </>
-      )}
-
-      {peerBrands.length > 0 && (
-        <>
-          <h2 className="text-muted-foreground mt-10 mb-3 text-xs font-semibold tracking-wider uppercase">
-            Tracked brands
-          </h2>
-          <div className="flex flex-col gap-4">
-            {peerBrands.map((brand) => (
-              <PeerBrandCard
-                key={brand.id}
-                brand={brand}
-                channels={channels
-                  .filter((c) => c.brandId === brand.id)
-                  .map(toLite)}
-                trackedByLabel={(peerTrackedBy.get(brand.id) ?? []).join(" · ")}
-                suggestions={suggestionsFor(brand.id)}
-                postCount={postCountByBrand.get(brand.id) ?? 0}
-                lastScraped={
-                  lastScrapedByBrand.get(brand.id)?.toISOString() ?? null
-                }
-                postCountByPlatform={postCountsForBrand(brand.id)}
-              />
-            ))}
-          </div>
-        </>
-      )}
+      {searchGroups.length > 0 && <BrandSearch groups={searchGroups} />}
 
       <AmplifierRolodex />
     </div>
