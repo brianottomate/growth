@@ -337,24 +337,26 @@ export type PerformanceIntakeStatus =
 /** What the client typed, verbatim. Never edited after submission. */
 export type PerformanceIntakeAnswers = {
   detailsConfirmed?: boolean;
-  detailsCorrection?: string;
   reportEmails?: string;
-  properties?: string[];
+  /** Listing URLs on the client's own booking site, not names. */
+  propertyUrls?: string[];
+  /** "Advertise everything", set instead of naming individual listings. */
+  allProperties?: boolean;
   propertyNotes?: string;
   budget?: string;
   budgetFlexible?: string;
   billingAcknowledged?: boolean;
   invoiceEmail?: string;
-  guestListName?: string;
-  guestConsent?: boolean;
-  logoName?: string;
   ugcPermission?: string;
-  avoid?: string;
+  /** Drive or Dropbox links. Both may be the same folder; this is human intake. */
+  creativeDriveUrl?: string;
+  guestListDriveUrl?: string;
   anythingElse?: string;
-  instagramLinked?: boolean;
+  instagramLinked?: string;
   accountsConnected?: boolean;
   [key: string]: unknown;
 };
+
 
 /**
  * A completed Performance+ intake: the RECEIPT, not the state.

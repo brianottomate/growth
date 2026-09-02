@@ -38,57 +38,55 @@ describe("intake budget parsing", () => {
 });
 
 describe("apply blockers", () => {
-  it("passes once the attestation is timestamped", () => {
-    expect(
-      applyBlockers({ status: "submitted", guestListConsentAt: new Date() }),
-    ).toHaveLength(0);
-  });
-
-  it("refuses without guest-audience consent", () => {
-    // We hold the booking data, so nothing is uploaded, but Meta's Custom
-    // Audience terms still need the advertiser's attestation. Under one shared
-    // ad account an unlawful audience risks every client, not just this one.
-    expect(
-      applyBlockers({ status: "submitted", guestListConsentAt: null }),
-    ).toHaveLength(1);
+  it("lets a submitted intake through", () => {
+    // Nothing apply writes reaches a platform, so there is no reason to refuse
+    // a submission on its contents.
+    expect(applyBlockers({ status: "submitted" })).toHaveLength(0);
   });
 
   it("refuses to apply twice", () => {
     // Re-applying would reopen a cycle an operator may have since adjusted.
-    expect(
-      applyBlockers({ status: "applied", guestListConsentAt: new Date() }),
-    ).toHaveLength(1);
+    expect(applyBlockers({ status: "applied" })).toHaveLength(1);
   });
 });
 
 describe("property rows", () => {
-  it("skips homes already on the account, case-insensitively", () => {
+  it("carries the client's URL onto the row", () => {
     const rows = propertyRowsFromAnswers(
       "perf_1",
-      { properties: ["Roam River Mansion", "arrow penthouse 215"] },
-      ["Arrow Penthouse 215"],
+      { propertyUrls: ["https://winterparkescapes.com/homes/roam"] },
+      [],
     );
-    expect(rows.map((row) => row.title)).toEqual(["Roam River Mansion"]);
+    expect(rows).toEqual([
+      {
+        accountId: "perf_1",
+        siteUrl: "https://winterparkescapes.com/homes/roam",
+        title: null,
+      },
+    ]);
   });
 
-  it("dedupes repeats within one submission", () => {
+  it("dedupes against existing rows and within a submission", () => {
+    // Trailing slash and case differ; it is the same listing.
     const rows = propertyRowsFromAnswers(
       "perf_1",
-      { properties: ["The Kiln House", "The Kiln House", "  "] },
-      [],
+      {
+        propertyUrls: [
+          "https://WinterParkEscapes.com/homes/roam/",
+          "https://winterparkescapes.com/homes/arrow",
+          "https://winterparkescapes.com/homes/arrow",
+        ],
+      },
+      ["https://winterparkescapes.com/homes/roam"],
     );
-    expect(rows).toHaveLength(1);
+    expect(rows.map((row) => row.siteUrl)).toEqual([
+      "https://winterparkescapes.com/homes/arrow",
+    ]);
   });
 
-  it("never guesses a URL from a title", () => {
-    // A fabricated link would 404 inside a live ad, so siteUrl stays null
-    // until someone matches the home against the booking site.
-    const [row] = propertyRowsFromAnswers(
-      "perf_1",
-      { properties: ["Cedar & Ninth"] },
-      [],
-    );
-    expect(row?.siteUrl).toBeNull();
+  it("invents nothing for an all-properties request", () => {
+    // "Advertise everything" is an instruction to the operator, not a list.
+    expect(propertyRowsFromAnswers("perf_1", { allProperties: true }, [])).toHaveLength(0);
   });
 });
 

@@ -52,30 +52,33 @@ export function currentPeriod(now = new Date()): string {
 }
 
 /**
- * Resolve one submitted property name to a row shape.
+ * The listings the client picked, as property rows.
  *
- * A name is all the form collects, so `siteUrl` stays null until someone
- * matches it against the client's booking site. That is deliberate: guessing
- * a URL from a title would produce links that 404 in a live ad.
+ * Intake collects URLs now, so `siteUrl` is populated rather than left null
+ * for someone to match up later. Deduped on the URL, case- and trailing-slash
+ * insensitively, so a resubmission does not double a home up.
+ *
+ * `allProperties` produces no rows on purpose. "Advertise everything" is an
+ * instruction to the operator, not a list we can invent, and inventing one
+ * would put homes on the record the client never named.
  */
 export function propertyRowsFromAnswers(
   accountId: string,
   answers: PerformanceIntakeAnswers,
-  existingTitles: string[],
-): { accountId: string; title: string; siteUrl: string | null }[] {
-  const seen = new Set(existingTitles.map((title) => title.toLowerCase()));
-  const rows: { accountId: string; title: string; siteUrl: string | null }[] =
-    [];
-  for (const name of answers.properties ?? []) {
-    const title = name.trim();
-    if (!title || seen.has(title.toLowerCase())) continue;
-    seen.add(title.toLowerCase());
-    rows.push({ accountId, title, siteUrl: null });
+  existingUrls: string[],
+): { accountId: string; siteUrl: string; title: string | null }[] {
+  const normalize = (url: string) => url.trim().toLowerCase().replace(/\/+$/, "");
+  const seen = new Set(existingUrls.map(normalize));
+  const rows: { accountId: string; siteUrl: string; title: string | null }[] = [];
+  for (const raw of answers.propertyUrls ?? []) {
+    const siteUrl = raw.trim();
+    const key = normalize(siteUrl);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    rows.push({ accountId, siteUrl, title: null });
   }
   return rows;
 }
-
-export { intakeBrandRef };
 
 export const submitIntakeSchema = z
   .object({
@@ -254,7 +257,7 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
           eq(performancePropertyTable.accountId, account.id),
           isNull(performancePropertyTable.deletedAt),
         ),
-        columns: { title: true },
+        columns: { siteUrl: true },
       })
     : [];
 
@@ -263,9 +266,10 @@ export async function intakePrefill(handle: { token?: string; slug?: string }) {
     slug: brand.slug,
     ...prefillContact(byToken, account ?? null),
     site: brand.website,
+    // URLs, because that is what the form collects and pre-ticks.
     properties: properties
-      .map((row) => row.title)
-      .filter((title): title is string => Boolean(title)),
+      .map((row) => row.siteUrl)
+      .filter((url): url is string => Boolean(url)),
     repName: brand.connectTokenIssuedByName?.split(" ")[0] ?? null,
     repEmail: brand.connectTokenIssuedByEmail,
   };
@@ -313,12 +317,14 @@ export async function previewIntakeApply(
       eq(performancePropertyTable.accountId, intake.accountId),
       isNull(performancePropertyTable.deletedAt),
     ),
-    columns: { title: true },
+    columns: { siteUrl: true },
   });
   const newProperties = propertyRowsFromAnswers(
     intake.accountId,
     answers,
-    existing.map((row) => row.title ?? ""),
+    // Dedupe on the URL, which is what a row is now keyed by. Comparing
+    // titles here would typecheck and silently never match.
+    existing.map((row) => row.siteUrl ?? ""),
   );
 
   const period = currentPeriod();
@@ -346,26 +352,21 @@ export async function previewIntakeApply(
   };
 }
 
-/** Why an intake cannot be applied yet. Pure so the rule is testable. */
-export function applyBlockers(intake: {
-  status: string;
-  guestListConsentAt: Date | null;
-}): string[] {
-  const blockers: string[] = [];
-  if (intake.status === "applied") {
-    blockers.push("This intake has already been applied.");
-  }
-  // We build the audience from booking data we already hold, so the client
-  // never uploads a list. What they still owe us is the attestation, because
-  // Meta's Custom Audience terms require it from the advertiser. Without it,
-  // building an audience risks the shared ad account, and under one account
-  // that means every client rather than this one.
-  if (!intake.guestListConsentAt) {
-    blockers.push(
-      "No guest-audience consent on this intake. Do not build a custom audience from their guest data.",
-    );
-  }
-  return blockers;
+/**
+ * Why an intake cannot be applied yet.
+ *
+ * Only one rule left: an intake applies once. Everything apply writes lands in
+ * the commercial tables and nothing reaches a platform, so there is no reason
+ * to refuse a submission on its contents. Consent for a guest audience is no
+ * longer asked on the form, and building one is an operator action with its
+ * own approval rather than something this gate can vouch for.
+ *
+ * Pure so the rule stays testable.
+ */
+export function applyBlockers(intake: { status: string }): string[] {
+  return intake.status === "applied"
+    ? ["This intake has already been applied."]
+    : [];
 }
 
 /**
@@ -388,10 +389,19 @@ export async function applyPerformanceIntake(
   const answers = intake.answers;
   const written: string[] = [];
 
-  // 1. Contact details onto the commercial record.
+  // 1. Contact details onto the commercial record. The free-text corrections
+  //    field is gone from the form (an AE handles those), so what carries over
+  //    is the notes the client did leave plus where their assets live.
   const accountPatch: Record<string, unknown> = { status: "active" };
-  if (answers.detailsCorrection?.trim()) {
-    accountPatch.notes = [intake.account.notes, answers.detailsCorrection]
+  const noteLines = [
+    answers.propertyNotes?.trim(),
+    answers.anythingElse?.trim(),
+    answers.creativeDriveUrl?.trim() && `Creative: ${answers.creativeDriveUrl.trim()}`,
+    answers.guestListDriveUrl?.trim() && `Guest list: ${answers.guestListDriveUrl.trim()}`,
+    answers.allProperties ? "Client asked for ALL properties." : undefined,
+  ].filter((line): line is string => Boolean(line));
+  if (noteLines.length > 0) {
+    accountPatch.notes = [intake.account.notes, ...noteLines]
       .filter(Boolean)
       .join("\n\n");
   }
