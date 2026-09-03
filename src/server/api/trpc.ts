@@ -49,8 +49,20 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
+    // A driver error's message is the whole failed statement. Drizzle threw
+    // one straight through to the UI once — an operator re-ran "draft ads from
+    // their homes" and got the full INSERT, column list and placeholders, in
+    // place of "that ad already exists". Nothing actionable, and it publishes
+    // the schema. The real error still reaches the server logs untouched.
+    const isDriverError =
+      typeof shape.message === "string" &&
+      /^(insert into|update |delete from|select )/i.test(shape.message.trim());
+    if (isDriverError) console.error("[trpc] driver error surfaced", error);
     return {
       ...shape,
+      message: isDriverError
+        ? "The database rejected that write. It has been logged — check the server logs for the query."
+        : shape.message,
       data: {
         ...shape.data,
         zodError:

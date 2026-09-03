@@ -460,17 +460,47 @@ export async function addDraftAd(input: {
   const businessKey =
     input.businessKey ??
     `${campaign.id}:${input.name.trim().toLowerCase().replace(/\s+/g, "-")}`;
+
+  // `business_key` carries a UNIQUE index, and every ad has one — a caller's,
+  // or one derived from the name. A bare insert therefore threw a raw Postgres
+  // error the second time anything was drafted twice: re-running "draft ads
+  // from their homes" dumped the full INSERT statement into the operator's
+  // face. The key means "this is the same ad", so saying it twice should
+  // refresh it, not fail.
+  const existing = await db.query.adTable.findFirst({
+    where: eq(adTable.businessKey, businessKey),
+    columns: { id: true, campaignId: true },
+  });
+
+  if (existing && existing.campaignId !== campaign.id) {
+    // Keys are globally unique, so silently updating would edit an ad on a
+    // DIFFERENT campaign. Refuse and say which.
+    throw new Error(
+      `Another campaign already has an ad keyed "${businessKey}". Give this one its own name, or edit the existing ad on campaign ${existing.campaignId}.`,
+    );
+  }
+
+  const values = {
+    campaignId: campaign.id,
+    brandId: brand.id,
+    name: input.name.trim(),
+    type: input.type ?? "creative",
+    content: input.content,
+    businessKey,
+  };
+
+  if (existing) {
+    const [updated] = await db
+      .update(adTable)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(adTable.id, existing.id))
+      .returning();
+    return updated!;
+  }
+
   const [ad] = await db
     .insert(adTable)
-    .values({
-      id: createId("ad"),
-      campaignId: campaign.id,
-      brandId: brand.id,
-      name: input.name.trim(),
-      type: input.type ?? "creative",
-      content: input.content,
-      businessKey,
-    })
+    .values({ id: createId("ad"), ...values })
     .returning();
   return ad!;
 }
