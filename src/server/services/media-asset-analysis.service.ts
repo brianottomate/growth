@@ -70,7 +70,9 @@ export async function analyzeStoredMediaAsset(input: {
     let transcriptError: string | undefined;
     try {
       const result = await Promise.race([
-        transcribeVideoUrl(asset.url),
+        // The brand's own name is the noun most often said and least often
+        // known to the model.
+        transcribeVideoUrl(asset.url, { vocabulary: [input.brandName] }),
         new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error("Transcription took longer than 50 s.")),

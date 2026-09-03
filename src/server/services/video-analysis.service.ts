@@ -333,7 +333,11 @@ export async function completeVideoAnalysis(input: {
   };
   let transcriptError: string | null = null;
   try {
-    transcript = await transcribeVideoUrl(analysis.sourceUrl);
+    transcript = await transcribeVideoUrl(analysis.sourceUrl, {
+      // Same reason as the library analyzer: the brand's own name is the noun
+      // most often spoken and least often known to the model.
+      vocabulary: [post.brand?.name ?? ""],
+    });
   } catch (error) {
     transcriptError =
       error instanceof Error ? error.message : "Transcription failed.";
