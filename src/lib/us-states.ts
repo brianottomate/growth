@@ -66,3 +66,22 @@ export function usStateName(code: string | null | undefined): string | null {
   if (!code) return null;
   return US_STATE_NAMES[code.trim().toUpperCase()] ?? null;
 }
+
+/**
+ * The two-letter code for a state written either way.
+ *
+ * Listing data carries both forms — the same portfolio had homes in "OH" and
+ * in "Ohio" — and uppercasing alone kept them as two different states, so a
+ * pitch page and its ad copy read "OH, OHIO".
+ */
+export function usStateCode(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase();
+  if (US_STATE_NAMES[upper]) return upper;
+  const byName = Object.entries(US_STATE_NAMES).find(
+    ([, name]) => name.toUpperCase() === upper,
+  );
+  return byName?.[0] ?? null;
+}

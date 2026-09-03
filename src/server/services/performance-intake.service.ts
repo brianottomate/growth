@@ -16,7 +16,7 @@ import {
   type PerformanceIntake,
   type PerformanceIntakeAnswers,
 } from "@/server/db/schema";
-import { usStateName } from "@/lib/us-states";
+import { usStateCode, usStateName } from "@/lib/us-states";
 import { zernioConnectionMatchesPlatform } from "@/lib/zernio-ads";
 import {
   brandListings,
@@ -74,9 +74,11 @@ export function propertyRowsFromAnswers(
   answers: PerformanceIntakeAnswers,
   existingUrls: string[],
 ): { accountId: string; siteUrl: string; title: string | null }[] {
-  const normalize = (url: string) => url.trim().toLowerCase().replace(/\/+$/, "");
+  const normalize = (url: string) =>
+    url.trim().toLowerCase().replace(/\/+$/, "");
   const seen = new Set(existingUrls.map(normalize));
-  const rows: { accountId: string; siteUrl: string; title: string | null }[] = [];
+  const rows: { accountId: string; siteUrl: string; title: string | null }[] =
+    [];
   for (const raw of answers.propertyUrls ?? []) {
     const siteUrl = raw.trim();
     const key = normalize(siteUrl);
@@ -124,7 +126,11 @@ export function withPropertyAddresses<T extends { siteUrl: string }>(
  * sometimes the right buy, and the operator prunes.
  */
 export function geographyFromProperties(
-  rows: { city?: string | null; state?: string | null; country?: string | null }[],
+  rows: {
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+  }[],
 ): AudienceGeographyPlan {
   const countries = new Set<string>();
   const states = new Set<string>();
@@ -133,7 +139,11 @@ export function geographyFromProperties(
   for (const row of rows) {
     const country = row.country?.trim().toUpperCase();
     if (country) countries.add(country);
-    const state = row.state?.trim().toUpperCase();
+    // Through the code map, not just uppercased: listings carry both "OH"
+    // and "Ohio", and a bare uppercase kept those as two separate states, so
+    // the pitch page and its ad copy read "OH, OHIO". An unrecognised value
+    // is still worth keeping — it is how a non-US market stays visible.
+    const state = usStateCode(row.state) ?? row.state?.trim().toUpperCase();
     if (state) states.add(state);
     const city = row.city?.trim();
     if (city) cities.add(city);
@@ -169,7 +179,9 @@ export function answersFingerprint(answers: PerformanceIntakeAnswers): string {
     }
     return value;
   };
-  return createHash("sha256").update(JSON.stringify(stable(answers))).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(stable(answers)))
+    .digest("hex");
 }
 
 /** How long an identical resubmission is treated as the same one. */
@@ -186,12 +198,16 @@ export const DUPLICATE_SUBMIT_WINDOW_MS = 10 * 60 * 1000;
  */
 export function isDuplicateSubmission(
   fingerprint: string,
-  previous: { answersFingerprint: string | null; submittedAt: Date } | undefined,
+  previous:
+    | { answersFingerprint: string | null; submittedAt: Date }
+    | undefined,
   now = new Date(),
 ): boolean {
   if (!previous?.answersFingerprint) return false;
   if (previous.answersFingerprint !== fingerprint) return false;
-  return now.getTime() - previous.submittedAt.getTime() < DUPLICATE_SUBMIT_WINDOW_MS;
+  return (
+    now.getTime() - previous.submittedAt.getTime() < DUPLICATE_SUBMIT_WINDOW_MS
+  );
 }
 
 export const submitIntakeSchema = z
@@ -335,7 +351,10 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
     // Restated in the return type: the null check does not survive the
     // function boundary, and callers insert with organizationId.
     if (brand?.organizationId) {
-      return { brand: { ...brand, organizationId: brand.organizationId }, byToken: true };
+      return {
+        brand: { ...brand, organizationId: brand.organizationId },
+        byToken: true,
+      };
     }
   }
   if (handle.slug) {
@@ -348,7 +367,10 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
       columns,
     });
     if (brand?.organizationId) {
-      return { brand: { ...brand, organizationId: brand.organizationId }, byToken: false };
+      return {
+        brand: { ...brand, organizationId: brand.organizationId },
+        byToken: false,
+      };
     }
   }
   throw new PerformanceError("NOT_FOUND", "Unknown intake link");
@@ -578,8 +600,10 @@ export async function applyPerformanceIntake(
   const noteLines = [
     answers.propertyNotes?.trim(),
     answers.anythingElse?.trim(),
-    answers.creativeDriveUrl?.trim() && `Creative: ${answers.creativeDriveUrl.trim()}`,
-    answers.guestListDriveUrl?.trim() && `Guest list: ${answers.guestListDriveUrl.trim()}`,
+    answers.creativeDriveUrl?.trim() &&
+      `Creative: ${answers.creativeDriveUrl.trim()}`,
+    answers.guestListDriveUrl?.trim() &&
+      `Guest list: ${answers.guestListDriveUrl.trim()}`,
     answers.allProperties ? "Client asked for ALL properties." : undefined,
   ].filter((line): line is string => Boolean(line));
   if (noteLines.length > 0) {
@@ -846,7 +870,11 @@ export async function checkAccessByToken(handle: {
   const match = matchBrandPage(brand.name, [...seen.values()]);
   // Only the Page NAME goes back: the id is an internal handle and this
   // response is public.
-  return { found: Boolean(match), pageName: match?.name ?? null, throttled: false };
+  return {
+    found: Boolean(match),
+    pageName: match?.name ?? null,
+    throttled: false,
+  };
 }
 
 // ---- THE PITCH PAGE --------------------------------------------------------
@@ -977,7 +1005,13 @@ export async function campaignPrefillFromIntake(
         eq(performancePropertyTable.accountId, account.id),
         isNull(performancePropertyTable.deletedAt),
       ),
-      columns: { siteUrl: true, wanderUrl: true, city: true, state: true, country: true },
+      columns: {
+        siteUrl: true,
+        wanderUrl: true,
+        city: true,
+        state: true,
+        country: true,
+      },
     }),
     db.query.performanceCycleTable.findFirst({
       where: and(
@@ -990,7 +1024,8 @@ export async function campaignPrefillFromIntake(
 
   return {
     accountId: account.id,
-    mediaBudgetDollars: cycle?.mediaBudget ?? intake?.mediaBudgetDollars ?? null,
+    mediaBudgetDollars:
+      cycle?.mediaBudget ?? intake?.mediaBudgetDollars ?? null,
     landingUrl: brand.website,
     propertyUrls: properties
       .map((row) => row.siteUrl ?? row.wanderUrl)
