@@ -2,6 +2,11 @@ import "server-only";
 
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
+import {
+  LINKEDIN_MIN_DAILY_BUDGET,
+  LINKEDIN_MIN_LIFETIME_BUDGET,
+} from "@/lib/zernio-ads";
+
 import { db } from "@/server/db";
 import {
   adTable,
@@ -266,7 +271,11 @@ export async function setPlatformDraft(input: {
   });
   if (!row) throw new Error("Platform campaign not found");
   if (!row.campaignId) throw new Error("Not attached to a plan");
-  await requireOwnedCampaign(row.campaignId, input.organizationId);
+  const { campaign: parent } = await requireOwnedCampaign(
+    row.campaignId,
+    input.organizationId,
+  );
+  const campaignEndAt = row.endAt ?? parent.endAt;
 
   const current = row.settings ?? {};
   const merge = <K extends keyof PlatformCampaignSettings>(
@@ -294,8 +303,41 @@ export async function setPlatformDraft(input: {
       },
     })
     .where(eq(platformCampaignTable.id, row.id))
-    .returning({ id: platformCampaignTable.id });
-  return updated!;
+    .returning({
+      id: platformCampaignTable.id,
+      platform: platformCampaignTable.platform,
+      budget: platformCampaignTable.budget,
+      budgetType: platformCampaignTable.budgetType,
+      settings: platformCampaignTable.settings,
+    });
+  const saved = updated!;
+
+  // Read the state back rather than returning a bare id. An agent that gets
+  // only `{id}` cannot tell a successful write from a dropped one, so it
+  // assumes the worst and calls again — one operator watched this fire ten
+  // times in a row, apologising, while every single write had in fact landed.
+  // Say now what the push would refuse later. These are the same rules
+  // `assertLinkedInAdPayload` enforces; the difference is that here the
+  // operator is still setting the number, rather than watching a push fail.
+  const warnings: string[] = [];
+  if (saved.budgetType === "lifetime" && !campaignEndAt) {
+    warnings.push(
+      "This is a lifetime budget and the campaign has no end date, so the push will refuse it. Set an end date on the campaign, or switch to a daily budget.",
+    );
+  }
+  if (saved.platform === "linkedin_ads" && saved.budget != null) {
+    const floor =
+      saved.budgetType === "lifetime"
+        ? LINKEDIN_MIN_LIFETIME_BUDGET
+        : LINKEDIN_MIN_DAILY_BUDGET;
+    if (saved.budget < floor) {
+      warnings.push(
+        `LinkedIn's minimum ${saved.budgetType ?? "daily"} budget is ${floor}, so the push will refuse ${saved.budget}.`,
+      );
+    }
+  }
+
+  return { ...saved, ...(warnings.length > 0 ? { warnings } : {}) };
 }
 
 /**
