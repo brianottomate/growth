@@ -20,12 +20,12 @@ const MODEL = "claude-sonnet-5";
  * code at all, and "Logan Ohio" as a city. A closed map cannot normalize data
  * whose shape it does not know in advance.
  *
- * So the model does the resolving and the schema does the constraining: it may
- * only emit ISO country codes, two-letter state codes and plain place names.
- * State codes still go through `usStateCode` on the way out, which is there to
- * normalize — it recovers "Ohio" written into a two-letter field — and drops
- * anything that is not a real code as a side effect. What the model adds over
- * the map is judgement — collapsing spellings, recognising a state
+ * So the model does the resolving and the schema does the constraining: the
+ * field descriptions say exactly what a state code is and the schema holds it
+ * to two characters, which is the whole guard. Nothing re-checks the answer
+ * against the state table afterwards — a schema plus a precise description is
+ * the contract, and a second copy of the rule downstream is just somewhere for
+ * the two to disagree. What the model adds over the map is judgement — collapsing spellings, recognising a state
  * written as a town, and naming the market a media buyer would actually buy
  * ("Hocking Hills") rather than the administrative region a feed happens to
  * record.
@@ -40,7 +40,7 @@ const ResolvedSchema = z.object({
     .array(z.string().length(2))
     .max(60)
     .describe(
-      "Two-letter US state codes, uppercase. Empty for locations outside the US.",
+      "US state codes ONLY: exactly two uppercase letters, the USPS abbreviation. 'OH', never 'Ohio', 'OHIO', 'Oh' or 'US-OH'. A place outside the United States has no code and belongs in regions instead, so leave this empty for it.",
     ),
   regions: z
     .array(z.string().min(2).max(60))
@@ -119,9 +119,7 @@ function distinctLocations(rows: LocationRow[]): string[] {
 
 /**
  * Trim, drop blanks, dedupe, sort. Every field of the model's answer wants
- * exactly this, and `normalize` is where a field adds its own rule — state
- * codes go through `usStateCode`, which also recovers a state the model wrote
- * out in full despite the schema asking for two letters.
+ * exactly this; `normalize` is where a field adds its own rule.
  */
 function clean(
   values: (string | null | undefined)[],
@@ -169,7 +167,7 @@ export async function resolveGeography(
     });
     if (!output) return fallback;
 
-    const states = clean(output.states, usStateCode);
+    const states = clean(output.states, (code) => code.trim().toUpperCase());
     const countries = clean(output.countries, (code) =>
       /^[a-z]{2}$/i.test(code.trim()) ? code.trim().toUpperCase() : null,
     );
