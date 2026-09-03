@@ -39,6 +39,9 @@ import {
   updateAudience,
 } from "@/server/services/ads-draft.service";
 import { draftAdsFromHomes } from "@/server/services/property-ads.service";
+import { requireOwnedCampaign } from "@/server/services/ads-draft.service";
+import { MediaService } from "@/server/services/media.service";
+import type { MediaItem } from "@/server/db/schema";
 import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -437,7 +440,7 @@ export const addAudienceUsersAction = growthAction({
 
 export const draftAdAction = growthAction({
   description:
-    "Add a drafted ad to a LOCAL campaign — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video with its thumbnail — for Meta. When the operator attached media this turn, pass the url mediaLibraryWrite.saveChatMedia returned, or pick one with mediaLibraryRead.list. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
+    "Add a drafted ad to a LOCAL campaign — a suggestion the push transforms per platform. Local only. Type creative (default) carries copy plus media: one image, several images (a carousel, in order), or a video — for Meta. Media the operator attached this turn can be passed by its chat url directly; it is saved into the brand's library and its video poster resolved for you. Type text is a pool of headlines and descriptions, for Google/OpenAI.",
   inputSchema: z
     .object({
       campaignId: z.string().trim().min(1),
@@ -481,7 +484,7 @@ export const draftAdAction = growthAction({
         .url()
         .optional()
         .describe(
-          "Required with videoUrl — Meta wants a still image alongside the clip.",
+          "Meta wants a still alongside the clip. Optional: for our own uploads the poster frame is found automatically, so only pass this to override it.",
         ),
       callToAction: z
         .string()
@@ -537,11 +540,6 @@ export const draftAdAction = growthAction({
         path: ["videoUrl"],
       },
     )
-    .refine((input) => !input.videoUrl || Boolean(input.videoThumbnailUrl), {
-      error:
-        "videoThumbnailUrl is required with videoUrl — Meta wants a still image alongside the clip.",
-      path: ["videoThumbnailUrl"],
-    })
     .refine(
       (input) =>
         input.type === "creative" ||
@@ -549,8 +547,51 @@ export const draftAdAction = growthAction({
           (input.descriptions?.length ?? 0) > 0),
       { error: "A text ad needs headlines and descriptions." },
     ),
-  execute: async (input, ctx) =>
-    addDraftAd({
+  execute: async (input, ctx) => {
+    let media: MediaItem[] = [];
+    if (input.type === "creative") {
+      const { brand } = await requireOwnedCampaign(input.campaignId, ctx.orgId);
+      const resolve = (url: string) =>
+        MediaService.resolveLibraryMedia({
+          brandId: brand.id,
+          userId: ctx.userId,
+          url,
+        });
+
+      if (input.videoUrl) {
+        const resolved = await resolve(input.videoUrl);
+        const thumbnail = input.videoThumbnailUrl ?? resolved.thumbnailUrl;
+        if (!thumbnail) {
+          throw new Error(
+            "This video has no poster frame, and Meta will not take a video ad without one. Re-upload it on /app/media, which cuts a poster from the file, then draft from the library asset. Passing videoThumbnailUrl explicitly also works.",
+          );
+        }
+        media = [
+          {
+            url: resolved.url,
+            type: "video",
+            thumbnail,
+            assetId: input.assetId ?? resolved.assetId,
+          },
+        ];
+      } else {
+        const urls = input.imageUrls?.length
+          ? input.imageUrls
+          : [input.imageUrl!];
+        media = await Promise.all(
+          urls.map(async (url) => {
+            const resolved = await resolve(url);
+            return {
+              url: resolved.url,
+              type: "image" as const,
+              assetId: input.assetId ?? resolved.assetId,
+            };
+          }),
+        );
+      }
+    }
+
+    return addDraftAd({
       campaignId: input.campaignId,
       name: input.name,
       type: input.type,
@@ -566,26 +607,11 @@ export const draftAdAction = growthAction({
               body: input.body!,
               linkUrl: input.linkUrl,
               callToAction: input.callToAction,
-              media: input.videoUrl
-                ? [
-                    {
-                      url: input.videoUrl,
-                      type: "video" as const,
-                      thumbnail: input.videoThumbnailUrl,
-                      assetId: input.assetId,
-                    },
-                  ]
-                : (input.imageUrls?.length
-                    ? input.imageUrls
-                    : [input.imageUrl!]
-                  ).map((url) => ({
-                    url,
-                    type: "image" as const,
-                    assetId: input.assetId,
-                  })),
+              media,
             },
       organizationId: ctx.orgId,
-    }),
+    });
+  },
 });
 
 // ---- READING AND FINISHING A CAMPAIGN -------------------------------

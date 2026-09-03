@@ -7,6 +7,7 @@ import {
   metaPageIdFromConnection,
   googlePauseOutcome,
   matchResponseAdsToPlan,
+  videoPayloadFor,
 } from "@/server/services/ads-write.service";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
 
@@ -197,6 +198,52 @@ describe("assertMetaAdPayload video rules", () => {
         account,
       ),
     ).toThrow(/thumbnailUrl is required/);
+  });
+});
+
+describe("videoPayloadFor", () => {
+  const content = (media: { url: string; thumbnail?: string }) => ({
+    headline: "V",
+    body: "clip",
+    media: [{ ...media, type: "video" as const }],
+  });
+
+  it("compiles the clip plus its still", () => {
+    expect(
+      videoPayloadFor(
+        "Concept A",
+        content({
+          url: "https://cdn.example.com/a.mp4",
+          thumbnail: "https://cdn.example.com/a.mp4.thumb.webp",
+        }),
+      ),
+    ).toEqual({
+      url: "https://cdn.example.com/a.mp4",
+      thumbnailUrl: "https://cdn.example.com/a.mp4.thumb.webp",
+    });
+  });
+
+  it("refuses a clip with no still", () => {
+    expect(() =>
+      videoPayloadFor("Concept A", content({ url: "https://x.test/a.mp4" })),
+    ).toThrow(/needs a still thumbnail/);
+  });
+
+  /**
+   * A poster-less pick used to carry the clip's own url as its thumbnail, which
+   * satisfies a presence check and is then rejected by Meta after the operator
+   * has already approved the push.
+   */
+  it("refuses a clip standing in as its own still", () => {
+    expect(() =>
+      videoPayloadFor(
+        "Concept A",
+        content({
+          url: "https://x.test/a.mp4",
+          thumbnail: "https://x.test/a.mp4",
+        }),
+      ),
+    ).toThrow(/needs a still thumbnail/);
   });
 });
 

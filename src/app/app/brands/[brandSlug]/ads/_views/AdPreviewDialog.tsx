@@ -170,7 +170,22 @@ export function AdPreviewDialog({
             )}
 
             <div className={cn("relative bg-neutral-100", crop)}>
-              {image ? (
+              {/* This is the surface an operator checks the creative on, so a
+              video plays here rather than showing its poster. */}
+              {isVideo && active?.url ? (
+                <video
+                  src={active.url}
+                  poster={
+                    active.thumbnail && active.thumbnail !== active.url
+                      ? active.thumbnail
+                      : undefined
+                  }
+                  className="h-full w-full bg-black object-cover"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              ) : image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={image}

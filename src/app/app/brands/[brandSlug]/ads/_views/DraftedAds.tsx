@@ -66,7 +66,15 @@ export function DraftedAds({
       <div className="mt-2 flex w-full gap-2 overflow-x-auto">
         {ads.map((ad) => {
           const preview = toPreview(ad);
-          const image = preview.media[0]?.thumbnail ?? preview.media[0]?.url;
+          const first = preview.media[0];
+          const isVideo = first?.type === "video";
+          // A poster-less video's `thumbnail` is the clip itself, and an <img>
+          // pointed at an .mp4 renders nothing while downloading all of it.
+          const image = isVideo
+            ? first?.thumbnail !== first?.url
+              ? first?.thumbnail
+              : undefined
+            : (first?.thumbnail ?? first?.url);
           return (
             <button
               key={ad.id}
@@ -81,6 +89,14 @@ export function DraftedAds({
                     src={image}
                     alt=""
                     className="h-full w-full object-cover"
+                  />
+                ) : isVideo && first?.url ? (
+                  <video
+                    src={first.url}
+                    className="h-full w-full bg-black object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
                   />
                 ) : (
                   <div className="text-muted-foreground flex h-full items-center justify-center p-2 text-center text-[10px]">

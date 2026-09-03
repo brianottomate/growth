@@ -120,7 +120,7 @@ export function ImageBatchImporter({
   const [slides, setSlides] = useState<PendingSlide[]>([]);
   const [processing, setProcessing] = useState(false);
   const previewUrls = useRef(new Set<string>());
-  const { uploadImages, uploading } = useMediaUpload(brandId);
+  const { uploadFiles, uploading } = useMediaUpload(brandId);
 
   useEffect(
     () => () => {
@@ -225,7 +225,7 @@ export function ImageBatchImporter({
 
   const busy = processing || uploading > 0;
   const importSlides = async () => {
-    const items = await uploadImages(slides.map((slide) => slide.file));
+    const items = await uploadFiles(slides.map((slide) => slide.file));
     if (!items.length) return;
     await onImported(items);
     toast.success(

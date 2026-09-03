@@ -10,6 +10,14 @@ const IMAGE_ACCEPT: Accept = {
   "image/*": [".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"],
 };
 
+/** Images plus the video types the media library stores. */
+export const MEDIA_ACCEPT: Accept = {
+  ...IMAGE_ACCEPT,
+  "video/mp4": [".mp4"],
+  "video/webm": [".webm"],
+  "video/quicktime": [".mov"],
+};
+
 /**
  * Folder picks bypass react-dropzone's own filtering, so we re-apply the
  * `accept` map by hand — otherwise `.DS_Store`, sidecar text files and other

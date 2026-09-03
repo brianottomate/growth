@@ -5,7 +5,11 @@ import { useMutation } from "@tanstack/react-query";
 
 import { useTRPC } from "@/trpc/react";
 import { toast } from "@/components/ui/toast";
-import { createImageThumbnail, THUMBNAIL_MIME } from "@/lib/image-thumbnail";
+import {
+  createImageThumbnail,
+  createVideoThumbnail,
+  THUMBNAIL_MIME,
+} from "@/lib/image-thumbnail";
 import type { MediaItem } from "@/server/db/schema";
 
 // Mirrors the media library's accepted types (src/app/app/media/MediaLibrary.tsx).
@@ -16,14 +20,19 @@ const IMAGE_TYPES = [
   "image/avif",
   "image/gif",
 ];
+const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 /**
- * Reusable image-upload hook backed by the media library's presigned direct
- * R2 upload flow. It returns
- * `MediaItem`s ready to attach to a `platform_post` (with `assetId` linking back
- * to the library). Video stays on the Drive-link path for now — the team works
- * in Drive and `assetLinks` already carries those.
+ * Reusable upload hook backed by the media library's presigned direct R2 flow.
+ * Returns `MediaItem`s ready to attach to a `platform_post` or an ad's creative
+ * pool, with `assetId` linking back to the library.
+ *
+ * Video is uploaded here too, not only on the media page. It used to be
+ * images-only, on the reasoning that the team worked in Drive, which left every
+ * other picker telling operators to go somewhere else and come back. Bytes go
+ * browser → R2 directly, so a large clip costs no function time; the poster
+ * frame is cut from the file before the upload starts.
  */
 export function useMediaUpload(brandId: string) {
   const trpc = useTRPC();
@@ -35,7 +44,7 @@ export function useMediaUpload(brandId: string) {
   );
   const [uploading, setUploading] = useState(0);
 
-  const uploadImages = useCallback(
+  const uploadFiles = useCallback(
     async (files: File[]): Promise<MediaItem[]> => {
       // Slot-indexed so concurrent uploads still land in the caller's order.
       const out = new Array<MediaItem | undefined>(files.length);
@@ -44,21 +53,28 @@ export function useMediaUpload(brandId: string) {
         while (cursor < files.length) {
           const index = cursor++;
           const file = files[index]!;
-          if (!IMAGE_TYPES.includes(file.type)) {
+          const isImage = IMAGE_TYPES.includes(file.type);
+          const isVideo = VIDEO_TYPES.includes(file.type);
+          if (!isImage && !isVideo) {
             toast.error(
-              `${file.name}: only images upload here — paste a link for video`,
+              `${file.name}: use JPEG, PNG, WebP, AVIF, GIF, MP4, WebM or MOV`,
             );
             continue;
           }
-          if (file.size > MAX_IMAGE_BYTES) {
+          // Only images are capped. Video goes browser → R2 directly, so its
+          // size costs us no function time and the cap would be arbitrary.
+          if (isImage && file.size > MAX_IMAGE_BYTES) {
             toast.error(`${file.name} exceeds 25MB`);
             continue;
           }
           setUploading((c) => c + 1);
           try {
-            // One decode yields both the true dimensions and the tile.
-            const { sourceWidth, sourceHeight, thumbnail } =
-              await createImageThumbnail(file);
+            // One decode yields both the true dimensions and the tile. For
+            // video that is a seek to a poster frame; for an undecodable codec
+            // it degrades to no poster rather than throwing.
+            const { sourceWidth, sourceHeight, thumbnail } = isVideo
+              ? await createVideoThumbnail(file)
+              : await createImageThumbnail(file);
             const {
               mediaId,
               uploadUrl,
@@ -101,7 +117,7 @@ export function useMediaUpload(brandId: string) {
             });
             out[index] = {
               url: publicUrl,
-              type: "image",
+              type: isVideo ? "video" : "image",
               assetId: mediaId,
               width: sourceWidth || undefined,
               height: sourceHeight || undefined,
@@ -122,5 +138,5 @@ export function useMediaUpload(brandId: string) {
     [brandId, createUploadUrl, finalizeUpload],
   );
 
-  return { uploadImages, uploading };
+  return { uploadFiles, uploading };
 }

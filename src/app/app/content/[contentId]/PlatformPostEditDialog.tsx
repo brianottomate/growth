@@ -108,7 +108,7 @@ export function PlatformPostEditDialog({
 }) {
   const trpc = useTRPC();
   const router = useRouter();
-  const { uploadImages, uploading } = useMediaUpload(brandId);
+  const { uploadFiles, uploading } = useMediaUpload(brandId);
   const [open, setOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerItemIndex, setPickerItemIndex] = useState(0);
@@ -468,7 +468,7 @@ export function PlatformPostEditDialog({
                     compact
                     multiple={!story}
                     onFiles={async (files) => {
-                      const uploaded = await uploadImages(files);
+                      const uploaded = await uploadFiles(files);
                       if (uploaded.length) {
                         setItemMedia(
                           index,

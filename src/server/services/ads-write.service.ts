@@ -1574,9 +1574,11 @@ function isVideoContent(content: AdCreativeContent) {
  * The thumbnail comes from the media item; refusing here (by name) beats a
  * platform rejection after approval.
  */
-function videoPayloadFor(adName: string, content: AdCreativeContent) {
+export function videoPayloadFor(adName: string, content: AdCreativeContent) {
   const lead = content.media[0]!;
-  if (!lead.thumbnail) {
+  // A poster-less clip used to arrive with its own url as the "thumbnail",
+  // which passes a presence check and then fails at Meta. Treat that as absent.
+  if (!lead.thumbnail || lead.thumbnail === lead.url) {
     throw new Error(
       `${adName}: a video ad needs a still thumbnail on its media item — Meta requires one alongside the clip`,
     );

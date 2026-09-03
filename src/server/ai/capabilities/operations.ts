@@ -335,6 +335,9 @@ export const saveChatMediaToLibrary = growthAction({
         mediaAssetId: asset.id,
         kind: asset.kind,
         url: asset.url,
+        // Video needs its poster passed to adsWrite.draftAd, so return it here
+        // rather than making the model go and look the asset up again.
+        thumbnailUrl: asset.thumbnailUrl,
         analyzed,
         suggestedTags,
       });

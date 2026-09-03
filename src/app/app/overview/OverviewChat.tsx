@@ -55,6 +55,7 @@ import {
   MAX_CHAT_ATTACHMENTS,
 } from "@/lib/chat-attachment";
 import { putWithProgress } from "@/lib/upload-with-progress";
+import { createVideoThumbnail, THUMBNAIL_MIME } from "@/lib/image-thumbnail";
 import {
   GROWTH_CAPABILITY_LABELS,
   isGrowthCapabilityId,
@@ -503,6 +504,26 @@ export function OverviewChat({
                   ),
                 ),
             });
+
+            // A poster frame for video, cut from the file we already have in
+            // hand. Without it the clip is anonymous everywhere downstream and
+            // cannot become a Meta video ad. Best-effort throughout: the
+            // attachment itself has already landed, so nothing here may fail it.
+            if (
+              uploadTarget.thumbnailUploadUrl &&
+              attachment.mediaType.startsWith("video/")
+            ) {
+              const { thumbnail } = await createVideoThumbnail(
+                attachment.file,
+              ).catch(() => ({ thumbnail: null }));
+              if (thumbnail) {
+                await fetch(uploadTarget.thumbnailUploadUrl, {
+                  method: "PUT",
+                  headers: { "Content-Type": THUMBNAIL_MIME },
+                  body: thumbnail,
+                }).catch(() => null);
+              }
+            }
             updatePendingAttachments((current) =>
               current.map((pending) =>
                 pending.id === attachment.id

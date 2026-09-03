@@ -57,7 +57,23 @@ export function CreativePool({
           </h2>
           <p className="text-muted-foreground mt-0.5 text-sm">
             Shared across this campaign&apos;s ads. Pick once here rather than
-            per ad.
+            per ad. Drop new files straight into{" "}
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="underline"
+            >
+              the picker
+            </button>
+            , browse the{" "}
+            <Link href="/app/media" className="underline">
+              media library
+            </Link>
+            , or make something in{" "}
+            <Link href="/app/studio" className="underline">
+              the studio
+            </Link>
+            .
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
@@ -67,17 +83,7 @@ export function CreativePool({
       </div>
 
       {pool.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Nothing yet. Pull from the brand&apos;s{" "}
-          <Link href="/app/media" className="underline">
-            media library
-          </Link>{" "}
-          or make something in{" "}
-          <Link href="/app/studio" className="underline">
-            the studio
-          </Link>
-          .
-        </p>
+        <p className="text-muted-foreground text-sm">Nothing yet.</p>
       ) : (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {pool.map((item) => (
@@ -85,13 +91,37 @@ export function CreativePool({
               key={item.url}
               className="bg-card group relative w-32 shrink-0 overflow-hidden rounded-lg border"
             >
-              <div className="bg-muted h-20">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.thumbnail ?? item.url}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
+              <div className="bg-muted relative h-20">
+                {/* A video's `thumbnail` can be the clip itself when no poster
+                was ever cut, and an <img> pointed at an .mp4 is a blank tile
+                that still downloads the whole file. Let <video> paint its own
+                first frame instead. */}
+                {item.type === "video" ? (
+                  <video
+                    src={item.url}
+                    poster={
+                      item.thumbnail && item.thumbnail !== item.url
+                        ? item.thumbnail
+                        : undefined
+                    }
+                    className="h-full w-full bg-black object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.thumbnail ?? item.url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                )}
+                {item.type === "video" && (
+                  <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                    Video
+                  </span>
+                )}
               </div>
               <button
                 type="button"

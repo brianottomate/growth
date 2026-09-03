@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Expand, Film, Image as ImageIcon } from "lucide-react";
+import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, Expand, Film, Image as ImageIcon } from "lucide-react";
 
 import { useTRPC, type RouterOutputs } from "@/trpc/react";
 import { MediaLightbox } from "@/app/app/media/MediaLightbox";
+import { useMediaUpload } from "@/app/app/media/use-media-upload";
 import { SimpleDialog } from "@/components/ui/dialog";
+import { Dropzone, MEDIA_ACCEPT } from "@/components/ui/dropzone";
 import { cn } from "@/components/ui/lib/utils";
 import type { MediaItem } from "@/server/db/schema";
 
@@ -16,6 +19,10 @@ import type { MediaItem } from "@/server/db/schema";
  * library that powers /app/media, surfaced as an assign picker (the swipestats
  * "add from library" pattern). Picked items become a `MediaItem` carrying
  * `assetId`, so the spot references the library asset rather than re-uploading.
+ *
+ * It also uploads. Sending an operator to /app/media and back is a poor trade
+ * when the file is already on their desktop and they are standing in the picker
+ * — and this dialog is the only creative entry point on the campaign page.
  */
 export function MediaPickerDialog({
   brandId,
@@ -31,10 +38,21 @@ export function MediaPickerDialog({
   existingAssetIds: string[];
 }) {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const listOptions = trpc.media.list.queryOptions({ brandId });
   const { data: assets = [], isLoading } = useQuery({
-    ...trpc.media.list.queryOptions({ brandId }),
+    ...listOptions,
     enabled: open,
   });
+  const { uploadFiles, uploading } = useMediaUpload(brandId);
+
+  // Uploads land in the pool right away rather than making the operator find
+  // them again in the grid; refreshing the list keeps the two in step.
+  const handleFiles = async (files: File[]) => {
+    const uploaded = await uploadFiles(files);
+    await queryClient.invalidateQueries({ queryKey: listOptions.queryKey });
+    for (const item of uploaded) onPick(item);
+  };
 
   // Picking is destructive-ish (it attaches to a spot), and a 100px tile is not
   // enough to tell two property shots apart, let alone judge a clip. Preview
@@ -57,20 +75,39 @@ export function MediaPickerDialog({
         size="lg"
         scrollable
       >
+        <div className="space-y-2 pb-1">
+          <Dropzone
+            compact
+            accept={MEDIA_ACCEPT}
+            onFiles={handleFiles}
+            uploading={uploading}
+            title="Drop images or video here"
+            hint="or click to browse · added to this brand's library"
+          />
+          <Link
+            href="/app/media"
+            target="_blank"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline"
+          >
+            Open the full media library
+            <ExternalLink className="size-3" />
+          </Link>
+        </div>
+
         {isLoading ? (
           <p className="text-muted-foreground py-8 text-sm">Loading…</p>
         ) : visible.length === 0 ? (
-          <div className="text-muted-foreground py-10 text-center text-sm">
-            No media in this brand&apos;s library yet. Upload on the Media page,
-            or drop a file directly on the spot.
+          <div className="text-muted-foreground py-8 text-center text-sm">
+            Nothing in this brand&apos;s library yet.
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-x-2 gap-y-3 py-2 sm:grid-cols-4">
             {visible.map((a) => {
               const isVideo = a.kind === "video";
-              // Only an image URL may reach <img>. Video assets have no generated
-              // tile yet, and falling back to `a.url` pointed the tag at the raw
-              // .mov — a blank square that also pulled the whole file down.
+              // Only an image URL may reach <img>. Uploads cut a poster frame,
+              // but anything older has none, and falling back to `a.url` pointed
+              // the tag at the raw .mov — a blank square that also pulled the
+              // whole file down.
               const thumb = isVideo
                 ? a.thumbnailUrl
                 : (a.thumbnailUrl ?? a.url);
@@ -84,8 +121,13 @@ export function MediaPickerDialog({
                     onClick={() => {
                       onPick({
                         url: a.url ?? a.thumbnailUrl ?? "",
-                        type: a.kind === "video" ? "video" : "image",
-                        thumbnail: a.thumbnailUrl ?? a.url ?? undefined,
+                        type: isVideo ? "video" : "image",
+                        // Never fall back to the asset's own url for video: a
+                        // clip standing in as its own still reads as "has a
+                        // thumbnail" downstream, and Meta rejects the push.
+                        thumbnail:
+                          (isVideo ? a.thumbnailUrl : a.thumbnailUrl ?? a.url) ??
+                          undefined,
                         assetId: a.id,
                         width: a.width ?? undefined,
                         height: a.height ?? undefined,

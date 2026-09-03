@@ -987,7 +987,12 @@ export async function createChatR2Upload(input: {
   mediaType: string;
   size: number;
   fileName?: string;
-}): Promise<{ uploadUrl: string; url: string; mediaType: string }> {
+}): Promise<{
+  uploadUrl: string;
+  url: string;
+  mediaType: string;
+  thumbnailUploadUrl?: string;
+}> {
   if (!isChatAttachmentMediaType(input.mediaType)) {
     throw new Error("Only supported images and videos can be attached");
   }
@@ -999,15 +1004,49 @@ export async function createChatR2Upload(input: {
     );
   }
 
+  const isVideo = input.mediaType.startsWith("video/");
   const ext = input.mediaType.split("/")[1]?.split("+")[0] ?? "png";
   // Unique key per upload so same-named pastes never collide; scoped per user.
-  const filename = `${input.mediaType.startsWith("video/") ? "video" : "image"}-${createId("att")}-${safeFilename(input.fileName ?? `paste.${ext}`)}`;
+  const filename = `${isVideo ? "video" : "image"}-${createId("att")}-${safeFilename(input.fileName ?? `paste.${ext}`)}`;
   const key = R2.buildUploadKey("chat", input.userId, filename);
   return {
     uploadUrl: await R2.presignPut(key, input.mediaType),
     url: R2.publicUrl(key),
     mediaType: input.mediaType,
+    // Video gets a poster slot. The URL is derived from the video's own key, so
+    // nothing has to carry it: an AI SDK file part has no field for a second
+    // URL, and `chatAttachmentPoster` recomputes the one legal value later.
+    ...(isVideo
+      ? {
+          thumbnailUploadUrl: await R2.presignPut(
+            R2.buildThumbnailKey(key),
+            THUMBNAIL_MIME,
+          ),
+        }
+      : {}),
   };
+}
+
+/**
+ * The poster frame for a chat-attached video, if the composer managed to make
+ * one. `createVideoThumbnail` resolves null for codecs the browser cannot
+ * decode (HEVC 10-bit, most often), so existence is checked rather than
+ * assumed. Returns null for anything that is not one of our chat uploads.
+ */
+export async function chatAttachmentPoster(
+  videoUrl: string,
+): Promise<string | null> {
+  let key: string;
+  try {
+    if (!R2.isPublicUrl(videoUrl)) return null;
+    key = new URL(videoUrl).pathname.replace(/^\//, "");
+  } catch {
+    return null;
+  }
+  const thumbnailKey = R2.buildThumbnailKey(key);
+  const object = await R2.head(thumbnailKey).catch(() => null);
+  if (!object || object.size === 0) return null;
+  return R2.publicUrl(thumbnailKey);
 }
 
 /** Promote a transient chat upload into the durable media library without
@@ -1040,6 +1079,10 @@ export async function promoteChatMedia(input: {
   // The bucket root maps to R2_PUBLIC_BASE_URL, so the URL pathname is the key.
   const key = parsed.pathname.replace(/^\//, "");
   const filename = key.split("/").pop() ?? "chat-image";
+  // Video is anonymous without one: every picker falls back to a film icon, and
+  // `draftAd` cannot make a Meta video ad at all.
+  const thumbnailUrl =
+    kind === "video" ? await chatAttachmentPoster(input.url) : null;
   const [asset] = await db
     .insert(mediaAssetTable)
     .values({
@@ -1053,11 +1096,69 @@ export async function promoteChatMedia(input: {
       mimeType: input.mimeType,
       r2Key: key,
       url: input.url,
+      ...(thumbnailUrl ? { thumbnailUrl } : {}),
       metadata: { source: "chat_attachment" },
     })
     .returning();
   if (!asset) throw new Error("Could not save the chat image");
   return asset;
+}
+
+/**
+ * Turn a URL an operator handed us mid-conversation into durable library media.
+ *
+ * Chat attachments are the awkward case. They are real, hosted, and usable, but
+ * they carry no `media_asset` row, so an ad built straight from one has no
+ * poster, no tags and no provenance — and a Meta video ad without a poster is
+ * rejected outright. Promoting first is what the model was asked to do by hand
+ * and predictably did not, so callers do it here instead. Idempotent: a URL
+ * already in the library returns its existing row.
+ *
+ * Anything else (a property render, a remote image) passes through untouched.
+ */
+export async function resolveLibraryMedia(input: {
+  brandId: string;
+  userId: string;
+  url: string;
+}): Promise<{ url: string; assetId?: string; thumbnailUrl?: string }> {
+  const existing = await db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.brandId, input.brandId),
+      eq(mediaAssetTable.url, input.url),
+      isNull(mediaAssetTable.deletedAt),
+    ),
+    columns: { id: true, url: true, thumbnailUrl: true },
+  });
+  if (existing?.url) {
+    return {
+      url: existing.url,
+      assetId: existing.id,
+      ...(existing.thumbnailUrl ? { thumbnailUrl: existing.thumbnailUrl } : {}),
+    };
+  }
+
+  if (!isOwnedChatAttachmentUrl(input.url, input.userId)) {
+    return { url: input.url };
+  }
+
+  // Read the type off the stored object rather than guessing from the
+  // extension: the composer PUT it with the browser's own Content-Type.
+  const key = new URL(input.url).pathname.replace(/^\//, "");
+  const object = await R2.head(key).catch(() => null);
+  const mimeType = object?.contentType;
+  if (!mimeType || kindForMime(mimeType) === "file") return { url: input.url };
+
+  const asset = await promoteChatMedia({
+    brandId: input.brandId,
+    userId: input.userId,
+    url: input.url,
+    mimeType,
+  });
+  return {
+    url: asset.url ?? input.url,
+    assetId: asset.id,
+    ...(asset.thumbnailUrl ? { thumbnailUrl: asset.thumbnailUrl } : {}),
+  };
 }
 
 /** Image-only wrapper kept for existing callers. */
@@ -1096,6 +1197,8 @@ export const MediaService = {
   delete: deleteMedia,
   kindForMime,
   createChatR2Upload,
+  chatAttachmentPoster,
   promoteChatImage,
   promoteChatMedia,
+  resolveLibraryMedia,
 } as const;
