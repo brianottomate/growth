@@ -2535,6 +2535,20 @@ async function pushToMeta(args: PushArgs) {
 // creative is our ad. Each plan audience becomes a LinkedIn campaign and every
 // creative ad runs under each. The create takes ONE creative per call, so the
 // first ad opens a campaign and the rest attach to it with adSetId.
+/**
+ * The ad-set id to attach the next creative to — on LinkedIn, the Campaign
+ * id, since its campaign GROUP is our campaign level.
+ *
+ * Read from the response root and from the returned ad, because
+ * `platformAdSetId` is a documented field on both and Meta happens to answer
+ * at the root. Anything beyond those two would be guessing at a field name,
+ * so a miss raises an error carrying the keys Zernio DID return — one more
+ * attempt then tells us the shape instead of failing the same way twice.
+ */
+function attachableAdSetId(result: ZernioAdWriteResponse): string | null {
+  return result.platformAdSetId ?? result.ad?.platformAdSetId ?? null;
+}
+
 async function pushToLinkedIn(args: PushArgs) {
   const {
     input,
@@ -2716,13 +2730,20 @@ async function pushToLinkedIn(args: PushArgs) {
       : (result.platformCampaignId ?? null);
     const attached: CreatedSet["attached"] = [];
     try {
+      const adSetId = attachableAdSetId(result);
       for (const { ad, content } of rest) {
-        if (!result.platformAdSetId) {
+        if (!adSetId) {
           throw new Error(
-            "Zernio returned no LinkedIn campaign id to attach the next creative to",
+            `Zernio created the LinkedIn campaign but returned no campaign id to attach the remaining creatives to. Response carried: ${Object.keys(
+              result,
+            ).join(", ")}${
+              result.ad
+                ? ` (ad: ${Object.keys(result.ad).join(", ")})`
+                : " (no ad object)"
+            }`,
           );
         }
-        const attach = attachPayload(result.platformAdSetId, ad, content);
+        const attach = attachPayload(adSetId, ad, content);
         attached.push({
           planAd: ad,
           result: await createLinkedInAd(attach, {
@@ -2758,7 +2779,14 @@ async function pushToLinkedIn(args: PushArgs) {
             ? " — the campaign group was removed from LinkedIn so nothing is half-built"
             : cleanedUp === false
               ? ` — removing campaign group ${rollbackCampaignId} from LinkedIn also failed, delete it in Campaign Manager`
-              : ""
+              : setArgs.existingCampaignId
+                ? " — the campaign it was attaching to was already there and was left alone"
+                : // No id came back, so there is nothing to delete BY id even
+                  // though a campaign was created. Silence here read as "nothing
+                  // was created": a first live push left an orphaned group and
+                  // campaign in Campaign Manager while the operator was told
+                  // the failure was clean.
+                  " — a campaign group WAS created on LinkedIn but no id came back, so it could not be removed. Check Campaign Manager and delete it by hand"
         }. ${error instanceof Error ? error.message : String(error)}`,
       );
     }
