@@ -17,17 +17,15 @@ import {
   isOwnedChatAttachmentUrl,
   maxChatAttachmentBytes,
 } from "@/lib/chat-attachment";
+import { MEDIA_MIME } from "@/lib/media-accept";
 import { classifyFetchUrl } from "@/server/ai/url-safety";
 import {
   MAX_STORYBOARD_BOARDS,
   MAX_STORYBOARD_DURATION_MS,
 } from "@/lib/storyboard-limits";
 
-export const MEDIA_MIME = {
-  image: ["image/jpeg", "image/png", "image/webp", "image/avif"],
-  gif: ["image/gif"],
-  video: ["video/mp4", "video/webm", "video/quicktime"],
-} as const;
+/** Re-exported: the accepted-type table lives in `@/lib/media-accept`. */
+export { MEDIA_MIME };
 
 function safeFilename(filename: string, fallback = "file"): string {
   return (
@@ -315,8 +313,10 @@ export async function finalizeR2Upload(input: {
     .update(mediaAssetTable)
     .set({
       status: "ready",
-      width: input.width ?? null,
-      height: input.height ?? null,
+      // Guarded like `thumbnailUrl`: finalize has no status precondition, so a
+      // second call without dimensions would null the ones already measured.
+      ...(input.width ? { width: input.width } : {}),
+      ...(input.height ? { height: input.height } : {}),
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
       ...(storyboard ? storyboardColumns(storyboard) : {}),
     })
@@ -337,11 +337,19 @@ export async function finalizeR2Upload(input: {
 const STALE_UPLOAD_MINUTES = 15;
 
 export async function failR2Upload(mediaId: string, reason?: string) {
+  const existing = await getMedia(mediaId);
   const [updated] = await db
     .update(mediaAssetTable)
     .set({
       status: "error",
-      alt: reason ? reason.slice(0, 500) : undefined,
+      // Into metadata, never `alt`. Alt text is copy: it is searched, rendered
+      // as the tile's alt attribute, and used as the asset's display name
+      // wherever there is no title — so an upload error written there became
+      // the asset's name and a search hit for "failed".
+      metadata: {
+        ...(existing?.metadata as Record<string, unknown> | null),
+        ...(reason ? { uploadError: reason.slice(0, 500) } : {}),
+      },
     })
     .where(
       and(
@@ -888,7 +896,7 @@ export async function reconcileStaleUploads(brandId: string) {
       isNull(mediaAssetTable.deletedAt),
       sql<boolean>`${mediaAssetTable.createdAt} <= now() - make_interval(mins => ${STALE_UPLOAD_MINUTES})`,
     ),
-    columns: { id: true, r2Key: true },
+    columns: { id: true, r2Key: true, metadata: true },
     limit: 50,
   });
   let recovered = 0;
@@ -908,6 +916,7 @@ export async function reconcileStaleUploads(brandId: string) {
         .set({
           status: "error",
           metadata: {
+            ...(asset.metadata as Record<string, unknown> | null),
             uploadError:
               "The browser never delivered the bytes — the tab closed, the network dropped, or the request was blocked.",
           },
@@ -934,6 +943,10 @@ export async function listMedia(input: {
       // closed, or the PUT hung. Hide it rather than showing a dead tile.
       sql<boolean>`(${mediaAssetTable.status} <> 'uploading'
         or ${mediaAssetTable.createdAt} > now() - make_interval(mins => ${STALE_UPLOAD_MINUTES}))`,
+      // `error` means the bytes are not there. Nothing purges these rows, so
+      // left visible each failed upload is a permanent broken tile in the
+      // library and in every picker that reads it.
+      sql<boolean>`${mediaAssetTable.status} <> 'error'`,
       input.kind ? eq(mediaAssetTable.kind, input.kind) : undefined,
       input.folderId === null
         ? isNull(mediaAssetTable.folderId)

@@ -44,7 +44,7 @@ export function MediaPickerDialog({
     ...listOptions,
     enabled: open,
   });
-  const { uploadFiles, uploading } = useMediaUpload(brandId);
+  const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
 
   // Uploads land in the pool right away rather than making the operator find
   // them again in the grid; refreshing the list keeps the two in step.
@@ -103,6 +103,7 @@ export function MediaPickerDialog({
             accept={MEDIA_ACCEPT}
             onFiles={handleFiles}
             uploading={uploading}
+            progress={progress}
             title="Drop images or video here"
             hint="or click to browse · added to this brand's library"
           />
@@ -167,8 +168,9 @@ export function MediaPickerDialog({
                         // clip standing in as its own still reads as "has a
                         // thumbnail" downstream, and Meta rejects the push.
                         thumbnail:
-                          (isVideo ? a.thumbnailUrl : a.thumbnailUrl ?? a.url) ??
-                          undefined,
+                          (isVideo
+                            ? a.thumbnailUrl
+                            : (a.thumbnailUrl ?? a.url)) ?? undefined,
                         assetId: a.id,
                         width: a.width ?? undefined,
                         height: a.height ?? undefined,

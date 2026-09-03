@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/ui/dropzone";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { MediaThumbnail } from "@/components/media-thumbnail";
+import { MEDIA_ACCEPT } from "@/lib/media-accept";
 import { platformLabel } from "@/components/channel-logos";
 import { toast } from "@/components/ui/toast";
 import type { MediaItem } from "@/server/db/schema";
@@ -108,7 +109,7 @@ export function PlatformPostEditDialog({
 }) {
   const trpc = useTRPC();
   const router = useRouter();
-  const { uploadFiles, uploading } = useMediaUpload(brandId);
+  const { uploadFiles, uploading, progress } = useMediaUpload(brandId);
   const [open, setOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerItemIndex, setPickerItemIndex] = useState(0);
@@ -467,6 +468,11 @@ export function PlatformPostEditDialog({
                   <Dropzone
                     compact
                     multiple={!story}
+                    // The editor takes image OR video spots; without this the
+                    // zone defaulted to images and a dropped clip was filtered
+                    // out by react-dropzone before `onFiles` ever fired.
+                    accept={MEDIA_ACCEPT}
+                    progress={progress}
                     onFiles={async (files) => {
                       const uploaded = await uploadFiles(files);
                       if (uploaded.length) {

@@ -6,18 +6,15 @@ import { FolderOpen, Loader2, UploadCloud } from "lucide-react";
 
 import { cn } from "./lib/utils";
 import { droppedFiles } from "@/lib/dropped-files";
+import {
+  MEDIA_ACCEPT as SHARED_MEDIA_ACCEPT,
+  STILL_MEDIA_ACCEPT,
+} from "@/lib/media-accept";
 
-const IMAGE_ACCEPT: Accept = {
-  "image/*": [".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"],
-};
+const IMAGE_ACCEPT: Accept = STILL_MEDIA_ACCEPT;
 
 /** Images plus the video types the media library stores. */
-export const MEDIA_ACCEPT: Accept = {
-  ...IMAGE_ACCEPT,
-  "video/mp4": [".mp4"],
-  "video/webm": [".webm"],
-  "video/quicktime": [".mov"],
-};
+export const MEDIA_ACCEPT: Accept = SHARED_MEDIA_ACCEPT;
 
 /**
  * Folder picks bypass react-dropzone's own filtering, so we re-apply the

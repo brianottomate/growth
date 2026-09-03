@@ -42,6 +42,15 @@ import {
 } from "@/lib/image-thumbnail";
 import { putWithProgress } from "@/lib/upload-with-progress";
 import {
+  formatUploadLimit,
+  isStillMediaType,
+  isVideoMediaType,
+  maxUploadBytesFor,
+  MEDIA_ACCEPT,
+  MEDIA_TYPES_HINT,
+  UPLOAD_CONCURRENCY,
+} from "@/lib/media-accept";
+import {
   captureVideoStoryboard,
   MAX_STORYBOARD_BOARDS,
   storyboardDescriptor,
@@ -104,25 +113,7 @@ function assetLaunchHref(asset: LibraryAsset, brandId: string): string {
   });
 }
 
-const IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-  "image/gif",
-];
-const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
-const ACCEPT: Accept = {
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/png": [".png"],
-  "image/webp": [".webp"],
-  "image/avif": [".avif"],
-  "image/gif": [".gif"],
-  "video/mp4": [".mp4"],
-  "video/webm": [".webm"],
-  "video/quicktime": [".mov"],
-};
-const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+const ACCEPT: Accept = MEDIA_ACCEPT;
 
 type Brand = {
   id: string;
@@ -281,14 +272,18 @@ export function MediaLibrary({
   // --- upload one file directly to R2 via a presigned PUT ---
   const uploadFile = useCallback(
     async (file: File) => {
-      const isImage = IMAGE_TYPES.includes(file.type);
-      const isVideo = VIDEO_TYPES.includes(file.type);
-      if (!isImage && !isVideo) {
-        toast.error(`Unsupported file type: ${file.type || file.name}`);
+      const isImage = isStillMediaType(file.type);
+      const isVideo = isVideoMediaType(file.type);
+      const maximumBytes = maxUploadBytesFor(file.type);
+      if (!maximumBytes) {
+        toast.error(`${file.name}: use ${MEDIA_TYPES_HINT}`);
         return;
       }
-      if (isImage && file.size > MAX_IMAGE_BYTES) {
-        toast.error(`${file.name} exceeds 25MB`);
+      // Checked before the decode: the server refuses anything over the video
+      // ceiling too, and finding that out after a minute of poster-cutting is
+      // a zod error message nobody can act on.
+      if (file.size > maximumBytes) {
+        toast.error(`${file.name} exceeds ${formatUploadLimit(maximumBytes)}`);
         return;
       }
 
@@ -400,7 +395,19 @@ export function MediaLibrary({
   const handleFiles = useCallback(
     async (files: File[] | FileList | null) => {
       if (!files?.length) return;
-      await Promise.all(Array.from(files).map((f) => uploadFile(f)));
+      // Bounded, because "choose a folder" routinely means a hundred files and
+      // a hundred simultaneous decodes, presigns and PUTs starves the browser
+      // of connections and reads as a hang.
+      const queue = Array.from(files);
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < queue.length) await uploadFile(queue[cursor++]!);
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(UPLOAD_CONCURRENCY, queue.length) }, () =>
+          worker(),
+        ),
+      );
     },
     [uploadFile],
   );

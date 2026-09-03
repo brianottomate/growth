@@ -11,6 +11,14 @@ import {
   THUMBNAIL_MIME,
 } from "@/lib/image-thumbnail";
 import {
+  formatUploadLimit,
+  isVideoMediaType,
+  maxUploadBytesFor,
+  MEDIA_TYPES_HINT,
+  UPLOAD_CONCURRENCY,
+} from "@/lib/media-accept";
+import { putWithProgress } from "@/lib/upload-with-progress";
+import {
   captureVideoStoryboard,
   MAX_STORYBOARD_BOARDS,
   storyboardDescriptor,
@@ -18,16 +26,7 @@ import {
 } from "@/lib/video-artifacts";
 import type { MediaItem } from "@/server/db/schema";
 
-// Mirrors the media library's accepted types (src/app/app/media/MediaLibrary.tsx).
-const IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/avif",
-  "image/gif",
-];
-const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
-const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+export type UploadProgress = { key: string; name: string; fraction: number };
 
 /**
  * Reusable upload hook backed by the media library's presigned direct R2 flow.
@@ -39,6 +38,10 @@ const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
  * other picker telling operators to go somewhere else and come back. Bytes go
  * browser → R2 directly, so a large clip costs no function time; the poster
  * frame is cut from the file before the upload starts.
+ *
+ * Kept in step with the media page deliberately: both report per-file progress
+ * and both mark a failed upload's row, because a row left on `uploading` has no
+ * other writer and sits in the library forever.
  */
 export function useMediaUpload(brandId: string) {
   const trpc = useTRPC();
@@ -48,7 +51,9 @@ export function useMediaUpload(brandId: string) {
   const finalizeUpload = useMutation(
     trpc.media.finalizeUpload.mutationOptions(),
   );
+  const failUpload = useMutation(trpc.media.failUpload.mutationOptions());
   const [uploading, setUploading] = useState(0);
+  const [progress, setProgress] = useState<UploadProgress[]>([]);
 
   const uploadFiles = useCallback(
     async (files: File[]): Promise<MediaItem[]> => {
@@ -59,21 +64,28 @@ export function useMediaUpload(brandId: string) {
         while (cursor < files.length) {
           const index = cursor++;
           const file = files[index]!;
-          const isImage = IMAGE_TYPES.includes(file.type);
-          const isVideo = VIDEO_TYPES.includes(file.type);
-          if (!isImage && !isVideo) {
+          const isVideo = isVideoMediaType(file.type);
+          const maximumBytes = maxUploadBytesFor(file.type);
+          if (!maximumBytes) {
+            toast.error(`${file.name}: use ${MEDIA_TYPES_HINT}`);
+            continue;
+          }
+          // Checked up front, including for video: `media.createUploadUrl`
+          // refuses anything over the same ceiling, and learning that after a
+          // minute of poster-cutting surfaces as a raw zod message.
+          if (file.size > maximumBytes) {
             toast.error(
-              `${file.name}: use JPEG, PNG, WebP, AVIF, GIF, MP4, WebM or MOV`,
+              `${file.name} exceeds ${formatUploadLimit(maximumBytes)}`,
             );
             continue;
           }
-          // Only images are capped. Video goes browser → R2 directly, so its
-          // size costs us no function time and the cap would be arbitrary.
-          if (isImage && file.size > MAX_IMAGE_BYTES) {
-            toast.error(`${file.name} exceeds 25MB`);
-            continue;
-          }
+          const uploadKey = `${file.name}-${file.size}-${file.lastModified}`;
+          let pendingMediaId: string | null = null;
           setUploading((c) => c + 1);
+          setProgress((current) => [
+            ...current,
+            { key: uploadKey, name: file.name, fraction: 0 },
+          ]);
           try {
             // One decode yields both the true dimensions and the tile. For
             // video that is a seek to a poster frame; for an undecodable codec
@@ -81,6 +93,15 @@ export function useMediaUpload(brandId: string) {
             const { sourceWidth, sourceHeight, thumbnail } = isVideo
               ? await createVideoThumbnail(file)
               : await createImageThumbnail(file);
+            const created = await createUploadUrl.mutateAsync({
+              brandId,
+              filename: file.name,
+              mimeType: file.type,
+              size: file.size,
+              // Slots for every board we might cut; presigning is free.
+              boardCount: isVideo ? MAX_STORYBOARD_BOARDS : 0,
+            });
+            pendingMediaId = created.mediaId;
             const {
               mediaId,
               uploadUrl,
@@ -89,50 +110,51 @@ export function useMediaUpload(brandId: string) {
               thumbnailUploadUrl,
               thumbnailPublicUrl,
               boardUploads,
-            } = await createUploadUrl.mutateAsync({
-              brandId,
-              filename: file.name,
-              mimeType: file.type,
-              size: file.size,
-              // Slots for every board we might cut; presigning is free.
-              boardCount: isVideo ? MAX_STORYBOARD_BOARDS : 0,
-            });
+            } = created;
             // The storyboard is what makes the clip analyzable later, from
             // anywhere, and the browser is the only place it can be cut. It
             // runs alongside the PUT so a long clip is not stuck at 0% while
             // frames are sampled.
-            const [put, storyboard] = await Promise.all([
-              fetch(uploadUrl, {
-                method: "PUT",
-                headers: { "Content-Type": file.type },
-                body: file,
+            const [, storyboard] = await Promise.all([
+              // XHR rather than fetch: only XHR reports upload progress, and a
+              // 100MB clip behind an indeterminate spinner reads as a hang.
+              putWithProgress(uploadUrl, file, {
+                contentType: file.type,
+                onProgress: (fraction) =>
+                  setProgress((current) =>
+                    current.map((item) =>
+                      item.key === uploadKey ? { ...item, fraction } : item,
+                    ),
+                  ),
               }),
               isVideo ? captureVideoStoryboard(file) : Promise.resolve(null),
             ]);
-            if (!put.ok) throw new Error(`Upload failed (${put.status})`);
 
             // Best-effort: a missing tile just means the grid falls back to the
             // original, so never fail the upload over it.
             let thumbnailUrl: string | undefined;
             if (thumbnail && thumbnailUploadUrl && thumbnailPublicUrl) {
-              const putThumbnail = await fetch(thumbnailUploadUrl, {
-                method: "PUT",
-                headers: { "Content-Type": THUMBNAIL_MIME },
-                body: thumbnail,
-              }).catch(() => null);
-              if (putThumbnail?.ok) thumbnailUrl = thumbnailPublicUrl;
+              const landed = await putWithProgress(
+                thumbnailUploadUrl,
+                thumbnail,
+                { contentType: THUMBNAIL_MIME },
+              ).then(
+                () => true,
+                () => false,
+              );
+              if (landed) thumbnailUrl = thumbnailPublicUrl;
             }
 
-            const landed = storyboard
+            const landedBoards = storyboard
               ? await uploadStoryboardBoards(
                   storyboard,
-                  (index) =>
-                    boardUploads.find((slot) => slot.index === index)
+                  (boardIndex) =>
+                    boardUploads.find((slot) => slot.index === boardIndex)
                       ?.uploadUrl,
                 )
               : new Set<number>();
             const descriptor = storyboard
-              ? storyboardDescriptor(storyboard, landed)
+              ? storyboardDescriptor(storyboard, landedBoards)
               : null;
 
             await finalizeUpload.mutateAsync({
@@ -144,6 +166,7 @@ export function useMediaUpload(brandId: string) {
               hasThumbnail: Boolean(thumbnailUrl),
               ...(descriptor ? { storyboard: descriptor } : {}),
             });
+            pendingMediaId = null;
             out[index] = {
               url: publicUrl,
               type: isVideo ? "video" : "image",
@@ -153,19 +176,33 @@ export function useMediaUpload(brandId: string) {
               ...(thumbnailUrl ? { thumbnail: thumbnailUrl } : {}),
             };
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Upload failed");
+            const message =
+              err instanceof Error ? err.message : "Upload failed";
+            // The reserved row's only other writer is the finalize that never
+            // ran, so without this it stays `uploading` in the library forever.
+            if (pendingMediaId) {
+              await failUpload
+                .mutateAsync({ mediaId: pendingMediaId, reason: message })
+                .catch(() => undefined);
+            }
+            toast.error(message);
           } finally {
             setUploading((c) => c - 1);
+            setProgress((current) =>
+              current.filter((item) => item.key !== uploadKey),
+            );
           }
         }
       };
       await Promise.all(
-        Array.from({ length: Math.min(3, files.length) }, () => uploadNext()),
+        Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, () =>
+          uploadNext(),
+        ),
       );
       return out.filter((item): item is MediaItem => Boolean(item));
     },
-    [brandId, createUploadUrl, finalizeUpload],
+    [brandId, createUploadUrl, failUpload, finalizeUpload],
   );
 
-  return { uploadFiles, uploading };
+  return { uploadFiles, uploading, progress };
 }
