@@ -318,6 +318,21 @@ async function requireAdDestination(input: {
   };
 }
 
+/**
+ * A push key is RUN-scoped, deliberately.
+ *
+ * A business key ignores runId so a re-run replays rather than opening a
+ * second campaign — right for a List+ deal create, wrong here. A push that
+ * fails partway stores its response under that stable key, so every later
+ * attempt replays it: after the orphaned entities were deleted, the replay
+ * handed back a campaign id LinkedIn no longer had and the attach 404'd. The
+ * campaign became permanently un-pushable.
+ *
+ * Duplicate protection does not depend on this: the push refuses outright
+ * when the draft already carries an externalId, which is a stronger local
+ * guard. Run scope still replays a genuine in-flight retry, because runId and
+ * payload are identical there.
+ */
 function idempotencyKey(
   context: AdsWriteContext,
   action: string,
@@ -2270,9 +2285,8 @@ async function pushToMeta(args: PushArgs) {
     const result = await createMetaAd(payload, {
       idempotencyKey: idempotencyKey(
         context,
-        "push-adset",
+        `push-adset:${setArgs.keyScope}`,
         payload,
-        setArgs.keyScope,
       ),
       adAccount: destination.adAccount,
     });
@@ -2308,9 +2322,8 @@ async function pushToMeta(args: PushArgs) {
           result: await createMetaAd(attachPayload, {
             idempotencyKey: idempotencyKey(
               context,
-              "push-attach",
+              `push-attach:${setArgs.keyScope}:${ad.id}`,
               attachPayload,
-              `${setArgs.keyScope}:${ad.id}`,
             ),
             adAccount: destination.adAccount,
           }),
@@ -2707,9 +2720,8 @@ async function pushToLinkedIn(args: PushArgs) {
     const result = await createLinkedInAd(payload, {
       idempotencyKey: idempotencyKey(
         context,
-        "push-adset",
+        `push-adset:${setArgs.keyScope}`,
         payload,
-        setArgs.keyScope,
       ),
       adAccount: destination.adAccount,
     });
@@ -2737,9 +2749,8 @@ async function pushToLinkedIn(args: PushArgs) {
           result: await createLinkedInAd(attach, {
             idempotencyKey: idempotencyKey(
               context,
-              "push-attach",
+              `push-attach:${setArgs.keyScope}:${ad.id}`,
               attach,
-              `${setArgs.keyScope}:${ad.id}`,
             ),
             adAccount: destination.adAccount,
           }),
