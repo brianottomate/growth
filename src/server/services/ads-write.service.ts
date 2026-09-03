@@ -54,6 +54,8 @@ import {
   type ZernioAdWriteResponse,
   type ZernioAudienceUser,
   type ZernioCarouselCard,
+  writtenAdSetId,
+  writtenCampaignId,
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
 import { usStateName } from "@/lib/us-states";
@@ -2090,13 +2092,13 @@ async function pushToGoogle(args: PushArgs) {
     status: result.status,
     budgetAmount,
     budgetType,
-    externalCampaignId: provider.platformCampaignId ?? null,
+    externalCampaignId: writtenCampaignId(provider),
     heroThumbnailUrl: creative?.content.media[0]?.url ?? null,
     sets: [
       {
         audience: first?.audience ?? null,
         name: first?.audience.name ?? campaign.name,
-        externalId: provider.platformAdSetId ?? null,
+        externalId: writtenAdSetId(provider),
         targetingSpec: first?.spec ?? null,
         budget: budgetAmount,
         budgetType,
@@ -2284,14 +2286,14 @@ async function pushToMeta(args: PushArgs) {
 
     const rollbackCampaignId = setArgs.existingCampaignId
       ? null
-      : (result.platformCampaignId ?? null);
+      : writtenCampaignId(result);
     const attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }> = [];
     try {
       for (const { ad, content } of trailing) {
         const attachPayload: CreateZernioStandaloneAdInput = {
           accountId: input.connectionAccountId,
           adAccountId: destination.adAccount.id,
-          adSetId: result.platformAdSetId!,
+          adSetId: writtenAdSetId(result)!,
           name: ad.name,
           goal: input.goal,
           headline: content.headline,
@@ -2412,13 +2414,13 @@ async function pushToMeta(args: PushArgs) {
       status: "paused",
       budgetAmount,
       budgetType,
-      externalCampaignId: set.result.platformCampaignId ?? null,
+      externalCampaignId: writtenCampaignId(set.result),
       heroThumbnailUrl: usable[0]!.content.media[0]?.url ?? null,
       sets: [
         {
           audience: only?.audience ?? null,
           name: only?.audience.name ?? campaign.name,
-          externalId: set.result.platformAdSetId ?? null,
+          externalId: writtenAdSetId(set.result),
           targetingSpec: only?.spec ?? null,
           budget: budgetAmount,
           budgetType,
@@ -2535,20 +2537,6 @@ async function pushToMeta(args: PushArgs) {
 // creative is our ad. Each plan audience becomes a LinkedIn campaign and every
 // creative ad runs under each. The create takes ONE creative per call, so the
 // first ad opens a campaign and the rest attach to it with adSetId.
-/**
- * The ad-set id to attach the next creative to — on LinkedIn, the Campaign
- * id, since its campaign GROUP is our campaign level.
- *
- * Read from the response root and from the returned ad, because
- * `platformAdSetId` is a documented field on both and Meta happens to answer
- * at the root. Anything beyond those two would be guessing at a field name,
- * so a miss raises an error carrying the keys Zernio DID return — one more
- * attempt then tells us the shape instead of failing the same way twice.
- */
-function attachableAdSetId(result: ZernioAdWriteResponse): string | null {
-  return result.platformAdSetId ?? result.ad?.platformAdSetId ?? null;
-}
-
 async function pushToLinkedIn(args: PushArgs) {
   const {
     input,
@@ -2727,10 +2715,10 @@ async function pushToLinkedIn(args: PushArgs) {
     });
     const rollbackCampaignId = setArgs.existingCampaignId
       ? null
-      : (result.platformCampaignId ?? null);
+      : writtenCampaignId(result);
     const attached: CreatedSet["attached"] = [];
     try {
-      const adSetId = attachableAdSetId(result);
+      const adSetId = writtenAdSetId(result);
       for (const { ad, content } of rest) {
         if (!adSetId) {
           throw new Error(
@@ -2840,13 +2828,13 @@ async function pushToLinkedIn(args: PushArgs) {
       status: "paused",
       budgetAmount,
       budgetType,
-      externalCampaignId: set.result.platformCampaignId ?? null,
+      externalCampaignId: writtenCampaignId(set.result),
       heroThumbnailUrl,
       sets: [
         {
           audience: only?.audience ?? null,
           name: only?.audience.name ?? campaign.name,
-          externalId: set.result.platformAdSetId ?? null,
+          externalId: writtenAdSetId(set.result),
           targetingSpec: only?.spec ?? null,
           budget: budgetAmount,
           budgetType,

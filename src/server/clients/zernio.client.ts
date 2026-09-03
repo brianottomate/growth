@@ -1231,10 +1231,22 @@ export async function createZernioAdCampaign(
   });
 }
 
+/**
+ * The 201 from POST /ads/create, which the docs define as one of two shapes:
+ *
+ *   { ad, message }                                    ← legacy single-creative
+ *   { ads, platformCampaignId, platformAdSetId, … }    ← Meta-only creatives[]
+ *
+ * So the root ids exist ONLY on the multi-creative shape. Meta uses that shape
+ * and reads them at the root; LinkedIn uses the legacy one and carries the same
+ * ids on `ad` instead, which is why a LinkedIn push found nothing at the root.
+ * Read them with `writtenCampaignId` / `writtenAdSetId` rather than by hand.
+ */
 export type ZernioAdWriteResponse = {
   ad?: ZernioAd;
   /** Multi-creative shape: the N ads of the single ad set that was created. */
   ads?: ZernioAd[];
+  /** Multi-creative shape only. Legacy shape puts these on `ad`. */
   platformCampaignId?: string;
   platformAdSetId?: string;
   validateOnly?: boolean;
@@ -1246,6 +1258,32 @@ export type ZernioAdWriteResponse = {
   message?: string;
   [key: string]: unknown;
 };
+
+/** The created campaign id, wherever this response shape carries it. */
+export function writtenCampaignId(
+  result: ZernioAdWriteResponse,
+): string | null {
+  return (
+    result.platformCampaignId ??
+    result.ad?.platformCampaignId ??
+    result.ads?.[0]?.platformCampaignId ??
+    null
+  );
+}
+
+/**
+ * The created ad set id — on LinkedIn the Campaign id, since its Campaign
+ * Group is Zernio's campaign level. This is the id an attach call wants as
+ * `adSetId`.
+ */
+export function writtenAdSetId(result: ZernioAdWriteResponse): string | null {
+  return (
+    result.platformAdSetId ??
+    result.ad?.platformAdSetId ??
+    result.ads?.[0]?.platformAdSetId ??
+    null
+  );
+}
 
 /**
  * Create one campaign tree through Zernio's normalized Meta/Google endpoint.
