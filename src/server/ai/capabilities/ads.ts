@@ -52,6 +52,7 @@ import {
 import { draftAdsFromHomes } from "@/server/services/property-ads.service";
 import { requireOwnedCampaign } from "@/server/services/ads-draft.service";
 import { MediaService } from "@/server/services/media.service";
+import { mediaTypeForUrl } from "@/lib/media-url";
 import type { MediaItem } from "@/server/db/schema";
 import { growthAction } from "./types";
 
@@ -851,7 +852,7 @@ export const planPlatformAction = growthAction({
 
 export const setCreativePoolAction = growthAction({
   description:
-    "Replace a campaign's shared creative pool — the images its ads draw from, picked once rather than per ad. Local only.",
+    "Replace a campaign's shared creative pool — the images and videos its ads draw from, picked once rather than per ad. Chat attachments are promoted into the media library on the way in. Local only.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
     media: z
@@ -859,16 +860,49 @@ export const setCreativePoolAction = growthAction({
         z.object({
           url: z.string().url(),
           assetId: z.string().trim().min(1).optional(),
+          type: z
+            .enum(["image", "video"])
+            .optional()
+            .describe(
+              "Only when the library cannot tell; a stored asset's own kind wins.",
+            ),
         }),
       )
       .max(50),
   }),
-  execute: async (input, ctx) =>
-    setCampaignCreativePool({
+  execute: async (input, ctx) => {
+    const { brand } = await requireOwnedCampaign(input.campaignId, ctx.orgId);
+    // Every item used to be stamped "image", so a chat-attached clip rendered
+    // through <img> as a blank tile. Ask the library what the bytes are.
+    const media: MediaItem[] = await Promise.all(
+      input.media.map(async (item) => {
+        const resolved = await MediaService.resolveLibraryMedia({
+          brandId: brand.id,
+          userId: ctx.userId,
+          url: item.url,
+        });
+        const type =
+          resolved.kind === "video"
+            ? "video"
+            : resolved.kind
+              ? "image"
+              : (item.type ?? mediaTypeForUrl(item.url));
+        return {
+          url: resolved.url,
+          type,
+          assetId: item.assetId ?? resolved.assetId,
+          ...(resolved.thumbnailUrl
+            ? { thumbnail: resolved.thumbnailUrl }
+            : {}),
+        };
+      }),
+    );
+    return setCampaignCreativePool({
       campaignId: input.campaignId,
-      media: input.media.map((item) => ({ ...item, type: "image" as const })),
+      media,
       organizationId: ctx.orgId,
-    }),
+    });
+  },
 });
 
 export const setPlatformDraftAction = growthAction({

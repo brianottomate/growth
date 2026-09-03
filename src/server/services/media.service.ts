@@ -58,7 +58,11 @@ const storyboardDescriptorShape = z.object({
   boards: z
     .array(
       z.object({
-        index: z.number().int().min(0).max(MAX_STORYBOARD_BOARDS - 1),
+        index: z
+          .number()
+          .int()
+          .min(0)
+          .max(MAX_STORYBOARD_BOARDS - 1),
         width: z.number().int().positive(),
         height: z.number().int().positive(),
         firstFrame: z.number().int().positive(),
@@ -1298,19 +1302,26 @@ export async function resolveLibraryMedia(input: {
   brandId: string;
   userId: string;
   url: string;
-}): Promise<{ url: string; assetId?: string; thumbnailUrl?: string }> {
+}): Promise<{
+  url: string;
+  assetId?: string;
+  thumbnailUrl?: string;
+  /** The library's word on what the bytes are; absent when the URL is foreign. */
+  kind?: MediaKind;
+}> {
   const existing = await db.query.mediaAssetTable.findFirst({
     where: and(
       eq(mediaAssetTable.brandId, input.brandId),
       eq(mediaAssetTable.url, input.url),
       isNull(mediaAssetTable.deletedAt),
     ),
-    columns: { id: true, url: true, thumbnailUrl: true },
+    columns: { id: true, url: true, thumbnailUrl: true, kind: true },
   });
   if (existing?.url) {
     return {
       url: existing.url,
       assetId: existing.id,
+      kind: existing.kind,
       ...(existing.thumbnailUrl ? { thumbnailUrl: existing.thumbnailUrl } : {}),
     };
   }
@@ -1335,6 +1346,7 @@ export async function resolveLibraryMedia(input: {
   return {
     url: asset.url ?? input.url,
     assetId: asset.id,
+    kind: asset.kind,
     ...(asset.thumbnailUrl ? { thumbnailUrl: asset.thumbnailUrl } : {}),
   };
 }
