@@ -55,13 +55,28 @@ export const getPerformanceAccountAction = growthAction({
   description:
     "Read one performance account completely: contact, plan, sponsored properties, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
   inputSchema: z.object({ accountId: z.string().min(1) }),
-  execute: (input, ctx) => getPerformanceAccount(actorFrom(ctx), input.accountId),
+  execute: (input, ctx) =>
+    getPerformanceAccount(actorFrom(ctx), input.accountId),
 });
 
 export const clientCampaignContextAction = growthAction({
   description:
     "What a Performance+ client agreed to and what we would advertise for them: the monthly media budget, whether they asked for every home, the property URLs on the record, and where those homes are (countries, state codes, resolvable region names, cities). Read this before proposing campaigns or audiences for a client brand — the geography is a fact about their portfolio, not a recommendation about who to target.",
   inputSchema: z.object({ brandId: z.string().min(1) }),
+  outputSchema: z.object({
+    accountId: z.string().nullable(),
+    mediaBudgetDollars: z.number().nullable(),
+    landingUrl: z.string().nullable(),
+    propertyUrls: z.array(z.string()),
+    allProperties: z.boolean(),
+    geography: z.object({
+      countries: z.array(z.string()).optional(),
+      states: z.array(z.string()).optional(),
+      regions: z.array(z.string()).optional(),
+      cities: z.array(z.string()).optional(),
+    }),
+  }),
+  examples: [{ brandId: "brand_winterpark" }],
   execute: (input, ctx) => campaignPrefillFromIntake(actorFrom(ctx), input),
 });
 
@@ -69,13 +84,16 @@ export const listIntakesAction = growthAction({
   description:
     "List the onboarding forms a Performance+ client has filed for one account, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified.",
   inputSchema: z.object({ accountId: z.string().min(1) }),
-  execute: (input, ctx) => listPerformanceIntakes(actorFrom(ctx), input.accountId),
+  examples: [{ accountId: "perf_01" }],
+  execute: (input, ctx) =>
+    listPerformanceIntakes(actorFrom(ctx), input.accountId),
 });
 
 export const previewIntakeApplyAction = growthAction({
   description:
     "Show exactly what applying an intake would write: the billing period and budget, which homes are new, and anything blocking it. Read-only. Always call this before applyIntake and show the operator the result.",
   inputSchema: z.object({ intakeId: z.string().min(1) }),
+  examples: [{ intakeId: "pint_01" }],
   execute: (input, ctx) => previewIntakeApply(actorFrom(ctx), input.intakeId),
 });
 
@@ -86,6 +104,15 @@ export const applyIntakeAction = growthAction({
     intakeId: z.string().min(1),
     mediaBudgetDollars: z.number().int().min(0).nullable().optional(),
   }),
+  outputSchema: z.object({
+    intakeId: z.string(),
+    /** One line per record that changed, in the order they were written. */
+    written: z.array(z.string()),
+  }),
+  examples: [
+    { intakeId: "pint_01" },
+    { intakeId: "pint_01", mediaBudgetDollars: 5000 },
+  ],
   execute: (input, ctx) => applyPerformanceIntake(actorFrom(ctx), input),
 });
 
@@ -93,6 +120,7 @@ export const verifyIntakeAccessAction = growthAction({
   description:
     "Check whether the client's Leadsie grant has landed: reads the Pages and ad accounts Wander's Meta connection can now manage and records the match when exactly one Page name looks like theirs. Reads the provider and writes only Growth's own verification stamps.",
   inputSchema: z.object({ intakeId: z.string().min(1) }),
+  examples: [{ intakeId: "pint_01" }],
   execute: (input, ctx) => verifyIntakeAccess(actorFrom(ctx), input.intakeId),
 });
 
@@ -103,6 +131,12 @@ export const promoteToClientAction = growthAction({
     brandId: z.string().min(1),
     plan: z.string().min(1).nullable().optional(),
   }),
+  outputSchema: z.object({
+    accountId: z.string(),
+    /** False when they already had a commercial record. */
+    created: z.boolean(),
+  }),
+  examples: [{ brandId: "brand_winterpark" }],
   execute: (input, ctx) => promoteBrandToClient(actorFrom(ctx), input),
 });
 

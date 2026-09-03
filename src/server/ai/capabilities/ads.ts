@@ -691,6 +691,30 @@ export const draftAdsFromHomesAction = growthAction({
     campaignId: z.string().min(1),
     carouselSize: z.number().int().min(1).max(8).optional(),
   }),
+  outputSchema: z.object({
+    campaignId: z.string(),
+    adIds: z.array(z.string()),
+    homesUsed: z.array(z.object({ name: z.string(), url: z.string() })),
+    feedRows: z.array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        description: z.string(),
+        availability: z.literal("in stock"),
+        condition: z.literal("new"),
+        price: z.string(),
+        link: z.string(),
+        image_link: z.string(),
+        brand: z.string(),
+      }),
+    ),
+    /** Anything an operator should read: skipped homes, missing prices. */
+    notes: z.array(z.string()),
+  }),
+  examples: [
+    { campaignId: "camp_01" },
+    { campaignId: "camp_01", carouselSize: 4 },
+  ],
   execute: (input, ctx) =>
     draftAdsFromHomes({
       organizationId: ctx.orgId,

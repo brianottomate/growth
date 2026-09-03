@@ -40,23 +40,52 @@ export type GrowthTool<INPUT = unknown, OUTPUT = unknown> = Tool<
   validationSchema: z.ZodType<INPUT>;
   /** Provider-safe schema advertised by transports such as the OAuth MCP. */
   transportInputSchema: z.ZodType<unknown>;
+  /**
+   * The actions this capability was compiled from, for anything that needs to
+   * see the definitions rather than the flattened result: the contract gate,
+   * and any inspector that wants to print what a surface actually advertises.
+   */
+  actions?: Record<string, GrowthAction<never, unknown>>;
 };
 
 /** A typed service action. It is deliberately not an AI SDK tool. */
 export interface GrowthAction<INPUT = unknown, OUTPUT = unknown> {
   description: string;
   inputSchema: z.ZodTypeAny;
+  /**
+   * What the action promises to return, when it makes one.
+   *
+   * Optional because the catalog predates it. Where it is declared, the
+   * envelope's `data` stops being `unknown` to everything downstream, and a
+   * result that drifts from the promise is reported instead of being handed to
+   * a model as if it were fine.
+   */
+  outputSchema?: z.ZodTypeAny;
+  /**
+   * Calls that must stay valid, checked by `bun run ai:contracts`.
+   *
+   * These are a contract test rather than prompt material: they catch the case
+   * where a schema tightens and the guidance in the description quietly starts
+   * describing a call the action would now refuse.
+   */
+  examples?: readonly unknown[];
   run: (input: INPUT, context: GrowthExecutionContext) => Promise<OUTPUT>;
 }
 
 export function growthAction<I extends z.ZodTypeAny, O>(definition: {
   description: string;
   inputSchema: I;
+  outputSchema?: z.ZodType<O>;
+  examples?: readonly z.input<I>[];
   execute: (input: z.infer<I>, ctx: GrowthExecutionContext) => Promise<O>;
 }): GrowthAction<z.infer<I>, O> {
   return {
     description: definition.description,
     inputSchema: definition.inputSchema,
+    ...(definition.outputSchema
+      ? { outputSchema: definition.outputSchema }
+      : {}),
+    ...(definition.examples ? { examples: definition.examples } : {}),
     run: definition.execute,
   };
 }
@@ -204,6 +233,7 @@ export function growthDomainTool<
   return growthTool({
     description: definition.description,
     inputSchema: validationSchema,
+    actions: definition.actions,
     ...transport,
     execute: async (input, context) => {
       const action = String(input.action);
@@ -215,6 +245,22 @@ export function growthDomainTool<
         unknown
       >;
       const data = await executable.run(payload, context);
+      // An action that declared a shape is held to it. Reported rather than
+      // thrown: the work already happened, and a caller learning that the
+      // result is off-contract is more useful than losing it. Tighten to a
+      // refusal once every action in a domain declares one.
+      if (spec.outputSchema) {
+        const checked = spec.outputSchema.safeParse(data);
+        if (!checked.success) {
+          console.error(
+            `${action} returned something its output schema does not describe`,
+            checked.error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              message: issue.message,
+            })),
+          );
+        }
+      }
       if (
         typeof data === "object" &&
         data !== null &&
@@ -247,6 +293,7 @@ export function growthTool<I extends z.ZodTypeAny, O>(definition: {
   inputSchema: I;
   modelInputSchema?: FlexibleSchema<z.infer<I>>;
   transportInputSchema?: z.ZodType<unknown>;
+  actions?: Record<string, GrowthAction<never, unknown>>;
   execute: (input: z.infer<I>, ctx: GrowthExecutionContext) => Promise<O>;
 }): GrowthTool<z.infer<I>, O> {
   const nativeTool = tool({
@@ -267,5 +314,6 @@ export function growthTool<I extends z.ZodTypeAny, O>(definition: {
     validationSchema: definition.inputSchema,
     transportInputSchema:
       definition.transportInputSchema ?? definition.inputSchema,
+    ...(definition.actions ? { actions: definition.actions } : {}),
   }) as unknown as GrowthTool<z.infer<I>, O>;
 }

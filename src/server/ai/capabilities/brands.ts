@@ -74,6 +74,14 @@ export const createProspectAction = growthAction({
   description:
     "Turn a row in the leads mirror into a prospect brand a rep can pitch, keyed on its domain so calling twice returns the brand that already exists. The mirror stays untouched. Follow with brandWrite.enrich to read their site for a logo and a tagline.",
   inputSchema: z.object({ domainId: z.string().min(1) }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    slug: z.string().nullable(),
+    name: z.string(),
+    /** False when this lead already had a brand. */
+    created: z.boolean(),
+  }),
+  examples: [{ domainId: "ld_winterparkescapes" }],
   execute: async (input, ctx) => {
     const { brand, created } = await createProspectFromLead({
       organizationId: ctx.orgId,
@@ -91,6 +99,11 @@ export const setBrandRelationshipAction = growthAction({
     brandId: z.string().min(1),
     relationship: z.enum(["internal", "client", "prospect", "reference"]),
   }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    relationship: z.enum(["internal", "client", "prospect", "reference"]),
+  }),
+  examples: [{ brandId: "brand_winterpark", relationship: "prospect" }],
   execute: async (input, ctx) => {
     const brand = await setBrandRelationship({ orgId: ctx.orgId }, input);
     return { brandId: brand.id, relationship: brand.relationship };
@@ -132,7 +145,10 @@ export const enrichBrandAction = growthAction({
 /** Brand ownership check shared by the purge pair. */
 async function assertOwnedBrand(brandId: string, orgId: string) {
   const brand = await db.query.brandTable.findFirst({
-    where: and(eq(brandTable.id, brandId), eq(brandTable.organizationId, orgId)),
+    where: and(
+      eq(brandTable.id, brandId),
+      eq(brandTable.organizationId, orgId),
+    ),
     columns: { id: true, name: true },
   });
   if (!brand) throw new Error("Brand not found in this organization.");

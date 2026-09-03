@@ -20,12 +20,12 @@ import { brandTable } from "@/server/db/schema";
  * one of their homepages on every intake, pitch and campaign read would be the
  * expensive half of a feature nobody asked for.
  *
- * A miss goes stale after a week, because a client can migrate onto WanderOS
- * after we first looked. A hit does not: ids are stable, and a wrong one shows
- * up immediately as an empty listing set rather than as wrong data.
+ * Both answers stick until someone asks again. A client can migrate onto
+ * WanderOS later, and rather than guess an interval at which that becomes
+ * likely, re-checking is a button: `recheckBrandWebsite` looks again, and
+ * `setBrandWebsiteId` takes an id by hand for a site whose HTML we cannot
+ * read. An expiry would only be a rule invented to avoid asking.
  */
-const MISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 export async function brandWebsiteId(brandId: string): Promise<string | null> {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
@@ -38,16 +38,82 @@ export async function brandWebsiteId(brandId: string): Promise<string | null> {
   });
   if (!brand?.website) return null;
   if (brand.wanderOsWebsiteId) return brand.wanderOsWebsiteId;
+  // Looked before and found nothing. Asking again is a decision someone makes.
+  if (brand.wanderOsCheckedAt) return null;
+  return discoverAndRemember(brand.id, brand.website);
+}
 
-  const checkedAt = brand.wanderOsCheckedAt?.getTime() ?? 0;
-  if (checkedAt && Date.now() - checkedAt < MISS_TTL_MS) return null;
-
-  const discovered = await wanderOsWebsiteId(brand.website);
+async function discoverAndRemember(
+  brandId: string,
+  website: string,
+): Promise<string | null> {
+  const discovered = await wanderOsWebsiteId(website);
   await db
     .update(brandTable)
     .set({ wanderOsWebsiteId: discovered, wanderOsCheckedAt: new Date() })
-    .where(eq(brandTable.id, brand.id));
+    .where(eq(brandTable.id, brandId));
   return discovered;
+}
+
+/** What the setup page shows, and what a re-check gives back. */
+export type BrandWebsiteState = {
+  website: string | null;
+  websiteId: string | null;
+  checkedAt: Date | null;
+};
+
+export async function brandWebsiteState(
+  brandId: string,
+): Promise<BrandWebsiteState> {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, brandId),
+    columns: {
+      website: true,
+      wanderOsWebsiteId: true,
+      wanderOsCheckedAt: true,
+    },
+  });
+  return {
+    website: brand?.website ?? null,
+    websiteId: brand?.wanderOsWebsiteId ?? null,
+    checkedAt: brand?.wanderOsCheckedAt ?? null,
+  };
+}
+
+/** Look at their site again, whatever we concluded last time. */
+export async function recheckBrandWebsite(
+  brandId: string,
+): Promise<BrandWebsiteState> {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, brandId),
+    columns: { id: true, website: true },
+  });
+  if (!brand?.website) return brandWebsiteState(brandId);
+  await discoverAndRemember(brand.id, brand.website);
+  return brandWebsiteState(brandId);
+}
+
+/**
+ * Set the id by hand.
+ *
+ * The automatic read is a regex over someone else's HTML, so it will
+ * eventually meet a site it cannot read. An operator who can find the id in a
+ * network tab should not be blocked by that. An empty string clears it back to
+ * "not a WanderOS site".
+ */
+export async function setBrandWebsiteId(input: {
+  brandId: string;
+  websiteId: string | null;
+}): Promise<BrandWebsiteState> {
+  const value = input.websiteId?.trim() || null;
+  if (value && !/^\d{6,}$/.test(value)) {
+    throw new Error("A WanderOS website id is a run of digits.");
+  }
+  await db
+    .update(brandTable)
+    .set({ wanderOsWebsiteId: value, wanderOsCheckedAt: new Date() })
+    .where(eq(brandTable.id, input.brandId));
+  return brandWebsiteState(input.brandId);
 }
 
 /**

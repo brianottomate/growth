@@ -74,6 +74,27 @@ function isCapabilityError(value: unknown): value is {
 }
 
 function capabilityFailure(error: unknown, action?: string) {
+  // A malformed call is the one failure the caller can fix on its own, so it
+  // gets the field paths back rather than a sentence about validation. Paths
+  // and Zod's own messages only: the values are the caller's, and echoing them
+  // puts organization data into a transport log for no benefit.
+  if (error instanceof z.ZodError) {
+    return {
+      ok: false as const,
+      ...(action ? { action } : {}),
+      error: {
+        code: "invalid_tool_input" as const,
+        message: action
+          ? `${action} input is invalid`
+          : "The tool input is invalid",
+        suggestedAction: "Fix the listed fields and call again.",
+        issues: error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      },
+    };
+  }
   const compact = compactGrowthError(error);
   return {
     ok: false as const,

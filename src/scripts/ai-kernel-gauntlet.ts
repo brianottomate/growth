@@ -89,9 +89,7 @@ function actionValuesFromSchema(schema: JsonSchemaObject): string[] {
   // carrying an `action` property, and the flattened model schema, whose
   // `action` is itself a union of described string consts.
   return variants.flatMap((variant) =>
-    actionValuesFromSchema(
-      variant.properties?.action ?? variant,
-    ),
+    actionValuesFromSchema(variant.properties?.action ?? variant),
   );
 }
 
@@ -191,6 +189,30 @@ async function main() {
           policyForGrowthTool(name, { action }).surfaces.length > 0,
           `${name}.${action} has no allowed surface`,
         );
+      }
+
+      // The definitions behind the flattened schema. A description is what the
+      // model chooses on, and an example is the promise that the description
+      // still describes a call this action would accept.
+      for (const [action, spec] of Object.entries(
+        nativeDefinition.actions ?? {},
+      )) {
+        assert(
+          spec.description.trim().length > 0,
+          `${name}.${action} has no description`,
+        );
+        for (const [index, example] of (spec.examples ?? []).entries()) {
+          const candidate = { ...(example as object), action };
+          const strict = nativeDefinition.validationSchema.safeParse(candidate);
+          assert(
+            strict.success,
+            `${name}.${action} example ${index} does not validate: ${strict.success ? "" : strict.error.issues.map((issue) => `${issue.path.join(".")} ${issue.message}`).join("; ")}`,
+          );
+          assert(
+            nativeDefinition.transportInputSchema.safeParse(candidate).success,
+            `${name}.${action} example ${index} does not validate against the transport schema`,
+          );
+        }
       }
     }
   }

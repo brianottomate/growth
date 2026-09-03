@@ -20,6 +20,11 @@ import { type db } from "@/server/db";
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 import {
+  brandWebsiteState,
+  recheckBrandWebsite,
+  setBrandWebsiteId,
+} from "@/server/services/wanderos-listings.service";
+import {
   brandConnectUrl,
   brandIntakeUrl,
   brandPitchUrl,
@@ -570,6 +575,38 @@ export const brandRouter = createTRPCRouter({
    * Client connect: the no-login link a Performance customer uses to connect
    * their own accounts into this brand's Zernio profile.
    */
+  /**
+   * Whether this brand's site is one we built, and the id that proves it.
+   *
+   * Discovery reads their homepage, so it happens once and the answer sticks
+   * until someone asks again here.
+   */
+  websiteState: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      return brandWebsiteState(input.brandId);
+    }),
+
+  recheckWebsite: protectedProcedure
+    .input(z.object({ brandId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      return recheckBrandWebsite(input.brandId);
+    }),
+
+  setWebsiteId: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        websiteId: z.string().trim().max(40).nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.brandId);
+      return setBrandWebsiteId(input);
+    }),
+
   connectStatus: protectedProcedure
     .input(z.object({ brandId: z.string() }))
     .query(async ({ ctx, input }) => {
