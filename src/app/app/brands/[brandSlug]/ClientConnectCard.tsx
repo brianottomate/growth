@@ -12,12 +12,23 @@ import { useTRPC } from "@/trpc/react";
  * either surface, see which channels the client has connected, and revoke
  * both by regenerating.
  */
+/**
+ * The Leadsie grant. One static link for all of Wander, not a per-brand one,
+ * which is why it is a constant here and not on `connectStatus`. Duplicated
+ * from wander.com's intake form deliberately: a rep regularly needs to send
+ * only this — to a client who has already filed the form, or who never will —
+ * and the only copy of the URL lived inside that form.
+ */
+const LEADSIE_URL = "https://app.leadsie.com/connect/wander/manage";
+const LEADSIE_SCOPES =
+  "Facebook Page · Instagram · Google Ads · Google Analytics";
+
 export function ClientConnectCard({ brandId }: { brandId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [copied, setCopied] = useState<"connect" | "intake" | "pitch" | null>(
-    null,
-  );
+  const [copied, setCopied] = useState<
+    "connect" | "intake" | "pitch" | "leadsie" | null
+  >(null);
 
   const status = useQuery(trpc.brand.connectStatus.queryOptions({ brandId }));
   const invalidate = () =>
@@ -39,7 +50,7 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
   const visible = channels.filter((row) => row.offered || row.connected);
 
   const copy = async (
-    which: "connect" | "intake" | "pitch",
+    which: "connect" | "intake" | "pitch" | "leadsie",
     value: string,
   ) => {
     await navigator.clipboard.writeText(value);
@@ -52,12 +63,14 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
       <div>
         <h2 className="text-base font-semibold">Client connect</h2>
         <p className="text-muted-foreground mt-0.5 text-sm">
-          Three no-login surfaces for one brand: the pitch a rep sends before
-          anything is signed, the intake form the client fills in, and the
-          connect page they use to authorise accounts. The token is the
-          credential for the last two, so regenerating it revokes those links
-          you have already sent. The pitch reads off the slug and shows only
-          what is already public on the client&rsquo;s own site.
+          Four client-facing surfaces for one brand: the pitch a rep sends
+          before anything is signed, the intake form the client fills in, the
+          Leadsie grant that hands us their ad accounts, and the connect page
+          they authorise accounts on here. The token is the credential for the
+          intake and connect links, so regenerating it revokes those you have
+          already sent. The pitch reads off the slug and shows only what is
+          already public on the client&rsquo;s own site. The grant is one
+          Wander-wide link, which the token does not govern at all.
         </p>
       </div>
 
@@ -127,6 +140,41 @@ export function ClientConnectCard({ brandId }: { brandId: string }) {
             </div>
           </div>
         )}
+
+        <div className="mb-3">
+          <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+            Access grant (Leadsie)
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="bg-surface-secondary/50 min-w-0 flex-1 truncate rounded-md px-2.5 py-1.5 font-mono text-xs">
+              {LEADSIE_URL}
+            </code>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void copy("leadsie", LEADSIE_URL)}
+            >
+              {copied === "leadsie" ? (
+                <Check className="size-3.5" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+              {copied === "leadsie" ? "Copied" : "Copy"}
+            </Button>
+            <a
+              href={LEADSIE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground text-xs"
+            >
+              Open ↗
+            </a>
+          </div>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Requests: {LEADSIE_SCOPES}. Not brand-specific and not revoked by
+            regenerating the token.
+          </p>
+        </div>
 
         {url && (
           <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
