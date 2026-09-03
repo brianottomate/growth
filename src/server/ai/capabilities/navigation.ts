@@ -20,7 +20,7 @@ const surfaceSchema = z.enum(WORKSPACE_SURFACES);
  */
 export const navigateWorkspace = growthTool({
   description:
-    'Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. The current page is context, not a capability boundary: complete the requested workspace operation first when possible, then navigate to the best inspection or editing surface. Prefer a named surface. Use surface "path" with a safe /app path only for a real route not yet represented by a named surface. For a specific brand map or brand-aware Next conversation, pass a brandId from brandRead.list. The in-app client follows the returned route; MCP clients receive the same canonical URL.',
+    'Navigate the operator to a Growth surface. Use only when the operator explicitly asks to open, show, take them to, or switch to a page. The current page is context, not a capability boundary: complete the requested workspace operation first when possible, then navigate to the best inspection or editing surface. When the operator means ONE specific record — this campaign, this content item, this brand\'s ads — use surface "path" with that record\'s own path, which earlier write results already gave you as `path` or `url` (for example /app/brands/<slug>/ads/<campaignId>). A named surface is the INDEX of its kind, so "take me to the campaign" answered with surface "campaigns" lands on the list of every campaign and looks like a half-working navigation. Prefer a named surface only when the operator means the index itself, or when no specific record is in play. For a specific brand map or brand-aware Next conversation, pass a brandId from brandRead.list. The in-app client follows the returned route; MCP clients receive the same canonical URL.',
   inputSchema: z.object({
     action: z.literal("navigate"),
     surface: surfaceSchema,
@@ -98,6 +98,13 @@ export const navigateWorkspace = growthTool({
         data: {
           surface: input.surface,
           href: WORKSPACE_ROUTES[input.surface],
+          // A named surface is a list, and the result used to say only which
+          // one — so "take me to the campaign" could be answered with the
+          // campaigns index and then narrated as if one campaign had been
+          // opened. Naming it a listing keeps the reply honest, and says how
+          // to reach the record instead.
+          opened: "index" as const,
+          note: `Opened the ${input.surface} index, which lists every one. If the operator meant a single record, navigate again with surface "path" and that record's own path.`,
         },
       };
     }
