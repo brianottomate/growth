@@ -6,7 +6,7 @@ import { intakeListings } from "@/server/services/performance-intake.service";
 
 // Reads the client's own site and then their listing search, so it is slower
 // than a database lookup and faster than a human pasting 200 URLs.
-export const maxDuration = 60;
+export const maxDuration = 800;
 
 /**
  * The homes on a client's booking site. GET /api/intake/v1/properties

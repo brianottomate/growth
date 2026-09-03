@@ -1,15 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ImagePlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
+
+/** Seconds as m:ss, the way a clip's length is normally written. */
+function clipLength(seconds: number | null | undefined): string | null {
+  if (!seconds || seconds <= 0) return null;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+}
+
+/**
+ * A readable name for a pool item that has no library row behind it.
+ *
+ * Chat uploads land as `video-att_<id>-<the-name-they-had>.mp4`, so the id
+ * prefix is stripped: five tiles reading "video-att_BDjm…" are five tiles a
+ * person cannot tell apart.
+ */
+function nameFromUrl(url: string): string {
+  try {
+    const file = new URL(url).pathname.split("/").pop() ?? "";
+    const decoded = decodeURIComponent(file).replace(/\.[a-z0-9]+$/i, "");
+    return (
+      decoded.replace(/^(?:video|image)-att_[A-Za-z0-9]+-/, "") || "Untitled"
+    );
+  } catch {
+    return "Untitled";
+  }
+}
 
 /**
  * The campaign's shared creative, mirroring the content post's pool: pick
@@ -28,6 +54,27 @@ export function CreativePool({
   const trpc = useTRPC();
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // The pool stores MediaItem JSON — url, type, thumbnail — and nothing a
+  // person can read. Everything worth showing on a tile (name, length, tags,
+  // whether it has been analyzed) lives on the library row, so resolve the
+  // ids the pool carries. Items with no `assetId` are raw uploads that were
+  // never promoted; they get what the URL can tell us and a marker saying so.
+  const assetIds = useMemo(
+    () =>
+      [
+        ...new Set(pool.map((item) => item.assetId).filter(Boolean)),
+      ] as string[],
+    [pool],
+  );
+  const assets = useQuery({
+    ...trpc.media.byIds.queryOptions({ brandId, ids: assetIds }),
+    enabled: assetIds.length > 0,
+  });
+  const assetById = useMemo(
+    () => new Map((assets.data ?? []).map((asset) => [asset.id, asset])),
+    [assets.data],
+  );
 
   const setPool = useMutation(
     trpc.ads.setCampaignCreativePool.mutationOptions({
@@ -86,52 +133,100 @@ export function CreativePool({
         <p className="text-muted-foreground text-sm">Nothing yet.</p>
       ) : (
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {pool.map((item) => (
-            <div
-              key={item.url}
-              className="bg-card group relative w-32 shrink-0 overflow-hidden rounded-lg border"
-            >
-              <div className="bg-muted relative h-20">
-                {/* A video's `thumbnail` can be the clip itself when no poster
+          {pool.map((item) => {
+            const asset = item.assetId ? assetById.get(item.assetId) : null;
+            const name =
+              asset?.title ?? asset?.filename ?? nameFromUrl(item.url);
+            const length = clipLength(asset?.duration);
+            const width = asset?.width ?? item.width;
+            const height = asset?.height ?? item.height;
+            const facts = [
+              length,
+              width && height ? `${width}\u00d7${height}` : null,
+            ].filter((value): value is string => Boolean(value));
+            return (
+              <div
+                key={item.url}
+                className="bg-card group relative w-40 shrink-0 overflow-hidden rounded-lg border"
+                title={asset?.alt ?? name}
+              >
+                <div className="bg-muted relative h-24">
+                  {/* A video's `thumbnail` can be the clip itself when no poster
                 was ever cut, and an <img> pointed at an .mp4 is a blank tile
                 that still downloads the whole file. Let <video> paint its own
                 first frame instead. */}
-                {item.type === "video" ? (
-                  <video
-                    src={item.url}
-                    poster={
-                      item.thumbnail && item.thumbnail !== item.url
-                        ? item.thumbnail
-                        : undefined
-                    }
-                    className="h-full w-full bg-black object-cover"
-                    muted
-                    playsInline
-                    preload="metadata"
-                  />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.thumbnail ?? item.url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                )}
-                {item.type === "video" && (
-                  <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                    Video
-                  </span>
-                )}
+                  {item.type === "video" ? (
+                    <video
+                      src={item.url}
+                      poster={
+                        item.thumbnail && item.thumbnail !== item.url
+                          ? item.thumbnail
+                          : undefined
+                      }
+                      className="h-full w-full bg-black object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.thumbnail ?? item.url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                  {item.type === "video" && (
+                    <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      {length ?? "Video"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1 p-2">
+                  <p className="truncate text-xs font-medium" title={name}>
+                    {name}
+                  </p>
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-[10px]">
+                    {facts.length > 0 ? <span>{facts.join(" · ")}</span> : null}
+                    {/* Not in the library means no tags, no analysis, and
+                      nothing reusable on another campaign — worth saying on
+                      the tile rather than only in a chat transcript. */}
+                    {!item.assetId && (
+                      <span className="text-amber-600 dark:text-amber-500">
+                        Not in library
+                      </span>
+                    )}
+                    {asset?.analyzed && <span>Analyzed</span>}
+                  </div>
+                  {asset && asset.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {asset.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="bg-muted rounded px-1 py-0.5 text-[10px]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {asset.tags.length > 3 && (
+                        <span className="text-muted-foreground text-[10px]">
+                          +{asset.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => remove(item.url)}
+                  className="absolute top-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+                >
+                  Remove
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => remove(item.url)}
-                className="absolute top-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

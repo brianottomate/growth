@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -478,9 +478,43 @@ export async function setCampaignCreativePool(input: {
     input.campaignId,
     input.organizationId,
   );
+
+  // Back-fill `assetId` for anything already in the brand's library under the
+  // same URL. Without it a pool item is a bare URL: no title on the tile, no
+  // tags, no analysis, and nothing reusable on another campaign. Five clips
+  // sat that way because the item was written before the file was promoted,
+  // and nothing ever went back to join them up.
+  const unlinked = input.media
+    .filter((item) => !item.assetId)
+    .map((item) => item.url);
+  const linkable =
+    unlinked.length > 0
+      ? await db.query.mediaAssetTable.findMany({
+          where: and(
+            eq(mediaAssetTable.brandId, campaign.brandId),
+            inArray(mediaAssetTable.url, unlinked),
+            isNull(mediaAssetTable.deletedAt),
+          ),
+          columns: { id: true, url: true, thumbnailUrl: true },
+        })
+      : [];
+  const byUrl = new Map(linkable.map((asset) => [asset.url!, asset]));
+  const media = input.media.map((item) => {
+    if (item.assetId) return item;
+    const asset = byUrl.get(item.url);
+    if (!asset) return item;
+    return {
+      ...item,
+      assetId: asset.id,
+      ...(item.thumbnail || !asset.thumbnailUrl
+        ? {}
+        : { thumbnail: asset.thumbnailUrl }),
+    };
+  });
+
   const [updated] = await db
     .update(campaignTable)
-    .set({ creativePool: input.media })
+    .set({ creativePool: media })
     .where(eq(campaignTable.id, campaign.id))
     .returning({ id: campaignTable.id });
   return updated!;

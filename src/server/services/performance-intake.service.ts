@@ -16,8 +16,12 @@ import {
   type PerformanceIntake,
   type PerformanceIntakeAnswers,
 } from "@/server/db/schema";
-import { usStateCode, usStateName } from "@/lib/us-states";
+
 import { zernioConnectionMatchesPlatform } from "@/lib/zernio-ads";
+import {
+  geographyByLookup,
+  resolveGeography,
+} from "@/server/services/geography-resolve.service";
 import {
   brandListings,
   normalizeListingUrl,
@@ -132,34 +136,10 @@ export function geographyFromProperties(
     country?: string | null;
   }[],
 ): AudienceGeographyPlan {
-  const countries = new Set<string>();
-  const states = new Set<string>();
-  const cities = new Set<string>();
-
-  for (const row of rows) {
-    const country = row.country?.trim().toUpperCase();
-    if (country) countries.add(country);
-    // Through the code map, not just uppercased: listings carry both "OH"
-    // and "Ohio", and a bare uppercase kept those as two separate states, so
-    // the pitch page and its ad copy read "OH, OHIO". An unrecognised value
-    // is still worth keeping — it is how a non-US market stays visible.
-    const state = usStateCode(row.state) ?? row.state?.trim().toUpperCase();
-    if (state) states.add(state);
-    const city = row.city?.trim();
-    if (city) cities.add(city);
-  }
-
-  const plan: AudienceGeographyPlan = {};
-  if (countries.size > 0) plan.countries = [...countries].sort();
-  if (states.size > 0) {
-    plan.states = [...states].sort();
-    const regions = plan.states
-      .map((code) => usStateName(code))
-      .filter((name): name is string => name !== null);
-    if (regions.length > 0) plan.regions = regions;
-  }
-  if (cities.size > 0) plan.cities = [...cities].sort();
-  return plan;
+  // The deterministic pass, kept for callers that cannot await a model and as
+  // the fallback inside `resolveGeography`. Prefer the async resolver: our own
+  // feed states one place several ways and a lookup only fixes what it knows.
+  return geographyByLookup(rows);
 }
 
 /**
@@ -958,7 +938,7 @@ export async function performancePitch(handle: {
       tagline: brand.tagline,
     },
     homes,
-    geography: geographyFromProperties(homes),
+    geography: await resolveGeography(homes),
     // The slug, never the token: this payload can reach a guessable page.
     intakePath: brand.slug ? `/internal/intake/${brand.slug}` : "",
   };
@@ -1054,6 +1034,6 @@ export async function campaignPrefillFromIntake(
       .map((row) => row.siteUrl ?? row.wanderUrl)
       .filter((url): url is string => Boolean(url)),
     allProperties: intake?.answers.allProperties === true,
-    geography: geographyFromProperties(properties),
+    geography: await resolveGeography(properties),
   };
 }

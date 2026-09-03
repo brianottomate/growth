@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -292,6 +292,71 @@ export const mediaRouter = createTRPCRouter({
         () => undefined,
       );
       return MediaService.list(input);
+    }),
+
+  /**
+   * Library metadata for a set of assets, for callers holding ids rather than
+   * a brand's whole library — an ad's creative pool above all, which stores
+   * `MediaItem` JSON (url, type, thumbnail) and nothing a person can read.
+   *
+   * Brand-scoped, so an id from another organization is simply absent from
+   * the result rather than an error: a pool can legitimately reference an
+   * asset that has since been deleted.
+   */
+  byIds: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        ids: z.array(z.string().min(1)).max(100),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx, input.brandId);
+      if (input.ids.length === 0) return [];
+      const rows = await ctx.db.query.mediaAssetTable.findMany({
+        where: and(
+          eq(mediaAssetTable.brandId, input.brandId),
+          inArray(mediaAssetTable.id, input.ids),
+          isNull(mediaAssetTable.deletedAt),
+        ),
+        columns: {
+          id: true,
+          kind: true,
+          title: true,
+          alt: true,
+          filename: true,
+          width: true,
+          height: true,
+          duration: true,
+          size: true,
+          mimeType: true,
+          status: true,
+          metadata: true,
+          storyboard: false,
+        },
+        with: { tagAssignments: { with: { tag: true } } },
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        title: row.title,
+        alt: row.alt,
+        filename: row.filename,
+        width: row.width,
+        height: row.height,
+        duration: row.duration,
+        size: row.size,
+        mimeType: row.mimeType,
+        status: row.status,
+        // Whether a teardown exists at all is what an operator wants on a
+        // tile; the analysis body itself is far too big for a grid.
+        analyzed: Boolean(
+          row.metadata &&
+            typeof row.metadata === "object" &&
+            "aiAnalysis" in row.metadata,
+        ),
+        tags: row.tagAssignments.map((assignment) => assignment.tag.name),
+      }));
     }),
 
   taxonomy: protectedProcedure

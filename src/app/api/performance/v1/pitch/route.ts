@@ -4,9 +4,12 @@ import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
 import { PerformanceError } from "@/server/services/performance.service";
 import { performancePitch } from "@/server/services/performance-intake.service";
 
-// Reads the client's own site and their listing search, so it is slower than a
-// database lookup and worth the wait: the homes are the pitch.
-export const maxDuration = 60;
+// Reads the client's own site and their listing search, then resolves their
+// messy location fields through a model, so it is far slower than a database
+// lookup and worth the wait: the homes are the pitch. Fluid compute bills for
+// active CPU rather than wall time, so this takes the time it needs instead of
+// being sized to a two-minute ceiling.
+export const maxDuration = 800;
 
 /**
  * The sales pitch page's payload. GET /api/performance/v1/pitch
