@@ -22,6 +22,7 @@ import { cn } from "@/components/ui/lib/utils";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { PILLAR_BY_SLUG, PILLARS } from "@/lib/pillars";
 import { useTRPC } from "@/trpc/react";
+import { posterForMedia } from "@/lib/media-url";
 
 const DEFAULT_PLATFORMS = ["instagram", "x", "linkedin", "facebook"] as const;
 
@@ -454,7 +455,7 @@ export function ProduceDrawer({
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               key={i}
-                              src={m.thumbnail ?? m.url}
+                              src={posterForMedia(m)}
                               alt=""
                               className="size-10 rounded object-cover"
                             />

@@ -18,6 +18,7 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { posterForMedia } from "@/lib/media-url";
 import { CopyButton } from "@/components/copy-button";
 
 import { AttachCampaign } from "./AttachCampaign";
@@ -74,7 +75,7 @@ const CAMPAIGN_STATUS: Record<string, string> = {
  * `thumbnailUrl` and no media at all.
  */
 const spotImage = (s: PlatformAd) =>
-  s.media?.[0]?.thumbnail ?? s.media?.[0]?.url ?? s.thumbnailUrl ?? undefined;
+  posterForMedia(s.media?.[0]) ?? s.thumbnailUrl ?? undefined;
 
 /** One per-channel campaign + its ad-spot creatives. */
 function CampaignRow({
@@ -437,7 +438,10 @@ export default async function BrandAdsPage({
               .map(spotImage)
               .find(Boolean) ??
             initCampaigns.map((row) => row.heroThumbnailUrl).find(Boolean) ??
-            init.creativePool?.[0]?.url;
+            // The pool's poster, never the clip itself: this is an <img>, and
+            // a video-only pool used to render the broken-image glyph here
+            // while downloading the whole file to get there.
+            init.creativePool?.map(posterForMedia).find(Boolean);
           return (
             <div key={init.id} className="bg-card rounded-2xl border p-4">
               {/* campaign header */}

@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
+import { posterForMedia } from "@/lib/media-url";
 
 /**
  * Draft an ad onto a draft campaign. The creative comes from the brand's
@@ -88,7 +89,7 @@ export function AddAdButton({
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={item.thumbnail ?? item.url}
+                        src={posterForMedia(item)}
                         alt=""
                         className="h-full w-full object-cover"
                       />

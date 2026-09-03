@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/components/ui/lib/utils";
 import { useTRPC } from "@/trpc/react";
+import { posterForMedia } from "@/lib/media-url";
 
 type Media = { url: string; thumbnail?: string; type?: string };
 
@@ -101,7 +102,7 @@ export function AdPreviewDialog({
   const isVideo = ad.media[0]?.type === "video";
   const isCarousel = !isVideo && ad.media.length > 1;
   const active = ad.media[Math.min(card, ad.media.length - 1)];
-  const image = active?.thumbnail ?? active?.url;
+  const image = posterForMedia(active);
   const link = ad.linkUrl ?? landingUrl;
   const crop = SURFACES.find((s) => s.id === surface)!.crop;
   const isStory = surface === "story";

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Eye } from "lucide-react";
 
 import { AdPreviewDialog, type PreviewAd } from "./AdPreviewDialog";
+import { posterForMedia } from "@/lib/media-url";
 
 type DraftAd = {
   id: string;
@@ -68,13 +69,9 @@ export function DraftedAds({
           const preview = toPreview(ad);
           const first = preview.media[0];
           const isVideo = first?.type === "video";
-          // A poster-less video's `thumbnail` is the clip itself, and an <img>
-          // pointed at an .mp4 renders nothing while downloading all of it.
-          const image = isVideo
-            ? first?.thumbnail !== first?.url
-              ? first?.thumbnail
-              : undefined
-            : (first?.thumbnail ?? first?.url);
+          // Shared rule: a video's poster or nothing. An <img> pointed at an
+          // .mp4 renders nothing and downloads all of it to get there.
+          const image = posterForMedia(first);
           return (
             <button
               key={ad.id}

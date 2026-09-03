@@ -11,6 +11,7 @@ import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { GoogleSettings } from "./GoogleSettings";
 import { LinkedInSettings } from "./LinkedInSettings";
+import { posterForMedia } from "@/lib/media-url";
 import { PlatformBudget } from "./PlatformBudget";
 import { PushToPlatform } from "./PushToPlatform";
 
@@ -205,8 +206,7 @@ export async function PlatformSection({
       {ads.length > 0 && (
         <div className="flex w-full gap-2 overflow-x-auto">
           {ads.map((ad) => {
-            const image =
-              ad.media?.[0]?.thumbnail ?? ad.media?.[0]?.url ?? ad.thumbnailUrl;
+            const image = posterForMedia(ad.media?.[0]) ?? ad.thumbnailUrl;
             return (
               <div
                 key={ad.id}
