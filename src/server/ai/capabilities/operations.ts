@@ -30,7 +30,7 @@ import {
   mixTargetTable,
   seriesTable,
 } from "@/server/db/schema";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { findLatestOwnedChatMedia } from "@/lib/chat-attachment";
 import { MediaService } from "@/server/services/media.service";
 import {
@@ -630,7 +630,13 @@ export const listMediaAnalyses = growthAction({
         ? db.query.mediaAssetTable.findMany({
             where: and(
               eq(mediaAssetTable.brandId, brandId),
-              eq(mediaAssetTable.kind, "image"),
+              // Video as well as image. `analyzeImage` analyzes both and
+              // writes the result to the asset's own `aiAnalysis` metadata,
+              // so filtering to images here made an analyzed library CLIP
+              // unlistable — and the durable table below never holds it,
+              // because that one is keyed to a timeline post. Five analyzed
+              // videos read back as "not found" from both branches at once.
+              inArray(mediaAssetTable.kind, ["image", "video"]),
               isNull(mediaAssetTable.deletedAt),
             ),
             orderBy: [desc(mediaAssetTable.updatedAt)],
@@ -638,14 +644,29 @@ export const listMediaAnalyses = growthAction({
           })
         : Promise.resolve([]),
     ]);
+    const analyzed = images.filter(
+      (asset) =>
+        asset.metadata &&
+        typeof asset.metadata === "object" &&
+        "aiAnalysis" in asset.metadata,
+    );
     return {
+      /** Storyboard analyses of timeline posts, keyed by their own id. */
       videos,
-      images: images.filter(
-        (asset) =>
-          asset.metadata &&
-          typeof asset.metadata === "object" &&
-          "aiAnalysis" in asset.metadata,
-      ),
+      /** Kept for callers that already read `images`. */
+      images: analyzed.filter((asset) => asset.kind === "image"),
+      /**
+       * Library assets carrying their own analysis, clips included. Read one
+       * with `get` using `kind: "asset"` and the mediaAssetId.
+       */
+      assets: analyzed.map((asset) => ({
+        mediaAssetId: asset.id,
+        kind: asset.kind,
+        title: asset.title,
+        alt: asset.alt,
+        url: asset.url,
+        updatedAt: asset.updatedAt,
+      })),
     };
   },
 });
@@ -654,7 +675,11 @@ export const getMediaAnalysis = growthAction({
   description:
     "Read one saved image or durable video analysis by its canonical ID.",
   inputSchema: z.object({
-    kind: z.enum(["image", "video"]),
+    kind: z
+      .enum(["image", "video", "asset"])
+      .describe(
+        '"video" is a durable storyboard analysis of a timeline post, by its analysis id. "asset" is a library asset\'s own analysis — image OR clip — by its mediaAssetId. "image" is the older name for that and still works.',
+      ),
     analysisId: z.string(),
   }),
   execute: async ({ kind, analysisId }, ctx) => {
@@ -668,21 +693,24 @@ export const getMediaAnalysis = growthAction({
       if (!analysis) throw new Error("Video analysis not found.");
       return analysis;
     }
+    // Either kind: the analysis lives on the asset, and a clip analyzed
+    // through `analyzeImage` was previously unreachable from here.
     const asset = await db.query.mediaAssetTable.findFirst({
       where: and(
         eq(mediaAssetTable.id, analysisId),
-        eq(mediaAssetTable.kind, "image"),
+        inArray(mediaAssetTable.kind, ["image", "video"]),
         isNull(mediaAssetTable.deletedAt),
       ),
     });
-    if (!asset) throw new Error("Image analysis not found.");
+    if (!asset) throw new Error("No analyzable library asset with that id.");
     await requireOwnedBrand(asset.brandId, ctx);
     const metadata =
       asset.metadata && typeof asset.metadata === "object"
         ? asset.metadata
         : {};
-    if (!("aiAnalysis" in metadata))
-      throw new Error("That image has not been analyzed yet.");
+    if (!("aiAnalysis" in metadata)) {
+      throw new Error("That asset has not been analyzed yet.");
+    }
     return { asset, analysis: metadata.aiAnalysis };
   },
 });

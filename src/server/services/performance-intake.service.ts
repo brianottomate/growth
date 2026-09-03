@@ -296,6 +296,25 @@ export async function submitPerformanceIntake(input: {
     })
     .returning({ id: performanceIntakeTable.id });
 
+  // Filing the form is the moment they stop being a prospect. Until now an
+  // operator had to promote them by hand, and everything gated on `client` —
+  // the campaign draft's budget and landing-URL prefill above all — stayed
+  // off in the meantime, so the first campaign was built by retyping numbers
+  // the client had already given us.
+  //
+  // Only from `prospect`: `internal` is Wander's own brands and `reference`
+  // is a stand-in, and neither becomes a customer by someone opening a form.
+  //
+  // Deliberately NOT touching the account's `status` or `signedAt`. Money is
+  // tracked separately, and `signedAt` is a contract date that cohort reports
+  // are built from — an intake submission is not a signature.
+  if (brand.relationship === "prospect") {
+    await db
+      .update(brandTable)
+      .set({ relationship: "client" })
+      .where(eq(brandTable.id, brand.id));
+  }
+
   return { intakeId: intake!.id };
 }
 
@@ -341,6 +360,10 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
     connectTokenIssuedByName: true,
     connectTokenIssuedByEmail: true,
     organizationId: true,
+    // Read so submission can promote a prospect. Never put on a payload: the
+    // pitch and prefill responses are built field by field and reach a page
+    // addressed by a guessable slug.
+    relationship: true,
   } as const;
 
   if (handle.token) {
