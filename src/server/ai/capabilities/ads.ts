@@ -907,7 +907,7 @@ export const setCreativePoolAction = growthAction({
 
 export const setPlatformDraftAction = growthAction({
   description:
-    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel and budget mode; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Local only.",
+    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel and budget mode; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Also the only place to set flight dates, which a lifetime budget requires. Local only.",
   inputSchema: z.object({
     platformCampaignId: z
       .string()
@@ -921,6 +921,20 @@ export const setPlatformDraftAction = growthAction({
       .optional()
       .describe("Whole currency units — the number the push will send."),
     budgetType: z.enum(["daily", "lifetime"]).optional(),
+    startAt: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "ISO start for this platform's flight; overrides the campaign.",
+      ),
+    endAt: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "ISO end for this platform's flight. REQUIRED by a lifetime budget — the push refuses one without an end date, and this is the only place to set it.",
+      ),
     google: z
       .object({
         campaignType: z.enum(["search", "display"]).optional(),
@@ -964,8 +978,13 @@ export const setPlatformDraftAction = growthAction({
       })
       .optional(),
   }),
-  execute: async (input, ctx) =>
-    setPlatformDraft({ ...input, organizationId: ctx.orgId }),
+  execute: async ({ startAt, endAt, ...input }, ctx) =>
+    setPlatformDraft({
+      ...input,
+      organizationId: ctx.orgId,
+      ...(startAt ? { startAt: new Date(startAt) } : {}),
+      ...(endAt ? { endAt: new Date(endAt) } : {}),
+    }),
 });
 
 export const attachCampaignAction = growthAction({

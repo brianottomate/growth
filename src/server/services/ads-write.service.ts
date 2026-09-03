@@ -255,8 +255,24 @@ async function requireAdDestination(input: {
     (candidate) => zernioAccountId(candidate) === input.connectionAccountId,
   );
   if (!connection) {
+    // Name the ids that WOULD work. The old message said only that this one
+    // was not active, which reads as "the connection is broken" — and sent an
+    // operator hunting a health problem when the real answer was that they
+    // had passed a social Page connection, or one from another platform's
+    // destination list, and a valid id was sitting right there.
+    const usable = matchingConnections(
+      accounts,
+      brand.zernioProfileId!,
+      input.platform,
+    )
+      .map((candidate) => zernioAccountId(candidate))
+      .filter((id): id is string => Boolean(id));
     throw new Error(
-      `That ${input.platform} Zernio connection is not active for ${brand.name}`,
+      `${input.connectionAccountId} is not a usable ${input.platform} connection for ${brand.name}. ${
+        usable.length > 0
+          ? `Use one of: ${usable.join(", ")} — take it from adsRead.listDestinations for THIS platform, not another one.`
+          : `${brand.name} has no active ${input.platform} connection at all, so connect one in Zernio first.`
+      }`,
     );
   }
   if (

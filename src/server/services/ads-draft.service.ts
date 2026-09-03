@@ -262,6 +262,14 @@ export async function setPlatformDraft(input: {
   platformCampaignId: string;
   budget?: number | null;
   budgetType?: "daily" | "lifetime" | null;
+  /**
+   * Flight dates for this platform, overriding the campaign's. Here because a
+   * lifetime budget is refused without an end date and this is where the
+   * budget is set — and because nothing else exposed them at all, so an agent
+   * told to "set an end date on the campaign" had no way to do it.
+   */
+  startAt?: Date | null;
+  endAt?: Date | null;
   google?: PlatformCampaignSettings["google"] | null;
   meta?: PlatformCampaignSettings["meta"] | null;
   linkedin?: PlatformCampaignSettings["linkedin"] | null;
@@ -275,7 +283,7 @@ export async function setPlatformDraft(input: {
     row.campaignId,
     input.organizationId,
   );
-  const campaignEndAt = row.endAt ?? parent.endAt;
+  const parentEndAt = parent.endAt;
 
   const current = row.settings ?? {};
   const merge = <K extends keyof PlatformCampaignSettings>(
@@ -295,6 +303,8 @@ export async function setPlatformDraft(input: {
       ...(input.budgetType !== undefined
         ? { budgetType: input.budgetType }
         : {}),
+      ...(input.startAt !== undefined ? { startAt: input.startAt } : {}),
+      ...(input.endAt !== undefined ? { endAt: input.endAt } : {}),
       settings: {
         ...current,
         ...merge("google", input.google),
@@ -308,6 +318,8 @@ export async function setPlatformDraft(input: {
       platform: platformCampaignTable.platform,
       budget: platformCampaignTable.budget,
       budgetType: platformCampaignTable.budgetType,
+      startAt: platformCampaignTable.startAt,
+      endAt: platformCampaignTable.endAt,
       settings: platformCampaignTable.settings,
     });
   const saved = updated!;
@@ -320,7 +332,7 @@ export async function setPlatformDraft(input: {
   // `assertLinkedInAdPayload` enforces; the difference is that here the
   // operator is still setting the number, rather than watching a push fail.
   const warnings: string[] = [];
-  if (saved.budgetType === "lifetime" && !campaignEndAt) {
+  if (saved.budgetType === "lifetime" && !(saved.endAt ?? parentEndAt)) {
     warnings.push(
       "This is a lifetime budget and the campaign has no end date, so the push will refuse it. Set an end date on the campaign, or switch to a daily budget.",
     );
