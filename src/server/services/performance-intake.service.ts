@@ -21,6 +21,7 @@ import { zernioConnectionMatchesPlatform } from "@/lib/zernio-ads";
 import {
   geographyByLookup,
   resolveGeography,
+  type ResolvedGeography,
 } from "@/server/services/geography-resolve.service";
 import {
   brandListings,
@@ -340,6 +341,8 @@ async function brandForHandle(handle: { token?: string; slug?: string }) {
     connectTokenIssuedByName: true,
     connectTokenIssuedByEmail: true,
     organizationId: true,
+    // The favicon here is the only square mark we hold for most brands.
+    websiteMeta: true,
     // Read so submission can promote a prospect. Never put on a payload: the
     // pitch and prefill responses are built field by field and reach a page
     // addressed by a guessable slug.
@@ -888,6 +891,30 @@ export async function checkAccessByToken(handle: {
 // and the homes already listed on their own booking site. No commercial
 // state, no contact details, no ids.
 
+/** Edge of the square mark we ask a WanderOS image proxy for. */
+const ICON_EDGE = 256;
+
+/**
+ * The brand's best square mark.
+ *
+ * WanderOS serves site images through `/i/width=..,height=..` and the favicon
+ * we stored asks for 32px, which is a browser-tab icon rendered into a
+ * 96px avatar. The proxy honours whatever the URL asks for and the underlying
+ * file is full size, so the numbers are rewritten rather than the image
+ * re-fetched. Anything not in that shape is passed through untouched.
+ */
+export function squareBrandMark(brand: {
+  logo: string | null;
+  websiteMeta: { favicon?: string } | null;
+}): string | null {
+  const source = brand.websiteMeta?.favicon ?? brand.logo;
+  if (!source) return null;
+  return source.replace(
+    /\/i\/width=\d+,height=\d+/,
+    `/i/width=${ICON_EDGE},height=${ICON_EDGE}`,
+  );
+}
+
 export type PerformancePitchHome = {
   name: string;
   url: string;
@@ -902,11 +929,21 @@ export type PerformancePitch = {
     name: string;
     website: string | null;
     logo: string | null;
+    /**
+     * Square mark for round avatars, separate from the lockup. A WanderOS
+     * favicon is served through the site's image proxy at whatever size the
+     * URL asks for, and the stored one asks for 32px — fine for a browser tab
+     * and useless in an ad mockup — so the request is widened.
+     */
+    icon: string | null;
     tagline: string | null;
   };
   homes: PerformancePitchHome[];
-  /** Rolled up from the homes, so the pitch can say where the ads would run. */
-  geography: AudienceGeographyPlan;
+  /**
+   * Rolled up from the homes, so the pitch can say where the ads would run.
+   * Carries `markets` too, which is the line a person actually reads.
+   */
+  geography: ResolvedGeography;
   /** Where the same link takes them once they say yes. */
   intakePath: string;
 };
@@ -935,6 +972,7 @@ export async function performancePitch(handle: {
       name: brand.name,
       website: brand.website,
       logo: brand.logo,
+      icon: squareBrandMark(brand),
       tagline: brand.tagline,
     },
     homes,

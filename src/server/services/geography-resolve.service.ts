@@ -21,9 +21,11 @@ const MODEL = "claude-sonnet-5";
  * whose shape it does not know in advance.
  *
  * So the model does the resolving and the schema does the constraining: it may
- * only emit ISO country codes, two-letter state codes and plain place names,
- * and every state code is checked against the real table afterwards. What it
- * adds over the map is judgement — collapsing spellings, recognising a state
+ * only emit ISO country codes, two-letter state codes and plain place names.
+ * State codes still go through `usStateCode` on the way out, which is there to
+ * normalize — it recovers "Ohio" written into a two-letter field — and drops
+ * anything that is not a real code as a side effect. What the model adds over
+ * the map is judgement — collapsing spellings, recognising a state
  * written as a town, and naming the market a media buyer would actually buy
  * ("Hocking Hills") rather than the administrative region a feed happens to
  * record.
@@ -116,6 +118,24 @@ function distinctLocations(rows: LocationRow[]): string[] {
 }
 
 /**
+ * Trim, drop blanks, dedupe, sort. Every field of the model's answer wants
+ * exactly this, and `normalize` is where a field adds its own rule — state
+ * codes go through `usStateCode`, which also recovers a state the model wrote
+ * out in full despite the schema asking for two letters.
+ */
+function clean(
+  values: (string | null | undefined)[],
+  normalize: (value: string) => string | null = (value) => value.trim(),
+): string[] {
+  const out = new Set<string>();
+  for (const value of values) {
+    const cleaned = value ? normalize(value) : null;
+    if (cleaned) out.add(cleaned);
+  }
+  return [...out].sort();
+}
+
+/**
  * Resolve listing locations into a geography plan, with the model doing the
  * normalizing and the lookup table catching a failure.
  *
@@ -149,44 +169,18 @@ export async function resolveGeography(
     });
     if (!output) return fallback;
 
-    // The schema constrains the shape; this constrains the content. A state
-    // code has exactly 50-odd legal values and a hallucinated one would be
-    // handed to a platform's geo targeting, so it is checked against the real
-    // table rather than trusted.
-    const states = [
-      ...new Set(
-        output.states
-          .map((code) => usStateCode(code))
-          .filter((code): code is string => code !== null),
-      ),
-    ].sort();
-    const regionsFromStates = states
-      .map((code) => usStateName(code))
-      .filter((name): name is string => name !== null);
-    const regions = [
-      ...new Set([
-        ...regionsFromStates,
-        ...output.regions.map((r) => r.trim()),
-      ]),
-    ]
-      .filter(Boolean)
-      .sort();
-    const countries = [
-      ...new Set(
-        output.countries
-          .map((code) => code.trim().toUpperCase())
-          .filter((code) => /^[A-Z]{2}$/.test(code)),
-      ),
-    ].sort();
-    const cities = [
-      ...new Set(output.cities.map((city) => city.trim()).filter(Boolean)),
-    ].sort();
-    const markets = [
-      ...new Set(output.markets.map((market) => market.trim()).filter(Boolean)),
-    ].sort();
+    const states = clean(output.states, usStateCode);
+    const countries = clean(output.countries, (code) =>
+      /^[a-z]{2}$/i.test(code.trim()) ? code.trim().toUpperCase() : null,
+    );
+    const cities = clean(output.cities);
+    const markets = clean(output.markets);
+    // Both: the code round-trips and the display name is what a platform's geo
+    // search takes, and the model may name a region that has no US code.
+    const regions = clean([...states.map(usStateName), ...output.regions]);
 
-    // A run that resolved nothing usable is a failed run, not an empty
-    // geography — the fallback knows at least what the raw fields said.
+    // Nothing usable is a failed run, not an empty geography — an empty one
+    // would target everywhere, and the fallback knows what the raw fields said.
     if (countries.length === 0 && states.length === 0 && cities.length === 0) {
       return fallback;
     }
