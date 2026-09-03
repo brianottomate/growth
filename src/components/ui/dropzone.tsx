@@ -5,6 +5,7 @@ import { useDropzone, type Accept } from "react-dropzone";
 import { FolderOpen, Loader2, UploadCloud } from "lucide-react";
 
 import { cn } from "./lib/utils";
+import { droppedFiles } from "@/lib/dropped-files";
 
 const IMAGE_ACCEPT: Accept = {
   "image/*": [".png", ".jpg", ".jpeg", ".webp", ".avif", ".gif"],
@@ -64,8 +65,8 @@ export function Dropzone({
   multiple?: boolean;
   /**
    * Offer a "choose a folder" affordance alongside click-to-browse. Dropping a
-   * folder already works for free (react-dropzone walks directory entries);
-   * this is the click path, which browsers only expose via `webkitdirectory`.
+   * folder already works (`droppedFiles` walks directory entries); this is the
+   * click path, which browsers only expose via `webkitdirectory`.
    * Defaults on wherever multiple files are allowed.
    */
   folders?: boolean;
@@ -90,6 +91,9 @@ export function Dropzone({
     accept,
     multiple,
     disabled: disabled || busy,
+    // The default reader asks the platform for a file handle and dies on the
+    // sources it refuses; see `droppedFiles`.
+    getFilesFromEvent: droppedFiles,
   });
   useEffect(() => {
     if (!openRef) return;

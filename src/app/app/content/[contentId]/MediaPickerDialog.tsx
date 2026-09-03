@@ -61,10 +61,32 @@ export function MediaPickerDialog({
     RouterOutputs["media"]["list"][number] | null
   >(null);
 
+  // Client-side, over the set already loaded: the library is small enough per
+  // brand that a round trip per keystroke buys nothing. Matches the fields
+  // `listMedia` searches server-side (title, filename, alt, tag names) so the
+  // two never disagree, and every space-separated term has to hit.
+  const [query, setQuery] = useState("");
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+
   const picked = new Set(existingAssetIds);
-  const visible = assets.filter(
+  const pickable = assets.filter(
     (a) => a.kind === "image" || a.kind === "gif" || a.kind === "video",
   );
+  const visible = pickable.filter((a) => {
+    if (terms.length === 0) return true;
+    const haystack = [
+      a.title,
+      a.filename,
+      a.alt,
+      a.kind,
+      a.folder?.name,
+      ...a.tagAssignments.map((assignment) => assignment.tag.name),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return terms.every((term) => haystack.includes(term));
+  });
 
   return (
     <>
@@ -84,21 +106,40 @@ export function MediaPickerDialog({
             title="Drop images or video here"
             hint="or click to browse · added to this brand's library"
           />
-          <Link
-            href="/app/media"
-            target="_blank"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline"
-          >
-            Open the full media library
-            <ExternalLink className="size-3" />
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link
+              href="/app/media"
+              target="_blank"
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline"
+            >
+              Open the full media library
+              <ExternalLink className="size-3" />
+            </Link>
+            {pickable.length > 0 && (
+              <div className="flex items-center gap-2">
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Filter by name or tag…"
+                  className="border-border bg-background focus:border-foreground/40 w-52 rounded-md border px-2 py-1 text-xs outline-none"
+                />
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {terms.length > 0
+                    ? `${visible.length}/${pickable.length}`
+                    : pickable.length}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
           <p className="text-muted-foreground py-8 text-sm">Loading…</p>
         ) : visible.length === 0 ? (
           <div className="text-muted-foreground py-8 text-center text-sm">
-            Nothing in this brand&apos;s library yet.
+            {terms.length > 0
+              ? `Nothing matches “${query.trim()}”.`
+              : "Nothing in this brand's library yet."}
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-x-2 gap-y-3 py-2 sm:grid-cols-4">
