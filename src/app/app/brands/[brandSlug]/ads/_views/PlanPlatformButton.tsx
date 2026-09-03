@@ -11,10 +11,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { platformLabel } from "@/components/channel-logos";
+import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { PLANNABLE_AD_PLATFORMS } from "@/lib/ad-platforms";
 import { useTRPC } from "@/trpc/react";
-
-const PLATFORMS = ["meta_ads", "google_ads", "openai_ads"] as const;
 
 /** Plan another platform: creates its local draft row, nothing more. */
 export function PlanPlatformButton({
@@ -31,7 +30,7 @@ export function PlanPlatformButton({
       onSuccess: () => router.refresh(),
     }),
   );
-  const remaining = PLATFORMS.filter(
+  const remaining = PLANNABLE_AD_PLATFORMS.filter(
     (platform) => !planned.includes(platform),
   );
   if (remaining.length === 0) return null;
@@ -49,6 +48,7 @@ export function PlanPlatformButton({
             key={platform}
             onSelect={() => plan.mutate({ campaignId, platform })}
           >
+            <ChannelLogo platform={platform} className="size-4" />
             {platformLabel(platform)}
           </DropdownMenuItem>
         ))}

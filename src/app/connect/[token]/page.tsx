@@ -24,6 +24,8 @@ const WHAT_HAPPENS: Record<BrandConnectChannelKey, string> = {
   facebook: "Opens Facebook's approval screen",
   "meta-ads": "Opens Meta Business approval",
   "google-ads": "Opens Google's approval screen",
+  "linkedin-ads":
+    "Opens LinkedIn's approval screen, or connects straight away if your Page already is",
 };
 
 /**

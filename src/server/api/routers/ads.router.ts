@@ -4,6 +4,17 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
+  AD_PUSH_GOALS,
+  PLANNABLE_AD_PLATFORMS,
+  PUSHABLE_AD_PLATFORMS,
+  ZERNIO_AD_PLATFORMS,
+} from "@/lib/ad-platforms";
+import {
+  LINKEDIN_CALL_TO_ACTIONS,
+  LINKEDIN_COST_TYPES,
+} from "@/lib/zernio-ads";
+
+import {
   AD_DESTINATIONS,
   computeAdsScope,
   computeTopAds,
@@ -135,9 +146,9 @@ export const adsRouter = {
         brandId: z.string().min(1),
         name: z.string().trim().min(1).max(300),
         platforms: z
-          .array(z.enum(["meta_ads", "google_ads", "openai_ads"]))
+          .array(z.enum(PLANNABLE_AD_PLATFORMS))
           .min(1)
-          .max(3)
+          .max(PLANNABLE_AD_PLATFORMS.length)
           .default(["meta_ads"]),
         goal: z.string().trim().max(200).nullish(),
         landingUrl: z.string().url().nullish(),
@@ -263,7 +274,7 @@ export const adsRouter = {
     .input(
       z.object({
         campaignId: z.string().min(1),
-        platform: z.enum(["meta_ads", "google_ads", "openai_ads"]),
+        platform: z.enum(PLANNABLE_AD_PLATFORMS),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -334,6 +345,14 @@ export const adsRouter = {
             pixelId: z.string().trim().max(64).optional(),
             customEventType: z.string().trim().max(64).optional(),
             budgetMode: z.enum(["cbo", "abo"]).optional(),
+          })
+          .nullish(),
+        linkedin: z
+          .object({
+            organizationId: z.string().trim().max(64).optional(),
+            costType: z.enum(LINKEDIN_COST_TYPES).optional(),
+            unitCost: z.number().positive().optional(),
+            callToAction: z.enum(LINKEDIN_CALL_TO_ACTIONS).optional(),
           })
           .nullish(),
       }),
@@ -489,7 +508,7 @@ export const adsRouter = {
     .input(
       z.object({
         brandSlug: z.string().trim().min(1),
-        platform: z.enum(["meta", "google"]),
+        platform: z.enum(ZERNIO_AD_PLATFORMS),
       }),
     )
     .query(async ({ ctx, input }) =>
@@ -508,16 +527,10 @@ export const adsRouter = {
     .input(
       z.object({
         campaignId: z.string().min(1),
-        platform: z.enum(["meta_ads", "google_ads"]).default("meta_ads"),
+        platform: z.enum(PUSHABLE_AD_PLATFORMS).default("meta_ads"),
         connectionAccountId: z.string().min(1),
         adAccountId: z.string().min(1),
-        goal: z.enum([
-          "engagement",
-          "traffic",
-          "awareness",
-          "video_views",
-          "conversions",
-        ]),
+        goal: z.enum(AD_PUSH_GOALS),
         // Budget, dates and settings come from the platform draft row.
         validateOnly: z.boolean().optional(),
       }),

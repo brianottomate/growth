@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/env";
+import { AD_PLATFORM_SPECS } from "@/lib/ad-platforms";
 import type { MediaItem, PostStats } from "@/server/db/content-schema";
 
 const ZERNIO_API_BASE = "https://zernio.com/api/v1";
@@ -70,9 +71,20 @@ export async function listZernioAccounts(): Promise<ZernioAccount[]> {
   return unwrapList<ZernioAccount>(data, "accounts", "data");
 }
 
-// Zernio platform strings → our `channelPlatformEnum` values. Most are 1:1;
-// the renames are verified against live /accounts data (twitter→x, metaads→meta_ads).
+// Zernio platform strings → our `channelPlatformEnum` values. Social names
+// are 1:1 apart from twitter→x (verified against live /accounts data); the
+// ads connections (metaads, googleads, linkedinads, …) come from the platform
+// table so a connection never degrades to "other" and lands as a social row.
 const ZERNIO_PLATFORM_MAP: Record<string, string> = {
+  ...Object.fromEntries(
+    AD_PLATFORM_SPECS.flatMap((spec) =>
+      (spec.zernio?.connectionPlatforms ?? []).map((name) => [
+        name,
+        spec.platform,
+      ]),
+    ),
+  ),
+  // Social names last, so a posting account can never be read as an ad channel.
   facebook: "facebook",
   instagram: "instagram",
   linkedin: "linkedin",
@@ -83,10 +95,6 @@ const ZERNIO_PLATFORM_MAP: Record<string, string> = {
   threads: "threads",
   reddit: "reddit",
   pinterest: "pinterest",
-  metaads: "meta_ads",
-  meta_ads: "meta_ads",
-  googleads: "google_ads",
-  google_ads: "google_ads",
 };
 
 // Normalize a Zernio platform string to our channel_platform enum; unknowns → "other".
@@ -1067,6 +1075,26 @@ export type ZernioCarouselCard = {
   callToAction?: string;
 };
 
+/** LinkedIn carousel card: every card needs a landing URL, or the ad-level linkUrl backfills. */
+export type ZernioLinkedInCarouselCard = {
+  imageUrl: string;
+  headline?: string;
+  landingUrl?: string;
+};
+
+export type ZernioPlatformSpecificData = {
+  // LinkedIn bidding + delivery (both /ads/create and /ads/boost).
+  costType?: "CPM" | "CPC" | "CPV";
+  unitCost?: number;
+  optimizationTargetType?: string;
+  creativeSelection?: "OPTIMIZED" | "ROUND_ROBIN";
+  audienceExpansionEnabled?: boolean;
+  offsiteDeliveryEnabled?: boolean;
+  // LinkedIn creative formats; mutually exclusive with imageUrl / video.
+  carousel?: { cards: ZernioLinkedInCarouselCard[] };
+  [key: string]: unknown;
+};
+
 export type CreateZernioStandaloneAdInput = {
   accountId: string;
   adAccountId: string;
@@ -1090,7 +1118,8 @@ export type CreateZernioStandaloneAdInput = {
   budgetType?: "daily" | "lifetime";
   headline: string;
   body: string;
-  linkUrl: string;
+  /** Destination. Required by Meta, Google and LinkedIn traffic ads; optional on LinkedIn engagement / awareness. */
+  linkUrl?: string;
   imageUrl?: string;
   /** Video creative: url + still thumbnail; replaces imageUrl on all shapes. */
   video?: ZernioAdVideo;
@@ -1138,6 +1167,21 @@ export type CreateZernioStandaloneAdInput = {
   additionalHeadlines?: string[];
   additionalDescriptions?: string[];
   businessName?: string;
+  /**
+   * LinkedIn only: the Company Page that authors the dark post behind the
+   * ad. Numeric organization id or urn:li:organization:N. Optional when the
+   * ad account is org-owned (Zernio infers it); required otherwise.
+   */
+  organizationId?: string;
+  /** LinkedIn: secondary description line on image link ads. */
+  longHeadline?: string;
+  /**
+   * Per-platform extras Zernio forwards (LinkedIn bidding and delivery
+   * toggles, LinkedIn creative formats such as `carousel`, Meta bid trio).
+   * The platform is derived from accountId; keys for another platform are a 400.
+   * https://docs.zernio.com/platforms/linkedin-ads/creative-formats
+   */
+  platformSpecificData?: ZernioPlatformSpecificData;
   targeting?: ZernioAdTargeting;
   startDate?: string;
   endDate?: string;

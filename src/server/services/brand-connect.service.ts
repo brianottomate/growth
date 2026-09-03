@@ -58,6 +58,14 @@ export const BRAND_CONNECT_CHANNELS = [
     target: { kind: "ads", platform: "googleads" },
     channelPlatform: "google_ads",
   },
+  // Same token as the LinkedIn Company Page connection: when the page is
+  // already connected Zernio answers alreadyConnected and no OAuth happens.
+  {
+    key: "linkedin-ads",
+    label: "LinkedIn Ads",
+    target: { kind: "ads", platform: "linkedin" },
+    channelPlatform: "linkedin_ads",
+  },
 ] as const satisfies readonly {
   key: string;
   label: string;
@@ -83,7 +91,9 @@ export const OFFERED_CONNECT_KINDS: readonly ZernioConnectPlatform["kind"][] = [
 
 export function isOfferedConnectChannel(key: string): boolean {
   const channel = BRAND_CONNECT_CHANNELS.find((row) => row.key === key);
-  return Boolean(channel && OFFERED_CONNECT_KINDS.includes(channel.target.kind));
+  return Boolean(
+    channel && OFFERED_CONNECT_KINDS.includes(channel.target.kind),
+  );
 }
 
 /** Exported so brand creation can stamp a token at insert (no Zernio call). */

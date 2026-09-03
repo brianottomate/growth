@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, inArray, isNotNull, ne, notInArray } from "drizzle-orm";
 
+import { adPlatformFromZernioString, adPlatformSpec } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import {
   platformAdSetTable,
@@ -52,6 +53,9 @@ function mapStatus(raw: unknown): PlatformCampaignStatus {
     case "completed":
     case "archived":
     case "deleted":
+    // LinkedIn's terminal states alongside completed/archived.
+    case "canceled":
+    case "cancelled":
     // Google's terminal status. It has no "completed": a Google campaign whose
     // end date passed stays enabled, so only removal is terminal there.
     case "removed":
@@ -125,17 +129,13 @@ function flattenAds(c: ZernioAdsTreeCampaign): ZernioAd[] {
   return ads;
 }
 
-// Platform-aware deep links. Google's campaign manager needs an `ocid` we
-// don't have, so Google gets the account-level campaigns view only.
+// Platform-aware deep links come from the platform table.
 function accountManageUrl(
   platform: ChannelPlatform,
   accountId: string | undefined,
 ): string | undefined {
   if (!accountId) return undefined;
-  if (platform === "meta_ads")
-    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId.replace("act_", "")}`;
-  if (platform === "google_ads") return "https://ads.google.com/aw/campaigns";
-  return undefined;
+  return adPlatformSpec(platform)?.accountManageUrl(accountId);
 }
 
 function campaignManageUrl(
@@ -144,37 +144,19 @@ function campaignManageUrl(
   platformCampaignId: string | undefined,
 ): string | undefined {
   if (!accountId || !platformCampaignId) return undefined;
-  if (platform === "meta_ads")
-    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId.replace("act_", "")}&selected_campaign_ids=${platformCampaignId}`;
-  return accountManageUrl(platform, accountId);
+  return adPlatformSpec(platform)?.campaignManageUrl(
+    accountId,
+    platformCampaignId,
+  );
 }
 
 // Zernio's tree mixes every connected ads platform in one list, and reports
 // the campaign platform as the SOCIAL network name (facebook/twitter/google),
-// not the connection name (metaads/xads/googleads). Map to our ad enums.
-const ADS_PLATFORM_MAP: Record<string, ChannelPlatform> = {
-  facebook: "meta_ads",
-  metaads: "meta_ads",
-  meta_ads: "meta_ads",
-  google: "google_ads",
-  googleads: "google_ads",
-  google_ads: "google_ads",
-  twitter: "x_ads",
-  x: "x_ads",
-  xads: "x_ads",
-  x_ads: "x_ads",
-  linkedin: "linkedin_ads",
-  linkedinads: "linkedin_ads",
-  tiktok: "tiktok_ads",
-  tiktokads: "tiktok_ads",
-  tiktok_ads: "tiktok_ads",
-  pinterest: "pinterest_ads",
-  pinterestads: "pinterest_ads",
-  pinterest_ads: "pinterest_ads",
-};
+// not the connection name (metaads/xads/googleads). The platform table knows
+// both spellings; anything else falls through to the social mapping.
 function campaignPlatform(c: Record<string, unknown>): string {
   const raw = str(c.platform)?.toLowerCase();
-  return (raw && ADS_PLATFORM_MAP[raw]) ?? mapZernioPlatform(raw);
+  return adPlatformFromZernioString(raw) ?? mapZernioPlatform(raw);
 }
 
 /**
@@ -501,14 +483,16 @@ export async function syncZernioAds(
   // attribution is worse than under-ingesting; a campaign nobody's brand
   // claims stays out until its account is allowed on the right brand.
   const allowedAccounts = await getAllowedAdAccountIds(brand.id);
-  // Meta allowlist rows carry the `act_` prefix; Zernio sometimes reports the
-  // bare id. Compare both spellings.
-  const isAllowed = (acct: string) =>
-    allowedAccounts.has(acct) ||
-    allowedAccounts.has(acct.replace(/^act_/, "")) ||
-    allowedAccounts.has(`act_${acct}`);
-  const sameAccount = (a: string, b: string) =>
-    a.replace(/^act_/, "") === b.replace(/^act_/, "");
+  // Allowlist rows and the tree can spell the same account differently (Meta
+  // `act_` prefix, Google dashes, LinkedIn URNs); compare canonical forms.
+  const normalize =
+    adPlatformSpec(platform)?.zernio?.normalizeAccountId ??
+    ((value: string) => value);
+  const allowedNormalized = new Set(
+    [...allowedAccounts].map((value) => normalize(value)),
+  );
+  const isAllowed = (acct: string) => allowedNormalized.has(normalize(acct));
+  const sameAccount = (a: string, b: string) => normalize(a) === normalize(b);
 
   const sinceDays =
     options?.sinceDays === null

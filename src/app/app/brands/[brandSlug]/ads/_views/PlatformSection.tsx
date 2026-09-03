@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { isPushableAdPlatform } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import { eq } from "drizzle-orm";
 import { platformAdTable, type PlatformCampaign } from "@/server/db/schema";
@@ -9,6 +10,7 @@ import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { GoogleSettings } from "./GoogleSettings";
+import { LinkedInSettings } from "./LinkedInSettings";
 import { PlatformBudget } from "./PlatformBudget";
 import { PushToPlatform } from "./PushToPlatform";
 
@@ -37,11 +39,12 @@ export async function PlatformSection({
   const label = platformLabel(platform);
   const isDraft = platformCampaign.status === "draft";
   const google = platformCampaign.settings?.google;
+  const linkedin = platformCampaign.settings?.linkedin;
 
   // ---- draft: the pre-push contract ------------------------------------
   if (isDraft) {
     const googleBlocked = platform === "google_ads" && !google?.campaignType;
-    const pushable = platform === "meta_ads" || platform === "google_ads";
+    const pushable = isPushableAdPlatform(platform);
     return (
       <div className="bg-card flex flex-wrap items-center gap-2.5 rounded-xl border p-3.5">
         <ChannelLogo platform={platform} className="size-5" />
@@ -69,6 +72,12 @@ export async function PlatformSection({
               brandSlug={brandSlug}
               brandUrl={brandUrl}
               compact
+            />
+          )}
+          {platform === "linkedin_ads" && (
+            <LinkedInSettings
+              platformCampaignId={platformCampaign.id}
+              config={linkedin}
             />
           )}
           {pushable && draftAdCount > 0 && !googleBlocked && (

@@ -9,7 +9,7 @@
 | **Zernio** (hosted MCP `mcp.zernio.com/mcp` + `zernio.client.ts`)                                   | Posting + standardized fetching/reading across platforms — campaign/ad tree, analytics, publishing, inbox    | One normalized shape over Meta/Google/TikTok/LinkedIn/Pinterest/X; already synced (570 campaigns incl. Google) |
 | **Official Meta MCP** (`mcp.facebook.com/ads`)                                                      | Digging deeper + verifying on Meta — pixel diagnostics, catalog, custom audiences, experiments               | First-party depth Zernio doesn't expose                                                                        |
 | **Official Google Ads MCP** (`googleads/google-ads-mcp`)                                            | Digging deeper + verifying on Google — GAQL forensics, conversion-action audits                              | Read-only by design; the tag-audit workhorse                                                                   |
-| **Hand-wrapped capabilities** (`src/server/ai/capabilities/ads.ts`, `src/server/services/ads-*.ts`) | Hot paths the agent runs constantly: ads scope, top ads, intent alignment, and governed Meta/Google creation | Typed, allowlisted, server-credentialed; no per-call MCP overhead                                              |
+| **Hand-wrapped capabilities** (`src/server/ai/capabilities/ads.ts`, `src/server/services/ads-*.ts`) | Hot paths the agent runs constantly: ads scope, top ads, intent alignment, and governed Meta/Google/LinkedIn creation | Typed, allowlisted, server-credentialed; no per-call MCP overhead                                              |
 
 Rule of thumb: **Zernio for breadth, official MCPs for depth, hand-wrapped for the hot paths.**
 

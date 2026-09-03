@@ -33,6 +33,7 @@ export const CHANNEL_LOGOS: Partial<Record<string, LogoComponent>> = {
   meta_ads: MetaAdsLogo,
   youtube: YouTubeLogo,
   openai_ads: OpenAIAdsLogo,
+  linkedin_ads: LinkedInLogo,
   x_ads: XLogo,
   tiktok_ads: TikTokLogo,
 };

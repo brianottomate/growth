@@ -16,17 +16,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  requireAdPlatformSpec,
+  zernioAdPlatformKey,
+  type AdPushGoal,
+  type PushableAdPlatform,
+} from "@/lib/ad-platforms";
 import { useTRPC } from "@/trpc/react";
 
 import { money } from "./format";
-
-const GOALS = [
-  "traffic",
-  "engagement",
-  "awareness",
-  "video_views",
-  "conversions",
-] as const;
 
 /**
  * Compile the plan onto one platform, PAUSED. Budget, dates and settings come
@@ -45,23 +43,29 @@ export function PushToPlatform({
 }: {
   campaignId: string;
   brandSlug: string;
-  platform: "meta_ads" | "google_ads";
+  platform: PushableAdPlatform;
   draftAdCount: number;
   audienceCount: number;
   budget: number | null;
   budgetType: string | null;
 }) {
-  const isMeta = platform === "meta_ads";
-  const platformName = isMeta ? "Meta" : "Google";
+  const spec = requireAdPlatformSpec(platform);
+  const platformName = spec.shortLabel;
+  const goals = spec.features.goals;
+  const dryRunReason = !spec.features.dryRun
+    ? `${platformName} has no dry run — Zernio's validate-only is Meta's own`
+    : audienceCount > 1
+      ? `${platformName} has no dry run for the multi-audience shape`
+      : undefined;
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [goal, setGoal] = useState<(typeof GOALS)[number]>("traffic");
+  const [goal, setGoal] = useState<AdPushGoal>(goals[0] ?? "traffic");
   const [destinationKey, setDestinationKey] = useState("");
 
   const destinations = useQuery(
     trpc.ads.destinations.queryOptions(
-      { brandSlug, platform: isMeta ? "meta" : "google" },
+      { brandSlug, platform: zernioAdPlatformKey(platform) },
       { enabled: open },
     ),
   );
@@ -146,7 +150,7 @@ export function PushToPlatform({
               onChange={(event) => setGoal(event.target.value as typeof goal)}
               className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
             >
-              {GOALS.map((value) => (
+              {goals.map((value) => (
                 <option key={value} value={value}>
                   {value}
                 </option>
@@ -167,14 +171,8 @@ export function PushToPlatform({
           <Button
             size="sm"
             variant="outline"
-            title={
-              !isMeta
-                ? "Only Meta has a dry run — Zernio's validate-only is Meta's own"
-                : audienceCount > 1
-                  ? "Meta has no dry run for the multi-audience shape"
-                  : undefined
-            }
-            disabled={!canPush || !isMeta || audienceCount > 1}
+            title={dryRunReason}
+            disabled={!canPush || Boolean(dryRunReason)}
             loading={push.isPending}
             onClick={() =>
               chosen &&
@@ -210,7 +208,8 @@ export function PushToPlatform({
         </DialogFooter>
         {push.isSuccess && push.data.validateOnly && (
           <p className="text-xs text-emerald-400">
-            Dry run passed — Meta validated the whole tree without creating it.
+            Dry run passed — {platformName} validated the whole tree without
+            creating it.
           </p>
         )}
         {push.isSuccess &&

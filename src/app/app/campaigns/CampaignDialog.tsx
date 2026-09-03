@@ -65,6 +65,7 @@ const CHANNELS = [
   "reddit",
   "google_ads",
   "meta_ads",
+  "linkedin_ads",
   "openai_ads",
   "newsletter",
   "blog",

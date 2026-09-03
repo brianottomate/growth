@@ -46,7 +46,7 @@ function guidanceForPath(pathname: string): string | null {
   if (pathname.startsWith("/app/transactional"))
     return "This is the product-event email registry. Transactional messages fire from product events and are separate from editorial newsletters; no general transactional AI write capability is currently advertised.";
   if (pathname.startsWith("/app/ads"))
-    return "This is the paid media surface. Use adsRead for scoped performance, allowlisted destinations, alignment, and conversion inspection. Read destinations before adsWrite. Meta standalone drafts and duplicates stay paused; Meta boosts and Google creates can start spend and require the in-app approval step.";
+    return "This is the paid media surface. Use adsRead for scoped performance, allowlisted destinations, alignment, and conversion inspection. Read destinations before adsWrite. Meta standalone drafts, duplicates and every LinkedIn push stay paused; Meta boosts and Google creates can start spend and require the in-app approval step.";
   if (pathname.startsWith("/app/inbox"))
     return "This is the engagement inbox. listeningRead can inspect recent triage state, but Growth does not currently advertise provider reply actions.";
   if (pathname.startsWith("/app/listen"))

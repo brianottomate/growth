@@ -3,6 +3,11 @@ import { waitUntil } from "@vercel/functions";
 import { and, eq, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
+import {
+  AD_ACCOUNT_PLATFORMS,
+  PUSHABLE_AD_PLATFORMS,
+} from "@/lib/ad-platforms";
+
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   type Brand,
@@ -670,7 +675,7 @@ export const brandRouter = createTRPCRouter({
     .input(
       z.object({
         brandId: z.string(),
-        platform: z.enum(["facebook", "google"]),
+        platform: z.enum(AD_ACCOUNT_PLATFORMS),
         externalId: z.string().min(1),
         name: z.string().nullable(),
         isAllowed: z.boolean(),
@@ -684,7 +689,7 @@ export const brandRouter = createTRPCRouter({
       });
     }),
 
-  /** Pull the brand's recent campaigns through the allowlist, both ad platforms. */
+  /** Pull the brand's recent campaigns through the allowlist, every pushable platform. */
   syncRecentAds: protectedProcedure
     .input(
       z.object({
@@ -703,7 +708,7 @@ export const brandRouter = createTRPCRouter({
         });
       }
       const results = [];
-      for (const platform of ["meta_ads", "google_ads"] as const) {
+      for (const platform of PUSHABLE_AD_PLATFORMS) {
         results.push(
           await syncZernioAds({
             brandSlug: brand.slug,

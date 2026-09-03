@@ -153,6 +153,20 @@ export type PlatformCampaignSettings = {
      */
     budgetMode?: "cbo" | "abo";
   };
+  linkedin?: {
+    /**
+     * The Company Page that authors the Direct Sponsored Content behind every
+     * ad: a numeric organization id or urn:li:organization:N. Zernio infers
+     * it when the ad account is owned by an organization.
+     */
+    organizationId?: string;
+    /** Bid type; CPM when omitted. Required when unitCost is set. */
+    costType?: "CPM" | "CPC" | "CPV";
+    /** Manual bid in whole account-currency units; omit for automated bidding. */
+    unitCost?: number;
+    /** CTA button on every creative; LEARN_MORE when omitted and a link is set. */
+    callToAction?: string;
+  };
 };
 
 // ---- CAMPAIGN (the plan) ---------------------------------------------

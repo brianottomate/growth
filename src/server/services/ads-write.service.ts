@@ -8,11 +8,28 @@ import {
   adWriteIdempotencyKey,
   allowlistPlatform,
   googleCreativeRequirement,
+  LINKEDIN_CALL_TO_ACTIONS,
+  LINKEDIN_CAROUSEL_CARDS,
+  LINKEDIN_HEADLINE_MAX,
+  LINKEDIN_MIN_DAILY_BUDGET,
+  LINKEDIN_MIN_LIFETIME_BUDGET,
+  LINKEDIN_PUSH_GOALS,
+  linkedInCreativeRequirement,
+  linkedInDraftProviderControls,
   metaDraftProviderControls,
   sameAdAccountId,
   type ZernioAdPlatform,
+  ZERNIO_AD_PLATFORMS,
   zernioConnectionMatchesPlatform,
 } from "@/lib/zernio-ads";
+import {
+  adPlatformSpec,
+  channelPlatformForZernioKey,
+  requireAdPlatformSpec,
+  zernioAdPlatformKey,
+  type AdPushGoal,
+  type PushableAdPlatform,
+} from "@/lib/ad-platforms";
 import {
   addUsersToZernioAdAudience,
   boostZernioMetaPost,
@@ -510,6 +527,148 @@ export async function createMetaAdDraft(
   };
 }
 
+// ---- LINKEDIN PAYLOAD RULES ---------------------------------------------
+
+/**
+ * Everything LinkedIn (through Zernio) rejects, checked against the payload
+ * the API receives — one ruleset for the opening create and the attach shape,
+ * for the same reason assertMetaAdPayload exists.
+ * https://docs.zernio.com/platforms/linkedin-ads/create-ads
+ */
+export function assertLinkedInAdPayload(
+  payload: CreateZernioStandaloneAdInput,
+  adAccount: { currency?: string; minimumDailyBudget?: number },
+) {
+  const attaching = Boolean(payload.adSetId);
+  if (payload.creatives) {
+    throw new Error(
+      "LinkedIn takes one creative per call — Zernio's creatives[] shape is Meta only",
+    );
+  }
+  if (payload.carouselCards) {
+    throw new Error(
+      "LinkedIn carousels ride on platformSpecificData.carousel, not carouselCards",
+    );
+  }
+  if (payload.validateOnly) {
+    throw new Error("LinkedIn has no dry run through Zernio");
+  }
+  if (!(LINKEDIN_PUSH_GOALS as readonly string[]).includes(payload.goal)) {
+    throw new Error(
+      `LinkedIn creates ${LINKEDIN_PUSH_GOALS.join(", ")} campaigns through Zernio, not ${payload.goal}`,
+    );
+  }
+  const carousel = payload.platformSpecificData?.carousel;
+  const shapes = [payload.imageUrl, payload.video, carousel].filter(
+    Boolean,
+  ).length;
+  if (shapes !== 1) {
+    throw new Error(
+      "A LinkedIn creative needs exactly one of an image, a video or a carousel",
+    );
+  }
+  // Typed as required, but it arrives from JSONB and can be missing at runtime.
+  const headline = (payload.headline as string | undefined)?.trim() ?? "";
+  if (!headline) throw new Error("LinkedIn ads need a headline");
+  if (headline.length > LINKEDIN_HEADLINE_MAX) {
+    throw new Error(
+      `LinkedIn headlines are at most ${LINKEDIN_HEADLINE_MAX} characters`,
+    );
+  }
+  if (payload.goal === "traffic" && !payload.linkUrl) {
+    throw new Error("LinkedIn traffic ads need a link URL");
+  }
+  if (payload.goal === "video_views" && !payload.video) {
+    throw new Error("LinkedIn video_views needs a video creative");
+  }
+  if (
+    payload.callToAction &&
+    !(LINKEDIN_CALL_TO_ACTIONS as readonly string[]).includes(
+      payload.callToAction,
+    )
+  ) {
+    throw new Error(
+      `LinkedIn does not offer the ${payload.callToAction} call to action`,
+    );
+  }
+  if (carousel) {
+    const cards = carousel.cards;
+    if (
+      cards.length < LINKEDIN_CAROUSEL_CARDS.min ||
+      cards.length > LINKEDIN_CAROUSEL_CARDS.max
+    ) {
+      throw new Error(
+        `LinkedIn carousels take ${LINKEDIN_CAROUSEL_CARDS.min}–${LINKEDIN_CAROUSEL_CARDS.max} cards`,
+      );
+    }
+    if (cards.some((card) => !card.landingUrl && !payload.linkUrl)) {
+      throw new Error(
+        "Every LinkedIn carousel card needs a landing URL, or the ad a link URL to fall back on",
+      );
+    }
+  }
+  const bidding = payload.platformSpecificData ?? {};
+  if (bidding.unitCost != null && !bidding.costType) {
+    throw new Error("A LinkedIn manual bid (unitCost) needs its costType");
+  }
+
+  if (attaching) {
+    // The LinkedIn campaign already owns these; Zernio returns 400 on any.
+    if (
+      payload.budgetAmount !== undefined ||
+      payload.budgetType ||
+      payload.targeting ||
+      payload.startDate ||
+      payload.endDate ||
+      bidding.costType ||
+      bidding.unitCost != null
+    ) {
+      throw new Error(
+        "Attaching a creative to a LinkedIn campaign inherits its budget, schedule, targeting and bidding — those must not be resent",
+      );
+    }
+    return;
+  }
+
+  if (payload.budgetAmount === undefined || !payload.budgetType) {
+    throw new Error("A LinkedIn campaign needs a budget");
+  }
+  const currency = adAccount.currency ?? "USD";
+  if (payload.budgetType === "lifetime") {
+    if (!payload.endDate) {
+      throw new Error("LinkedIn lifetime budgets require endDate");
+    }
+    if (payload.budgetAmount < LINKEDIN_MIN_LIFETIME_BUDGET) {
+      throw new Error(
+        `LinkedIn lifetime budgets must be at least ${LINKEDIN_MIN_LIFETIME_BUDGET} ${currency}`,
+      );
+    }
+  } else {
+    const floor = Math.max(
+      LINKEDIN_MIN_DAILY_BUDGET,
+      adAccount.minimumDailyBudget ?? 0,
+    );
+    if (payload.budgetAmount < floor) {
+      throw new Error(
+        `LinkedIn daily budget must be at least ${floor} ${currency}`,
+      );
+    }
+  }
+}
+
+async function createLinkedInAd(
+  payload: CreateZernioStandaloneAdInput,
+  options: {
+    idempotencyKey: string;
+    adAccount: { currency?: string; minimumDailyBudget?: number };
+  },
+) {
+  assertLinkedInAdPayload(payload, options.adAccount);
+  return createZernioStandaloneAd(payload, {
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export type CreateGoogleAdInput = {
   /** Stable cross-run dedupe key; see adWriteIdempotencyKey. */
   businessKey?: string | null;
@@ -783,7 +942,7 @@ export async function syncBrandPlatformAudiences(input: {
   organizationId: string;
   brandSlug: string;
 }) {
-  const platforms: ZernioAdPlatform[] = ["meta", "google"];
+  const platforms: ZernioAdPlatform[] = [...ZERNIO_AD_PLATFORMS];
   let mirrored = 0;
   const errors: string[] = [];
 
@@ -800,7 +959,7 @@ export async function syncBrandPlatformAudiences(input: {
     });
     if (!listed) continue;
 
-    const channelPlatform = platform === "meta" ? "meta_ads" : "google_ads";
+    const channelPlatform = channelPlatformForZernioKey(platform);
     const channel = await db.query.channelTable.findFirst({
       where: and(
         eq(channelTable.brandId, listed.brand.id),
@@ -1107,7 +1266,7 @@ async function pauseFreshGoogleCampaign(
     await setZernioCampaignStatus({
       platformCampaignId,
       status: "paused",
-      platform: DELIVERY_PLATFORMS.google_ads,
+      platform: requireAdPlatformSpec("google_ads").zernio!.treePlatform,
     });
     return googlePauseOutcome({ paused: true });
   } catch (error) {
@@ -1323,11 +1482,6 @@ export async function previewDraftAd(
 
 // ---- DELIVERY SWITCH -------------------------------------------------
 
-const DELIVERY_PLATFORMS: Record<string, string> = {
-  meta_ads: "facebook",
-  google_ads: "google",
-};
-
 /**
  * Pause or resume a synced campaign — the Launch button on the campaign
  * page. This is the moment money starts (or stops) moving, so it is only
@@ -1356,7 +1510,9 @@ export async function setCampaignDelivery(
       "This campaign has no platform id yet — it was never synced or launched on the provider",
     );
   }
-  const platform = DELIVERY_PLATFORMS[campaign.platform];
+  // The status call is the one Zernio write that names the platform, in the
+  // tree's vocabulary (facebook / google / linkedin).
+  const platform = adPlatformSpec(campaign.platform)?.zernio?.treePlatform;
   if (!platform) {
     throw new Error(`Delivery toggle not supported for ${campaign.platform}`);
   }
@@ -1387,7 +1543,7 @@ export async function setCampaignDelivery(
 async function platformAudienceExternalIdFor(
   planAudienceId: string,
   brandId: string,
-  platform: "meta_ads" | "google_ads",
+  platform: PushableAdPlatform,
 ): Promise<string | null> {
   const rows = await db
     .select({ externalId: platformAudienceTable.externalId })
@@ -1424,16 +1580,26 @@ async function compileAudienceTargeting(input: {
   audience: PlanAudience;
   connectionAccountId: string;
   brandId: string;
-  platform: "meta_ads" | "google_ads";
+  platform: PushableAdPlatform;
 }): Promise<{ spec: ZernioAdTargeting | undefined; warnings: string[] }> {
   const { audience } = input;
   const warnings: string[] = [];
   const spec: ZernioAdTargeting = {};
+  const platformSpec = requireAdPlatformSpec(input.platform);
+  const canTarget = platformSpec.features.targeting;
 
   const geography = audience.geography ?? {};
   if (geography.countries?.length) spec.countries = geography.countries;
-  if (audience.ageMin != null) spec.ageMin = audience.ageMin;
-  if (audience.ageMax != null) spec.ageMax = audience.ageMax;
+  if (audience.ageMin != null || audience.ageMax != null) {
+    if (canTarget.age) {
+      if (audience.ageMin != null) spec.ageMin = audience.ageMin;
+      if (audience.ageMax != null) spec.ageMax = audience.ageMax;
+    } else {
+      warnings.push(
+        `${audience.name}: ${platformSpec.shortLabel} takes no age targeting through Zernio — the age window was left out`,
+      );
+    }
+  }
 
   // `states` holds codes and `regions` the names the geo search takes, so a
   // state that has no name in `regions` is named here rather than dropped. A
@@ -1459,7 +1625,19 @@ async function compileAudienceTargeting(input: {
       );
     }
   }
-  if (regionNames.length > 0) {
+  if (regionNames.length > 0 && !canTarget.regions) {
+    // Country-level platforms: say what was dropped, and never let a plan
+    // that named US states compile to a worldwide buy.
+    warnings.push(
+      `${audience.name}: ${platformSpec.shortLabel} targets at country level only through Zernio — ${regionNames.join(", ")} left out`,
+    );
+    if (!spec.countries?.length && namedStates.length > 0) {
+      spec.countries = ["US"];
+      warnings.push(
+        `${audience.name}: no countries set, so US was inferred from the state codes`,
+      );
+    }
+  } else if (regionNames.length > 0) {
     const resolved: Array<{ key: string }> = [];
     for (const name of regionNames) {
       try {
@@ -1602,20 +1780,22 @@ function textAds(ads: Ad[]) {
 export async function pushDraftToPlatform(
   input: {
     campaignId: string;
-    platform?: "meta_ads" | "google_ads";
+    platform?: PushableAdPlatform;
     connectionAccountId: string;
     adAccountId: string;
-    goal:
-      | "engagement"
-      | "traffic"
-      | "awareness"
-      | "video_views"
-      | "conversions";
+    goal: AdPushGoal;
     validateOnly?: boolean;
   },
   context: AdsWriteContext,
 ) {
   const platform = input.platform ?? "meta_ads";
+  const platformSpec = requireAdPlatformSpec(platform);
+  const platformName = platformSpec.shortLabel;
+  if (!platformSpec.features.goals.includes(input.goal)) {
+    throw new Error(
+      `${platformName} does not offer the ${input.goal} goal through Zernio — pick one of ${platformSpec.features.goals.join(", ")}`,
+    );
+  }
   const campaign = await db.query.campaignTable.findFirst({
     where: eq(campaignTable.id, input.campaignId),
   });
@@ -1638,12 +1818,12 @@ export async function pushDraftToPlatform(
   });
   if (!draft) {
     throw new Error(
-      `${platform === "meta_ads" ? "Meta" : "Google"} is not planned for this campaign — plan it on the campaign page first`,
+      `${platformName} is not planned for this campaign — plan it on the campaign page first`,
     );
   }
   if (draft.externalId) {
     throw new Error(
-      `This campaign already exists on ${platform === "meta_ads" ? "Meta" : "Google"} — edit it there, or draft a new campaign`,
+      `This campaign already exists on ${platformName} — edit it there, or draft a new campaign`,
     );
   }
   if (!draft.budget || draft.budget <= 0) {
@@ -1658,7 +1838,7 @@ export async function pushDraftToPlatform(
   const destination = await requireAdDestination({
     organizationId: context.organizationId,
     brandSlug: brand.slug,
-    platform: platform === "meta_ads" ? "meta" : "google",
+    platform: zernioAdPlatformKey(platform),
     connectionAccountId: input.connectionAccountId,
     adAccountId: input.adAccountId,
   });
@@ -1701,25 +1881,7 @@ export async function pushDraftToPlatform(
     compiled.push({ audience, spec });
   }
 
-  if (platform === "google_ads") {
-    return pushToGoogle({
-      input,
-      context,
-      campaign,
-      brand,
-      draft,
-      destination,
-      compiled,
-      ads,
-      budgetAmount,
-      budgetType,
-      settings,
-      startDate,
-      endDate,
-      warnings,
-    });
-  }
-  return pushToMeta({
+  const pushArgs: PushArgs = {
     input,
     context,
     campaign,
@@ -1734,7 +1896,10 @@ export async function pushDraftToPlatform(
     startDate,
     endDate,
     warnings,
-  });
+  };
+  if (platform === "google_ads") return pushToGoogle(pushArgs);
+  if (platform === "linkedin_ads") return pushToLinkedIn(pushArgs);
+  return pushToMeta(pushArgs);
 }
 
 type PushArgs = {
@@ -1742,12 +1907,7 @@ type PushArgs = {
     campaignId: string;
     connectionAccountId: string;
     adAccountId: string;
-    goal:
-      | "engagement"
-      | "traffic"
-      | "awareness"
-      | "video_views"
-      | "conversions";
+    goal: AdPushGoal;
     validateOnly?: boolean;
   };
   context: AdsWriteContext;
@@ -2337,6 +2497,407 @@ async function pushToMeta(args: PushArgs) {
     adSetsCreated: perSet.length,
     adsCreated: perSet.length * usable.length,
     path: `/app/brands/${brand.slug}/ads/platform/${draft.id}`,
+    warnings,
+  };
+}
+
+// ---- LINKEDIN COMPILE ---------------------------------------------------
+//
+// LinkedIn's pyramid is campaign group → campaign → creative, and Zernio lays
+// it on the shared shape: the group is our platform_campaign, the campaign
+// (which owns budget, bid, schedule and targeting) is our ad set, the
+// creative is our ad. Each plan audience becomes a LinkedIn campaign and every
+// creative ad runs under each. The create takes ONE creative per call, so the
+// first ad opens a campaign and the rest attach to it with adSetId.
+async function pushToLinkedIn(args: PushArgs) {
+  const {
+    input,
+    context,
+    campaign,
+    brand,
+    draft,
+    destination,
+    compiled,
+    ads,
+    budgetAmount,
+    budgetType,
+    settings,
+    startDate,
+    endDate,
+    warnings,
+  } = args;
+
+  const usable = creativeAds(ads);
+  if (usable.length === 0) {
+    throw new Error(
+      "LinkedIn needs at least one creative ad with an image or video — text ads compile to Google only",
+    );
+  }
+  const skippedText = textAds(ads).length;
+  if (skippedText > 0) {
+    warnings.push(
+      `${skippedText} text ad(s) were not sent to LinkedIn — they compile to Google`,
+    );
+  }
+  const linkUrl =
+    usable.find(({ content }) => content.linkUrl)?.content.linkUrl ??
+    campaign.landingUrl ??
+    undefined;
+  const requirement = linkedInCreativeRequirement({
+    goal: input.goal,
+    hasVideo: usable.some(({ content }) => isVideoContent(content)),
+    linkUrl,
+  });
+  if (requirement) throw new Error(requirement);
+  if (input.validateOnly) {
+    throw new Error(
+      "LinkedIn has no dry run through Zernio — push it paused and review it in Campaign Manager",
+    );
+  }
+
+  const linkedin = settings.linkedin ?? {};
+  const bidding =
+    linkedin.costType || linkedin.unitCost != null
+      ? {
+          costType: linkedin.costType ?? "CPM",
+          ...(linkedin.unitCost != null ? { unitCost: linkedin.unitCost } : {}),
+        }
+      : {};
+
+  const isCarousel = (content: AdCreativeContent) =>
+    !isVideoContent(content) && (content.media?.length ?? 0) >= 2;
+
+  /** One creative as the LinkedIn create wants it: image, video or carousel. */
+  const creativePayload = (
+    content: AdCreativeContent,
+  ): Pick<
+    CreateZernioStandaloneAdInput,
+    | "headline"
+    | "body"
+    | "linkUrl"
+    | "callToAction"
+    | "imageUrl"
+    | "video"
+    | "platformSpecificData"
+  > => ({
+    headline: content.headline,
+    body: content.body,
+    linkUrl: content.linkUrl ?? linkUrl,
+    callToAction: content.callToAction ?? linkedin.callToAction,
+    ...(isVideoContent(content)
+      ? // LinkedIn generates the poster frame itself; no thumbnail needed.
+        { video: { url: content.media[0]!.url } }
+      : isCarousel(content)
+        ? {
+            platformSpecificData: {
+              carousel: {
+                cards: content.media
+                  .slice(0, LINKEDIN_CAROUSEL_CARDS.max)
+                  .map((item, index) => ({
+                    imageUrl: item.url,
+                    headline: index === 0 ? content.headline : undefined,
+                    landingUrl: content.linkUrl ?? linkUrl,
+                  })),
+              },
+            },
+          }
+        : { imageUrl: content.media[0]!.url }),
+  });
+
+  /** Opens a LinkedIn campaign — and, without existingCampaignId, its group. */
+  const openingPayload = (setArgs: {
+    audience: PlanAudience | null;
+    spec: ZernioAdTargeting | undefined;
+    existingCampaignId?: string;
+    lead: (typeof usable)[number];
+  }): CreateZernioStandaloneAdInput => {
+    const { platformSpecificData: creativeData, ...creative } = creativePayload(
+      setArgs.lead.content,
+    );
+    const platformSpecificData = { ...bidding, ...(creativeData ?? {}) };
+    return {
+      accountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      organizationId: linkedin.organizationId,
+      ...(setArgs.existingCampaignId
+        ? { existingCampaignId: setArgs.existingCampaignId }
+        : { campaignName: campaign.name }),
+      name: setArgs.existingCampaignId
+        ? (setArgs.audience?.name ?? campaign.name)
+        : campaign.name,
+      adSetName: setArgs.audience?.name,
+      adName: setArgs.lead.ad.name,
+      goal: input.goal,
+      budgetAmount,
+      budgetType,
+      ...creative,
+      ...(Object.keys(platformSpecificData).length > 0
+        ? { platformSpecificData }
+        : {}),
+      targeting: setArgs.spec,
+      startDate,
+      endDate,
+      ...linkedInDraftProviderControls(),
+    };
+  };
+
+  /** One more creative under an existing LinkedIn campaign; it inherits the rest. */
+  const attachPayload = (
+    adSetId: string,
+    ad: Ad,
+    content: AdCreativeContent,
+  ): CreateZernioStandaloneAdInput => ({
+    accountId: input.connectionAccountId,
+    adAccountId: destination.adAccount.id,
+    organizationId: linkedin.organizationId,
+    adSetId,
+    name: ad.name,
+    adName: ad.name,
+    goal: input.goal,
+    ...creativePayload(content),
+    ...linkedInDraftProviderControls(),
+  });
+
+  type CreatedSet = {
+    lead: (typeof usable)[number];
+    result: ZernioAdWriteResponse;
+    attached: Array<{ planAd: Ad; result: ZernioAdWriteResponse }>;
+  };
+
+  /**
+   * Create one LinkedIn campaign and every creative inside it. A failed
+   * attach on a fresh group deletes the group rather than stranding it.
+   */
+  const createCampaignWithAds = async (setArgs: {
+    audience: PlanAudience | null;
+    spec: ZernioAdTargeting | undefined;
+    existingCampaignId?: string;
+    keyScope: string;
+  }): Promise<CreatedSet> => {
+    const [lead, ...rest] = usable;
+    const payload = openingPayload({ ...setArgs, lead: lead! });
+    const result = await createLinkedInAd(payload, {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-adset",
+        payload,
+        setArgs.keyScope,
+      ),
+      adAccount: destination.adAccount,
+    });
+    const rollbackCampaignId = setArgs.existingCampaignId
+      ? null
+      : (result.platformCampaignId ?? null);
+    const attached: CreatedSet["attached"] = [];
+    try {
+      for (const { ad, content } of rest) {
+        if (!result.platformAdSetId) {
+          throw new Error(
+            "Zernio returned no LinkedIn campaign id to attach the next creative to",
+          );
+        }
+        const attach = attachPayload(result.platformAdSetId, ad, content);
+        attached.push({
+          planAd: ad,
+          result: await createLinkedInAd(attach, {
+            idempotencyKey: idempotencyKey(
+              context,
+              "push-attach",
+              attach,
+              `${setArgs.keyScope}:${ad.id}`,
+            ),
+            adAccount: destination.adAccount,
+          }),
+        });
+      }
+    } catch (error) {
+      const cleanedUp = rollbackCampaignId
+        ? await deleteZernioCampaign({
+            campaignId: rollbackCampaignId,
+            accountId: input.connectionAccountId,
+          })
+            .then(() => true)
+            .catch((cleanupError) => {
+              console.error(
+                "attach rollback failed",
+                rollbackCampaignId,
+                cleanupError,
+              );
+              return false;
+            })
+        : null;
+      throw new Error(
+        `Push failed while attaching creative ${attached.length + 2} of ${usable.length}${
+          cleanedUp === true
+            ? " — the campaign group was removed from LinkedIn so nothing is half-built"
+            : cleanedUp === false
+              ? ` — removing campaign group ${rollbackCampaignId} from LinkedIn also failed, delete it in Campaign Manager`
+              : ""
+        }. ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return { lead: lead!, result, attached };
+  };
+
+  const externalAdId = (row: ZernioAdWriteResponse["ad"] | undefined) =>
+    (typeof row?.platformAdId === "string" ? row.platformAdId : null) ??
+    row?.id ??
+    row?._id ??
+    null;
+
+  /** Plan lineage: the opening call made the lead ad, each attach one more. */
+  const setAdsFor = (set: CreatedSet) => [
+    {
+      planAd: set.lead.ad,
+      externalId: externalAdId(set.result.ad ?? set.result.ads?.[0]),
+      headline: set.lead.content.headline,
+      body: set.lead.content.body,
+      linkUrl: set.lead.content.linkUrl ?? linkUrl ?? null,
+      media: set.lead.content.media,
+    },
+    ...set.attached.map(({ planAd, result }) => {
+      const content = planAd.content as AdCreativeContent;
+      return {
+        planAd,
+        externalId: externalAdId(result.ad ?? result.ads?.[0]),
+        headline: content.headline,
+        body: content.body,
+        linkUrl: content.linkUrl ?? linkUrl ?? null,
+        media: content.media,
+      };
+    }),
+  ];
+
+  const heroThumbnailUrl = usable[0]!.content.media[0]?.url ?? null;
+  const path = `/app/brands/${brand.slug}/ads/platform/${draft.id}`;
+
+  // ---- one (or no) audience: one campaign under a fresh group ------------
+  if (compiled.length <= 1) {
+    const only = compiled[0] ?? null;
+    const set = await createCampaignWithAds({
+      audience: only?.audience ?? null,
+      spec: only?.spec,
+      keyScope: `push:${campaign.id}:linkedin`,
+    });
+    await recordCompiledCampaign({
+      draft,
+      campaign,
+      status: "paused",
+      budgetAmount,
+      budgetType,
+      externalCampaignId: set.result.platformCampaignId ?? null,
+      heroThumbnailUrl,
+      sets: [
+        {
+          audience: only?.audience ?? null,
+          name: only?.audience.name ?? campaign.name,
+          externalId: set.result.platformAdSetId ?? null,
+          targetingSpec: only?.spec ?? null,
+          budget: budgetAmount,
+          budgetType,
+          ads: setAdsFor(set),
+        },
+      ],
+    });
+    return {
+      campaignId: campaign.id,
+      platform: "linkedin_ads" as const,
+      validateOnly: false,
+      platformCampaignRowId: draft.id,
+      adSetsCreated: 1,
+      adsCreated: usable.length,
+      path,
+      warnings,
+    };
+  }
+
+  // ---- several audiences: the group first, then one campaign each --------
+  // A LinkedIn group takes no budget; every campaign under it brings its own.
+  const shell = await createZernioAdCampaign(
+    {
+      accountId: input.connectionAccountId,
+      adAccountId: destination.adAccount.id,
+      name: campaign.name,
+      goal: input.goal,
+      status: "PAUSED",
+    },
+    {
+      idempotencyKey: idempotencyKey(
+        context,
+        "push-shell",
+        { campaignId: campaign.id },
+        `shell:${campaign.id}:linkedin`,
+      ),
+    },
+  );
+  const shellId =
+    shell.campaign?.platformCampaignId ?? shell.campaign?.id ?? null;
+  if (!shellId) {
+    throw new Error("Zernio returned no campaign group id for the shell");
+  }
+
+  const perSet: Array<{
+    audience: PlanAudience;
+    spec: ZernioAdTargeting | undefined;
+    set: CreatedSet;
+  }> = [];
+  try {
+    for (const { audience, spec } of compiled) {
+      const set = await createCampaignWithAds({
+        audience,
+        spec,
+        existingCampaignId: shellId,
+        // Suffixed so a plan pushed to Meta and LinkedIn never shares a key.
+        keyScope: `push:${campaign.id}:${audience.id}:linkedin`,
+      });
+      perSet.push({ audience, spec, set });
+    }
+  } catch (error) {
+    const cleanedUp = await deleteZernioCampaign({
+      campaignId: shellId,
+      accountId: input.connectionAccountId,
+    })
+      .then(() => true)
+      .catch((cleanupError) => {
+        console.error("push rollback failed", shellId, cleanupError);
+        return false;
+      });
+    throw new Error(
+      `Push failed after ${perSet.length} of ${compiled.length} audiences — ${
+        cleanedUp
+          ? "the campaign group was removed from LinkedIn so nothing is half-built"
+          : `removing campaign group ${shellId} from LinkedIn also failed, delete it in Campaign Manager`
+      }. ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  await recordCompiledCampaign({
+    draft,
+    campaign,
+    status: "paused",
+    budgetAmount,
+    budgetType,
+    externalCampaignId: shellId,
+    heroThumbnailUrl,
+    sets: perSet.map(({ audience, spec, set }) => ({
+      audience,
+      name: audience.name,
+      externalId: set.result.platformAdSetId ?? null,
+      targetingSpec: spec ?? null,
+      budget: budgetAmount,
+      budgetType,
+      ads: setAdsFor(set),
+    })),
+  });
+
+  return {
+    campaignId: campaign.id,
+    platform: "linkedin_ads" as const,
+    validateOnly: false,
+    platformCampaignRowId: draft.id,
+    adSetsCreated: perSet.length,
+    adsCreated: perSet.length * usable.length,
+    path,
     warnings,
   };
 }

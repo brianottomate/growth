@@ -7,15 +7,14 @@ import { DownloadCloud, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  adPlatformByAllowlistPlatform,
+  type AdAccountPlatform,
+} from "@/lib/ad-platforms";
 import { useTRPC } from "@/trpc/react";
 
-const PLATFORM_LABEL: Record<string, string> = {
-  facebook: "Meta",
-  google: "Google",
-};
-
 type Row = {
-  platform: "facebook" | "google";
+  platform: AdAccountPlatform;
   externalId: string;
   name: string | null;
   allowed: boolean | null;
@@ -112,7 +111,7 @@ export function AdAccountsCard({
         ) : ordered.length === 0 ? (
           <p className="text-muted-foreground p-4 text-sm">
             {enumerated
-              ? "Nothing to allow yet. Accounts appear here once the client connects Meta Ads or Google Ads through the link above."
+              ? "Nothing to allow yet. Accounts appear here once the client connects an ad platform through the link above."
               : "Asking the connections what they can see…"}
           </p>
         ) : (
@@ -129,8 +128,9 @@ export function AdAccountsCard({
                       {row.name ?? row.externalId}
                     </p>
                     <p className="text-muted-foreground font-mono text-xs">
-                      {PLATFORM_LABEL[row.platform] ?? row.platform} ·{" "}
-                      {row.externalId}
+                      {adPlatformByAllowlistPlatform(row.platform)
+                        ?.shortLabel ?? row.platform}{" "}
+                      · {row.externalId}
                     </p>
                   </label>
                   <div className="flex shrink-0 items-center gap-2.5">

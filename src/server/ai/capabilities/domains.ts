@@ -375,7 +375,7 @@ export const adsRead = growthDomainTool({
 
 export const adsWrite = growthDomainTool({
   description:
-    'Build and ship paid campaigns. TWO LAYERS: the first-party draft (draftCampaign, draftAd, addAdSet and the rest) is local rows only, touches no ad platform, and needs no approval — start there for "make a campaign" unless the user asks for the platform by name. Only push, setDelivery and the create* actions reach Meta or Google, and those are account-allowlisted and approval-gated. Everything is created paused except boostMetaPost and createGoogle; setDelivery is what starts spend.',
+    'Build and ship paid campaigns. TWO LAYERS: the first-party draft (draftCampaign, draftAd, addAdSet and the rest) is local rows only, touches no ad platform, and needs no approval — start there for "make a campaign" unless the user asks for the platform by name. Only push, setDelivery and the create* actions reach Meta, Google or LinkedIn, and those are account-allowlisted and approval-gated. Everything is created paused except boostMetaPost and createGoogle; setDelivery is what starts spend.',
   actions: {
     draftCampaign: draftCampaignAction,
     draftAd: draftAdAction,

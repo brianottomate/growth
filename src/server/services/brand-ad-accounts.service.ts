@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, eq, inArray, or } from "drizzle-orm";
 
+import { AD_PLATFORM_SPECS, type AdAccountPlatform } from "@/lib/ad-platforms";
 import { db } from "@/server/db";
 import { adAccountTable, brandTable } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
@@ -21,11 +22,18 @@ import {
 // service is the brand-page surface for that decision: enumerate what the
 // connection can see, record an allow or an explicit deny.
 
-/** Zernio ads connection platform → ad_account.platform key. */
-const CONNECTION_PLATFORMS: Record<string, "facebook" | "google"> = {
-  metaads: "facebook",
-  googleads: "google",
-};
+/** Zernio ads connection platform → ad_account.platform key, for every pushable platform. */
+const CONNECTION_PLATFORMS: Record<string, AdAccountPlatform> =
+  Object.fromEntries(
+    AD_PLATFORM_SPECS.filter(
+      (spec) => spec.stage === "push" && spec.zernio,
+    ).flatMap((spec) =>
+      spec.zernio!.connectionPlatforms.map((name) => [
+        name,
+        spec.zernio!.allowlistPlatform as AdAccountPlatform,
+      ]),
+    ),
+  );
 
 function zernioAccountProfileId(account: ZernioAccount): string | null {
   if (typeof account.profileId === "string") return account.profileId;
@@ -33,7 +41,7 @@ function zernioAccountProfileId(account: ZernioAccount): string | null {
 }
 
 export type BrandAdAccount = {
-  platform: "facebook" | "google";
+  platform: AdAccountPlatform;
   externalId: string;
   name: string | null;
   /** null = no row yet (undecided); the allowlist treats that as deny. */
@@ -61,7 +69,7 @@ export async function listBrandAdAccounts(
   if (!brand) throw new Error("Brand not found");
 
   type Discovered = {
-    platform: "facebook" | "google";
+    platform: AdAccountPlatform;
     externalId: string;
     name: string | null;
   };
@@ -152,7 +160,7 @@ export async function listBrandAdAccounts(
     const key = `${registry.platform}:${registry.externalId}`;
     if (seen.has(key)) continue;
     merged.push({
-      platform: registry.platform as "facebook" | "google",
+      platform: registry.platform as AdAccountPlatform,
       externalId: registry.externalId,
       name: registry.name,
       allowed: registry.isAllowed,
@@ -171,7 +179,7 @@ export async function listBrandAdAccounts(
  */
 export async function setBrandAdAccountAllowed(input: {
   brandId: string;
-  platform: "facebook" | "google";
+  platform: AdAccountPlatform;
   externalId: string;
   name: string | null;
   isAllowed: boolean;

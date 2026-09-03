@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { PUSHABLE_AD_PLATFORMS } from "@/lib/ad-platforms";
+
 import {
   addPerformanceProperty,
   addPerformancePropertySchema,
@@ -209,7 +211,7 @@ export const syncAdCampaignsAction = growthAction({
     "Pull ad campaigns from Zernio into Growth so they can be attached to a performance cycle, then reprice every cycle's observed spend. Bounded to recent campaigns by default because the provider returns every campaign an account has ever had; widen with sinceDays or drop the window with sinceDays null. Reads the provider and writes only our own mirror rows.",
   inputSchema: z.object({
     brandSlug: z.string().trim().min(1).default("wander"),
-    platform: z.enum(["meta_ads", "google_ads"]).default("meta_ads"),
+    platform: z.enum(PUSHABLE_AD_PLATFORMS).default("meta_ads"),
     sinceDays: z
       .number()
       .int()

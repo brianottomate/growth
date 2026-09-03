@@ -14,7 +14,7 @@ import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { CopyButton } from "@/components/copy-button";
 
-// The 4 paid platforms the matrix has columns for (order = sheet order).
+// The paid platforms the matrix has columns for (order = sheet order).
 const AD_PLATFORMS = [
   "google_ads",
   "meta_ads",

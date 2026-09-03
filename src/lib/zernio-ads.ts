@@ -1,13 +1,25 @@
-export const ZERNIO_AD_PLATFORMS = ["meta", "google"] as const;
-export type ZernioAdPlatform = (typeof ZERNIO_AD_PLATFORMS)[number];
+import {
+  adPlatformByKey,
+  ZERNIO_AD_PLATFORMS,
+  type AdPushGoal,
+  type ZernioAdPlatform,
+} from "@/lib/ad-platforms";
+
+export { ZERNIO_AD_PLATFORMS, type ZernioAdPlatform };
+
+function zernioSpec(platform: ZernioAdPlatform) {
+  const spec = adPlatformByKey(platform);
+  if (!spec?.zernio) {
+    throw new Error(`${platform} is not reachable through Zernio`);
+  }
+  return spec;
+}
 
 export function normalizeAdAccountId(
   platform: ZernioAdPlatform,
   value: string,
 ): string {
-  const trimmed = value.trim();
-  if (platform === "meta") return trimmed.replace(/^act_/i, "");
-  return trimmed.replace(/-/g, "");
+  return zernioSpec(platform).zernio!.normalizeAccountId(value.trim());
 }
 
 export function sameAdAccountId(
@@ -26,13 +38,15 @@ export function zernioConnectionMatchesPlatform(
   connectionPlatform: string,
 ): boolean {
   const normalized = connectionPlatform.toLowerCase().replaceAll("_", "");
-  return platform === "meta"
-    ? normalized === "facebook" || normalized === "metaads"
-    : normalized === "googleads";
+  const { connectionPlatforms, connectionAliases = [] } =
+    zernioSpec(platform).zernio!;
+  return [...connectionPlatforms, ...connectionAliases].some(
+    (candidate) => candidate.replaceAll("_", "") === normalized,
+  );
 }
 
 export function allowlistPlatform(platform: ZernioAdPlatform): string {
-  return platform === "meta" ? "facebook" : "google";
+  return zernioSpec(platform).zernio!.allowlistPlatform;
 }
 
 export function metaDraftProviderControls(validateOnly?: boolean) {
@@ -40,6 +54,15 @@ export function metaDraftProviderControls(validateOnly?: boolean) {
     status: "PAUSED" as const,
     validateOnly,
   };
+}
+
+/**
+ * LinkedIn pauses the whole campaign group → campaign → creative hierarchy on
+ * `status: PAUSED`. Zernio documents validate-only for Meta alone, so a
+ * LinkedIn push never sends it.
+ */
+export function linkedInDraftProviderControls() {
+  return { status: "PAUSED" as const };
 }
 
 export function googleCreativeRequirement(input: {
@@ -52,6 +75,64 @@ export function googleCreativeRequirement(input: {
   }
   if (input.campaignType === "display" && !input.images) {
     return "Google Display creation requires landscape and square images";
+  }
+  return null;
+}
+
+// ---- LINKEDIN ----------------------------------------------------------
+//
+// From-scratch LinkedIn ads through Zernio are Direct Sponsored Content
+// ("dark posts") authored by a Company Page: a single image or a single video
+// per creative, country-level targeting, four goals. Conversion campaigns are
+// only reachable by boosting an existing post.
+// https://docs.zernio.com/platforms/linkedin-ads/create-ads
+
+export const LINKEDIN_PUSH_GOALS = [
+  "engagement",
+  "traffic",
+  "awareness",
+  "video_views",
+] as const satisfies readonly AdPushGoal[];
+
+export const LINKEDIN_CALL_TO_ACTIONS = [
+  "LEARN_MORE",
+  "SIGN_UP",
+  "DOWNLOAD",
+  "SUBSCRIBE",
+  "REGISTER",
+  "JOIN",
+  "ATTEND",
+  "REQUEST_DEMO",
+  "VIEW_QUOTE",
+  "APPLY",
+  "SEE_MORE",
+  "SHOP_NOW",
+  "BUY_NOW",
+] as const;
+export type LinkedInCallToAction = (typeof LINKEDIN_CALL_TO_ACTIONS)[number];
+
+export const LINKEDIN_COST_TYPES = ["CPM", "CPC", "CPV"] as const;
+export type LinkedInCostType = (typeof LINKEDIN_COST_TYPES)[number];
+
+/** LinkedIn's flat floors; the account-specific one comes from bid pricing. */
+export const LINKEDIN_MIN_DAILY_BUDGET = 10;
+export const LINKEDIN_MIN_LIFETIME_BUDGET = 100;
+export const LINKEDIN_HEADLINE_MAX = 400;
+export const LINKEDIN_CAROUSEL_CARDS = { min: 2, max: 10 };
+
+export function linkedInCreativeRequirement(input: {
+  goal: string;
+  hasVideo: boolean;
+  linkUrl?: string | null;
+}): string | null {
+  if (!(LINKEDIN_PUSH_GOALS as readonly string[]).includes(input.goal)) {
+    return `LinkedIn creates ${LINKEDIN_PUSH_GOALS.join(", ")} campaigns through Zernio; a ${input.goal} campaign needs a boosted Company Page post instead`;
+  }
+  if (input.goal === "video_views" && !input.hasVideo) {
+    return "LinkedIn video_views needs a video creative";
+  }
+  if (input.goal === "traffic" && !input.linkUrl) {
+    return "LinkedIn traffic ads need a link URL";
   }
   return null;
 }

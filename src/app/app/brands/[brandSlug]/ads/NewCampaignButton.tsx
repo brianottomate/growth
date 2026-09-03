@@ -18,6 +18,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ChannelLogo } from "@/components/channel-logos";
+import {
+  PUSHABLE_AD_PLATFORMS,
+  requireAdPlatformSpec,
+  type PushableAdPlatform,
+} from "@/lib/ad-platforms";
 import { useTRPC } from "@/trpc/react";
 
 /**
@@ -39,7 +45,7 @@ export function NewCampaignButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [platforms, setPlatforms] = useState<("meta_ads" | "google_ads")[]>([
+  const [platforms, setPlatforms] = useState<PushableAdPlatform[]>([
     "meta_ads",
   ]);
   const [budget, setBudget] = useState("");
@@ -95,12 +101,11 @@ export function NewCampaignButton({
         <DialogHeader>
           <DialogTitle>New campaign draft</DialogTitle>
           <DialogDescription>
-            A local draft — nothing reaches an ad platform until you push it.
-            Pick both to plan one push across Meta and Google; each platform
-            gets its own campaign when the push runs.
+            A local draft. Nothing reaches an ad platform until you push it, and
+            each platform you pick gets its own campaign then.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="camp-name">Name</Label>
             <Input
@@ -111,53 +116,39 @@ export function NewCampaignButton({
               placeholder="WANDER_PROSPECTING_PURCHASES"
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Platforms</Label>
-              <div className="flex gap-2">
-                {(
-                  [
-                    { value: "meta_ads", label: "Meta" },
-                    { value: "google_ads", label: "Google" },
-                  ] as const
-                ).map((option) => {
-                  const on = platforms.includes(option.value);
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() =>
-                        setPlatforms((current) =>
-                          current.includes(option.value)
-                            ? current.length > 1
-                              ? current.filter((p) => p !== option.value)
-                              : current
-                            : [...current, option.value],
-                        )
-                      }
-                      className={`h-9 flex-1 rounded-md border text-sm transition-colors ${
-                        on
-                          ? "border-white/30 bg-white/10 font-medium"
-                          : "border-input text-muted-foreground hover:bg-white/5"
-                      }`}
-                    >
-                      {on ? "✓ " : ""}
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="camp-budget">Budget ($, optional)</Label>
-              <Input
-                id="camp-budget"
-                type="number"
-                min={0}
-                value={budget}
-                onChange={(event) => setBudget(event.target.value)}
-                placeholder="500"
-              />
+          <div className="space-y-1.5">
+            <Label>Platforms</Label>
+            <div className="flex flex-wrap gap-2">
+              {PUSHABLE_AD_PLATFORMS.map((value) => {
+                const on = platforms.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setPlatforms((current) =>
+                        current.includes(value)
+                          ? current.length > 1
+                            ? current.filter((p) => p !== value)
+                            : current
+                          : [...current, value],
+                      )
+                    }
+                    className={`flex h-9 items-center gap-2 rounded-md border px-3 text-sm transition-colors ${
+                      on
+                        ? "border-white/30 bg-white/10 font-medium"
+                        : "border-input text-muted-foreground hover:bg-white/5"
+                    }`}
+                  >
+                    <ChannelLogo
+                      platform={value}
+                      className={on ? "size-4" : "size-4 opacity-60"}
+                    />
+                    {requireAdPlatformSpec(value).shortLabel}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="space-y-1.5">
@@ -169,35 +160,56 @@ export function NewCampaignButton({
               placeholder="https://…"
             />
             <p className="text-muted-foreground text-xs">
-              Where the ads send people. Every ad inherits this unless it
-              overrides it. Point it at the specific property or offer page — a
-              homepage converts far worse on paid traffic.
+              Where the ads send people. A property or offer page converts far
+              better than the homepage.
             </p>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="camp-description">What is this push for?</Label>
-            <Textarea
-              id="camp-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={2}
-              placeholder="The audience, the season, the goal — context chat and the team read later."
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="camp-budget">Budget ($)</Label>
+              <Input
+                id="camp-budget"
+                type="number"
+                min={0}
+                value={budget}
+                onChange={(event) => setBudget(event.target.value)}
+                placeholder="500"
+              />
+              <p className="text-muted-foreground text-xs">
+                {prefilled?.mediaBudgetDollars != null
+                  ? `From their intake: $${prefilled.mediaBudgetDollars.toLocaleString()}/mo`
+                  : "Optional. Advisory; each platform draft sets its own."}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="camp-description">Notes</Label>
+              <Textarea
+                id="camp-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={2}
+                placeholder="Audience, season, goal."
+              />
+            </div>
           </div>
-          {prefilled?.accountId && (
-            <p className="text-muted-foreground text-xs">
-              From their intake:{" "}
-              {prefilled.mediaBudgetDollars != null
-                ? `$${prefilled.mediaBudgetDollars}/mo`
-                : "no budget agreed"}
-              {prefilled.allProperties
-                ? " · all their homes"
-                : prefilled.propertyUrls.length > 0
-                  ? ` · ${prefilled.propertyUrls.length} homes on the record`
-                  : ""}
-              {geoSummary ? ` · ${geoSummary}` : ""}
-            </p>
-          )}
+          {prefilled?.accountId &&
+            (prefilled.allProperties ||
+              prefilled.propertyUrls.length > 0 ||
+              geoSummary) && (
+              <p className="text-muted-foreground text-xs">
+                Also from their intake:{" "}
+                {[
+                  prefilled.allProperties
+                    ? "all their homes"
+                    : prefilled.propertyUrls.length > 0
+                      ? `${prefilled.propertyUrls.length} homes on the record`
+                      : null,
+                  geoSummary,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
           {create.error && (
             <p className="text-xs text-red-300">{create.error.message}</p>
           )}

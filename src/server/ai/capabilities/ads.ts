@@ -3,6 +3,17 @@ import "server-only";
 import { z } from "zod";
 
 import {
+  AD_PUSH_GOALS,
+  PLANNABLE_AD_PLATFORMS,
+  PUSHABLE_AD_PLATFORMS,
+  ZERNIO_AD_PLATFORMS,
+} from "@/lib/ad-platforms";
+import {
+  LINKEDIN_CALL_TO_ACTIONS,
+  LINKEDIN_COST_TYPES,
+} from "@/lib/zernio-ads";
+
+import {
   AD_DESTINATIONS,
   computeAdsScope,
   computeTopAds,
@@ -105,7 +116,7 @@ export const topAds = growthAction({
     computeTopAds({ ...input, organizationId: ctx.orgId }),
 });
 
-const platformSchema = z.enum(["meta", "google"]);
+const platformSchema = z.enum(ZERNIO_AD_PLATFORMS);
 const budgetTypeSchema = z.enum(["daily", "lifetime"]);
 const dateTimeSchema = z.string().datetime({ offset: true });
 const targetingSchema = z.object({
@@ -143,7 +154,7 @@ const schedulingSchema = {
 
 export const listAdsDestinations = growthAction({
   description:
-    "List the active Zernio Meta or Google connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id.",
+    "List the active Zernio Meta, Google or LinkedIn connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     platform: platformSchema,
@@ -162,9 +173,9 @@ export const draftCampaignAction = growthAction({
     brandSlug: destinationSchema.brandSlug,
     name: z.string().trim().min(1).max(300),
     platforms: z
-      .array(z.enum(["meta_ads", "google_ads", "openai_ads"]))
+      .array(z.enum(PLANNABLE_AD_PLATFORMS))
       .min(1)
-      .max(3)
+      .max(PLANNABLE_AD_PLATFORMS.length)
       .optional()
       .describe(
         "Platforms to plan: each gets a local draft platform campaign holding its budget and settings. Default meta_ads.",
@@ -832,7 +843,7 @@ export const planPlatformAction = growthAction({
     "Plan a platform for a LOCAL campaign: creates the draft platform campaign row that holds that platform's authoritative budget and settings. Local only; idempotent per platform.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
-    platform: z.enum(["meta_ads", "google_ads", "openai_ads"]),
+    platform: z.enum(PLANNABLE_AD_PLATFORMS),
   }),
   execute: async (input, ctx) =>
     planPlatform({ ...input, organizationId: ctx.orgId }),
@@ -862,7 +873,7 @@ export const setCreativePoolAction = growthAction({
 
 export const setPlatformDraftAction = growthAction({
   description:
-    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel and budget mode. Local only.",
+    "Set a platform draft's AUTHORITATIVE budget and its platform-specific settings before pushing: Google needs a campaign type (a search campaign without keywords is rejected at push — its keywords derive from the audiences' suggestions unless overridden here); Meta takes pixel and budget mode; LinkedIn takes the authoring Company Page id, a manual bid and the CTA, all optional. Local only.",
   inputSchema: z.object({
     platformCampaignId: z
       .string()
@@ -897,6 +908,25 @@ export const setPlatformDraftAction = growthAction({
         pixelId: z.string().trim().min(1).optional(),
         customEventType: z.string().trim().min(1).optional(),
         budgetMode: z.enum(["cbo", "abo"]).optional(),
+      })
+      .optional(),
+    linkedin: z
+      .object({
+        organizationId: z
+          .string()
+          .trim()
+          .max(64)
+          .optional()
+          .describe(
+            "Company Page that authors the ads (numeric id or urn:li:organization:N). Omit when the ad account is owned by the Page.",
+          ),
+        costType: z.enum(LINKEDIN_COST_TYPES).optional(),
+        unitCost: z
+          .number()
+          .positive()
+          .optional()
+          .describe("Manual bid in whole currency units; omit for automated."),
+        callToAction: z.enum(LINKEDIN_CALL_TO_ACTIONS).optional(),
       })
       .optional(),
   }),
@@ -969,19 +999,13 @@ export const deleteAdDraftAction = growthAction({
 
 export const pushDraftAction = growthAction({
   description:
-    "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. Call adsRead.listDestinations first for the account ids; never guess them.",
+    "COMPILE a LOCAL campaign onto one platform: each audience becomes an ad set / ad group, every creative ad runs under each, and region names resolve to real platform geo keys. Budget, dates and settings come from the platform DRAFT row (set them with setPlatformDraft first), so this takes no numbers of its own. Everything is created PAUSED; adsWrite.setDelivery starts spend separately. Set validateOnly for a dry run — Meta only, single audience only. LinkedIn: campaign group → campaign (the ad set) → creative, one creative per call, country-level targeting only, goals engagement / traffic / awareness / video_views. Call adsRead.listDestinations first for the account ids; never guess them.",
   inputSchema: z.object({
     campaignId: z.string().trim().min(1),
-    platform: z.enum(["meta_ads", "google_ads"]).optional(),
+    platform: z.enum(PUSHABLE_AD_PLATFORMS).optional(),
     connectionAccountId: destinationSchema.connectionAccountId,
     adAccountId: destinationSchema.adAccountId,
-    goal: z.enum([
-      "engagement",
-      "traffic",
-      "awareness",
-      "video_views",
-      "conversions",
-    ]),
+    goal: z.enum(AD_PUSH_GOALS),
     validateOnly: z.boolean().optional(),
   }),
   execute: async (input, ctx) =>

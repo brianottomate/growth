@@ -5,6 +5,8 @@ import {
   allowlistPlatform,
   campaignBusinessKey,
   googleCreativeRequirement,
+  linkedInCreativeRequirement,
+  linkedInDraftProviderControls,
   metaDraftProviderControls,
   sameAdAccountId,
   zernioConnectionMatchesPlatform,
@@ -62,6 +64,56 @@ describe("Zernio ad account boundaries", () => {
           square: "https://example.com/square.jpg",
         },
       }),
+    ).toBeNull();
+  });
+});
+
+describe("LinkedIn boundaries", () => {
+  test("matches sponsored accounts by number or URN", () => {
+    expect(
+      sameAdAccountId(
+        "linkedin",
+        "urn:li:sponsoredAccount:515601419",
+        "515601419",
+      ),
+    ).toBe(true);
+    expect(sameAdAccountId("linkedin", "515601419", "517256407")).toBe(false);
+  });
+
+  test("keeps the ads connection apart from the Company Page connection", () => {
+    expect(zernioConnectionMatchesPlatform("linkedin", "linkedinads")).toBe(
+      true,
+    );
+    expect(zernioConnectionMatchesPlatform("linkedin", "linkedin_ads")).toBe(
+      true,
+    );
+    expect(zernioConnectionMatchesPlatform("linkedin", "linkedin")).toBe(false);
+    expect(allowlistPlatform("linkedin")).toBe("linkedin");
+  });
+
+  test("pauses the whole hierarchy and never asks for a dry run", () => {
+    expect(linkedInDraftProviderControls()).toEqual({ status: "PAUSED" });
+  });
+
+  test("states what a from-scratch LinkedIn campaign cannot be", () => {
+    expect(
+      linkedInCreativeRequirement({ goal: "conversions", hasVideo: false }),
+    ).toContain("boosted");
+    expect(
+      linkedInCreativeRequirement({ goal: "video_views", hasVideo: false }),
+    ).toContain("video");
+    expect(
+      linkedInCreativeRequirement({ goal: "traffic", hasVideo: false }),
+    ).toContain("link URL");
+    expect(
+      linkedInCreativeRequirement({
+        goal: "traffic",
+        hasVideo: false,
+        linkUrl: "https://wander.com",
+      }),
+    ).toBeNull();
+    expect(
+      linkedInCreativeRequirement({ goal: "engagement", hasVideo: false }),
     ).toBeNull();
   });
 });

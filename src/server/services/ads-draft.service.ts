@@ -22,6 +22,10 @@ import {
   type PlatformCampaignSettings,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
+import {
+  requireAdPlatformSpec,
+  type PlannableAdPlatform,
+} from "@/lib/ad-platforms";
 import { importRemoteImage } from "@/server/services/media.service";
 
 // ---- THE PLAN'S CRUD ---------------------------------------------------
@@ -31,13 +35,8 @@ import { importRemoteImage } from "@/server/services/media.service";
 // the authoritative budget and per-platform settings live); nothing reaches
 // a provider until the push compiles the plan.
 
-export type DraftAdPlatform = "meta_ads" | "google_ads" | "openai_ads";
-
-const PLATFORM_LABELS: Record<DraftAdPlatform, string> = {
-  meta_ads: "Meta Ads",
-  google_ads: "Google Ads",
-  openai_ads: "OpenAI Ads",
-};
+/** A platform whose stage in the platform table is plan or push. */
+export type DraftAdPlatform = PlannableAdPlatform;
 
 async function requireOwnedBrand(input: {
   organizationId: string;
@@ -115,7 +114,7 @@ async function ensureAdsChannel(brandId: string, platform: DraftAdPlatform) {
       brandId,
       kind: "ad",
       platform,
-      handle: PLATFORM_LABELS[platform],
+      handle: requireAdPlatformSpec(platform).label,
       connectionStatus: "disconnected",
     })
     .returning({ id: channelTable.id });
@@ -260,6 +259,7 @@ export async function setPlatformDraft(input: {
   budgetType?: "daily" | "lifetime" | null;
   google?: PlatformCampaignSettings["google"] | null;
   meta?: PlatformCampaignSettings["meta"] | null;
+  linkedin?: PlatformCampaignSettings["linkedin"] | null;
 }) {
   const row = await db.query.platformCampaignTable.findFirst({
     where: eq(platformCampaignTable.id, input.platformCampaignId),
@@ -290,6 +290,7 @@ export async function setPlatformDraft(input: {
         ...current,
         ...merge("google", input.google),
         ...merge("meta", input.meta),
+        ...merge("linkedin", input.linkedin),
       },
     })
     .where(eq(platformCampaignTable.id, row.id))
