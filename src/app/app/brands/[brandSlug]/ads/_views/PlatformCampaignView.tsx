@@ -12,6 +12,7 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { posterForMedia } from "@/lib/media-url";
 
 import { fmtDate, money, statusStyle } from "./format";
 import { DeletePlatformCampaign } from "./DeletePlatformCampaign";
@@ -225,7 +226,7 @@ export async function PlatformCampaignView({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={
-                      spot.media?.[0]?.url ??
+                      posterForMedia(spot.media?.[0]) ??
                       spot.thumbnailUrl ??
                       "/placeholder.svg"
                     }

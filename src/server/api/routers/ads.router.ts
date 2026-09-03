@@ -527,7 +527,8 @@ export const adsRouter = {
     .input(
       z.object({
         campaignId: z.string().min(1),
-        platform: z.enum(PUSHABLE_AD_PLATFORMS).default("meta_ads"),
+        // Required: a default here silently pushed the wrong platform.
+        platform: z.enum(PUSHABLE_AD_PLATFORMS),
         connectionAccountId: z.string().min(1),
         adAccountId: z.string().min(1),
         goal: z.enum(AD_PUSH_GOALS),

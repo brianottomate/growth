@@ -1796,7 +1796,14 @@ function textAds(ads: Ad[]) {
 export async function pushDraftToPlatform(
   input: {
     campaignId: string;
-    platform?: PushableAdPlatform;
+    /**
+     * Explicit, never inferred. This used to default to Meta, from when Meta
+     * was the only platform — so an operator asking to push LinkedIn with the
+     * field unset pushed META instead. It happened to be caught here by the
+     * already-exists guard; on a campaign not yet on Meta it would have
+     * created a second Meta campaign while the operator watched for LinkedIn.
+     */
+    platform: PushableAdPlatform;
     connectionAccountId: string;
     adAccountId: string;
     goal: AdPushGoal;
@@ -1804,7 +1811,7 @@ export async function pushDraftToPlatform(
   },
   context: AdsWriteContext,
 ) {
-  const platform = input.platform ?? "meta_ads";
+  const platform = input.platform;
   const platformSpec = requireAdPlatformSpec(platform);
   const platformName = platformSpec.shortLabel;
   if (!platformSpec.features.goals.includes(input.goal)) {
@@ -2077,6 +2084,7 @@ async function pushToGoogle(args: PushArgs) {
 
   const provider = result.provider;
   await recordCompiledCampaign({
+    adAccountId: destination.adAccount.id,
     draft,
     campaign,
     status: result.status,
@@ -2398,6 +2406,7 @@ async function pushToMeta(args: PushArgs) {
       };
     }
     await recordCompiledCampaign({
+      adAccountId: destination.adAccount.id,
       draft,
       campaign,
       status: "paused",
@@ -2487,6 +2496,7 @@ async function pushToMeta(args: PushArgs) {
   }
 
   await recordCompiledCampaign({
+    adAccountId: destination.adAccount.id,
     draft,
     campaign,
     status: "paused",
@@ -2796,6 +2806,7 @@ async function pushToLinkedIn(args: PushArgs) {
       keyScope: `push:${campaign.id}:linkedin`,
     });
     await recordCompiledCampaign({
+      adAccountId: destination.adAccount.id,
       draft,
       campaign,
       status: "paused",
@@ -2888,6 +2899,7 @@ async function pushToLinkedIn(args: PushArgs) {
   }
 
   await recordCompiledCampaign({
+    adAccountId: destination.adAccount.id,
     draft,
     campaign,
     status: "paused",
@@ -2931,6 +2943,8 @@ async function recordCompiledCampaign(input: {
   budgetType: "daily" | "lifetime";
   externalCampaignId: string | null;
   heroThumbnailUrl: string | null;
+  /** The account the campaign was created under, for the manage deep link. */
+  adAccountId: string;
   sets: Array<{
     audience: PlanAudience | null;
     name: string;
@@ -2958,6 +2972,18 @@ async function recordCompiledCampaign(input: {
       budgetType: input.budgetType,
       adCount,
       heroThumbnailUrl: input.heroThumbnailUrl,
+      // Sync sets this when it PULLS a campaign, so a pushed one had no link
+      // to the platform at all and the "Open in platform" button never
+      // appeared on the thing we had just created.
+      ...(input.externalCampaignId
+        ? {
+            manageUrl:
+              adPlatformSpec(input.draft.platform)?.campaignManageUrl(
+                input.adAccountId,
+                input.externalCampaignId,
+              ) ?? null,
+          }
+        : {}),
     })
     .where(eq(platformCampaignTable.id, input.draft.id));
 

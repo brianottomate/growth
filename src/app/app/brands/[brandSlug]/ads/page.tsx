@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -111,6 +112,19 @@ function CampaignRow({
             >
               {c.name}
             </Link>
+            {/* Straight out to Ads Manager. Only once it exists there. */}
+            {c.manageUrl && (
+              <a
+                href={c.manageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open in ${platformLabel(c.platform)}`}
+                aria-label={`Open in ${platformLabel(c.platform)}`}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <ExternalLink className="size-3.5" />
+              </a>
+            )}
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
                 PLATFORM_CAMPAIGN_STATUS[c.status] ??
