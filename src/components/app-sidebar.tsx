@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Logo } from "@wandercom/design-system-web/ui/logo";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -123,9 +124,12 @@ const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: "Wander Performance",
+    items: [{ label: "Accounts", href: "/app/performance", icon: Handshake }],
+  },
+  {
     label: "Grow",
     items: [
-      { label: "Performance+", href: "/app/performance", icon: Handshake },
       { label: "Leads", href: "/app/leads", icon: Database, exact: true },
       {
         // Not a route of its own — send-review was deleted (same table, same
@@ -210,8 +214,11 @@ export function AppSidebar({
                 tooltip={orgName}
                 className="cursor-default"
               >
-                <div className="bg-primary text-primary-foreground flex aspect-square size-7 items-center justify-center rounded-md text-sm font-semibold">
-                  {orgName.slice(0, 1).toUpperCase()}
+                {/* The real logomark, not the first letter of the org name.
+                    Same component the client-facing connect page uses, so the
+                    back-office and the pages we send clients agree. */}
+                <div className="bg-primary text-primary-foreground flex aspect-square size-7 items-center justify-center rounded-md">
+                  <Logo variant="logomark" className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate text-sm font-semibold">

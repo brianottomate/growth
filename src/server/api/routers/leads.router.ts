@@ -34,6 +34,7 @@ import {
   SETTLED_PROSPECT_STATUSES,
 } from "@/server/clients/wander.client";
 import { memberTable } from "@/server/db/auth-schema";
+import { brandTable } from "@/server/db/brand-schema";
 import { createProspectFromLead } from "@/server/services/brand-relationship.service";
 import { captureAndPersistChannels } from "@/server/services/channel-discovery.service";
 import { capturePreviewVisual } from "@/server/services/pregen/preview-visual";
@@ -797,8 +798,8 @@ export const leadsRouter = createTRPCRouter({
       });
       if (!domain) return null;
 
-      const [contacts, channels, outreachRows, memberships] = await Promise.all(
-        [
+      const [contacts, channels, outreachRows, memberships, brandRows] =
+        await Promise.all([
           ctx.db
             .select({
               id: leadContactTable.id,
@@ -848,8 +849,30 @@ export const leadsRouter = createTRPCRouter({
               ),
             )
             .limit(1),
-        ],
-      );
+          // The prospect brand, if a rep already made one. Read here because
+          // the detail view's own button state was derived from the create
+          // mutation's result — client state that a reload throws away, so a
+          // brand that plainly existed showed as "Create prospect brand"
+          // again. The database is the only thing that knows.
+          ctx.db
+            .select({
+              id: brandTable.id,
+              slug: brandTable.slug,
+              name: brandTable.name,
+              website: brandTable.website,
+              logo: brandTable.logo,
+              tagline: brandTable.tagline,
+              websiteMeta: brandTable.websiteMeta,
+            })
+            .from(brandTable)
+            .where(
+              and(
+                eq(brandTable.leadDomain, domain.domain),
+                isNull(brandTable.deletedAt),
+              ),
+            )
+            .limit(1),
+        ]);
 
       const channel = scoreLeadChannel({
         domain: domain.domain,
@@ -869,6 +892,20 @@ export const leadsRouter = createTRPCRouter({
         contacts,
         outreach: outreachRows[0] ?? null,
         outreachHistory: outreachRows,
+        brand: brandRows[0]
+          ? {
+              ...brandRows[0],
+              // What `brand.enrich` fills in. Surfaced so the view can offer a
+              // re-run: enrichment only fires automatically on the call that
+              // creates the brand, so a brand that already existed never got
+              // scraped at all.
+              enriched: Boolean(
+                brandRows[0].logo ??
+                brandRows[0].tagline ??
+                brandRows[0].websiteMeta,
+              ),
+            }
+          : null,
         // Probing our own preview host, not a provider — cheap enough to do on
         // load, and it is the fact that gates the Generate button.
         preview: await probePreview(domain.pregenSiteUrl),

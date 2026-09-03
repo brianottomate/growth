@@ -207,7 +207,6 @@ const PREVIEW_TONE: Record<string, string> = {
   none: "bg-slate-500/15 text-slate-300",
 };
 
-
 const VERDICT_TONE: Record<string, string> = {
   send: "bg-emerald-500/15 text-emerald-300",
   review: "bg-amber-500/15 text-amber-300",
@@ -251,12 +250,16 @@ export function ProspectDetail({ domain }: { domain: string }) {
   // as its own mutation rather than as background work on the first one, so
   // the rep watches it finish instead of finding out by reloading the brand
   // page later.
-  const enrichBrand = useMutation(trpc.brand.enrich.mutationOptions());
+  const enrichBrand = useMutation(
+    trpc.brand.enrich.mutationOptions({ onSuccess: invalidate }),
+  );
   const createProspect = useMutation(
     trpc.leads.createProspect.mutationOptions({
       onSuccess: (result) => {
         if (result.enrichable) {
           enrichBrand.mutate({ id: result.brandId });
+        } else {
+          void invalidate();
         }
       },
     }),
@@ -291,7 +294,16 @@ export function ProspectDetail({ domain }: { domain: string }) {
     preview,
     outreach,
     cohort,
+    brand,
   } = prospect.data;
+  // The database first, the create mutation second. Deriving this from the
+  // mutation alone meant a reload forgot a brand that plainly existed. The two
+  // sources name the id differently, so normalize rather than union them.
+  const prospectBrand = brand
+    ? { id: brand.id, slug: brand.slug }
+    : createProspect.data
+      ? { id: createProspect.data.brandId, slug: createProspect.data.slug }
+      : null;
   // The other side of the blast-vs-bespoke debate, computed right here so the
   // two sequences this lead could receive sit on one screen. Merges in exactly
   // what a HubSpot template would: the selected contact's first name, the
@@ -440,23 +452,44 @@ export function ProspectDetail({ domain }: { domain: string }) {
             </a>
           ) : null}
           <span className="bg-border mx-1 h-6 w-px" />
-          {createProspect.data?.slug ? (
-            <Button size="sm" variant="outline" asChild disabled={enrichBrand.isPending}>
-              {/* Straight to setup: that page holds the pitch, intake and
-                  connect links, which is the next thing a rep needs. */}
-              <Link href={`/app/brands/${createProspect.data.slug}/setup`}>
+          {prospectBrand?.slug ? (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                asChild
+                disabled={enrichBrand.isPending}
+              >
+                {/* Straight to setup: that page holds the pitch, intake and
+                    connect links, which is the next thing a rep needs. */}
+                <Link href={`/app/brands/${prospectBrand.slug}/setup`}>
+                  {enrichBrand.isPending
+                    ? "Reading their site…"
+                    : "Open brand ↗"}
+                </Link>
+              </Button>
+              {/* Enrichment only fires automatically on the call that CREATES
+                  the brand, so a brand made earlier — or one whose scrape came
+                  back empty — never got one and had no way to ask for it. */}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={enrichBrand.isPending}
+                onClick={() => enrichBrand.mutate({ id: prospectBrand.id })}
+                title="Re-read their website for logo, tagline and description"
+              >
                 {enrichBrand.isPending
                   ? "Reading their site…"
-                  : createProspect.data.created
-                    ? "Brand ready ↗"
-                    : "Open brand ↗"}
-              </Link>
-            </Button>
+                  : brand?.enriched
+                    ? "Regenerate brand"
+                    : "Generate brand"}
+              </Button>
+            </>
           ) : (
             <Button
               size="sm"
               variant="outline"
-              disabled={createProspect.isPending}
+              disabled={createProspect.isPending || enrichBrand.isPending}
               onClick={() => createProspect.mutate({ domainId: row.id })}
             >
               {createProspect.isPending ? "Creating…" : "Create prospect brand"}
