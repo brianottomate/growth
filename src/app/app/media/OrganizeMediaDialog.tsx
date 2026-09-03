@@ -23,16 +23,33 @@ import { useTRPC, type RouterOutputs } from "@/trpc/react";
 type LibraryAsset = RouterOutputs["media"]["list"][number];
 type Taxonomy = RouterOutputs["media"]["taxonomy"];
 
+function text(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
 function readAnalysis(metadata: unknown) {
   if (!metadata || typeof metadata !== "object") return null;
   const value = (metadata as Record<string, unknown>).aiAnalysis;
   if (!value || typeof value !== "object") return null;
   const analysis = value as Record<string, unknown>;
+  const lessons = Array.isArray(analysis.reusableLessons)
+    ? analysis.reusableLessons.filter(
+        (lesson): lesson is string => typeof lesson === "string",
+      )
+    : [];
   return {
-    description:
-      typeof analysis.description === "string" ? analysis.description : null,
-    analyzedAt:
-      typeof analysis.analyzedAt === "string" ? analysis.analyzedAt : null,
+    description: text(analysis.description),
+    analyzedAt: text(analysis.analyzedAt),
+    // Video only. `evidence` says whether the model saw the storyboard or a
+    // single poster frame, which is the difference between a read and a guess.
+    summary: text(analysis.summary),
+    hook: text(analysis.hook),
+    lessons,
+    evidence:
+      analysis.evidence === "storyboard" || analysis.evidence === "poster"
+        ? analysis.evidence
+        : null,
+    transcriptError: text(analysis.transcriptError),
   };
 }
 
@@ -219,15 +236,41 @@ export function OrganizeMediaDialog({
             )}
           </div>
 
-          {asset.kind === "image" && (
+          {(asset.kind === "image" || asset.kind === "video") && (
             <div className="bg-muted/30 grid gap-2 rounded-lg border p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="size-4" />
                 <span className="text-sm font-medium">AI analysis</span>
+                {analysis?.evidence === "poster" && (
+                  <span
+                    className="text-muted-foreground text-[11px]"
+                    title="No storyboard was cut for this clip, so only one frame was read. Re-upload it to get the full teardown."
+                  >
+                    · from the poster frame only
+                  </span>
+                )}
               </div>
-              {analysis?.description && (
+              {(analysis?.summary ?? analysis?.description) && (
                 <p className="text-muted-foreground text-xs">
-                  {analysis.description}
+                  {analysis?.summary ?? analysis?.description}
+                </p>
+              )}
+              {analysis?.hook && (
+                <p className="text-xs">
+                  <span className="font-medium">Hook: </span>
+                  <span className="text-muted-foreground">{analysis.hook}</span>
+                </p>
+              )}
+              {analysis && analysis.lessons.length > 0 && (
+                <ul className="text-muted-foreground list-disc space-y-0.5 pl-4 text-xs">
+                  {analysis.lessons.slice(0, 4).map((lesson, index) => (
+                    <li key={index}>{lesson}</li>
+                  ))}
+                </ul>
+              )}
+              {analysis?.transcriptError && (
+                <p className="text-muted-foreground text-[11px]">
+                  No transcript: {analysis.transcriptError}
                 </p>
               )}
               <Input
@@ -245,7 +288,11 @@ export function OrganizeMediaDialog({
                 }
               >
                 <Sparkles className="size-3.5" />
-                {analysis ? "Re-analyze" : "Analyze image"}
+                {analysis
+                  ? "Re-analyze"
+                  : asset.kind === "video"
+                    ? "Analyze video"
+                    : "Analyze image"}
               </Button>
             </div>
           )}

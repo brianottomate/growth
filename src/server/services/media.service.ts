@@ -1,7 +1,8 @@
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { z } from "zod";
 
 import { db, withTransaction } from "../db";
-import type { MediaKind } from "../db/schema";
+import type { MediaKind, MediaStoryboard } from "../db/schema";
 import {
   mediaAssetTable,
   mediaAssetTagTable,
@@ -17,6 +18,10 @@ import {
   maxChatAttachmentBytes,
 } from "@/lib/chat-attachment";
 import { classifyFetchUrl } from "@/server/ai/url-safety";
+import {
+  MAX_STORYBOARD_BOARDS,
+  MAX_STORYBOARD_DURATION_MS,
+} from "@/lib/storyboard-limits";
 
 export const MEDIA_MIME = {
   image: ["image/jpeg", "image/png", "image/webp", "image/avif"],
@@ -37,6 +42,91 @@ function safeFilename(filename: string, fallback = "file"): string {
 const MAX_IMPORTED_IMAGE_BYTES = 25 * 1024 * 1024;
 /** Format the browser encodes downscaled tiles as. */
 const THUMBNAIL_MIME = "image/webp";
+/** Boards are PNG so the frame-number labels stay legible to the model. */
+const STORYBOARD_BOARD_MIME = "image/png";
+
+/**
+ * What the browser reports after cutting a storyboard: geometry and frame map,
+ * never URLs. The server derives every board URL from the video's key, exactly
+ * as `finalizeR2Upload` derives the thumbnail, so a client cannot point an
+ * asset at boards it did not make.
+ */
+const storyboardDescriptorShape = z.object({
+  durationMs: z.number().int().positive().max(MAX_STORYBOARD_DURATION_MS),
+  sampleIntervalMs: z.number().int().positive().max(60_000),
+  gridSize: z.number().int().min(2).max(5),
+  boards: z
+    .array(
+      z.object({
+        index: z.number().int().min(0).max(MAX_STORYBOARD_BOARDS - 1),
+        width: z.number().int().positive(),
+        height: z.number().int().positive(),
+        firstFrame: z.number().int().positive(),
+        lastFrame: z.number().int().positive(),
+      }),
+    )
+    .min(1)
+    .max(MAX_STORYBOARD_BOARDS),
+  frames: z
+    .array(
+      z.object({
+        index: z.number().int().positive(),
+        timestampMs: z.number().int().min(0),
+        boardIndex: z.number().int().min(0),
+        row: z.number().int().min(0),
+        column: z.number().int().min(0),
+      }),
+    )
+    .min(1)
+    .max(300),
+});
+export const storyboardDescriptorSchema = storyboardDescriptorShape
+  .refine(
+    (value) =>
+      new Set(value.boards.map((board) => board.index)).size ===
+      value.boards.length,
+    { message: "Storyboard board indices must be unique." },
+  )
+  .refine(
+    (value) => {
+      const present = new Set(value.boards.map((board) => board.index));
+      return value.frames.every((frame) => present.has(frame.boardIndex));
+    },
+    { message: "Every storyboard frame must sit on an included board." },
+  );
+export type StoryboardDescriptor = z.infer<typeof storyboardDescriptorSchema>;
+
+function storyboardFromDescriptor(
+  videoKey: string,
+  descriptor: StoryboardDescriptor,
+): MediaStoryboard {
+  return {
+    durationMs: descriptor.durationMs,
+    sampleIntervalMs: descriptor.sampleIntervalMs,
+    gridSize: descriptor.gridSize,
+    frames: descriptor.frames,
+    boards: descriptor.boards.map((board) => {
+      const pathname = R2.buildStoryboardKey(videoKey, board.index);
+      return { ...board, pathname, url: R2.publicUrl(pathname) };
+    }),
+  };
+}
+
+/**
+ * Whole seconds, the unit `media_asset.duration` has always used. Null at the
+ * renderer's clamp: a longer clip is sampled only to that point, and recording
+ * the clamp as its length would be a lie.
+ */
+function durationSeconds(durationMs: number): number | null {
+  if (durationMs >= MAX_STORYBOARD_DURATION_MS) return null;
+  return Math.max(1, Math.round(durationMs / 1_000));
+}
+
+/** The column values a storyboard settles: itself, and the length if known. */
+function storyboardColumns(storyboard: MediaStoryboard) {
+  const duration = durationSeconds(storyboard.durationMs);
+  return { storyboard, ...(duration ? { duration } : {}) };
+}
 /**
  * Image types any import path will store — direct upload, remote URL, or a
  * connector. Derived from MEDIA_MIME so there is one list, not three.
@@ -117,6 +207,8 @@ export async function createR2Upload(input: {
   filename: string;
   mimeType: string;
   size: number;
+  /** Storyboard boards the browser has already cut for a video. */
+  boardCount?: number;
 }) {
   const kind = kindForMime(input.mimeType);
   const [asset] = await db
@@ -163,12 +255,27 @@ export async function createR2Upload(input: {
         })()
       : null;
 
+  const boardCount =
+    kind === "video"
+      ? Math.min(MAX_STORYBOARD_BOARDS, Math.max(0, input.boardCount ?? 0))
+      : 0;
+  const boardUploads = await Promise.all(
+    Array.from({ length: boardCount }, async (_, index) => {
+      const boardKey = R2.buildStoryboardKey(key, index);
+      return {
+        index,
+        uploadUrl: await R2.presignPut(boardKey, STORYBOARD_BOARD_MIME),
+      };
+    }),
+  );
+
   return {
     mediaId: asset.id,
     uploadUrl,
     publicUrl,
     pathname: key,
     ...(thumbnail ?? {}),
+    boardUploads,
   };
 }
 
@@ -181,6 +288,8 @@ export async function finalizeR2Upload(input: {
   height?: number;
   /** The browser PUT a downscaled tile to the presigned thumbnail slot. */
   hasThumbnail?: boolean;
+  /** The browser PUT these boards to the presigned board slots. */
+  storyboard?: StoryboardDescriptor;
 }) {
   const asset = await getMedia(input.mediaId);
   if (asset?.provider !== "r2") return null;
@@ -188,11 +297,15 @@ export async function finalizeR2Upload(input: {
     throw new Error("Upload does not match the media asset");
   }
 
-  // Derived, never client-supplied — the only key the presign could have been
-  // issued for.
+  // Derived, never client-supplied — the only keys the presigns could have
+  // been issued for.
   const thumbnailUrl = input.hasThumbnail
     ? R2.publicUrl(R2.buildThumbnailKey(asset.r2Key))
     : null;
+  const storyboard =
+    input.storyboard && asset.kind === "video"
+      ? storyboardFromDescriptor(asset.r2Key, input.storyboard)
+      : null;
 
   const [updated] = await db
     .update(mediaAssetTable)
@@ -201,6 +314,7 @@ export async function finalizeR2Upload(input: {
       width: input.width ?? null,
       height: input.height ?? null,
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      ...(storyboard ? storyboardColumns(storyboard) : {}),
     })
     .where(eq(mediaAssetTable.id, input.mediaId))
     .returning();
@@ -844,6 +958,9 @@ export async function listMedia(input: {
         : undefined,
       isNull(mediaAssetTable.deletedAt),
     ),
+    // The storyboard is analysis input, up to a few hundred frame entries per
+    // clip; nothing in a grid reads it.
+    columns: { storyboard: false },
     with: {
       folder: true,
       tagAssignments: { with: { tag: true } },
@@ -960,12 +1077,23 @@ export async function deleteMedia(id: string) {
     R2.delete(asset.r2Key).catch((error) =>
       console.error(`R2 delete failed for ${asset.id}:`, error),
     );
-    // Derived tiles are separate objects — without this they outlive the asset
+    // Derived objects are separate — without this they outlive the asset
     // forever. Only ours: an externally-set thumbnail isn't at this key.
     const derivedThumbnailKey = R2.buildThumbnailKey(asset.r2Key);
     if (asset.thumbnailUrl === R2.publicUrl(derivedThumbnailKey)) {
       R2.delete(derivedThumbnailKey).catch((error) =>
         console.error(`R2 thumbnail delete failed for ${asset.id}:`, error),
+      );
+    }
+    // Storyboard boards, plus the manifest a chat upload leaves. Both keys are
+    // derived, so a missing object just no-ops.
+    const derivedKeys = [
+      ...(asset.storyboard?.boards ?? []).map((board) => board.pathname),
+      ...(asset.storyboard ? [R2.buildStoryboardManifestKey(asset.r2Key)] : []),
+    ];
+    for (const key of derivedKeys) {
+      R2.delete(key).catch((error) =>
+        console.error(`R2 storyboard delete failed for ${asset.id}:`, error),
       );
     }
   } else if (asset.provider === "stream" && asset.streamUid) {
@@ -992,6 +1120,9 @@ export async function createChatR2Upload(input: {
   url: string;
   mediaType: string;
   thumbnailUploadUrl?: string;
+  /** One presigned slot per possible board, indexed; the browser uses as many as it cut. */
+  boardUploadUrls?: string[];
+  manifestUploadUrl?: string;
 }> {
   if (!isChatAttachmentMediaType(input.mediaType)) {
     throw new Error("Only supported images and videos can be attached");
@@ -1013,18 +1144,58 @@ export async function createChatR2Upload(input: {
     uploadUrl: await R2.presignPut(key, input.mediaType),
     url: R2.publicUrl(key),
     mediaType: input.mediaType,
-    // Video gets a poster slot. The URL is derived from the video's own key, so
-    // nothing has to carry it: an AI SDK file part has no field for a second
-    // URL, and `chatAttachmentPoster` recomputes the one legal value later.
+    // Video gets a poster slot plus storyboard slots. Every URL is derived from
+    // the video's own key, so nothing has to carry them: an AI SDK file part
+    // has no field for a second URL, and the server recomputes the legal values
+    // when the attachment is promoted. Presigning is a local signature, so ten
+    // slots the browser may not fill cost nothing.
     ...(isVideo
       ? {
           thumbnailUploadUrl: await R2.presignPut(
             R2.buildThumbnailKey(key),
             THUMBNAIL_MIME,
           ),
+          boardUploadUrls: await Promise.all(
+            Array.from({ length: MAX_STORYBOARD_BOARDS }, (_, index) =>
+              R2.presignPut(
+                R2.buildStoryboardKey(key, index),
+                STORYBOARD_BOARD_MIME,
+              ),
+            ),
+          ),
+          manifestUploadUrl: await R2.presignPut(
+            R2.buildStoryboardManifestKey(key),
+            "application/json",
+          ),
         }
       : {}),
   };
+}
+
+/**
+ * The storyboard a chat upload left beside its video, if the composer managed
+ * to cut one. Read from the public bucket and validated like any client input;
+ * board URLs are derived rather than taken from the manifest.
+ */
+async function chatAttachmentStoryboard(
+  videoUrl: string,
+): Promise<MediaStoryboard | null> {
+  let key: string;
+  try {
+    if (!R2.isPublicUrl(videoUrl)) return null;
+    key = new URL(videoUrl).pathname.replace(/^\//, "");
+  } catch {
+    return null;
+  }
+  const manifestUrl = R2.publicUrl(R2.buildStoryboardManifestKey(key));
+  const response = await fetch(manifestUrl, {
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  const parsed = storyboardDescriptorSchema.safeParse(
+    await response.json().catch(() => null),
+  );
+  return parsed.success ? storyboardFromDescriptor(key, parsed.data) : null;
 }
 
 /**
@@ -1079,10 +1250,16 @@ export async function promoteChatMedia(input: {
   // The bucket root maps to R2_PUBLIC_BASE_URL, so the URL pathname is the key.
   const key = parsed.pathname.replace(/^\//, "");
   const filename = key.split("/").pop() ?? "chat-image";
-  // Video is anonymous without one: every picker falls back to a film icon, and
-  // `draftAd` cannot make a Meta video ad at all.
-  const thumbnailUrl =
-    kind === "video" ? await chatAttachmentPoster(input.url) : null;
+  // Video is anonymous without a poster (every picker falls back to a film
+  // icon, and `draftAd` cannot make a Meta video ad), and unanalyzable without
+  // a storyboard. Both were cut by the composer if they exist at all.
+  const [thumbnailUrl, storyboard] =
+    kind === "video"
+      ? await Promise.all([
+          chatAttachmentPoster(input.url),
+          chatAttachmentStoryboard(input.url),
+        ])
+      : [null, null];
   const [asset] = await db
     .insert(mediaAssetTable)
     .values({
@@ -1097,6 +1274,7 @@ export async function promoteChatMedia(input: {
       r2Key: key,
       url: input.url,
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      ...(storyboard ? storyboardColumns(storyboard) : {}),
       metadata: { source: "chat_attachment" },
     })
     .returning();

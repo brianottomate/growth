@@ -446,7 +446,8 @@ export const mediaAnalysisRead = growthDomainTool({
 });
 
 export const mediaAnalysisWrite = growthDomainTool({
-  description: "Analyze an image or prepare durable storyboard video analysis.",
+  description:
+    "Analyze a library image or video (analyzeImage handles both), or prepare a durable storyboard analysis of a timeline post's video.",
   actions: {
     analyzeImage: analyzeMediaAsset,
     prepareVideo: analyzeTimelineVideo,

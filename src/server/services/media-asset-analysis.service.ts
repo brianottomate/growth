@@ -8,33 +8,95 @@ import {
   mediaAssetTagTable,
   mediaTagTable,
 } from "@/server/db/schema";
-import { analyzeMediaImage } from "./media-analysis.service";
+import { transcribeVideoUrl } from "./audio-transcription.service";
+import {
+  analyzeMediaImage,
+  analyzeMediaVideo,
+  videoEvidence,
+  type MediaAnalysis,
+  type MediaVideoAnalysis,
+} from "./media-analysis.service";
 
-/** Shared persistence workflow used by the library UI, chat, and MCP. */
+const TRANSCRIPTION_BUDGET_MS = 50_000;
+
+/**
+ * Shared persistence workflow used by the library UI, chat, and MCP.
+ *
+ * Images and videos land in the same place — title, alt, managed tags on the
+ * row, the full analysis under `metadata.aiAnalysis` — so a clip files and
+ * searches exactly like a still. A video is read from the storyboard cut at
+ * upload when there is one, and from its poster frame when there is not; the
+ * result records which, because a one-frame read is a weaker claim.
+ */
 export async function analyzeStoredMediaAsset(input: {
   mediaId: string;
   brandName: string;
   steer?: string;
-}) {
+}): Promise<MediaAnalysis | MediaVideoAnalysis> {
   const asset = await db.query.mediaAssetTable.findFirst({
     where: eq(mediaAssetTable.id, input.mediaId),
   });
-  if (asset?.kind !== "image" || !asset.url) {
-    throw new Error("Only ready images can be analyzed.");
+  if (!asset?.url || (asset.kind !== "image" && asset.kind !== "video")) {
+    throw new Error("Only ready images and videos can be analyzed.");
   }
   const managedTags = await db.query.mediaTagTable.findMany({
     where: eq(mediaTagTable.brandId, asset.brandId),
     orderBy: [asc(mediaTagTable.name)],
   });
-  const analysis = await analyzeMediaImage({
-    url: asset.url,
-    brandName: input.brandName,
-    tags: managedTags.map((tag) => ({
-      name: tag.name,
-      description: tag.description,
-    })),
-    steer: input.steer,
-  });
+  const tags = managedTags.map((tag) => ({
+    name: tag.name,
+    description: tag.description,
+  }));
+
+  let analysis: MediaAnalysis | MediaVideoAnalysis;
+  if (asset.kind === "image") {
+    analysis = await analyzeMediaImage({
+      url: asset.url,
+      brandName: input.brandName,
+      tags,
+      steer: input.steer,
+    });
+  } else {
+    const evidence = videoEvidence(asset);
+    if (!evidence) {
+      throw new Error(
+        "This video has no frames to look at: no storyboard was cut and it has no poster. Re-upload it on /app/media, which captures both.",
+      );
+    }
+    // Transcription is worth having and not worth failing over: Whisper caps
+    // at 25 MB, a silent clip is a legitimate clip, and a stalled upstream
+    // should cost the transcript, not the analysis behind it.
+    let transcript: MediaVideoAnalysis["transcript"] = null;
+    let transcriptError: string | undefined;
+    try {
+      const result = await Promise.race([
+        transcribeVideoUrl(asset.url),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Transcription took longer than 50 s.")),
+            TRANSCRIPTION_BUDGET_MS,
+          ),
+        ),
+      ]);
+      transcript = result.text.trim()
+        ? { text: result.text, language: result.language }
+        : null;
+    } catch (error) {
+      transcriptError =
+        error instanceof Error ? error.message : "Transcription failed.";
+    }
+    analysis = await analyzeMediaVideo({
+      imageUrls: evidence.imageUrls,
+      evidence: evidence.source,
+      transcript,
+      transcriptError,
+      durationSeconds: asset.duration,
+      brandName: input.brandName,
+      tags,
+      steer: input.steer,
+    });
+  }
+
   const tagIdByName = new Map(
     managedTags.map((tag) => [tag.name.toLowerCase(), tag.id] as const),
   );

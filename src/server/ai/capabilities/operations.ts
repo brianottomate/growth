@@ -237,7 +237,7 @@ export const proposeContentGroupings = growthAction({
 
 export const analyzeMediaAsset = growthAction({
   description:
-    "Analyze one ready image in an owned brand's media library using the brand's human-managed tag vocabulary. Saves literal visual analysis, suggested managed tags, alt text, and optional human steering; it does not invent a campaign strategy.",
+    "Analyze one ready image or video in an owned brand's media library using the brand's human-managed tag vocabulary. Saves literal visual analysis, suggested managed tags, alt text, and optional human steering; for video it also saves the transcript and a creative teardown (summary, hook, structure, pacing, key beats, reusable lessons), read from the storyboard cut at upload. It does not invent a campaign strategy.",
   inputSchema: z.object({
     mediaId: z.string(),
     steer: z.string().trim().max(500).optional(),
@@ -255,7 +255,7 @@ export const analyzeMediaAsset = growthAction({
 
 export const saveChatMediaToLibrary = growthAction({
   description:
-    "Save pasted chat media (images, GIFs, or videos) into an owned brand's durable media library without needing a content work item, then auto-analyze each image against the brand's managed tag vocabulary so it arrives tagged. Use only when the operator explicitly asks to save, upload, or keep pasted media in the library or media pool. Pass the complete media array for the current turn; when the operator refers to attachments from an earlier turn, omit media and the server resolves the newest owned attachments in this conversation.",
+    "Save pasted chat media (images, GIFs, or videos) into an owned brand's durable media library without needing a content work item, then auto-analyze each image and video against the brand's managed tag vocabulary so it arrives tagged (video also gets a transcript and creative teardown). Use only when the operator explicitly asks to save, upload, or keep pasted media in the library or media pool. Pass the complete media array for the current turn; when the operator refers to attachments from an earlier turn, omit media and the server resolves the newest owned attachments in this conversation.",
   inputSchema: z.object({
     brandId: z.string(),
     media: z
@@ -273,7 +273,7 @@ export const saveChatMediaToLibrary = growthAction({
       .boolean()
       .default(true)
       .describe(
-        "Run managed-tag analysis on each saved image (videos and GIFs are stored untagged).",
+        "Run managed-tag analysis on each saved image and video (GIFs are stored untagged). Video also gets a transcript and creative teardown, and takes longer.",
       ),
   }),
   execute: async (input, ctx) => {
@@ -307,41 +307,52 @@ export const saveChatMediaToLibrary = growthAction({
         "No user-owned media attachments are available in this conversation.",
       );
     }
-    const saved = [];
+    const assets = [];
     for (const item of media) {
-      const asset = await MediaService.promoteChatMedia({
-        brandId: brand.id,
-        userId: ctx.userId,
-        url: item.url,
-        mimeType: item.mediaType,
-        title: item.title,
-      });
-      // Tagging is best-effort — a failed analysis must not lose the save.
-      let suggestedTags: string[] = [];
-      let analyzed = false;
-      if (input.autoAnalyze && asset.kind === "image") {
-        try {
-          const analysis = await analyzeStoredMediaAsset({
-            mediaId: asset.id,
-            brandName: brand.name,
-          });
-          suggestedTags = analysis.tags;
-          analyzed = true;
-        } catch {
-          analyzed = false;
-        }
-      }
-      saved.push({
-        mediaAssetId: asset.id,
-        kind: asset.kind,
-        url: asset.url,
-        // Video needs its poster passed to adsWrite.draftAd, so return it here
-        // rather than making the model go and look the asset up again.
-        thumbnailUrl: asset.thumbnailUrl,
-        analyzed,
-        suggestedTags,
-      });
+      assets.push(
+        await MediaService.promoteChatMedia({
+          brandId: brand.id,
+          userId: ctx.userId,
+          url: item.url,
+          mimeType: item.mediaType,
+          title: item.title,
+        }),
+      );
     }
+    // Tagging is best-effort — a failed analysis must not lose the save. Runs
+    // in parallel because a video analysis transcribes and reads several
+    // boards, and five clips in series would not fit the request.
+    const saved = await Promise.all(
+      assets.map(async (asset) => {
+        let suggestedTags: string[] = [];
+        let analyzed = false;
+        if (
+          input.autoAnalyze &&
+          (asset.kind === "image" || asset.kind === "video")
+        ) {
+          try {
+            const analysis = await analyzeStoredMediaAsset({
+              mediaId: asset.id,
+              brandName: brand.name,
+            });
+            suggestedTags = analysis.tags;
+            analyzed = true;
+          } catch {
+            analyzed = false;
+          }
+        }
+        return {
+          mediaAssetId: asset.id,
+          kind: asset.kind,
+          url: asset.url,
+          // Video needs its poster passed to adsWrite.draftAd, so return it
+          // here rather than making the model go and look the asset up again.
+          thumbnailUrl: asset.thumbnailUrl,
+          analyzed,
+          suggestedTags,
+        };
+      }),
+    );
     return { ok: true as const, brandId: brand.id, saved, url: "/app/media" };
   },
 });

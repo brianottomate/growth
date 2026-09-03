@@ -39,7 +39,8 @@ export function EditLinkDialog({
   onOpenChange,
   onSaved,
 }: {
-  asset: MediaAsset | null;
+  // The list query leaves the storyboard behind; nothing here needs it.
+  asset: Omit<MediaAsset, "storyboard"> | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;

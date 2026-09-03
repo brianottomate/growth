@@ -57,6 +57,11 @@ import {
 import { putWithProgress } from "@/lib/upload-with-progress";
 import { createVideoThumbnail, THUMBNAIL_MIME } from "@/lib/image-thumbnail";
 import {
+  captureVideoStoryboard,
+  storyboardDescriptor,
+  uploadStoryboardBoards,
+} from "@/lib/video-artifacts";
+import {
   GROWTH_CAPABILITY_LABELS,
   isGrowthCapabilityId,
 } from "@/lib/growth-capabilities";
@@ -505,24 +510,51 @@ export function OverviewChat({
                 ),
             });
 
-            // A poster frame for video, cut from the file we already have in
-            // hand. Without it the clip is anonymous everywhere downstream and
-            // cannot become a Meta video ad. Best-effort throughout: the
-            // attachment itself has already landed, so nothing here may fail it.
-            if (
-              uploadTarget.thumbnailUploadUrl &&
-              attachment.mediaType.startsWith("video/")
-            ) {
-              const { thumbnail } = await createVideoThumbnail(
-                attachment.file,
-              ).catch(() => ({ thumbnail: null }));
-              if (thumbnail) {
-                await fetch(uploadTarget.thumbnailUploadUrl, {
-                  method: "PUT",
-                  headers: { "Content-Type": THUMBNAIL_MIME },
-                  body: thumbnail,
-                }).catch(() => null);
+            // A poster frame and a storyboard for video, cut from the file we
+            // already have in hand. Without the poster the clip is anonymous
+            // everywhere downstream and cannot become a Meta video ad; without
+            // the storyboard it cannot be analyzed or tagged once it reaches
+            // the library. Best-effort throughout: the attachment itself has
+            // already landed, so nothing here may fail it.
+            if (attachment.mediaType.startsWith("video/")) {
+              const { thumbnailUploadUrl, boardUploadUrls, manifestUploadUrl } =
+                uploadTarget;
+              const [{ thumbnail }, storyboard] = await Promise.all([
+                createVideoThumbnail(attachment.file).catch(() => ({
+                  thumbnail: null,
+                })),
+                captureVideoStoryboard(attachment.file),
+              ]);
+              const puts: Promise<unknown>[] = [];
+              if (thumbnail && thumbnailUploadUrl) {
+                puts.push(
+                  fetch(thumbnailUploadUrl, {
+                    method: "PUT",
+                    headers: { "Content-Type": THUMBNAIL_MIME },
+                    body: thumbnail,
+                  }).catch(() => null),
+                );
               }
+              if (storyboard && boardUploadUrls && manifestUploadUrl) {
+                puts.push(
+                  uploadStoryboardBoards(
+                    storyboard,
+                    (index) => boardUploadUrls[index],
+                  ).then((landed) => {
+                    const descriptor = storyboardDescriptor(storyboard, landed);
+                    if (!descriptor) return null;
+                    // The manifest is how the server learns the storyboard
+                    // exists once the attachment is promoted; there is no
+                    // media row yet to hold it.
+                    return fetch(manifestUploadUrl, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(descriptor),
+                    }).catch(() => null);
+                  }),
+                );
+              }
+              await Promise.all(puts);
             }
             updatePendingAttachments((current) =>
               current.map((pending) =>

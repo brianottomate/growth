@@ -10,6 +10,12 @@ import {
   createVideoThumbnail,
   THUMBNAIL_MIME,
 } from "@/lib/image-thumbnail";
+import {
+  captureVideoStoryboard,
+  MAX_STORYBOARD_BOARDS,
+  storyboardDescriptor,
+  uploadStoryboardBoards,
+} from "@/lib/video-artifacts";
 import type { MediaItem } from "@/server/db/schema";
 
 // Mirrors the media library's accepted types (src/app/app/media/MediaLibrary.tsx).
@@ -82,17 +88,27 @@ export function useMediaUpload(brandId: string) {
               pathname,
               thumbnailUploadUrl,
               thumbnailPublicUrl,
+              boardUploads,
             } = await createUploadUrl.mutateAsync({
               brandId,
               filename: file.name,
               mimeType: file.type,
               size: file.size,
+              // Slots for every board we might cut; presigning is free.
+              boardCount: isVideo ? MAX_STORYBOARD_BOARDS : 0,
             });
-            const put = await fetch(uploadUrl, {
-              method: "PUT",
-              headers: { "Content-Type": file.type },
-              body: file,
-            });
+            // The storyboard is what makes the clip analyzable later, from
+            // anywhere, and the browser is the only place it can be cut. It
+            // runs alongside the PUT so a long clip is not stuck at 0% while
+            // frames are sampled.
+            const [put, storyboard] = await Promise.all([
+              fetch(uploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": file.type },
+                body: file,
+              }),
+              isVideo ? captureVideoStoryboard(file) : Promise.resolve(null),
+            ]);
             if (!put.ok) throw new Error(`Upload failed (${put.status})`);
 
             // Best-effort: a missing tile just means the grid falls back to the
@@ -107,6 +123,18 @@ export function useMediaUpload(brandId: string) {
               if (putThumbnail?.ok) thumbnailUrl = thumbnailPublicUrl;
             }
 
+            const landed = storyboard
+              ? await uploadStoryboardBoards(
+                  storyboard,
+                  (index) =>
+                    boardUploads.find((slot) => slot.index === index)
+                      ?.uploadUrl,
+                )
+              : new Set<number>();
+            const descriptor = storyboard
+              ? storyboardDescriptor(storyboard, landed)
+              : null;
+
             await finalizeUpload.mutateAsync({
               mediaId,
               url: publicUrl,
@@ -114,6 +142,7 @@ export function useMediaUpload(brandId: string) {
               width: sourceWidth || undefined,
               height: sourceHeight || undefined,
               hasThumbnail: Boolean(thumbnailUrl),
+              ...(descriptor ? { storyboard: descriptor } : {}),
             });
             out[index] = {
               url: publicUrl,

@@ -8,7 +8,11 @@ import { createTRPCContext } from "@/server/api/trpc";
 // Human-triggered content analysis includes a live source read plus a structured
 // model pass. Keep the shared tRPC endpoint within the Pro/Fluid execution
 // window instead of cutting those advisory jobs off at the platform default.
-export const maxDuration = 120;
+// Fluid compute bills for active CPU, not wall time, so a long-running
+// mutation (a video analysis that transcribes and then reads ten boards, an
+// eight-home ad draft) can take the time it needs instead of being sized to
+// fit a two-minute ceiling.
+export const maxDuration = 800;
 
 /**
  * This wraps the `createTRPCContext` helper and provides the required context for the tRPC API when

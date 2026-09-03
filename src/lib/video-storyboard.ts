@@ -42,8 +42,10 @@ type CapturedFrame = {
   timestampMs: number;
 };
 
-const MAX_DURATION_MS = 300_000;
-const MAX_BOARDS = 10;
+import {
+  MAX_STORYBOARD_BOARDS as MAX_BOARDS,
+  MAX_STORYBOARD_DURATION_MS as MAX_DURATION_MS,
+} from "@/lib/storyboard-limits";
 
 function waitForVideoMetadata(video: HTMLVideoElement) {
   return new Promise<void>((resolve, reject) => {

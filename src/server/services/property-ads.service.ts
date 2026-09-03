@@ -231,12 +231,11 @@ export async function draftAdsFromHomes(input: {
     input.campaignId,
     input.organizationId,
   );
-  // Eight, not ten: every card is a download, an image encode and two R2
-  // writes, and the tRPC route this runs under has a 120-second budget. A run
-  // that times out leaves rendered assets behind and no ads to show for them.
+  // Ten is Meta's own carousel ceiling. The cap used to be eight to fit a
+  // two-minute route budget; the route now allows what the work needs.
   const size = Math.min(
     Math.max(input.carouselSize ?? DEFAULT_CAROUSEL_SIZE, 1),
-    8,
+    10,
   );
 
   const { listings, notes } = await homesForCampaign(brand);

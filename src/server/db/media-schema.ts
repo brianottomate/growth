@@ -91,6 +91,23 @@ export type VideoTranscriptWord = {
   endMs: number;
 };
 
+/**
+ * Sampled frames of a library video, laid out on numbered storyboard boards.
+ *
+ * Only a browser can decode video, and the one moment a browser reliably holds
+ * the file is upload. So the boards are cut then and stored beside the clip,
+ * which lets analysis run later from anywhere — the library, chat, MCP — with
+ * no browser in the loop. Board images live at keys derived from the video's
+ * own key (`R2.buildStoryboardKey`), so the server never trusts a client URL.
+ */
+export type MediaStoryboard = {
+  durationMs: number;
+  sampleIntervalMs: number;
+  gridSize: number;
+  boards: VideoAnalysisBoard[];
+  frames: VideoAnalysisFrame[];
+};
+
 // ---- FOLDERS + MANAGED TAGS --------------------------------------
 
 export const mediaFolderTable = pgTable(
@@ -213,6 +230,7 @@ export const mediaAssetTable = pgTable(
     width: t.integer(),
     height: t.integer(),
     duration: t.integer(), // seconds, video/audio only
+    storyboard: t.jsonb().$type<MediaStoryboard>(), // video only
 
     metadata: t.jsonb(),
 

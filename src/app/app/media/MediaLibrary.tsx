@@ -24,7 +24,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 
-import type { MediaAsset, MediaKind } from "@/server/db/schema";
+import type { MediaKind } from "@/server/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
@@ -41,6 +41,12 @@ import {
   THUMBNAIL_MIME,
 } from "@/lib/image-thumbnail";
 import { putWithProgress } from "@/lib/upload-with-progress";
+import {
+  captureVideoStoryboard,
+  MAX_STORYBOARD_BOARDS,
+  storyboardDescriptor,
+  uploadStoryboardBoards,
+} from "@/lib/video-artifacts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SimpleSelect } from "@/components/ui/select";
@@ -82,7 +88,7 @@ function launchHref(opts: {
 }
 
 /** Deep-link for a media asset (only hand the model a URL it can actually fetch). */
-function assetLaunchHref(asset: MediaAsset, brandId: string): string {
+function assetLaunchHref(asset: LibraryAsset, brandId: string): string {
   const isExternal = asset.provider === "external";
   return launchHref({
     brandId,
@@ -188,7 +194,7 @@ export function MediaLibrary({
   const linkThumb = usePhotoPicker();
 
   // "Edit link" dialog — the asset currently being edited.
-  const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
+  const [editingAsset, setEditingAsset] = useState<LibraryAsset | null>(null);
 
   const listInput = {
     brandId,
@@ -265,7 +271,7 @@ export function MediaLibrary({
   const analyzeMedia = useMutation(
     trpc.media.analyze.mutationOptions({
       onSuccess: () => {
-        toast.success("Image analyzed");
+        toast.success("Analyzed and tagged");
         void invalidate();
       },
       onError: (error) => toast.error(error.message),
@@ -305,19 +311,34 @@ export function MediaLibrary({
           filename: file.name,
           mimeType: file.type,
           size: file.size,
+          // Slots for every board we might cut; presigning is free.
+          boardCount: isVideo ? MAX_STORYBOARD_BOARDS : 0,
         });
         pendingMediaId = created.mediaId;
-        const { mediaId, uploadUrl, publicUrl, pathname, thumbnailUploadUrl } =
-          created;
-        await putWithProgress(uploadUrl, file, {
-          contentType: file.type,
-          onProgress: (fraction) =>
-            setUploads((current) =>
-              current.map((upload) =>
-                upload.key === uploadKey ? { ...upload, fraction } : upload,
+        const {
+          mediaId,
+          uploadUrl,
+          publicUrl,
+          pathname,
+          thumbnailUploadUrl,
+          boardUploads,
+        } = created;
+        // The storyboard is what makes the clip analyzable later, from
+        // anywhere, and the browser is the only place it can be cut. It runs
+        // alongside the PUT so a long clip is not stuck at 0% while frames
+        // are sampled.
+        const [, storyboard] = await Promise.all([
+          putWithProgress(uploadUrl, file, {
+            contentType: file.type,
+            onProgress: (fraction) =>
+              setUploads((current) =>
+                current.map((upload) =>
+                  upload.key === uploadKey ? { ...upload, fraction } : upload,
+                ),
               ),
-            ),
-        });
+          }),
+          isVideo ? captureVideoStoryboard(file) : Promise.resolve(null),
+        ]);
 
         // Best-effort — a missing tile only means the grid uses the original.
         let hasThumbnail = false;
@@ -333,6 +354,17 @@ export function MediaLibrary({
           hasThumbnail = putThumbnail;
         }
 
+        const landed = storyboard
+          ? await uploadStoryboardBoards(
+              storyboard,
+              (index) =>
+                boardUploads.find((slot) => slot.index === index)?.uploadUrl,
+            )
+          : new Set<number>();
+        const descriptor = storyboard
+          ? storyboardDescriptor(storyboard, landed)
+          : null;
+
         await finalizeUpload.mutateAsync({
           mediaId,
           url: publicUrl,
@@ -340,6 +372,7 @@ export function MediaLibrary({
           width: decoded?.sourceWidth || undefined,
           height: decoded?.sourceHeight || undefined,
           hasThumbnail,
+          ...(descriptor ? { storyboard: descriptor } : {}),
         });
         pendingMediaId = null;
         toast.success(`Uploaded ${file.name}`);
@@ -585,7 +618,7 @@ export function MediaLibrary({
               onOrganize={() => setOrganizingAsset(asset)}
               onPreview={() => setPreviewAsset(asset)}
               onAnalyze={
-                asset.kind === "image"
+                asset.kind === "image" || asset.kind === "video"
                   ? () => analyzeMedia.mutate({ id: asset.id })
                   : undefined
               }
@@ -780,7 +813,7 @@ function MediaCard({
               size="icon"
               variant="secondary"
               className="pointer-events-auto size-7"
-              title="Analyze image"
+              title="Analyze and tag"
               onClick={(event) => {
                 event.stopPropagation();
                 event.preventDefault();

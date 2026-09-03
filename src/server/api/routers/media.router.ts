@@ -16,7 +16,11 @@ import {
   mediaVideoAnalysisTable,
   platformPostTable,
 } from "@/server/db/schema";
-import { MediaService } from "@/server/services/media.service";
+import { MAX_STORYBOARD_BOARDS } from "@/lib/storyboard-limits";
+import {
+  MediaService,
+  storyboardDescriptorSchema,
+} from "@/server/services/media.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import {
   refreshInstagramPostMedia,
@@ -472,6 +476,12 @@ export const mediaRouter = createTRPCRouter({
           .int()
           .positive()
           .max(250 * 1024 * 1024),
+        boardCount: z
+          .number()
+          .int()
+          .min(0)
+          .max(MAX_STORYBOARD_BOARDS)
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -501,6 +511,7 @@ export const mediaRouter = createTRPCRouter({
         width: z.number().int().positive().optional(),
         height: z.number().int().positive().optional(),
         hasThumbnail: z.boolean().optional(),
+        storyboard: storyboardDescriptorSchema.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -781,10 +792,10 @@ export const mediaRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const asset = await assertMediaAccess(ctx, input.id);
-      if (asset.kind !== "image" || !asset.url) {
+      if ((asset.kind !== "image" && asset.kind !== "video") || !asset.url) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Only ready images can be analyzed",
+          message: "Only ready images and videos can be analyzed",
         });
       }
       const brand = await assertBrandAccess(ctx, asset.brandId);

@@ -92,6 +92,27 @@ export function r2BuildThumbnailKey(
   return `${originalKey}.thumb.${extension}`;
 }
 
+/**
+ * Key for one storyboard board of a library video, derived from the video's
+ * own key like the thumbnail is, so the server can recompute every legal board
+ * URL from the asset alone.
+ */
+export function r2BuildStoryboardKey(
+  originalKey: string,
+  boardIndex: number,
+): string {
+  return `${originalKey}.board-${boardIndex}.png`;
+}
+
+/**
+ * Key for the storyboard descriptor a chat upload leaves beside its video.
+ * Chat attachments have no media row to hold the descriptor until they are
+ * promoted, and an AI SDK file part cannot carry it, so it waits in the bucket.
+ */
+export function r2BuildStoryboardManifestKey(originalKey: string): string {
+  return `${originalKey}.storyboard.json`;
+}
+
 /** Presign a PUT for direct browser upload. URL expires in `expiresIn` seconds. */
 export async function r2PresignPut(
   key: string,
@@ -294,6 +315,8 @@ export const R2 = {
   isPublicUrl: r2IsPublicUrl,
   buildKey: r2BuildKey,
   buildThumbnailKey: r2BuildThumbnailKey,
+  buildStoryboardKey: r2BuildStoryboardKey,
+  buildStoryboardManifestKey: r2BuildStoryboardManifestKey,
   analysisKeyPrefix: r2AnalysisKeyPrefix,
   buildAnalysisKey: r2BuildAnalysisKey,
   buildPosterKey: r2BuildPosterKey,
