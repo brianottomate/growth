@@ -69,6 +69,16 @@ function brandPalette(identity: BrandIdentity | null | undefined) {
 
 type Direction = { verdict: "keep" | "adjust"; note: string; changes: string[] };
 
+/** Where the crop leans, as the focal point the renderer keeps in frame. */
+const CROP_PRESETS = {
+  center: null,
+  left: { x: 0, y: 50 },
+  right: { x: 100, y: 50 },
+  top: { x: 50, y: 0 },
+  bottom: { x: 50, y: 100 },
+} as const satisfies Record<string, { x: number; y: number } | null>;
+type CropPreset = keyof typeof CROP_PRESETS;
+
 export function CompositionWorkbench({
   brands,
   brandId,
@@ -96,7 +106,10 @@ export function CompositionWorkbench({
   const [assetTitle, setAssetTitle] = useState("Wander social composition");
   const [sourceSearch, setSourceSearch] = useState("");
   const [mark, setMark] = useState<"auto" | "color" | "white" | "dark" | "none">("auto");
-  const [imagePosition, setImagePosition] = useState<"top" | "center" | "bottom">("center");
+  // The crop is a focal point: the point of the photo that must stay in
+  // frame. A landscape photo on a portrait canvas loses its sides, a portrait
+  // one on a square loses top and bottom, and one control has to cover both.
+  const imagePosition = "center" as const;
   // What the art director set. Cleared when the photo or the layout changes,
   // because the read belonged to that card.
   const [focal, setFocal] = useState<{ x: number; y: number } | null>(null);
@@ -117,6 +130,13 @@ export function CompositionWorkbench({
     setAccent(brandAccent(selectedBrand?.brandIdentity));
   }, [selectedBrand]);
 
+  const cropPreset: CropPreset | "custom" = !focal
+    ? "center"
+    : ((Object.keys(CROP_PRESETS) as CropPreset[]).find((key) => {
+        const preset = CROP_PRESETS[key];
+        return preset?.x === focal.x && preset?.y === focal.y;
+      }) ?? "custom");
+
   const fields = getCompositionFields(templateId);
   const has = (key: CompositionFieldKey) =>
     fields.some((field) => field.key === key);
@@ -133,7 +153,10 @@ export function CompositionWorkbench({
         (asset) =>
           asset.provider === "r2" &&
           asset.status === "ready" &&
-          Boolean(asset.url),
+          Boolean(asset.url) &&
+          // The brand mark's own renders live in the library too; they are
+          // drawn onto cards, never used as the photo under one.
+          (asset.metadata as { source?: string } | null)?.source !== "brand_mark",
       ),
     [assets],
   );
@@ -541,15 +564,21 @@ export function CompositionWorkbench({
               />
               {requiresImage && (
                 <SimpleSelect
-                  value={imagePosition}
+                  value={cropPreset}
                   onValueChange={(value) => {
-                    setImagePosition(value as typeof imagePosition);
-                    setFocal(null);
+                    const preset = CROP_PRESETS[value as CropPreset];
+                    setFocal(preset ? { ...preset } : null);
+                    setDirection(null);
                   }}
                   options={[
-                    { value: "top", label: "Crop from top" },
-                    { value: "center", label: "Crop from center" },
-                    { value: "bottom", label: "Crop from bottom" },
+                    { value: "center", label: "Crop toward centre" },
+                    { value: "left", label: "Crop toward left" },
+                    { value: "right", label: "Crop toward right" },
+                    { value: "top", label: "Crop toward top" },
+                    { value: "bottom", label: "Crop toward bottom" },
+                    ...(cropPreset === "custom"
+                      ? [{ value: "custom", label: `Art director's point (${focal?.x}%, ${focal?.y}%)` }]
+                      : []),
                   ]}
                   size="sm"
                 />
