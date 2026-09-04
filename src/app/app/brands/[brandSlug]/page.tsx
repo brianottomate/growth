@@ -83,10 +83,14 @@ export default async function BrandPage({
           columns: { id: true, url: true },
         });
         const url = (id: string) => rows.find((r) => r.id === id)?.url ?? "";
+        // A traced vector draws sharp at any tile size; the PNG is the fallback.
+        const svg = (markup: string) =>
+          `data:image/svg+xml;base64,${Buffer.from(markup).toString("base64")}`;
+        const vector = brand.brandMark!.vector;
         return {
-          color: url(brand.brandMark!.variants.color),
-          white: url(brand.brandMark!.variants.white),
-          dark: url(brand.brandMark!.variants.dark),
+          color: vector?.color ? svg(vector.color) : url(brand.brandMark!.variants.color),
+          white: vector ? svg(vector.white) : url(brand.brandMark!.variants.white),
+          dark: vector ? svg(vector.dark) : url(brand.brandMark!.variants.dark),
         };
       })()
     : null;

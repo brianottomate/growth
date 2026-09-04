@@ -1,6 +1,6 @@
 import "server-only";
 
-import potrace from "potrace";
+import ImageTracer from "imagetracerjs";
 import sharp from "sharp";
 
 /**
@@ -21,9 +21,45 @@ export function unwrapImageProxy(url: string): string {
 }
 
 /**
+ * The one colour a flat mark is drawn in, or null when it has more than one.
+ * A favicon or a single-ink logo traces to a colour vector that stays sharp
+ * at any size; a photo-like or multi-colour mark stays a bitmap.
+ */
+export async function dominantColor(png: Buffer): Promise<string | null> {
+  const { data, info } = await sharp(png)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const counts = new Map<number, number>();
+  let opaque = 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (data[i + 3]! < 128) continue;
+    opaque += 1;
+    // 4 bits per channel: anti-aliased edges fall into the same bucket.
+    const key = ((data[i]! >> 4) << 8) | ((data[i + 1]! >> 4) << 4) | (data[i + 2]! >> 4);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  if (opaque < 16) return null;
+  let bestKey = 0;
+  let best = 0;
+  for (const [key, count] of counts) {
+    if (count > best) [bestKey, best] = [key, count];
+  }
+  // Edge pixels blend toward the background; allow a tenth of them to stray.
+  if (best / opaque < 0.9) return null;
+  const r = ((bestKey >> 8) & 15) * 17;
+  const g = ((bestKey >> 4) & 15) * 17;
+  const b = (bestKey & 15) * 17;
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
  * The image's alpha traced to an SVG path in one colour, or null when the
  * trace finds no shape. A flat mark becomes resolution-independent; satori
  * draws SVG at any size without the softness of an upscaled bitmap.
+ *
+ * imagetracerjs works on raw pixels and has no dependencies, which is why it
+ * is here: potrace's jimp dependency does not survive Next's server bundling.
  */
 export async function traceSilhouette(
   png: Buffer,
@@ -31,20 +67,42 @@ export async function traceSilhouette(
 ): Promise<string | null> {
   const { hasAlpha } = await sharp(png).metadata();
   if (!hasAlpha) return null;
-  // potrace fills the dark pixels: the shape's alpha, inverted, on white.
-  const mask = await sharp(png)
+  const { data, info } = await sharp(png)
     .ensureAlpha()
-    .extractChannel(3)
-    .negate()
-    .png()
-    .toBuffer();
-  const svg = await new Promise<string>((resolve, reject) => {
-    potrace.trace(
-      mask,
-      { color, background: "transparent", threshold: 128, turdSize: 4 },
-      (error, result) => (error ? reject(error) : resolve(result)),
-    );
-  });
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(color.slice(i, i + 2), 16));
+  // Two colours only: the shape in `color`, everything else transparent, so
+  // the tracer has one clean boundary to follow.
+  const pixels = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    pixels[i] = r!;
+    pixels[i + 1] = g!;
+    pixels[i + 2] = b!;
+    pixels[i + 3] = data[i + 3]! >= 128 ? 255 : 0;
+  }
+  const svg = ImageTracer.imagedataToSVG(
+    { width: info.width, height: info.height, data: pixels },
+    {
+      pal: [
+        { r, g, b, a: 0 },
+        { r, g, b, a: 255 },
+      ],
+      numberofcolors: 2,
+      colorsampling: 0,
+      ltres: 0.5,
+      qtres: 0.5,
+      pathomit: 4,
+      roundcoords: 2,
+      strokewidth: 0,
+      blurradius: 0,
+      linefilter: true,
+      viewbox: true,
+      desc: false,
+    },
+  )
+    // The transparent layer's paths carry nothing; drop them.
+    .replace(/<path[^>]*opacity="0"[^>]*\/>/g, "");
   return svg.includes("<path") ? svg : null;
 }
 
@@ -132,9 +190,12 @@ export async function loadLogoImage(url: string): Promise<LogoImage> {
 export async function tintSilhouette(png: Buffer, color: string): Promise<Buffer> {
   const { width, height } = await sharp(png).metadata();
   if (!width || !height) throw new Error("Cannot read the image's size.");
-  const alpha = await sharp(png).ensureAlpha().extractChannel(3).toBuffer();
+  // Exported "transparent" backgrounds often carry a whisper of alpha; painted
+  // white over a photo that whisper is a grey box around the mark. Floor it.
+  const alpha = await sharp(png).ensureAlpha().extractChannel(3).raw().toBuffer();
+  for (let i = 0; i < alpha.length; i++) if (alpha[i]! < 24) alpha[i] = 0;
   return sharp({ create: { width, height, channels: 3, background: color } })
-    .joinChannel(alpha)
+    .joinChannel(alpha, { raw: { width, height, channels: 1 } })
     .png()
     .toBuffer();
 }

@@ -202,13 +202,13 @@ export function BrandMarkCard({
 
           <div
             className={cn(
-              "flex h-40 items-center justify-center overflow-hidden rounded-lg border",
+              "flex h-24 items-center justify-center overflow-hidden rounded-lg border",
               tone === "white" ? "bg-neutral-900" : "bg-white",
             )}
           >
             {previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={previewUrl} src={previewUrl} alt="" className="max-h-24 max-w-[90%] object-contain" />
+              <img key={previewUrl} src={previewUrl} alt="" className="max-h-10 max-w-[90%] object-contain" />
             ) : (
               <span className="text-muted-foreground text-xs">Pick an image to preview.</span>
             )}
@@ -270,11 +270,12 @@ function Swatch({
     <div className="overflow-hidden rounded-md border">
       <div className="text-muted-foreground border-b px-2 py-1 text-[11px]">{label}</div>
       <div
-        className={cn("flex h-24 items-center justify-center bg-cover bg-center p-3", className)}
+        className={cn("flex h-16 items-center justify-center bg-cover bg-center p-3", className)}
         style={photo ? { backgroundImage: `url(${photo})` } : undefined}
       >
+        {/* The size a mark is drawn at on a card, so it is judged at that size. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt="" className="max-h-full max-w-full object-contain" />
+        <img src={src} alt="" className="max-h-9 max-w-full object-contain" />
       </div>
     </div>
   );

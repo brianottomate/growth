@@ -8,6 +8,7 @@ import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, type BrandMark } from "@/server/db/schema";
 import { brandFontFamily, loadGoogleFont } from "@/server/services/composition-fonts";
 import {
+  dominantColor,
   tintSilhouette,
   traceSilhouette,
   unwrapImageProxy,
@@ -111,6 +112,29 @@ async function iconForTone(png: Buffer, tone: MarkTone): Promise<Buffer> {
 }
 
 /**
+ * The icon as satori should draw it inside a lockup: a traced vector when
+ * the shape allows (any tone for a silhouette, colour only for a one-colour
+ * mark), else the bitmap. A 192px favicon drawn at 260px is soft as pixels
+ * and sharp as a path.
+ */
+async function iconSourceForTone(
+  png: Buffer,
+  tone: MarkTone,
+): Promise<{ src: string; width: number; height: number }> {
+  const meta = await sharp(png).metadata();
+  const width = meta.width ?? 1;
+  const height = meta.height ?? 1;
+  const color =
+    tone === "white" ? "#ffffff" : tone === "dark" ? "#111111" : await dominantColor(png);
+  const svg = color ? await traceSilhouette(png, color).catch(() => null) : null;
+  if (svg) {
+    return { src: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`, width, height };
+  }
+  const bitmap = await iconForTone(png, tone);
+  return { src: `data:image/png;base64,${bitmap.toString("base64")}`, width, height };
+}
+
+/**
  * One variant of the mark as a transparent PNG.
  *
  * Logo and favicon marks are the icon alone. A lockup sets the icon beside
@@ -123,12 +147,13 @@ export async function renderBrandMark(
   tone: MarkTone,
 ): Promise<Buffer> {
   const iconUrl = await resolveMarkIconUrl(recipe, brand);
-  const icon = iconUrl ? await iconForTone(await fetchPng(iconUrl), tone) : null;
+  const iconPng = iconUrl ? await fetchPng(iconUrl) : null;
 
   if (recipe.source !== "lockup") {
-    if (!icon) throw new Error("This brand has no logo or favicon to use.");
-    return icon;
+    if (!iconPng) throw new Error("This brand has no logo or favicon to use.");
+    return iconForTone(iconPng, tone);
   }
+  const icon = iconPng ? await iconSourceForTone(iconPng, tone) : null;
 
   const text = (recipe.text ?? brand.name).trim() || brand.name;
   const family =
@@ -138,11 +163,7 @@ export async function renderBrandMark(
   const fonts = family ? await loadGoogleFont(family) : null;
   const color = markTextColor(tone, brand.brandIdentity);
   const iconSize = 260;
-  const iconMeta = icon ? await sharp(icon).metadata() : null;
-  const iconWidth =
-    iconMeta?.width && iconMeta.height
-      ? Math.round((iconSize * iconMeta.width) / iconMeta.height)
-      : iconSize;
+  const iconWidth = icon ? Math.round((iconSize * icon.width) / icon.height) : iconSize;
 
   const response = new ImageResponse(
     (
@@ -165,7 +186,7 @@ export async function renderBrandMark(
         {icon ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={`data:image/png;base64,${icon.toString("base64")}`}
+            src={icon.src}
             alt=""
             width={iconWidth}
             height={iconSize}
@@ -218,8 +239,11 @@ export async function setBrandMark(input: {
       vector = await Promise.all([
         traceSilhouette(body, "#ffffff"),
         traceSilhouette(body, "#111111"),
+        dominantColor(body).then((c) => (c ? traceSilhouette(body, c) : null)),
       ])
-        .then(([white, dark]) => (white && dark ? { white, dark } : null))
+        .then(([white, dark, color]) =>
+          white && dark ? { white, dark, color: color ?? null } : null,
+        )
         .catch((error: unknown) => {
           console.error("mark trace failed, keeping bitmap variants", error);
           return null;

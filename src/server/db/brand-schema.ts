@@ -100,8 +100,11 @@ export type BrandMark = {
   /** Lockup only: the family the text is set in; null means the house font. */
   fontFamily?: string | null;
   variants: { color: string; white: string; dark: string };
-  /** The white and dark marks traced to SVG, when the shape traces cleanly. */
-  vector?: { white: string; dark: string } | null;
+  /**
+   * The mark traced to SVG, when the shape traces cleanly: white and dark
+   * always, colour only when the mark is drawn in a single colour.
+   */
+  vector?: { white: string; dark: string; color?: string | null } | null;
   updatedAt: string;
 };
 

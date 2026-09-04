@@ -188,6 +188,7 @@ async function loadChosenMark(mark: BrandMark): Promise<LogoImage | null> {
     `data:image/svg+xml;base64,${Buffer.from(markup).toString("base64")}`;
   return {
     ...color,
+    src: mark.vector?.color ? svg(mark.vector.color) : color.src,
     inverse: mark.vector ? svg(mark.vector.white) : (white?.src ?? color.inverse),
     dark: mark.vector ? svg(mark.vector.dark) : (dark?.src ?? color.dark),
     small: false,
