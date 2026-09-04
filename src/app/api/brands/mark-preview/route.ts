@@ -18,6 +18,7 @@ const query = z.object({
   text: z.string().max(60).optional(),
   /** Absent = the brand's heading font; "" = the house font. */
   fontFamily: z.string().max(80).optional(),
+  critique: z.enum(["1"]).optional(),
 });
 
 /** The lockup editor's live preview. Renders one tone, stores nothing. */
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     iconFrom: params.get("iconFrom") || undefined,
     text: params.get("text") || undefined,
     fontFamily: params.has("fontFamily") ? params.get("fontFamily")! : undefined,
+    critique: params.get("critique") || undefined,
   });
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid mark" }, { status: 400 });
@@ -58,9 +60,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const png = await previewBrandMark({
+    const { png, tuning } = await previewBrandMark({
       brandId: parsed.data.brandId,
       tone: parsed.data.tone,
+      critique: parsed.data.critique === "1",
       recipe: {
         source: parsed.data.source,
         iconAssetId: parsed.data.iconAssetId ?? null,
@@ -74,7 +77,11 @@ export async function GET(request: NextRequest) {
       },
     });
     return new NextResponse(new Uint8Array(png), {
-      headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "no-store",
+        ...(tuning?.note ? { "X-Mark-Note": encodeURIComponent(tuning.note) } : {}),
+      },
     });
   } catch (error) {
     return NextResponse.json(

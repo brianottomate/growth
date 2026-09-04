@@ -1,8 +1,11 @@
 import "server-only";
 
+import { anthropic } from "@ai-sdk/anthropic";
+import { generateText, Output } from "ai";
 import { and, eq, isNull } from "drizzle-orm";
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
+import { z } from "zod";
 
 import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, type BrandMark } from "@/server/db/schema";
@@ -21,6 +24,72 @@ import {
 import { importImageBuffer } from "@/server/services/media.service";
 
 export type MarkTone = "color" | "white" | "dark";
+
+export type MarkTuning = NonNullable<BrandMark["tuning"]>;
+
+const NO_TUNING: MarkTuning = { iconScale: 1, iconShift: 0, gapScale: 1, note: "" };
+
+const CritiqueSchema = z.object({
+  verdict: z.enum(["balanced", "adjust"]),
+  /** Multiply the icon's height. 1 keeps it. */
+  iconScale: z.number().min(0.7).max(1.4),
+  /** Move the icon, in cap heights; positive is down. */
+  iconShift: z.number().min(-0.3).max(0.3),
+  /** Multiply the gap between icon and wordmark. */
+  gapScale: z.number().min(0.6).max(1.6),
+  /** True when the icon already carries the brand name, so a lockup repeats it. */
+  iconIsWordmark: z.boolean(),
+  note: z.string().max(600),
+});
+
+/**
+ * An art director's read of a rendered lockup. Geometry gets the icon to the
+ * cap band; what it cannot judge is whether the mark holds its own beside the
+ * type, and that is a question of ink and shape, not of pixels. The model
+ * answers in cap heights with hard bounds, so a bad read can only nudge.
+ */
+export async function critiqueLockup(input: {
+  png: Buffer;
+  brandName: string;
+}): Promise<MarkTuning & { iconIsWordmark: boolean }> {
+  try {
+    // A transparent PNG flattens to nothing in a vision pipeline, and a white
+    // mark on it to less. Judge on a light ground, as the colour render.
+    const png = await sharp(input.png)
+      .flatten({ background: "#f4f4f2" })
+      .png()
+      .toBuffer();
+    const { output } = await generateText({
+      model: anthropic("claude-sonnet-5"),
+      output: Output.object({ schema: CritiqueSchema }),
+      system:
+        "You are an art director checking a logo lockup: an icon to the left of a wordmark. Judge optical balance the way a type designer would: the icon should read as the same visual weight as the letters, sit centred on the capitals, and be spaced like a wide letter. Answer only with the corrections needed. If it already looks right, say balanced and return 1, 0, 1.",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", image: png },
+            {
+              type: "text",
+              text: `Brand: ${input.brandName}. The wordmark is the brand name. Is the icon the right size, height and distance from the wordmark? If the icon itself already contains the brand name as text, say so.`,
+            },
+          ],
+        },
+      ],
+      temperature: 0,
+    });
+    return {
+      iconScale: output.iconScale,
+      iconShift: output.iconShift,
+      gapScale: output.gapScale,
+      note: output.note,
+      iconIsWordmark: output.iconIsWordmark,
+    };
+  } catch (error) {
+    console.error("lockup critique failed, keeping the measured layout", error);
+    return { ...NO_TUNING, iconIsWordmark: false };
+  }
+}
 
 export type BrandMarkRecipe = {
   source: BrandMark["source"];
@@ -296,6 +365,7 @@ export async function renderBrandMark(
   recipe: BrandMarkRecipe,
   brand: MarkBrand,
   tone: MarkTone,
+  tuning: MarkTuning = NO_TUNING,
 ): Promise<Buffer> {
   const iconUrl = await resolveMarkIconUrl(recipe, brand);
   const iconPng = iconUrl ? await fetchPng(iconUrl) : null;
@@ -344,28 +414,40 @@ export async function renderBrandMark(
   // A wide mark sized by height would dwarf the wordmark it introduces, so
   // width is the binding constraint past two cap heights.
   const iconHeight = Math.round(
-    Math.min(capHeight * scale, (capHeight * 2) / Math.max(aspect, 0.01)),
+    Math.min(capHeight * scale, (capHeight * 2) / Math.max(aspect, 0.01)) *
+      tuning.iconScale,
   );
-  const gap = Math.round(capHeight * 0.34);
+  const gap = Math.round(capHeight * 0.34 * tuning.gapScale);
   const icon = await iconAtHeight(iconPng, tone, iconHeight);
   const iconMeta = await sharp(icon).metadata();
   const iconWidth = iconMeta.width ?? iconHeight;
-  const iconTop = Math.round(capCentre - iconHeight / 2);
+  const iconTop = Math.round(
+    capCentre - iconHeight / 2 + tuning.iconShift * capHeight,
+  );
 
-  const originY = Math.min(iconTop, textInk.top);
+  // A hair of margin: trimmed ink still anti-aliases one column past its
+  // box, and a canvas cut exactly to it clips that column.
+  const margin = 4;
+  const originY = Math.min(iconTop, textInk.top) - margin;
   const height =
-    Math.max(iconTop + iconHeight, textInk.top + textInk.height) - originY;
+    Math.max(iconTop + iconHeight, textInk.top + textInk.height) -
+    originY +
+    margin;
   return sharp({
     create: {
-      width: iconWidth + gap + textInk.width,
+      width: iconWidth + gap + textInk.width + margin * 2,
       height,
       channels: 4,
       background: { r: 0, g: 0, b: 0, alpha: 0 },
     },
   })
     .composite([
-      { input: icon, left: 0, top: iconTop - originY },
-      { input: textInk.crop, left: iconWidth + gap, top: textInk.top - originY },
+      { input: icon, left: margin, top: iconTop - originY },
+      {
+        input: textInk.crop,
+        left: margin + iconWidth + gap,
+        top: textInk.top - originY,
+      },
     ])
     .png()
     .toBuffer();
@@ -376,9 +458,40 @@ export async function previewBrandMark(input: {
   brandId: string;
   recipe: BrandMarkRecipe;
   tone: MarkTone;
-}): Promise<Buffer> {
+  /** Run the art-director pass on this preview too. Slower; opt in. */
+  critique?: boolean;
+}): Promise<{ png: Buffer; tuning: MarkTuning | null }> {
   const brand = await loadMarkBrand(input.brandId);
-  return renderBrandMark(input.recipe, brand, input.tone);
+  const first = await renderBrandMark(input.recipe, brand, input.tone);
+  if (!input.critique || input.recipe.source !== "lockup") {
+    return { png: first, tuning: null };
+  }
+  // Always judged on the colour tone, whatever tone is being previewed.
+  const judged =
+    input.tone === "color"
+      ? first
+      : await renderBrandMark(input.recipe, brand, "color");
+  const tuning = await tuneLockup(input.recipe, brand, judged);
+  return {
+    png: tuning ? await renderBrandMark(input.recipe, brand, input.tone, tuning) : first,
+    tuning,
+  };
+}
+
+/** One vision pass over a colour render; null when it changes nothing. */
+async function tuneLockup(
+  recipe: BrandMarkRecipe,
+  brand: MarkBrand,
+  colorRender: Buffer,
+): Promise<MarkTuning | null> {
+  const read = await critiqueLockup({ png: colorRender, brandName: brand.name });
+  const note = read.iconIsWordmark
+    ? `The icon already carries the brand name; a lockup repeats it. ${read.note}`.trim()
+    : read.note;
+  const unchanged =
+    read.iconScale === 1 && read.iconShift === 0 && read.gapScale === 1;
+  if (unchanged && !note) return null;
+  return { iconScale: read.iconScale, iconShift: read.iconShift, gapScale: read.gapScale, note };
 }
 
 /**
@@ -392,11 +505,21 @@ export async function setBrandMark(input: {
   recipe: BrandMarkRecipe;
 }): Promise<BrandMark> {
   const brand = await loadMarkBrand(input.brandId);
+  // Judge the lockup once, on its colour render, and set every tone to the
+  // same corrections; the three variants must agree with each other.
+  const tuning =
+    input.recipe.source === "lockup"
+      ? await tuneLockup(
+          input.recipe,
+          brand,
+          await renderBrandMark(input.recipe, brand, "color"),
+        )
+      : null;
   const tones: MarkTone[] = ["color", "white", "dark"];
   const ids: Partial<Record<MarkTone, string>> = {};
   let vector: BrandMark["vector"] = null;
   for (const tone of tones) {
-    const body = await renderBrandMark(input.recipe, brand, tone);
+    const body = await renderBrandMark(input.recipe, brand, tone, tuning ?? NO_TUNING);
     // An icon-only mark may come from a small file; a lockup is rendered
     // large already. Trace the mono icons so cards draw them at any size.
     if (tone === "color" && input.recipe.source !== "lockup") {
@@ -436,6 +559,7 @@ export async function setBrandMark(input: {
     fontFamily: input.recipe.fontFamily ?? null,
     variants: { color: ids.color!, white: ids.white!, dark: ids.dark! },
     vector,
+    tuning,
     updatedAt: new Date().toISOString(),
   };
   await db.update(brandTable).set({ brandMark: mark }).where(eq(brandTable.id, brand.id));

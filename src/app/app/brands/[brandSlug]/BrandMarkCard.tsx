@@ -119,6 +119,8 @@ export function BrandMarkCard({
         </div>
       </div>
 
+      <Critique mark={mark} />
+
       {variants ? (
         <div className="grid grid-cols-3 gap-2">
           <Swatch label="Colour on white" src={variants.color} className="bg-white" />
@@ -232,7 +234,7 @@ export function BrandMarkCard({
                 })
               }
             >
-              {setMark.isPending ? "Rendering…" : "Save mark"}
+              {setMark.isPending ? "Rendering and judging…" : "Save mark"}
             </Button>
           </div>
         </div>
@@ -253,6 +255,17 @@ function describe(mark: BrandMark) {
   if (mark.source === "logo") return "Using the site logo";
   if (mark.source === "favicon") return "Using the favicon";
   return `Lockup: “${mark.text ?? ""}”${mark.fontFamily ? ` in ${mark.fontFamily}` : ""}`;
+}
+
+/** What the art-director pass said when the lockup was saved. */
+function Critique({ mark }: { mark: BrandMark | null }) {
+  const note = mark?.tuning?.note;
+  if (!note) return null;
+  return (
+    <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
+      <span className="font-medium">Art director:</span> {note}
+    </p>
+  );
 }
 
 function Swatch({

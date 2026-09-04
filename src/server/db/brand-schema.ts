@@ -105,6 +105,17 @@ export type BrandMark = {
    * always, colour only when the mark is drawn in a single colour.
    */
   vector?: { white: string; dark: string; color?: string | null } | null;
+  /**
+   * An art director's corrections to the measured lockup, in cap heights, from
+   * a vision pass over the first render. Stored so every tone and every later
+   * render agrees with what was judged.
+   */
+  tuning?: {
+    iconScale: number;
+    iconShift: number;
+    gapScale: number;
+    note: string;
+  } | null;
   updatedAt: string;
 };
 
