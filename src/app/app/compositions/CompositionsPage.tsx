@@ -4,7 +4,14 @@ import { useState } from "react";
 
 import { CompositionWorkbench } from "./CompositionWorkbench";
 
-type Brand = { id: string; name: string; logo: string | null };
+import type { BrandIdentity } from "@/server/db/brand-schema";
+
+type Brand = {
+  id: string;
+  name: string;
+  logo: string | null;
+  brandIdentity: BrandIdentity | null;
+};
 
 export function CompositionsPage({ brands }: { brands: Brand[] }) {
   const preferredBrand =

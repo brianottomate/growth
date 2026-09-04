@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ImageIcon, Layers3, Loader2, Snowflake } from "lucide-react";
 
@@ -18,9 +18,20 @@ import { SimpleSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
+import type { BrandIdentity } from "@/server/db/brand-schema";
 import { useTRPC } from "@/trpc/react";
 
-type Brand = { id: string; name: string; logo: string | null };
+type Brand = {
+  id: string;
+  name: string;
+  logo: string | null;
+  brandIdentity: BrandIdentity | null;
+};
+
+/** The colour a brand's cards get when nobody picks one: the renderer's rule. */
+function brandAccent(identity: BrandIdentity | null | undefined) {
+  return identity?.colors?.accent ?? identity?.colors?.primary ?? "#18a8b5";
+}
 
 export function CompositionWorkbench({
   brands,
@@ -45,7 +56,15 @@ export function CompositionWorkbench({
   const [cta, setCta] = useState("Explore the stay");
   const [assetTitle, setAssetTitle] = useState("Wander social composition");
   const [sourceSearch, setSourceSearch] = useState("");
-  const [accent, setAccent] = useState("#18a8b5");
+  const selectedBrand = brands.find((brand) => brand.id === brandId);
+  const [accent, setAccent] = useState(() =>
+    brandAccent(selectedBrand?.brandIdentity),
+  );
+  // Switching brand resets the accent to that brand's own; a tweak made for
+  // one brand should not leak onto the next.
+  useEffect(() => {
+    setAccent(brandAccent(selectedBrand?.brandIdentity));
+  }, [selectedBrand]);
   const [imagePosition, setImagePosition] = useState<
     "top" | "center" | "bottom"
   >("center");
@@ -162,6 +181,11 @@ export function CompositionWorkbench({
               />
             </div>
           </div>
+
+          <BrandDefaults
+            logo={selectedBrand?.logo ?? null}
+            identity={selectedBrand?.brandIdentity ?? null}
+          />
 
           <div className="space-y-1.5">
             <Label>Eyebrow</Label>
@@ -401,6 +425,88 @@ export function CompositionWorkbench({
           </Button>
         </section>
       </div>
+    </div>
+  );
+}
+
+/**
+ * What enrichment learned about the brand, read-only. The accent above starts
+ * from it; the rest is here so the operator can see what the site says before
+ * overriding it.
+ */
+function BrandDefaults({
+  logo,
+  identity,
+}: {
+  logo: string | null;
+  identity: BrandIdentity | null;
+}) {
+  const swatches = (
+    [
+      ["Primary", identity?.colors?.primary],
+      ["Secondary", identity?.colors?.secondary],
+      ["Accent", identity?.colors?.accent],
+    ] as const
+  ).flatMap(([label, value]) => (value ? [[label, value] as const] : []));
+  const fonts = identity?.fonts ?? [];
+
+  if (!identity && !logo) {
+    return (
+      <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
+        No brand defaults yet. Enrich from website on the brand card reads the
+        logo, colours and fonts from their site.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold">Brand defaults</span>
+        {identity?.personality && (
+          <span className="text-muted-foreground text-[11px]">
+            {identity.personality.tone} · {identity.personality.energy} energy
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        {logo ? (
+          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logo} alt="" className="max-h-8 max-w-8 object-contain" />
+          </span>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {swatches.map(([label, value]) => (
+            <span
+              key={label}
+              className="flex items-center gap-1.5 text-[11px]"
+              title={`${label} ${value}`}
+            >
+              <span
+                className="size-3.5 rounded-sm border"
+                style={{ background: value }}
+              />
+              <span className="text-muted-foreground">{label}</span>
+              <span className="font-mono">{value}</span>
+            </span>
+          ))}
+          {swatches.length === 0 && (
+            <span className="text-muted-foreground text-[11px]">
+              No colours found on the site.
+            </span>
+          )}
+        </div>
+      </div>
+      {fonts.length > 0 && (
+        <p className="text-muted-foreground text-[11px]">
+          Fonts:{" "}
+          {fonts
+            .map((font) => (font.role ? `${font.family} (${font.role})` : font.family))
+            .join(", ")}
+          . Cards render in the house typeface for now.
+        </p>
+      )}
     </div>
   );
 }

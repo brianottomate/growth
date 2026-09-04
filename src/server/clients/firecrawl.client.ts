@@ -1,5 +1,5 @@
 import type { ZodType } from "zod";
-import Firecrawl from "@mendable/firecrawl-js";
+import Firecrawl, { type BrandingProfile } from "@mendable/firecrawl-js";
 import { env } from "@/env";
 
 // =====================================================
@@ -76,6 +76,8 @@ export async function scrapeForEnrichment(url: string): Promise<{
 interface ScrapeResult {
   markdown?: string;
   metadata?: Record<string, unknown>;
+  /** Firecrawl's extracted brand profile, when `branding` was requested. */
+  branding?: BrandingProfile;
 }
 
 interface ExtractResult {
@@ -109,7 +111,7 @@ interface MapResult {
  */
 export async function scrapeUrl(params: {
   url: string;
-  formats?: ("markdown" | "html")[];
+  formats?: ("markdown" | "html" | "branding")[];
 }): Promise<ScrapeResult | null> {
   try {
     console.log("🔵 [Firecrawl] Scraping URL:", { url: params.url });
@@ -126,6 +128,7 @@ export async function scrapeUrl(params: {
     return {
       markdown: result.markdown,
       metadata: result.metadata,
+      branding: (result as { branding?: BrandingProfile }).branding,
     };
   } catch (error) {
     console.error("❌ [Firecrawl] Scrape failed:", {

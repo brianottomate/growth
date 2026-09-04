@@ -76,6 +76,7 @@ export function NewBrandButton() {
             description: enrichment.description,
             logo: enrichment.logo,
             websiteMeta: enrichment.websiteMeta,
+            brandIdentity: enrichment.brandIdentity,
           }
         : undefined,
       // The preview already ran (or was skipped on purpose) — never re-scrape

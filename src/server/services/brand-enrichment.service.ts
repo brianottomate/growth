@@ -1,7 +1,9 @@
 import "server-only";
 
+import type { BrandingProfile } from "@mendable/firecrawl-js";
+
 import { scrapeUrl } from "@/server/clients/firecrawl.client";
-import type { BrandWebsiteMeta } from "@/server/db/brand-schema";
+import type { BrandIdentity, BrandWebsiteMeta } from "@/server/db/brand-schema";
 import { selectBrandLogo } from "@/server/services/brand-enrichment-meta";
 
 /** Pull the first non-empty string from a metadata blob across candidate keys. */
@@ -28,7 +30,51 @@ export type BrandEnrichment = {
   description?: string;
   logo?: string;
   websiteMeta: BrandWebsiteMeta;
+  /** Absent when Firecrawl returned no branding profile for the page. */
+  brandIdentity?: BrandIdentity;
 };
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const hex = (value: string | undefined) =>
+  value && HEX.test(value.trim()) ? value.trim().toLowerCase() : undefined;
+
+/**
+ * Firecrawl's branding profile, reduced to what the brand row stores and the
+ * renderer reads. Only six-digit hex colours survive: the renderer feeds them
+ * to satori unchecked, and Firecrawl sometimes reports `rgb()` or a name.
+ * Fonts come from the typography roles when present, else the flat list.
+ */
+export function identityFromBranding(
+  branding: BrandingProfile | undefined,
+  fallback: { favicon?: string; ogImage?: string },
+): BrandIdentity | undefined {
+  if (!branding) return undefined;
+  const families = branding.typography?.fontFamilies;
+  const fonts: NonNullable<BrandIdentity["fonts"]> = [];
+  if (families?.primary) fonts.push({ family: families.primary, role: "body" });
+  if (families?.heading && families.heading !== families.primary) {
+    fonts.push({ family: families.heading, role: "heading" });
+  }
+  if (fonts.length === 0) {
+    for (const font of branding.fonts ?? []) {
+      if (font.family) fonts.push({ family: font.family });
+    }
+  }
+  const colors = {
+    primary: hex(branding.colors?.primary),
+    secondary: hex(branding.colors?.secondary),
+    accent: hex(branding.colors?.accent),
+  };
+  return {
+    colorScheme: branding.colorScheme,
+    colors,
+    fonts,
+    logo: branding.logo ?? branding.images?.logo ?? null,
+    favicon: branding.images?.favicon ?? fallback.favicon ?? null,
+    ...(branding.personality && { personality: branding.personality }),
+    extractedAt: new Date().toISOString(),
+  };
+}
 
 /**
  * Scrape a brand's website and map page metadata onto brand fields.
@@ -41,7 +87,7 @@ export type BrandEnrichment = {
 export async function enrichBrandFromWebsite(
   url: string,
 ): Promise<BrandEnrichment | null> {
-  const result = await scrapeUrl({ url, formats: ["markdown"] });
+  const result = await scrapeUrl({ url, formats: ["markdown", "branding"] });
   if (!result?.metadata) return null;
 
   const meta = result.metadata;
@@ -55,10 +101,16 @@ export async function enrichBrandFromWebsite(
   const ogImage = pick(meta, "ogImage", "og:image");
   const favicon = pick(meta, "favicon");
 
+  const brandIdentity = identityFromBranding(result.branding, {
+    favicon,
+    ogImage,
+  });
+
   return {
     tagline: title,
     description,
-    logo: selectBrandLogo({ favicon, ogImage }),
+    logo: selectBrandLogo({ logo: brandIdentity?.logo, favicon, ogImage }),
+    brandIdentity,
     websiteMeta: {
       title,
       description,

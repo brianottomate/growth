@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { BrandIdentity } from "@/server/db/brand-schema";
+
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/server/db";
@@ -65,6 +67,7 @@ export type BrandEnrichmentValues = {
   description?: string | null;
   logo?: string | null;
   websiteMeta?: BrandWebsiteMeta | null;
+  brandIdentity?: BrandIdentity | null;
 };
 
 export async function createOwnedBrand(input: {
@@ -114,6 +117,9 @@ export async function createOwnedBrand(input: {
       ...(input.enrichment?.websiteMeta && {
         websiteMeta: input.enrichment.websiteMeta,
       }),
+      ...(input.enrichment?.brandIdentity && {
+        brandIdentity: input.enrichment.brandIdentity,
+      }),
     })
     .returning();
   return brand!;
@@ -146,6 +152,9 @@ export async function enrichBrandById(
       ...(enrichment.tagline && { tagline: enrichment.tagline }),
       ...(enrichment.description && { description: enrichment.description }),
       ...(enrichment.logo && { logo: enrichment.logo }),
+      ...(enrichment.brandIdentity && {
+        brandIdentity: enrichment.brandIdentity,
+      }),
       websiteMeta: enrichment.websiteMeta,
     })
     .where(eq(brandTable.id, brandId))

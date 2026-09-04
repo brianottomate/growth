@@ -216,6 +216,37 @@ export const brandRouter = createTRPCRouter({
                 scrapedAt: z.string().optional(),
               })
               .nullish(),
+            brandIdentity: z
+              .object({
+                colorScheme: z.enum(["light", "dark"]).optional(),
+                colors: z
+                  .object({
+                    primary: z.string().optional(),
+                    secondary: z.string().optional(),
+                    accent: z.string().optional(),
+                  })
+                  .optional(),
+                fonts: z
+                  .array(
+                    z.object({
+                      family: z.string(),
+                      weight: z.number().optional(),
+                      role: z.enum(["body", "heading"]).optional(),
+                    }),
+                  )
+                  .optional(),
+                logo: z.string().nullish(),
+                favicon: z.string().nullish(),
+                personality: z
+                  .object({
+                    tone: z.string(),
+                    energy: z.string(),
+                    targetAudience: z.string(),
+                  })
+                  .optional(),
+                extractedAt: z.string().optional(),
+              })
+              .nullish(),
           })
           .nullish(),
       }),
@@ -450,6 +481,7 @@ export const brandRouter = createTRPCRouter({
         description: enrichment.description ?? null,
         logo: enrichment.logo ?? null,
         websiteMeta: enrichment.websiteMeta,
+        brandIdentity: enrichment.brandIdentity ?? null,
       };
     }),
 
