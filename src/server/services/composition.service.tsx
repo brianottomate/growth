@@ -657,6 +657,32 @@ export function renderComposition(
         </div>
       </div>
     );
+  } else if (spec.templateId === "photo-only") {
+    content = (
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: "#000000",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+      </div>
+    );
   } else {
     content = (
       <div

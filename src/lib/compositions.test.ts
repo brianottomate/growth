@@ -137,3 +137,24 @@ describe("composition identity", () => {
     });
   });
 });
+
+describe("photo only", () => {
+  test("is the one blueprint that renders without a headline", () => {
+    const base = {
+      brandId: "brand_01",
+      formatId: "portrait",
+      sourceMediaAssetId: "media_01",
+      title: "",
+    };
+    expect(
+      compositionSpecSchema.safeParse({ ...base, templateId: "photo-only" })
+        .success,
+    ).toBe(true);
+    const other = compositionSpecSchema.safeParse({
+      ...base,
+      templateId: "image-hero",
+    });
+    expect(other.success).toBe(false);
+    expect(other.error?.issues[0]?.path).toEqual(["title"]);
+  });
+});

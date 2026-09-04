@@ -61,6 +61,13 @@ export const COMPOSITION_TEMPLATES = [
       "A restrained copy column with a product card entering from the lower right.",
   },
   {
+    id: "photo-only",
+    version: 1,
+    label: "Photo only",
+    description:
+      "The source image alone, full-bleed. The baseline every other blueprint adds to.",
+  },
+  {
     id: "brand-statement",
     version: 1,
     label: "Brand statement",
@@ -87,7 +94,7 @@ const compositionShape = {
   templateId: z.enum(templateIds),
   formatId: z.enum(formatIds),
   sourceMediaAssetId: z.string().min(1).optional(),
-  title: z.string().trim().min(1).max(120),
+  title: z.string().trim().max(120),
   subtitle: z.string().trim().max(220).optional(),
   eyebrow: z.string().trim().max(40).optional(),
   cta: z.string().trim().max(60).optional(),
@@ -111,16 +118,33 @@ function requireSourceImage(
   }
 }
 
+// Photo only draws no copy, so it is the one blueprint a headline is not
+// required for. Every other template puts the title on the canvas.
+function requireTitle(
+  value: { templateId: CompositionTemplateId; title: string },
+  context: z.RefinementCtx,
+) {
+  if (value.templateId !== "photo-only" && value.title.length === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["title"],
+      message: "This blueprint needs a headline",
+    });
+  }
+}
+
 export const compositionSpecSchema = z
   .object(compositionShape)
-  .superRefine(requireSourceImage);
+  .superRefine(requireSourceImage)
+  .superRefine(requireTitle);
 
 export const freezeCompositionSchema = z
   .object({
     ...compositionShape,
     assetTitle: z.string().trim().min(1).max(180),
   })
-  .superRefine(requireSourceImage);
+  .superRefine(requireSourceImage)
+  .superRefine(requireTitle);
 
 export type CompositionSpec = z.infer<typeof compositionSpecSchema>;
 export type FreezeCompositionInput = z.infer<typeof freezeCompositionSchema>;
