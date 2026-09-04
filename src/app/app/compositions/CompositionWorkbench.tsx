@@ -34,7 +34,7 @@ export function CompositionWorkbench({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [templateId, setTemplateId] =
-    useState<CompositionTemplateId>("editorial-overlay");
+    useState<CompositionTemplateId>("photo-only");
   const [formatId, setFormatId] = useState<CompositionFormatId>("portrait");
   const [sourceMediaAssetId, setSourceMediaAssetId] = useState("");
   const [title, setTitle] = useState("The view is only the beginning.");
@@ -130,45 +130,6 @@ export function CompositionWorkbench({
   return (
     <div className="grid gap-6 2xl:grid-cols-[420px_minmax(0,1fr)]">
       <div className="space-y-5">
-        <section className="space-y-3 rounded-xl border p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <Layers3 className="size-4" />
-                Blueprint
-              </h2>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Choose the reusable layout before adding copy and media.
-              </p>
-            </div>
-            <Badge variant="outline">v{selectedTemplate.version}</Badge>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {COMPOSITION_TEMPLATES.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                onClick={() => setTemplateId(template.id)}
-                className={cn(
-                  "hover:bg-muted/70 relative rounded-lg border p-3 text-left transition-colors",
-                  templateId === template.id &&
-                    "border-primary bg-primary/5 ring-primary/20 ring-2",
-                )}
-              >
-                {templateId === template.id && (
-                  <Check className="text-primary absolute top-2 right-2 size-3.5" />
-                )}
-                <span className="block pr-4 text-xs font-semibold">
-                  {template.label}
-                </span>
-                <span className="text-muted-foreground mt-1 block text-[11px] leading-4">
-                  {template.description}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-
         <section className="space-y-4 rounded-xl border p-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -249,6 +210,45 @@ export function CompositionWorkbench({
                 className="w-full p-1"
               />
             </div>
+          </div>
+        </section>
+
+        <section className="space-y-3 rounded-xl border p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold">
+                <Layers3 className="size-4" />
+                Blueprint
+              </h2>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Choose the reusable layout before adding copy and media.
+              </p>
+            </div>
+            <Badge variant="outline">v{selectedTemplate.version}</Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {COMPOSITION_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => setTemplateId(template.id)}
+                className={cn(
+                  "hover:bg-muted/70 relative rounded-lg border p-3 text-left transition-colors",
+                  templateId === template.id &&
+                    "border-primary bg-primary/5 ring-primary/20 ring-2",
+                )}
+              >
+                {templateId === template.id && (
+                  <Check className="text-primary absolute top-2 right-2 size-3.5" />
+                )}
+                <span className="block pr-4 text-xs font-semibold">
+                  {template.label}
+                </span>
+                <span className="text-muted-foreground mt-1 block text-[11px] leading-4">
+                  {template.description}
+                </span>
+              </button>
+            ))}
           </div>
         </section>
       </div>

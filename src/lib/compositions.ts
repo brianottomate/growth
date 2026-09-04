@@ -33,6 +33,13 @@ export const COMPOSITION_FORMATS = [
 
 export const COMPOSITION_TEMPLATES = [
   {
+    id: "photo-only",
+    version: 1,
+    label: "Photo only",
+    description:
+      "The source image alone, full-bleed. The baseline every other blueprint adds to.",
+  },
+  {
     id: "image-hero",
     version: 2,
     label: "Image hero",
@@ -59,13 +66,6 @@ export const COMPOSITION_TEMPLATES = [
     label: "Product proof",
     description:
       "A restrained copy column with a product card entering from the lower right.",
-  },
-  {
-    id: "photo-only",
-    version: 1,
-    label: "Photo only",
-    description:
-      "The source image alone, full-bleed. The baseline every other blueprint adds to.",
   },
   {
     id: "brand-statement",
