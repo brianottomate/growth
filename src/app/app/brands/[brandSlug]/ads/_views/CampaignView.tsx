@@ -186,10 +186,9 @@ export async function CampaignView({
               compiles this into its own shape when you push.
             </p>
           </div>
-          {/* Only a client has homes of their own to build from. */}
-          {draft.brand.relationship === "client" && (
-            <DraftFromHomesButton campaignId={campaign.id} />
-          )}
+          {/* Any brand with a WanderOS site has homes to build from; a brand
+              without one gets told so by the run rather than shown nothing. */}
+          <DraftFromHomesButton campaignId={campaign.id} />
         </div>
 
         <CreativePool

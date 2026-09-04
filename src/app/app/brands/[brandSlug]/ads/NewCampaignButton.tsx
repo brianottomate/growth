@@ -24,6 +24,7 @@ import {
   requireAdPlatformSpec,
   type PushableAdPlatform,
 } from "@/lib/ad-platforms";
+import { campaignDraftName } from "@/lib/performance-ads";
 import { useTRPC } from "@/trpc/react";
 
 /**
@@ -31,12 +32,17 @@ import { useTRPC } from "@/trpc/react";
  * name and a platform are enough to start; everything else is edited in chat
  * and read on the canvas.
  */
+/** What a draft is worth before anyone has said otherwise. Advisory. */
+const DEFAULT_BUDGET_USD = 1000;
+
 export function NewCampaignButton({
   brandId,
+  brandName,
   brandWebsite,
   isClient = false,
 }: {
   brandId: string;
+  brandName: string;
   brandWebsite?: string | null;
   /** Only a paying client has an intake to prefill from. */
   isClient?: boolean;
@@ -44,11 +50,17 @@ export function NewCampaignButton({
   const trpc = useTRPC();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
+  // Born in the house convention, editable from the first keystroke.
+  const [name, setName] = useState(() =>
+    campaignDraftName({ brandName, isClient }),
+  );
   const [platforms, setPlatforms] = useState<PushableAdPlatform[]>([
     "meta_ads",
   ]);
-  const [budget, setBudget] = useState("");
+  // A real default rather than a placeholder: the draft carries $1,000 unless
+  // the operator or the client's intake says otherwise.
+  const [budget, setBudget] = useState(String(DEFAULT_BUDGET_USD));
+  const [budgetTouched, setBudgetTouched] = useState(false);
   // Prefilled from the brand so the field is never empty, but visible and
   // editable: paid traffic to a homepage converts far worse than traffic to
   // the specific property or offer page.
@@ -68,13 +80,13 @@ export function NewCampaignButton({
 
   useEffect(() => {
     if (!prefilled) return;
-    setBudget((current) =>
-      current === "" && prefilled.mediaBudgetDollars != null
-        ? String(prefilled.mediaBudgetDollars)
-        : current,
-    );
+    // The intake's number beats the default; a number the operator typed
+    // beats both.
+    if (!budgetTouched && prefilled.mediaBudgetDollars != null) {
+      setBudget(String(prefilled.mediaBudgetDollars));
+    }
     setLandingUrl((current) => current || prefilled.landingUrl || "");
-  }, [prefilled]);
+  }, [prefilled, budgetTouched]);
 
   const geoSummary = prefilled?.geography.regions?.length
     ? prefilled.geography.regions.join(", ")
@@ -115,6 +127,11 @@ export function NewCampaignButton({
               onChange={(event) => setName(event.target.value)}
               placeholder="WANDER_PROSPECTING_PURCHASES"
             />
+            <p className="text-muted-foreground text-xs">
+              {isClient
+                ? "OSPERF+CUSTOMER_STRATEGY_OBJECTIVE. Finance filters spend on the OSPERF+ prefix, so it leads."
+                : "BRAND_STRATEGY_OBJECTIVE, upper snake case. Change the strategy or objective to match the campaign."}
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Platforms</Label>
@@ -172,13 +189,16 @@ export function NewCampaignButton({
                 type="number"
                 min={0}
                 value={budget}
-                onChange={(event) => setBudget(event.target.value)}
-                placeholder="500"
+                onChange={(event) => {
+                  setBudgetTouched(true);
+                  setBudget(event.target.value);
+                }}
+                placeholder={String(DEFAULT_BUDGET_USD)}
               />
               <p className="text-muted-foreground text-xs">
                 {prefilled?.mediaBudgetDollars != null
                   ? `From their intake: $${prefilled.mediaBudgetDollars.toLocaleString()}/mo`
-                  : "Optional. Advisory; each platform draft sets its own."}
+                  : `Defaults to $${DEFAULT_BUDGET_USD.toLocaleString()}. Advisory; each platform draft sets its own.`}
               </p>
             </div>
             <div className="space-y-1.5">

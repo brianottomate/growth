@@ -427,6 +427,7 @@ export default async function BrandAdsPage({
           <CopyButton text={md} label="Copy for ChatGPT / Claude" />
           <NewCampaignButton
             brandId={brand.id}
+            brandName={brand.name}
             brandWebsite={brand.website}
             isClient={brand.relationship === "client"}
           />

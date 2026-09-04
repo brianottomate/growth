@@ -6,6 +6,7 @@ import {
   buildPerformanceAdPlan,
   dailyBudgetFromMedia,
   performanceAdName,
+  campaignDraftName,
   performanceCampaignName,
   propertySlot,
 } from "./performance-ads";
@@ -145,5 +146,24 @@ describe("ad plan", () => {
     expect(() =>
       buildPerformanceAdPlan({ customer: "Away & Stay", properties: [] }),
     ).toThrow();
+  });
+});
+
+describe("the name a draft is born with", () => {
+  it("leads with the finance prefix for a paying client", () => {
+    expect(
+      campaignDraftName({ brandName: "Forever Stays", isClient: true }),
+    ).toBe("OSPERF+FOREVER+STAYS_PROSPECTING_PURCHASES");
+  });
+
+  it("keeps the same shape without the prefix for Wander's own brands", () => {
+    // Finance filters spend on OSPERF+; a Wander brand under that prefix would
+    // be billed to a client that does not exist.
+    expect(campaignDraftName({ brandName: "Wander", isClient: false })).toBe(
+      "WANDER_PROSPECTING_PURCHASES",
+    );
+    expect(campaignDraftName({ brandName: "", isClient: false })).toBe(
+      "WANDER_PROSPECTING_PURCHASES",
+    );
   });
 });

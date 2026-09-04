@@ -140,6 +140,23 @@ export function performanceCampaignName(input: {
     .join("_");
 }
 
+/**
+ * The name a new campaign draft starts with, so every draft is born in the
+ * house convention instead of whatever was typed in the moment. A paying
+ * client gets the finance-filterable `OSPERF+` form; Wander's own brands get
+ * the same shape without the prefix, `WANDER_PROSPECTING_PURCHASES`. Always
+ * editable in the form; this is the default, not a rule.
+ */
+export function campaignDraftName(input: {
+  brandName: string;
+  isClient: boolean;
+}): string {
+  if (input.isClient) {
+    return performanceCampaignName({ customer: input.brandName });
+  }
+  return [upperSnake(input.brandName) || "WANDER", "PROSPECTING", "PURCHASES"].join("_");
+}
+
 /** `LOOKALIKE_SEEDLIST`, `PROSPECTING_LIST`, `THIRD_PARTY_INTENT`. */
 export function performanceAdSetName(kind: PerformanceAudienceKind): string {
   const names: Record<PerformanceAudienceKind, string> = {

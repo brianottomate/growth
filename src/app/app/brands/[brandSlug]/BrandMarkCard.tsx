@@ -99,6 +99,33 @@ export function BrandMarkCard({
     }),
   );
 
+  // A saved lockup, back in the editor as it was saved, judged straight away.
+  // The critique runs on the saved recipe itself, so what it corrects is the
+  // mark on the cards and not a re-typed approximation of it.
+  const fixSavedLockup = () => {
+    if (mark?.source !== "lockup") return;
+    setIcon(mark.iconFrom ?? (mark.iconAssetId ? "library" : "none"));
+    setIconAssetId(mark.iconAssetId ?? "");
+    setText(mark.text ?? brandName);
+    setFont(
+      mark.fontFamily == null
+        ? "house"
+        : mark.fontFamily === bodyFont
+          ? "body"
+          : "heading",
+    );
+    setTone("color");
+    setTuning(null);
+    setBuilding(true);
+    critique.mutate({
+      id: brandId,
+      iconAssetId: mark.iconAssetId ?? null,
+      iconFrom: mark.iconFrom ?? undefined,
+      text: mark.text ?? null,
+      fontFamily: mark.fontFamily ?? null,
+    });
+  };
+
   const onDone = (message: string) => () => {
     toast.success(message);
     setBuilding(false);
@@ -283,7 +310,19 @@ export function BrandMarkCard({
       ) : null}
 
       {mark ? (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {mark.source === "lockup" && !building ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || critique.isPending}
+              onClick={fixSavedLockup}
+              title="Reopen the saved lockup, have Claude judge it, and apply its corrections to the preview"
+            >
+              <Wand2 className={cn("mr-1.5 size-3.5", critique.isPending && "animate-pulse")} />
+              {critique.isPending ? "Judging…" : "Fix with AI"}
+            </Button>
+          ) : null}
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => clearMark.mutate({ id: brandId })}>
             Clear mark
           </Button>
