@@ -177,14 +177,6 @@ describe("the fields a blueprint declares", () => {
       const fields = getCompositionFields(template.id);
       expect(Array.isArray(fields)).toBe(true);
       expect(fields.length === 0).toBe(template.id === "photo-only");
-      // Anchors are fractions of the canvas; anything else puts a marker
-      // off the picture.
-      for (const field of fields) {
-        expect(field.anchor.x).toBeGreaterThanOrEqual(0);
-        expect(field.anchor.x).toBeLessThanOrEqual(1);
-        expect(field.anchor.y).toBeGreaterThanOrEqual(0);
-        expect(field.anchor.y).toBeLessThanOrEqual(1);
-      }
     }
   });
 

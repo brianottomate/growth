@@ -251,22 +251,6 @@ export function CompositionWorkbench({
     fonts.find((font) => font.role === "heading")?.family ?? fonts[0]?.family;
   const bodyFont = fonts.find((font) => font.role === "body")?.family;
 
-  /** Whether a field has something to point at on the canvas. */
-  const drawn = (key: CompositionFieldKey) =>
-    key === "mark"
-      ? mark !== "none"
-      : key === "accent"
-        ? true
-        : key === "rating"
-          ? Boolean(rating)
-          : key === "title"
-            ? Boolean(title.trim())
-            : key === "subtitle"
-              ? Boolean(subtitle.trim())
-              : key === "eyebrow"
-                ? Boolean(eyebrow.trim())
-                : Boolean(cta.trim());
-
   return (
     <div className="grid gap-6 2xl:grid-cols-[440px_minmax(0,1fr)]">
       <div className="space-y-5">
@@ -408,17 +392,16 @@ export function CompositionWorkbench({
             <Badge variant="outline">
               {fields.length} field{fields.length === 1 ? "" : "s"}
             </Badge>
-            <span className="text-muted-foreground text-xs">
-              {fields.length > 0
-                ? "numbers show where each renders"
-                : "draws the photo and nothing else"}
-            </span>
+            {fields.length === 0 ? (
+              <span className="text-muted-foreground text-xs">
+                draws the photo and nothing else
+              </span>
+            ) : null}
           </div>
 
-          {fields.map((field, index) => (
+          {fields.map((field) => (
             <div key={field.key} className="space-y-1.5">
               <Label className="flex items-center gap-2">
-                <FieldNumber n={index + 1} />
                 {field.label}
                 {field.hint && field.key === "accent" ? (
                   <span className="text-muted-foreground font-normal">{field.hint}</span>
@@ -636,30 +619,12 @@ export function CompositionWorkbench({
           </div>
           <div className="flex min-h-96 items-center justify-center bg-[radial-gradient(circle_at_center,var(--color-muted)_1px,transparent_1px)] bg-size-[16px_16px] p-5">
             {previewUrl ? (
-              <div className="relative inline-block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={previewUrl}
-                  alt="Composition preview"
-                  className="max-h-[680px] max-w-full rounded-md object-contain shadow-2xl"
-                />
-                {/* Where each numbered field lands. Guidance from the
-                    blueprint's anchors, not measured from the render. */}
-                {fields.map((field, index) =>
-                  drawn(field.key) ? (
-                    <span
-                      key={field.key}
-                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-                      style={{
-                        left: `${field.anchor.x * 100}%`,
-                        top: `${field.anchor.y * 100}%`,
-                      }}
-                    >
-                      <FieldNumber n={index + 1} />
-                    </span>
-                  ) : null,
-                )}
-              </div>
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt="Composition preview"
+                className="max-h-[680px] max-w-full rounded-md object-contain shadow-2xl"
+              />
             ) : (
               <div className="text-muted-foreground flex flex-col items-center gap-2 text-sm">
                 <ImageIcon className="size-6" />
@@ -677,9 +642,6 @@ export function CompositionWorkbench({
               maxLength={180}
               className="flex-1"
             />
-            <p className="text-muted-foreground hidden text-[11px] lg:block">
-              Freezing saves the PNG and this exact blueprint recipe.
-            </p>
             {requiresImage && fields.length > 0 ? (
               <Button
                 variant="outline"
@@ -705,13 +667,5 @@ export function CompositionWorkbench({
         </section>
       </div>
     </div>
-  );
-}
-
-function FieldNumber({ n }: { n: number }) {
-  return (
-    <span className="bg-foreground text-background inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums">
-      {n}
-    </span>
   );
 }
