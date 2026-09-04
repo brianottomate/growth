@@ -4,6 +4,7 @@ import { compositionSpecSchema } from "@/lib/compositions";
 import { getSession } from "@/server/better-auth/server";
 import {
   CompositionAccessError,
+  loadCompositionSource,
   renderComposition,
   resolveCompositionContext,
 } from "@/server/services/composition.service";
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       session.user.id,
       parsed.data,
     );
-    return renderComposition(parsed.data, context);
+    return renderComposition(parsed.data, await loadCompositionSource(context));
   } catch (error) {
     if (error instanceof CompositionAccessError) {
       return NextResponse.json(

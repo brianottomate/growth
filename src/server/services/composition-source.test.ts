@@ -3,32 +3,43 @@ import sharp from "sharp";
 
 import { toSatoriImageSource } from "./composition-source";
 
-const pixel = (format: "webp" | "png") =>
-  sharp({
-    create: { width: 2, height: 2, channels: 3, background: "#336699" },
-  })
-    [format]()
-    .toBuffer();
+const decode = (src: string) =>
+  sharp(Buffer.from(src.split(",")[1]!, "base64")).metadata();
 
 describe("satori image source", () => {
   test("converts WebP, which satori cannot decode, to JPEG", async () => {
-    const src = await toSatoriImageSource({
-      body: await pixel("webp"),
-      contentType: "image/webp",
-    });
+    const webp = await sharp({
+      create: { width: 2, height: 2, channels: 3, background: "#336699" },
+    })
+      .webp()
+      .toBuffer();
+    const src = await toSatoriImageSource(webp);
     expect(src.startsWith("data:image/jpeg;base64,")).toBe(true);
-    const meta = await sharp(
-      Buffer.from(src.split(",")[1]!, "base64"),
-    ).metadata();
-    expect(meta.format).toBe("jpeg");
+    expect((await decode(src)).format).toBe("jpeg");
   });
 
-  test("passes a type satori decodes through untouched", async () => {
-    const png = await pixel("png");
-    const src = await toSatoriImageSource({
-      body: png,
-      contentType: "image/png; charset=binary",
-    });
-    expect(src).toBe(`data:image/png;base64,${png.toString("base64")}`);
+  test("keeps alpha by emitting PNG, whatever the header said", async () => {
+    const png = await sharp({
+      create: {
+        width: 2,
+        height: 2,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const src = await toSatoriImageSource(png);
+    expect(src.startsWith("data:image/png;base64,")).toBe(true);
+    expect((await decode(src)).hasAlpha).toBe(true);
+  });
+
+  test("caps oversized sources", async () => {
+    const wide = await sharp({
+      create: { width: 3000, height: 100, channels: 3, background: "#000" },
+    })
+      .jpeg()
+      .toBuffer();
+    expect((await decode(await toSatoriImageSource(wide))).width).toBe(2160);
   });
 });

@@ -25,8 +25,12 @@ export type CompositionContext = {
       colors?: { primary?: string; secondary?: string; accent?: string };
     } | null;
   };
+  /** Where the source lives. A lookup needs only this; a render loads it. */
   sourceUrl: string | null;
-  /** The source as satori can render it: a data URI in a format it decodes. */
+};
+
+/** A context with the source loaded as satori can render it. */
+export type RenderContext = CompositionContext & {
   sourceImage: string | null;
 };
 
@@ -134,7 +138,22 @@ export async function resolveCompositionContext(
       brandIdentity: brand.brandIdentity ?? null,
     },
     sourceUrl,
-    sourceImage: sourceUrl ? await fetchSatoriImageSource(sourceUrl) : null,
+  };
+}
+
+/**
+ * Download and transcode the source for a render. Kept apart from
+ * `resolveCompositionContext` so `findFrozenComposition` can match a cached
+ * card without paying for bytes it will never draw.
+ */
+export async function loadCompositionSource(
+  context: CompositionContext,
+): Promise<RenderContext> {
+  return {
+    ...context,
+    sourceImage: context.sourceUrl
+      ? await fetchSatoriImageSource(context.sourceUrl)
+      : null,
   };
 }
 
@@ -310,7 +329,7 @@ function renderInputs(
 
 export function renderComposition(
   spec: CompositionSpec,
-  context: CompositionContext,
+  context: RenderContext,
 ) {
   const format = getCompositionFormat(spec.formatId);
   const accent = resolveAccent(spec, context);
@@ -738,7 +757,9 @@ export async function freezeComposition(input: {
   userId: string;
   spec: FreezeCompositionInput;
 }) {
-  const context = await resolveCompositionContext(input.userId, input.spec);
+  const context = await loadCompositionSource(
+    await resolveCompositionContext(input.userId, input.spec),
+  );
   const format = getCompositionFormat(input.spec.formatId);
   const image = renderComposition(input.spec, context);
   const bytes = Buffer.from(await image.arrayBuffer());
