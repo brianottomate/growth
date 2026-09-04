@@ -71,7 +71,7 @@ export async function loadGoogleFont(
     name: face.name,
     weight: face.weight,
     style: face.style,
-    data: face.bytes.slice().buffer as ArrayBuffer,
+    data: face.bytes.slice().buffer,
   }));
 }
 
