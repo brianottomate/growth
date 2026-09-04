@@ -12,7 +12,8 @@ describe("identity from Firecrawl branding", () => {
           fontFamilies: { primary: "Inter", heading: "Gentium Book Plus" },
         },
         fonts: [{ family: "Inter" }],
-        logo: "https://chaletshh.com/logo.svg",
+        logo: "https://chaletshh.com/i/format=jpeg?src=logo.png",
+        images: { logo: "https://chaletshh.com/logo.svg" },
         personality: {
           tone: "professional",
           energy: "medium",
@@ -33,7 +34,8 @@ describe("identity from Firecrawl branding", () => {
     expect(identity?.logo).toBe("https://chaletshh.com/logo.svg");
     expect(identity?.favicon).toBe("https://chaletshh.com/favicon.png");
     expect(identity?.personality?.tone).toBe("professional");
-    expect(identity?.raw?.logo).toBe("https://chaletshh.com/logo.svg");
+    // raw keeps Firecrawl's answer verbatim; the identity prefers the served asset.
+    expect(identity?.raw?.logo).toBe("https://chaletshh.com/i/format=jpeg?src=logo.png");
   });
 
   test("is absent when Firecrawl returned no profile", () => {

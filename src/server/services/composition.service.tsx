@@ -212,10 +212,13 @@ function BrandMark({
   textSize?: number;
 }) {
   if (logo) {
-    // A wide logo is a wordmark and carries the name itself; a square one is
-    // an icon (often the favicon) and reads better beside the name.
-    const wordmark = logo.width / logo.height > 2;
-    const height = wordmark ? Math.round(markSize * 1.1) : markSize;
+    // A real logo stands alone, whatever its shape: a stacked mark already
+    // carries the name. Only a favicon-sized icon gets the name beside it.
+    const alone = !logo.small;
+    const wide = logo.width / logo.height > 2;
+    const height = alone
+      ? Math.round(markSize * (wide ? 1.1 : 2))
+      : markSize;
     const width = Math.round((height * logo.width) / logo.height);
     return (
       <div
@@ -237,7 +240,7 @@ function BrandMark({
           height={height}
           style={{ width, height, objectFit: "contain" }}
         />
-        {wordmark ? null : clamp(brandName, 32)}
+        {alone ? null : clamp(brandName, 32)}
       </div>
     );
   }

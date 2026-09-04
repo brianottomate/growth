@@ -34,7 +34,13 @@ export async function fetchSatoriImageSource(url: string): Promise<string> {
   return toSatoriImageSource(Buffer.from(await response.arrayBuffer()));
 }
 
-export type LogoImage = { src: string; width: number; height: number };
+export type LogoImage = {
+  src: string;
+  width: number;
+  height: number;
+  /** Favicon-sized at the source: an icon, not a mark that can stand alone. */
+  small: boolean;
+};
 
 /**
  * A brand logo as satori can draw it, with its intrinsic size so the mark
@@ -59,5 +65,6 @@ export async function loadLogoImage(url: string): Promise<LogoImage> {
     src: `data:image/png;base64,${png.toString("base64")}`,
     width: out.width ?? 1,
     height: out.height ?? 1,
+    small: Math.max(meta.width ?? 0, meta.height ?? 0) < 96,
   };
 }

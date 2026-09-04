@@ -70,7 +70,10 @@ export function identityFromBranding(
     colorScheme: branding.colorScheme,
     colors,
     fonts,
-    logo: branding.logo ?? branding.images?.logo ?? null,
+    // `images.logo` is the asset the site serves; top-level `logo` is often a
+    // proxied, flattened copy (format=jpeg) that loses the transparency a
+    // card over a photo depends on.
+    logo: branding.images?.logo ?? branding.logo ?? null,
     favicon: branding.images?.favicon ?? fallback.favicon ?? null,
     ...(branding.personality && { personality: branding.personality }),
     extractedAt: new Date().toISOString(),
