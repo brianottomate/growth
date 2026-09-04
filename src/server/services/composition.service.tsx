@@ -12,6 +12,7 @@ import {
 import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, memberTable } from "@/server/db/schema";
+import { fetchSatoriImageSource } from "@/server/services/composition-source";
 import { importImageBuffer } from "@/server/services/media.service";
 
 export type CompositionContext = {
@@ -25,6 +26,8 @@ export type CompositionContext = {
     } | null;
   };
   sourceUrl: string | null;
+  /** The source as satori can render it: a data URI in a format it decodes. */
+  sourceImage: string | null;
 };
 
 export class CompositionAccessError extends Error {
@@ -131,6 +134,7 @@ export async function resolveCompositionContext(
       brandIdentity: brand.brandIdentity ?? null,
     },
     sourceUrl,
+    sourceImage: sourceUrl ? await fetchSatoriImageSource(sourceUrl) : null,
   };
 }
 
@@ -335,7 +339,7 @@ export function renderComposition(
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={context.sourceUrl!}
+          src={context.sourceImage!}
           alt=""
           width={format.width}
           height={format.height}
@@ -410,7 +414,7 @@ export function renderComposition(
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={context.sourceUrl!}
+            src={context.sourceImage!}
             alt=""
             width={format.width}
             height={format.height}
@@ -438,7 +442,7 @@ export function renderComposition(
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={context.sourceUrl!}
+          src={context.sourceImage!}
           alt=""
           width={format.width}
           height={format.height}
@@ -620,7 +624,7 @@ export function renderComposition(
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={context.sourceUrl!}
+            src={context.sourceImage!}
             alt=""
             width={format.width}
             height={format.height}

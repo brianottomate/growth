@@ -34,28 +34,28 @@ export const COMPOSITION_FORMATS = [
 export const COMPOSITION_TEMPLATES = [
   {
     id: "image-hero",
-    version: 1,
+    version: 2,
     label: "Image hero",
     description:
       "A full-bleed image with a restrained, readable message block.",
   },
   {
     id: "split-frame",
-    version: 1,
+    version: 2,
     label: "Split frame",
     description:
       "Copy and a framed source image share the canvas. Good for product UI.",
   },
   {
     id: "editorial-overlay",
-    version: 1,
+    version: 2,
     label: "Editorial overlay",
     description:
       "Large type over an atmospheric crop. Good for property and campaign work.",
   },
   {
     id: "product-proof",
-    version: 1,
+    version: 2,
     label: "Product proof",
     description:
       "A restrained copy column with a product card entering from the lower right.",

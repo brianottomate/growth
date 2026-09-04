@@ -102,7 +102,7 @@ describe("composition blueprints", () => {
 
     expect(getCompositionMetadata(spec, "2026-08-19T00:00:00.000Z")).toEqual({
       templateId: "product-proof",
-      templateVersion: 1,
+      templateVersion: 2,
       formatId: "landscape",
       sourceMediaAssetId: "media_product",
       title: "Every stay, ready to explore.",
@@ -130,7 +130,7 @@ describe("composition identity", () => {
     });
     const identity = getCompositionIdentity(spec);
     expect(identity).not.toHaveProperty("renderedAt");
-    expect(identity.templateVersion).toBe(1);
+    expect(identity.templateVersion).toBe(2);
     expect(getCompositionMetadata(spec, "2026-09-04T00:00:00.000Z")).toEqual({
       ...identity,
       renderedAt: "2026-09-04T00:00:00.000Z",
