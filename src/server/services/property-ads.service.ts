@@ -5,6 +5,7 @@ import { generateText, Output } from "ai";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import type { FreezeCompositionInput } from "@/lib/compositions";
 import { usStateName } from "@/lib/us-states";
 import type { WanderOsListing } from "@/server/clients/wanderos-site.client";
 import { db } from "@/server/db";
@@ -18,8 +19,14 @@ import {
   addDraftAd,
   requireOwnedCampaign,
 } from "@/server/services/ads-draft.service";
-import { freezeComposition } from "@/server/services/composition.service";
-import { importRemoteImage } from "@/server/services/media.service";
+import {
+  findFrozenComposition,
+  freezeComposition,
+} from "@/server/services/composition.service";
+import {
+  findImportedImage,
+  importRemoteImage,
+} from "@/server/services/media.service";
 import {
   brandListings,
   normalizeListingUrl,
@@ -217,9 +224,10 @@ async function homesForCampaign(brand: {
 /**
  * Draft one static ad and one carousel from a client's own homes.
  *
- * Each home's hero shot is imported into the media library and then rendered
- * through a composition, so the creative is our own asset rather than a hot
- * link to their CDN and stays put when they re-shoot a listing.
+ * Each home's hero shot is imported into the media library once and rendered
+ * through a composition once, so the creative is our own asset rather than a
+ * hot link to their CDN, stays put when they re-shoot a listing, and a rerun
+ * reuses both instead of doubling the library.
  */
 export async function draftAdsFromHomes(input: {
   organizationId: string;
@@ -270,29 +278,43 @@ export async function draftAdsFromHomes(input: {
   // One rendered card per home. Sequential on purpose: each render is an
   // image encode plus two R2 writes, and a client with ten homes firing them
   // all at once is how a serverless function meets its memory limit.
+  //
+  // Both steps look before they write. A rerun, whether the first attempt
+  // failed downstream or the operator asked twice, would otherwise import
+  // every hero shot and render every card again.
   const cards: MediaItem[] = [];
+  let reused = 0;
   for (const listing of chosen) {
     try {
-      const source = await importRemoteImage({
-        brandId: brand.id,
-        uploadedBy: input.userId,
-        url: listing.imageUrl!,
-        title: listing.name,
-      });
-      const rendered = await freezeComposition({
-        userId: input.userId,
-        spec: {
+      const source =
+        (await findImportedImage({
           brandId: brand.id,
-          templateId: "editorial-overlay",
-          formatId: "portrait",
-          sourceMediaAssetId: source.id,
+          url: listing.imageUrl!,
+        })) ??
+        (await importRemoteImage({
+          brandId: brand.id,
+          uploadedBy: input.userId,
+          url: listing.imageUrl!,
           title: listing.name,
-          subtitle: homeSubtitle(listing),
-          cta: "Book direct",
-          imagePosition: "center",
-          assetTitle: `${listing.name} — ${brand.name}`,
-        },
+        }));
+      const spec: FreezeCompositionInput = {
+        brandId: brand.id,
+        templateId: "editorial-overlay",
+        formatId: "portrait",
+        sourceMediaAssetId: source.id,
+        title: listing.name,
+        subtitle: homeSubtitle(listing),
+        cta: "Book direct",
+        imagePosition: "center",
+        assetTitle: `${listing.name} — ${brand.name}`,
+      };
+      const existing = await findFrozenComposition({
+        userId: input.userId,
+        spec,
       });
+      if (existing) reused += 1;
+      const rendered =
+        existing ?? (await freezeComposition({ userId: input.userId, spec }));
       // A media asset's url is nullable because video assets are pending until
       // their upload settles. A render we just wrote always has one, so a null
       // here means something is wrong with this card rather than with the run.
@@ -310,6 +332,9 @@ export async function draftAdsFromHomes(input: {
       console.error("card render failed", listing.url, error);
       notes.push(`Could not render a card for ${listing.name}.`);
     }
+  }
+  if (reused > 0) {
+    notes.push(`Reused ${reused} card(s) rendered on an earlier run.`);
   }
   if (cards.length === 0) {
     throw new Error("Every card failed to render; nothing was drafted.");

@@ -727,7 +727,7 @@ export const draftAdsFromHomesAction = growthAction({
     "Build draft ads for a Performance+ client from their own listings: renders a card per home from its hero photo, then drafts one single-home static ad and one carousel. Also returns catalog feed rows for the homes that currently quote a price. Local drafts and rendered images only; the platform push is what decides whether any of it runs.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
-    carouselSize: z.number().int().min(1).max(8).optional(),
+    carouselSize: z.number().int().min(1).max(10).optional(),
   }),
   outputSchema: z.object({
     campaignId: z.string(),

@@ -6,6 +6,7 @@ import {
   compositionSpecSchema,
   freezeCompositionSchema,
   getCompositionFormat,
+  getCompositionIdentity,
   getCompositionMetadata,
   getCompositionTemplate,
 } from "./compositions";
@@ -111,6 +112,28 @@ describe("composition blueprints", () => {
       accent: "#18a8b5",
       imagePosition: "top",
       renderedAt: "2026-08-19T00:00:00.000Z",
+    });
+  });
+});
+
+describe("composition identity", () => {
+  test("is the metadata without the render time, so a rerun can find it", () => {
+    const spec = freezeCompositionSchema.parse({
+      brandId: "brand_01",
+      templateId: "editorial-overlay",
+      formatId: "portrait",
+      sourceMediaAssetId: "media_01",
+      title: "Arrow Rooftop Villa",
+      subtitle: "3 bd · Winter Park, Colorado",
+      cta: "Book direct",
+      assetTitle: "Arrow Rooftop Villa — Winter Park Escapes",
+    });
+    const identity = getCompositionIdentity(spec);
+    expect(identity).not.toHaveProperty("renderedAt");
+    expect(identity.templateVersion).toBe(1);
+    expect(getCompositionMetadata(spec, "2026-09-04T00:00:00.000Z")).toEqual({
+      ...identity,
+      renderedAt: "2026-09-04T00:00:00.000Z",
     });
   });
 });

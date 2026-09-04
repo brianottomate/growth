@@ -169,7 +169,7 @@ export const adsRouter = {
     .input(
       z.object({
         campaignId: z.string().min(1),
-        carouselSize: z.number().int().min(1).max(8).optional(),
+        carouselSize: z.number().int().min(1).max(10).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) =>

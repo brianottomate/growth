@@ -133,10 +133,12 @@ export function getCompositionTemplate(id: CompositionTemplateId) {
   return COMPOSITION_TEMPLATES.find((template) => template.id === id)!;
 }
 
-export function getCompositionMetadata(
-  spec: FreezeCompositionInput,
-  renderedAt = new Date().toISOString(),
-) {
+/**
+ * Everything that makes one render differ from another. Two specs with the
+ * same identity produce the same PNG, so a caller can reuse the earlier one.
+ * The template version is part of it: bumping a template must miss.
+ */
+export function getCompositionIdentity(spec: FreezeCompositionInput) {
   const template = getCompositionTemplate(spec.templateId);
   const format = getCompositionFormat(spec.formatId);
   return {
@@ -150,6 +152,12 @@ export function getCompositionMetadata(
     cta: spec.cta ?? null,
     accent: spec.accent ?? null,
     imagePosition: spec.imagePosition,
-    renderedAt,
   };
+}
+
+export function getCompositionMetadata(
+  spec: FreezeCompositionInput,
+  renderedAt = new Date().toISOString(),
+) {
+  return { ...getCompositionIdentity(spec), renderedAt };
 }

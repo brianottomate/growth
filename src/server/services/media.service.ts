@@ -512,6 +512,30 @@ export async function importRemoteImage(input: {
 }
 
 /**
+ * The library's copy of a remote image this brand already imported, if any.
+ * `importRemoteImage` records the requested url, so the same hero shot asked
+ * for twice is one asset rather than one per run.
+ */
+export async function findImportedImage(input: {
+  brandId: string;
+  url: string;
+}) {
+  return db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.brandId, input.brandId),
+      eq(mediaAssetTable.provider, "r2"),
+      // importRemoteImage files a GIF under its own kind.
+      inArray(mediaAssetTable.kind, ["image", "gif"]),
+      eq(mediaAssetTable.status, "ready"),
+      isNull(mediaAssetTable.deletedAt),
+      sql`${mediaAssetTable.metadata} ->> 'sourceUrl' = ${input.url}`,
+    ),
+    orderBy: (asset, { desc }) => [desc(asset.createdAt)],
+    columns: { id: true, url: true },
+  });
+}
+
+/**
  * Flip a legacy Cloudflare Stream asset to ready and backfill metadata
  * (webhook-driven). New video uploads go to R2; this only serves rows created
  * before the R2 cutover whose transcodes finish late.

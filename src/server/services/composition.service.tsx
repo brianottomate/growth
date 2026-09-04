@@ -1,11 +1,11 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { ImageResponse } from "next/og";
 
 import {
   getCompositionFormat,
-  getCompositionMetadata,
+  getCompositionIdentity,
   type CompositionSpec,
   type FreezeCompositionInput,
 } from "@/lib/compositions";
@@ -279,17 +279,37 @@ function Message({
   );
 }
 
-export function renderComposition(
-  spec: CompositionSpec,
-  context: CompositionContext,
-) {
-  const format = getCompositionFormat(spec.formatId);
-  const accent = safeHex(
+function resolveAccent(spec: CompositionSpec, context: CompositionContext) {
+  return safeHex(
     spec.accent ??
       context.brand.brandIdentity?.colors?.accent ??
       context.brand.brandIdentity?.colors?.primary,
     "#18a8b5",
   );
+}
+
+/**
+ * Everything a render reads: the spec's identity plus the brand inputs the
+ * templates draw, the name in the mark and the resolved accent. Stored on the
+ * asset and matched on reuse, so a rename or a palette change renders again.
+ */
+function renderInputs(
+  spec: FreezeCompositionInput,
+  context: CompositionContext,
+) {
+  return {
+    ...getCompositionIdentity(spec),
+    brandName: context.brand.name,
+    renderedAccent: resolveAccent(spec, context),
+  };
+}
+
+export function renderComposition(
+  spec: CompositionSpec,
+  context: CompositionContext,
+) {
+  const format = getCompositionFormat(spec.formatId);
+  const accent = resolveAccent(spec, context);
   const portrait = format.height > format.width;
   const square = format.height === format.width;
   const padding = portrait ? 68 : 58;
@@ -683,6 +703,33 @@ export function renderComposition(
   });
 }
 
+/**
+ * A ready render of exactly this spec for this brand as it is now, if one
+ * exists. Resolves the context the same way `freezeComposition` does (so the
+ * caller must own the brand and the source must be ready) and matches on the
+ * stored render inputs, so a plain rerun finds the earlier card while a
+ * changed subtitle, a bumped template, a rename or a new accent renders again.
+ */
+export async function findFrozenComposition(input: {
+  userId: string;
+  spec: FreezeCompositionInput;
+}) {
+  const context = await resolveCompositionContext(input.userId, input.spec);
+  const wanted = JSON.stringify(renderInputs(input.spec, context));
+  return db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.brandId, input.spec.brandId),
+      eq(mediaAssetTable.provider, "r2"),
+      eq(mediaAssetTable.kind, "image"),
+      eq(mediaAssetTable.status, "ready"),
+      isNull(mediaAssetTable.deletedAt),
+      sql`${mediaAssetTable.metadata} -> 'composition' @> ${wanted}::jsonb`,
+    ),
+    orderBy: (asset, { desc }) => [desc(asset.createdAt)],
+    columns: { id: true, url: true },
+  });
+}
+
 export async function freezeComposition(input: {
   userId: string;
   spec: FreezeCompositionInput;
@@ -703,6 +750,11 @@ export async function freezeComposition(input: {
     alt: input.spec.title,
     width: format.width,
     height: format.height,
-    metadata: { composition: getCompositionMetadata(input.spec) },
+    metadata: {
+      composition: {
+        ...renderInputs(input.spec, context),
+        renderedAt: new Date().toISOString(),
+      },
+    },
   });
 }
