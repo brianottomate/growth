@@ -1,3 +1,4 @@
+import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { relations, sql } from "drizzle-orm";
 import {
   check,
@@ -84,6 +85,8 @@ export type BrandWebsiteMeta = {
 };
 
 export type BrandIdentity = {
+  /** Firecrawl's whole branding profile, kept so nothing it read is lost. */
+  raw?: BrandingProfile;
   colorScheme?: "light" | "dark";
   colors?: { primary?: string; secondary?: string; accent?: string };
   fonts?: Array<{ family: string; weight?: number; role?: "body" | "heading" }>;

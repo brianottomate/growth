@@ -66,6 +66,7 @@ export function identityFromBranding(
     accent: hex(branding.colors?.accent),
   };
   return {
+    raw: branding,
     colorScheme: branding.colorScheme,
     colors,
     fonts,

@@ -17,6 +17,7 @@ import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
 import { PILLARS } from "@/lib/pillars";
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
 
+import { BrandBrandingCard } from "./BrandBrandingCard";
 import { BrandStrategyClient } from "./BrandStrategyClient";
 import { BrandSurfaceMap } from "./BrandSurfaceMap";
 
@@ -50,7 +51,15 @@ export default async function BrandPage({
       eq(brandTable.organizationId, org.id),
       isNull(brandTable.deletedAt),
     ),
-    columns: { id: true, name: true, slug: true, type: true },
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      type: true,
+      logo: true,
+      website: true,
+      brandIdentity: true,
+    },
   });
   if (!brand) notFound();
 
@@ -156,6 +165,13 @@ export default async function BrandPage({
       </header>
 
       <BrandSurfaceMap brandId={brand.id} summary={surfaceSummary} />
+
+      <BrandBrandingCard
+        brandId={brand.id}
+        logo={brand.logo}
+        identity={brand.brandIdentity ?? null}
+        website={brand.website}
+      />
 
       {latestSpots.length > 0 && (
         <section className="space-y-3">

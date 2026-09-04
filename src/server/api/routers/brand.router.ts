@@ -1,3 +1,4 @@
+import type { BrandingProfile } from "@mendable/firecrawl-js";
 import { z } from "zod";
 import { waitUntil } from "@vercel/functions";
 import { and, eq, isNull } from "drizzle-orm";
@@ -218,6 +219,11 @@ export const brandRouter = createTRPCRouter({
               .nullish(),
             brandIdentity: z
               .object({
+                raw: z
+                  .custom<BrandingProfile>(
+                    (value) => typeof value === "object" && value !== null,
+                  )
+                  .optional(),
                 colorScheme: z.enum(["light", "dark"]).optional(),
                 colors: z
                   .object({

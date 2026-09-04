@@ -33,6 +33,7 @@ describe("identity from Firecrawl branding", () => {
     expect(identity?.logo).toBe("https://chaletshh.com/logo.svg");
     expect(identity?.favicon).toBe("https://chaletshh.com/favicon.png");
     expect(identity?.personality?.tone).toBe("professional");
+    expect(identity?.raw?.logo).toBe("https://chaletshh.com/logo.svg");
   });
 
   test("is absent when Firecrawl returned no profile", () => {
