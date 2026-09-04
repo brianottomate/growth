@@ -166,12 +166,15 @@ export async function renderBrandMark(
       : recipe.fontFamily;
   const fonts = family ? await loadGoogleFont(family) : null;
   const color = markTextColor(tone, brand.brandIdentity);
-  // Lockup metrics, the way a type designer sets one: the icon matches the
-  // capital letters rather than the line box, and the gap is a fraction of
-  // that cap height. 0.72em is a fair cap height across the faces we load.
+  // Lockup metrics, the way a type designer sets one: the icon is measured
+  // against the capital letters rather than the line box, and the gap is a
+  // fraction of that cap height. A little over cap height, because a line-
+  // drawn symbol carries less visual weight than a solid glyph and reads
+  // small at exactly the same height. 0.72em is a fair cap height across the
+  // faces we load.
   const fontSize = 200;
   const capHeight = Math.round(fontSize * 0.72);
-  const iconSize = Math.round(capHeight * 1.04);
+  const iconSize = Math.round(capHeight * 1.15);
   const gap = Math.round(capHeight * 0.34);
   const iconWidth = icon ? Math.round((iconSize * icon.width) / icon.height) : iconSize;
 
@@ -180,9 +183,11 @@ export async function renderBrandMark(
       <div
         style={{
           display: "flex",
-          // Bottom edges, with the descender discounted below, so the icon
-          // stands on the type's baseline the way a glyph would.
-          alignItems: "flex-end",
+          // Centred on the cap band, not the line box: the text below is
+          // pulled up by its descender, so this brackets the capitals the
+          // way a mark beside a wordmark should. Centring the whole line box
+          // instead drags the icon down by the descender's depth.
+          alignItems: "center",
           gap,
           width: "100%",
           height: "100%",
