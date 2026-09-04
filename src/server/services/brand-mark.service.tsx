@@ -6,7 +6,11 @@ import sharp from "sharp";
 
 import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, type BrandMark } from "@/server/db/schema";
-import { brandFontFamily, loadGoogleFont } from "@/server/services/composition-fonts";
+import {
+  brandFontFamily,
+  loadGoogleFont,
+  type LoadedFont,
+} from "@/server/services/composition-fonts";
 import {
   dominantColor,
   tintSilhouette,
@@ -88,13 +92,57 @@ export async function resolveMarkIconUrl(
   return asset?.url ?? null;
 }
 
+/**
+ * The largest image inside a .ico, which most favicons still are and sharp
+ * cannot read. Modern icons embed PNGs, which come straight out; the older
+ * BMP form is not worth decoding by hand, so the caller says so plainly.
+ */
+function pngInsideIco(body: Buffer): Buffer | null {
+  if (body.length < 6 || body.readUInt16LE(0) !== 0 || body.readUInt16LE(2) !== 1) {
+    return null;
+  }
+  const count = body.readUInt16LE(4);
+  let best: { size: number; offset: number; area: number } | null = null;
+  for (let i = 0; i < count; i++) {
+    const entry = 6 + i * 16;
+    if (entry + 16 > body.length) break;
+    // 0 in the width or height byte means 256.
+    const area = (body[entry]! || 256) * (body[entry + 1]! || 256);
+    const size = body.readUInt32LE(entry + 8);
+    const offset = body.readUInt32LE(entry + 12);
+    if (!best || area > best.area) best = { size, offset, area };
+  }
+  if (!best || best.offset + best.size > body.length) return null;
+  const image = body.subarray(best.offset, best.offset + best.size);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  return image.subarray(0, 4).equals(png) ? image : null;
+}
+
 async function fetchPng(url: string): Promise<Buffer> {
   const response = await fetch(unwrapImageProxy(url), {
     signal: AbortSignal.timeout(10_000),
+    // Some brand CDNs refuse a bare fetch; this is the same request a page
+    // showing the logo would make.
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+      // Not the browser's avif-first list: a CDN that honours it hands back
+      // a format sharp may not read, for a file we only want to trace.
+      Accept: "image/*",
+    },
   });
   if (!response.ok) throw new Error(`Icon download failed (${response.status}).`);
-  const body = Buffer.from(await response.arrayBuffer());
-  const meta = await sharp(body).metadata();
+  const raw = Buffer.from(await response.arrayBuffer());
+  const body = pngInsideIco(raw) ?? raw;
+  const meta = await sharp(body)
+    .metadata()
+    .catch(() => {
+      throw new Error(
+        raw === body && raw.readUInt16LE?.(0) === 0
+          ? "That favicon is an .ico this cannot read. Use the logo, or upload an image and build a lockup."
+          : "That icon is not an image format this can read.",
+      );
+    });
   const image = meta.format === "svg" ? sharp(body, { density: 288 }) : sharp(body);
   const png = await image
     .resize({ height: 1024, withoutEnlargement: meta.format !== "svg" })
@@ -116,26 +164,125 @@ async function iconForTone(png: Buffer, tone: MarkTone): Promise<Buffer> {
 }
 
 /**
- * The icon as satori should draw it inside a lockup: a traced vector when
- * the shape allows (any tone for a silhouette, colour only for a one-colour
- * mark), else the bitmap. A 192px favicon drawn at 260px is soft as pixels
- * and sharp as a path.
+ * The icon at an exact height, as sharp bytes. A traced vector is rasterised
+ * at the size it will be drawn, so it stays crisp; otherwise the bitmap is
+ * resized. Returns null when the recipe has no icon.
  */
-async function iconSourceForTone(
+async function iconAtHeight(
   png: Buffer,
   tone: MarkTone,
-): Promise<{ src: string; width: number; height: number }> {
-  const meta = await sharp(png).metadata();
-  const width = meta.width ?? 1;
-  const height = meta.height ?? 1;
+  height: number,
+): Promise<Buffer> {
   const color =
     tone === "white" ? "#ffffff" : tone === "dark" ? "#111111" : await dominantColor(png);
   const svg = color ? await traceSilhouette(png, color).catch(() => null) : null;
   if (svg) {
-    return { src: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`, width, height };
+    // A trace of an intricate mark can be too much for the rasteriser; the
+    // bitmap below is always there.
+    const raster = await sharp(Buffer.from(svg))
+      .resize({ height })
+      .png()
+      .toBuffer()
+      .catch(() => null);
+    if (raster) return raster;
   }
   const bitmap = await iconForTone(png, tone);
-  return { src: `data:image/png;base64,${bitmap.toString("base64")}`, width, height };
+  return sharp(bitmap).resize({ height }).png().toBuffer();
+}
+
+/**
+ * The drawn part of an image: the crop itself and where it sat. sharp trims
+ * natively, so this costs no 10 MB pixel scan of a wide text canvas.
+ */
+async function inkOf(png: Buffer) {
+  const { data, info } = await sharp(png)
+    .trim({ threshold: 1 })
+    .png()
+    .toBuffer({ resolveWithObject: true });
+  return {
+    crop: data,
+    width: info.width,
+    height: info.height,
+    top: Math.abs(info.trimOffsetTop ?? 0),
+    left: Math.abs(info.trimOffsetLeft ?? 0),
+  };
+}
+
+/**
+ * How much of its own box a mark inks. A solid wordmark approaches 1; a
+ * hairline outline is a few percent, and set to the same height as the
+ * letters beside it, it reads much smaller than them.
+ */
+async function inkCoverage(png: Buffer): Promise<number> {
+  const { data, info } = await sharp(png)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let opaque = 0;
+  for (let i = 3; i < data.length; i += 4) if (data[i]! >= 128) opaque += 1;
+  return opaque / Math.max(1, info.width * info.height);
+}
+
+/**
+ * One line of type as a PNG, checked before it is handed on. The renderer
+ * occasionally returns a buffer nothing can read, and a second attempt has
+ * always produced a good one; a mark is worth one retry.
+ */
+async function renderTextPng(input: {
+  text: string;
+  color: string;
+  fontSize: number;
+  fonts: LoadedFont[] | null;
+}): Promise<Buffer> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const png = Buffer.from(await renderTextLayer(input).arrayBuffer());
+    const readable = await sharp(png)
+      .metadata()
+      .then(() => true)
+      .catch(() => false);
+    if (readable) return png;
+  }
+  throw new Error("The wordmark could not be rendered. Try again.");
+}
+
+/** One line of type on a transparent canvas, laid out from the top left. */
+function renderTextLayer(input: {
+  text: string;
+  color: string;
+  fontSize: number;
+  fonts: LoadedFont[] | null;
+}) {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          width: "100%",
+          height: "100%",
+          color: input.color,
+          fontSize: input.fontSize,
+          fontWeight: 700,
+          lineHeight: 1,
+          letterSpacing: "-0.02em",
+          whiteSpace: "nowrap",
+          ...(input.fonts?.length ? { fontFamily: input.fonts[0]!.name } : {}),
+        }}
+      >
+        <div style={{ display: "flex" }}>{input.text}</div>
+      </div>
+    ),
+    {
+      // Sized to the line: a fixed wide canvas costs memory on every render
+      // and buys nothing. 0.8em per character clears the widest faces.
+      width: Math.min(
+        8000,
+        Math.round(input.text.length * input.fontSize * 0.8) + 200,
+      ),
+      height: input.fontSize * 2,
+      ...(input.fonts?.length ? { fonts: input.fonts } : {}),
+    },
+  );
 }
 
 /**
@@ -157,7 +304,6 @@ export async function renderBrandMark(
     if (!iconPng) throw new Error("This brand has no logo or favicon to use.");
     return iconForTone(iconPng, tone);
   }
-  const icon = iconPng ? await iconSourceForTone(iconPng, tone) : null;
 
   const text = (recipe.text ?? brand.name).trim() || brand.name;
   const family =
@@ -166,75 +312,63 @@ export async function renderBrandMark(
       : recipe.fontFamily;
   const fonts = family ? await loadGoogleFont(family) : null;
   const color = markTextColor(tone, brand.brandIdentity);
-  // Lockup metrics, the way a type designer sets one: the icon is measured
-  // against the capital letters rather than the line box, and the gap is a
-  // fraction of that cap height. A little over cap height, because a line-
-  // drawn symbol carries less visual weight than a solid glyph and reads
-  // small at exactly the same height. 0.72em is a fair cap height across the
-  // faces we load.
   const fontSize = 200;
-  const capHeight = Math.round(fontSize * 0.72);
-  const iconSize = Math.round(capHeight * 1.15);
-  const gap = Math.round(capHeight * 0.34);
-  const iconWidth = icon ? Math.round((iconSize * icon.width) / icon.height) : iconSize;
 
-  const response = new ImageResponse(
-    (
-      <div
-        style={{
-          display: "flex",
-          // Centred on the cap band, not the line box: the text below is
-          // pulled up by its descender, so this brackets the capitals the
-          // way a mark beside a wordmark should. Centring the whole line box
-          // instead drags the icon down by the descender's depth.
-          alignItems: "center",
-          gap,
-          width: "100%",
-          height: "100%",
-          padding: 40,
-          color,
-          fontSize,
-          fontWeight: 700,
-          // The line box hugs the type, so centring the row centres the caps
-          // against the icon instead of against ascender-plus-descender.
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-          whiteSpace: "nowrap",
-          ...(fonts?.length ? { fontFamily: fonts[0]!.name } : {}),
-        }}
-      >
-        {icon ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={icon.src}
-            alt=""
-            width={iconWidth}
-            height={iconSize}
-            style={{ width: iconWidth, height: iconSize, objectFit: "contain" }}
-          />
-        ) : null}
-        <div
-          style={{
-            display: "flex",
-            // The line box runs to the descender; pulling it back up by that
-            // depth makes the box bottom the baseline. 0.22em is a fair
-            // descender across the faces we load, the sibling of the 0.72
-            // cap height above.
-            marginBottom: -Math.round(fontSize * 0.22),
-          }}
-        >
-          {text}
-        </div>
-      </div>
-    ),
-    {
-      width: 3200,
-      height: 360,
-      ...(fonts?.length ? { fonts } : {}),
-    },
+  // The font's own metrics, measured rather than assumed: a capital H is
+  // flat top and bottom, so its ink runs exactly cap top to baseline. Every
+  // face we might load has different metrics, and a lockup that guesses them
+  // puts the mark at the wrong height or the wrong altitude.
+  // A capital from the brand's own name, so the glyph is one this font
+  // certainly has; H only as a last resort. Its ink runs cap top to
+  // baseline, because a capital is flat top and bottom and sits on the line.
+  const probe = /\p{Lu}/u.exec(text)?.[0] ?? "H";
+  // One at a time: satori's renderer is a shared WASM instance, and two
+  // renders in flight together corrupt each other's output.
+  const textPng = await renderTextPng({ text, color, fontSize, fonts });
+  const probePng = await renderTextPng({ text: probe, color, fontSize, fonts });
+  const textInk = await inkOf(textPng);
+  // A script with no capitals leaves the whole line as the only measure.
+  const capInk = await inkOf(probePng).catch(() => textInk);
+  const capHeight = capInk.height;
+  const capCentre = capInk.top + capInk.height / 2;
+
+  if (!iconPng) return textInk.crop;
+
+  // Set against the capitals, not the line box, and sized by how much ink
+  // the mark carries: a solid one sits at cap height, a sparse outline goes
+  // up to a fifth taller so it holds its own beside the letters.
+  const coverage = await inkCoverage(iconPng);
+  const scale = 1 + 0.2 * (1 - Math.min(coverage / 0.5, 1));
+  const source = await sharp(iconPng).metadata();
+  const aspect = (source.width ?? 1) / (source.height ?? 1);
+  // A wide mark sized by height would dwarf the wordmark it introduces, so
+  // width is the binding constraint past two cap heights.
+  const iconHeight = Math.round(
+    Math.min(capHeight * scale, (capHeight * 2) / Math.max(aspect, 0.01)),
   );
-  const png = Buffer.from(await response.arrayBuffer());
-  return sharp(png).trim().png().toBuffer();
+  const gap = Math.round(capHeight * 0.34);
+  const icon = await iconAtHeight(iconPng, tone, iconHeight);
+  const iconMeta = await sharp(icon).metadata();
+  const iconWidth = iconMeta.width ?? iconHeight;
+  const iconTop = Math.round(capCentre - iconHeight / 2);
+
+  const originY = Math.min(iconTop, textInk.top);
+  const height =
+    Math.max(iconTop + iconHeight, textInk.top + textInk.height) - originY;
+  return sharp({
+    create: {
+      width: iconWidth + gap + textInk.width,
+      height,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([
+      { input: icon, left: 0, top: iconTop - originY },
+      { input: textInk.crop, left: iconWidth + gap, top: textInk.top - originY },
+    ])
+    .png()
+    .toBuffer();
 }
 
 /** Render one tone for a live preview; nothing is stored. */

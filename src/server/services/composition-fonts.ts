@@ -45,14 +45,37 @@ export function parseGoogleFontCss(
 const TTF_USER_AGENT =
   "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:22.0) Gecko/20130328 Firefox/22.0";
 
-const cache = new Map<string, Promise<LoadedFont[] | null>>();
+type CachedFace = {
+  name: string;
+  bytes: Uint8Array;
+  weight: 400 | 700;
+  style: "normal";
+};
+
+const cache = new Map<string, Promise<CachedFace[] | null>>();
 
 /**
  * Regular and bold of a Google Fonts family, or null when Google does not
  * carry it (a licensed or self-hosted face), in which case the card renders
  * in the house font and nothing fails. Cached per process.
  */
-export function loadGoogleFont(family: string): Promise<LoadedFont[] | null> {
+export async function loadGoogleFont(
+  family: string,
+): Promise<LoadedFont[] | null> {
+  const faces = await cachedFaces(family);
+  if (!faces) return null;
+  // satori consumes the buffer it is handed, so a cached face can only be
+  // used once. Every caller gets its own copy; without this the second
+  // render in a process silently loses the brand font.
+  return faces.map((face) => ({
+    name: face.name,
+    weight: face.weight,
+    style: face.style,
+    data: face.bytes.slice().buffer as ArrayBuffer,
+  }));
+}
+
+function cachedFaces(family: string): Promise<CachedFace[] | null> {
   const key = family.trim();
   const hit = cache.get(key);
   if (hit) return hit;
@@ -70,17 +93,18 @@ export function loadGoogleFont(family: string): Promise<LoadedFont[] | null> {
         (face) => face.weight === 400 || face.weight === 700,
       );
       if (faces.length === 0) return null;
-      const fonts = await Promise.all(
+      return Promise.all(
         faces.map(async (face) => ({
           name: key,
-          data: await (
-            await fetch(face.url, { signal: AbortSignal.timeout(8_000) })
-          ).arrayBuffer(),
+          bytes: new Uint8Array(
+            await (
+              await fetch(face.url, { signal: AbortSignal.timeout(8_000) })
+            ).arrayBuffer(),
+          ),
           weight: face.weight as 400 | 700,
           style: "normal" as const,
         })),
       );
-      return fonts;
     } catch (error) {
       console.error("brand font unavailable, using the house font", key, error);
       return null;
