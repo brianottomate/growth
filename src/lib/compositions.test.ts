@@ -3,7 +3,9 @@ import { describe, expect, test } from "bun:test";
 import {
   COMPOSITION_FORMATS,
   COMPOSITION_TEMPLATES,
+  compositionHasField,
   compositionSpecSchema,
+  getCompositionFields,
   freezeCompositionSchema,
   getCompositionFormat,
   getCompositionIdentity,
@@ -166,6 +168,45 @@ describe("composition identity", () => {
       ...identity,
       renderedAt: "2026-09-04T00:00:00.000Z",
     });
+  });
+});
+
+describe("the fields a blueprint declares", () => {
+  test("every blueprint declares its fields, and only photo only draws none", () => {
+    for (const template of COMPOSITION_TEMPLATES) {
+      const fields = getCompositionFields(template.id);
+      expect(Array.isArray(fields)).toBe(true);
+      expect(fields.length === 0).toBe(template.id === "photo-only");
+      // Anchors are fractions of the canvas; anything else puts a marker
+      // off the picture.
+      for (const field of fields) {
+        expect(field.anchor.x).toBeGreaterThanOrEqual(0);
+        expect(field.anchor.x).toBeLessThanOrEqual(1);
+        expect(field.anchor.y).toBeGreaterThanOrEqual(0);
+        expect(field.anchor.y).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  test("a blueprint that requires a headline declares a title field, and vice versa", () => {
+    // The form is built from the declaration and the schema enforces the
+    // headline; the two must agree or the form asks for what it cannot show.
+    for (const template of COMPOSITION_TEMPLATES) {
+      const requires = compositionSpecSchema.safeParse({
+        brandId: "b",
+        templateId: template.id,
+        formatId: "square",
+        sourceMediaAssetId: "m",
+        title: "",
+      }).success === false;
+      expect(compositionHasField(template.id, "title")).toBe(requires);
+    }
+  });
+
+  test("the review card is the only one with stars", () => {
+    expect(
+      COMPOSITION_TEMPLATES.filter((t) => compositionHasField(t.id, "rating")).map((t) => t.id),
+    ).toEqual(["catalog-review"]);
   });
 });
 

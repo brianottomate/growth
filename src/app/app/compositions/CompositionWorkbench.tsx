@@ -1,12 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ImageIcon, Layers3, Loader2, Snowflake } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  ImageIcon,
+  Layers3,
+  Loader2,
+  Snowflake,
+  Star,
+  Wand2,
+} from "lucide-react";
 
 import {
   COMPOSITION_FORMATS,
   COMPOSITION_TEMPLATES,
+  getCompositionFields,
+  type CompositionFieldKey,
   type CompositionFormatId,
   type CompositionTemplateId,
 } from "@/lib/compositions";
@@ -18,14 +30,14 @@ import { SimpleSelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
-import { BrandingPanel } from "@/components/brand/BrandingPanel";
-import { ListingSamplesDialog } from "./ListingSamplesDialog";
 import type { BrandIdentity } from "@/server/db/brand-schema";
 import { useTRPC } from "@/trpc/react";
+import { ListingSamplesDialog } from "./ListingSamplesDialog";
 
 type Brand = {
   id: string;
   name: string;
+  slug: string | null;
   logo: string | null;
   brandIdentity: BrandIdentity | null;
 };
@@ -34,6 +46,28 @@ type Brand = {
 function brandAccent(identity: BrandIdentity | null | undefined) {
   return identity?.colors?.accent ?? identity?.colors?.primary ?? "#18a8b5";
 }
+
+/** The brand's own colours, deduplicated, for the accent swatches. */
+function brandPalette(identity: BrandIdentity | null | undefined) {
+  const colors = identity?.colors ?? {};
+  const seen = new Set<string>();
+  return (
+    [
+      ["Accent", colors.accent],
+      ["Primary", colors.primary],
+      ["Secondary", colors.secondary],
+      ["Background", (colors as { background?: string }).background],
+    ] as const
+  ).flatMap(([label, hex]) => {
+    if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return [];
+    const key = hex.toLowerCase();
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ label, hex: key }];
+  });
+}
+
+type Direction = { verdict: "keep" | "adjust"; note: string; changes: string[] };
 
 export function CompositionWorkbench({
   brands,
@@ -50,15 +84,30 @@ export function CompositionWorkbench({
     useState<CompositionTemplateId>("photo-only");
   const [formatId, setFormatId] = useState<CompositionFormatId>("portrait");
   const [sourceMediaAssetId, setSourceMediaAssetId] = useState("");
+  // Copy lives outside the blueprint: switching layouts keeps it, and a field
+  // reappears with its text when a layout uses it again.
   const [title, setTitle] = useState("The view is only the beginning.");
   const [subtitle, setSubtitle] = useState(
     "Turn a strong property image into channel-ready creative without rebuilding the layout.",
   );
   const [eyebrow, setEyebrow] = useState("Stay with Wander");
   const [cta, setCta] = useState("Explore the stay");
+  const [rating, setRating] = useState<number | undefined>(5);
   const [assetTitle, setAssetTitle] = useState("Wander social composition");
   const [sourceSearch, setSourceSearch] = useState("");
+  const [mark, setMark] = useState<"auto" | "color" | "white" | "dark" | "none">("auto");
+  const [imagePosition, setImagePosition] = useState<"top" | "center" | "bottom">("center");
+  // What the art director set. Cleared when the photo or the layout changes,
+  // because the read belonged to that card.
+  const [focal, setFocal] = useState<{ x: number; y: number } | null>(null);
+  const [scrim, setScrim] = useState<string | null>(null);
+  const [direction, setDirection] = useState<Direction | null>(null);
+
   const selectedBrand = brands.find((brand) => brand.id === brandId);
+  const palette = useMemo(
+    () => brandPalette(selectedBrand?.brandIdentity),
+    [selectedBrand],
+  );
   const [accent, setAccent] = useState(() =>
     brandAccent(selectedBrand?.brandIdentity),
   );
@@ -67,10 +116,10 @@ export function CompositionWorkbench({
   useEffect(() => {
     setAccent(brandAccent(selectedBrand?.brandIdentity));
   }, [selectedBrand]);
-  const [mark, setMark] = useState<"auto" | "color" | "white" | "dark" | "none">("auto");
-  const [imagePosition, setImagePosition] = useState<
-    "top" | "center" | "bottom"
-  >("center");
+
+  const fields = getCompositionFields(templateId);
+  const has = (key: CompositionFieldKey) =>
+    fields.some((field) => field.key === key);
 
   const sourceListOptions = trpc.media.list.queryOptions({
     brandId,
@@ -95,8 +144,46 @@ export function CompositionWorkbench({
     : (hostedAssets[0]?.id ?? "");
   const requiresImage = templateId !== "brand-statement";
   const renderSourceId = requiresImage ? effectiveSourceId : "";
+  const needsTitle = has("title");
   const canRender = Boolean(
-    title.trim() && (!requiresImage || renderSourceId),
+    (!needsTitle || title.trim()) && (!requiresImage || renderSourceId),
+  );
+
+  const resetDirection = () => {
+    setFocal(null);
+    setScrim(null);
+    setDirection(null);
+  };
+  const chooseTemplate = (next: CompositionTemplateId) => {
+    setTemplateId(next);
+    resetDirection();
+  };
+  const chooseSource = (id: string) => {
+    setSourceMediaAssetId(id);
+    resetDirection();
+  };
+
+  // The spec as the renderer will read it: only the fields this blueprint
+  // declares travel, so a hidden field cannot leak onto the canvas.
+  const spec = useMemo(
+    () => ({
+      brandId,
+      templateId,
+      formatId,
+      sourceMediaAssetId: renderSourceId || undefined,
+      title: needsTitle ? title.trim() : "",
+      subtitle: has("subtitle") && subtitle.trim() ? subtitle.trim() : undefined,
+      eyebrow: has("eyebrow") && eyebrow.trim() ? eyebrow.trim() : undefined,
+      cta: has("cta") && cta.trim() ? cta.trim() : undefined,
+      accent: has("accent") ? accent : undefined,
+      rating: has("rating") ? rating : undefined,
+      mark: has("mark") ? mark : ("auto" as const),
+      imagePosition,
+      focal: focal ?? undefined,
+      scrim: scrim ?? undefined,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [brandId, templateId, formatId, renderSourceId, title, subtitle, eyebrow, cta, accent, rating, mark, imagePosition, focal, scrim, fields],
   );
 
   const previewUrl = useMemo(() => {
@@ -105,32 +192,23 @@ export function CompositionWorkbench({
       brandId,
       templateId,
       formatId,
-      title: title.trim(),
+      title: spec.title,
       imagePosition,
+      mark: spec.mark,
     });
-    if (renderSourceId) {
-      params.set("sourceMediaAssetId", renderSourceId);
+    if (spec.sourceMediaAssetId) params.set("sourceMediaAssetId", spec.sourceMediaAssetId);
+    if (spec.subtitle) params.set("subtitle", spec.subtitle);
+    if (spec.eyebrow) params.set("eyebrow", spec.eyebrow);
+    if (spec.cta) params.set("cta", spec.cta);
+    if (spec.accent) params.set("accent", spec.accent);
+    if (spec.rating) params.set("rating", String(spec.rating));
+    if (spec.focal) {
+      params.set("focalX", String(spec.focal.x));
+      params.set("focalY", String(spec.focal.y));
     }
-    if (subtitle.trim()) params.set("subtitle", subtitle.trim());
-    if (eyebrow.trim()) params.set("eyebrow", eyebrow.trim());
-    if (cta.trim()) params.set("cta", cta.trim());
-    if (accent) params.set("accent", accent);
-    params.set("mark", mark);
+    if (spec.scrim) params.set("scrim", spec.scrim);
     return `/api/compositions/preview?${params.toString()}`;
-  }, [
-    accent,
-    mark,
-    brandId,
-    canRender,
-    cta,
-    renderSourceId,
-    eyebrow,
-    formatId,
-    imagePosition,
-    subtitle,
-    templateId,
-    title,
-  ]);
+  }, [brandId, canRender, formatId, imagePosition, spec, templateId]);
 
   const freeze = useMutation(
     trpc.composition.freeze.mutationOptions({
@@ -144,130 +222,158 @@ export function CompositionWorkbench({
     }),
   );
 
+  const direct = useMutation(
+    trpc.composition.direct.mutationOptions({
+      onSuccess: (result) => {
+        setTitle(result.title);
+        if (has("subtitle")) setSubtitle(result.subtitle ?? "");
+        setFocal(result.focal);
+        setScrim(result.scrim);
+        setDirection({
+          verdict: result.verdict,
+          note: result.note,
+          changes: result.changes,
+        });
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
   const selectedFormat = COMPOSITION_FORMATS.find(
     (format) => format.id === formatId,
   )!;
   const selectedTemplate = COMPOSITION_TEMPLATES.find(
     (template) => template.id === templateId,
   )!;
+  const identity = selectedBrand?.brandIdentity ?? null;
+  const fonts = identity?.fonts ?? [];
+  const headingFont =
+    fonts.find((font) => font.role === "heading")?.family ?? fonts[0]?.family;
+  const bodyFont = fonts.find((font) => font.role === "body")?.family;
+
+  /** Whether a field has something to point at on the canvas. */
+  const drawn = (key: CompositionFieldKey) =>
+    key === "mark"
+      ? mark !== "none"
+      : key === "accent"
+        ? true
+        : key === "rating"
+          ? Boolean(rating)
+          : key === "title"
+            ? Boolean(title.trim())
+            : key === "subtitle"
+              ? Boolean(subtitle.trim())
+              : key === "eyebrow"
+                ? Boolean(eyebrow.trim())
+                : Boolean(cta.trim());
 
   return (
-    <div className="grid gap-6 2xl:grid-cols-[420px_minmax(0,1fr)]">
+    <div className="grid gap-6 2xl:grid-cols-[440px_minmax(0,1fr)]">
       <div className="space-y-5">
-        <section className="space-y-4 rounded-xl border p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Brand</Label>
-              <SimpleSelect
-                value={brandId}
-                onValueChange={(nextBrandId) => {
-                  onBrandChange(nextBrandId);
-                  setSourceMediaAssetId("");
-                }}
-                options={brands.map((brand) => ({
-                  value: brand.id,
-                  label: brand.name,
-                }))}
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Canvas</Label>
-              <SimpleSelect
-                value={formatId}
-                onValueChange={(value) =>
-                  setFormatId(value as CompositionFormatId)
-                }
-                options={COMPOSITION_FORMATS.map((format) => ({
-                  value: format.id,
-                  label: `${format.label} · ${format.detail}`,
-                }))}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          <BrandDefaults
-            logo={selectedBrand?.logo ?? null}
-            identity={selectedBrand?.brandIdentity ?? null}
-          />
-
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>Eyebrow</Label>
-            <Input
-              value={eyebrow}
-              onChange={(event) => setEyebrow(event.target.value)}
-              maxLength={40}
-              placeholder="Optional category or campaign"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Headline</Label>
-            <Textarea
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              maxLength={120}
-              rows={3}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Supporting copy</Label>
-            <Textarea
-              value={subtitle}
-              onChange={(event) => setSubtitle(event.target.value)}
-              maxLength={220}
-              rows={3}
-              placeholder="Optional"
-            />
-          </div>
-          <div className="grid grid-cols-[1fr_110px] gap-3">
-            <div className="space-y-1.5">
-              <Label>CTA</Label>
-              <Input
-                value={cta}
-                onChange={(event) => setCta(event.target.value)}
-                maxLength={60}
-                placeholder="Optional"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Accent</Label>
-              <Input
-                type="color"
-                value={accent}
-                onChange={(event) => setAccent(event.target.value)}
-                className="w-full p-1"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Mark</Label>
+            <Label>Brand</Label>
             <SimpleSelect
-              value={mark}
-              onValueChange={(value) => setMark(value as typeof mark)}
-              options={[
-                { value: "auto", label: "Brand default · white over photos" },
-                { value: "color", label: "Colour" },
-                { value: "white", label: "White" },
-                { value: "dark", label: "Dark" },
-                { value: "none", label: "No mark" },
-              ]}
+              value={brandId}
+              onValueChange={(nextBrandId) => {
+                onBrandChange(nextBrandId);
+                setSourceMediaAssetId("");
+                resetDirection();
+              }}
+              options={brands.map((brand) => ({
+                value: brand.id,
+                label: brand.name,
+              }))}
               className="w-full"
             />
           </div>
+          <div className="space-y-1.5">
+            <Label>Canvas</Label>
+            <SimpleSelect
+              value={formatId}
+              onValueChange={(value) => {
+                setFormatId(value as CompositionFormatId);
+                resetDirection();
+              }}
+              options={COMPOSITION_FORMATS.map((format) => ({
+                value: format.id,
+                label: `${format.label} · ${format.detail}`,
+              }))}
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        {/* Brand truth, read-only. It is edited on the brand page; the Studio
+            only shows what it is composing with. */}
+        <section className="space-y-2 rounded-xl border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs">
+              <span className="font-semibold">Brand defaults</span>{" "}
+              <span className="text-muted-foreground">read from the brand page</span>
+            </p>
+            {selectedBrand?.slug ? (
+              <Link
+                href={`/app/brands/${selectedBrand.slug}`}
+                className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+              >
+                Edit on {selectedBrand.name}
+                <ExternalLink className="size-3" />
+              </Link>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            {selectedBrand?.logo ? (
+              <span className="inline-flex h-7 items-center rounded-md border bg-white px-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={selectedBrand.logo} alt="" className="max-h-4 max-w-28 object-contain" />
+              </span>
+            ) : null}
+            {palette.length > 0 ? (
+              <span className="flex items-center gap-1">
+                {palette.map((swatch) => (
+                  <span
+                    key={swatch.hex}
+                    title={`${swatch.label} ${swatch.hex}`}
+                    className="size-4 rounded-full border border-white/20"
+                    style={{ background: swatch.hex }}
+                  />
+                ))}
+              </span>
+            ) : null}
+            {identity?.colorScheme ? (
+              <span className="capitalize">{identity.colorScheme}</span>
+            ) : null}
+            {headingFont ? (
+              <span>
+                {headingFont}
+                {bodyFont && bodyFont !== headingFont ? ` / ${bodyFont}` : ""}
+              </span>
+            ) : null}
+            {!selectedBrand?.logo && palette.length === 0 && !headingFont ? (
+              <span className="text-muted-foreground">
+                Nothing read yet. Re-enrich on the brand page.
+              </span>
+            ) : null}
+          </div>
+          {identity?.personality ? (
+            <p className="text-muted-foreground text-[11px]">
+              {[identity.personality.tone, identity.personality.energy, identity.personality.targetAudience]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
         </section>
 
         <section className="space-y-3 rounded-xl border p-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <Layers3 className="size-4" />
-                Blueprint
-              </h2>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Choose the reusable layout before adding copy and media.
-              </p>
-            </div>
+            <p className="flex items-center gap-2 text-sm">
+              <Layers3 className="size-4" />
+              <span className="font-semibold">Blueprint</span>
+              <span className="text-muted-foreground text-xs">
+                decides which fields exist below
+              </span>
+            </p>
             <Badge variant="outline">v{selectedTemplate.version}</Badge>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -275,7 +381,7 @@ export function CompositionWorkbench({
               <button
                 key={template.id}
                 type="button"
-                onClick={() => setTemplateId(template.id)}
+                onClick={() => chooseTemplate(template.id)}
                 className={cn(
                   "hover:bg-muted/70 relative rounded-lg border p-3 text-left transition-colors",
                   templateId === template.id &&
@@ -295,39 +401,168 @@ export function CompositionWorkbench({
             ))}
           </div>
         </section>
+
+        <section className="space-y-4 rounded-xl border p-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-semibold">{selectedTemplate.label}</span>
+            <Badge variant="outline">
+              {fields.length} field{fields.length === 1 ? "" : "s"}
+            </Badge>
+            <span className="text-muted-foreground text-xs">
+              {fields.length > 0
+                ? "numbers show where each renders"
+                : "draws the photo and nothing else"}
+            </span>
+          </div>
+
+          {fields.map((field, index) => (
+            <div key={field.key} className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <FieldNumber n={index + 1} />
+                {field.label}
+                {field.hint && field.key === "accent" ? (
+                  <span className="text-muted-foreground font-normal">{field.hint}</span>
+                ) : null}
+              </Label>
+              {field.key === "mark" ? (
+                <SimpleSelect
+                  value={mark}
+                  onValueChange={(value) => setMark(value as typeof mark)}
+                  options={[
+                    { value: "auto", label: "Brand default · white over photos" },
+                    { value: "color", label: "Colour" },
+                    { value: "white", label: "White" },
+                    { value: "dark", label: "Dark" },
+                    { value: "none", label: "No mark" },
+                  ]}
+                  className="w-full"
+                />
+              ) : field.key === "eyebrow" ? (
+                <Input
+                  value={eyebrow}
+                  onChange={(event) => setEyebrow(event.target.value)}
+                  maxLength={40}
+                  placeholder={field.hint}
+                />
+              ) : field.key === "title" ? (
+                <Textarea
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  maxLength={120}
+                  rows={2}
+                  placeholder={field.hint}
+                />
+              ) : field.key === "subtitle" ? (
+                <Textarea
+                  value={subtitle}
+                  onChange={(event) => setSubtitle(event.target.value)}
+                  maxLength={220}
+                  rows={2}
+                  placeholder={field.hint}
+                />
+              ) : field.key === "cta" ? (
+                <Input
+                  value={cta}
+                  onChange={(event) => setCta(event.target.value)}
+                  maxLength={60}
+                  placeholder={field.hint}
+                />
+              ) : field.key === "rating" ? (
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setRating(rating === n ? undefined : n)}
+                      aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                      className="p-0.5"
+                    >
+                      <Star
+                        className={cn(
+                          "size-5",
+                          rating && n <= rating
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-muted-foreground",
+                        )}
+                      />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  {palette.map((swatch) => (
+                    <button
+                      key={swatch.hex}
+                      type="button"
+                      title={`${swatch.label} ${swatch.hex}`}
+                      onClick={() => setAccent(swatch.hex)}
+                      className={cn(
+                        "size-7 rounded-full border-2 transition",
+                        accent.toLowerCase() === swatch.hex
+                          ? "border-white"
+                          : "border-transparent hover:border-white/40",
+                      )}
+                      style={{ background: swatch.hex }}
+                    />
+                  ))}
+                  <Input
+                    type="color"
+                    value={accent}
+                    onChange={(event) => setAccent(event.target.value)}
+                    className="h-7 w-10 p-0.5"
+                    title="Custom"
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {direction ? (
+            <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
+              <span className="font-medium">Art director:</span> {direction.note}
+              {direction.changes.length > 0 ? ` Applied: ${direction.changes.join("; ")}.` : ""}
+            </p>
+          ) : null}
+
+          <p className="text-muted-foreground text-[11px]">
+            Copy is kept when you switch blueprints. It reappears when a layout
+            uses it.
+          </p>
+        </section>
       </div>
 
       <div className="space-y-5">
         <section className="rounded-xl border p-4">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold">Source media</h2>
-              <p className="text-muted-foreground mt-1 text-xs">
-                Pick a ready image from this brand&apos;s R2 media library.
-              </p>
-            </div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm">
+              <span className="font-semibold">Source media</span>{" "}
+              <span className="text-muted-foreground text-xs">
+                from this brand&apos;s media library
+              </span>
+            </p>
             <div className="flex flex-wrap gap-2">
               <ListingSamplesDialog
                 brandId={brandId}
-                onImported={async (assets) => {
+                onImported={async (imported) => {
                   await queryClient.invalidateQueries({
                     queryKey: sourceListOptions.queryKey,
                   });
-                  if (assets[0]) setSourceMediaAssetId(assets[0].id);
+                  if (imported[0]) chooseSource(imported[0].id);
                 }}
               />
               <Input
                 value={sourceSearch}
                 onChange={(event) => setSourceSearch(event.target.value)}
                 placeholder="Search library"
-                className="h-8 w-44"
+                className="h-8 w-40"
               />
               {requiresImage && (
                 <SimpleSelect
                   value={imagePosition}
-                  onValueChange={(value) =>
-                    setImagePosition(value as typeof imagePosition)
-                  }
+                  onValueChange={(value) => {
+                    setImagePosition(value as typeof imagePosition);
+                    setFocal(null);
+                  }}
                   options={[
                     { value: "top", label: "Crop from top" },
                     { value: "center", label: "Crop from center" },
@@ -352,7 +587,7 @@ export function CompositionWorkbench({
           ) : hostedAssets.length === 0 ? (
             <div className="text-muted-foreground flex h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-xs">
               <ImageIcon className="size-5" />
-              Upload an image in Media to use image-led blueprints.
+              Nothing in the library yet. Pull a few from their homes, or upload in Media.
             </div>
           ) : (
             <div className="grid max-h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6">
@@ -362,7 +597,7 @@ export function CompositionWorkbench({
                   <button
                     type="button"
                     key={asset.id}
-                    onClick={() => setSourceMediaAssetId(asset.id)}
+                    onClick={() => chooseSource(asset.id)}
                     className={cn(
                       "bg-muted relative aspect-square overflow-hidden rounded-lg border",
                       selected &&
@@ -391,103 +626,92 @@ export function CompositionWorkbench({
 
         <section className="overflow-hidden rounded-xl border">
           <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-3">
-            <div>
-              <h2 className="text-sm font-semibold">Live composition</h2>
-              <p className="text-muted-foreground text-xs">
+            <p className="text-sm">
+              <span className="font-semibold">Live composition</span>{" "}
+              <span className="text-muted-foreground text-xs">
                 {selectedFormat.width}×{selectedFormat.height} PNG
-              </p>
-            </div>
+              </span>
+            </p>
             <Badge variant="secondary">{selectedTemplate.label}</Badge>
           </div>
           <div className="flex min-h-96 items-center justify-center bg-[radial-gradient(circle_at_center,var(--color-muted)_1px,transparent_1px)] bg-size-[16px_16px] p-5">
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={previewUrl}
-                alt="Composition preview"
-                className="max-h-[680px] max-w-full rounded-md object-contain shadow-2xl"
-              />
+              <div className="relative inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="Composition preview"
+                  className="max-h-[680px] max-w-full rounded-md object-contain shadow-2xl"
+                />
+                {/* Where each numbered field lands. Guidance from the
+                    blueprint's anchors, not measured from the render. */}
+                {fields.map((field, index) =>
+                  drawn(field.key) ? (
+                    <span
+                      key={field.key}
+                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        left: `${field.anchor.x * 100}%`,
+                        top: `${field.anchor.y * 100}%`,
+                      }}
+                    >
+                      <FieldNumber n={index + 1} />
+                    </span>
+                  ) : null,
+                )}
+              </div>
             ) : (
               <div className="text-muted-foreground flex flex-col items-center gap-2 text-sm">
                 <ImageIcon className="size-6" />
-                {title.trim()
-                  ? "Choose a source image to render this blueprint."
-                  : "Add a headline to render this blueprint."}
+                {needsTitle && !title.trim()
+                  ? `Add a ${fields.find((f) => f.key === "title")?.label.toLowerCase() ?? "headline"} to render this blueprint.`
+                  : "Choose a source image to render this blueprint."}
               </div>
             )}
           </div>
-        </section>
-
-        <section className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end">
-          <div className="flex-1 space-y-1.5">
-            <Label>Library asset name</Label>
+          <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center">
+            <Label className="whitespace-nowrap">Library asset name</Label>
             <Input
               value={assetTitle}
               onChange={(event) => setAssetTitle(event.target.value)}
               maxLength={180}
+              className="flex-1"
             />
-            <p className="text-muted-foreground text-[11px]">
-              Freezing saves the exact PNG and its complete blueprint recipe.
+            <p className="text-muted-foreground hidden text-[11px] lg:block">
+              Freezing saves the PNG and this exact blueprint recipe.
             </p>
+            {requiresImage && fields.length > 0 ? (
+              <Button
+                variant="outline"
+                disabled={!canRender || direct.isPending || freeze.isPending}
+                onClick={() => direct.mutate(spec)}
+                title="Have the art director judge this card and apply its corrections to the form"
+              >
+                <Wand2 className={cn("size-4", direct.isPending && "animate-pulse")} />
+                {direct.isPending ? "Judging…" : direction ? "Judge again" : "Art director"}
+              </Button>
+            ) : null}
+            <Button
+              disabled={!canRender || !assetTitle.trim()}
+              loading={freeze.isPending}
+              onClick={() =>
+                freeze.mutate({ ...spec, assetTitle: assetTitle.trim() })
+              }
+            >
+              <Snowflake className="size-4" />
+              Freeze to library
+            </Button>
           </div>
-          <Button
-            disabled={!canRender || !assetTitle.trim()}
-            loading={freeze.isPending}
-            onClick={() =>
-              freeze.mutate({
-                brandId,
-                templateId,
-                formatId,
-                sourceMediaAssetId: renderSourceId || undefined,
-                title: title.trim(),
-                subtitle: subtitle.trim() || undefined,
-                eyebrow: eyebrow.trim() || undefined,
-                cta: cta.trim() || undefined,
-                accent,
-                imagePosition,
-                mark,
-                assetTitle: assetTitle.trim(),
-              })
-            }
-          >
-            <Snowflake className="size-4" />
-            Freeze to library
-          </Button>
         </section>
       </div>
     </div>
   );
 }
 
-/**
- * What enrichment learned about the brand, read-only. The accent above starts
- * from it; the rest is here so the operator can see what the site says before
- * overriding it.
- */
-function BrandDefaults({
-  logo,
-  identity,
-}: {
-  logo: string | null;
-  identity: BrandIdentity | null;
-}) {
-  if (!identity && !logo) {
-    return (
-      <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
-        No brand defaults yet. Re-enrich on the brand page reads the logo,
-        colours and fonts from their site.
-      </p>
-    );
-  }
+function FieldNumber({ n }: { n: number }) {
   return (
-    <div className="space-y-2 rounded-lg border p-3">
-      <span className="text-xs font-semibold">Brand defaults</span>
-      <BrandingPanel identity={identity} logo={logo} compact />
-      {identity?.fonts?.length ? (
-        <p className="text-muted-foreground text-[11px]">
-          Cards render in the heading face when Google Fonts carries it.
-        </p>
-      ) : null}
-    </div>
+    <span className="bg-foreground text-background inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums">
+      {n}
+    </span>
   );
 }

@@ -10,6 +10,7 @@ import type { BrandIdentity } from "@/server/db/brand-schema";
 type Brand = {
   id: string;
   name: string;
+  slug: string | null;
   logo: string | null;
   brandIdentity: BrandIdentity | null;
 };

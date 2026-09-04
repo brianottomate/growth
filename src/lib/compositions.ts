@@ -108,6 +108,92 @@ export type CompositionFormatId = (typeof COMPOSITION_FORMATS)[number]["id"];
 export type CompositionTemplateId =
   (typeof COMPOSITION_TEMPLATES)[number]["id"];
 
+export type CompositionFieldKey =
+  | "mark"
+  | "eyebrow"
+  | "title"
+  | "subtitle"
+  | "cta"
+  | "accent"
+  | "rating";
+
+export type CompositionField = {
+  key: CompositionFieldKey;
+  /** What the field is called on this blueprint: "Home name", not "Headline". */
+  label: string;
+  hint?: string;
+  /** Where the field lands on the canvas, as fractions of width and height. */
+  anchor: { x: number; y: number };
+};
+
+const mark = (x = 0.06, y = 0.05): CompositionField => ({
+  key: "mark",
+  label: "Mark",
+  anchor: { x, y },
+});
+const message = (x: number, y: number, step = 0.06): CompositionField[] => [
+  { key: "eyebrow", label: "Eyebrow", hint: "Optional", anchor: { x, y } },
+  { key: "title", label: "Headline", anchor: { x, y: y + step } },
+  { key: "subtitle", label: "Supporting copy", hint: "Optional", anchor: { x, y: y + step * 2.2 } },
+  { key: "cta", label: "CTA", hint: "Optional", anchor: { x, y: y + step * 3.2 } },
+];
+const accent = (x: number, y: number, hint: string): CompositionField => ({
+  key: "accent",
+  label: "Accent",
+  hint,
+  anchor: { x, y },
+});
+
+/**
+ * The fields each blueprint draws, and only those. The form is built from
+ * this, so a field that exists on screen is a field the render reads, and the
+ * label says what it means on that layout. Anchors place the numbered markers
+ * on the preview; they are guidance, not the renderer's own geometry.
+ */
+export const COMPOSITION_FIELDS: Record<CompositionTemplateId, CompositionField[]> = {
+  // The photo alone: nothing from the form reaches the canvas.
+  "photo-only": [],
+  "catalog-copy": [
+    mark(),
+    { key: "title", label: "Home name", anchor: { x: 0.06, y: 0.85 } },
+    { key: "subtitle", label: "Facts", hint: "3 bedrooms · 2 baths · 8 guests", anchor: { x: 0.06, y: 0.94 } },
+  ],
+  "catalog-review": [
+    mark(),
+    { key: "title", label: "Guest quote", hint: "Without the quotation marks", anchor: { x: 0.06, y: 0.82 } },
+    { key: "subtitle", label: "Guest", hint: "Who said it", anchor: { x: 0.06, y: 0.94 } },
+    { key: "rating", label: "Stars", anchor: { x: 0.3, y: 0.94 } },
+  ],
+  "tall-statement": [
+    mark(0.5, 0.05),
+    { key: "title", label: "Headline", anchor: { x: 0.5, y: 0.3 } },
+    { key: "subtitle", label: "Supporting line", hint: "Optional", anchor: { x: 0.5, y: 0.42 } },
+    { key: "cta", label: "Call to action", hint: "Optional", anchor: { x: 0.5, y: 0.9 } },
+  ],
+  "tall-welcome": [
+    mark(),
+    { key: "title", label: "Headline", anchor: { x: 0.06, y: 0.62 } },
+    { key: "subtitle", label: "Supporting line", hint: "Optional", anchor: { x: 0.06, y: 0.74 } },
+    { key: "cta", label: "Button", hint: "Optional", anchor: { x: 0.06, y: 0.9 } },
+  ],
+  "image-hero": [mark(), ...message(0.06, 0.72)],
+  "split-frame": [mark(), ...message(0.06, 0.3)],
+  "editorial-overlay": [mark(), ...message(0.06, 0.66), accent(0.9, 0.94, "colours the CTA")],
+  "product-proof": [mark(), ...message(0.06, 0.26), accent(0.86, 0.86, "colours the card edge")],
+  "brand-statement": [mark(), ...message(0.06, 0.38), accent(0.9, 0.9, "warms the ground")],
+};
+
+export function getCompositionFields(id: CompositionTemplateId) {
+  return COMPOSITION_FIELDS[id];
+}
+
+export function compositionHasField(
+  id: CompositionTemplateId,
+  key: CompositionFieldKey,
+) {
+  return COMPOSITION_FIELDS[id].some((field) => field.key === key);
+}
+
 const templateIds = COMPOSITION_TEMPLATES.map((template) => template.id) as [
   CompositionTemplateId,
   ...CompositionTemplateId[],

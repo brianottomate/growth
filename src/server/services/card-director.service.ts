@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import {
   getCompositionFormat,
+  getCompositionTemplate,
   type FreezeCompositionInput,
 } from "@/lib/compositions";
 import {
@@ -193,7 +194,7 @@ export async function critiqueCard(input: {
               type: "text",
               text: [
                 `Brand: ${input.brandName}. Home: ${input.home.name}.`,
-                `Card: ${format.label.toLowerCase()} ${format.width}×${format.height}, the brand mark top left, the headline and facts line at the foot over the darkening.`,
+                `Card: ${format.label.toLowerCase()} ${format.width}×${format.height}. Layout: ${getCompositionTemplate(input.spec.templateId).description}`,
                 headline.length > 1
                   ? `Headline on the card, set on ${headline.length} lines: ${headline.map((line) => `“${line}”`).join(" / ")}.`
                   : `Headline on the card, on one line: “${input.spec.title}”.`,
