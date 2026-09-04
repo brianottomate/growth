@@ -186,6 +186,21 @@ export async function loadLogoImage(url: string): Promise<LogoImage> {
   };
 }
 
+/**
+ * The image with its empty margin removed, so its box is the mark itself.
+ * A favicon is drawn inside a square with padding; measured with that padding
+ * a mark looks small beside text set to the same height. Returns the original
+ * when there is nothing to trim (a full-bleed image) or when trim fails.
+ */
+export async function trimTransparent(png: Buffer): Promise<Buffer> {
+  try {
+    // threshold 1: only pixels that match the corner exactly are margin.
+    return await sharp(png).trim({ threshold: 1 }).png().toBuffer();
+  } catch {
+    return png;
+  }
+}
+
 /** The image's alpha over a flat colour: its shape, in that colour. */
 export async function tintSilhouette(png: Buffer, color: string): Promise<Buffer> {
   const { width, height } = await sharp(png).metadata();

@@ -11,6 +11,7 @@ import {
   dominantColor,
   tintSilhouette,
   traceSilhouette,
+  trimTransparent,
   unwrapImageProxy,
 } from "@/server/services/composition-source";
 import { importImageBuffer } from "@/server/services/media.service";
@@ -95,10 +96,13 @@ async function fetchPng(url: string): Promise<Buffer> {
   const body = Buffer.from(await response.arrayBuffer());
   const meta = await sharp(body).metadata();
   const image = meta.format === "svg" ? sharp(body, { density: 288 }) : sharp(body);
-  return image
+  const png = await image
     .resize({ height: 1024, withoutEnlargement: meta.format !== "svg" })
     .png()
     .toBuffer();
+  // Tight bounds, so every later measurement is of the mark and not its
+  // padding: the icon's size against the text, and the traced viewBox.
+  return trimTransparent(png);
 }
 
 /** The icon in the tone: as-is for colour, a silhouette otherwise. */
@@ -162,7 +166,13 @@ export async function renderBrandMark(
       : recipe.fontFamily;
   const fonts = family ? await loadGoogleFont(family) : null;
   const color = markTextColor(tone, brand.brandIdentity);
-  const iconSize = 260;
+  // Lockup metrics, the way a type designer sets one: the icon matches the
+  // capital letters rather than the line box, and the gap is a fraction of
+  // that cap height. 0.72em is a fair cap height across the faces we load.
+  const fontSize = 200;
+  const capHeight = Math.round(fontSize * 0.72);
+  const iconSize = Math.round(capHeight * 1.04);
+  const gap = Math.round(capHeight * 0.34);
   const iconWidth = icon ? Math.round((iconSize * icon.width) / icon.height) : iconSize;
 
   const response = new ImageResponse(
@@ -170,14 +180,19 @@ export async function renderBrandMark(
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          gap: 56,
+          // Bottom edges, with the descender discounted below, so the icon
+          // stands on the type's baseline the way a glyph would.
+          alignItems: "flex-end",
+          gap,
           width: "100%",
           height: "100%",
-          padding: 20,
+          padding: 40,
           color,
-          fontSize: 200,
+          fontSize,
           fontWeight: 700,
+          // The line box hugs the type, so centring the row centres the caps
+          // against the icon instead of against ascender-plus-descender.
+          lineHeight: 1,
           letterSpacing: "-0.02em",
           whiteSpace: "nowrap",
           ...(fonts?.length ? { fontFamily: fonts[0]!.name } : {}),
@@ -193,7 +208,18 @@ export async function renderBrandMark(
             style={{ width: iconWidth, height: iconSize, objectFit: "contain" }}
           />
         ) : null}
-        <div style={{ display: "flex" }}>{text}</div>
+        <div
+          style={{
+            display: "flex",
+            // The line box runs to the descender; pulling it back up by that
+            // depth makes the box bottom the baseline. 0.22em is a fair
+            // descender across the faces we load, the sibling of the 0.72
+            // cap height above.
+            marginBottom: -Math.round(fontSize * 0.22),
+          }}
+        >
+          {text}
+        </div>
       </div>
     ),
     {
