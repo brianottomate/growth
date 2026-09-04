@@ -25,7 +25,11 @@ import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
-import { clearBrandMark, setBrandMark } from "@/server/services/brand-mark.service";
+import {
+  clearBrandMark,
+  critiqueBrandMark,
+  setBrandMark,
+} from "@/server/services/brand-mark.service";
 import {
   brandWebsiteState,
   recheckBrandWebsite,
@@ -71,6 +75,13 @@ async function userOrgIds(ctx: Ctx): Promise<string[]> {
  * - Owned brand (organizationId set): user must be a member of that org.
  * - Reference brand (organizationId NULL): user must own a brand that tracks it.
  */
+const markTuningSchema = z.object({
+  iconScale: z.number().min(0.7).max(1.4),
+  iconShift: z.number().min(-0.3).max(0.3),
+  gapScale: z.number().min(0.6).max(1.6),
+  note: z.string().max(600),
+});
+
 async function assertBrandManageable(
   ctx: Ctx,
   brandId: string,
@@ -456,6 +467,7 @@ export const brandRouter = createTRPCRouter({
         text: z.string().trim().max(60).nullish(),
         /** Omit for the brand's heading font; null for the house font. */
         fontFamily: z.string().trim().max(80).nullish(),
+        tuning: markTuningSchema.nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -465,6 +477,32 @@ export const brandRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         recipe: {
           source: input.source,
+          iconAssetId: input.iconAssetId ?? null,
+          iconFrom: input.iconFrom ?? null,
+          text: input.text ?? null,
+          fontFamily: input.fontFamily,
+        },
+        tuning: input.tuning ?? null,
+      });
+    }),
+
+  /** "Fix with AI": the art director's corrections for the lockup as edited. */
+  critiqueMark: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        iconAssetId: z.string().nullish(),
+        iconFrom: z.enum(["logo", "favicon"]).nullish(),
+        text: z.string().trim().max(60).nullish(),
+        fontFamily: z.string().trim().max(80).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.id);
+      return critiqueBrandMark({
+        brandId: input.id,
+        recipe: {
+          source: "lockup",
           iconAssetId: input.iconAssetId ?? null,
           iconFrom: input.iconFrom ?? null,
           text: input.text ?? null,

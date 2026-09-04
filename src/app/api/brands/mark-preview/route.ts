@@ -18,7 +18,9 @@ const query = z.object({
   text: z.string().max(60).optional(),
   /** Absent = the brand's heading font; "" = the house font. */
   fontFamily: z.string().max(80).optional(),
-  critique: z.enum(["1"]).optional(),
+  iconScale: z.coerce.number().min(0.7).max(1.4).optional(),
+  iconShift: z.coerce.number().min(-0.3).max(0.3).optional(),
+  gapScale: z.coerce.number().min(0.6).max(1.6).optional(),
 });
 
 /** The lockup editor's live preview. Renders one tone, stores nothing. */
@@ -36,7 +38,9 @@ export async function GET(request: NextRequest) {
     iconFrom: params.get("iconFrom") || undefined,
     text: params.get("text") || undefined,
     fontFamily: params.has("fontFamily") ? params.get("fontFamily")! : undefined,
-    critique: params.get("critique") || undefined,
+    iconScale: params.get("iconScale") || undefined,
+    iconShift: params.get("iconShift") || undefined,
+    gapScale: params.get("gapScale") || undefined,
   });
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid mark" }, { status: 400 });
@@ -60,10 +64,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { png, tuning } = await previewBrandMark({
+    const { iconScale, iconShift, gapScale } = parsed.data;
+    const png = await previewBrandMark({
       brandId: parsed.data.brandId,
       tone: parsed.data.tone,
-      critique: parsed.data.critique === "1",
+      tuning:
+        iconScale !== undefined || iconShift !== undefined || gapScale !== undefined
+          ? {
+              iconScale: iconScale ?? 1,
+              iconShift: iconShift ?? 0,
+              gapScale: gapScale ?? 1,
+              note: "",
+            }
+          : null,
       recipe: {
         source: parsed.data.source,
         iconAssetId: parsed.data.iconAssetId ?? null,
@@ -77,11 +90,7 @@ export async function GET(request: NextRequest) {
       },
     });
     return new NextResponse(new Uint8Array(png), {
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "no-store",
-        ...(tuning?.note ? { "X-Mark-Note": encodeURIComponent(tuning.note) } : {}),
-      },
+      headers: { "Content-Type": "image/png", "Cache-Control": "no-store" },
     });
   } catch (error) {
     return NextResponse.json(

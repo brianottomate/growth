@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Wand2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import type { BrandIdentity, BrandMark } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
 
 type Variants = { color: string; white: string; dark: string };
+type Tuning = NonNullable<BrandMark["tuning"]>;
 type IconChoice = "logo" | "favicon" | "none" | "library";
 type FontChoice = "heading" | "body" | "house";
 
@@ -50,6 +51,13 @@ export function BrandMarkCard({
   const [text, setText] = useState(brandName);
   const [font, setFont] = useState<FontChoice>("heading");
   const [tone, setTone] = useState<"color" | "white" | "dark">("color");
+  // What "Fix with AI" returned for the lockup as currently edited. Any edit
+  // to the recipe drops it: the correction belonged to the previous picture.
+  const [tuning, setTuning] = useState<Tuning | null>(null);
+  const editRecipe = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v);
+    setTuning(null);
+  };
 
   const fonts = identity?.fonts ?? [];
   const headingFont = fonts.find((f) => f.role === "heading")?.family ?? fonts[0]?.family ?? null;
@@ -70,8 +78,26 @@ export function BrandMarkCard({
     if (fontFamily !== null) params.set("fontFamily", fontFamily);
     // A lockup with the site logo or favicon as its icon reuses those sources.
     if (icon === "logo" || icon === "favicon") params.set("iconFrom", icon);
+    if (tuning) {
+      params.set("iconScale", String(tuning.iconScale));
+      params.set("iconShift", String(tuning.iconShift));
+      params.set("gapScale", String(tuning.gapScale));
+    }
     return `/api/brands/mark-preview?${params.toString()}`;
-  }, [brandId, building, fontFamily, icon, iconAssetId, text, tone]);
+  }, [brandId, building, fontFamily, icon, iconAssetId, text, tone, tuning]);
+
+  const recipe = {
+    iconAssetId: icon === "library" ? iconAssetId : null,
+    iconFrom: icon === "logo" || icon === "favicon" ? icon : undefined,
+    text: text.trim() || null,
+    fontFamily: fontFamily === "" ? null : fontFamily,
+  };
+  const critique = useMutation(
+    trpc.brand.critiqueMark.mutationOptions({
+      onSuccess: (result) => setTuning(result),
+      onError: (error) => toast.error(error.message),
+    }),
+  );
 
   const onDone = (message: string) => () => {
     toast.success(message);
@@ -136,7 +162,7 @@ export function BrandMarkCard({
               <Label>Icon</Label>
               <SimpleSelect
                 value={icon}
-                onValueChange={(value) => setIcon(value as IconChoice)}
+                onValueChange={editRecipe((value: string) => setIcon(value as IconChoice))}
                 options={[
                   ...(logo ? [{ value: "logo", label: "Site logo" }] : []),
                   { value: "favicon", label: "Favicon" },
@@ -148,13 +174,17 @@ export function BrandMarkCard({
             </div>
             <div className="space-y-1.5">
               <Label>Name</Label>
-              <Input value={text} maxLength={60} onChange={(event) => setText(event.target.value)} />
+              <Input
+                value={text}
+                maxLength={60}
+                onChange={editRecipe((event: React.ChangeEvent<HTMLInputElement>) => setText(event.target.value))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Font</Label>
               <SimpleSelect
                 value={font}
-                onValueChange={(value) => setFont(value as FontChoice)}
+                onValueChange={editRecipe((value: string) => setFont(value as FontChoice))}
                 options={[
                   { value: "heading", label: headingFont ? `${headingFont} (heading)` : "Heading (none read)" },
                   { value: "body", label: bodyFont ? `${bodyFont} (body)` : "Body (none read)" },
@@ -174,7 +204,7 @@ export function BrandMarkCard({
                   <button
                     key={asset.id}
                     type="button"
-                    onClick={() => setIconAssetId(asset.id)}
+                    onClick={editRecipe(() => setIconAssetId(asset.id))}
                     className={cn(
                       "aspect-square overflow-hidden rounded-md border bg-white",
                       iconAssetId === asset.id && "ring-primary ring-2",
@@ -216,26 +246,38 @@ export function BrandMarkCard({
             )}
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setBuilding(false)}>
-              Cancel
-            </Button>
+          {tuning ? (
+            <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-[11px] leading-4">
+              <span className="font-medium">Art director:</span> {tuning.note}{" "}
+              <span className="font-mono">
+                (icon ×{tuning.iconScale}, shift {tuning.iconShift}, gap ×{tuning.gapScale})
+              </span>
+            </p>
+          ) : null}
+
+          <div className="flex items-center justify-between gap-2">
             <Button
               size="sm"
-              disabled={busy || (icon === "library" && !iconAssetId)}
-              onClick={() =>
-                setMark.mutate({
-                  id: brandId,
-                  source: "lockup",
-                  iconAssetId: icon === "library" ? iconAssetId : null,
-                  text: text.trim() || null,
-                  fontFamily: fontFamily === "" ? null : fontFamily,
-                  iconFrom: icon === "logo" || icon === "favicon" ? icon : undefined,
-                })
-              }
+              variant="outline"
+              disabled={busy || critique.isPending || (icon === "library" && !iconAssetId)}
+              onClick={() => critique.mutate({ id: brandId, ...recipe })}
+              title="Have Claude judge this lockup and apply its corrections to the preview"
             >
-              {setMark.isPending ? "Rendering and judging…" : "Save mark"}
+              <Wand2 className={cn("mr-1.5 size-3.5", critique.isPending && "animate-pulse")} />
+              {critique.isPending ? "Judging…" : tuning ? "Fix again" : "Fix with AI"}
             </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setBuilding(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy || (icon === "library" && !iconAssetId)}
+                onClick={() => setMark.mutate({ id: brandId, source: "lockup", ...recipe, tuning })}
+              >
+                {setMark.isPending ? "Rendering…" : "Save mark"}
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

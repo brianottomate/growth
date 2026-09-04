@@ -458,40 +458,34 @@ export async function previewBrandMark(input: {
   brandId: string;
   recipe: BrandMarkRecipe;
   tone: MarkTone;
-  /** Run the art-director pass on this preview too. Slower; opt in. */
-  critique?: boolean;
-}): Promise<{ png: Buffer; tuning: MarkTuning | null }> {
+  /** Corrections the editor is holding, from an earlier "Fix with AI". */
+  tuning?: MarkTuning | null;
+}): Promise<Buffer> {
   const brand = await loadMarkBrand(input.brandId);
-  const first = await renderBrandMark(input.recipe, brand, input.tone);
-  if (!input.critique || input.recipe.source !== "lockup") {
-    return { png: first, tuning: null };
-  }
-  // Always judged on the colour tone, whatever tone is being previewed.
-  const judged =
-    input.tone === "color"
-      ? first
-      : await renderBrandMark(input.recipe, brand, "color");
-  const tuning = await tuneLockup(input.recipe, brand, judged);
-  return {
-    png: tuning ? await renderBrandMark(input.recipe, brand, input.tone, tuning) : first,
-    tuning,
-  };
+  return renderBrandMark(input.recipe, brand, input.tone, input.tuning ?? NO_TUNING);
 }
 
-/** One vision pass over a colour render; null when it changes nothing. */
-async function tuneLockup(
-  recipe: BrandMarkRecipe,
-  brand: MarkBrand,
-  colorRender: Buffer,
-): Promise<MarkTuning | null> {
+/**
+ * The art director's corrections for a lockup as the editor has it. A
+ * separate step from saving, so the operator sees the fix before keeping it:
+ * the editor re-previews with these numbers and sends them along on save.
+ */
+export async function critiqueBrandMark(input: {
+  brandId: string;
+  recipe: BrandMarkRecipe;
+}): Promise<MarkTuning> {
+  const brand = await loadMarkBrand(input.brandId);
+  const colorRender = await renderBrandMark(input.recipe, brand, "color");
   const read = await critiqueLockup({ png: colorRender, brandName: brand.name });
   const note = read.iconIsWordmark
     ? `The icon already carries the brand name; a lockup repeats it. ${read.note}`.trim()
     : read.note;
-  const unchanged =
-    read.iconScale === 1 && read.iconShift === 0 && read.gapScale === 1;
-  if (unchanged && !note) return null;
-  return { iconScale: read.iconScale, iconShift: read.iconShift, gapScale: read.gapScale, note };
+  return {
+    iconScale: read.iconScale,
+    iconShift: read.iconShift,
+    gapScale: read.gapScale,
+    note: note || "Balanced as it is.",
+  };
 }
 
 /**
@@ -503,18 +497,11 @@ export async function setBrandMark(input: {
   brandId: string;
   userId: string;
   recipe: BrandMarkRecipe;
+  /** What the operator accepted from "Fix with AI", if they asked for it. */
+  tuning?: MarkTuning | null;
 }): Promise<BrandMark> {
   const brand = await loadMarkBrand(input.brandId);
-  // Judge the lockup once, on its colour render, and set every tone to the
-  // same corrections; the three variants must agree with each other.
-  const tuning =
-    input.recipe.source === "lockup"
-      ? await tuneLockup(
-          input.recipe,
-          brand,
-          await renderBrandMark(input.recipe, brand, "color"),
-        )
-      : null;
+  const tuning = input.recipe.source === "lockup" ? (input.tuning ?? null) : null;
   const tones: MarkTone[] = ["color", "white", "dark"];
   const ids: Partial<Record<MarkTone, string>> = {};
   let vector: BrandMark["vector"] = null;
