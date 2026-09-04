@@ -36,6 +36,12 @@ export async function fetchSatoriImageSource(url: string): Promise<string> {
 
 export type LogoImage = {
   src: string;
+  /**
+   * The same mark as a white silhouette, for use over a photo. Brand logos
+   * ship in brand colours for a light page; a dark teal mark over a grey sky
+   * disappears. Absent when the logo has no transparency to cut from.
+   */
+  inverse: string | null;
   width: number;
   height: number;
   /** Favicon-sized at the source: an icon, not a mark that can stand alone. */
@@ -63,8 +69,22 @@ export async function loadLogoImage(url: string): Promise<LogoImage> {
   const out = await sharp(png).metadata();
   return {
     src: `data:image/png;base64,${png.toString("base64")}`,
+    inverse: out.hasAlpha ? await whiteSilhouette(png) : null,
     width: out.width ?? 1,
     height: out.height ?? 1,
     small: Math.max(meta.width ?? 0, meta.height ?? 0) < 96,
   };
+}
+
+async function whiteSilhouette(png: Buffer): Promise<string | null> {
+  const { width, height } = await sharp(png).metadata();
+  if (!width || !height) return null;
+  const alpha = await sharp(png).ensureAlpha().extractChannel(3).toBuffer();
+  const white = await sharp({
+    create: { width, height, channels: 3, background: "#ffffff" },
+  })
+    .joinChannel(alpha)
+    .png()
+    .toBuffer();
+  return `data:image/png;base64,${white.toString("base64")}`;
 }

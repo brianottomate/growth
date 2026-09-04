@@ -217,7 +217,7 @@ function BrandMark({
     const alone = !logo.small;
     const wide = logo.width / logo.height > 2;
     const height = alone
-      ? Math.round(markSize * (wide ? 1.1 : 2))
+      ? Math.round(markSize * (wide ? 1.2 : 2.4))
       : markSize;
     const width = Math.round((height * logo.width) / logo.height);
     return (
@@ -234,7 +234,7 @@ function BrandMark({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={logo.src}
+          src={inverse ? (logo.inverse ?? logo.src) : logo.src}
           alt=""
           width={width}
           height={height}
@@ -782,6 +782,20 @@ export function renderComposition(
             height: "62%",
             background:
               "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.82) 100%)",
+          }}
+        />
+        {/* Brand logos arrive in brand colours, not white; a light scrim keeps
+            a dark mark readable over a bright sky. */}
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: "26%",
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 100%)",
           }}
         />
         <div
