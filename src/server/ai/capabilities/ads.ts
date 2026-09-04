@@ -724,7 +724,7 @@ export const listCampaignsAction = growthAction({
 
 export const draftAdsFromHomesAction = growthAction({
   description:
-    "Build draft ads for a Performance+ client from their own listings: renders a card per home from its hero photo, then drafts one single-home static ad and one carousel. Also returns catalog feed rows for the homes that currently quote a price. Local drafts and rendered images only; the platform push is what decides whether any of it runs.",
+    "Build draft ads for a Performance+ client from their own listings: writes the ad and card copy, renders a card per home from its hero photo, has an art director check each card (crop, copy length, scrim tint) and re-render the ones that need it, then drafts one single-home static ad and one carousel. Also returns catalog feed rows for the homes that currently quote a price. Local drafts and rendered images only; the platform push is what decides whether any of it runs.",
   inputSchema: z.object({
     campaignId: z.string().min(1),
     carouselSize: z.number().int().min(1).max(10).optional(),

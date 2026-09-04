@@ -29,6 +29,11 @@ export async function GET(request: NextRequest) {
     cta: params.get("cta") || undefined,
     accent: params.get("accent") || undefined,
     imagePosition: params.get("imagePosition") || "center",
+    focal:
+      params.get("focalX") && params.get("focalY")
+        ? { x: Number(params.get("focalX")), y: Number(params.get("focalY")) }
+        : undefined,
+    scrim: params.get("scrim") || undefined,
     rating: params.get("rating") ? Number(params.get("rating")) : undefined,
     mark: params.get("mark") || "auto",
   });

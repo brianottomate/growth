@@ -19,10 +19,7 @@ import {
   addDraftAd,
   requireOwnedCampaign,
 } from "@/server/services/ads-draft.service";
-import {
-  findFrozenComposition,
-  freezeComposition,
-} from "@/server/services/composition.service";
+import { renderDirectedCard } from "@/server/services/card-director.service";
 import {
   findImportedImage,
   importRemoteImage,
@@ -69,12 +66,40 @@ export type DraftAdsFromHomesResult = {
   notes: string[];
 };
 
+const CardCopySchema = z.object({
+  /** What the card says in large type: the home's name, or a shorter form of it. */
+  title: z.string().max(48),
+  /** The small line under it: the facts, as given. */
+  line: z.string().max(70),
+});
+
 const CopySchema = z.object({
   staticHeadline: z.string().max(60),
   staticBody: z.string().max(200),
   carouselHeadline: z.string().max(60),
   carouselBody: z.string().max(200),
+  /** One per home, in the order given. */
+  cards: z.array(CardCopySchema),
 });
+
+type CardCopy = z.infer<typeof CardCopySchema>;
+
+/**
+ * What one card says, from the copy run or from the facts when the run gave
+ * nothing usable for this home. The facts are the floor: a card always names
+ * the home and, when the feed said so, how many it sleeps.
+ */
+export function cardCopyFor(
+  written: CardCopy | undefined,
+  listing: WanderOsListing,
+): CardCopy {
+  const title = written?.title.trim();
+  const line = written?.line.trim();
+  return {
+    title: title || listing.name,
+    line: line || homeFacts(listing) || homeSubtitle(listing),
+  };
+}
 
 /** "3 bd · Winter Park, Colorado", from whatever the feed actually gave us. */
 export function homeSubtitle(listing: WanderOsListing): string {
@@ -128,16 +153,23 @@ export function catalogFeedRow(
 }
 
 /**
- * Ad copy for the pair, written from facts the feed gave us.
+ * Copy for the pair and for every card, written from facts the feed gave us.
  *
- * The model gets names, towns and prices and nothing else, so it cannot invent
- * an amenity the homes do not have. A failure falls back to copy built from
- * the same facts, because a draft with plain copy is more useful than no draft.
+ * The model gets names, towns, counts and prices and nothing else, so it
+ * cannot invent an amenity the homes do not have. The card copy is written
+ * here too, in one pass with the ad copy, so the words on the image and the
+ * words beside it agree. A failure falls back to copy built from the same
+ * facts, because a draft with plain copy is more useful than no draft.
  */
 async function writeCopy(input: {
   brandName: string;
   where: string;
-  homes: { name: string; subtitle: string; nightlyFrom: number | null }[];
+  homes: {
+    name: string;
+    subtitle: string;
+    facts: string;
+    nightlyFrom: number | null;
+  }[];
 }): Promise<z.infer<typeof CopySchema>> {
   const fallback = {
     staticHeadline: input.homes[0]?.name ?? input.brandName,
@@ -146,6 +178,7 @@ async function writeCopy(input: {
       ? `Stay in ${input.where}`
       : `Stays from ${input.brandName}`,
     carouselBody: `${input.homes.length} homes, booked direct with ${input.brandName}.`,
+    cards: [],
   };
 
   try {
@@ -160,9 +193,10 @@ async function writeCopy(input: {
         "Homes:",
         ...input.homes.map(
           (home) =>
-            `- ${home.name} (${home.subtitle}${home.nightlyFrom ? `, from $${home.nightlyFrom}/night` : ""})`,
+            `- ${home.name} (${[home.subtitle, home.facts].filter(Boolean).join("; ")}${home.nightlyFrom ? `, from $${home.nightlyFrom}/night` : ""})`,
         ),
         "Write a headline and body for a single-home ad about the first home, and a headline and body for a carousel of all of them.",
+        "Then, for each home in the order listed, write the copy printed on its image card. The title is the home's name. Drop a suffix that repeats the location or the brand (the brand's mark is already on the card), and keep the rest whole: it must still identify the home. The card breaks the title after about 22 characters, so a title either fits on one line or breaks into two balanced lines. The line under it is the home's facts (bedrooms, baths, guests) as given, in that order, separated by ' · '; if there are none, use the place.",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -284,6 +318,7 @@ export async function draftAdsFromHomes(input: {
     homes: chosen.map((row) => ({
       name: row.name,
       subtitle: homeSubtitle(row),
+      facts: homeFacts(row),
       nightlyFrom: row.nightlyFrom ?? null,
     })),
   });
@@ -292,12 +327,15 @@ export async function draftAdsFromHomes(input: {
   // image encode plus two R2 writes, and a client with ten homes firing them
   // all at once is how a serverless function meets its memory limit.
   //
-  // Both steps look before they write. A rerun, whether the first attempt
+  // Every step looks before it writes. A rerun, whether the first attempt
   // failed downstream or the operator asked twice, would otherwise import
-  // every hero shot and render every card again.
-  const cards: MediaItem[] = [];
+  // every hero shot, render every card and ask the art director again.
+  // Each card with the home it shows, so the static ad is built from the first
+  // home that got a card rather than from the first home asked for.
+  const cards: { listing: WanderOsListing; media: MediaItem }[] = [];
   let reused = 0;
-  for (const listing of chosen) {
+  let adjusted = 0;
+  for (const [index, listing] of chosen.entries()) {
     try {
       const source =
         (await findImportedImage({
@@ -310,39 +348,47 @@ export async function draftAdsFromHomes(input: {
           url: listing.imageUrl!,
           title: listing.name,
         }));
+      if (!source.url) {
+        notes.push(`The imported photo for ${listing.name} has no URL yet.`);
+        continue;
+      }
       // The feed card: name over the photo, facts under it, the brand's own
-      // logo top left. Facts fall back to the place line for a home the feed
-      // describes thinly.
+      // logo top left. The art director then looks at it and re-cuts the crop,
+      // shortens the copy or tints the darkening where the card needs it.
+      const written = cardCopyFor(copy.cards[index], listing);
       const spec: FreezeCompositionInput = {
         brandId: brand.id,
         templateId: "catalog-copy",
         formatId: "portrait",
         sourceMediaAssetId: source.id,
-        title: listing.name,
-        subtitle: homeFacts(listing) || homeSubtitle(listing),
+        title: written.title,
+        subtitle: written.line || undefined,
         imagePosition: "center",
         mark: "auto",
         assetTitle: `${listing.name} — ${brand.name}`,
       };
-      const existing = await findFrozenComposition({
+      const card = await renderDirectedCard({
         userId: input.userId,
         spec,
+        source: { id: source.id, url: source.url },
+        brandName: brand.name,
+        home: { name: listing.name, facts: homeFacts(listing) },
       });
-      if (existing) reused += 1;
-      const rendered =
-        existing ?? (await freezeComposition({ userId: input.userId, spec }));
-      // A media asset's url is nullable because video assets are pending until
-      // their upload settles. A render we just wrote always has one, so a null
-      // here means something is wrong with this card rather than with the run.
-      if (!rendered.url) {
-        notes.push(`The rendered card for ${listing.name} has no URL yet.`);
-        continue;
+      if (card.reused) reused += 1;
+      if (card.changes.length > 0) {
+        adjusted += 1;
+        notes.push(`${listing.name}: ${card.changes.join("; ")}.`);
+      } else if (card.note) {
+        notes.push(`${listing.name}: ${card.note}`);
       }
       cards.push({
-        url: rendered.url,
-        type: "image",
-        assetId: rendered.id,
-        derivedFrom: source.id,
+        listing,
+        media: {
+          url: card.url,
+          type: "image",
+          assetId: card.id,
+          derivedFrom: source.id,
+        },
       });
     } catch (error) {
       console.error("card render failed", listing.url, error);
@@ -352,8 +398,17 @@ export async function draftAdsFromHomes(input: {
   if (reused > 0) {
     notes.push(`Reused ${reused} card(s) rendered on an earlier run.`);
   }
-  if (cards.length === 0) {
+  if (adjusted > 0) {
+    notes.push(`The art director adjusted ${adjusted} of ${cards.length} card(s).`);
+  }
+  const first = cards[0];
+  if (!first) {
     throw new Error("Every card failed to render; nothing was drafted.");
+  }
+  if (first.listing !== chosen[0]) {
+    notes.push(
+      `${chosen[0]!.name} has no card, so the static ad shows ${first.listing.name}. Its copy was written for ${chosen[0]!.name}.`,
+    );
   }
 
   const landingUrl = campaign.landingUrl ?? brand.website ?? undefined;
@@ -362,18 +417,18 @@ export async function draftAdsFromHomes(input: {
   const staticAd = await addDraftAd({
     organizationId: input.organizationId,
     campaignId: campaign.id,
-    name: `${chosen[0]!.name} — static`,
+    name: `${first.listing.name} — static`,
     type: "creative",
     content: {
       headline: copy.staticHeadline,
       body: copy.staticBody,
       // A single-home ad goes to that home's page. Paid traffic landing on a
       // homepage has to find the home again by itself.
-      linkUrl: chosen[0]!.url,
+      linkUrl: first.listing.url,
       callToAction: "Book now",
-      media: [cards[0]!],
+      media: [first.media],
     } satisfies AdCreativeContent,
-    businessKey: `homes:static:${normalizeListingUrl(chosen[0]!.url)}`,
+    businessKey: `homes:static:${normalizeListingUrl(first.listing.url)}`,
   });
   adIds.push(staticAd.id);
 
@@ -388,7 +443,7 @@ export async function draftAdsFromHomes(input: {
         body: copy.carouselBody,
         linkUrl: landingUrl,
         callToAction: "Book now",
-        media: cards,
+        media: cards.map((card) => card.media),
       } satisfies AdCreativeContent,
       businessKey: `homes:carousel:${campaign.id}`,
     });

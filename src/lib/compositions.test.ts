@@ -111,10 +111,39 @@ describe("composition blueprints", () => {
       cta: null,
       accent: "#18a8b5",
       imagePosition: "top",
+      focal: null,
+      scrim: null,
       rating: null,
       mark: "auto",
       renderedAt: "2026-08-19T00:00:00.000Z",
     });
+  });
+
+  test("a focal point and a scrim tint are part of what makes a render", () => {
+    // The art director's changes must miss the earlier card on reuse, or a
+    // rerun would hand back the crop it asked to fix.
+    const base = {
+      brandId: "brand_01",
+      templateId: "catalog-copy",
+      formatId: "portrait",
+      sourceMediaAssetId: "media_01",
+      title: "Sycamore Chalet",
+      assetTitle: "Sycamore Chalet",
+    } as const;
+    const plain = getCompositionIdentity(freezeCompositionSchema.parse(base));
+    const directed = getCompositionIdentity(
+      freezeCompositionSchema.parse({
+        ...base,
+        focal: { x: 72, y: 40 },
+        scrim: "#1b3a5c",
+      }),
+    );
+    expect(plain.focal).toBeNull();
+    expect(directed).toMatchObject({ focal: { x: 72, y: 40 }, scrim: "#1b3a5c" });
+    expect(
+      freezeCompositionSchema.safeParse({ ...base, focal: { x: 120, y: 0 } })
+        .success,
+    ).toBe(false);
   });
 });
 

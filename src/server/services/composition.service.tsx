@@ -71,6 +71,20 @@ function safeFilename(value: string) {
   );
 }
 
+/**
+ * The darkening colour as a function of alpha. Whatever hex arrives is pulled
+ * down until its brightest channel is 40/255, so a tint reads as a deep
+ * version of the photo's hue and white type stays as legible as over black.
+ */
+export function scrimRgba(hex: string | undefined) {
+  const safe = safeHex(hex, "#000000");
+  const channels = [1, 3, 5].map((at) => parseInt(safe.slice(at, at + 2), 16));
+  const brightest = Math.max(...channels);
+  const scale = brightest > 40 ? 40 / brightest : 1;
+  const [r, g, b] = channels.map((value) => Math.round(value * scale));
+  return (alpha: number) => `rgba(${r},${g},${b},${alpha})`;
+}
+
 function clamp(value: string | undefined, max: number) {
   if (!value) return "";
   return value.length > max ? `${value.slice(0, max).trimEnd()}…` : value;
@@ -458,6 +472,14 @@ function renderInputs(
   };
 }
 
+/**
+ * The lines a catalog card breaks its headline into. Exported so the art
+ * director can be told where the breaks fall instead of having to see them.
+ */
+export function catalogHeadline(spec: Pick<CompositionSpec, "title" | "formatId">) {
+  return wrapText(clamp(spec.title, 90), spec.formatId === "square" ? 24 : 22);
+}
+
 export function renderComposition(
   spec: CompositionSpec,
   context: RenderContext,
@@ -468,12 +490,16 @@ export function renderComposition(
   const square = format.height === format.width;
   const padding = portrait ? 68 : 58;
   const titleSize = portrait ? 78 : 68;
-  const imagePosition =
-    spec.imagePosition === "top"
+  // A focal point pans the cover crop so that point of the photo lands at the
+  // same fraction of the canvas, which keeps it in frame whatever the ratio.
+  const imagePosition = spec.focal
+    ? `${spec.focal.x}% ${spec.focal.y}%`
+    : spec.imagePosition === "top"
       ? "center top"
       : spec.imagePosition === "bottom"
         ? "center bottom"
         : "center center";
+  const scrim = scrimRgba(spec.scrim);
 
   let content: React.ReactNode;
   if (spec.templateId === "image-hero") {
@@ -796,7 +822,7 @@ export function renderComposition(
     const pad = square ? 56 : 64;
     const headline = review
       ? wrapText(`“${clamp(spec.title, 110)}”`, square ? 24 : 22)
-      : wrapText(clamp(spec.title, 90), square ? 24 : 22);
+      : catalogHeadline(spec);
     const headlineSize = review ? (square ? 56 : 62) : square ? 62 : 70;
     const line = clamp(spec.subtitle, 80);
     const stars = review && spec.rating ? spec.rating : 0;
@@ -833,8 +859,7 @@ export function renderComposition(
             right: 0,
             bottom: 0,
             height: "62%",
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.82) 100%)",
+            background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.55)} 45%, ${scrim(0.82)} 100%)`,
           }}
         />
         {/* Brand logos arrive in brand colours, not white; a light scrim keeps
@@ -847,8 +872,7 @@ export function renderComposition(
             right: 0,
             top: 0,
             height: "26%",
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 100%)",
+            background: `linear-gradient(180deg, ${scrim(0.45)} 0%, ${scrim(0)} 100%)`,
           }}
         />
         <div
@@ -1188,13 +1212,26 @@ export async function findFrozenComposition(input: {
       sql`${mediaAssetTable.metadata} -> 'composition' @> ${wanted}::jsonb`,
     ),
     orderBy: (asset, { desc }) => [desc(asset.createdAt)],
-    columns: { id: true, url: true },
+    columns: { id: true, url: true, metadata: true },
   });
 }
+
+/**
+ * What the art director decided about a card, stored beside its recipe. A
+ * `keep` sits on the card it judged; an `adjust` sits on the re-render, with
+ * `directedFrom` pointing at the card it replaced so a rerun finds it.
+ */
+export type CardDirectionRecord = {
+  verdict: "keep" | "adjust";
+  note: string;
+  changes: string[];
+  directedFrom?: string;
+};
 
 export async function freezeComposition(input: {
   userId: string;
   spec: FreezeCompositionInput;
+  direction?: CardDirectionRecord;
 }) {
   const context = await loadCompositionSource(
     await resolveCompositionContext(input.userId, input.spec),
@@ -1218,7 +1255,84 @@ export async function freezeComposition(input: {
       composition: {
         ...renderInputs(input.spec, context),
         renderedAt: new Date().toISOString(),
+        ...(input.direction
+          ? {
+              direction: {
+                verdict: input.direction.verdict,
+                note: input.direction.note,
+                changes: input.direction.changes,
+              },
+              directedFrom: input.direction.directedFrom ?? null,
+            }
+          : {}),
       },
     },
+  });
+}
+
+/**
+ * The card the art director already judged for this photo, drawn with the
+ * brand as it is now, whatever the copy said. The copy pass is not
+ * deterministic, so a rerun matching on words would render and judge again
+ * for a home that already has its card; matching on everything but the words
+ * and the director's own fields is what makes a rerun a no-op.
+ */
+export async function findJudgedComposition(input: {
+  userId: string;
+  spec: FreezeCompositionInput;
+}) {
+  const context = await resolveCompositionContext(input.userId, input.spec);
+  const {
+    title: _title,
+    subtitle: _subtitle,
+    focal: _focal,
+    scrim: _scrim,
+    ...lineage
+  } = renderInputs(input.spec, context);
+  const wanted = JSON.stringify(lineage);
+  return db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.brandId, input.spec.brandId),
+      eq(mediaAssetTable.provider, "r2"),
+      eq(mediaAssetTable.kind, "image"),
+      eq(mediaAssetTable.status, "ready"),
+      isNull(mediaAssetTable.deletedAt),
+      sql`${mediaAssetTable.metadata} -> 'composition' @> ${wanted}::jsonb`,
+      sql`${mediaAssetTable.metadata} -> 'composition' ? 'direction'`,
+    ),
+    orderBy: (asset, { desc }) => [desc(asset.createdAt)],
+    columns: { id: true, url: true, metadata: true },
+  });
+}
+
+/** Record a `keep` on the card the art director judged and left alone. */
+export async function recordCardDirection(
+  assetId: string,
+  direction: Omit<CardDirectionRecord, "directedFrom">,
+) {
+  await db
+    .update(mediaAssetTable)
+    .set({
+      metadata: sql`jsonb_set(coalesce(${mediaAssetTable.metadata}, '{}'::jsonb), '{composition,direction}', ${JSON.stringify(direction)}::jsonb, true)`,
+    })
+    .where(eq(mediaAssetTable.id, assetId));
+}
+
+/**
+ * The re-render the art director made from this card on an earlier run, if
+ * any. Found by lineage rather than by recipe, because the recipe is what the
+ * director changed.
+ */
+export async function findDirectedCard(baseAssetId: string) {
+  return db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.provider, "r2"),
+      eq(mediaAssetTable.kind, "image"),
+      eq(mediaAssetTable.status, "ready"),
+      isNull(mediaAssetTable.deletedAt),
+      sql`${mediaAssetTable.metadata} -> 'composition' ->> 'directedFrom' = ${baseAssetId}`,
+    ),
+    orderBy: (asset, { desc }) => [desc(asset.createdAt)],
+    columns: { id: true, url: true, metadata: true },
   });
 }

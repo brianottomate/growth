@@ -131,6 +131,26 @@ const compositionShape = {
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
   imagePosition: z.enum(["top", "center", "bottom"]).default("center"),
+  /**
+   * The point of the photo that must stay in frame, as percentages of its
+   * width and height. Set by the art director from what the crop cut off;
+   * overrides `imagePosition` when present.
+   */
+  focal: z
+    .object({
+      x: z.number().int().min(0).max(100),
+      y: z.number().int().min(0).max(100),
+    })
+    .optional(),
+  /**
+   * Colour of the darkening on catalog cards. Black by default; a deep tint of
+   * the photo's own hue (a navy over sky, a green over forest) where the art
+   * director asked for one. Always clamped dark enough to keep the type legible.
+   */
+  scrim: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
   /** Stars on the review card. Drawn only by blueprints that show a review. */
   rating: z.number().int().min(1).max(5).optional(),
   /**
@@ -211,6 +231,8 @@ export function getCompositionIdentity(spec: FreezeCompositionInput) {
     cta: spec.cta ?? null,
     accent: spec.accent ?? null,
     imagePosition: spec.imagePosition,
+    focal: spec.focal ?? null,
+    scrim: spec.scrim ?? null,
     rating: spec.rating ?? null,
     mark: spec.mark,
   };

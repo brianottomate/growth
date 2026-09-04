@@ -111,7 +111,8 @@ export async function listWanderOsListings(input: {
         overallRating?: number;
         totalReviews?: number;
         // Media carries sized variants, not a bare `url`: lowResUrl is 640px
-        // and mediumResUrl 1200px, both webp on assets.wander.com.
+        // and mediumResUrl 1200px or the full upload (`fullres.webp`), all
+        // webp on assets.wander.com.
         medias?: { lowResUrl?: string; mediumResUrl?: string; type?: string }[];
         address?: {
           city?: string;
@@ -140,7 +141,9 @@ export async function listWanderOsListings(input: {
         guests: row.occupancy,
         rating: row.overallRating,
         reviewCount: row.totalReviews,
-        imageUrl: row.medias?.[0]?.lowResUrl ?? row.medias?.[0]?.mediumResUrl,
+        // The larger variant: a 1080×1350 card cut from the 640px one is
+        // upscaled twice over, and the feed row it also feeds wants ≥500px.
+        imageUrl: row.medias?.[0]?.mediumResUrl ?? row.medias?.[0]?.lowResUrl,
         city: row.address?.city,
         state: row.address?.state,
         country: row.address?.countryShortCode ?? row.address?.country,
