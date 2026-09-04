@@ -7,7 +7,11 @@ import sharp from "sharp";
 import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, type BrandMark } from "@/server/db/schema";
 import { brandFontFamily, loadGoogleFont } from "@/server/services/composition-fonts";
-import { tintSilhouette } from "@/server/services/composition-source";
+import {
+  tintSilhouette,
+  traceSilhouette,
+  unwrapImageProxy,
+} from "@/server/services/composition-source";
 import { importImageBuffer } from "@/server/services/media.service";
 
 export type MarkTone = "color" | "white" | "dark";
@@ -83,13 +87,15 @@ export async function resolveMarkIconUrl(
 }
 
 async function fetchPng(url: string): Promise<Buffer> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(unwrapImageProxy(url), {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!response.ok) throw new Error(`Icon download failed (${response.status}).`);
   const body = Buffer.from(await response.arrayBuffer());
   const meta = await sharp(body).metadata();
   const image = meta.format === "svg" ? sharp(body, { density: 288 }) : sharp(body);
   return image
-    .resize({ height: 512, withoutEnlargement: meta.format !== "svg" })
+    .resize({ height: 1024, withoutEnlargement: meta.format !== "svg" })
     .png()
     .toBuffer();
 }
@@ -202,8 +208,18 @@ export async function setBrandMark(input: {
   const brand = await loadMarkBrand(input.brandId);
   const tones: MarkTone[] = ["color", "white", "dark"];
   const ids: Partial<Record<MarkTone, string>> = {};
+  let vector: BrandMark["vector"] = null;
   for (const tone of tones) {
     const body = await renderBrandMark(input.recipe, brand, tone);
+    // An icon-only mark may come from a small file; a lockup is rendered
+    // large already. Trace the mono icons so cards draw them at any size.
+    if (tone === "color" && input.recipe.source !== "lockup") {
+      const [white, dark] = await Promise.all([
+        traceSilhouette(body, "#ffffff"),
+        traceSilhouette(body, "#111111"),
+      ]);
+      vector = white && dark ? { white, dark } : null;
+    }
     const { width, height } = await sharp(body).metadata();
     const asset = await importImageBuffer({
       brandId: brand.id,
@@ -225,6 +241,7 @@ export async function setBrandMark(input: {
     text: input.recipe.text ?? null,
     fontFamily: input.recipe.fontFamily ?? null,
     variants: { color: ids.color!, white: ids.white!, dark: ids.dark! },
+    vector,
     updatedAt: new Date().toISOString(),
   };
   await db.update(brandTable).set({ brandMark: mark }).where(eq(brandTable.id, brand.id));

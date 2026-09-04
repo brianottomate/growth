@@ -183,10 +183,13 @@ async function loadChosenMark(mark: BrandMark): Promise<LogoImage | null> {
     url(mark.variants.white) ? loadLogoImage(url(mark.variants.white)!) : null,
     url(mark.variants.dark) ? loadLogoImage(url(mark.variants.dark)!) : null,
   ]);
+  // A traced vector beats the bitmap: satori draws it sharp at any size.
+  const svg = (markup: string) =>
+    `data:image/svg+xml;base64,${Buffer.from(markup).toString("base64")}`;
   return {
     ...color,
-    inverse: white?.src ?? color.inverse,
-    dark: dark?.src ?? color.dark,
+    inverse: mark.vector ? svg(mark.vector.white) : (white?.src ?? color.inverse),
+    dark: mark.vector ? svg(mark.vector.dark) : (dark?.src ?? color.dark),
     small: false,
   };
 }

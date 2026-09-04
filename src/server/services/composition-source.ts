@@ -1,6 +1,52 @@
 import "server-only";
 
+import potrace from "potrace";
 import sharp from "sharp";
+
+/**
+ * The file behind a WanderOS image-proxy URL. The site editor serves every
+ * asset through `/i/<transforms>?src=<original>`, and Firecrawl reports what
+ * the page used, so a favicon arrives as a 32px copy of a 192px file. The
+ * original is what a mark should be cut from.
+ */
+export function unwrapImageProxy(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const src = parsed.searchParams.get("src");
+    if (parsed.pathname.startsWith("/i/") && src) return new URL(src).toString();
+  } catch {
+    // Not a URL we can read; the caller's fetch will say so.
+  }
+  return url;
+}
+
+/**
+ * The image's alpha traced to an SVG path in one colour, or null when the
+ * trace finds no shape. A flat mark becomes resolution-independent; satori
+ * draws SVG at any size without the softness of an upscaled bitmap.
+ */
+export async function traceSilhouette(
+  png: Buffer,
+  color: string,
+): Promise<string | null> {
+  const { hasAlpha } = await sharp(png).metadata();
+  if (!hasAlpha) return null;
+  // potrace fills the dark pixels: the shape's alpha, inverted, on white.
+  const mask = await sharp(png)
+    .ensureAlpha()
+    .extractChannel(3)
+    .negate()
+    .png()
+    .toBuffer();
+  const svg = await new Promise<string>((resolve, reject) => {
+    potrace.trace(
+      mask,
+      { color, background: "transparent", threshold: 128, turdSize: 4 },
+      (error, result) => (error ? reject(error) : resolve(result)),
+    );
+  });
+  return svg.includes("<path") ? svg : null;
+}
 
 /**
  * An `<img src>` satori can render for a stored source image.
@@ -56,7 +102,9 @@ export type LogoImage = {
  * draws them as bitmaps and a favicon-sized raster looks soft on a card.
  */
 export async function loadLogoImage(url: string): Promise<LogoImage> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(unwrapImageProxy(url), {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!response.ok) {
     throw new Error(`Logo download failed (${response.status}).`);
   }
@@ -65,7 +113,7 @@ export async function loadLogoImage(url: string): Promise<LogoImage> {
   const image =
     meta.format === "svg" ? sharp(body, { density: 288 }) : sharp(body);
   const png = await image
-    .resize({ height: 144, withoutEnlargement: meta.format !== "svg" })
+    .resize({ height: 1024, withoutEnlargement: meta.format !== "svg" })
     .png()
     .toBuffer();
   const out = await sharp(png).metadata();
