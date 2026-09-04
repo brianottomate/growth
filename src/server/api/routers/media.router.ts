@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -19,8 +19,11 @@ import {
 import { MAX_STORYBOARD_BOARDS } from "@/lib/storyboard-limits";
 import {
   MediaService,
+  findImportedImage,
+  importRemoteImage,
   storyboardDescriptorSchema,
 } from "@/server/services/media.service";
+import { brandListings } from "@/server/services/wanderos-listings.service";
 import { analyzeStoredMediaAsset } from "@/server/services/media-asset-analysis.service";
 import {
   refreshInstagramPostMedia,
@@ -292,6 +295,99 @@ export const mediaRouter = createTRPCRouter({
         () => undefined,
       );
       return MediaService.list(input);
+    }),
+
+  /**
+   * A look at the brand's listing photos without importing any: hero and
+   * thumbnail URLs straight from their WanderOS feed, marked where the library
+   * already holds one. The picker shows these; only what the operator ticks
+   * is imported, so sampling a site does not fill the library with it.
+   */
+  listingSamples: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        limit: z.number().int().min(1).max(48).default(24),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx, input.brandId);
+      const brand = await ctx.db.query.brandTable.findFirst({
+        where: eq(brandTable.id, input.brandId),
+        columns: { id: true, website: true },
+      });
+      const listings = (await brandListings({
+        id: input.brandId,
+        website: brand?.website ?? null,
+      }))
+        .filter((row) => row.imageUrl)
+        .slice(0, input.limit);
+      const urls = listings.map((row) => row.imageUrl!);
+      const imported =
+        urls.length > 0
+          ? await ctx.db.query.mediaAssetTable.findMany({
+              where: and(
+                eq(mediaAssetTable.brandId, input.brandId),
+                eq(mediaAssetTable.status, "ready"),
+                isNull(mediaAssetTable.deletedAt),
+                sql`${mediaAssetTable.metadata} ->> 'sourceUrl' in (${sql.join(
+                  urls.map((url) => sql`${url}`),
+                  sql`, `,
+                )})`,
+              ),
+              columns: { id: true, metadata: true },
+            })
+          : [];
+      const importedByUrl = new Map(
+        imported.map((row) => [
+          (row.metadata as { sourceUrl?: string } | null)?.sourceUrl ?? "",
+          row.id,
+        ]),
+      );
+      return {
+        hasSite: Boolean(brand?.website),
+        homes: listings.map((row) => ({
+          id: row.id,
+          name: row.name,
+          url: row.url,
+          imageUrl: row.imageUrl!,
+          thumbUrl: row.thumbUrl ?? row.imageUrl!,
+          place: [row.city, row.state].filter(Boolean).join(", "),
+          importedAssetId: importedByUrl.get(row.imageUrl!) ?? null,
+        })),
+      };
+    }),
+
+  /**
+   * Import the listing photos the operator ticked. Idempotent per URL: a hero
+   * already in the library is returned rather than imported twice.
+   */
+  importListingImages: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        homes: z
+          .array(z.object({ imageUrl: z.string().url(), name: z.string().min(1) }))
+          .min(1)
+          .max(48),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx, input.brandId);
+      const assets: { id: string; url: string | null; name: string }[] = [];
+      // Sequential: each import is a download and an R2 write.
+      for (const home of input.homes) {
+        const asset =
+          (await findImportedImage({ brandId: input.brandId, url: home.imageUrl })) ??
+          (await importRemoteImage({
+            brandId: input.brandId,
+            uploadedBy: ctx.session.user.id,
+            url: home.imageUrl,
+            title: home.name,
+          }));
+        assets.push({ id: asset.id, url: asset.url, name: home.name });
+      }
+      return { assets };
     }),
 
   /**

@@ -124,6 +124,15 @@ export function BrandSurfaceMap({
       facts: [fact(summary.mediaAssets, "asset")],
       state: summary.mediaAssets > 0 ? "mapped" : "empty",
     },
+    {
+      title: "Compositions",
+      description:
+        "The Studio, opened on this brand: its photos, mark and font on a blueprint.",
+      href: `/app/compositions?brandId=${encodeURIComponent(brandId)}`,
+      icon: GalleryVerticalEnd,
+      facts: [summary.mediaAssets > 0 ? "Photos ready" : "Import photos first"],
+      state: summary.mediaAssets > 0 ? "mapped" : "partial",
+    },
   ];
 
   return (

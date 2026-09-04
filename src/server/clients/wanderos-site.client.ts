@@ -28,6 +28,8 @@ export type WanderOsListing = {
   rating?: number;
   reviewCount?: number;
   imageUrl?: string;
+  /** The 640px variant of the same hero, for a picker that only looks. */
+  thumbUrl?: string;
   /** Where the home is, as the feed states it. */
   city?: string;
   /** Two-letter state code, e.g. "CO". */
@@ -144,6 +146,7 @@ export async function listWanderOsListings(input: {
         // The larger variant: a 1080×1350 card cut from the 640px one is
         // upscaled twice over, and the feed row it also feeds wants ≥500px.
         imageUrl: row.medias?.[0]?.mediumResUrl ?? row.medias?.[0]?.lowResUrl,
+        thumbUrl: row.medias?.[0]?.lowResUrl ?? row.medias?.[0]?.mediumResUrl,
         city: row.address?.city,
         state: row.address?.state,
         country: row.address?.countryShortCode ?? row.address?.country,

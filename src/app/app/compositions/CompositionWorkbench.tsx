@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/components/ui/lib/utils";
 import { BrandingPanel } from "@/components/brand/BrandingPanel";
+import { ListingSamplesDialog } from "./ListingSamplesDialog";
 import type { BrandIdentity } from "@/server/db/brand-schema";
 import { useTRPC } from "@/trpc/react";
 
@@ -306,6 +307,15 @@ export function CompositionWorkbench({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <ListingSamplesDialog
+                brandId={brandId}
+                onImported={async (assets) => {
+                  await queryClient.invalidateQueries({
+                    queryKey: sourceListOptions.queryKey,
+                  });
+                  if (assets[0]) setSourceMediaAssetId(assets[0].id);
+                }}
+              />
               <Input
                 value={sourceSearch}
                 onChange={(event) => setSourceSearch(event.target.value)}
