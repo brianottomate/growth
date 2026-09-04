@@ -46,6 +46,8 @@ export async function generateGeminiImage(input: {
   prompt: string;
   aspectRatio: string;
   referenceImageUrls?: string[];
+  /** 1K is near one megapixel; 2K roughly doubles each edge. */
+  imageSize?: "1K" | "2K";
 }) {
   const referenceParts = await Promise.all(
     (input.referenceImageUrls ?? [])
@@ -61,7 +63,7 @@ export async function generateGeminiImage(input: {
       responseModalities: ["IMAGE"],
       imageConfig: {
         aspectRatio: input.aspectRatio,
-        imageSize: "1K",
+        imageSize: input.imageSize ?? "1K",
       },
     },
   });

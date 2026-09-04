@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, FileText, Rows3 } from "lucide-react";
+import { FileText } from "lucide-react";
 
+import { NAV_GROUPS } from "@/components/app-nav";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import {
   Command,
@@ -57,37 +58,38 @@ export function CommandMenu() {
       open={open}
       onOpenChange={setOpen}
       title="Search Wander Growth"
-      description="Search content ideas and their platform posts."
+      description="Go to a section, or search content ideas and their platform posts."
     >
       <Command>
-        <CommandInput placeholder="Search ideas, copy, brands, or platforms…" />
+        <CommandInput placeholder="Go to a section, or search ideas, copy, brands, platforms…" />
         <CommandList>
           <CommandEmpty>
             {isLoading ? "Loading content…" : "No content found."}
           </CommandEmpty>
 
-          <CommandGroup heading="Jump to">
-            <CommandItem
-              value="Content ideas board"
-              onSelect={() => go("/app/content")}
-            >
-              <FileText />
-              Content
-            </CommandItem>
-            <CommandItem
-              value="Content calendar"
-              onSelect={() => go("/app/calendar")}
-            >
-              <Calendar />
-              Calendar
-            </CommandItem>
-            <CommandItem
-              value="Content timeline posts"
-              onSelect={() => go("/app/feed-v5")}
-            >
-              <Rows3 />
-              Timeline
-            </CommandItem>
+          {/* Every section the sidebar lists, so "leads" or "compositions"
+              typed here goes there. The group name is part of the match, so
+              "grow" or "library" surfaces a whole section. */}
+          <CommandGroup heading="Go to">
+            {NAV_GROUPS.flatMap((group) =>
+              group.items.map((item) => (
+                <CommandItem
+                  key={item.href}
+                  value={[group.label, item.label, item.href]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onSelect={() => go(item.href)}
+                >
+                  <item.icon />
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {group.label ? (
+                    <CommandShortcut className="tracking-normal">
+                      {group.label}
+                    </CommandShortcut>
+                  ) : null}
+                </CommandItem>
+              )),
+            )}
           </CommandGroup>
 
           {data?.ideas.length ? (

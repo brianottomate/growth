@@ -259,6 +259,7 @@ export async function extendSource(input: {
     input.axis === "vertical"
       ? "above and below it: continue the sky upward and the ground, deck or foliage downward"
       : "to its left and right: continue the landscape, trees and sky sideways";
+  const original = await sharp(await download(input.source.url)).metadata();
   const { bytes, contentType } = await generateGeminiImage({
     prompt: [
       `Outpaint this photograph into a ${aspectRatio} frame.`,
@@ -266,9 +267,29 @@ export async function extendSource(input: {
       "Photoreal, the same lens, light and colour grade as the original. Do not add text, people, vehicles, furniture or new buildings.",
     ].join(" "),
     aspectRatio,
+    // 1K lands near one megapixel, under the card; 2K clears it.
+    imageSize: "2K",
     referenceImageUrls: [input.source.url],
   });
   const meta = await sharp(bytes).metadata();
+  // The same guard the monolith's hero outpaint uses: the model sometimes
+  // answers in another ratio, or with far fewer pixels than it was given.
+  // Either would make the card worse than the crop it was meant to fix.
+  const { width, height } = getCompositionFormat(input.formatId);
+  const wanted = width / height;
+  if (!meta.width || !meta.height || !original.width) {
+    throw new Error("The extended photo could not be measured.");
+  }
+  if (Math.abs(meta.width / meta.height - wanted) > wanted * 0.03) {
+    throw new Error(
+      `The extended photo came back ${meta.width}×${meta.height}, not ${aspectRatio}.`,
+    );
+  }
+  if (meta.width < original.width * 0.75) {
+    throw new Error(
+      `The extended photo is ${meta.width}px wide against a ${original.width}px original.`,
+    );
+  }
   const asset = await importImageBuffer({
     brandId: input.brandId,
     uploadedBy: input.userId,
