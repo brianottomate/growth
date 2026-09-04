@@ -321,6 +321,7 @@ export async function draftAdsFromHomes(input: {
         title: listing.name,
         subtitle: homeFacts(listing) || homeSubtitle(listing),
         imagePosition: "center",
+        mark: "auto",
         assetTitle: `${listing.name} — ${brand.name}`,
       };
       const existing = await findFrozenComposition({

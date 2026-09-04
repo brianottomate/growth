@@ -66,6 +66,7 @@ export function CompositionWorkbench({
   useEffect(() => {
     setAccent(brandAccent(selectedBrand?.brandIdentity));
   }, [selectedBrand]);
+  const [mark, setMark] = useState<"auto" | "color" | "white" | "dark" | "none">("auto");
   const [imagePosition, setImagePosition] = useState<
     "top" | "center" | "bottom"
   >("center");
@@ -113,9 +114,11 @@ export function CompositionWorkbench({
     if (eyebrow.trim()) params.set("eyebrow", eyebrow.trim());
     if (cta.trim()) params.set("cta", cta.trim());
     if (accent) params.set("accent", accent);
+    params.set("mark", mark);
     return `/api/compositions/preview?${params.toString()}`;
   }, [
     accent,
+    mark,
     brandId,
     canRender,
     cta,
@@ -235,6 +238,21 @@ export function CompositionWorkbench({
                 className="w-full p-1"
               />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Mark</Label>
+            <SimpleSelect
+              value={mark}
+              onValueChange={(value) => setMark(value as typeof mark)}
+              options={[
+                { value: "auto", label: "Brand default · white over photos" },
+                { value: "color", label: "Colour" },
+                { value: "white", label: "White" },
+                { value: "dark", label: "Dark" },
+                { value: "none", label: "No mark" },
+              ]}
+              className="w-full"
+            />
           </div>
         </section>
 
@@ -417,6 +435,7 @@ export function CompositionWorkbench({
                 cta: cta.trim() || undefined,
                 accent,
                 imagePosition,
+                mark,
                 assetTitle: assetTitle.trim(),
               })
             }

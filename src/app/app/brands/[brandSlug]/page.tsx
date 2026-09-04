@@ -18,6 +18,9 @@ import { PILLARS } from "@/lib/pillars";
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
 
 import { BrandBrandingCard } from "./BrandBrandingCard";
+import { BrandMarkCard } from "./BrandMarkCard";
+import { mediaAssetTable } from "@/server/db/schema";
+import { inArray } from "drizzle-orm";
 import { BrandStrategyClient } from "./BrandStrategyClient";
 import { BrandSurfaceMap } from "./BrandSurfaceMap";
 
@@ -59,6 +62,8 @@ export default async function BrandPage({
       logo: true,
       website: true,
       brandIdentity: true,
+      brandMark: true,
+      websiteMeta: true,
     },
   });
   if (!brand) notFound();
@@ -69,6 +74,22 @@ export default async function BrandPage({
     columns: { inspirationBrandId: true },
   });
   const peerBrandIds = inspirations.map((i) => i.inspirationBrandId);
+
+  const markVariants = brand.brandMark
+    ? await (async () => {
+        const ids = Object.values(brand.brandMark!.variants);
+        const rows = await db.query.mediaAssetTable.findMany({
+          where: inArray(mediaAssetTable.id, ids),
+          columns: { id: true, url: true },
+        });
+        const url = (id: string) => rows.find((r) => r.id === id)?.url ?? "";
+        return {
+          color: url(brand.brandMark!.variants.color),
+          white: url(brand.brandMark!.variants.white),
+          dark: url(brand.brandMark!.variants.dark),
+        };
+      })()
+    : null;
 
   const strategy = await getBrandStrategy(brand.id, { peerBrandIds });
 
@@ -171,6 +192,20 @@ export default async function BrandPage({
         logo={brand.logo}
         identity={brand.brandIdentity ?? null}
         website={brand.website}
+      />
+
+      <BrandMarkCard
+        brandId={brand.id}
+        brandName={brand.name}
+        logo={brand.logo}
+        identity={brand.brandIdentity ?? null}
+        mark={brand.brandMark ?? null}
+        variants={markVariants}
+        photo={
+          brand.brandIdentity?.raw?.images?.ogImage ??
+          brand.websiteMeta?.ogImage ??
+          null
+        }
       />
 
       {latestSpots.length > 0 && (

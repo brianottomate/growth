@@ -84,6 +84,25 @@ export type BrandWebsiteMeta = {
   scrapedAt?: string; // ISO 8601
 };
 
+/**
+ * The mark a brand's cards carry, chosen by an operator rather than scraped.
+ * `variants` are library assets rendered from the recipe: the colour version,
+ * a white silhouette for photos, a near-black one for light grounds.
+ */
+export type BrandMark = {
+  source: "logo" | "favicon" | "lockup";
+  /** Lockup only: the icon beside the name, a library asset. */
+  iconAssetId?: string | null;
+  /** Lockup only: the icon taken from the scraped logo or favicon instead. */
+  iconFrom?: "logo" | "favicon" | null;
+  /** Lockup only: the wordmark text. Defaults to the brand name. */
+  text?: string | null;
+  /** Lockup only: the family the text is set in; null means the house font. */
+  fontFamily?: string | null;
+  variants: { color: string; white: string; dark: string };
+  updatedAt: string;
+};
+
 export type BrandIdentity = {
   /** Firecrawl's whole branding profile, kept so nothing it read is lost. */
   raw?: BrandingProfile;
@@ -235,6 +254,7 @@ export const brandTable = pgTable(
     // Enrichment (AI / scraped) — JSONB until we need to query it.
     websiteMeta: t.jsonb().$type<BrandWebsiteMeta>(),
     brandIdentity: t.jsonb().$type<BrandIdentity>(),
+    brandMark: t.jsonb().$type<BrandMark>(),
     brandFingerprint: t.jsonb().$type<BrandFingerprint>(),
     // Shared listening judgment + reply guidance (voice still from brandFingerprint).
     brandListeningStory: t.jsonb().$type<BrandListeningStory>(),

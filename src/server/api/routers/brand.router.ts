@@ -25,6 +25,7 @@ import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
+import { clearBrandMark, setBrandMark } from "@/server/services/brand-mark.service";
 import {
   brandWebsiteState,
   recheckBrandWebsite,
@@ -438,6 +439,46 @@ export const brandRouter = createTRPCRouter({
         .where(eq(brandTable.id, input.id))
         .returning();
       return updated;
+    }),
+
+  /**
+   * Choose the mark the brand's cards carry: the site logo, the favicon, or a
+   * lockup of an icon beside the name in the brand font. Renders the colour,
+   * white and dark variants into the library and points the brand at them.
+   */
+  setMark: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        source: z.enum(["logo", "favicon", "lockup"]),
+        iconAssetId: z.string().nullish(),
+        iconFrom: z.enum(["logo", "favicon"]).nullish(),
+        text: z.string().trim().max(60).nullish(),
+        /** Omit for the brand's heading font; null for the house font. */
+        fontFamily: z.string().trim().max(80).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.id);
+      return setBrandMark({
+        brandId: input.id,
+        userId: ctx.session.user.id,
+        recipe: {
+          source: input.source,
+          iconAssetId: input.iconAssetId ?? null,
+          iconFrom: input.iconFrom ?? null,
+          text: input.text ?? null,
+          fontFamily: input.fontFamily,
+        },
+      });
+    }),
+
+  clearMark: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.id);
+      await clearBrandMark(input.id);
+      return { id: input.id };
     }),
 
   /** Scrape the brand's website and refresh its fields. Runs inline. */

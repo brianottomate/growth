@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     accent: params.get("accent") || undefined,
     imagePosition: params.get("imagePosition") || "center",
     rating: params.get("rating") ? Number(params.get("rating")) : undefined,
+    mark: params.get("mark") || "auto",
   });
   if (!parsed.success) {
     return NextResponse.json(

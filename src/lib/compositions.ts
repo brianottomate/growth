@@ -133,6 +133,11 @@ const compositionShape = {
   imagePosition: z.enum(["top", "center", "bottom"]).default("center"),
   /** Stars on the review card. Drawn only by blueprints that show a review. */
   rating: z.number().int().min(1).max(5).optional(),
+  /**
+   * Which version of the brand mark a card draws. `auto` picks white over a
+   * photo and colour on a light ground; the rest force it or drop it.
+   */
+  mark: z.enum(["auto", "color", "white", "dark", "none"]).default("auto"),
 };
 
 function requireSourceImage(
@@ -207,6 +212,7 @@ export function getCompositionIdentity(spec: FreezeCompositionInput) {
     accent: spec.accent ?? null,
     imagePosition: spec.imagePosition,
     rating: spec.rating ?? null,
+    mark: spec.mark,
   };
 }
 

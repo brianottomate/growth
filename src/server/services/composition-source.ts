@@ -42,6 +42,8 @@ export type LogoImage = {
    * disappears. Absent when the logo has no transparency to cut from.
    */
   inverse: string | null;
+  /** The near-black silhouette, for light grounds. */
+  dark: string | null;
   width: number;
   height: number;
   /** Favicon-sized at the source: an icon, not a mark that can stand alone. */
@@ -67,24 +69,29 @@ export async function loadLogoImage(url: string): Promise<LogoImage> {
     .png()
     .toBuffer();
   const out = await sharp(png).metadata();
+  const toUri = (b: Buffer) => `data:image/png;base64,${b.toString("base64")}`;
   return {
-    src: `data:image/png;base64,${png.toString("base64")}`,
-    inverse: out.hasAlpha ? await whiteSilhouette(png) : null,
+    src: toUri(png),
+    inverse: out.hasAlpha ? toUri(await tintSilhouette(png, "#ffffff")) : null,
+    dark: out.hasAlpha ? toUri(await tintSilhouette(png, "#111111")) : null,
     width: out.width ?? 1,
     height: out.height ?? 1,
     small: Math.max(meta.width ?? 0, meta.height ?? 0) < 96,
   };
 }
 
-async function whiteSilhouette(png: Buffer): Promise<string | null> {
+/** The image's alpha over a flat colour: its shape, in that colour. */
+export async function tintSilhouette(png: Buffer, color: string): Promise<Buffer> {
   const { width, height } = await sharp(png).metadata();
-  if (!width || !height) return null;
+  if (!width || !height) throw new Error("Cannot read the image's size.");
   const alpha = await sharp(png).ensureAlpha().extractChannel(3).toBuffer();
-  const white = await sharp({
-    create: { width, height, channels: 3, background: "#ffffff" },
-  })
+  return sharp({ create: { width, height, channels: 3, background: color } })
     .joinChannel(alpha)
     .png()
     .toBuffer();
-  return `data:image/png;base64,${white.toString("base64")}`;
+}
+
+/** A stored asset by id, as a satori-ready logo. */
+export async function loadLogoAsset(url: string): Promise<LogoImage> {
+  return loadLogoImage(url);
 }

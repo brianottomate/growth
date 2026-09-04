@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ImageResponse } from "next/og";
 
 import {
@@ -22,6 +22,7 @@ import {
   loadLogoImage,
   type LogoImage,
 } from "@/server/services/composition-source";
+import type { BrandMark } from "@/server/db/schema";
 import { importImageBuffer } from "@/server/services/media.service";
 
 export type CompositionContext = {
@@ -29,6 +30,7 @@ export type CompositionContext = {
     id: string;
     name: string;
     logo: string | null;
+    brandMark: BrandMark | null;
     organizationId: string;
     brandIdentity: {
       colorScheme?: "light" | "dark";
@@ -96,6 +98,7 @@ export async function resolveCompositionContext(
       id: true,
       name: true,
       logo: true,
+      brandMark: true,
       organizationId: true,
       brandIdentity: true,
     },
@@ -149,8 +152,42 @@ export async function resolveCompositionContext(
       ...brand,
       organizationId: brand.organizationId,
       brandIdentity: brand.brandIdentity ?? null,
+      brandMark: brand.brandMark ?? null,
     },
     sourceUrl,
+  };
+}
+
+/**
+ * The chosen mark's three variants as one logo: colour as `src`, white as
+ * `inverse`, near-black as `dark`. Rendered once when the mark was set, so
+ * this is three small downloads and no image work.
+ */
+async function loadChosenMark(mark: BrandMark): Promise<LogoImage | null> {
+  const rows = await db.query.mediaAssetTable.findMany({
+    where: and(
+      inArray(mediaAssetTable.id, [
+        mark.variants.color,
+        mark.variants.white,
+        mark.variants.dark,
+      ]),
+      isNull(mediaAssetTable.deletedAt),
+    ),
+    columns: { id: true, url: true },
+  });
+  const url = (id: string) => rows.find((row) => row.id === id)?.url ?? null;
+  const colorUrl = url(mark.variants.color);
+  if (!colorUrl) return null;
+  const [color, white, dark] = await Promise.all([
+    loadLogoImage(colorUrl),
+    url(mark.variants.white) ? loadLogoImage(url(mark.variants.white)!) : null,
+    url(mark.variants.dark) ? loadLogoImage(url(mark.variants.dark)!) : null,
+  ]);
+  return {
+    ...color,
+    inverse: white?.src ?? color.inverse,
+    dark: dark?.src ?? color.dark,
+    small: false,
   };
 }
 
@@ -167,12 +204,15 @@ export async function loadCompositionSource(
   // card. The source is not; its failure is the render's failure.
   const [sourceImage, logo, fonts] = await Promise.all([
     context.sourceUrl ? fetchSatoriImageSource(context.sourceUrl) : null,
-    context.brand.logo
-      ? loadLogoImage(context.brand.logo).catch((error: unknown) => {
-          console.error("brand logo unavailable", context.brand.id, error);
-          return null;
-        })
-      : null,
+    (context.brand.brandMark
+      ? loadChosenMark(context.brand.brandMark)
+      : context.brand.logo
+        ? loadLogoImage(context.brand.logo)
+        : Promise.resolve(null)
+    ).catch((error: unknown) => {
+      console.error("brand mark unavailable", context.brand.id, error);
+      return null;
+    }),
     family ? loadGoogleFont(family) : null,
   ]);
   return { ...context, sourceImage, logo, fonts };
@@ -201,16 +241,19 @@ function Stars({ count, size }: { count: number; size: number }) {
 function BrandMark({
   brandName,
   logo,
+  tone = "auto",
   inverse = false,
   markSize = 36,
   textSize = 24,
 }: {
   brandName: string;
   logo?: LogoImage | null;
+  tone?: CompositionSpec["mark"];
   inverse?: boolean;
   markSize?: number;
   textSize?: number;
 }) {
+  if (tone === "none") return null;
   if (logo) {
     // A real logo stands alone, whatever its shape: a stacked mark already
     // carries the name. Only a favicon-sized icon gets the name beside it.
@@ -234,7 +277,13 @@ function BrandMark({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={inverse ? (logo.inverse ?? logo.src) : logo.src}
+          src={
+            tone === "white" || (tone === "auto" && inverse)
+              ? (logo.inverse ?? logo.src)
+              : tone === "dark"
+                ? (logo.dark ?? logo.src)
+                : logo.src
+          }
           alt=""
           width={width}
           height={height}
@@ -399,7 +448,7 @@ function renderInputs(
   return {
     ...getCompositionIdentity(spec),
     brandName: context.brand.name,
-    brandLogo: context.brand.logo ?? null,
+    brandLogo: context.brand.brandMark?.variants.color ?? context.brand.logo ?? null,
     fontFamily: brandFontFamily(context.brand.brandIdentity),
     renderedAccent: resolveAccent(spec, context),
   };
@@ -466,7 +515,7 @@ export function renderComposition(
             padding,
           }}
         >
-          <BrandMark brandName={context.brand.name} inverse />
+          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
           <div style={{ display: "flex", maxWidth: portrait ? "92%" : "64%" }}>
             <Message spec={spec} color="#ffffff" titleSize={titleSize} />
           </div>
@@ -496,7 +545,7 @@ export function renderComposition(
             height: portrait ? "43%" : "100%",
           }}
         >
-          <BrandMark brandName={context.brand.name} />
+          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} />
           <Message spec={spec} color="#111111" titleSize={portrait ? 72 : 62} />
         </div>
         <div
@@ -569,7 +618,7 @@ export function renderComposition(
             padding,
           }}
         >
-          <BrandMark brandName={context.brand.name} inverse />
+          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div
               style={{
@@ -623,7 +672,7 @@ export function renderComposition(
           }}
         >
           <BrandMark
-            brandName={context.brand.name}
+            brandName={context.brand.name} logo={context.logo} tone={spec.mark}
             markSize={square ? 48 : 42}
             textSize={square ? 30 : 27}
           />
@@ -806,7 +855,7 @@ export function renderComposition(
             left: pad,
           }}
         >
-          <BrandMark brandName={context.brand.name} logo={context.logo} inverse />
+          <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
         </div>
         <div
           style={{
@@ -927,8 +976,7 @@ export function renderComposition(
           }}
         >
           <BrandMark
-            brandName={context.brand.name}
-            logo={context.logo}
+            brandName={context.brand.name} logo={context.logo} tone={spec.mark}
             inverse
             markSize={40}
             textSize={26}
@@ -1059,7 +1107,7 @@ export function renderComposition(
             opacity: 0.22,
           }}
         />
-        <BrandMark brandName={context.brand.name} inverse />
+        <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
         <div
           style={{
             display: "flex",
