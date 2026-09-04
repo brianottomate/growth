@@ -214,11 +214,16 @@ export async function setBrandMark(input: {
     // An icon-only mark may come from a small file; a lockup is rendered
     // large already. Trace the mono icons so cards draw them at any size.
     if (tone === "color" && input.recipe.source !== "lockup") {
-      const [white, dark] = await Promise.all([
+      // Best effort: the PNG variants are the mark; the vector is a bonus.
+      vector = await Promise.all([
         traceSilhouette(body, "#ffffff"),
         traceSilhouette(body, "#111111"),
-      ]);
-      vector = white && dark ? { white, dark } : null;
+      ])
+        .then(([white, dark]) => (white && dark ? { white, dark } : null))
+        .catch((error: unknown) => {
+          console.error("mark trace failed, keeping bitmap variants", error);
+          return null;
+        });
     }
     const { width, height } = await sharp(body).metadata();
     const asset = await importImageBuffer({

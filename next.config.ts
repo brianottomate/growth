@@ -9,7 +9,9 @@ const config: NextConfig = {
   // The published email registry is ESM-only. Keep it external so the Node
   // runtime loads its named exports natively instead of passing it through
   // webpack's CommonJS bridge.
-  serverExternalPackages: ["@wandercom/design-system-emails"],
+  // potrace and its jimp dependency check `instanceof Jimp` against a class
+  // that Turbopack turns into a module namespace; loaded natively they work.
+  serverExternalPackages: ["@wandercom/design-system-emails", "potrace", "jimp"],
   turbopack: {
     root: process.cwd(),
   },
