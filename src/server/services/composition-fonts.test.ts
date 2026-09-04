@@ -3,12 +3,12 @@ import { describe, expect, test } from "bun:test";
 import { brandFontFamily, parseGoogleFontCss } from "./composition-fonts";
 
 describe("brand fonts", () => {
-  test("reads weight and TrueType url from a Google Fonts stylesheet", () => {
+  test("reads weight and url for the formats satori can decode", () => {
     const css = `
       @font-face { font-family: 'Inter'; font-style: normal; font-weight: 400;
         src: url(https://fonts.gstatic.com/s/inter/v20/a.ttf) format('truetype'); }
       @font-face { font-family: 'Inter'; font-style: normal; font-weight: 700;
-        src: url(https://fonts.gstatic.com/s/inter/v20/b.ttf) format('truetype'); }
+        src: url(https://fonts.gstatic.com/s/inter/v20/b.ttf) format('woff'); }
       @font-face { font-family: 'Inter'; font-weight: 900;
         src: url(https://fonts.gstatic.com/s/inter/v20/c.woff2) format('woff2'); }
     `;

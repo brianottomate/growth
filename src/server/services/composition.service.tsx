@@ -178,6 +178,26 @@ export async function loadCompositionSource(
   return { ...context, sourceImage, logo, fonts };
 }
 
+// Drawn, not typed: the house font has no ★ and satori's fallback fetch for
+// missing glyphs is not something a render should depend on.
+function Stars({ count, size }: { count: number; size: number }) {
+  return (
+    <div style={{ display: "flex", gap: Math.round(size * 0.18) }}>
+      {Array.from({ length: count }, (_, index) => (
+        <svg
+          key={index}
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="#ffffff"
+        >
+          <path d="M12 2.5l2.9 6.2 6.8.8-5 4.7 1.3 6.7L12 17.6l-6 3.3 1.3-6.7-5-4.7 6.8-.8z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
 function BrandMark({
   brandName,
   logo,
@@ -720,13 +740,10 @@ export function renderComposition(
     const pad = square ? 56 : 64;
     const headline = review
       ? wrapText(`“${clamp(spec.title, 110)}”`, square ? 24 : 22)
-      : wrapText(clamp(spec.title, 90), square ? 22 : 20);
+      : wrapText(clamp(spec.title, 90), square ? 24 : 22);
     const headlineSize = review ? (square ? 56 : 62) : square ? 62 : 70;
-    const line = review
-      ? [clamp(spec.subtitle, 80), spec.rating ? "★".repeat(spec.rating) : ""]
-          .filter(Boolean)
-          .join("  ·  ")
-      : clamp(spec.subtitle, 80);
+    const line = clamp(spec.subtitle, 80);
+    const stars = review && spec.rating ? spec.rating : 0;
     content = (
       <div
         style={{
@@ -801,16 +818,19 @@ export function renderComposition(
               </div>
             ))}
           </div>
-          {line ? (
+          {line || stars ? (
             <div
               style={{
                 display: "flex",
+                alignItems: "center",
+                gap: 14,
                 marginTop: 18,
                 fontSize: square ? 24 : 26,
                 opacity: 0.86,
               }}
             >
-              {line}
+              {line ? <div style={{ display: "flex" }}>{line}</div> : null}
+              {stars ? <Stars count={stars} size={square ? 22 : 24} /> : null}
             </div>
           ) : null}
         </div>
@@ -823,8 +843,11 @@ export function renderComposition(
     const centred = spec.templateId === "tall-statement";
     const story = spec.formatId === "story";
     const pad = story ? 72 : 64;
-    const headline = wrapText(clamp(spec.title, 110), centred ? 20 : 18);
-    const subtitle = wrapText(clamp(spec.subtitle, 160), 40);
+    const headline = wrapText(
+      clamp(spec.title, 110),
+      centred ? (story ? 24 : 22) : 20,
+    );
+    const subtitle = wrapText(clamp(spec.subtitle, 160), 46);
     content = (
       <div
         style={{

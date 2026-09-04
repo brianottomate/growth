@@ -21,23 +21,27 @@ export function brandFontFamily(
   );
 }
 
-/** Weight and TrueType url of every @font-face in a Google Fonts stylesheet. */
+/**
+ * Weight and url of every @font-face in a Google Fonts stylesheet whose
+ * format satori can read: TrueType, OpenType or WOFF. WOFF2 is skipped.
+ */
 export function parseGoogleFontCss(
   css: string,
 ): Array<{ weight: number; url: string }> {
   const faces: Array<{ weight: number; url: string }> = [];
   for (const block of css.split("@font-face").slice(1)) {
     const weight = /font-weight:\s*(\d+)/.exec(block)?.[1];
-    const url = /src:\s*url\(([^)]+)\)\s*format\(['"]truetype['"]\)/.exec(
-      block,
-    )?.[1];
+    const url =
+      /src:\s*url\(([^)]+)\)\s*format\(['"](?:truetype|opentype|woff)['"]\)/.exec(
+        block,
+      )?.[1];
     if (weight && url) faces.push({ weight: Number(weight), url });
   }
   return faces;
 }
 
 // satori takes raw font bytes and cannot read WOFF2, which is what Google
-// serves modern browsers. An old Firefox user agent gets TrueType instead.
+// serves modern browsers. An old Firefox user agent gets WOFF or TrueType.
 const TTF_USER_AGENT =
   "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:22.0) Gecko/20130328 Firefox/22.0";
 
