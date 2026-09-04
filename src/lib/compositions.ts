@@ -191,6 +191,8 @@ const formatIds = COMPOSITION_FORMATS.map((format) => format.id) as [
   ...CompositionFormatId[],
 ];
 
+export const compositionFormatIdSchema = z.enum(formatIds);
+
 const compositionShape = {
   brandId: z.string().min(1),
   templateId: z.enum(templateIds),

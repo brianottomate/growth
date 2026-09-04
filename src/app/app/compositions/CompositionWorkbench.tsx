@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
+  Expand,
   ExternalLink,
   ImageIcon,
   Layers3,
@@ -247,16 +248,41 @@ export function CompositionWorkbench({
 
   const direct = useMutation(
     trpc.composition.direct.mutationOptions({
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         setTitle(result.title);
         if (has("subtitle")) setSubtitle(result.subtitle ?? "");
         setFocal(result.focal);
         setScrim(result.scrim);
+        if (result.sourceMediaAssetId) {
+          // The director had the photo extended; the new one is in the
+          // library and the card now starts from it.
+          await queryClient.invalidateQueries({
+            queryKey: sourceListOptions.queryKey,
+          });
+          setSourceMediaAssetId(result.sourceMediaAssetId);
+        }
         setDirection({
           verdict: result.verdict,
           note: result.note,
           changes: result.changes,
         });
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  const extend = useMutation(
+    trpc.composition.extend.mutationOptions({
+      onSuccess: async (result) => {
+        await queryClient.invalidateQueries({
+          queryKey: sourceListOptions.queryKey,
+        });
+        chooseSource(result.id);
+        toast.success(
+          result.reused
+            ? "Already extended once; switched to that photo"
+            : `Photo extended ${result.axis === "vertical" ? "above and below" : "to both sides"}`,
+        );
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -562,6 +588,26 @@ export function CompositionWorkbench({
                 placeholder="Search library"
                 className="h-8 w-40"
               />
+              {requiresImage && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={!renderSourceId || extend.isPending}
+                  onClick={() =>
+                    extend.mutate({
+                      brandId,
+                      sourceMediaAssetId: renderSourceId,
+                      formatId,
+                      title: title.trim() || undefined,
+                    })
+                  }
+                  title="Paint more of the scene in so the photo fills this canvas without cropping"
+                >
+                  <Expand className={cn("size-3.5", extend.isPending && "animate-pulse")} />
+                  {extend.isPending ? "Extending…" : "Extend to canvas"}
+                </Button>
+              )}
               {requiresImage && (
                 <SimpleSelect
                   value={cropPreset}

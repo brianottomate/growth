@@ -311,6 +311,34 @@ export async function extendSource(input: {
   return { id: asset.id, url: asset.url, reused: false };
 }
 
+/**
+ * Extend a photo to the canvas's ratio along whichever axis it falls short:
+ * a landscape photo on a portrait canvas gets more sky and ground, a portrait
+ * one on a square gets more width. Same lineage reuse as `extendSource`.
+ */
+export async function extendToCanvas(input: {
+  brandId: string;
+  userId: string;
+  source: { id: string; url: string };
+  formatId: FreezeCompositionInput["formatId"];
+  home: string;
+}) {
+  if (!isGeminiImageConfigured) {
+    throw new Error("Photo extension is not configured here (no Gemini key).");
+  }
+  const meta = await sharp(await download(input.source.url)).metadata();
+  const canvas = getCompositionFormat(input.formatId);
+  if (!meta.width || !meta.height) {
+    throw new Error("The photo could not be measured.");
+  }
+  const axis: "vertical" | "horizontal" =
+    meta.width / meta.height > canvas.width / canvas.height
+      ? "vertical"
+      : "horizontal";
+  const extended = await extendSource({ ...input, axis });
+  return { ...extended, axis };
+}
+
 type StoredComposition = {
   composition?: { direction?: CardDirectionRecord } & Record<string, unknown>;
 };

@@ -4,13 +4,17 @@ import { z } from "zod";
 import {
   COMPOSITION_FORMATS,
   COMPOSITION_TEMPLATES,
+  compositionFormatIdSchema,
   compositionSpecSchema,
   freezeCompositionSchema,
 } from "@/lib/compositions";
 import {
   applyDirection,
   critiqueCard,
+  extendSource,
+  extendToCanvas,
 } from "@/server/services/card-director.service";
+import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
 import {
   CompositionAccessError,
   freezeComposition,
@@ -73,6 +77,8 @@ export const compositionRouter = createTRPCRouter({
         subtitle: z.string().nullable(),
         focal: z.object({ x: z.number(), y: z.number() }).nullable(),
         scrim: z.string().nullable(),
+        /** Set when the director had the photo extended; the new source. */
+        sourceMediaAssetId: z.string().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -80,7 +86,7 @@ export const compositionRouter = createTRPCRouter({
         const context = await loadCompositionSource(
           await resolveCompositionContext(ctx.session.user.id, input),
         );
-        if (!context.sourceUrl) {
+        if (!context.sourceUrl || !input.sourceMediaAssetId) {
           throw new CompositionAccessError(
             "The art director judges a card against its photo; this blueprint has none.",
             422,
@@ -107,15 +113,92 @@ export const compositionRouter = createTRPCRouter({
           });
         }
         const applied = applyDirection(spec, direction);
+        const changes = [...applied.changes];
+        let sourceMediaAssetId: string | null = null;
+        let focal = applied.spec.focal ?? null;
+        // The same step the homes flow takes: when no crop can show the
+        // subject, paint more of the scene in and start from that photo.
+        if (direction.verdict === "adjust" && direction.extend !== "none") {
+          if (isGeminiImageConfigured) {
+            try {
+              const extended = await extendSource({
+                brandId: input.brandId,
+                userId: ctx.session.user.id,
+                source: { id: input.sourceMediaAssetId, url: context.sourceUrl },
+                formatId: input.formatId,
+                axis: direction.extend,
+                home: input.title || context.brand.name,
+              });
+              sourceMediaAssetId = extended.id;
+              focal = null;
+              changes.push(
+                `extended the photo ${direction.extend === "vertical" ? "above and below" : "to both sides"} so the subject fits`,
+              );
+            } catch (error) {
+              console.error("photo extension failed", error);
+              changes.push("wanted the photo extended, which failed, so the crop stands");
+            }
+          } else {
+            changes.push("wanted the photo extended, which is not configured here");
+          }
+        }
         return {
           verdict: direction.verdict,
           note: direction.note,
-          changes: applied.changes,
+          changes,
           title: applied.spec.title,
           subtitle: applied.spec.subtitle ?? null,
-          focal: applied.spec.focal ?? null,
+          focal,
           scrim: applied.spec.scrim ?? null,
+          sourceMediaAssetId,
         };
+      } catch (error) {
+        rethrowAccess(error);
+      }
+    }),
+
+  /**
+   * Extend the chosen photo to the canvas's ratio, on the operator's say-so.
+   * Returns the new library asset; the Studio switches to it.
+   */
+  extend: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        sourceMediaAssetId: z.string().min(1),
+        formatId: compositionFormatIdSchema,
+        title: z.string().trim().max(120).optional(),
+      }),
+    )
+    .output(
+      z.object({
+        id: z.string(),
+        url: z.string(),
+        reused: z.boolean(),
+        axis: z.enum(["vertical", "horizontal"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const context = await resolveCompositionContext(ctx.session.user.id, {
+          brandId: input.brandId,
+          templateId: "photo-only",
+          formatId: input.formatId,
+          sourceMediaAssetId: input.sourceMediaAssetId,
+          title: "",
+          imagePosition: "center",
+          mark: "auto",
+        });
+        if (!context.sourceUrl) {
+          throw new CompositionAccessError("Choose a photo to extend", 422);
+        }
+        return await extendToCanvas({
+          brandId: input.brandId,
+          userId: ctx.session.user.id,
+          source: { id: input.sourceMediaAssetId, url: context.sourceUrl },
+          formatId: input.formatId,
+          home: input.title?.trim() || context.brand.name,
+        });
       } catch (error) {
         rethrowAccess(error);
       }
