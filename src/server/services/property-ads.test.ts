@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { centsToDollars } from "@/server/clients/wanderos-site.client";
 
-import { catalogFeedRow, homeSubtitle } from "./property-ads.service";
+import { catalogFeedRow, homeFacts, homeSubtitle } from "./property-ads.service";
 
 const home = {
   id: "12",
@@ -81,5 +81,20 @@ describe("what the card says under the name", () => {
         state: undefined,
       }),
     ).toBe("");
+  });
+});
+
+describe("the facts line on a catalog card", () => {
+  it("counts what the feed gave, in the order a guest reads them", () => {
+    expect(homeFacts({ ...home, bathrooms: 2, guests: 8 })).toBe(
+      "3 bedrooms · 2 baths · 8 guests",
+    );
+    expect(homeFacts({ ...home, bedrooms: 1, bathrooms: 1, guests: 2 })).toBe(
+      "1 bedroom · 1 bath · 2 guests",
+    );
+  });
+
+  it("says nothing rather than inventing a count", () => {
+    expect(homeFacts({ ...home, bedrooms: undefined })).toBe("");
   });
 });

@@ -504,7 +504,7 @@ function BrandDefaults({
           {fonts
             .map((font) => (font.role ? `${font.family} (${font.role})` : font.family))
             .join(", ")}
-          . Cards render in the house typeface for now.
+          . Cards render in the heading face when Google Fonts carries it.
         </p>
       )}
     </div>

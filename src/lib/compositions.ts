@@ -40,6 +40,34 @@ export const COMPOSITION_TEMPLATES = [
       "The source image alone, full-bleed. The baseline every other blueprint adds to.",
   },
   {
+    id: "catalog-copy",
+    version: 1,
+    label: "Catalog · copy",
+    description:
+      "Logo top left, the home's name and facts over a dark gradient at the foot. The feed card.",
+  },
+  {
+    id: "catalog-review",
+    version: 1,
+    label: "Catalog · review",
+    description:
+      "Same photo treatment, a guest quote and their stars at the foot instead of facts.",
+  },
+  {
+    id: "tall-statement",
+    version: 1,
+    label: "Tall · statement",
+    description:
+      "Logo and a centred headline high on the photo, a quiet call to action at the base. Stories and Reels.",
+  },
+  {
+    id: "tall-welcome",
+    version: 1,
+    label: "Tall · welcome",
+    description:
+      "Left-set headline and supporting line under the logo, a pill button at the base.",
+  },
+  {
     id: "image-hero",
     version: 2,
     label: "Image hero",
@@ -103,6 +131,8 @@ const compositionShape = {
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
   imagePosition: z.enum(["top", "center", "bottom"]).default("center"),
+  /** Stars on the review card. Drawn only by blueprints that show a review. */
+  rating: z.number().int().min(1).max(5).optional(),
 };
 
 function requireSourceImage(
@@ -176,6 +206,7 @@ export function getCompositionIdentity(spec: FreezeCompositionInput) {
     cta: spec.cta ?? null,
     accent: spec.accent ?? null,
     imagePosition: spec.imagePosition,
+    rating: spec.rating ?? null,
   };
 }
 

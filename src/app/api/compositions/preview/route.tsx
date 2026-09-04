@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     cta: params.get("cta") || undefined,
     accent: params.get("accent") || undefined,
     imagePosition: params.get("imagePosition") || "center",
+    rating: params.get("rating") ? Number(params.get("rating")) : undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(

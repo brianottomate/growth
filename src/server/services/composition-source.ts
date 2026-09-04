@@ -33,3 +33,31 @@ export async function fetchSatoriImageSource(url: string): Promise<string> {
   }
   return toSatoriImageSource(Buffer.from(await response.arrayBuffer()));
 }
+
+export type LogoImage = { src: string; width: number; height: number };
+
+/**
+ * A brand logo as satori can draw it, with its intrinsic size so the mark
+ * can scale it by height. SVGs are rasterised at high density because satori
+ * draws them as bitmaps and a favicon-sized raster looks soft on a card.
+ */
+export async function loadLogoImage(url: string): Promise<LogoImage> {
+  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) {
+    throw new Error(`Logo download failed (${response.status}).`);
+  }
+  const body = Buffer.from(await response.arrayBuffer());
+  const meta = await sharp(body).metadata();
+  const image =
+    meta.format === "svg" ? sharp(body, { density: 288 }) : sharp(body);
+  const png = await image
+    .resize({ height: 144, withoutEnlargement: meta.format !== "svg" })
+    .png()
+    .toBuffer();
+  const out = await sharp(png).metadata();
+  return {
+    src: `data:image/png;base64,${png.toString("base64")}`,
+    width: out.width ?? 1,
+    height: out.height ?? 1,
+  };
+}

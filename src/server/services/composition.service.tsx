@@ -12,13 +12,23 @@ import {
 import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
 import { brandTable, mediaAssetTable, memberTable } from "@/server/db/schema";
-import { fetchSatoriImageSource } from "@/server/services/composition-source";
+import {
+  brandFontFamily,
+  loadGoogleFont,
+  type LoadedFont,
+} from "@/server/services/composition-fonts";
+import {
+  fetchSatoriImageSource,
+  loadLogoImage,
+  type LogoImage,
+} from "@/server/services/composition-source";
 import { importImageBuffer } from "@/server/services/media.service";
 
 export type CompositionContext = {
   brand: {
     id: string;
     name: string;
+    logo: string | null;
     organizationId: string;
     brandIdentity: {
       colorScheme?: "light" | "dark";
@@ -29,9 +39,11 @@ export type CompositionContext = {
   sourceUrl: string | null;
 };
 
-/** A context with the source loaded as satori can render it. */
+/** A context with everything satori draws loaded: source, logo, brand font. */
 export type RenderContext = CompositionContext & {
   sourceImage: string | null;
+  logo: LogoImage | null;
+  fonts: LoadedFont[] | null;
 };
 
 export class CompositionAccessError extends Error {
@@ -83,6 +95,7 @@ export async function resolveCompositionContext(
     columns: {
       id: true,
       name: true,
+      logo: true,
       organizationId: true,
       brandIdentity: true,
     },
@@ -149,25 +162,65 @@ export async function resolveCompositionContext(
 export async function loadCompositionSource(
   context: CompositionContext,
 ): Promise<RenderContext> {
-  return {
-    ...context,
-    sourceImage: context.sourceUrl
-      ? await fetchSatoriImageSource(context.sourceUrl)
+  const family = brandFontFamily(context.brand.brandIdentity);
+  // The logo and the font are best effort: a card without them is still the
+  // card. The source is not; its failure is the render's failure.
+  const [sourceImage, logo, fonts] = await Promise.all([
+    context.sourceUrl ? fetchSatoriImageSource(context.sourceUrl) : null,
+    context.brand.logo
+      ? loadLogoImage(context.brand.logo).catch((error: unknown) => {
+          console.error("brand logo unavailable", context.brand.id, error);
+          return null;
+        })
       : null,
-  };
+    family ? loadGoogleFont(family) : null,
+  ]);
+  return { ...context, sourceImage, logo, fonts };
 }
 
 function BrandMark({
   brandName,
+  logo,
   inverse = false,
   markSize = 36,
   textSize = 24,
 }: {
   brandName: string;
+  logo?: LogoImage | null;
   inverse?: boolean;
   markSize?: number;
   textSize?: number;
 }) {
+  if (logo) {
+    // A wide logo is a wordmark and carries the name itself; a square one is
+    // an icon (often the favicon) and reads better beside the name.
+    const wordmark = logo.width / logo.height > 2;
+    const height = wordmark ? Math.round(markSize * 1.1) : markSize;
+    const width = Math.round((height * logo.width) / logo.height);
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          color: inverse ? "#ffffff" : "#111111",
+          fontSize: textSize,
+          fontWeight: 700,
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logo.src}
+          alt=""
+          width={width}
+          height={height}
+          style={{ width, height, objectFit: "contain" }}
+        />
+        {wordmark ? null : clamp(brandName, 32)}
+      </div>
+    );
+  }
   return (
     <div
       style={{
@@ -323,6 +376,8 @@ function renderInputs(
   return {
     ...getCompositionIdentity(spec),
     brandName: context.brand.name,
+    brandLogo: context.brand.logo ?? null,
+    fontFamily: brandFontFamily(context.brand.brandIdentity),
     renderedAccent: resolveAccent(spec, context),
   };
 }
@@ -657,6 +712,259 @@ export function renderComposition(
         </div>
       </div>
     );
+  } else if (
+    spec.templateId === "catalog-copy" ||
+    spec.templateId === "catalog-review"
+  ) {
+    const review = spec.templateId === "catalog-review";
+    const pad = square ? 56 : 64;
+    const headline = review
+      ? wrapText(`“${clamp(spec.title, 110)}”`, square ? 24 : 22)
+      : wrapText(clamp(spec.title, 90), square ? 22 : 20);
+    const headlineSize = review ? (square ? 56 : 62) : square ? 62 : 70;
+    const line = review
+      ? [clamp(spec.subtitle, 80), spec.rating ? "★".repeat(spec.rating) : ""]
+          .filter(Boolean)
+          .join("  ·  ")
+      : clamp(spec.subtitle, 80);
+    content = (
+      <div
+        style={{
+          display: "flex",
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: "#000000",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: "62%",
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.82) 100%)",
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            top: pad,
+            left: pad,
+          }}
+        >
+          <BrandMark brandName={context.brand.name} logo={context.logo} inverse />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            position: "absolute",
+            left: pad,
+            right: pad,
+            bottom: pad,
+            color: "#ffffff",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: headlineSize,
+              fontWeight: review ? 600 : 700,
+              lineHeight: 1.06,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {headline.map((text) => (
+              <div key={text} style={{ display: "flex" }}>
+                {text}
+              </div>
+            ))}
+          </div>
+          {line ? (
+            <div
+              style={{
+                display: "flex",
+                marginTop: 18,
+                fontSize: square ? 24 : 26,
+                opacity: 0.86,
+              }}
+            >
+              {line}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  } else if (
+    spec.templateId === "tall-statement" ||
+    spec.templateId === "tall-welcome"
+  ) {
+    const centred = spec.templateId === "tall-statement";
+    const story = spec.formatId === "story";
+    const pad = story ? 72 : 64;
+    const headline = wrapText(clamp(spec.title, 110), centred ? 20 : 18);
+    const subtitle = wrapText(clamp(spec.subtitle, 160), 40);
+    content = (
+      <div
+        style={{
+          display: "flex",
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: "#000000",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            height: "58%",
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0) 100%)",
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: "28%",
+            background:
+              "linear-gradient(0deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)",
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            position: "absolute",
+            top: pad,
+            left: pad,
+            right: pad,
+            alignItems: centred ? "center" : "flex-start",
+            color: "#ffffff",
+          }}
+        >
+          <BrandMark
+            brandName={context.brand.name}
+            logo={context.logo}
+            inverse
+            markSize={40}
+            textSize={26}
+          />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: centred ? "center" : "flex-start",
+              marginTop: centred ? 64 : 40,
+              fontSize: story ? 68 : 60,
+              fontWeight: 700,
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
+              textAlign: centred ? "center" : "left",
+            }}
+          >
+            {headline.map((text) => (
+              <div key={text} style={{ display: "flex" }}>
+                {text}
+              </div>
+            ))}
+          </div>
+          {!centred && subtitle.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                marginTop: 22,
+                fontSize: story ? 30 : 27,
+                lineHeight: 1.3,
+                opacity: 0.92,
+              }}
+            >
+              {subtitle.map((text) => (
+                <div key={text} style={{ display: "flex" }}>
+                  {text}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        {spec.cta ? (
+          <div
+            style={{
+              display: "flex",
+              position: "absolute",
+              left: pad,
+              right: pad,
+              bottom: pad,
+              justifyContent: centred ? "center" : "flex-start",
+            }}
+          >
+            {centred ? (
+              <div style={{ display: "flex", color: "#ffffff", fontSize: 28, fontWeight: 600 }}>
+                {clamp(spec.cta, 60)}
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  padding: "22px 40px",
+                  borderRadius: 999,
+                  background: "#ffffff",
+                  color: "#111111",
+                  fontSize: 26,
+                  fontWeight: 700,
+                }}
+              >
+                {clamp(spec.cta, 60)}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
   } else if (spec.templateId === "photo-only") {
     content = (
       <div
@@ -746,10 +1054,23 @@ export function renderComposition(
     );
   }
 
-  return new ImageResponse(content, {
-    width: format.width,
-    height: format.height,
-  });
+  // A loaded brand font is set on a wrapper so every blueprint inherits it;
+  // satori falls back to the house font for any family it was not given.
+  const fontFamily = context.fonts?.[0]?.name;
+  return new ImageResponse(
+    fontFamily ? (
+      <div style={{ display: "flex", width: "100%", height: "100%", fontFamily }}>
+        {content}
+      </div>
+    ) : (
+      content
+    ),
+    {
+      width: format.width,
+      height: format.height,
+      ...(context.fonts?.length ? { fonts: context.fonts } : {}),
+    },
+  );
 }
 
 /**

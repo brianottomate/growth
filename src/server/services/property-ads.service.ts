@@ -88,6 +88,19 @@ export function homeSubtitle(listing: WanderOsListing): string {
     .join(" · ");
 }
 
+/** "3 bedrooms · 2 baths · 8 guests", from whatever the feed gave us. */
+export function homeFacts(listing: WanderOsListing): string {
+  const count = (n: number | undefined, one: string, many: string) =>
+    n ? `${n} ${n === 1 ? one : many}` : null;
+  return [
+    count(listing.bedrooms, "bedroom", "bedrooms"),
+    count(listing.bathrooms, "bath", "baths"),
+    count(listing.guests, "guest", "guests"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /**
  * One home as a catalog row, or null when it cannot be one.
  *
@@ -297,14 +310,16 @@ export async function draftAdsFromHomes(input: {
           url: listing.imageUrl!,
           title: listing.name,
         }));
+      // The feed card: name over the photo, facts under it, the brand's own
+      // logo top left. Facts fall back to the place line for a home the feed
+      // describes thinly.
       const spec: FreezeCompositionInput = {
         brandId: brand.id,
-        templateId: "editorial-overlay",
+        templateId: "catalog-copy",
         formatId: "portrait",
         sourceMediaAssetId: source.id,
         title: listing.name,
-        subtitle: homeSubtitle(listing),
-        cta: "Book direct",
+        subtitle: homeFacts(listing) || homeSubtitle(listing),
         imagePosition: "center",
         assetTitle: `${listing.name} — ${brand.name}`,
       };

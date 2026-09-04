@@ -21,6 +21,12 @@ export type WanderOsListing = {
   /** Canonical listing URL, the shape the site's own links use. */
   url: string;
   bedrooms?: number;
+  bathrooms?: number;
+  /** Sleeps, as the feed calls it: `occupancy`. */
+  guests?: number;
+  /** 0–5 as the feed reports it; absent for homes with no reviews yet. */
+  rating?: number;
+  reviewCount?: number;
   imageUrl?: string;
   /** Where the home is, as the feed states it. */
   city?: string;
@@ -100,6 +106,10 @@ export async function listWanderOsListings(input: {
         slug?: string;
         name?: string;
         bedrooms?: number;
+        bathrooms?: number;
+        occupancy?: number;
+        overallRating?: number;
+        totalReviews?: number;
         // Media carries sized variants, not a bare `url`: lowResUrl is 640px
         // and mediumResUrl 1200px, both webp on assets.wander.com.
         medias?: { lowResUrl?: string; mediumResUrl?: string; type?: string }[];
@@ -126,6 +136,10 @@ export async function listWanderOsListings(input: {
         // The shape the site's own links use: /property/<id>/<slug>.
         url: `${origin}/property/${id}/${row.slug}`,
         bedrooms: row.bedrooms,
+        bathrooms: row.bathrooms,
+        guests: row.occupancy,
+        rating: row.overallRating,
+        reviewCount: row.totalReviews,
         imageUrl: row.medias?.[0]?.lowResUrl ?? row.medias?.[0]?.mediumResUrl,
         city: row.address?.city,
         state: row.address?.state,

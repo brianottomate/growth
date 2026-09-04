@@ -111,6 +111,7 @@ describe("composition blueprints", () => {
       cta: null,
       accent: "#18a8b5",
       imagePosition: "top",
+      rating: null,
       renderedAt: "2026-08-19T00:00:00.000Z",
     });
   });
