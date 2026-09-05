@@ -15,7 +15,7 @@ Work in this order. Each step reads before it writes, and re-running any step is
 ## 1. Brand
 
 1. `brandRead.list` to see whether the brand already exists (match on the website's domain). If it does, use it and skip to step 2.
-2. Otherwise `brandWrite.create` with the name and website. Take the name from the site, not the URL slug, if the operator did not give one.
+2. Otherwise find the business name before creating: `researchRead` the homepage and take the name from its title or logo text (for chaletshh.com that is "Chalets Hocking Hills", not "Chalets HH"). Then `brandWrite.create` with that name and the website. Never name a brand after its domain.
 3. `brandWrite.enrich` with the brandId. This reads the logo, colours, fonts and tagline. If enrichment fails, say so and continue; the mark step will have nothing to draw and should be skipped.
 
 ## 2. Mark
@@ -29,7 +29,7 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 ## 4. Campaign shell
 
-`adsWrite.draftCampaign` with the brandSlug, platforms `["meta_ads"]`, landingUrl set to the website, and budget 1000 unless the operator named one. Name it with the campaign naming convention: `<BRAND>_PROSPECTING_PURCHASES` for a prospect, `OSPERF+<CUSTOMER>_PROSPECTING_PURCHASES` for a signed client, brand name upper-cased with spaces as `+`.
+`adsWrite.draftCampaign` with the brandSlug, platforms `["meta_ads"]`, landingUrl set to the website, and budget 1000 unless the operator named one. Leave `name` out: the action applies the house naming convention itself.
 
 ## 5. Ads
 

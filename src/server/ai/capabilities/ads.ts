@@ -54,7 +54,11 @@ import { draftAdsFromHomes } from "@/server/services/property-ads.service";
 import { requireOwnedCampaign } from "@/server/services/ads-draft.service";
 import { MediaService } from "@/server/services/media.service";
 import { mediaTypeForUrl } from "@/lib/media-url";
-import type { MediaItem } from "@/server/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+
+import { campaignDraftName } from "@/lib/performance-ads";
+import { db } from "@/server/db";
+import { brandTable, type MediaItem } from "@/server/db/schema";
 import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -173,7 +177,15 @@ export const draftCampaignAction = growthAction({
     "Create a LOCAL campaign draft — the editable first-party object shown at /app/brands/{brandSlug}/ads/{campaignId}. Nothing touches any ad platform: per-platform campaigns are created later by the push, which is a separate operator-approved step. Use adsWrite.createMetaDraft when the user explicitly wants a campaign created directly ON the provider instead.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
-    name: z.string().trim().min(1).max(300),
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .optional()
+      .describe(
+        "Omit to use the house convention: BRAND_PROSPECTING_PURCHASES for a prospect, OSPERF+CUSTOMER_PROSPECTING_PURCHASES for a signed client.",
+      ),
     platforms: z
       .array(z.enum(PLANNABLE_AD_PLATFORMS))
       .min(1)
@@ -192,12 +204,29 @@ export const draftCampaignAction = growthAction({
       .describe("Total intended budget in whole dollars."),
     campaignId: z.string().trim().min(1).optional(),
   }),
-  execute: async (input, ctx) =>
-    createDraftCampaign({
+  execute: async (input, ctx) => {
+    // The convention lives in code so the model never has to spell it.
+    const name = input.name ?? (await conventionalCampaignName(input.brandSlug, ctx.orgId));
+    return createDraftCampaign({
       ...input,
+      name,
       organizationId: ctx.orgId,
-    }),
+    });
+  },
 });
+
+async function conventionalCampaignName(brandSlug: string, orgId: string) {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.slug, brandSlug),
+      eq(brandTable.organizationId, orgId),
+      isNull(brandTable.deletedAt),
+    ),
+    columns: { name: true, relationship: true },
+  });
+  if (!brand) throw new Error("No access to this brand");
+  return campaignDraftName({ brandName: brand.name, isClient: brand.relationship === "client" });
+}
 
 export const createMetaAdDraftAction = growthAction({
   description:
