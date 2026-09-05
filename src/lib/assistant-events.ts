@@ -71,12 +71,19 @@ export type AssistantIntent =
  * work_content_post. The campaign page is read-only by design, so refining
  * headlines and primary text happens here, with the campaign in context.
  */
+/**
+ * The step of the campaign page the operator asked from. The chat gets a hint
+ * so it starts on that step rather than reading the whole campaign back.
+ */
+export type CampaignFocus = "photos" | "ads" | "audiences" | "platforms" | "live";
+
 export type WorkAdCampaignIntent = {
   type: "work_ad_campaign";
   brandId: string;
   brandName: string;
   campaignId: string;
   campaignName: string;
+  focus?: CampaignFocus;
   visibleText: string;
 };
 

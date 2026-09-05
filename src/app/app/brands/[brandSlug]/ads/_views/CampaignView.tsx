@@ -1,33 +1,38 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { Check, Radio } from "lucide-react";
 
 import { db } from "@/server/db";
-import { memberTable } from "@/server/db/schema";
+import { memberTable, platformAdTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { campaignPrefillFromIntake } from "@/server/services/performance-intake.service";
-import { DraftFromHomesButton } from "./DraftFromHomesButton";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/components/ui/lib/utils";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
 
 import { AddAdButton } from "./AddAdButton";
+import { AskAssistantButton } from "./AskAssistantButton";
 import { Audiences } from "./Audiences";
-import { money } from "./format";
-import { PlanPlatformButton } from "./PlanPlatformButton";
-import { DraftedAds } from "./DraftedAds";
-import { PlatformSection } from "./PlatformSection";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
+import { DraftedAds, type AdState } from "./DraftedAds";
+import { DraftFromHomesButton } from "./DraftFromHomesButton";
+import { money } from "./format";
+import { PlanPlatformButton } from "./PlanPlatformButton";
+import { PlatformSection } from "./PlatformSection";
 import { WorkInChatButton } from "./WorkInChatButton";
 
 /**
- * The campaign: one plan, compiled onto one or more platforms.
+ * The campaign, read top to bottom as the work happens: photos, then the ads
+ * made from them, who sees them, where they run, and what they are doing once
+ * live. Each step shows its content when it has some and one clear way to
+ * fill it when it does not, and each step can be handed to the assistant.
  *
- * Two halves, because that is what the model is. The plan half carries what
- * is shared — creative pool, drafted ads, audiences with their advisory
- * splits. Below it, one section per planned platform holds that platform's
- * authoritative budget and settings while it is a draft, and what the
- * platform is actually doing once pushed.
+ * Underneath it is still one plan compiled onto platforms: the platform rows
+ * hold the authoritative budget while drafts, and the platform's own numbers
+ * once pushed.
  */
 export async function CampaignView({
   brandSlug,
@@ -50,23 +55,44 @@ export async function CampaignView({
   if (draft?.brand.slug !== brandSlug) notFound();
 
   const { campaign, audiences, ads, platformCampaigns, personas } = draft;
+  const brand = draft.brand;
+  const brandName = brand.name;
 
   // Where this client's homes are, offered to the audience form as a starting
   // point. Only a paying client has an intake behind them; for Wander's own
   // brands this would be a query that can only answer "nothing".
   const prefill =
-    draft.brand.relationship === "client"
-      ? await campaignPrefillFromIntake(
-          { orgId: org.id },
-          { brandId: draft.brand.id },
-        ).catch(() => null)
+    brand.relationship === "client"
+      ? await campaignPrefillFromIntake({ orgId: org.id }, { brandId: brand.id }).catch(
+          () => null,
+        )
       : null;
 
   const planned = [...platformCampaigns].sort((a, b) =>
     a.platform.localeCompare(b.platform),
   );
   const plannedPlatforms = planned.map((row) => row.platform);
-  const anyPushed = planned.some((row) => row.externalId);
+  const pushed = planned.filter((row) => row.externalId);
+  const anyPushed = pushed.length > 0;
+  const anyLive = planned.some((row) => row.status === "live");
+
+  // Where each ad stands, from the platform rows that point back at it.
+  const states: Record<string, AdState> = {};
+  if (pushed.length > 0) {
+    const liveIds = new Set(pushed.filter((row) => row.status === "live").map((row) => row.id));
+    const rows = await db.query.platformAdTable.findMany({
+      where: and(
+        inArray(platformAdTable.platformCampaignId, pushed.map((row) => row.id)),
+        isNotNull(platformAdTable.adId),
+      ),
+      columns: { adId: true, platformCampaignId: true },
+    });
+    for (const row of rows) {
+      if (!row.adId) continue;
+      const state: AdState = liveIds.has(row.platformCampaignId) ? "live" : "pushed";
+      if (states[row.adId] !== "live") states[row.adId] = state;
+    }
+  }
 
   const totals = planned.reduce(
     (acc, row) => {
@@ -83,8 +109,35 @@ export async function CampaignView({
       ? `${((totals.clicks / totals.impressions) * 100).toFixed(2)}%`
       : "—";
 
+  const pool = campaign.creativePool ?? [];
+  const homesRun = campaign.homesRun ?? null;
+  const ask = (focus: "photos" | "ads" | "audiences" | "platforms" | "live", text: string) => (
+    <AskAssistantButton
+      brandId={brand.id}
+      brandName={brandName}
+      campaignId={campaign.id}
+      campaignName={campaign.name}
+      focus={focus}
+      ask={text}
+      variant="ghost"
+    />
+  );
+
+  // The first step without content is the one to do next.
+  const filled = {
+    photos: pool.length > 0,
+    ads: ads.length > 0,
+    audiences: audiences.length > 0,
+    platforms: planned.length > 0,
+    live: anyPushed,
+  };
+  const order = ["photos", "ads", "audiences", "platforms", "live"] as const;
+  const next = order.find((key) => !filled[key]) ?? null;
+  const stateOf = (key: (typeof order)[number]) =>
+    filled[key] ? "done" : key === next ? "next" : "todo";
+
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
+    <div className="mx-auto w-full max-w-4xl space-y-8 p-6">
       <header className="space-y-3">
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <Link href="/app/brands" className="hover:underline">
@@ -92,174 +145,304 @@ export async function CampaignView({
           </Link>
           <span>/</span>
           <Link href={`/app/brands/${brandSlug}`} className="hover:underline">
-            {brandSlug}
+            {brandName}
           </Link>
           <span>/</span>
-          <Link
-            href={`/app/brands/${brandSlug}/ads`}
-            className="hover:underline"
-          >
+          <Link href={`/app/brands/${brandSlug}/ads`} className="hover:underline">
             Ads
           </Link>
         </div>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <h1 className="truncate text-xl font-semibold tracking-tight">
-                {campaign.name}
-              </h1>
-              <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
-                {anyPushed ? campaign.status : "draft"}
+              <h1 className="truncate text-xl font-semibold tracking-tight">{campaign.name}</h1>
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  anyLive
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : anyPushed
+                      ? "bg-sky-500/15 text-sky-300"
+                      : "bg-muted text-muted-foreground",
+                )}
+              >
+                {anyLive ? "live" : anyPushed ? "pushed, paused" : "draft"}
               </span>
             </div>
-            <p className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
-              <span>Planned for</span>
-              {plannedPlatforms.length === 0 && <span>no platforms yet</span>}
-              {plannedPlatforms.map((platform) => (
-                <span key={platform} className="flex items-center gap-1">
-                  <ChannelLogo platform={platform} className="size-4" />
-                  {platformLabel(platform)}
-                </span>
-              ))}
-              {campaign.landingUrl && (
-                <span className="truncate">· {campaign.landingUrl}</span>
+            <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
+              {plannedPlatforms.length === 0 ? (
+                <span>No platform planned yet</span>
+              ) : (
+                plannedPlatforms.map((platform) => (
+                  <span key={platform} className="flex items-center gap-1">
+                    <ChannelLogo platform={platform} className="size-4" />
+                    {platformLabel(platform)}
+                  </span>
+                ))
               )}
+              {campaign.budget != null ? <span>· {money(campaign.budget)} planned</span> : null}
+              {campaign.landingUrl ? (
+                <span className="truncate">· {campaign.landingUrl}</span>
+              ) : null}
             </p>
-            {campaign.description && (
-              <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
-                {campaign.description}
-              </p>
-            )}
+            {campaign.description ? (
+              <p className="text-muted-foreground mt-2 max-w-2xl text-sm">{campaign.description}</p>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
             <DeleteCampaignButton
               campaignId={campaign.id}
               campaignName={campaign.name}
               brandSlug={brandSlug}
-              livePlatformCampaigns={
-                planned.filter((row) => row.externalId).length
-              }
+              livePlatformCampaigns={pushed.length}
             />
             <WorkInChatButton
-              brandId={draft.brand.id}
-              brandName={draft.brand.slug ?? brandSlug}
+              brandId={brand.id}
+              brandName={brandName}
               campaignId={campaign.id}
               campaignName={campaign.name}
               hasAds={ads.length > 0}
-            />
-            <AddAdButton
-              campaignId={campaign.id}
-              brandId={draft.brand.id}
-              inheritedLinkUrl={campaign.landingUrl}
             />
           </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          label="Spend"
-          value={anyPushed ? money(totals.spend) : "—"}
-          sub={
-            campaign.budget != null
-              ? `of ${money(campaign.budget)} planned`
+      <ol className="space-y-8">
+        <Step
+          n={1}
+          state={stateOf("photos")}
+          title="Photos"
+          meta={pool.length > 0 ? `${pool.length} in the pool` : undefined}
+          hint="Their listing heroes, library images, or cards from the Studio. Ads draw from these."
+        >
+          <CreativePool
+            campaignId={campaign.id}
+            brandId={brand.id}
+            pool={pool}
+            askAssistant={ask("photos", `Find photos for “${campaign.name}”`)}
+          />
+        </Step>
+
+        <Step
+          n={2}
+          state={stateOf("ads")}
+          title="Ads"
+          meta={
+            ads.length > 0
+              ? [
+                  `${ads.length} ad${ads.length === 1 ? "" : "s"}`,
+                  Object.values(states).length > 0
+                    ? `${Object.values(states).length} on a platform`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
               : undefined
           }
-        />
-        <Stat
-          label="Impressions"
-          value={totals.impressions ? totals.impressions.toLocaleString() : "—"}
-        />
-        <Stat
-          label="Clicks"
-          value={totals.clicks ? totals.clicks.toLocaleString() : "—"}
-        />
-        <Stat label="CTR" value={ctr} />
-      </div>
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold">The plan</h2>
-            <p className="text-muted-foreground text-xs">
-              Creative, ads and audiences, picked once here. Each platform below
-              compiles this into its own shape when you push.
-            </p>
-          </div>
-          {/* Any brand with a WanderOS site has homes to build from; a brand
-              without one gets told so by the run rather than shown nothing. */}
-          <DraftFromHomesButton campaignId={campaign.id} />
-        </div>
-
-        <CreativePool
-          campaignId={campaign.id}
-          brandId={draft.brand.id}
-          pool={campaign.creativePool ?? []}
-        />
-
-        <DraftedAds
-          ads={ads}
-          brandSlug={brandSlug}
-          brandName={draft.brand.name}
-          brandLogo={draft.brand.logo}
-          landingUrl={campaign.landingUrl}
-        />
-
-        <Audiences
-          campaignId={campaign.id}
-          audiences={audiences}
-          personas={personas}
-          geoPrefill={prefill?.geography ?? null}
-        />
-      </section>
-
-      <section className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold">On each platform</h2>
-          <PlanPlatformButton
+          hint="Each ad is a headline, a body and its cards. Every platform compiles these when you push."
+          actions={
+            ads.length > 0 ? (
+              <>
+                <DraftFromHomesButton
+                  campaignId={campaign.id}
+                  brandId={brand.id}
+                  lastRun={homesRun}
+                  label={homesRun ? "Homes run" : "From their homes"}
+                />
+                <AddAdButton
+                  campaignId={campaign.id}
+                  brandId={brand.id}
+                  inheritedLinkUrl={campaign.landingUrl}
+                />
+              </>
+            ) : null
+          }
+        >
+          <DraftedAds
+            ads={ads}
+            states={states}
+            brandId={brand.id}
+            brandSlug={brandSlug}
+            brandName={brandName}
+            brandLogo={brand.logo}
+            landingUrl={campaign.landingUrl}
             campaignId={campaign.id}
-            planned={plannedPlatforms}
+            homesRun={homesRun}
+            emptyActions={
+              <>
+                <DraftFromHomesButton
+                  campaignId={campaign.id}
+                  brandId={brand.id}
+                  lastRun={homesRun}
+                  variant="default"
+                />
+                <AddAdButton
+                  campaignId={campaign.id}
+                  brandId={brand.id}
+                  inheritedLinkUrl={campaign.landingUrl}
+                />
+                {ask("ads", `Draft the ads for “${campaign.name}”`)}
+              </>
+            }
           />
-        </div>
-        {planned.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No platforms planned yet. Planning one creates its local draft —
-            budget and settings live there, and nothing reaches the platform
-            until you push.
-          </p>
-        ) : (
-          planned.map((platformCampaign) => (
-            <PlatformSection
-              key={platformCampaign.id}
-              brandSlug={brandSlug}
-              campaignId={campaign.id}
-              platformCampaign={platformCampaign}
-              draftAdCount={ads.length}
-              audienceCount={audiences.length}
-              brandUrl={campaign.landingUrl ?? draft.brand.website ?? null}
+        </Step>
+
+        <Step
+          n={3}
+          state={stateOf("audiences")}
+          title="Audiences"
+          meta={audiences.length > 0 ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}` : "broad"}
+          hint="Who sees the ads. Each row becomes an ad set on Meta, an ad group on Google."
+        >
+          <Audiences
+            campaignId={campaign.id}
+            audiences={audiences}
+            personas={personas}
+            geoPrefill={prefill?.geography ?? null}
+            emptyActions={ask("audiences", `Suggest audiences for “${campaign.name}”`)}
+          />
+        </Step>
+
+        <Step
+          n={4}
+          state={stateOf("platforms")}
+          title="Platforms"
+          meta={
+            planned.length > 0
+              ? planned.map((row) => platformLabel(row.platform)).join(", ")
+              : undefined
+          }
+          hint="Where it runs. Each platform holds its own budget; the push compiles the plan there, paused."
+          actions={
+            planned.length > 0 ? (
+              <PlanPlatformButton campaignId={campaign.id} planned={plannedPlatforms} />
+            ) : null
+          }
+        >
+          {planned.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Radio}
+              title="No platform yet"
+              description="Planning one creates its local draft with a budget and settings. Nothing reaches the platform until you push, and the push creates everything paused."
+              actions={
+                <>
+                  <PlanPlatformButton campaignId={campaign.id} planned={plannedPlatforms} />
+                  {ask("platforms", `Plan the platforms for “${campaign.name}”`)}
+                </>
+              }
             />
-          ))
-        )}
-      </section>
+          ) : (
+            <div className="space-y-2">
+              {planned.map((platformCampaign) => (
+                <PlatformSection
+                  key={platformCampaign.id}
+                  brandSlug={brandSlug}
+                  campaignId={campaign.id}
+                  platformCampaign={platformCampaign}
+                  draftAdCount={ads.length}
+                  audienceCount={audiences.length}
+                  brandUrl={campaign.landingUrl ?? brand.website ?? null}
+                />
+              ))}
+            </div>
+          )}
+        </Step>
+
+        {anyPushed ? (
+          <Step
+            n={5}
+            state="done"
+            title="Live"
+            meta={anyLive ? "spending" : "paused"}
+            hint="What the platforms report. Delivery is switched per platform above."
+            actions={ask("live", `How is “${campaign.name}” doing?`)}
+          >
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat
+                label="Spend"
+                value={money(totals.spend)}
+                sub={campaign.budget != null ? `of ${money(campaign.budget)} planned` : undefined}
+              />
+              <Stat
+                label="Impressions"
+                value={totals.impressions ? totals.impressions.toLocaleString() : "—"}
+              />
+              <Stat label="Clicks" value={totals.clicks ? totals.clicks.toLocaleString() : "—"} />
+              <Stat label="CTR" value={ctr} />
+            </div>
+          </Step>
+        ) : null}
+      </ol>
     </div>
   );
 }
 
-/** One figure in the campaign's top strip. */
-function Stat({
-  label,
-  value,
-  sub,
+/**
+ * One step of the sequence. The number shows where the operator is: filled
+ * when the step has content, ringed when it is the next thing to do.
+ */
+function Step({
+  n,
+  state,
+  title,
+  meta,
+  hint,
+  actions,
+  children,
 }: {
-  label: string;
-  value: string;
-  sub?: string;
+  n: number;
+  state: "done" | "next" | "todo";
+  title: string;
+  meta?: string;
+  hint: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
 }) {
+  return (
+    <li className="grid gap-3 sm:grid-cols-[2rem_minmax(0,1fr)]">
+      <div className="hidden sm:block">
+        <span
+          className={cn(
+            "flex size-7 items-center justify-center rounded-full border text-xs font-semibold tabular-nums",
+            state === "done" && "bg-foreground text-background border-foreground",
+            state === "next" && "border-primary text-primary ring-primary/25 ring-4",
+            state === "todo" && "text-muted-foreground",
+          )}
+          aria-label={
+            state === "done" ? "Done" : state === "next" ? "Next step" : "Later"
+          }
+        >
+          {state === "done" ? <Check className="size-3.5" /> : n}
+        </span>
+      </div>
+      <div className="min-w-0 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <span className="sm:hidden">{n}.</span>
+              {title}
+              {meta ? (
+                <span className="text-muted-foreground text-sm font-normal">{meta}</span>
+              ) : null}
+            </h2>
+            <p className="text-muted-foreground text-xs">{hint}</p>
+          </div>
+          {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+        </div>
+        {children}
+      </div>
+    </li>
+  );
+}
+
+/** One figure in the live strip. */
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="bg-card rounded-xl border p-3">
       <p className="text-muted-foreground text-xs">{label}</p>
       <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
-      {sub && <p className="text-muted-foreground text-[11px]">{sub}</p>}
+      {sub ? <p className="text-muted-foreground text-[11px]">{sub}</p> : null}
     </div>
   );
 }

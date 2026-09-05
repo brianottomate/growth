@@ -27,6 +27,15 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
     brands.find((brand) => brand.name.toLowerCase() === "wander") ??
     brands[0]!;
   const [brandId, setBrandId] = useState(preferredBrand.id);
+  // A card handed over from the library or an ad: reopen it with the form
+  // filled in, and when it came from an ad, offer to put the new render back.
+  const openAssetId = searchParams.get("asset");
+  const adId = searchParams.get("adId");
+  const cardIndex = searchParams.get("card");
+  const replaceTarget =
+    adId && cardIndex !== null && /^\d+$/.test(cardIndex)
+      ? { adId, index: Number(cardIndex), back: searchParams.get("back") }
+      : null;
   const changeBrand = (next: string) => {
     setBrandId(next);
     // Keep the URL saying which brand, so the page can be shared or reloaded.
@@ -47,6 +56,8 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
         brands={brands}
         brandId={brandId}
         onBrandChange={changeBrand}
+        openAssetId={openAssetId}
+        replaceTarget={replaceTarget}
       />
     </div>
   );

@@ -101,6 +101,24 @@ function sanitizeForModel(history: UIMessage[]) {
     );
 }
 
+/** Which step of the campaign page the operator asked from, as a first move. */
+function campaignFocusPrompt(focus: AdCampaignWorkContext["focus"]) {
+  switch (focus) {
+    case "photos":
+      return "\n\nThe operator asked from the Photos step: they want images in this campaign's pool. Check mediaLibraryRead.list for the brand first; adsWrite.draftAdsFromHomes both imports their listing photos and renders cards from them, and adsWrite.setCreativePool sets the pool from library assets.";
+    case "ads":
+      return "\n\nThe operator asked from the Ads step: they want ads drafted or improved. For a brand with a WanderOS site, adsWrite.draftAdsFromHomes is the fast path (cards per home, one static, one carousel); otherwise adsWrite.draftAd with pool media. Write the copy yourself, do not ask them for it.";
+    case "audiences":
+      return "\n\nThe operator asked from the Audiences step. Broad with a geography is the default that leaves the learning phase at these budgets; propose one or two audiences with a reason each, then adsWrite.addAudience once they agree.";
+    case "platforms":
+      return "\n\nThe operator asked from the Platforms step: planning a platform (adsWrite.planPlatform), setting its budget, or pushing. Read adsRead.listDestinations before naming any account.";
+    case "live":
+      return "\n\nThe operator asked from the Live step: what the pushed campaign is doing. Read adsRead.openCampaign and adsRead.top, report spend against budget, and suggest at most one change.";
+    default:
+      return "";
+  }
+}
+
 export async function POST(req: Request): Promise<Response> {
   const requestNow = new Date();
   const session = await getSession();
@@ -234,6 +252,7 @@ export async function POST(req: Request): Promise<Response> {
           brandName: campaignWorkItem.brand.name,
           campaignId: campaignWorkItem.id,
           campaignName: campaignWorkItem.name,
+          focus: requestedCampaignContext?.focus,
         }
       : null;
 
@@ -271,7 +290,7 @@ export async function POST(req: Request): Promise<Response> {
             : "";
   const campaignContextPrompt =
     activeCampaignContext && brand
-      ? `\n\n# Active ad campaign\nThe operator is working on the campaign “${activeCampaignContext.campaignName}” (campaignId: ${activeCampaignContext.campaignId}) for ${brand.name}. Call adsRead.openCampaign first so you are working from its current state, not from earlier in this conversation.\n\nIt is a first-party campaign: ads and ad sets live on it, and per-platform campaigns exist only once it is pushed. Local edits touch no provider: adsWrite.draftAd adds an ad, adsWrite.addAdSet adds an ad set (audience and budget live there; omitting both audience fields means broad, which is often right), adsWrite.setCreativePool sets the shared images, and adsWrite.setGoogleSettings is required before any Google push.\n\nadsWrite.push creates the campaign tree PAUSED, so it cannot spend; adsWrite.setDelivery with status active is what starts spend on the client's account. Both ask the operator to approve before they run. Offer them when the campaign looks ready, and run them only when the operator asks, never unprompted. Call adsRead.listDestinations for account ids rather than guessing them. Prefer concrete copy over suggestion lists.`
+      ? `\n\n# Active ad campaign\nThe operator is working on the campaign “${activeCampaignContext.campaignName}” (campaignId: ${activeCampaignContext.campaignId}) for ${brand.name}. Call adsRead.openCampaign first so you are working from its current state, not from earlier in this conversation.\n\nIt is a first-party campaign: ads and ad sets live on it, and per-platform campaigns exist only once it is pushed. Local edits touch no provider: adsWrite.draftAd adds an ad, adsWrite.addAdSet adds an ad set (audience and budget live there; omitting both audience fields means broad, which is often right), adsWrite.setCreativePool sets the shared images, and adsWrite.setGoogleSettings is required before any Google push.\n\nadsWrite.push creates the campaign tree PAUSED, so it cannot spend; adsWrite.setDelivery with status active is what starts spend on the client's account. Both ask the operator to approve before they run. Offer them when the campaign looks ready, and run them only when the operator asks, never unprompted. Call adsRead.listDestinations for account ids rather than guessing them. Prefer concrete copy over suggestion lists.${campaignFocusPrompt(activeCampaignContext.focus)}`
       : "";
   const workContextPrompt =
     campaignContextPrompt +

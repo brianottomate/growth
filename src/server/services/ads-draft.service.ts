@@ -929,6 +929,58 @@ export async function deleteAudience(input: {
   return { deleted: true };
 }
 
+/**
+ * Swap one card on a drafted ad for a library asset. The card's slot keeps
+ * its place in the carousel; the new asset's own dimensions travel with it.
+ */
+export async function replaceDraftAdMedia(input: {
+  organizationId: string;
+  adId: string;
+  index: number;
+  mediaAssetId: string;
+}) {
+  const ad = await db.query.adTable.findFirst({
+    where: eq(adTable.id, input.adId),
+  });
+  if (!ad) throw new Error("Ad not found");
+  const { brand } = await requireOwnedCampaign(ad.campaignId, input.organizationId);
+  const content = ad.content;
+  if (!("media" in content) || !Array.isArray(content.media)) {
+    throw new Error("This ad has no cards to replace");
+  }
+  if (input.index < 0 || input.index >= content.media.length) {
+    throw new Error(`This ad has ${content.media.length} card(s); there is no card ${input.index + 1}`);
+  }
+  const asset = await db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.id, input.mediaAssetId),
+      eq(mediaAssetTable.brandId, brand.id),
+      eq(mediaAssetTable.status, "ready"),
+      isNull(mediaAssetTable.deletedAt),
+    ),
+    columns: { id: true, url: true, width: true, height: true, kind: true, metadata: true },
+  });
+  if (!asset?.url) throw new Error("That library asset is not available for this brand");
+  const previous = content.media[input.index]!;
+  const derivedFrom =
+    (asset.metadata as { composition?: { sourceMediaAssetId?: string | null } } | null)
+      ?.composition?.sourceMediaAssetId ?? undefined;
+  const media = [...content.media];
+  media[input.index] = {
+    url: asset.url,
+    type: asset.kind === "video" ? "video" : "image",
+    assetId: asset.id,
+    ...(asset.width && asset.height ? { width: asset.width, height: asset.height } : {}),
+    ...(derivedFrom ? { derivedFrom } : {}),
+  };
+  const [updated] = await db
+    .update(adTable)
+    .set({ content: { ...content, media } })
+    .where(eq(adTable.id, ad.id))
+    .returning();
+  return { ad: updated!, replaced: previous };
+}
+
 export async function deleteDraftAd(input: {
   organizationId: string;
   adId: string;

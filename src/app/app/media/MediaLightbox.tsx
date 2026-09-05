@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, PenLine } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import {
@@ -34,12 +34,31 @@ export function MediaLightbox({
   const videoUrl =
     asset.kind === "video" && asset.provider === "r2" ? asset.url : null;
   const externalUrl = asset.externalUrl ?? asset.url;
+  // A card the Studio froze carries its whole spec; it can be picked back up.
+  const isComposition = Boolean(
+    (asset.metadata as { composition?: unknown } | null)?.composition,
+  );
+  const studioHref = isComposition
+    ? `/app/compositions?brandId=${encodeURIComponent(asset.brandId)}&asset=${encodeURIComponent(asset.id)}`
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[90vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden border-white/10 bg-black/95 p-0 text-white sm:max-w-[94vw]">
         <DialogHeader className="shrink-0 border-b border-white/10 px-5 py-3 pr-12 text-left">
-          <DialogTitle className="text-sm text-white">{title}</DialogTitle>
+          <DialogTitle className="flex items-center gap-3 text-sm text-white">
+            <span className="truncate">{title}</span>
+            {studioHref ? (
+              <ButtonLink
+                href={studioHref}
+                size="sm"
+                variant="outline"
+                className="h-7 border-white/20 bg-transparent text-white hover:bg-white/10"
+              >
+                <PenLine className="size-3.5" /> Open in Studio
+              </ButtonLink>
+            ) : null}
+          </DialogTitle>
           <DialogDescription className="text-xs text-white/55">
             {[
               asset.folder?.name,

@@ -84,10 +84,16 @@ export function CompositionWorkbench({
   brands,
   brandId,
   onBrandChange,
+  openAssetId = null,
+  replaceTarget = null,
 }: {
   brands: Brand[];
   brandId: string;
   onBrandChange: (brandId: string) => void;
+  /** A frozen card to reopen with its spec in the form. */
+  openAssetId?: string | null;
+  /** The ad card the reopened composition came from; a freeze goes back there. */
+  replaceTarget?: { adId: string; index: number; back: string | null } | null;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -116,6 +122,47 @@ export function CompositionWorkbench({
   const [focal, setFocal] = useState<{ x: number; y: number } | null>(null);
   const [scrim, setScrim] = useState<string | null>(null);
   const [direction, setDirection] = useState<Direction | null>(null);
+
+  // Reopening: the stored identity becomes the form, once, when it arrives.
+  const reopened = useQuery({
+    ...trpc.composition.open.queryOptions({ assetId: openAssetId ?? "" }),
+    enabled: Boolean(openAssetId),
+    staleTime: Infinity,
+  });
+  const [hydratedFrom, setHydratedFrom] = useState<string | null>(null);
+  useEffect(() => {
+    const data = reopened.data;
+    if (!openAssetId || !data || hydratedFrom === openAssetId) return;
+    const { spec: saved } = data;
+    if (saved.brandId !== brandId) onBrandChange(saved.brandId);
+    setTemplateId(saved.templateId);
+    setFormatId(saved.formatId);
+    setSourceMediaAssetId(saved.sourceMediaAssetId ?? "");
+    setTitle(saved.title);
+    setSubtitle(saved.subtitle ?? "");
+    setEyebrow(saved.eyebrow ?? "");
+    setCta(saved.cta ?? "");
+    if (saved.accent) setAccent(saved.accent);
+    setRating(saved.rating);
+    setMark(saved.mark);
+    setFocal(saved.focal ?? null);
+    setScrim(saved.scrim ?? null);
+    setAssetTitle(data.assetTitle);
+    setDirection(
+      data.direction
+        ? {
+            verdict: data.direction.verdict === "adjust" ? "adjust" : "keep",
+            note: data.direction.note,
+            changes: data.direction.changes,
+          }
+        : null,
+    );
+    setHydratedFrom(openAssetId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reopened.data, openAssetId, hydratedFrom]);
+  useEffect(() => {
+    if (reopened.error) toast.error(reopened.error.message);
+  }, [reopened.error]);
 
   const selectedBrand = brands.find((brand) => brand.id === brandId);
   const palette = useMemo(
@@ -234,10 +281,37 @@ export function CompositionWorkbench({
     return `/api/compositions/preview?${params.toString()}`;
   }, [brandId, canRender, formatId, imagePosition, spec, templateId]);
 
+  const replaceCard = useMutation(
+    trpc.ads.replaceAdMedia.mutationOptions({
+      onSuccess: () => {
+        toast.success(
+          replaceTarget?.back ? (
+            <span>
+              Card {replaceTarget.index + 1} replaced on the ad.{" "}
+              <Link href={replaceTarget.back} className="underline">
+                Back to the campaign
+              </Link>
+            </span>
+          ) : (
+            "Card replaced on the ad"
+          ),
+        );
+      },
+      onError: (error) => toast.error(`Frozen, but not put on the ad: ${error.message}`),
+    }),
+  );
   const freeze = useMutation(
     trpc.composition.freeze.mutationOptions({
-      onSuccess: async () => {
-        toast.success("Frozen into the media library");
+      onSuccess: async (asset) => {
+        if (replaceTarget) {
+          replaceCard.mutate({
+            adId: replaceTarget.adId,
+            index: replaceTarget.index,
+            mediaAssetId: asset.id,
+          });
+        } else {
+          toast.success("Frozen into the media library");
+        }
         await queryClient.invalidateQueries({
           queryKey: sourceListOptions.queryKey,
         });
@@ -303,6 +377,22 @@ export function CompositionWorkbench({
   return (
     <div className="grid gap-6 2xl:grid-cols-[440px_minmax(0,1fr)]">
       <div className="space-y-5">
+        {openAssetId ? (
+          <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs">
+            <span>
+              {reopened.isLoading
+                ? "Opening the card…"
+                : replaceTarget
+                  ? `Editing card ${replaceTarget.index + 1} of an ad. Freezing puts the new render in its place.`
+                  : "Reopened from the library. Freezing makes a new card; the old one stays."}
+            </span>
+            {replaceTarget?.back ? (
+              <Link href={replaceTarget.back} className="text-primary shrink-0 hover:underline">
+                Back to the campaign
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Brand</Label>
@@ -730,13 +820,13 @@ export function CompositionWorkbench({
             ) : null}
             <Button
               disabled={!canRender || !assetTitle.trim()}
-              loading={freeze.isPending}
+              loading={freeze.isPending || replaceCard.isPending}
               onClick={() =>
                 freeze.mutate({ ...spec, assetTitle: assetTitle.trim() })
               }
             >
               <Snowflake className="size-4" />
-              Freeze to library
+              {replaceTarget ? `Freeze and put on card ${replaceTarget.index + 1}` : "Freeze to library"}
             </Button>
           </div>
         </section>

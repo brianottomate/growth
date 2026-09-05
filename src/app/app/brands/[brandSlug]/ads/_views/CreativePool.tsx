@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Images } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListingSamplesDialog } from "@/app/app/compositions/ListingSamplesDialog";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
@@ -38,18 +39,21 @@ function nameFromUrl(url: string): string {
 }
 
 /**
- * The campaign's shared creative, mirroring the content post's pool: pick
- * from the brand's media library once here, then each ad draws from it instead
- * of re-picking. Same library the studio and compositions publish into.
+ * The campaign's photos, mirroring the content post's pool: pick from the
+ * brand's media library once here, then each ad draws from it instead of
+ * re-picking. Same library the Studio and the homes run publish into.
  */
 export function CreativePool({
   campaignId,
   brandId,
   pool,
+  askAssistant,
 }: {
   campaignId: string;
   brandId: string;
   pool: MediaItem[];
+  /** The step's "Ask the assistant" button, rendered by the page. */
+  askAssistant?: React.ReactNode;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -92,45 +96,50 @@ export function CreativePool({
       media: pool.filter((item) => item.url !== url),
     });
 
+  const addImported = (assets: { id: string; url: string | null }[]) => {
+    const fresh = assets
+      .filter((asset) => asset.url && !pool.some((item) => item.assetId === asset.id))
+      .map((asset) => ({ url: asset.url!, type: "image" as const, assetId: asset.id }));
+    if (fresh.length === 0) return;
+    setPool.mutate({ campaignId, media: [...pool, ...fresh] });
+  };
+
   return (
     <section className="space-y-3">
-      <div className="flex items-end justify-between">
-        <div>
-          <h2 className="text-base font-semibold">
-            Creative pool{" "}
-            <span className="text-muted-foreground text-sm font-normal">
-              {pool.length}
-            </span>
-          </h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
-            Shared across this campaign&apos;s ads. Pick once here rather than
-            per ad. Drop new files straight into{" "}
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              className="underline"
-            >
-              the picker
-            </button>
-            , browse the{" "}
-            <Link href="/app/media" className="underline">
-              media library
-            </Link>
-            , or make something in{" "}
-            <Link href="/app/studio" className="underline">
-              the studio
-            </Link>
-            .
-          </p>
+      {pool.length > 0 ? (
+        <div className="flex items-center justify-end gap-2">
+          <ListingSamplesDialog brandId={brandId} onImported={addImported} />
+          <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+            <ImagePlus className="size-3.5" />
+            From the library
+          </Button>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
-          <ImagePlus className="size-3.5" />
-          Add creative
-        </Button>
-      </div>
+      ) : null}
 
       {pool.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nothing yet.</p>
+        <EmptyState
+          compact
+          icon={Images}
+          title="No photos yet"
+          description="Pull a few from their listings, pick from the library, or compose a card in the Studio. Ads draw from what is here."
+          actions={
+            <>
+              <ListingSamplesDialog brandId={brandId} onImported={addImported} />
+              <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+                <ImagePlus className="size-3.5" />
+                From the library
+              </Button>
+              <ButtonLink
+                size="sm"
+                variant="ghost"
+                href={`/app/compositions?brandId=${encodeURIComponent(brandId)}`}
+              >
+                Open the Studio
+              </ButtonLink>
+              {askAssistant}
+            </>
+          }
+        />
       ) : (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {pool.map((item) => {

@@ -19,6 +19,7 @@ import {
   CompositionAccessError,
   freezeComposition,
   loadCompositionSource,
+  openComposition,
   renderComposition,
   resolveCompositionContext,
 } from "@/server/services/composition.service";
@@ -44,6 +45,20 @@ export const compositionRouter = createTRPCRouter({
     templates: COMPOSITION_TEMPLATES,
     formats: COMPOSITION_FORMATS,
   })),
+
+  /** Reopen a frozen card in the Studio: the spec that made it, plus its direction. */
+  open: protectedProcedure
+    .input(z.object({ assetId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      try {
+        return await openComposition({
+          userId: ctx.session.user.id,
+          assetId: input.assetId,
+        });
+      } catch (error) {
+        rethrowAccess(error);
+      }
+    }),
 
   freeze: protectedProcedure
     .input(freezeCompositionSchema)

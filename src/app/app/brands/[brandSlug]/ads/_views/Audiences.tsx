@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
 import { useTRPC } from "@/trpc/react";
 
@@ -52,6 +53,7 @@ export function Audiences({
   audiences,
   personas,
   geoPrefill,
+  emptyActions,
 }: {
   campaignId: string;
   audiences: AudienceRow[];
@@ -63,6 +65,8 @@ export function Audiences({
     regions?: string[];
     cities?: string[];
   } | null;
+  /** Extra buttons for the empty state, rendered by the page. */
+  emptyActions?: React.ReactNode;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -154,21 +158,8 @@ export function Audiences({
       .join(" · ");
 
   return (
-    <div className="bg-card rounded-xl border p-3.5">
-      <div className="flex items-center gap-2">
-        <Users className="text-muted-foreground size-4" />
-        <p className="text-sm font-semibold">
-          Audiences
-          {audiences.length > 0 && (
-            <span className="text-muted-foreground ml-1.5 font-normal">
-              {audiences.length}
-            </span>
-          )}
-        </p>
-        <span className="text-muted-foreground text-xs">
-          Who this campaign buys. Each becomes an ad set on Meta, an ad group on
-          Google.
-        </span>
+    <div className="space-y-2">
+      <div className={audiences.length === 0 ? "hidden" : "flex items-center justify-end gap-2"}>
         <div className="ml-auto">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -349,12 +340,23 @@ export function Audiences({
       </div>
 
       {audiences.length === 0 ? (
-        <p className="text-muted-foreground mt-2 text-xs">
-          No audiences yet — the push runs one broad ad set. Broad is a
-          legitimate choice; a split is how you test who responds.
-        </p>
+        <EmptyState
+          compact
+          icon={Users}
+          title="Broad, for now"
+          description="Without an audience the push runs one broad ad set, which is what leaves the learning phase at these budgets. Add one to narrow by age or place; each row becomes its own ad set."
+          actions={
+            <>
+              <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+                <Plus className="size-3.5" />
+                Add audience
+              </Button>
+              {emptyActions}
+            </>
+          }
+        />
       ) : (
-        <div className="mt-3 divide-y divide-white/5">
+        <div className="bg-card divide-y divide-white/5 rounded-xl border px-3.5 py-1">
           {audiences.map((row) => (
             <div
               key={row.id}

@@ -147,6 +147,7 @@ export function OverviewAssistantPopup({
           brandName: intent.brandName,
           campaignId: intent.campaignId,
           campaignName: intent.campaignName,
+          focus: intent.focus,
         });
       }
       if (intent.type === "work_content_post") {

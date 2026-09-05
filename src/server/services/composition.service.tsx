@@ -4,10 +4,11 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ImageResponse } from "next/og";
 
 import {
-  getCompositionFormat,
-  getCompositionIdentity,
   type CompositionSpec,
   type FreezeCompositionInput,
+  compositionSpecSchema,
+  getCompositionFormat,
+  getCompositionIdentity,
 } from "@/lib/compositions";
 import { R2 } from "@/server/clients/r2.client";
 import { db } from "@/server/db";
@@ -1335,4 +1336,63 @@ export async function findDirectedCard(baseAssetId: string) {
     orderBy: (asset, { desc }) => [desc(asset.createdAt)],
     columns: { id: true, url: true, metadata: true },
   });
+}
+
+/**
+ * A frozen card, reopened as the spec that made it. The identity stored on the
+ * asset carries every field the form needs; the brand comes from the asset's
+ * own row. Used by the Studio to pick a card back up from the library or an ad.
+ */
+export async function openComposition(input: {
+  userId: string;
+  assetId: string;
+}): Promise<{
+  spec: CompositionSpec;
+  assetTitle: string;
+  direction: { verdict: string; note: string; changes: string[] } | null;
+}> {
+  const asset = await db.query.mediaAssetTable.findFirst({
+    where: and(
+      eq(mediaAssetTable.id, input.assetId),
+      isNull(mediaAssetTable.deletedAt),
+    ),
+    columns: { id: true, brandId: true, title: true, metadata: true },
+  });
+  const stored = (asset?.metadata as { composition?: Record<string, unknown> } | null)
+    ?.composition;
+  if (!asset?.brandId || !stored) {
+    throw new CompositionAccessError("That asset is not a composition", 404);
+  }
+  const parsed = compositionSpecSchema.safeParse({
+    brandId: asset.brandId,
+    templateId: stored.templateId,
+    formatId: stored.formatId,
+    sourceMediaAssetId: stored.sourceMediaAssetId ?? undefined,
+    title: stored.title ?? "",
+    subtitle: stored.subtitle ?? undefined,
+    eyebrow: stored.eyebrow ?? undefined,
+    cta: stored.cta ?? undefined,
+    accent: stored.accent ?? undefined,
+    imagePosition: stored.imagePosition ?? "center",
+    focal: stored.focal ?? undefined,
+    scrim: stored.scrim ?? undefined,
+    rating: stored.rating ?? undefined,
+    mark: stored.mark ?? "auto",
+  });
+  if (!parsed.success) {
+    throw new CompositionAccessError(
+      "This card was rendered by an older blueprint and cannot be reopened",
+      422,
+    );
+  }
+  // The access check is the same one a render makes.
+  await resolveCompositionContext(input.userId, parsed.data);
+  const direction = stored.direction as
+    | { verdict: string; note: string; changes: string[] }
+    | undefined;
+  return {
+    spec: parsed.data,
+    assetTitle: asset.title ?? "Composition",
+    direction: direction ?? null,
+  };
 }

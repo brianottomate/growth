@@ -10,9 +10,12 @@ import { usStateName } from "@/lib/us-states";
 import type { WanderOsListing } from "@/server/clients/wanderos-site.client";
 import { db } from "@/server/db";
 import {
+  campaignTable,
   performanceAccountTable,
   performancePropertyTable,
   type AdCreativeContent,
+  type HomesRun,
+  type HomesRunStep,
   type MediaItem,
 } from "@/server/db/schema";
 import {
@@ -281,6 +284,11 @@ export async function draftAdsFromHomes(input: {
   userId: string;
   campaignId: string;
   carouselSize?: number;
+  /**
+   * The homes the operator ticked, by listing URL and in their order. Without
+   * it the campaign's own ranking decides, capped at the carousel size.
+   */
+  listingUrls?: string[];
 }): Promise<DraftAdsFromHomesResult> {
   const { campaign, brand } = await requireOwnedCampaign(
     input.campaignId,
@@ -289,20 +297,111 @@ export async function draftAdsFromHomes(input: {
   // Ten is Meta's own carousel ceiling. The cap used to be eight to fit a
   // two-minute route budget; the route now allows what the work needs.
   const size = Math.min(
-    Math.max(input.carouselSize ?? DEFAULT_CAROUSEL_SIZE, 1),
+    Math.max(input.carouselSize ?? input.listingUrls?.length ?? DEFAULT_CAROUSEL_SIZE, 1),
     10,
   );
 
   const { listings, notes } = await homesForCampaign(brand);
-  const chosen = listings.filter((row) => row.imageUrl).slice(0, size);
+  const withPhoto = listings.filter((row) => row.imageUrl);
+  const chosen = input.listingUrls?.length
+    ? pickListings(withPhoto, input.listingUrls, notes).slice(0, size)
+    : withPhoto.slice(0, size);
   if (chosen.length === 0) {
     throw new Error(
-      "No homes with a photo to build ads from. Check the brand's website is a WanderOS site.",
+      input.listingUrls?.length
+        ? "None of the chosen homes are on their site's listing feed with a photo."
+        : "No homes with a photo to build ads from. Check the brand's website is a WanderOS site.",
     );
   }
-  if (chosen.length < listings.length) {
+  if (!input.listingUrls?.length && chosen.length < listings.length) {
     notes.push(`Used the first ${chosen.length} of ${listings.length} homes.`);
   }
+
+  // The run is written as it goes so the page can watch it, and it outlives
+  // the request so the director's notes are still there tomorrow.
+  const run: HomesRun = {
+    status: "running",
+    startedAt: new Date().toISOString(),
+    steps: chosen.map((row) => ({ name: row.name, url: row.url, status: "pending" })),
+    notes: [],
+    adIds: [],
+  };
+  const saveRun = async () => {
+    run.notes = [...notes];
+    await db
+      .update(campaignTable)
+      .set({ homesRun: run })
+      .where(eq(campaignTable.id, campaign.id));
+  };
+  const step = (index: number, patch: Partial<HomesRunStep>) => {
+    run.steps[index] = { ...run.steps[index]!, ...patch };
+  };
+  await saveRun();
+
+  try {
+    return await draftAdsFromChosenHomes({
+      input,
+      campaign,
+      brand,
+      listings,
+      chosen,
+      notes,
+      run,
+      saveRun,
+      step,
+    });
+  } catch (error) {
+    run.status = "failed";
+    run.finishedAt = new Date().toISOString();
+    run.error = error instanceof Error ? error.message : String(error);
+    await saveRun();
+    throw error;
+  }
+}
+
+/** The ticked homes in the operator's order; unknown URLs are noted, not fatal. */
+function pickListings(
+  listings: WanderOsListing[],
+  urls: string[],
+  notes: string[],
+): WanderOsListing[] {
+  const byUrl = new Map(
+    listings.map((row) => [normalizeListingUrl(row.url), row] as const),
+  );
+  const picked: WanderOsListing[] = [];
+  let missing = 0;
+  for (const url of urls) {
+    const row = byUrl.get(normalizeListingUrl(url));
+    if (row) picked.push(row);
+    else missing += 1;
+  }
+  if (missing > 0) {
+    notes.push(`${missing} chosen home(s) are not on the listing feed right now.`);
+  }
+  return picked;
+}
+
+async function draftAdsFromChosenHomes({
+  input,
+  campaign,
+  brand,
+  listings,
+  chosen,
+  notes,
+  run,
+  saveRun,
+  step,
+}: {
+  input: { organizationId: string; userId: string };
+  campaign: Awaited<ReturnType<typeof requireOwnedCampaign>>["campaign"];
+  brand: Awaited<ReturnType<typeof requireOwnedCampaign>>["brand"];
+  listings: WanderOsListing[];
+  chosen: WanderOsListing[];
+  notes: string[];
+  run: HomesRun;
+  saveRun: () => Promise<void>;
+  step: (index: number, patch: Partial<HomesRunStep>) => void;
+}): Promise<DraftAdsFromHomesResult> {
 
   const where = [
     ...new Set(
@@ -336,6 +435,8 @@ export async function draftAdsFromHomes(input: {
   let reused = 0;
   let adjusted = 0;
   for (const [index, listing] of chosen.entries()) {
+    step(index, { status: "rendering" });
+    await saveRun();
     try {
       const source =
         (await findImportedImage({
@@ -350,6 +451,7 @@ export async function draftAdsFromHomes(input: {
         }));
       if (!source.url) {
         notes.push(`The imported photo for ${listing.name} has no URL yet.`);
+        step(index, { status: "failed", note: "The imported photo has no URL yet." });
         continue;
       }
       // The feed card: name over the photo, facts under it, the brand's own
@@ -381,6 +483,13 @@ export async function draftAdsFromHomes(input: {
       } else if (card.note) {
         notes.push(`${listing.name}: ${card.note}`);
       }
+      step(index, {
+        status: card.reused ? "reused" : "done",
+        assetId: card.id,
+        cardUrl: card.url,
+        changes: card.changes,
+        note: card.note ?? undefined,
+      });
       cards.push({
         listing,
         media: {
@@ -393,6 +502,10 @@ export async function draftAdsFromHomes(input: {
     } catch (error) {
       console.error("card render failed", listing.url, error);
       notes.push(`Could not render a card for ${listing.name}.`);
+      step(index, {
+        status: "failed",
+        note: error instanceof Error ? error.message : "Render failed.",
+      });
     }
   }
   if (reused > 0) {
@@ -459,6 +572,20 @@ export async function draftAdsFromHomes(input: {
       `${dropped} home(s) have no photo or no nightly price right now, so they are not in the catalog feed. Meta requires both on every row.`,
     );
   }
+
+  // The cards join the campaign's photos, so the Photos step shows what the
+  // ads were built from and a hand-made ad can reuse a card.
+  const pool = campaign.creativePool ?? [];
+  const fresh = cards
+    .map((card) => card.media)
+    .filter((media) => !pool.some((item) => item.url === media.url));
+  run.status = "done";
+  run.finishedAt = new Date().toISOString();
+  run.adIds = adIds;
+  await db
+    .update(campaignTable)
+    .set({ homesRun: { ...run, notes: [...notes] }, creativePool: [...pool, ...fresh] })
+    .where(eq(campaignTable.id, campaign.id));
 
   return {
     campaignId: campaign.id,

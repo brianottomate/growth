@@ -37,6 +37,8 @@ import {
   deleteDraftCampaign,
   attachPlatformCampaign,
   importPlatformAdCreative,
+  replaceDraftAdMedia,
+  requireOwnedCampaign,
   planPlatform,
   setPlatformDraft,
   unplanPlatform,
@@ -170,6 +172,7 @@ export const adsRouter = {
       z.object({
         campaignId: z.string().min(1),
         carouselSize: z.number().int().min(1).max(10).optional(),
+        listingUrls: z.array(z.string().url()).max(10).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -178,6 +181,34 @@ export const adsRouter = {
         userId: ctx.session.user.id,
         campaignId: input.campaignId,
         carouselSize: input.carouselSize,
+        listingUrls: input.listingUrls,
+      }),
+    ),
+
+  /** The last homes run on a campaign, polled while one is in progress. */
+  homesRun: protectedProcedure
+    .input(z.object({ campaignId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const { campaign } = await requireOwnedCampaign(
+        input.campaignId,
+        await organizationIdFor(ctx),
+      );
+      return campaign.homesRun ?? null;
+    }),
+
+  /** Put a different library asset in one card slot of a drafted ad. */
+  replaceAdMedia: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        index: z.number().int().min(0).max(9),
+        mediaAssetId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      replaceDraftAdMedia({
+        organizationId: await organizationIdFor(ctx),
+        ...input,
       }),
     ),
 

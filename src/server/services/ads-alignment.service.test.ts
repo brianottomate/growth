@@ -16,6 +16,7 @@ function campaign(overrides: Partial<Campaign> = {}): Campaign {
     color: null,
     status: "active",
     creativePool: [],
+    homesRun: null,
     budget: 10_000,
     performanceCycleId: null,
     startAt: new Date("2026-07-01"),

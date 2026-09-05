@@ -121,6 +121,34 @@ export type AdTextContent = {
 
 export type AdContent = AdCreativeContent | AdTextContent;
 
+/** One home's card in a homes run, as the operator watches it happen. */
+export type HomesRunStep = {
+  name: string;
+  url: string;
+  status: "pending" | "rendering" | "done" | "reused" | "failed";
+  /** The rendered card, once there is one. */
+  assetId?: string;
+  cardUrl?: string;
+  /** What the art director changed, in its own words. */
+  changes?: string[];
+  note?: string;
+};
+
+/**
+ * The last "draft ads from their homes" run on a campaign. Written as it
+ * goes, so the page can show progress while the mutation is still working
+ * and keep the director's notes after it is done.
+ */
+export type HomesRun = {
+  status: "running" | "done" | "failed";
+  startedAt: string;
+  finishedAt?: string;
+  steps: HomesRunStep[];
+  notes: string[];
+  adIds: string[];
+  error?: string;
+};
+
 /**
  * Per-platform settings on the platform campaign row itself. Typed JSONB
  * rather than per-platform tables because these are payload we read whole and
@@ -207,6 +235,9 @@ export const campaignTable = pgTable(
      * media library so an ad references it rather than re-picking per ad.
      */
     creativePool: t.jsonb().$type<MediaItem[]>().default([]),
+
+    /** Progress and outcome of the last homes run; null until one is started. */
+    homesRun: t.jsonb().$type<HomesRun>(),
 
     /**
      * ADVISORY total (whole dollars): what the operator intends to spend
