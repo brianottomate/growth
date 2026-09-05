@@ -57,7 +57,19 @@ export type WorkProspectIntent = {
   visibleText: string;
 };
 
+/**
+ * "Set this website up as a client": the assistant runs the new-client-setup
+ * playbook (brand, mark, photos, campaign shell, first ads) and stops before
+ * any push. Fired from the ads desk's New client box.
+ */
+export type SetUpClientIntent = {
+  type: "set_up_client";
+  website: string;
+  visibleText: string;
+};
+
 export type AssistantIntent =
+  | SetUpClientIntent
   | PlanTwoWeeksIntent
   | WorkContentIntent
   | BuildChannelStrategyIntent

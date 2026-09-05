@@ -40,7 +40,15 @@ import {
   type ChatImageReference,
 } from "@/lib/chat-attachment";
 import { getContentReadiness } from "@/lib/content-readiness";
-import { freezeCompositionSchema } from "@/lib/compositions";
+import {
+  compositionFormatIdSchema,
+  compositionSpecSchema,
+  freezeCompositionSchema,
+} from "@/lib/compositions";
+import {
+  directComposition,
+  extendCompositionSource,
+} from "@/server/services/composition-direct.service";
 import {
   classifyFormatFromFields,
   platformFormatsFor,
@@ -1241,7 +1249,7 @@ export const attachLibraryMediaToContent = growthAction({
 
 export const freezeCompositionToLibrary = growthAction({
   description:
-    "Render one deterministic composition blueprint with an owned R2 library image and save the final PNG as a reusable media asset. Use a mediaAssetId returned by suggestMedia. Freezing only creates the asset; call attachLibraryMedia separately when the operator also wants it attached to content.",
+    "Render a composition blueprint over an owned library image and save the PNG as a reusable media asset (a card). templateId picks the layout: catalog-copy is the feed card (home name + facts over a dark gradient), catalog-review a guest quote with stars (rating 1-5), tall-statement and tall-welcome for stories, photo-only the bare photo. formatId picks the canvas (portrait 4:5 for feeds, story 9:16, square, landscape). focal {x,y} in percent keeps that point of the photo in frame; scrim is a dark hex tint for the gradient; mark picks the brand mark tone (auto is right). Run contentMediaWrite.directComposition first and freeze its corrected values: that is how a card gets judged before it is kept. Freezing only creates the asset; attachLibraryMedia or adsWrite.replaceAdCard put it somewhere.",
   inputSchema: freezeCompositionSchema,
   execute: async (input, ctx) => {
     const brand = await db.query.brandTable.findFirst({
@@ -1274,6 +1282,61 @@ export const freezeCompositionToLibrary = growthAction({
     };
   },
 });
+
+export const directCompositionAction = growthAction({
+  description:
+    "The art director's read of a composition before it is frozen: renders the spec, looks at the card beside its photo, and returns corrected form values (a shorter title or subtitle, a focal point for the crop, a scrim tint) with a note saying why. When no crop can show the subject it extends the photo and returns the new sourceMediaAssetId. Nothing is saved. Freeze the returned values with contentMediaWrite.freezeComposition; a verdict of keep means the spec was fine as given.",
+  inputSchema: compositionSpecSchema,
+  outputSchema: z.object({
+    verdict: z.enum(["keep", "adjust"]),
+    note: z.string(),
+    changes: z.array(z.string()),
+    title: z.string(),
+    subtitle: z.string().nullable(),
+    focal: z.object({ x: z.number(), y: z.number() }).nullable(),
+    scrim: z.string().nullable(),
+    sourceMediaAssetId: z.string().nullable(),
+  }),
+  execute: async (input, ctx) => {
+    await requireOwnedBrandId(input.brandId, ctx);
+    return directComposition({ userId: ctx.userId, spec: input });
+  },
+});
+
+export const extendCompositionAction = growthAction({
+  description:
+    "Extend (outpaint) a library photo to a canvas's ratio with Gemini, so a landscape hero fits a portrait or story card without cropping the subject. The axis is chosen from the photo's shape against the canvas. Returns the new library asset, or the earlier extension of the same photo. Use it when directComposition says the subject cannot fit, or when the operator asks.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    sourceMediaAssetId: z.string().min(1),
+    formatId: compositionFormatIdSchema,
+    title: z.string().trim().max(120).optional().describe("The home or subject, for the asset name."),
+  }),
+  outputSchema: z.object({
+    mediaAssetId: z.string(),
+    url: z.string(),
+    reused: z.boolean(),
+    axis: z.enum(["vertical", "horizontal"]),
+  }),
+  execute: async (input, ctx) => {
+    await requireOwnedBrandId(input.brandId, ctx);
+    const result = await extendCompositionSource({ userId: ctx.userId, ...input });
+    return { mediaAssetId: result.id, url: result.url, reused: result.reused, axis: result.axis };
+  },
+});
+
+async function requireOwnedBrandId(brandId: string, ctx: CapabilityContext) {
+  const brand = await db.query.brandTable.findFirst({
+    where: and(
+      eq(brandTable.id, brandId),
+      eq(brandTable.organizationId, ctx.orgId),
+      isNull(brandTable.deletedAt),
+    ),
+    columns: { id: true },
+  });
+  if (!brand) throw new Error("That brand is not available in the active organization.");
+  return brand;
+}
 
 export const recoverArchiveMediaToContent = growthAction({
   description:

@@ -17,6 +17,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "createProspect",
     "setRelationship",
     "enrich",
+    "setMark",
     "previewPurge",
     "purge",
   ],
@@ -83,6 +84,8 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "attachChatImage",
     "attachLibraryMedia",
     "freezeComposition",
+    "directComposition",
+    "extendComposition",
     "recoverArchiveMedia",
     "makeCarousel",
     "prepareUpload",
@@ -124,6 +127,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "draftCampaign",
     "draftAd",
     "draftAdsFromHomes",
+    "replaceAdCard",
     "addAudience",
     "updateAudience",
     "planPlatform",
@@ -165,9 +169,10 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   ],
   mediaAnalysisRead: ["list", "get"],
   mediaAnalysisWrite: ["analyzeImage", "prepareVideo"],
-  mediaLibraryRead: ["list"],
+  mediaLibraryRead: ["list", "listingPhotos"],
   sessionRead: ["get"],
-  mediaLibraryWrite: ["saveChatMedia"],
+  mediaLibraryWrite: ["saveChatMedia", "importListingPhotos"],
+  playbookRead: ["list", "read"],
   strategyRead: ["getTargets", "proposeTargets"],
   strategyWrite: [
     "createCadence",
@@ -245,6 +250,7 @@ export const GROWTH_CAPABILITY_LABELS = {
   lifecycleRead: "Reading lifecycle",
   lifecycleWrite: "Updating lifecycle",
   listeningRead: "Reading mentions",
+  playbookRead: "Reading a playbook",
 } as const satisfies Record<GrowthCapabilityId, string>;
 
 export function isGrowthCapabilityId(

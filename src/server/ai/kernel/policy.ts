@@ -97,6 +97,9 @@ export const growthActionPolicies = {
     }),
     // Re-running refreshes the same fields from the same site.
     enrich: write({ idempotent: true }),
+    // Renders three tones into our own library and points the brand at them;
+    // the model-write consequence covers the lockup critique.
+    setMark: write({ idempotent: true, consequence: "model-write" }),
     previewPurge: read(),
     // Offboarding. Deletes rows, R2 bytes and the Zernio connection, none of
     // which come back, so it is approval-gated and kept off MCP: a hard delete
@@ -215,6 +218,10 @@ export const growthActionPolicies = {
     attachChatImage: write({ idempotent: true }),
     attachLibraryMedia: write({ idempotent: true }),
     freezeComposition: write({ consequence: "provider-write" }),
+    // A render and a vision pass; nothing is saved.
+    directComposition: read("model-read", PRODUCT),
+    // Gemini paints the photo out to the canvas; the result is a library asset.
+    extendComposition: write({ idempotent: true, consequence: "model-write" }),
     recoverArchiveMedia: write({ consequence: "provider-write" }),
     makeCarousel: write({ idempotent: true }),
     prepareUpload: write(),
@@ -263,6 +270,8 @@ export const growthActionPolicies = {
     // R2 bytes, no provider call, but it is a heavier call than the rest of
     // this domain and re-running adds another pair of drafts.
     draftAdsFromHomes: write(),
+    // Swaps one card slot on a local draft for a library asset.
+    replaceAdCard: write({ idempotent: true }),
     addAudience: write(),
     updateAudience: write({ idempotent: true }),
     planPlatform: write({ idempotent: true }),
@@ -425,13 +434,20 @@ export const growthActionPolicies = {
     analyzeImage: write({ consequence: "model-write" }),
     prepareVideo: write({ consequence: "model-write" }),
   },
-  mediaLibraryRead: { list: read() },
+  mediaLibraryRead: {
+    list: read(),
+    // Reads the brand's own site feed; nothing enters the library.
+    listingPhotos: read("provider-read"),
+  },
   sessionRead: { get: read() },
   mediaLibraryWrite: {
     // Promotion dedups by URL, so re-saving the same paste is a no-op; the
     // model-write consequence covers the auto-tag analysis pass.
     saveChatMedia: write({ idempotent: true, consequence: "model-write" }),
+    // Idempotent per photo URL: a hero already in the library is returned.
+    importListingPhotos: write({ idempotent: true, consequence: "provider-read" }),
   },
+  playbookRead: { list: read(), read: read() },
   strategyRead: { getTargets: read(), proposeTargets: read("model-read") },
   strategyWrite: {
     createCadence: write(),

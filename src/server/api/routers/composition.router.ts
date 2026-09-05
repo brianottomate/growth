@@ -9,19 +9,13 @@ import {
   freezeCompositionSchema,
 } from "@/lib/compositions";
 import {
-  applyDirection,
-  critiqueCard,
-  extendSource,
-  extendToCanvas,
-} from "@/server/services/card-director.service";
-import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
+  directComposition,
+  extendCompositionSource,
+} from "@/server/services/composition-direct.service";
 import {
   CompositionAccessError,
   freezeComposition,
-  loadCompositionSource,
   openComposition,
-  renderComposition,
-  resolveCompositionContext,
 } from "@/server/services/composition.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -98,75 +92,7 @@ export const compositionRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const context = await loadCompositionSource(
-          await resolveCompositionContext(ctx.session.user.id, input),
-        );
-        if (!context.sourceUrl || !input.sourceMediaAssetId) {
-          throw new CompositionAccessError(
-            "The art director judges a card against its photo; this blueprint has none.",
-            422,
-          );
-        }
-        const spec = { ...input, assetTitle: input.title || "preview" };
-        const [card, source] = await Promise.all([
-          renderComposition(input, context).arrayBuffer(),
-          fetch(context.sourceUrl, { signal: AbortSignal.timeout(20_000) }).then(
-            (response) => response.arrayBuffer(),
-          ),
-        ]);
-        const direction = await critiqueCard({
-          card: Buffer.from(card),
-          source: Buffer.from(source),
-          spec,
-          brandName: context.brand.name,
-          home: { name: input.title, facts: input.subtitle ?? "" },
-        });
-        if (!direction) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "The art director could not be reached.",
-          });
-        }
-        const applied = applyDirection(spec, direction);
-        const changes = [...applied.changes];
-        let sourceMediaAssetId: string | null = null;
-        let focal = applied.spec.focal ?? null;
-        // The same step the homes flow takes: when no crop can show the
-        // subject, paint more of the scene in and start from that photo.
-        if (direction.verdict === "adjust" && direction.extend !== "none") {
-          if (isGeminiImageConfigured) {
-            try {
-              const extended = await extendSource({
-                brandId: input.brandId,
-                userId: ctx.session.user.id,
-                source: { id: input.sourceMediaAssetId, url: context.sourceUrl },
-                formatId: input.formatId,
-                axis: direction.extend,
-                home: input.title || context.brand.name,
-              });
-              sourceMediaAssetId = extended.id;
-              focal = null;
-              changes.push(
-                `extended the photo ${direction.extend === "vertical" ? "above and below" : "to both sides"} so the subject fits`,
-              );
-            } catch (error) {
-              console.error("photo extension failed", error);
-              changes.push("wanted the photo extended, which failed, so the crop stands");
-            }
-          } else {
-            changes.push("wanted the photo extended, which is not configured here");
-          }
-        }
-        return {
-          verdict: direction.verdict,
-          note: direction.note,
-          changes,
-          title: applied.spec.title,
-          subtitle: applied.spec.subtitle ?? null,
-          focal,
-          scrim: applied.spec.scrim ?? null,
-          sourceMediaAssetId,
-        };
+        return await directComposition({ userId: ctx.session.user.id, spec: input });
       } catch (error) {
         rethrowAccess(error);
       }
@@ -195,24 +121,9 @@ export const compositionRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const context = await resolveCompositionContext(ctx.session.user.id, {
-          brandId: input.brandId,
-          templateId: "photo-only",
-          formatId: input.formatId,
-          sourceMediaAssetId: input.sourceMediaAssetId,
-          title: "",
-          imagePosition: "center",
-          mark: "auto",
-        });
-        if (!context.sourceUrl) {
-          throw new CompositionAccessError("Choose a photo to extend", 422);
-        }
-        return await extendToCanvas({
-          brandId: input.brandId,
+        return await extendCompositionSource({
           userId: ctx.session.user.id,
-          source: { id: input.sourceMediaAssetId, url: context.sourceUrl },
-          formatId: input.formatId,
-          home: input.title?.trim() || context.brand.name,
+          ...input,
         });
       } catch (error) {
         rethrowAccess(error);

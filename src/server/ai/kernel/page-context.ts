@@ -56,7 +56,7 @@ function guidanceForPath(pathname: string): string | null {
   if (pathname.startsWith("/app/media"))
     return "This is the media library. Growth-only Drive and upload capabilities remain available here alongside media analysis.";
   if (pathname.startsWith("/app/compositions"))
-    return "This is the composition workbench. contentMediaWrite freezeComposition combines one owned R2 library image with a named blueprint into a reusable PNG. Attaching the result to content is a separate attachLibraryMedia action.";
+    return "This is the Compositions Studio: a blueprint (layout), a canvas, one library photo and the copy fields the blueprint draws. contentMediaWrite.directComposition is the art director's read of a spec (crop, copy length, scrim tint, extension); freezeComposition saves the corrected spec as a card; extendComposition outpaints a photo to the canvas. Photos come from mediaLibraryRead.list or, for a WanderOS brand, mediaLibraryWrite.importListingPhotos. Attaching a card to content or an ad is a separate step (attachLibraryMedia, adsWrite.replaceAdCard).";
   if (pathname.startsWith("/app/pillars") || pathname.startsWith("/app/series"))
     return "This is a content-structure surface. Use contentStrategyRead before contentStrategyWrite.";
   if (pathname.startsWith("/app/people"))

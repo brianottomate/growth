@@ -102,10 +102,10 @@ const playbooks = defineCollection({
       id: s.string(),
       title: s.string(),
       kind: s
-        .enum(["product-reference", "reply-guide", "positioning"])
+        .enum(["product-reference", "reply-guide", "positioning", "procedure"])
         .default("reply-guide")
         .describe(
-          "product-reference = what Wander is/says (transcripts, landing pages). reply-guide = how we engage. positioning = competitive/market framing.",
+          "product-reference = what Wander is/says (transcripts, landing pages). reply-guide = how we engage. positioning = competitive/market framing. procedure = a step-by-step job the assistant runs with its tools.",
         ),
       summary: s.string().max(280),
       sourceUrl: s.string().optional(),

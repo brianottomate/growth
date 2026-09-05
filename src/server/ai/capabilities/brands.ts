@@ -15,6 +15,10 @@ import {
   createProspectFromLead,
   setBrandRelationship,
 } from "@/server/services/brand-relationship.service";
+import {
+  critiqueBrandMark,
+  setBrandMark,
+} from "@/server/services/brand-mark.service";
 import { growthAction } from "./types";
 
 /** Brand ids for the org — shared by other org-scoped capabilities. */
@@ -142,6 +146,67 @@ export const enrichBrandAction = growthAction({
   },
 });
 
+export const setBrandMarkAction = growthAction({
+  description:
+    "Set the brand mark drawn on every composition and card: three tones (colour, white, dark) rendered into the brand's library. source logo uses the scraped logo, favicon the site icon, lockup an icon beside the brand name in its heading font. A lockup is judged by the art director and its corrections applied before saving, the same as the Fix with AI button. Run brandWrite.enrich first so there is a logo to draw. Re-running replaces the mark.",
+  inputSchema: z.object({
+    brandId: z.string().trim().min(1),
+    source: z.enum(["logo", "favicon", "lockup"]).default("logo"),
+    text: z
+      .string()
+      .trim()
+      .max(60)
+      .optional()
+      .describe("Lockup only: the wordmark text. Defaults to the brand name."),
+    iconFrom: z
+      .enum(["logo", "favicon"])
+      .optional()
+      .describe("Lockup only: which scraped image is the icon. Default logo."),
+  }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    source: z.enum(["logo", "favicon", "lockup"]),
+    variants: z.object({ color: z.string(), white: z.string(), dark: z.string() }),
+    note: z.string().nullable(),
+    path: z.string(),
+  }),
+  examples: [
+    { brandId: "brand_winterpark" },
+    { brandId: "brand_winterpark", source: "lockup", iconFrom: "favicon" },
+  ],
+  execute: async (input, ctx) => {
+    const brand = await assertOwnedBrand(input.brandId, ctx.orgId);
+    const recipe = {
+      source: input.source,
+      iconAssetId: null,
+      iconFrom: input.source === "lockup" ? (input.iconFrom ?? "logo") : null,
+      text: input.text ?? null,
+    };
+    // A lockup is measured, then looked at: the same vision pass the editor's
+    // Fix with AI runs, applied before the tones are rendered.
+    const tuning =
+      input.source === "lockup"
+        ? await critiqueBrandMark({ brandId: brand.id, recipe }).catch((error: unknown) => {
+            console.error("lockup critique failed, saving as measured", error);
+            return null;
+          })
+        : null;
+    const mark = await setBrandMark({
+      brandId: brand.id,
+      userId: ctx.userId,
+      recipe,
+      tuning,
+    });
+    return {
+      brandId: brand.id,
+      source: mark.source,
+      variants: mark.variants,
+      note: tuning?.note ?? null,
+      path: `/app/brands/${brand.slug ?? brand.id}`,
+    };
+  },
+});
+
 /** Brand ownership check shared by the purge pair. */
 async function assertOwnedBrand(brandId: string, orgId: string) {
   const brand = await db.query.brandTable.findFirst({
@@ -149,7 +214,7 @@ async function assertOwnedBrand(brandId: string, orgId: string) {
       eq(brandTable.id, brandId),
       eq(brandTable.organizationId, orgId),
     ),
-    columns: { id: true, name: true },
+    columns: { id: true, name: true, slug: true },
   });
   if (!brand) throw new Error("Brand not found in this organization.");
   return brand;

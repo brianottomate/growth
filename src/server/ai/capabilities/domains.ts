@@ -31,6 +31,7 @@ import {
   topAds,
   updateAudienceAction,
   draftAdsFromHomesAction,
+  replaceAdCardAction,
 } from "./ads";
 import { diagnoseAlignment } from "./alignment";
 import { AMPLIFICATION_TOOLS } from "./amplification";
@@ -49,7 +50,9 @@ import {
   listBrands,
   createProspectAction,
   setBrandRelationshipAction,
+  setBrandMarkAction,
 } from "./brands";
+import { listPlaybooksAction, readPlaybookAction } from "./playbooks";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
 import { inspectConversionReality } from "./conversions";
 import {
@@ -62,6 +65,8 @@ import {
   deleteContentWorkItem,
   finishContentMediaUploads,
   freezeCompositionToLibrary,
+  directCompositionAction,
+  extendCompositionAction,
   getContentWorkItem,
   importRemoteImagesToContent,
   makeCarouselFromPool,
@@ -110,6 +115,8 @@ import {
   syncOwnedBrandContent,
   updateBrandMix,
   updateChannelCadence,
+  listListingPhotos,
+  importListingPhotos,
 } from "./operations";
 import { PLANNING_TOOLS } from "./planning";
 import {
@@ -175,6 +182,7 @@ export const brandWrite = growthDomainTool({
     createProspect: createProspectAction,
     setRelationship: setBrandRelationshipAction,
     enrich: enrichBrandAction,
+    setMark: setBrandMarkAction,
     previewPurge: previewBrandPurgeAction,
     purge: purgeBrandAction,
   },
@@ -311,6 +319,8 @@ export const contentMediaWrite = growthDomainTool({
     attachChatImage: attachChatImageToContent,
     attachLibraryMedia: attachLibraryMediaToContent,
     freezeComposition: freezeCompositionToLibrary,
+    directComposition: directCompositionAction,
+    extendComposition: extendCompositionAction,
     recoverArchiveMedia: recoverArchiveMediaToContent,
     makeCarousel: makeCarouselFromPool,
     prepareUpload: prepareContentMediaUploads,
@@ -380,6 +390,7 @@ export const adsWrite = growthDomainTool({
     draftCampaign: draftCampaignAction,
     draftAd: draftAdAction,
     draftAdsFromHomes: draftAdsFromHomesAction,
+    replaceAdCard: replaceAdCardAction,
     addAudience: addAudienceAction,
     updateAudience: updateAudienceAction,
     planPlatform: planPlatformAction,
@@ -456,8 +467,17 @@ export const mediaAnalysisWrite = growthDomainTool({
 
 export const mediaLibraryWrite = growthDomainTool({
   description:
-    "Save operator-pasted chat media into an owned brand's durable media library, tagged on arrival — no content work item required.",
-  actions: { saveChatMedia: saveChatMediaToLibrary },
+    "Save operator-pasted chat media into an owned brand's durable media library, or import the hero photos of the brand's own homes from its WanderOS site.",
+  actions: {
+    saveChatMedia: saveChatMediaToLibrary,
+    importListingPhotos,
+  },
+});
+
+export const playbookRead = growthDomainTool({
+  description:
+    "The playbooks: step-by-step procedures to follow with the other tools (kind procedure), and reference texts. Read a procedure before starting the job it describes.",
+  actions: { list: listPlaybooksAction, read: readPlaybookAction },
 });
 
 export const sessionRead = growthDomainTool({
@@ -468,8 +488,8 @@ export const sessionRead = growthDomainTool({
 
 export const mediaLibraryRead = growthDomainTool({
   description:
-    "Browse an owned brand's media library. Use this when the operator says to use, pick, or reuse something already saved, rather than asking them to re-attach it.",
-  actions: { list: listMediaLibrary },
+    "Browse an owned brand's media library, or look at the homes and hero photos on its WanderOS site before importing any. Use list when the operator says to use, pick, or reuse something already saved, rather than asking them to re-attach it.",
+  actions: { list: listMediaLibrary, listingPhotos: listListingPhotos },
 });
 
 export const strategyRead = growthDomainTool({
@@ -579,4 +599,5 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   leadsRead,
   leadsWrite,
   listeningRead,
+  playbookRead,
 } as const;

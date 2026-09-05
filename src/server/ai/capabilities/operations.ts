@@ -34,6 +34,14 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { findLatestOwnedChatMedia } from "@/lib/chat-attachment";
 import { MediaService } from "@/server/services/media.service";
 import {
+  findImportedImage,
+  importRemoteImage,
+} from "@/server/services/media.service";
+import {
+  brandListings,
+  normalizeListingUrl,
+} from "@/server/services/wanderos-listings.service";
+import {
   replaceBrandMixTargets,
   replaceChannelCadence,
   replaceSeriesCadence,
@@ -1050,3 +1058,123 @@ export const OPERATION_TOOLS = {
   createBrandMix,
   updateBrandMix,
 } as const;
+
+const listingPhotoShape = z.object({
+  name: z.string(),
+  url: z.string(),
+  imageUrl: z.string(),
+  place: z.string(),
+  /** Set when this hero is already in the library; use it instead of importing. */
+  mediaAssetId: z.string().nullable(),
+});
+
+/**
+ * The brand's homes as their WanderOS site lists them, with the hero photo of
+ * each. Read-only: a look before anything enters the library.
+ */
+export const listListingPhotos = growthAction({
+  description:
+    "The homes on an owned brand's WanderOS site with each one's hero photo URL, straight from the site's feed. Nothing is imported. Use it to see what there is to work with, then mediaLibraryWrite.importListingPhotos for the ones worth keeping, or adsWrite.draftAdsFromHomes to turn them into cards in one step. Empty for a brand whose website is not a WanderOS site.",
+  inputSchema: z.object({
+    brandId: z.string(),
+    limit: z.number().int().min(1).max(48).default(24),
+  }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    hasSite: z.boolean(),
+    homes: z.array(listingPhotoShape),
+  }),
+  execute: async ({ brandId, limit }, ctx) => {
+    const brand = await requireOwnedBrand(brandId, ctx);
+    const listings = (await brandListings({ id: brand.id, website: brand.website }))
+      .filter((row) => row.imageUrl)
+      .slice(0, limit);
+    const imported = await Promise.all(
+      listings.map((row) => findImportedImage({ brandId: brand.id, url: row.imageUrl! })),
+    );
+    return {
+      brandId: brand.id,
+      hasSite: Boolean(brand.website),
+      homes: listings.map((row, index) => ({
+        name: row.name,
+        url: row.url,
+        imageUrl: row.imageUrl!,
+        place: [row.city, row.state].filter(Boolean).join(", "),
+        mediaAssetId: imported[index]?.id ?? null,
+      })),
+    };
+  },
+});
+
+/**
+ * Import chosen listing heroes into the library. Idempotent per photo URL, so
+ * a home already imported comes back rather than doubling.
+ */
+export const importListingPhotos = growthAction({
+  description:
+    "Import the hero photos of an owned brand's homes into its media library, by listing URL. Omit listingUrls to import the first `limit` homes on the feed. Idempotent per photo: a hero already in the library is returned, not imported twice. Each result carries the mediaAssetId a composition or ad creative takes.",
+  inputSchema: z.object({
+    brandId: z.string(),
+    listingUrls: z
+      .array(z.string().url())
+      .max(24)
+      .optional()
+      .describe("Listing page URLs from mediaLibraryRead.listingPhotos."),
+    limit: z.number().int().min(1).max(24).default(6),
+  }),
+  outputSchema: z.object({
+    brandId: z.string(),
+    imported: z.number(),
+    reused: z.number(),
+    assets: z.array(
+      z.object({
+        mediaAssetId: z.string(),
+        url: z.string().nullable(),
+        name: z.string(),
+        listingUrl: z.string(),
+      }),
+    ),
+    notes: z.array(z.string()),
+  }),
+  execute: async ({ brandId, listingUrls, limit }, ctx) => {
+    const brand = await requireOwnedBrand(brandId, ctx);
+    const listings = (await brandListings({ id: brand.id, website: brand.website })).filter(
+      (row) => row.imageUrl,
+    );
+    const notes: string[] = [];
+    let chosen = listings.slice(0, limit);
+    if (listingUrls?.length) {
+      const byUrl = new Map(listings.map((row) => [normalizeListingUrl(row.url), row] as const));
+      chosen = listingUrls.flatMap((url) => {
+        const row = byUrl.get(normalizeListingUrl(url));
+        if (!row) notes.push(`${url} is not on the listing feed right now.`);
+        return row ? [row] : [];
+      });
+    }
+    if (chosen.length === 0) {
+      throw new GrowthActionError(
+        "not_found",
+        "No homes with photos to import. Check the brand's website is a WanderOS site, or pass listing URLs from mediaLibraryRead.listingPhotos.",
+      );
+    }
+    let imported = 0;
+    let reused = 0;
+    const assets = [];
+    // Sequential: each import is a download and an R2 write.
+    for (const row of chosen) {
+      const existing = await findImportedImage({ brandId: brand.id, url: row.imageUrl! });
+      const asset =
+        existing ??
+        (await importRemoteImage({
+          brandId: brand.id,
+          uploadedBy: ctx.userId,
+          url: row.imageUrl!,
+          title: row.name,
+        }));
+      if (existing) reused += 1;
+      else imported += 1;
+      assets.push({ mediaAssetId: asset.id, url: asset.url, name: row.name, listingUrl: row.url });
+    }
+    return { brandId: brand.id, imported, reused, assets, notes };
+  },
+});

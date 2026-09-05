@@ -42,6 +42,7 @@ import {
   deleteDraftCampaign,
   getDraftCampaign,
   importPlatformAdCreative,
+  replaceDraftAdMedia,
   linkPlatformAudience,
   listBrandCampaigns,
   planPlatform,
@@ -728,6 +729,13 @@ export const draftAdsFromHomesAction = growthAction({
   inputSchema: z.object({
     campaignId: z.string().min(1),
     carouselSize: z.number().int().min(1).max(10).optional(),
+    listingUrls: z
+      .array(z.string().url())
+      .max(10)
+      .optional()
+      .describe(
+        "Which homes, by listing URL from mediaLibraryRead.listingPhotos, in carousel order. Omit for the campaign's own ranking.",
+      ),
   }),
   outputSchema: z.object({
     campaignId: z.string(),
@@ -759,7 +767,28 @@ export const draftAdsFromHomesAction = growthAction({
       userId: ctx.userId,
       campaignId: input.campaignId,
       carouselSize: input.carouselSize,
+      listingUrls: input.listingUrls,
     }),
+});
+
+export const replaceAdCardAction = growthAction({
+  description:
+    "Put a different library asset in one card slot of a LOCAL draft ad (index 0 is the first card; a single-image ad has one). Use it after freezing a corrected composition to swap the card that looked wrong. Local only; a pushed ad keeps the platform's copy.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    index: z.number().int().min(0).max(9).default(0),
+    mediaAssetId: z.string().min(1),
+  }),
+  examples: [{ adId: "ad_01", index: 2, mediaAssetId: "media_01" }],
+  execute: async (input, ctx) => {
+    const { ad, replaced } = await replaceDraftAdMedia({ organizationId: ctx.orgId, ...input });
+    return {
+      adId: ad.id,
+      index: input.index,
+      replacedUrl: replaced.url,
+      cards: ("media" in ad.content ? ad.content.media : []).length,
+    };
+  },
 });
 
 export const addAudienceAction = growthAction({
