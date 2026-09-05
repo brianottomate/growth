@@ -1,97 +1,76 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq, inArray, isNull, and } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { Crosshair, ExternalLink } from "lucide-react";
 
 import { db } from "@/server/db";
 import {
   brandTable,
-  type ConversionFunnel,
-  type ConversionStatus,
-  conversionEventTable,
-  conversionMappingTable,
+  campaignTable,
   memberTable,
+  platformCampaignTable,
+  type PlatformCampaign,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
-import { CopyButton } from "@/components/copy-button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/components/ui/lib/utils";
 
-// The paid platforms the matrix has columns for (order = sheet order).
-const AD_PLATFORMS = [
-  "google_ads",
-  "meta_ads",
-  "reddit_ads",
-  "linkedin_ads",
-  "x_ads",
-  "tiktok_ads",
-] as const;
+import { NewClientBox } from "./NewClientBox";
 
-const FUNNELS: { key: ConversionFunnel; label: string; sub: string }[] = [
-  { key: "supply", label: "Supply", sub: "WanderOS — host / operator" },
-  { key: "demand", label: "Demand", sub: "wander.com — guest / booking" },
-];
+const money = (n: number | null | undefined) =>
+  n == null ? "—" : n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${Math.round(n)}`;
 
-const STATUS_STYLE: Record<ConversionStatus, { badge: string; label: string }> =
-  {
-    verified: {
-      badge: "bg-emerald-500/15 text-emerald-300",
-      label: "verified",
-    },
-    wanted: { badge: "bg-amber-500/15 text-amber-300", label: "wanted" },
-    not_implemented: { badge: "bg-red-500/15 text-red-300", label: "not impl" },
-  };
+type CampaignState = "draft" | "pushed" | "live" | "ended";
 
-type EventRow = typeof conversionEventTable.$inferSelect;
-type MappingRow = typeof conversionMappingTable.$inferSelect & {
-  sources: { conversionEventId: string }[];
-  channel: { platform: string; manageUrl: string | null } | null;
+const STATE_STYLE: Record<CampaignState, string> = {
+  draft: "bg-muted text-muted-foreground",
+  pushed: "bg-sky-500/15 text-sky-300",
+  live: "bg-emerald-500/15 text-emerald-300",
+  ended: "bg-muted text-muted-foreground",
 };
 
-/** One platform's mapping(s) for one event, or an empty cell. */
-function Cell({ mappings }: { mappings: MappingRow[] }) {
-  if (mappings.length === 0) {
-    return <span className="text-muted-foreground/40 text-xs">—</span>;
+/** Where a campaign stands, from its platform rows. */
+function stateOf(rows: PlatformCampaign[]): CampaignState {
+  if (rows.some((row) => row.status === "live")) return "live";
+  if (rows.some((row) => row.externalId)) {
+    return rows.every((row) => row.status === "ended") ? "ended" : "pushed";
   }
-  return (
-    <div className="flex flex-col gap-1.5">
-      {mappings.map((m) => {
-        const s = STATUS_STYLE[m.status];
-        return (
-          <div key={m.id} className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${s.badge}`}
-              >
-                {s.label}
-              </span>
-              <span className="truncate text-xs font-medium">
-                {m.platformEventName}
-              </span>
-              {m.sources.length > 1 && (
-                <span className="text-muted-foreground rounded border px-1 text-[9px]">
-                  shared
-                </span>
-              )}
-            </div>
-            <div className="text-muted-foreground flex items-center gap-1.5 text-[10px]">
-              {m.externalConversionId ? (
-                <code
-                  className="bg-muted max-w-[160px] truncate rounded px-1 py-0.5 font-mono"
-                  title={m.externalConversionId}
-                >
-                  {m.externalConversionId}
-                </code>
-              ) : (
-                <span className="italic">no id</span>
-              )}
-              {m.mode && <span>· {m.mode}</span>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return "draft";
 }
 
-export default async function AdsPage() {
+/**
+ * Spend against budget, read against time when the platform has dates. A
+ * campaign 40% through its window that has spent 20% is behind; the note says
+ * so in words rather than leaving the arithmetic to the reader.
+ */
+function pacing(rows: PlatformCampaign[]) {
+  const spend = rows.reduce((sum, row) => sum + (row.stats?.spend ?? row.spend ?? 0), 0);
+  const budget = rows.reduce((sum, row) => sum + (row.budget ?? 0), 0);
+  const dated = rows.filter((row) => row.startAt && row.endAt && row.budget);
+  let note: string | null = null;
+  if (budget > 0 && dated.length > 0) {
+    const now = Date.now();
+    const expected = dated.reduce((sum, row) => {
+      const start = row.startAt!.getTime();
+      const end = row.endAt!.getTime();
+      const fraction = end > start ? Math.min(1, Math.max(0, (now - start) / (end - start))) : 1;
+      return sum + fraction * (row.budget ?? 0);
+    }, 0);
+    if (expected > 0) {
+      const ratio = spend / expected;
+      note = ratio > 1.15 ? "ahead of pace" : ratio < 0.85 ? "behind pace" : "on pace";
+    }
+  }
+  return { spend, budget, note };
+}
+
+/**
+ * The ads desk: every client and prospect with where their campaigns stand,
+ * and the box that starts a new one. Built for the person who runs paid media
+ * across clients and should not have to open each brand to know the day.
+ */
+export default async function AdsDeskPage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
 
@@ -105,206 +84,208 @@ export default async function AdsPage() {
   }
 
   const brands = await db.query.brandTable.findMany({
-    where: and(
-      eq(brandTable.organizationId, org.id),
-      isNull(brandTable.deletedAt),
-    ),
-    columns: { id: true, name: true },
+    where: and(eq(brandTable.organizationId, org.id), isNull(brandTable.deletedAt)),
+    columns: { id: true, name: true, slug: true, logo: true, relationship: true, website: true },
+    orderBy: (brand, { asc }) => [asc(brand.name)],
   });
-  const brandIds = brands.map((b) => b.id);
-
-  const [events, mappings] = brandIds.length
-    ? await Promise.all([
-        db.query.conversionEventTable.findMany({
-          where: inArray(conversionEventTable.brandId, brandIds),
-        }),
-        db.query.conversionMappingTable.findMany({
-          where: inArray(conversionMappingTable.brandId, brandIds),
-          with: {
-            sources: { columns: { conversionEventId: true } },
-            channel: { columns: { platform: true, manageUrl: true } },
-          },
-        }),
-      ])
-    : [[] as EventRow[], [] as MappingRow[]];
-
-  const eventsByBrand = new Map<string, EventRow[]>();
-  for (const e of events) {
-    const list = eventsByBrand.get(e.brandId) ?? [];
-    list.push(e);
-    eventsByBrand.set(e.brandId, list);
+  const brandIds = brands.map((brand) => brand.id);
+  const campaigns = brandIds.length
+    ? await db.query.campaignTable.findMany({
+        where: and(inArray(campaignTable.brandId, brandIds), isNull(campaignTable.deletedAt)),
+        columns: { id: true, brandId: true, name: true, budget: true, createdAt: true },
+        orderBy: (campaign, { desc }) => [desc(campaign.createdAt)],
+      })
+    : [];
+  const platformRows = campaigns.length
+    ? await db.query.platformCampaignTable.findMany({
+        where: inArray(
+          platformCampaignTable.campaignId,
+          campaigns.map((campaign) => campaign.id),
+        ),
+      })
+    : [];
+  const rowsByCampaign = new Map<string, PlatformCampaign[]>();
+  for (const row of platformRows) {
+    if (!row.campaignId) continue;
+    rowsByCampaign.set(row.campaignId, [...(rowsByCampaign.get(row.campaignId) ?? []), row]);
   }
-  // cellMap: a mapping lands in a cell for EVERY event that feeds it, so the one
-  // Reddit "Lead" mapping appears under both submit rows (one row, two cells).
-  const cellMap = new Map<string, MappingRow[]>();
-  for (const m of mappings) {
-    for (const src of m.sources) {
-      const key = `${src.conversionEventId}|${m.platform}`;
-      const list = cellMap.get(key) ?? [];
-      list.push(m);
-      cellMap.set(key, list);
-    }
+  const campaignsByBrand = new Map<string, typeof campaigns>();
+  for (const campaign of campaigns) {
+    campaignsByBrand.set(campaign.brandId, [
+      ...(campaignsByBrand.get(campaign.brandId) ?? []),
+      campaign,
+    ]);
   }
-  const cell = (eventId: string, platform: string) =>
-    cellMap.get(`${eventId}|${platform}`) ?? [];
 
-  const totalMapped = mappings.filter((m) => m.status === "verified").length;
+  // Clients and prospects always show; an internal brand only once it runs ads.
+  const rank: Record<CampaignState, number> = { live: 0, pushed: 1, draft: 2, ended: 3 };
+  const desk = brands
+    .filter(
+      (brand) =>
+        brand.relationship === "client" ||
+        brand.relationship === "prospect" ||
+        (campaignsByBrand.get(brand.id)?.length ?? 0) > 0,
+    )
+    .map((brand) => {
+      const own = (campaignsByBrand.get(brand.id) ?? []).map((campaign) => {
+        const rows = rowsByCampaign.get(campaign.id) ?? [];
+        return { ...campaign, rows, state: stateOf(rows), ...pacing(rows) };
+      });
+      const best = own.reduce<CampaignState | null>(
+        (acc, campaign) => (acc === null || rank[campaign.state] < rank[acc] ? campaign.state : acc),
+        null,
+      );
+      return { brand, campaigns: own, best };
+    })
+    .sort((a, b) => {
+      const ra = a.best ? rank[a.best] : 4;
+      const rb = b.best ? rank[b.best] : 4;
+      if (ra !== rb) return ra - rb;
+      if (a.brand.relationship !== b.brand.relationship) {
+        return a.brand.relationship === "client" ? -1 : 1;
+      }
+      return a.brand.name.localeCompare(b.brand.name);
+    });
 
-  // Markdown export for the AI sync pass / ChatGPT hand-off.
-  const md = [
-    `# Wander — Ad conversion matrix`,
-    `${events.length} events · ${mappings.length} platform conversions · ${totalMapped} verified`,
-    ...FUNNELS.flatMap(({ key, label }) => {
-      const evs = events
-        .filter((e) => e.funnel === key)
-        .sort((a, b) => a.stage - b.stage);
-      if (!evs.length) return [];
-      return [
-        `\n## ${label}`,
-        ...evs.map((e) => {
-          const rowMaps = AD_PLATFORMS.flatMap((p) =>
-            cell(e.id, p).map(
-              (m) =>
-                `${platformLabel(p)}:${m.platformEventName}` +
-                `${m.externalConversionId ? ` (${m.externalConversionId})` : ""} [${m.status}]`,
-            ),
-          );
-          return `- ${e.name}${e.canonicalEvent ? ` → ${e.canonicalEvent}` : " → (no canonical event yet)"}${rowMaps.length ? ` — ${rowMaps.join(", ")}` : " — (no mappings)"}`;
-        }),
-      ];
-    }),
-  ].join("\n");
+  const liveSpend = desk
+    .flatMap((row) => row.campaigns)
+    .filter((campaign) => campaign.state === "live")
+    .reduce((sum, campaign) => sum + campaign.spend, 0);
+  const liveCount = desk.flatMap((row) => row.campaigns).filter((c) => c.state === "live").length;
 
   return (
-    <div>
-      <div className="flex items-start justify-between gap-4">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Ads · Conversions
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">Ads</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            What each ad platform should receive for every Wander funnel event —
-            the intent, with its real-world status. Status is maintained by an
-            AI pass against the wander.com / tracking code.
-          </p>
-          <p className="text-muted-foreground mt-2 text-xs">
-            {events.length} events · {mappings.length} platform conversions ·{" "}
-            {totalMapped} verified
+            Every client and where their campaigns stand.
+            {liveCount > 0
+              ? ` ${liveCount} live, ${money(liveSpend)} spent so far.`
+              : " Nothing is spending right now."}{" "}
+            <Link href="/app/ads/conversions" className="underline">
+              Conversion mapping
+            </Link>
           </p>
         </div>
-        {mappings.length > 0 && (
-          <CopyButton text={md} label="Copy for ChatGPT / Claude" />
-        )}
+        <NewClientBox />
       </div>
 
-      {brands.length === 0 && (
-        <p className="text-muted-foreground mt-8 text-sm">No brands yet.</p>
-      )}
-
-      {brands.map((brand) => {
-        const brandEvents = eventsByBrand.get(brand.id) ?? [];
-        return (
-          <section key={brand.id} className="mt-8">
-            <h2 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
-              {brand.name}
-            </h2>
-            {brandEvents.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                No conversion events yet.
-              </p>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border">
-                <table className="w-full min-w-[860px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="w-56 p-3 text-xs font-semibold">Event</th>
-                      {AD_PLATFORMS.map((p) => (
-                        <th key={p} className="p-3 text-xs font-semibold">
-                          <span className="flex items-center gap-1.5">
-                            <ChannelLogo platform={p} className="size-4" />
-                            {platformLabel(p)}
-                          </span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {FUNNELS.map(({ key, label, sub }) => {
-                      const rows = brandEvents
-                        .filter((e) => e.funnel === key)
-                        .sort((a, b) => a.stage - b.stage);
-                      if (rows.length === 0) return null;
-                      return (
-                        <FunnelGroup
-                          key={key}
-                          label={label}
-                          sub={sub}
-                          rows={rows}
-                          cell={cell}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
+      {desk.length === 0 ? (
+        <EmptyState
+          icon={Crosshair}
+          title="No clients yet"
+          description="Paste a website above. The assistant creates the brand, reads its logo and colours, pulls listing photos, opens a campaign shell and drafts the first ads. Nothing is pushed until you say so."
+        />
+      ) : (
+        <div className="space-y-3">
+          {desk.map(({ brand, campaigns: own }) => (
+            <section key={brand.id} className="bg-card rounded-xl border">
+              <div className="flex items-center gap-3 px-4 py-3">
+                {brand.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={brand.logo}
+                    alt=""
+                    className="size-8 shrink-0 rounded-md border bg-white object-contain p-0.5"
+                  />
+                ) : (
+                  <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold">
+                    {brand.name.slice(0, 1)}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/app/brands/${brand.slug ?? brand.id}/ads`}
+                      className="truncate text-sm font-semibold hover:underline"
+                    >
+                      {brand.name}
+                    </Link>
+                    <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium capitalize">
+                      {brand.relationship}
+                    </span>
+                  </div>
+                  {brand.website ? (
+                    <a
+                      href={brand.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-muted-foreground inline-flex items-center gap-1 text-[11px] hover:underline"
+                    >
+                      {brand.website.replace(/^https?:\/\//, "")}
+                      <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
+                </div>
+                <Link
+                  href={`/app/brands/${brand.slug ?? brand.id}/ads`}
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                >
+                  {own.length === 0 ? "Start a campaign" : `${own.length} campaign${own.length === 1 ? "" : "s"}`}
+                </Link>
               </div>
-            )}
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-function FunnelGroup({
-  label,
-  sub,
-  rows,
-  cell,
-}: {
-  label: string;
-  sub: string;
-  rows: EventRow[];
-  cell: (eventId: string, platform: string) => MappingRow[];
-}) {
-  return (
-    <>
-      <tr className="bg-muted/40 border-b">
-        <td
-          colSpan={1 + AD_PLATFORMS.length}
-          className="px-3 py-1.5 text-[11px] font-semibold tracking-wide uppercase"
-        >
-          {label}{" "}
-          <span className="text-muted-foreground font-normal tracking-normal normal-case">
-            · {sub}
-          </span>
-        </td>
-      </tr>
-      {rows.map((e) => (
-        <tr key={e.id} className="border-b align-top last:border-0">
-          <td className="p-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-medium">{e.name}</span>
-              {e.isPrimary && (
-                <span className="rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-medium text-sky-300">
-                  primary
-                </span>
-              )}
-            </div>
-            <div className="text-muted-foreground mt-0.5 text-[11px]">
-              {e.canonicalEvent ? (
-                <code className="font-mono">{e.canonicalEvent}</code>
-              ) : (
-                <span className="text-amber-400">⚠ needs reconciliation</span>
-              )}
-            </div>
-          </td>
-          {AD_PLATFORMS.map((p) => (
-            <td key={p} className="p-3">
-              <Cell mappings={cell(e.id, p)} />
-            </td>
+              {own.length > 0 ? (
+                <ul className="divide-y border-t">
+                  {own.map((campaign) => (
+                    <li key={campaign.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <span
+                        className={cn(
+                          "w-14 shrink-0 rounded-full px-2 py-0.5 text-center text-[10px] font-medium capitalize",
+                          STATE_STYLE[campaign.state],
+                        )}
+                      >
+                        {campaign.state}
+                      </span>
+                      <Link
+                        href={`/app/brands/${brand.slug ?? brand.id}/ads/${campaign.id}`}
+                        className="min-w-0 flex-1 truncate text-sm hover:underline"
+                      >
+                        {campaign.name}
+                      </Link>
+                      <span className="text-muted-foreground flex items-center gap-1.5">
+                        {campaign.rows.map((row) => (
+                          <span key={row.id} title={`${platformLabel(row.platform)} · ${row.status}`}>
+                            <ChannelLogo platform={row.platform} className="size-3.5" />
+                          </span>
+                        ))}
+                      </span>
+                      <span className="w-36 shrink-0 text-right text-xs tabular-nums">
+                        {campaign.state === "draft" ? (
+                          <span className="text-muted-foreground">
+                            {campaign.budget != null ? `${money(campaign.budget)} planned` : "no budget"}
+                          </span>
+                        ) : (
+                          <>
+                            <span className="font-medium">{money(campaign.spend)}</span>
+                            <span className="text-muted-foreground">
+                              {campaign.budget > 0 ? ` of ${money(campaign.budget)}` : ""}
+                            </span>
+                            {campaign.note ? (
+                              <span
+                                className={cn(
+                                  "ml-1.5",
+                                  campaign.note === "behind pace"
+                                    ? "text-amber-300"
+                                    : campaign.note === "ahead of pace"
+                                      ? "text-sky-300"
+                                      : "text-muted-foreground",
+                                )}
+                              >
+                                {campaign.note}
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
           ))}
-        </tr>
-      ))}
-    </>
+        </div>
+      )}
+    </div>
   );
 }

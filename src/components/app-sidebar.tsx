@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Logo } from "@wandercom/design-system-web/ui/logo";
 import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -45,7 +46,12 @@ import {
 import { useTheme } from "@/components/ui/theme";
 import { authClient } from "@/server/better-auth/client";
 import { useTRPC } from "@/trpc/react";
-import { NAV_GROUPS, type NavItem } from "@/components/app-nav";
+import {
+  NAV_FOCUS_STORAGE_KEY,
+  navGroupsFor,
+  type NavFocus,
+  type NavItem,
+} from "@/components/app-nav";
 
 
 interface AppSidebarProps {
@@ -68,6 +74,26 @@ export function AppSidebar({
   const trpc = useTRPC();
   const { data: orgs } = useQuery(trpc.org.list.queryOptions());
   const { themeMode, setTheme } = useTheme();
+  // Which slice of the app the sidebar shows. Read after mount so the server
+  // and the first client paint agree; the default is everything.
+  const [focus, setFocusState] = useState<NavFocus>("all");
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(NAV_FOCUS_STORAGE_KEY);
+      if (stored === "performance") setFocusState(stored);
+    } catch {
+      // Storage can be unavailable; the full sidebar is the right fallback.
+    }
+  }, []);
+  const setFocus = (next: NavFocus) => {
+    setFocusState(next);
+    try {
+      window.localStorage.setItem(NAV_FOCUS_STORAGE_KEY, next);
+    } catch {
+      // Same as above: a preference that cannot be kept is still applied now.
+    }
+  };
+  const groups = navGroupsFor(focus);
 
   const isActive = (item: NavItem) =>
     item.href === "/app" || item.exact
@@ -165,7 +191,38 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {NAV_GROUPS.map((group, i) => (
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <SidebarGroupContent>
+            <div
+              role="tablist"
+              aria-label="Sidebar focus"
+              className="bg-muted/60 grid grid-cols-2 rounded-lg p-0.5 text-[11px] font-medium"
+            >
+              {(
+                [
+                  ["all", "Everything"],
+                  ["performance", "Performance"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={focus === value}
+                  onClick={() => setFocus(value)}
+                  className={
+                    focus === value
+                      ? "bg-background text-foreground rounded-md px-2 py-1 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground rounded-md px-2 py-1"
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {groups.map((group, i) => (
           <SidebarGroup key={group.label ?? `group-${i}`}>
             {group.label && (
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
