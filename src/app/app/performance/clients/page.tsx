@@ -143,22 +143,17 @@ export default async function PerformanceClientsPage() {
       defaultHidden: true,
     },
   ];
-  const total = groups[0]!.entries.length + groups[1]!.entries.length;
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground max-w-xl text-sm">
-          {total} client{total === 1 ? "" : "s"} and prospects. Each row shows
-          what they filed on the intake form and where their campaigns stand.
-        </p>
+      <div className="flex justify-end">
         <NewClientDialog />
       </div>
       {desk.brands.length === 0 ? (
         <EmptyState
           icon={Building2}
           title="No clients yet"
-          description="Add a client by its website and the assistant sets the brand up and drafts its first ads."
+          description="Add one by its website; the assistant sets it up."
           actions={<NewClientDialog />}
         />
       ) : (
@@ -227,14 +222,6 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
           <Link href={brandAdsHref(brand)} className="font-medium hover:underline">
             {brand.campaigns.length === 0 ? "Start a campaign" : "Campaigns"}
           </Link>
-          {brand.account ? (
-            <Link
-              href={`/app/performance/${brand.account.id}`}
-              className="text-muted-foreground hover:underline"
-            >
-              Account
-            </Link>
-          ) : null}
           {brand.intakeUrl ? <IntakeLink url={brand.intakeUrl} /> : null}
         </div>
       </div>
@@ -243,10 +230,7 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         <div className="border-t px-4 py-3">
           {intake ? <IntakeFacts intake={intake} /> : (
             <p className="text-muted-foreground text-xs">
-              No intake filed yet.{" "}
-              {brand.intakeUrl
-                ? "Send them the intake link; what they answer shows up here."
-                : "This brand has no slug or connect token, so there is no intake link to send."}
+              {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
             </p>
           )}
         </div>

@@ -344,7 +344,7 @@ export function Audiences({
           compact
           icon={Users}
           title="Broad, for now"
-          description="Without an audience the push runs one broad ad set, which is what leaves the learning phase at these budgets. Add one to narrow by age or place; each row becomes its own ad set."
+          description="The push runs one broad ad set. Add an audience to narrow by age or place."
           actions={
             <>
               <Button size="sm" variant="outline" onClick={() => setOpen(true)}>

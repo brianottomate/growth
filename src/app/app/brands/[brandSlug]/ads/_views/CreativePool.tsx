@@ -121,7 +121,7 @@ export function CreativePool({
           compact
           icon={Images}
           title="No photos yet"
-          description="Pull a few from their listings, pick from the library, or compose a card in the Studio. Ads draw from what is here."
+          description="From their listings, the library, or the Studio."
           actions={
             <>
               <ListingSamplesDialog brandId={brandId} onImported={addImported} />

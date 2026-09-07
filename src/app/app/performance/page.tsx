@@ -89,7 +89,7 @@ export default async function PerformanceDashboardPage() {
         <EmptyState
           icon={Crosshair}
           title="No clients yet"
-          description="Add a client by its website. The assistant creates the brand, reads its logo and colours, pulls listing photos, opens a campaign shell and drafts the first ads. Nothing is pushed until you say so."
+          description="Add one by its website; the assistant sets it up and drafts the first ads."
           actions={<NewClientDialog />}
         />
       ) : (
@@ -98,7 +98,7 @@ export default async function PerformanceDashboardPage() {
             <h2 className="text-sm font-semibold">Live now</h2>
             {desk.live.length === 0 ? (
               <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
-                Nothing is spending. Push a campaign and switch its delivery on.
+                Nothing live.
               </p>
             ) : (
               <ul className="bg-card divide-y rounded-xl border">
@@ -114,7 +114,7 @@ export default async function PerformanceDashboardPage() {
             <h2 className="text-sm font-semibold">Needs a hand</h2>
             {attention.length === 0 ? (
               <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
-                Every campaign has ads and a platform, and nothing live is behind.
+                Nothing waiting.
               </p>
             ) : (
               <ul className="bg-card divide-y rounded-xl border">
@@ -146,7 +146,7 @@ export default async function PerformanceDashboardPage() {
             </div>
             {recent.length === 0 ? (
               <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
-                No drafts. Start one from a client.
+                No drafts.
               </p>
             ) : (
               <ul className="bg-card divide-y rounded-xl border">

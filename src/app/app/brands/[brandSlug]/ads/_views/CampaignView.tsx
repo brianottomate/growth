@@ -218,7 +218,6 @@ export async function CampaignView({
           state={stateOf("photos")}
           title="Photos"
           meta={pool.length > 0 ? `${pool.length} in the pool` : undefined}
-          hint="Their listing heroes, library images, or cards from the Studio. Ads draw from these."
         >
           <CreativePool
             campaignId={campaign.id}
@@ -244,7 +243,6 @@ export async function CampaignView({
                   .join(" · ")
               : undefined
           }
-          hint="Each ad is a headline, a body and its cards. Every platform compiles these when you push."
           actions={
             ads.length > 0 ? (
               <>
@@ -297,7 +295,6 @@ export async function CampaignView({
           state={stateOf("audiences")}
           title="Audiences"
           meta={audiences.length > 0 ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}` : "broad"}
-          hint="Who sees the ads. Each row becomes an ad set on Meta, an ad group on Google."
         >
           <Audiences
             campaignId={campaign.id}
@@ -317,7 +314,6 @@ export async function CampaignView({
               ? planned.map((row) => platformLabel(row.platform)).join(", ")
               : undefined
           }
-          hint="Where it runs. Each platform holds its own budget; the push compiles the plan there, paused."
           actions={
             planned.length > 0 ? (
               <PlanPlatformButton campaignId={campaign.id} planned={plannedPlatforms} />
@@ -329,7 +325,7 @@ export async function CampaignView({
               compact
               icon={Radio}
               title="No platform yet"
-              description="Planning one creates its local draft with a budget and settings. Nothing reaches the platform until you push, and the push creates everything paused."
+              description="Plan one to set its budget. Nothing reaches the platform until you push."
               actions={
                 <>
                   <PlanPlatformButton campaignId={campaign.id} planned={plannedPlatforms} />
@@ -360,7 +356,6 @@ export async function CampaignView({
             state="done"
             title="Live"
             meta={anyLive ? "spending" : "paused"}
-            hint="What the platforms report. Delivery is switched per platform above."
             actions={ask("live", `How is “${campaign.name}” doing?`)}
           >
             <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
@@ -392,7 +387,6 @@ function Step({
   state,
   title,
   meta,
-  hint,
   actions,
   children,
 }: {
@@ -400,7 +394,6 @@ function Step({
   state: "done" | "next" | "todo";
   title: string;
   meta?: string;
-  hint: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -431,7 +424,6 @@ function Step({
                 <span className="text-muted-foreground text-sm font-normal">{meta}</span>
               ) : null}
             </h2>
-            <p className="text-muted-foreground text-xs">{hint}</p>
           </div>
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </div>

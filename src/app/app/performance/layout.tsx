@@ -11,12 +11,7 @@ import { PerformanceNav } from "./PerformanceNav";
 export default function PerformanceLayout({ children }: { children: ReactNode }) {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Wander Performance</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Clients, their campaigns, and what is spending.
-        </p>
-      </div>
+      <h1 className="text-xl font-semibold tracking-tight">Wander Performance</h1>
       <PerformanceNav />
       {children}
     </div>

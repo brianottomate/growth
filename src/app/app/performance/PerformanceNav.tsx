@@ -5,23 +5,20 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/components/ui/lib/utils";
 
+// Accounts (the List+ sponsorship records: sponsored homes, billing cycles)
+// is deliberately not a tab. Its pages still answer at /app/performance/accounts
+// and /app/performance/perf_… for the history they hold.
 const TABS = [
   { label: "Dashboard", href: "/app/performance", exact: true },
   { label: "Clients", href: "/app/performance/clients" },
   { label: "Campaigns", href: "/app/performance/campaigns" },
-  { label: "Accounts", href: "/app/performance/accounts" },
 ] as const;
 
-/** The section's tabs. An account detail page keeps Accounts lit. */
+/** The section's tabs. */
 export function PerformanceNav() {
   const pathname = usePathname();
-  const active = (tab: (typeof TABS)[number]) => {
-    if ("exact" in tab && tab.exact) return pathname === tab.href;
-    if (tab.href.endsWith("/accounts")) {
-      return pathname.startsWith(tab.href) || pathname.startsWith("/app/performance/perf_");
-    }
-    return pathname.startsWith(tab.href);
-  };
+  const active = (tab: (typeof TABS)[number]) =>
+    "exact" in tab && tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
   return (
     <nav
       aria-label="Wander Performance"

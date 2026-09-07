@@ -73,10 +73,8 @@ export function NewClientDialog({
           <DialogHeader>
             <DialogTitle>New client</DialogTitle>
             <DialogDescription>
-              Their website is enough. The assistant creates the brand, reads
-              the logo and colours, sets the mark, opens a campaign shell and
-              drafts the first ads from their homes. Nothing is pushed until you
-              say so.
+              The assistant sets up the brand and drafts the first ads. Nothing
+              is pushed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5 py-4">

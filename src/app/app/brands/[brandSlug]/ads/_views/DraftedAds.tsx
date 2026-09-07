@@ -93,7 +93,7 @@ export function DraftedAds({
         compact
         icon={Megaphone}
         title="No ads yet"
-        description="For a brand with a WanderOS site, the fast path is a card per home from their own photos, judged by the art director. Or add one by hand from the photos above."
+        description="Draft them from their homes, or add one by hand."
         actions={emptyActions}
       />
     );

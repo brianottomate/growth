@@ -51,13 +51,7 @@ export function PerformanceClient() {
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
         <h2 className="text-base font-semibold">Accounts</h2>
-        <p className="text-muted-foreground text-sm">
-          The commercial record behind each Performance client: plan, billing
-          cycles, media budget and what ran. Payment is handled offline.
-        </p>
-        </div>
         <NewAccountDialog />
       </header>
 
