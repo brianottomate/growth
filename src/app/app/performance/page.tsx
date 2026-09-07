@@ -1,26 +1,170 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { Crosshair } from "lucide-react";
 
+import { db } from "@/server/db";
+import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { HydrateClient, prefetch, trpc } from "@/trpc/server";
-import { PerformanceClient } from "./PerformanceClient";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  deskMoney,
+  loadPerformanceDesk,
+  type DeskBrand,
+  type DeskCampaign,
+} from "@/server/services/performance-desk.service";
 
-export const metadata: Metadata = {
-  title: "Performance+",
-};
+import { brandAdsHref, BrandLogo, CampaignRow, campaignHref } from "./_components";
+import { NewClientBox } from "./NewClientBox";
 
-// Performance+ — the property managers paying for sponsored placement on
-// Wander's marketing surfaces, sold through wander.com/list-plus. This replaces
-// the "Performance Dashboard" sheet, so the columns deliberately mirror it.
-export default async function PerformancePage() {
+export const metadata: Metadata = { title: "Wander Performance" };
+export const dynamic = "force-dynamic";
+
+/**
+ * The morning page: what is spending, what needs a hand, and the box that
+ * starts a new client. Three numbers, two lists, one action.
+ */
+export default async function PerformanceDashboardPage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
+  const membership = await db.query.memberTable.findFirst({
+    where: eq(memberTable.userId, session.user.id),
+    with: { organization: true },
+  });
+  const org = membership?.organization;
+  if (!org) return <div className="text-muted-foreground">No organization found.</div>;
 
-  prefetch(trpc.performance.list.queryOptions());
+  const desk = await loadPerformanceDesk(org.id);
+  const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
+
+  // What needs a person: drafts with no ads, drafts with ads but no platform,
+  // live campaigns behind pace, and clients with nothing started.
+  const attention: { key: string; text: string; href: string; brand: DeskBrand }[] = [];
+  for (const campaign of desk.campaigns) {
+    const brand = brandById.get(campaign.brandId);
+    if (!brand) continue;
+    if (campaign.state === "draft" && campaign.adCount === 0) {
+      attention.push({ key: campaign.id, brand, href: campaignHref(brand, campaign), text: `${campaign.name} has no ads yet` });
+    } else if (campaign.state === "draft" && campaign.platforms.length === 0) {
+      attention.push({ key: campaign.id, brand, href: campaignHref(brand, campaign), text: `${campaign.name} has ads but no platform planned` });
+    } else if (campaign.state === "live" && campaign.pace === "behind") {
+      attention.push({ key: campaign.id, brand, href: campaignHref(brand, campaign), text: `${campaign.name} is behind pace` });
+    }
+  }
+  for (const brand of desk.brands) {
+    if (brand.campaigns.length === 0 && brand.relationship !== "internal") {
+      attention.push({ key: brand.id, brand, href: brandAdsHref(brand), text: `${brand.name} has no campaign yet` });
+    }
+  }
+
+  const recent: { campaign: DeskCampaign; brand: DeskBrand }[] = desk.campaigns
+    .filter((campaign) => campaign.state !== "live")
+    .slice(0, 6)
+    .flatMap((campaign) => {
+      const brand = brandById.get(campaign.brandId);
+      return brand ? [{ campaign, brand }] : [];
+    });
 
   return (
-    <HydrateClient>
-      <PerformanceClient />
-    </HydrateClient>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="grid flex-1 grid-cols-3 gap-3">
+          <Figure label="Live campaigns" value={String(desk.live.length)} sub={
+              desk.live.length === 0
+                ? "Nothing spending"
+                : desk.liveBudget > 0
+                  ? `${deskMoney(desk.liveSpend)} spent of ${deskMoney(desk.liveBudget)}`
+                  : `${deskMoney(desk.liveSpend)} spent, no budget set`
+            } />
+          <Figure label="Clients" value={String(desk.clients)} sub={`${desk.prospects} prospect${desk.prospects === 1 ? "" : "s"}`} />
+          <Figure label="Needs a hand" value={String(attention.length)} sub={attention.length ? "listed below" : "All caught up"} />
+        </div>
+        <NewClientBox />
+      </div>
+
+      {desk.brands.length === 0 ? (
+        <EmptyState
+          icon={Crosshair}
+          title="No clients yet"
+          description="Paste a website above. The assistant creates the brand, reads its logo and colours, pulls listing photos, opens a campaign shell and drafts the first ads. Nothing is pushed until you say so."
+        />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold">Live now</h2>
+            {desk.live.length === 0 ? (
+              <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
+                Nothing is spending. Push a campaign and switch its delivery on.
+              </p>
+            ) : (
+              <ul className="bg-card divide-y rounded-xl border">
+                {desk.live.map((campaign) => {
+                  const brand = brandById.get(campaign.brandId)!;
+                  return <CampaignRow key={campaign.id} brand={brand} campaign={campaign} showBrand />;
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold">Needs a hand</h2>
+            {attention.length === 0 ? (
+              <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
+                Every campaign has ads and a platform, and nothing live is behind.
+              </p>
+            ) : (
+              <ul className="bg-card divide-y rounded-xl border">
+                {attention.slice(0, 8).map((item) => (
+                  <li key={item.key} className="flex items-center gap-3 px-4 py-2.5">
+                    <BrandLogo brand={item.brand} className="size-6" />
+                    <Link href={item.href} className="min-w-0 flex-1 truncate text-sm hover:underline">
+                      {item.text}
+                    </Link>
+                  </li>
+                ))}
+                {attention.length > 8 ? (
+                  <li className="text-muted-foreground px-4 py-2 text-xs">
+                    <Link href="/app/performance/campaigns" className="hover:underline">
+                      {attention.length - 8} more on the campaigns page
+                    </Link>
+                  </li>
+                ) : null}
+              </ul>
+            )}
+          </section>
+
+          <section className="space-y-2 lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold">In progress</h2>
+              <Link href="/app/performance/campaigns" className="text-muted-foreground text-xs hover:underline">
+                All campaigns
+              </Link>
+            </div>
+            {recent.length === 0 ? (
+              <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
+                No drafts. Start one from a client.
+              </p>
+            ) : (
+              <ul className="bg-card divide-y rounded-xl border">
+                {recent.map(({ campaign, brand }) => (
+                  <CampaignRow key={campaign.id} brand={brand} campaign={campaign} showBrand />
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Figure({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="bg-card rounded-xl border p-4">
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      <p className="text-muted-foreground text-[11px]">{sub}</p>
+    </div>
   );
 }

@@ -72,7 +72,10 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Wander Performance",
     items: [
-      { label: "Accounts", href: "/app/performance", icon: Handshake, focus: ["performance"] },
+      { label: "Dashboard", href: "/app/performance", icon: Crosshair, exact: true, focus: ["performance"] },
+      { label: "Clients", href: "/app/performance/clients", icon: Building2, focus: ["performance"] },
+      { label: "Campaigns", href: "/app/performance/campaigns", icon: Megaphone, focus: ["performance"] },
+      { label: "Accounts", href: "/app/performance/accounts", icon: Handshake, focus: ["performance"] },
     ],
   },
   {
@@ -102,7 +105,6 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Timeline", href: "/app/feed-v5", icon: Rows3 },
       { label: "Blog", href: "/app/blog", icon: Newspaper },
       { label: "Newsletters", href: "/app/newsletters", icon: Mail },
-      { label: "Ads", href: "/app/ads", icon: Crosshair, focus: ["performance"] },
       { label: "Spend", href: "/app/spend", icon: CircleDollarSign, focus: ["performance"] },
       { label: "Inbox", href: "/app/inbox", icon: InboxIcon },
       { label: "Listen", href: "/app/listen", icon: Radar },

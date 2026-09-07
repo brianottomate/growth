@@ -1,0 +1,221 @@
+import "server-only";
+
+import { and, eq, inArray, isNull } from "drizzle-orm";
+
+import { db } from "@/server/db";
+import {
+  brandTable,
+  campaignTable,
+  performanceAccountTable,
+  platformCampaignTable,
+  type HomesRun,
+  type PlatformCampaign,
+} from "@/server/db/schema";
+
+export type DeskCampaignState = "draft" | "pushed" | "live" | "ended";
+
+export type DeskCampaign = {
+  id: string;
+  name: string;
+  brandId: string;
+  createdAt: Date;
+  state: DeskCampaignState;
+  platforms: { id: string; platform: string; status: string }[];
+  /** Whole dollars spent, as the platforms report it. */
+  spend: number;
+  /** Whole dollars: platform budgets when planned, else the advisory total. */
+  budget: number;
+  /** Where spend sits against time, when the platform rows carry dates. */
+  pace: "ahead" | "on" | "behind" | null;
+  adCount: number;
+  lastHomesRun: HomesRun | null;
+};
+
+export type DeskBrand = {
+  id: string;
+  name: string;
+  slug: string | null;
+  logo: string | null;
+  website: string | null;
+  relationship: "internal" | "client" | "prospect" | "reference";
+  hasMark: boolean;
+  account: { id: string; status: string; plan: string | null } | null;
+  campaigns: DeskCampaign[];
+  /** The furthest along any of this brand's campaigns is. */
+  best: DeskCampaignState | null;
+};
+
+export type PerformanceDesk = {
+  brands: DeskBrand[];
+  campaigns: DeskCampaign[];
+  live: DeskCampaign[];
+  liveSpend: number;
+  liveBudget: number;
+  clients: number;
+  prospects: number;
+};
+
+const RANK: Record<DeskCampaignState, number> = { live: 0, pushed: 1, draft: 2, ended: 3 };
+
+function stateOf(rows: PlatformCampaign[]): DeskCampaignState {
+  if (rows.some((row) => row.status === "live")) return "live";
+  if (rows.some((row) => row.externalId)) {
+    return rows.every((row) => row.status === "ended") ? "ended" : "pushed";
+  }
+  return "draft";
+}
+
+/**
+ * Spend against budget, read against time. A campaign 40% through its window
+ * that has spent 20% is behind. Only platform rows with dates and a budget
+ * count; without them there is no pace to speak of.
+ */
+function paceOf(rows: PlatformCampaign[], spend: number): DeskCampaign["pace"] {
+  const dated = rows.filter((row) => row.startAt && row.endAt && row.budget);
+  if (dated.length === 0) return null;
+  const now = Date.now();
+  const expected = dated.reduce((sum, row) => {
+    const start = row.startAt!.getTime();
+    const end = row.endAt!.getTime();
+    const fraction = end > start ? Math.min(1, Math.max(0, (now - start) / (end - start))) : 1;
+    return sum + fraction * (row.budget ?? 0);
+  }, 0);
+  if (expected <= 0) return null;
+  const ratio = spend / expected;
+  return ratio > 1.15 ? "ahead" : ratio < 0.85 ? "behind" : "on";
+}
+
+/**
+ * Everything the Wander Performance section shows, read once: the clients and
+ * prospects, their campaigns with where each stands, and the live totals.
+ * Internal brands appear only once they run ads, so Wander's own campaigns are
+ * on the desk without Wander's other brands crowding the client list.
+ */
+export async function loadPerformanceDesk(organizationId: string): Promise<PerformanceDesk> {
+  const brandRows = await db.query.brandTable.findMany({
+    where: and(eq(brandTable.organizationId, organizationId), isNull(brandTable.deletedAt)),
+    columns: {
+      id: true,
+      name: true,
+      slug: true,
+      logo: true,
+      website: true,
+      relationship: true,
+      brandMark: true,
+    },
+    orderBy: (brand, { asc }) => [asc(brand.name)],
+  });
+  const brandIds = brandRows.map((brand) => brand.id);
+  if (brandIds.length === 0) {
+    return { brands: [], campaigns: [], live: [], liveSpend: 0, liveBudget: 0, clients: 0, prospects: 0 };
+  }
+
+  const [campaignRows, accounts] = await Promise.all([
+    db.query.campaignTable.findMany({
+      where: and(inArray(campaignTable.brandId, brandIds), isNull(campaignTable.deletedAt)),
+      columns: { id: true, brandId: true, name: true, budget: true, createdAt: true, homesRun: true },
+      with: { ads: { columns: { id: true } } },
+      orderBy: (campaign, { desc }) => [desc(campaign.createdAt)],
+    }),
+    db.query.performanceAccountTable.findMany({
+      where: and(
+        inArray(performanceAccountTable.brandId, brandIds),
+        isNull(performanceAccountTable.deletedAt),
+      ),
+      columns: { id: true, brandId: true, status: true, plan: true },
+    }),
+  ]);
+  const platformRows = campaignRows.length
+    ? await db.query.platformCampaignTable.findMany({
+        where: inArray(
+          platformCampaignTable.campaignId,
+          campaignRows.map((campaign) => campaign.id),
+        ),
+      })
+    : [];
+
+  const rowsByCampaign = new Map<string, PlatformCampaign[]>();
+  for (const row of platformRows) {
+    if (!row.campaignId) continue;
+    rowsByCampaign.set(row.campaignId, [...(rowsByCampaign.get(row.campaignId) ?? []), row]);
+  }
+  const accountByBrand = new Map(accounts.map((account) => [account.brandId, account]));
+
+  const campaigns: DeskCampaign[] = campaignRows.map((campaign) => {
+    const rows = rowsByCampaign.get(campaign.id) ?? [];
+    const spend = rows.reduce((sum, row) => sum + (row.stats?.spend ?? row.spend ?? 0), 0);
+    const platformBudget = rows.reduce((sum, row) => sum + (row.budget ?? 0), 0);
+    return {
+      id: campaign.id,
+      name: campaign.name,
+      brandId: campaign.brandId,
+      createdAt: campaign.createdAt,
+      state: stateOf(rows),
+      platforms: rows.map((row) => ({ id: row.id, platform: row.platform, status: row.status })),
+      spend,
+      budget: platformBudget > 0 ? platformBudget : (campaign.budget ?? 0),
+      pace: paceOf(rows, spend),
+      adCount: campaign.ads.length,
+      lastHomesRun: campaign.homesRun ?? null,
+    };
+  });
+  const campaignsByBrand = new Map<string, DeskCampaign[]>();
+  for (const campaign of campaigns) {
+    campaignsByBrand.set(campaign.brandId, [
+      ...(campaignsByBrand.get(campaign.brandId) ?? []),
+      campaign,
+    ]);
+  }
+
+  const brands: DeskBrand[] = brandRows
+    .filter(
+      (brand) =>
+        brand.relationship === "client" ||
+        brand.relationship === "prospect" ||
+        (campaignsByBrand.get(brand.id)?.length ?? 0) > 0,
+    )
+    .map((brand) => {
+      const own = campaignsByBrand.get(brand.id) ?? [];
+      const account = accountByBrand.get(brand.id);
+      return {
+        id: brand.id,
+        name: brand.name,
+        slug: brand.slug,
+        logo: brand.logo,
+        website: brand.website,
+        relationship: brand.relationship,
+        hasMark: Boolean(brand.brandMark),
+        account: account ? { id: account.id, status: account.status, plan: account.plan } : null,
+        campaigns: own,
+        best: own.reduce<DeskCampaignState | null>(
+          (acc, campaign) => (acc === null || RANK[campaign.state] < RANK[acc] ? campaign.state : acc),
+          null,
+        ),
+      };
+    })
+    .sort((a, b) => {
+      const ra = a.best ? RANK[a.best] : 4;
+      const rb = b.best ? RANK[b.best] : 4;
+      if (ra !== rb) return ra - rb;
+      if (a.relationship !== b.relationship) return a.relationship === "client" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+  const onDesk = new Set(brands.map((brand) => brand.id));
+  const deskCampaigns = campaigns.filter((campaign) => onDesk.has(campaign.brandId));
+  const live = deskCampaigns.filter((campaign) => campaign.state === "live");
+  return {
+    brands,
+    campaigns: deskCampaigns,
+    live,
+    liveSpend: live.reduce((sum, campaign) => sum + campaign.spend, 0),
+    liveBudget: live.reduce((sum, campaign) => sum + campaign.budget, 0),
+    clients: brands.filter((brand) => brand.relationship === "client").length,
+    prospects: brands.filter((brand) => brand.relationship === "prospect").length,
+  };
+}
+
+/** Whole dollars as the desk writes them. */
+export function deskMoney(n: number | null | undefined) {
+  return n == null ? "—" : n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${Math.round(n)}`;
+}

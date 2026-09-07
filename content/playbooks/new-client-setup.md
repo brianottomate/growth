@@ -16,7 +16,8 @@ Work in this order. Each step reads before it writes, and re-running any step is
 
 1. `brandRead.list` to see whether the brand already exists (match on the website's domain). If it does, use it and skip to step 2.
 2. Otherwise find the business name before creating: `researchRead` the homepage and take the name from its title or logo text (for chaletshh.com that is "Chalets Hocking Hills", not "Chalets HH"). Then `brandWrite.create` with that name and the website. Never name a brand after its domain.
-3. `brandWrite.enrich` with the brandId. This reads the logo, colours, fonts and tagline. If enrichment fails, say so and continue; the mark step will have nothing to draw and should be skipped.
+3. `brandWrite.setRelationship` with `prospect` (or `client` when the operator says they have signed). A brand left as internal shows up as one of Wander's own on the Performance desk.
+4. `brandWrite.enrich` with the brandId. This reads the logo, colours, fonts and tagline. If enrichment fails, say so and continue; the mark step will have nothing to draw and should be skipped.
 
 ## 2. Mark
 
