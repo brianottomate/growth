@@ -37,7 +37,7 @@ export default async function PerformanceClientsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 @xl:flex-row @xl:items-center @xl:justify-between">
         <p className="text-muted-foreground text-sm">
           {clients.length} client{clients.length === 1 ? "" : "s"} and prospects.
         </p>
@@ -51,7 +51,7 @@ export default async function PerformanceClientsPage() {
           description="Paste a website above and the assistant sets the brand up and drafts its first ads."
         />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
           {clients.map((brand) => (
             <li key={brand.id} className="bg-card flex flex-col gap-3 rounded-xl border p-4">
               <div className="flex items-center gap-3">

@@ -23,7 +23,10 @@ export function PerformanceNav() {
     return pathname.startsWith(tab.href);
   };
   return (
-    <nav aria-label="Wander Performance" className="flex gap-1 border-b">
+    <nav
+      aria-label="Wander Performance"
+      className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto border-b px-1 whitespace-nowrap"
+    >
       {TABS.map((tab) => (
         <Link
           key={tab.href}

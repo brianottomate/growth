@@ -39,7 +39,7 @@ export function NewClientBox() {
   };
   return (
     <form
-      className="flex w-full max-w-md items-center gap-2"
+      className="flex w-full items-center gap-2 @4xl:max-w-md"
       onSubmit={(event) => {
         event.preventDefault();
         start();
@@ -50,7 +50,7 @@ export function NewClientBox() {
         onChange={(event) => setValue(event.target.value)}
         placeholder="theirsite.com"
         aria-label="New client website"
-        className="h-9"
+        className="h-9 min-w-0 flex-1"
       />
       <Button type="submit" size="sm" disabled={!website} className="h-9 shrink-0">
         <Sparkles className="size-3.5" />

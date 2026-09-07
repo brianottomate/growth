@@ -107,9 +107,9 @@ export function CampaignRow({
   showBrand?: boolean;
 }) {
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5">
-      <StateChip state={campaign.state} className="w-24 text-center" />
-      <div className="min-w-0 flex-1">
+    <li className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 px-4 py-2.5 @lg:flex">
+      <StateChip state={campaign.state} className="@lg:w-24 @lg:text-center" />
+      <div className="min-w-0 @lg:flex-1">
         <Link href={campaignHref(brand, campaign)} className="block truncate text-sm hover:underline">
           {campaign.name}
         </Link>
@@ -117,7 +117,7 @@ export function CampaignRow({
           <span className="text-muted-foreground text-[11px]">{brand.name}</span>
         ) : null}
       </div>
-      <span className="text-muted-foreground hidden items-center gap-1.5 sm:flex">
+      <span className="text-muted-foreground col-span-2 flex items-center gap-1.5 @lg:col-span-1">
         {campaign.platforms.map((row) => (
           <span key={row.id} title={`${platformLabel(row.platform)} · ${row.status}`}>
             <ChannelLogo platform={row.platform} className="size-3.5" />
@@ -126,8 +126,11 @@ export function CampaignRow({
         {campaign.platforms.length === 0 ? (
           <span className="text-[11px]">no platform</span>
         ) : null}
+        <span className="ml-auto @lg:hidden">
+          <SpendCell campaign={campaign} />
+        </span>
       </span>
-      <span className="w-40 shrink-0 text-right">
+      <span className="hidden w-40 shrink-0 text-right @lg:block">
         <SpendCell campaign={campaign} />
       </span>
     </li>

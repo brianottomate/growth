@@ -68,8 +68,8 @@ export default async function PerformanceDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="grid flex-1 grid-cols-3 gap-3">
+      <div className="flex flex-col gap-4 @4xl:flex-row @4xl:items-start @4xl:justify-between">
+        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-3 @4xl:flex-1">
           <Figure label="Live campaigns" value={String(desk.live.length)} sub={
               desk.live.length === 0
                 ? "Nothing spending"
@@ -90,7 +90,7 @@ export default async function PerformanceDashboardPage() {
           description="Paste a website above. The assistant creates the brand, reads its logo and colours, pulls listing photos, opens a campaign shell and drafts the first ads. Nothing is pushed until you say so."
         />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 @4xl:grid-cols-2">
           <section className="space-y-2">
             <h2 className="text-sm font-semibold">Live now</h2>
             {desk.live.length === 0 ? (
@@ -134,7 +134,7 @@ export default async function PerformanceDashboardPage() {
             )}
           </section>
 
-          <section className="space-y-2 lg:col-span-2">
+          <section className="space-y-2 @4xl:col-span-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold">In progress</h2>
               <Link href="/app/performance/campaigns" className="text-muted-foreground text-xs hover:underline">
@@ -161,10 +161,13 @@ export default async function PerformanceDashboardPage() {
 
 function Figure({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="bg-card rounded-xl border p-4">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-      <p className="text-muted-foreground text-[11px]">{sub}</p>
+    <div className="bg-card flex items-baseline justify-between gap-3 rounded-xl border p-4 @xl:block">
+      <div className="min-w-0">
+        <p className="text-muted-foreground text-xs">{label}</p>
+        <p className="text-muted-foreground text-[11px] @xl:hidden">{sub}</p>
+      </div>
+      <p className="text-2xl font-semibold tabular-nums @xl:mt-1">{value}</p>
+      <p className="text-muted-foreground hidden text-[11px] @xl:block">{sub}</p>
     </div>
   );
 }

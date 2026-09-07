@@ -363,7 +363,7 @@ export async function CampaignView({
             hint="What the platforms report. Delivery is switched per platform above."
             actions={ask("live", `How is “${campaign.name}” doing?`)}
           >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
               <Stat
                 label="Spend"
                 value={money(totals.spend)}
@@ -405,8 +405,8 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <li className="grid gap-3 sm:grid-cols-[2rem_minmax(0,1fr)]">
-      <div className="hidden sm:block">
+    <li className="grid gap-3 @lg:grid-cols-[2rem_minmax(0,1fr)]">
+      <div className="hidden @lg:block">
         <span
           className={cn(
             "flex size-7 items-center justify-center rounded-full border text-xs font-semibold tabular-nums",
@@ -425,7 +425,7 @@ function Step({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="flex items-center gap-2 text-base font-semibold">
-              <span className="sm:hidden">{n}.</span>
+              <span className="@lg:hidden">{n}.</span>
               {title}
               {meta ? (
                 <span className="text-muted-foreground text-sm font-normal">{meta}</span>

@@ -101,7 +101,7 @@ export function DraftedAds({
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 @3xl:grid-cols-2">
         {ads.map((ad) => {
           const preview = toPreview(ad);
           const first = preview.media[0];
@@ -117,7 +117,7 @@ export function DraftedAds({
               key={ad.id}
               className={cn(
                 "bg-card overflow-hidden rounded-xl border",
-                unfolded && "sm:col-span-2",
+                unfolded && "@3xl:col-span-2",
               )}
             >
               <div className="flex gap-3 p-3">
