@@ -16,7 +16,7 @@ import {
 } from "@/server/services/performance-desk.service";
 
 import { brandAdsHref, BrandLogo, CampaignRow, campaignHref } from "./_components";
-import { NewClientBox } from "./NewClientBox";
+import { NewClientDialog } from "./NewClientDialog";
 
 export const metadata: Metadata = { title: "Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -80,14 +80,17 @@ export default async function PerformanceDashboardPage() {
           <Figure label="Clients" value={String(desk.clients)} sub={`${desk.prospects} prospect${desk.prospects === 1 ? "" : "s"}`} />
           <Figure label="Needs a hand" value={String(attention.length)} sub={attention.length ? "listed below" : "All caught up"} />
         </div>
-        <NewClientBox />
+        <div className="@4xl:pt-1">
+          <NewClientDialog size="default" />
+        </div>
       </div>
 
       {desk.brands.length === 0 ? (
         <EmptyState
           icon={Crosshair}
           title="No clients yet"
-          description="Paste a website above. The assistant creates the brand, reads its logo and colours, pulls listing photos, opens a campaign shell and drafts the first ads. Nothing is pushed until you say so."
+          description="Add a client by its website. The assistant creates the brand, reads its logo and colours, pulls listing photos, opens a campaign shell and drafts the first ads. Nothing is pushed until you say so."
+          actions={<NewClientDialog />}
         />
       ) : (
         <div className="grid gap-6 @4xl:grid-cols-2">

@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/server/db";
+import { brandIntakeUrl } from "@/server/services/brand-connect.service";
 import {
   brandTable,
   campaignTable,
@@ -46,6 +47,8 @@ export type DeskBrand = {
   website: string | null;
   relationship: "internal" | "client" | "prospect" | "reference";
   hasMark: boolean;
+  /** The client-facing intake form on wander.com, by slug or by connect token. */
+  intakeUrl: string | null;
   account: { id: string; status: string; plan: string | null } | null;
   campaigns: DeskCampaign[];
   /** The furthest along any of this brand's campaigns is. */
@@ -109,6 +112,7 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
       website: true,
       relationship: true,
       brandMark: true,
+      connectToken: true,
     },
     orderBy: (brand, { asc }) => [asc(brand.name)],
   });
@@ -216,6 +220,11 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
         website: brand.website,
         relationship: brand.relationship,
         hasMark: Boolean(brand.brandMark),
+        intakeUrl: brand.slug
+          ? brandIntakeUrl(brand.slug)
+          : brand.connectToken
+            ? brandIntakeUrl(brand.connectToken)
+            : null,
         account: account ? { id: account.id, status: account.status, plan: account.plan } : null,
         campaigns: own,
         best: own.reduce<DeskCampaignState | null>(
