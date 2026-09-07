@@ -114,7 +114,11 @@ export function CampaignRow({
           {campaign.name}
         </Link>
         {showBrand ? (
-          <span className="text-muted-foreground text-[11px]">{brand.name}</span>
+          <span className="text-muted-foreground text-[11px]">
+            {campaign.accountName && brand.relationship === "internal"
+              ? `${campaign.accountName} · run from ${brand.name}`
+              : brand.name}
+          </span>
         ) : null}
       </div>
       <span className="text-muted-foreground col-span-2 flex items-center gap-1.5 @lg:col-span-1">

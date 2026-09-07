@@ -7,6 +7,7 @@ import {
   brandTable,
   campaignTable,
   performanceAccountTable,
+  performanceCycleTable,
   platformCampaignTable,
   type HomesRun,
   type PlatformCampaign,
@@ -29,6 +30,12 @@ export type DeskCampaign = {
   pace: "ahead" | "on" | "behind" | null;
   adCount: number;
   lastHomesRun: HomesRun | null;
+  /**
+   * The client this campaign is billed to when it runs under Wander's own
+   * brand: the account on the cycle it is attached to. Null when the campaign
+   * runs as the client's brand, where the brand already says who it is for.
+   */
+  accountName: string | null;
 };
 
 export type DeskBrand = {
@@ -113,7 +120,15 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
   const [campaignRows, accounts] = await Promise.all([
     db.query.campaignTable.findMany({
       where: and(inArray(campaignTable.brandId, brandIds), isNull(campaignTable.deletedAt)),
-      columns: { id: true, brandId: true, name: true, budget: true, createdAt: true, homesRun: true },
+      columns: {
+        id: true,
+        brandId: true,
+        name: true,
+        budget: true,
+        createdAt: true,
+        homesRun: true,
+        performanceCycleId: true,
+      },
       with: { ads: { columns: { id: true } } },
       orderBy: (campaign, { desc }) => [desc(campaign.createdAt)],
     }),
@@ -125,6 +140,19 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
       columns: { id: true, brandId: true, status: true, plan: true },
     }),
   ]);
+  const cycleIds = campaignRows
+    .map((campaign) => campaign.performanceCycleId)
+    .filter((id): id is string => Boolean(id));
+  const cycles = cycleIds.length
+    ? await db.query.performanceCycleTable.findMany({
+        where: inArray(performanceCycleTable.id, cycleIds),
+        columns: { id: true, accountId: true },
+        with: { account: { columns: { name: true } } },
+      })
+    : [];
+  const accountNameByCycle = new Map(
+    cycles.map((cycle) => [cycle.id, cycle.account?.name ?? null] as const),
+  );
   const platformRows = campaignRows.length
     ? await db.query.platformCampaignTable.findMany({
         where: inArray(
@@ -157,6 +185,9 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
       pace: paceOf(rows, spend),
       adCount: campaign.ads.length,
       lastHomesRun: campaign.homesRun ?? null,
+      accountName: campaign.performanceCycleId
+        ? (accountNameByCycle.get(campaign.performanceCycleId) ?? null)
+        : null,
     };
   });
   const campaignsByBrand = new Map<string, DeskCampaign[]>();

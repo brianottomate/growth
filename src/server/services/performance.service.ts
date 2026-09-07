@@ -787,7 +787,7 @@ async function attachCampaignToCycle(
         .insert(campaignTable)
         .values({
           brandId: campaign.brandId,
-          name: `Performance+ · ${cycle.period}`,
+          name: `Performance · ${cycle.period}`,
           slug,
           goal: "performance",
           description:

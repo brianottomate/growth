@@ -18,7 +18,7 @@ export const brandTypeEnum = pgEnum("brand_type", ["company", "personal"]);
 export type BrandType = (typeof brandTypeEnum.enumValues)[number];
 
 // Wander's relationship to a brand, which is a different question from what
-// the brand IS (`type`). Wander's own brands, paying Performance+ clients,
+// the brand IS (`type`). Wander's own brands, paying Performance clients,
 // targets a rep is pitching, and competitors we merely watch all belong in
 // one table and none of them belong in the same list.
 export const brandRelationshipEnum = pgEnum("brand_relationship", [

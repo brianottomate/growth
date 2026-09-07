@@ -8,7 +8,7 @@ import {
 } from "@/server/services/performance-intake.service";
 
 /**
- * Record a Performance+ intake. POST /api/intake/v1/submit
+ * Record a Performance intake. POST /api/intake/v1/submit
  *
  * Called by wander.com, which hosts the form. The body's token or slug
  * resolves the brand, so this route must never accept an accountId or

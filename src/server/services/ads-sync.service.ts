@@ -447,7 +447,7 @@ export async function syncZernioAds(
   updated: number;
   skipped: number;
   byObjective: Record<string, number>;
-  /** Performance+ cycles whose observed spend was refreshed from this sync. */
+  /** Performance cycles whose observed spend was refreshed from this sync. */
   cyclesRepriced: number;
   /** Ad set and ad rows mirrored from the tree. */
   adSetsWritten: number;
@@ -802,7 +802,7 @@ export async function syncZernioAds(
     byObjective[k] = (byObjective[k] ?? 0) + 1;
   }
 
-  // Observed spend for Performance+ cycles is derived from the campaign rows
+  // Observed spend for Performance cycles is derived from the campaign rows
   // this sync just refreshed, so it rides the same compute wake rather than
   // earning a cron mark of its own. A failure here must not fail the sync.
   let cyclesRepriced = 0;

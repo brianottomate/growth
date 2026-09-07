@@ -222,7 +222,7 @@ async function assertOwnedBrand(brandId: string, orgId: string) {
 
 export const previewBrandPurgeAction = growthAction({
   description:
-    "Show exactly what purging a brand would destroy: row counts per table, plus anything that blocks the purge (Performance+ accounts and partner programs are financial records and must be detached first). Read-only. Always call this before brandWrite.purge and show the operator the counts.",
+    "Show exactly what purging a brand would destroy: row counts per table, plus anything that blocks the purge (Performance accounts and partner programs are financial records and must be detached first). Read-only. Always call this before brandWrite.purge and show the operator the counts.",
   inputSchema: z.object({ brandId: z.string().trim().min(1) }),
   execute: async (input, ctx) => {
     await assertOwnedBrand(input.brandId, ctx.orgId);

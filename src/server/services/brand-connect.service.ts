@@ -106,7 +106,7 @@ export function brandConnectUrl(token: string): string {
 }
 
 /**
- * The Performance+ intake, on the same token.
+ * The Performance intake, on the same token.
  *
  * Points at wander.com, because that is where the form lives. It used to
  * build this app's own origin, which meant an operator copying the link off

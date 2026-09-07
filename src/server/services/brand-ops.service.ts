@@ -173,7 +173,7 @@ export async function enrichBrandById(
 /**
  * Why a purge is refused, if it is.
  *
- * Performance+ cycles and partner programs are money records rather than
+ * Performance cycles and partner programs are money records rather than
  * marketing data, and both are RESTRICT/NO ACTION at the foreign key, so the
  * delete would fail regardless. Refusing with a reason beats a constraint
  * error. Pure so the rule can be tested without a database.
@@ -185,7 +185,7 @@ export function purgeBlockers(counts: {
   const blockers: string[] = [];
   if (counts.performance_accounts > 0) {
     blockers.push(
-      `${counts.performance_accounts} Performance+ account(s): billed cycles are financial history, so detach or archive them first.`,
+      `${counts.performance_accounts} Performance account(s): billed cycles are financial history, so detach or archive them first.`,
     );
   }
   if (counts.partner_programs > 0) {

@@ -6,7 +6,7 @@ import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 import { AccountDetail } from "./AccountDetail";
 
 export const metadata: Metadata = {
-  title: "Performance+ account",
+  title: "Account · Wander Performance",
 };
 
 export default async function PerformanceAccountPage({

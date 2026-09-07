@@ -61,11 +61,11 @@ export function AccountDetail({ accountId }: { accountId: string }) {
     <div className="space-y-8">
       <div className="space-y-2">
         <Link
-          href="/app/performance"
+          href="/app/performance/accounts"
           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
         >
           <ArrowLeft className="size-3" />
-          Performance+
+          Accounts
         </Link>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="text-xl font-semibold">{account.name}</h1>
@@ -603,7 +603,7 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold">
-        Abandoned on sponsored homes · last 7 days
+        Abandoned on the client&apos;s homes · last 7 days
       </h2>
 
       {isLoading && (
@@ -671,9 +671,9 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
 }
 
 /**
- * A home is bookable on wander.com (List+) or on the client's own WanderOS
- * site (Performance+). Either column can be null, so read whichever is set
- * rather than assuming the List+ shape.
+ * A home is bookable on the client's own WanderOS site (Performance) or, for
+ * the early List+ accounts, on wander.com. Either column can be null, so read
+ * whichever is set.
  */
 function propertyUrl(property: {
   wanderUrl: string | null;

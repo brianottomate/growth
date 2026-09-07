@@ -11,28 +11,26 @@ import { organizationTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
 import { createId } from "./utils";
 
-// ---- PERFORMANCE (sponsored placements sold to property managers) ----------
+// ---- PERFORMANCE (the commercial layer of Performance by Wander) ------------
 //
-// The paid counterpart of the List+ sales page: a property manager pays to be
-// featured across Wander's own marketing surfaces (Meta ads, lifecycle email,
-// influencer collabs). The spreadsheet this replaces tracked
-// Customer/Onboarded/Properties/Ads/Emails/Billing per customer.
+// A property manager pays Wander a management fee plus a media budget to run
+// performance marketing for their homes: ads, email, creators, reporting. The
+// spreadsheet this replaces tracked Customer/Onboarded/Properties/Ads/Emails/
+// Billing per customer.
 //
 // A performance ACCOUNT is the commercial entity — deliberately NOT a brand.
 // It attaches to delivery through the nullable performanceCycleId FK on
 // campaign / lifecycle_campaign / amplification_target, and the spend rollup
-// never filters on brand, so the same commercial layer serves both products:
-//
-//   List+          delivery on WANDER's channels; campaigns carry
-//                  brandId = Wander and the customer is a sponsor.
-//   Performance+   delivery as the CLIENT; campaigns carry the client's own
-//                  brandId, run from Wander's shared ad account, and appear
-//                  under the client's own Page.
+// never filters on brand. Delivery runs AS the client: campaigns carry the
+// client's own brandId, run from Wander's shared ad account, and appear under
+// the client's own Page. The first accounts (List+, 2026-08) ran on Wander's
+// own brand instead; those campaigns still attach through their cycle, which
+// is how the desk names the client behind a Wander-brand campaign.
 //
 // `brandId` here is the amplifier.promotedBrandId graduation pattern: a brand
-// row holding the customer's identity, promotable to real connected channels.
-// Performance+ is that promotion, which is why ad_account is a per-brand
-// allowlist rather than a 1:1 brand↔account map.
+// row holding the customer's identity, promotable to real connected channels,
+// which is why ad_account is a per-brand allowlist rather than a 1:1
+// brand↔account map.
 
 export const performanceAccountStatusEnum = pgEnum(
   "performance_account_status",

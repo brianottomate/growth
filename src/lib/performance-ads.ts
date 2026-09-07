@@ -1,7 +1,7 @@
 /**
- * Performance+ ad conventions — the house style for sponsored placement builds.
+ * Performance ad conventions: the house style for client campaign builds.
  *
- * These are Brooke's conventions, lifted from the first live Performance+
+ * These are Brooke's conventions, lifted from the first live Performance
  * campaign (Away & Stay, 2026-08) and her walkthrough recordings, so that a
  * Growth-generated build is recognisably the same thing she would have made by
  * hand in Ads Manager. Where our own data gave a better answer than the manual
@@ -29,7 +29,7 @@ export const PERFORMANCE_AD_DEFAULTS = {
   objective: "OUTCOME_SALES",
 
   /**
-   * Budget lives on the ad set, never the campaign. A Performance+ campaign
+   * Budget lives on the ad set, never the campaign. A Performance campaign
    * gains audiences as the customer's spend grows (see audiencePlanFor), and
    * CBO would silently reallocate a customer's money across them.
    */

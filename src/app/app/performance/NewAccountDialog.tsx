@@ -71,7 +71,7 @@ export function NewAccountDialog() {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Onboard a Performance+ customer</DialogTitle>
+          <DialogTitle>Onboard a Performance client</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">

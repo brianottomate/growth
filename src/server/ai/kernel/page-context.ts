@@ -54,7 +54,7 @@ function guidanceForPath(pathname: string): string | null {
   if (pathname.startsWith("/app/lifecycle"))
     return "This is the lifecycle workspace. Use lifecycleRead before lifecycleWrite. Customer.io and Outreach remain Growth-only provider integrations.";
   if (pathname.startsWith("/app/performance"))
-    return "This is Wander Performance, the paid-media desk: clients, their campaigns and what is spending. adsRead.listCampaigns and adsRead.openCampaign read the plan; performanceRead reads the commercial accounts. To set up a new client from a website, read the new-client-setup playbook and follow it.";
+    return "This is Wander Performance: the desk for Performance by Wander, where a property manager pays a management fee plus media budget and Wander runs the marketing for their homes as their brand. Tabs: Dashboard, Clients (the brands), Campaigns, Accounts (the commercial record: plan, cycles, billed vs media). adsRead.listCampaigns and adsRead.openCampaign read the plan; performanceRead reads accounts. To set up a new client from a website, read the new-client-setup playbook and follow it.";
   if (pathname.startsWith("/app/media"))
     return "This is the media library. Growth-only Drive and upload capabilities remain available here alongside media analysis.";
   if (pathname.startsWith("/app/compositions"))

@@ -67,7 +67,7 @@ export function NewCampaignButton({
   const [landingUrl, setLandingUrl] = useState(brandWebsite ?? "");
   const [description, setDescription] = useState("");
 
-  // A Performance+ client already told us their budget and which homes they
+  // A Performance client already told us their budget and which homes they
   // are advertising, on the intake form. Retyping it is how the number in the
   // campaign drifts from the number they agreed to.
   const prefill = useQuery({

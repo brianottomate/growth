@@ -48,14 +48,14 @@ const actorFrom = (ctx: { orgId: string }): PerformanceActor => ({
 
 export const listPerformanceAccountsAction = growthAction({
   description:
-    "List performance accounts (property managers paying for sponsored placement on Wander's marketing surfaces) with their properties and recent billing cycles.",
+    "List Performance accounts (the commercial record of each property manager paying Wander to run performance marketing for their homes) with their properties and recent billing cycles.",
   inputSchema: z.object({}),
   execute: (_input, ctx) => listPerformanceAccounts(actorFrom(ctx)),
 });
 
 export const getPerformanceAccountAction = growthAction({
   description:
-    "Read one performance account completely: contact, plan, sponsored properties, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
+    "Read one Performance account completely: contact, plan, the homes on the record, every billing cycle, report list, and the delivery attached to each cycle (campaigns, lifecycle campaigns, amplification targets).",
   inputSchema: z.object({ accountId: z.string().min(1) }),
   execute: (input, ctx) =>
     getPerformanceAccount(actorFrom(ctx), input.accountId),
@@ -63,7 +63,7 @@ export const getPerformanceAccountAction = growthAction({
 
 export const clientCampaignContextAction = growthAction({
   description:
-    "What a Performance+ client agreed to and what we would advertise for them: the monthly media budget, whether they asked for every home, the property URLs on the record, and where those homes are (countries, state codes, resolvable region names, cities). Read this before proposing campaigns or audiences for a client brand — the geography is a fact about their portfolio, not a recommendation about who to target.",
+    "What a Performance client agreed to and what we would advertise for them: the monthly media budget, whether they asked for every home, the property URLs on the record, and where those homes are (countries, state codes, resolvable region names, cities). Read this before proposing campaigns or audiences for a client brand — the geography is a fact about their portfolio, not a recommendation about who to target.",
   inputSchema: z.object({ brandId: z.string().min(1) }),
   outputSchema: z.object({
     accountId: z.string().nullable(),
@@ -84,7 +84,7 @@ export const clientCampaignContextAction = growthAction({
 
 export const listIntakesAction = growthAction({
   description:
-    "List the onboarding forms a Performance+ client has filed for one account, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified.",
+    "List the onboarding forms a Performance client has filed for one account, newest first: what they answered, the budget they agreed to, whether it has been applied, and whether their ad access has been verified.",
   inputSchema: z.object({ accountId: z.string().min(1) }),
   examples: [{ accountId: "perf_01" }],
   execute: (input, ctx) =>
@@ -158,14 +158,14 @@ export const updatePerformanceAccountAction = growthAction({
 
 export const addPerformancePropertyAction = growthAction({
   description:
-    "Add a sponsored wander.com property to a performance account. The monolith propertyId can be backfilled later; rows without it have no booking attribution yet.",
+    "Add one of the client's homes to a Performance account. The monolith propertyId can be backfilled later; rows without it have no booking attribution yet.",
   inputSchema: addPerformancePropertySchema,
   execute: (input, ctx) => addPerformanceProperty(actorFrom(ctx), input),
 });
 
 export const updatePerformancePropertyAction = growthAction({
   description:
-    "Update a sponsored property's title, notes, or backfill its monolith property id (the booking-attribution join key).",
+    "Update a home's title, notes, or backfill its monolith property id (the booking-attribution join key).",
   inputSchema: updatePerformancePropertySchema,
   execute: (input, ctx) => updatePerformanceProperty(actorFrom(ctx), input),
 });
@@ -201,7 +201,7 @@ export const refreshPerformanceCycleSpendAction = growthAction({
 
 export const listSponsoredAbandonmentAction = growthAction({
   description:
-    "Guests who abandoned checkout (or wishlisted) on a Performance+ customer's sponsored homes, hottest first. Joined on the listing id the tracked event carries, never on property name. Use this to answer what a customer's boosted homes produced and to hand BDRs a follow-up list. Read-only; it does not contact anyone.",
+    "Guests who abandoned checkout (or wishlisted) on a Performance client's homes, hottest first. Joined on the listing id the tracked event carries, never on property name. Use this to answer what a customer's boosted homes produced and to hand BDRs a follow-up list. Read-only; it does not contact anyone.",
   inputSchema: sponsoredAbandonmentSchema,
   execute: (input, ctx) => listSponsoredAbandonment(actorFrom(ctx), input),
 });

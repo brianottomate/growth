@@ -44,8 +44,8 @@ import {
 
 import { protectedProcedure } from "../trpc";
 
-// Performance+ (/app/performance) — the customers paying for sponsored
-// placement on Wander's surfaces. Replaces the "Performance Dashboard" sheet.
+// Performance accounts (/app/performance/accounts) — the clients paying for
+// Wander to run their marketing. Replaces the "Performance Dashboard" sheet.
 // Delivery itself stays in campaign / lifecycle / amplification; this is the
 // commercial layer plus a read of what is attached to each cycle.
 
@@ -229,7 +229,7 @@ export const performanceRouter = {
       setBrandRelationship(await actorFor(ctx), input),
     ),
 
-  // What a new campaign draft opens with for a Performance+ client.
+  // What a new campaign draft opens with for a Performance client.
   campaignPrefill: protectedProcedure
     .input(z.object({ brandId: z.string().min(1) }))
     .query(async ({ ctx, input }) =>

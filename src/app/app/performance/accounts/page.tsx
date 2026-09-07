@@ -6,12 +6,12 @@ import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 import { PerformanceClient } from "../PerformanceClient";
 
 export const metadata: Metadata = {
-  title: "Performance+",
+  title: "Accounts · Wander Performance",
 };
 
-// Performance+ — the property managers paying for sponsored placement on
-// Wander's marketing surfaces, sold through wander.com/list-plus. This replaces
-// the "Performance Dashboard" sheet, so the columns deliberately mirror it.
+// The commercial layer of Performance by Wander: one account per paying
+// client, with cycles of billed amount versus media budget. Replaces the
+// "Performance Dashboard" sheet, so the columns deliberately mirror it.
 export default async function PerformancePage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");

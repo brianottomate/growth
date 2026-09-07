@@ -225,7 +225,7 @@ export const storefrontWrite = growthDomainTool({
 
 export const performanceRead = growthDomainTool({
   description:
-    "Read performance accounts — property managers paying for sponsored placement on Wander's marketing surfaces — with their properties, billing cycles, and attached delivery.",
+    "Read Performance accounts, the commercial record of each client paying Wander to run performance marketing for their homes, with their properties, billing cycles, and attached delivery.",
   actions: {
     list: listPerformanceAccountsAction,
     get: getPerformanceAccountAction,
@@ -239,7 +239,7 @@ export const performanceRead = growthDomainTool({
 
 export const performanceWrite = growthDomainTool({
   description:
-    "Manage performance accounts: onboard customers, add sponsored properties, open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
+    "Manage Performance accounts: onboard clients, add their homes, open and update billing cycles, and attach existing delivery (campaigns, lifecycle campaigns, amplification targets) to a cycle. Never creates ads or sends anything.",
   actions: {
     createAccount: createPerformanceAccountAction,
     updateAccount: updatePerformanceAccountAction,

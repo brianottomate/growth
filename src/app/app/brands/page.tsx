@@ -177,7 +177,7 @@ function BrandCard({
                     href={`/app/performance/${readiness.accountId}`}
                     className="text-foreground text-xs hover:underline"
                   >
-                    Performance+ ↗
+                    Account ↗
                   </Link>
                 )}
               </>
@@ -426,7 +426,7 @@ export default async function BrandsPage() {
       })
     : [];
 
-  // Performance+ readiness. Only brands with a commercial record get a strip,
+  // Performance readiness. Only brands with a commercial record get a strip,
   // so this is a handful of rows however many brands the org has.
   const perfAccounts = brandIds.length
     ? await db.query.performanceAccountTable.findMany({

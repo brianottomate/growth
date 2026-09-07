@@ -52,12 +52,10 @@ export function PerformanceClient() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-        <h1 className="text-xl font-semibold">Performance+</h1>
+        <h2 className="text-base font-semibold">Accounts</h2>
         <p className="text-muted-foreground text-sm">
-          Property managers paying for placement on Wander&apos;s marketing
-          surfaces. Sold through{" "}
-          <span className="font-mono text-xs">wander.com/list-plus</span>;
-          payment is handled offline.
+          The commercial record behind each Performance client: plan, billing
+          cycles, media budget and what ran. Payment is handled offline.
         </p>
         </div>
         <NewAccountDialog />
@@ -69,7 +67,7 @@ export function PerformanceClient() {
 
       {!isLoading && accounts.length === 0 && (
         <div className="border-border rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm font-medium">No Performance+ customers yet</p>
+          <p className="text-sm font-medium">No Performance clients on record yet</p>
           <p className="text-muted-foreground mt-1 text-sm">
             Use the button above, or ask the assistant to onboard one.
           </p>

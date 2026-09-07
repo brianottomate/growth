@@ -997,7 +997,7 @@ export type CampaignPrefill = {
 };
 
 /**
- * What a new campaign draft should open with for a Performance+ client.
+ * What a new campaign draft should open with for a Performance client.
  *
  * Reads the promoted rows rather than the receipt wherever both exist, since
  * an operator may have corrected a home or a budget after apply. The budget
