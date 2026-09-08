@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { DeleteCampaignButton } from "@/app/app/brands/[brandSlug]/ads/_views/DeleteCampaignButton";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { cn } from "@/components/ui/lib/utils";
 import {
@@ -155,10 +156,13 @@ export function CampaignRow({
   brand,
   campaign,
   showBrand = false,
+  deletable = false,
 }: {
   brand: DeskBrand;
   campaign: DeskCampaign;
   showBrand?: boolean;
+  /** Offer the confirmed delete on drafts (rows on a platform refuse it). */
+  deletable?: boolean;
 }) {
   const client =
     campaign.accountName && brand.relationship === "internal"
@@ -192,6 +196,18 @@ export function CampaignRow({
       <span className="hidden w-36 shrink-0 text-right @lg:block">
         <SpendCell campaign={campaign} />
       </span>
+      {deletable && campaign.state === "draft" ? (
+        <span className="col-start-2 justify-self-end @lg:col-auto">
+          <DeleteCampaignButton
+            campaignId={campaign.id}
+            campaignName={campaign.name}
+            brandSlug={brand.slug ?? brand.id}
+            livePlatformCampaigns={campaign.platforms.filter((row) => row.status !== "draft").length}
+            compact
+            afterDelete="refresh"
+          />
+        </span>
+      ) : null}
     </li>
   );
 }

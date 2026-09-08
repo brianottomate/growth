@@ -10,6 +10,7 @@ import { cn } from "@/components/ui/lib/utils";
 import { loadPerformanceDesk, narrowDesk } from "@/server/services/performance-desk.service";
 
 import { brandAdsHref, BrandLogo, panel, SectionLabel, StateChip } from "../_components";
+import { BrandRowMenu } from "../BrandRowMenu";
 import { ProspectActions } from "./ProspectActions";
 import { ProspectSearch } from "./ProspectSearch";
 
@@ -66,7 +67,8 @@ export default async function PerformanceProspectsPage() {
                     {brand.best ? <StateChip state={brand.best} /> : null}
                   </div>
                 </div>
-                <ProspectActions brandId={brand.id} website={brand.website} intakeUrl={brand.intakeUrl} />
+                <ProspectActions website={brand.website} intakeUrl={brand.intakeUrl} />
+                <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="prospect" />
               </li>
             ))}
           </ul>

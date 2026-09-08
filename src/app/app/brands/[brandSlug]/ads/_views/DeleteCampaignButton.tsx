@@ -26,11 +26,17 @@ export function DeleteCampaignButton({
   campaignName,
   brandSlug,
   livePlatformCampaigns,
+  compact = false,
+  afterDelete = "list",
 }: {
   campaignId: string;
   campaignName: string;
   brandSlug: string;
   livePlatformCampaigns: number;
+  /** Icon only, for a row in a list. */
+  compact?: boolean;
+  /** Where to go once it is gone: the brand's ads list, or stay and refresh. */
+  afterDelete?: "list" | "refresh";
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -40,7 +46,8 @@ export function DeleteCampaignButton({
     trpc.ads.deleteDraftCampaign.mutationOptions({
       onSuccess: () => {
         setOpen(false);
-        router.push(`/app/brands/${brandSlug}/ads`);
+        if (afterDelete === "list") router.push(`/app/brands/${brandSlug}/ads`);
+        else router.refresh();
       },
     }),
   );
@@ -50,11 +57,13 @@ export function DeleteCampaignButton({
       <Button
         size="sm"
         variant="ghost"
-        className="text-muted-foreground"
+        className={compact ? "text-muted-foreground hover:text-foreground size-7 rounded-full p-0" : "text-muted-foreground"}
         onClick={() => setOpen(true)}
+        aria-label={compact ? `Delete ${campaignName}` : undefined}
+        title={compact ? "Delete campaign" : undefined}
       >
         <Trash2 className="size-3.5" />
-        Delete
+        {compact ? null : "Delete"}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

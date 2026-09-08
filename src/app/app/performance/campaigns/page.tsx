@@ -58,7 +58,7 @@ export default async function PerformanceCampaignsPage() {
         node: (
           <ul className={cn(panel, "divide-y")}>
             {rows.map((campaign) => (
-              <CampaignRow key={campaign.id} brand={brandById.get(campaign.brandId)!} campaign={campaign} showBrand />
+              <CampaignRow key={campaign.id} brand={brandById.get(campaign.brandId)!} campaign={campaign} showBrand deletable />
             ))}
           </ul>
         ),

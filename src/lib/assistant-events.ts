@@ -68,7 +68,16 @@ export type SetUpClientIntent = {
   visibleText: string;
 };
 
+/** "Define personas for this brand": the chat reads the brand and proposes them. */
+export type DefinePersonasIntent = {
+  type: "define_personas";
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+};
+
 export type AssistantIntent =
+  | DefinePersonasIntent
   | SetUpClientIntent
   | PlanTwoWeeksIntent
   | WorkContentIntent

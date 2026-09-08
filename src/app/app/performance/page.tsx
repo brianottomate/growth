@@ -59,13 +59,13 @@ export default async function PerformanceDashboardPage() {
   }
   const uncapped = desk.live.filter((campaign) => campaign.budget === 0).length;
 
-  const inProgress: { campaign: DeskCampaign; brand: DeskBrand }[] = desk.campaigns
-    .filter((campaign) => campaign.state !== "live")
-    .slice(0, 6)
-    .flatMap((campaign) => {
+  const withBrand = (rows: DeskCampaign[]) =>
+    rows.flatMap((campaign) => {
       const brand = brandById.get(campaign.brandId);
       return brand ? [{ campaign, brand }] : [];
     });
+  const pushed = withBrand(desk.campaigns.filter((campaign) => campaign.state === "pushed"));
+  const drafts = withBrand(desk.campaigns.filter((campaign) => campaign.state === "draft"));
 
   return (
     <div className="space-y-7">
@@ -129,18 +129,29 @@ export default async function PerformanceDashboardPage() {
               )}
             </section>
 
+            {pushed.length > 0 ? (
+              <section className="space-y-2.5">
+                <SectionLabel>Pushed, paused · {pushed.length}</SectionLabel>
+                <ul className={cn(panel, "divide-y")}>
+                  {pushed.map(({ campaign, brand }) => (
+                    <CampaignRow key={campaign.id} brand={brand} campaign={campaign} showBrand />
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
             <section className="space-y-2.5">
               <div className="flex items-baseline justify-between">
-                <SectionLabel>In progress · {desk.campaigns.filter((c) => c.state !== "live").length}</SectionLabel>
+                <SectionLabel>Drafts · {drafts.length}</SectionLabel>
                 <Link href="/app/performance/campaigns" className="inline-flex items-center gap-1 text-[11.5px] text-sky-300 hover:underline">
                   All campaigns <ArrowRight className="size-3" />
                 </Link>
               </div>
-              {inProgress.length === 0 ? (
+              {drafts.length === 0 ? (
                 <p className={cn(panel, "text-muted-foreground px-4 py-6 text-center text-xs")}>No drafts.</p>
               ) : (
                 <ul className={cn(panel, "divide-y")}>
-                  {inProgress.map(({ campaign, brand }) => (
+                  {drafts.slice(0, 6).map(({ campaign, brand }) => (
                     <CampaignRow key={campaign.id} brand={brand} campaign={campaign} showBrand />
                   ))}
                 </ul>

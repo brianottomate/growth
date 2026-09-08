@@ -25,6 +25,8 @@ import { CopyButton } from "@/components/copy-button";
 import { AttachCampaign } from "./AttachCampaign";
 import { ImportCreativeButton } from "./_views/ImportCreativeButton";
 import { NewCampaignButton } from "./NewCampaignButton";
+import { DeleteCampaignButton } from "./_views/DeleteCampaignButton";
+import { DefinePersonasButton } from "./DefinePersonasButton";
 
 const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
@@ -515,6 +517,14 @@ export default async function BrandAdsPage({
                     />
                   </div>
                 </div>
+                <DeleteCampaignButton
+                  campaignId={init.id}
+                  campaignName={init.name}
+                  brandSlug={brandSlug}
+                  livePlatformCampaigns={initCampaigns.filter((row) => row.externalId).length}
+                  compact
+                  afterDelete="refresh"
+                />
               </div>
 
               {/* platforms: planned drafts vs pushed reality */}
@@ -614,12 +624,9 @@ export default async function BrandAdsPage({
             who travel&rdquo; — that inspires campaign audiences and content
             alike. Few and stable, like pillars.
           </p>
-          <Link
-            href="/app/audiences"
-            className="bg-primary text-primary-foreground mt-4 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium hover:opacity-90"
-          >
-            Define personas
-          </Link>
+          <div className="mt-4">
+            <DefinePersonasButton brandId={brand.id} brandName={brand.name} />
+          </div>
         </div>
       ) : (
         <div className="grid gap-2.5 md:grid-cols-2">

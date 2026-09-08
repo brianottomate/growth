@@ -67,22 +67,19 @@ export async function traceSilhouette(
 ): Promise<string | null> {
   const { hasAlpha } = await sharp(png).metadata();
   if (!hasAlpha) return null;
-  const { data, info } = await sharp(png)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+  const { width, height, alpha } = await silhouetteAlpha(png);
   const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(color.slice(i, i + 2), 16));
   // Two colours only: the shape in `color`, everything else transparent, so
   // the tracer has one clean boundary to follow.
-  const pixels = new Uint8ClampedArray(data.length);
-  for (let i = 0; i < data.length; i += 4) {
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let p = 0, i = 0; p < alpha.length; p++, i += 4) {
     pixels[i] = r!;
     pixels[i + 1] = g!;
     pixels[i + 2] = b!;
-    pixels[i + 3] = data[i + 3]! >= 128 ? 255 : 0;
+    pixels[i + 3] = alpha[p]! >= 128 ? 255 : 0;
   }
   const svg = ImageTracer.imagedataToSVG(
-    { width: info.width, height: info.height, data: pixels },
+    { width, height, data: pixels },
     {
       pal: [
         { r, g, b, a: 0 },
@@ -202,13 +199,63 @@ export async function trimTransparent(png: Buffer): Promise<Buffer> {
 }
 
 /** The image's alpha over a flat colour: its shape, in that colour. */
+
+/**
+ * The alpha a one-colour rendering of an icon should use.
+ *
+ * A mark that is a solid badge with a glyph inside (a dark circle carrying an
+ * "H") has an alpha channel that is just the circle, so a white or dark tone
+ * cut from alpha alone is a white dot with no H. Here the badge colour is the
+ * most common opaque colour; pixels that stray far from it are the glyph and
+ * are knocked out, so the tone renders as the badge shape with the glyph
+ * showing through as the photo. A mark that is already one colour keeps its
+ * alpha as it is, and a mark with no dominant colour is left alone too.
+ */
+export async function silhouetteAlpha(
+  png: Buffer,
+): Promise<{ width: number; height: number; alpha: Buffer }> {
+  const { data, info } = await sharp(png)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const alpha = Buffer.alloc(width * height);
+  const counts = new Map<number, number>();
+  let opaque = 0;
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    // Exported "transparent" backgrounds carry a whisper of alpha; painted
+    // white over a photo that whisper is a grey box around the mark. Floor it.
+    const a = data[i + 3]! < 24 ? 0 : data[i + 3]!;
+    alpha[p] = a;
+    if (a < 128) continue;
+    opaque += 1;
+    const key = ((data[i]! >> 4) << 8) | ((data[i + 1]! >> 4) << 4) | (data[i + 2]! >> 4);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  if (opaque < 64) return { width, height, alpha };
+  let bestKey = 0;
+  let best = 0;
+  for (const [key, count] of counts) if (count > best) [bestKey, best] = [key, count];
+  const share = best / opaque;
+  // Above 0.97 the mark is one colour already; below 0.45 there is no badge to
+  // speak of and the glyph rule would eat half the mark.
+  if (share > 0.97 || share < 0.45) return { width, height, alpha };
+  const br = ((bestKey >> 8) & 15) * 17 + 8;
+  const bg = ((bestKey >> 4) & 15) * 17 + 8;
+  const bb = (bestKey & 15) * 17 + 8;
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    if (alpha[p] === 0) continue;
+    const d = Math.abs(data[i]! - br) + Math.abs(data[i + 1]! - bg) + Math.abs(data[i + 2]! - bb);
+    // Badge pixels sit within ~60 of the badge colour; glyph pixels are far
+    // off. Between the two the edge fades, which keeps the knock-out smooth.
+    const keep = d <= 60 ? 1 : d >= 150 ? 0 : (150 - d) / 90;
+    alpha[p] = Math.round(alpha[p]! * keep);
+  }
+  return { width, height, alpha };
+}
+
 export async function tintSilhouette(png: Buffer, color: string): Promise<Buffer> {
-  const { width, height } = await sharp(png).metadata();
-  if (!width || !height) throw new Error("Cannot read the image's size.");
-  // Exported "transparent" backgrounds often carry a whisper of alpha; painted
-  // white over a photo that whisper is a grey box around the mark. Floor it.
-  const alpha = await sharp(png).ensureAlpha().extractChannel(3).raw().toBuffer();
-  for (let i = 0; i < alpha.length; i++) if (alpha[i]! < 24) alpha[i] = 0;
+  const { width, height, alpha } = await silhouetteAlpha(png);
   return sharp({ create: { width, height, channels: 3, background: color } })
     .joinChannel(alpha, { raw: { width, height, channels: 1 } })
     .png()

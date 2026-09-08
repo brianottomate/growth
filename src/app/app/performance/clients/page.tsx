@@ -21,6 +21,7 @@ import {
 
 import { cn } from "@/components/ui/lib/utils";
 import { brandAdsHref, BrandLogo, panel, pill, SectionLabel, StateChip, tile } from "../_components";
+import { BrandRowMenu } from "../BrandRowMenu";
 import { IntakeLink } from "./IntakeLink";
 
 export const metadata: Metadata = { title: "Clients · Wander Performance" };
@@ -207,6 +208,7 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
             {brand.campaigns.length === 0 ? "Start a campaign" : "Campaigns"}
           </Link>
           {brand.intakeUrl ? <IntakeLink url={brand.intakeUrl} /> : null}
+          <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="client" />
         </div>
       </div>
 
@@ -222,7 +224,7 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         <div className="mt-4 flex items-center gap-2 border-t pt-3 text-xs text-amber-300">
           <span className="size-1.5 rounded-full bg-amber-400" />
           Brand mark missing, so cards render without the logo.
-          <Link href={`/app/brands/${brand.slug ?? brand.id}`} className="text-sky-300 hover:underline">
+          <Link href={`/app/brands/${brand.slug ?? brand.id}#brand-mark`} className="text-sky-300 hover:underline">
             Fix
           </Link>
         </div>

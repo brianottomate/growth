@@ -1,37 +1,20 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
-import { Check, Copy, MessageSquare, UserCheck } from "lucide-react";
+import { Check, Copy, MessageSquare } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/toast";
 import { sendAssistantIntent } from "@/lib/assistant-events";
-import { useTRPC } from "@/trpc/react";
 
-/** Set a prospect up in chat, or mark them signed. */
+/** Copy the intake link, or set the prospect up in chat. */
 export function ProspectActions({
-  brandId,
   website,
   intakeUrl,
 }: {
-  brandId: string;
   website: string | null;
   intakeUrl: string | null;
 }) {
-  const trpc = useTRPC();
-  const router = useRouter();
   const [copied, setCopied] = useState(false);
-  const promote = useMutation(
-    trpc.performance.setBrandRelationship.mutationOptions({
-      onSuccess: () => {
-        toast.success("Now a client");
-        router.refresh();
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
   const pillClass = "h-auto rounded-full px-3 py-1 text-[11.5px] font-semibold";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -67,16 +50,6 @@ export function ProspectActions({
           Set up in chat
         </Button>
       ) : null}
-      <Button
-        size="sm"
-        variant="ghost"
-        className={pillClass}
-        disabled={promote.isPending}
-        onClick={() => promote.mutate({ brandId, relationship: "client" })}
-      >
-        <UserCheck className="size-3" />
-        Signed
-      </Button>
     </div>
   );
 }

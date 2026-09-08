@@ -35,32 +35,13 @@ import {
  * The app's sections, in sidebar order. One list feeds the sidebar and the
  * command menu, so a section added here is reachable from both.
  */
-/**
- * A view of the sidebar for one kind of work. "performance" is the paid-media
- * path (brand, ads, accounts, the library behind the cards); "all" is the
- * whole app. Stored per browser, so a marketer's sidebar stays short.
- */
-export type NavFocus = "all" | "performance";
-export const NAV_FOCUS_STORAGE_KEY = "growth_nav_focus";
-
 export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
   badge?: string;
   exact?: boolean;
-  /** Focuses this item belongs to besides "all". */
-  focus?: readonly Exclude<NavFocus, "all">[];
 };
-
-/** The sidebar groups as one focus sees them; empty groups drop out. */
-export function navGroupsFor(focus: NavFocus) {
-  if (focus === "all") return NAV_GROUPS;
-  return NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => item.focus?.includes(focus)),
-  })).filter((group) => group.items.length > 0);
-}
 
 export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
@@ -72,16 +53,16 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Wander Performance",
     items: [
-      { label: "Dashboard", href: "/app/performance", icon: Crosshair, exact: true, focus: ["performance"] },
-      { label: "Clients", href: "/app/performance/clients", icon: Building2, focus: ["performance"] },
-      { label: "Campaigns", href: "/app/performance/campaigns", icon: Megaphone, focus: ["performance"] },
-      { label: "Prospects", href: "/app/performance/prospects", icon: Target, focus: ["performance"] },
+      { label: "Dashboard", href: "/app/performance", icon: Crosshair, exact: true },
+      { label: "Clients", href: "/app/performance/clients", icon: Building2 },
+      { label: "Campaigns", href: "/app/performance/campaigns", icon: Megaphone },
+      { label: "Prospects", href: "/app/performance/prospects", icon: Target },
     ],
   },
   {
     label: "Brand map",
     items: [
-      { label: "Brands", href: "/app/brands", icon: Building2, focus: ["performance"] },
+      { label: "Brands", href: "/app/brands", icon: Building2 },
       { label: "Channels", href: "/app/channels", icon: Radio },
       { label: "Website", href: "/app/website", icon: Globe },
       { label: "Apps & marketplaces", href: "/app/apps", icon: AppWindow },
@@ -105,7 +86,7 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Timeline", href: "/app/feed-v5", icon: Rows3 },
       { label: "Blog", href: "/app/blog", icon: Newspaper },
       { label: "Newsletters", href: "/app/newsletters", icon: Mail },
-      { label: "Spend", href: "/app/spend", icon: CircleDollarSign, focus: ["performance"] },
+      { label: "Spend", href: "/app/spend", icon: CircleDollarSign },
       { label: "Inbox", href: "/app/inbox", icon: InboxIcon },
       { label: "Listen", href: "/app/listen", icon: Radar },
     ],
@@ -113,7 +94,7 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Grow",
     items: [
-      { label: "Leads", href: "/app/leads", icon: Database, exact: true, focus: ["performance"] },
+      { label: "Leads", href: "/app/leads", icon: Database, exact: true },
       {
         // Not a route of its own — send-review was deleted (same table, same
         // scorer, a drifting copy of the same card) and its default view lives
@@ -132,12 +113,11 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Library",
     items: [
-      { label: "Media", href: "/app/media", icon: ImageIcon, focus: ["performance"] },
+      { label: "Media", href: "/app/media", icon: ImageIcon },
       {
         label: "Compositions",
         href: "/app/compositions",
         icon: LayoutTemplate,
-        focus: ["performance"],
       },
       { label: "Pillars", href: "/app/pillars", icon: Layers },
       { label: "People", href: "/app/people", icon: Users },

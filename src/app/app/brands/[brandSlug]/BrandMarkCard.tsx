@@ -146,7 +146,7 @@ export function BrandMarkCard({
   const busy = setMark.isPending || clearMark.isPending;
 
   return (
-    <section className="space-y-4 rounded-xl border p-4">
+    <section id="brand-mark" className="scroll-mt-6 space-y-4 rounded-xl border p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">Brand mark</h2>
