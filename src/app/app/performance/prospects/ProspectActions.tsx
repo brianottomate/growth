@@ -1,42 +1,15 @@
 "use client";
 
-import { Check, Copy, MessageSquare } from "lucide-react";
-import { useState } from "react";
+import { MessageSquare } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 
-/** Copy the intake link, or set the prospect up in chat. */
-export function ProspectActions({
-  website,
-  intakeUrl,
-  pitchUrl,
-}: {
-  website: string | null;
-  intakeUrl: string | null;
-  pitchUrl: string | null;
-}) {
-  const [copied, setCopied] = useState<"intake" | "pitch" | null>(null);
-  const copy = async (which: "intake" | "pitch", url: string) => {
-    await navigator.clipboard.writeText(url);
-    setCopied(which);
-    setTimeout(() => setCopied(null), 1500);
-  };
+/** Set the prospect up in chat; the links live in the row menu. */
+export function ProspectActions({ website }: { website: string | null }) {
   const pillClass = "h-auto rounded-full px-3 py-1 text-[11.5px] font-semibold";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {pitchUrl ? (
-        <Button size="sm" variant="outline" className={pillClass} onClick={() => copy("pitch", pitchUrl)}>
-          {copied === "pitch" ? <Check className="size-3" /> : <Copy className="size-3" />}
-          {copied === "pitch" ? "Copied" : "Copy pitch link"}
-        </Button>
-      ) : null}
-      {intakeUrl ? (
-        <Button size="sm" variant="outline" className={pillClass} onClick={() => copy("intake", intakeUrl)}>
-          {copied === "intake" ? <Check className="size-3" /> : <Copy className="size-3" />}
-          {copied === "intake" ? "Copied" : "Copy intake link"}
-        </Button>
-      ) : null}
       {website ? (
         <Button
           size="sm"

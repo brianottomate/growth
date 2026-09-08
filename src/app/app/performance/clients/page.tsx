@@ -20,9 +20,8 @@ import {
 } from "@/server/services/performance-desk.service";
 
 import { cn } from "@/components/ui/lib/utils";
-import { brandAdsHref, BrandLogo, panel, pill, SectionLabel, StateChip, tile } from "../_components";
+import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel, StateChip, tile } from "../_components";
 import { BrandRowMenu } from "../BrandRowMenu";
-import { IntakeLink } from "./IntakeLink";
 
 export const metadata: Metadata = { title: "Clients · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -149,18 +148,7 @@ export default async function PerformanceClientsPage() {
 
 /** One client: who they are on one line, what they filed as tiles, and what is missing. */
 function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary | null }) {
-  const live = brand.campaigns.filter((campaign) => campaign.state === "live").length;
-  const drafts = brand.campaigns.filter((campaign) => campaign.state === "draft").length;
   const meta = [
-    brand.campaigns.length === 0
-      ? "no campaign yet"
-      : [
-          `${brand.campaigns.length} campaign${brand.campaigns.length === 1 ? "" : "s"}`,
-          live ? `${live} live` : null,
-          drafts ? `${drafts} draft${drafts === 1 ? "" : "s"}` : null,
-        ]
-          .filter(Boolean)
-          .join(", "),
     intake ? `intake filed ${fmtDate(intake.submittedAt)}${intake.by ? ` by ${intake.by}` : ""}` : "no intake yet",
   ];
   return (
@@ -200,17 +188,13 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
             {meta.join(" · ")}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Link
-            href={brandAdsHref(brand)}
-            className={cn(pill, "border-border/80 hover:bg-muted/60 inline-flex items-center border px-3 py-1.5 text-xs font-semibold")}
-          >
-            {brand.campaigns.length === 0 ? "Start a campaign" : "Campaigns"}
-          </Link>
-          {brand.pitchUrl ? <IntakeLink url={brand.pitchUrl} label="Copy pitch link" /> : null}
-          {brand.intakeUrl ? <IntakeLink url={brand.intakeUrl} /> : null}
-          <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="client" />
-        </div>
+        <BrandRowMenu
+          brandId={brand.id}
+          brandName={brand.name}
+          relationship="client"
+          pitchUrl={brand.pitchUrl}
+          intakeUrl={brand.intakeUrl}
+        />
       </div>
 
       {intake ? (
@@ -220,6 +204,22 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
           {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
         </p>
       )}
+
+      <div className="mt-4 space-y-2 border-t pt-3">
+        <div className="flex items-baseline justify-between">
+          <SectionLabel>Campaigns{brand.campaigns.length ? ` · ${brand.campaigns.length}` : ""}</SectionLabel>
+          <Link href={brandAdsHref(brand)} className="text-[11.5px] text-sky-300 hover:underline">
+            {brand.campaigns.length === 0 ? "Start a campaign" : "New campaign"}
+          </Link>
+        </div>
+        {brand.campaigns.length > 0 ? (
+          <ul className="divide-y rounded-xl border">
+            {brand.campaigns.map((campaign) => (
+              <CampaignRow key={campaign.id} brand={brand} campaign={campaign} />
+            ))}
+          </ul>
+        ) : null}
+      </div>
 
       {!brand.hasMark ? (
         <div className="mt-4 flex items-center gap-2 border-t pt-3 text-xs text-amber-300">

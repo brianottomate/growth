@@ -67,8 +67,14 @@ export default async function PerformanceProspectsPage() {
                     {brand.best ? <StateChip state={brand.best} /> : null}
                   </div>
                 </div>
-                <ProspectActions website={brand.website} intakeUrl={brand.intakeUrl} pitchUrl={brand.pitchUrl} />
-                <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="prospect" />
+                <ProspectActions website={brand.website} />
+                <BrandRowMenu
+                  brandId={brand.id}
+                  brandName={brand.name}
+                  relationship="prospect"
+                  pitchUrl={brand.pitchUrl}
+                  intakeUrl={brand.intakeUrl}
+                />
               </li>
             ))}
           </ul>
