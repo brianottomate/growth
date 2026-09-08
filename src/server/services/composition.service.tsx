@@ -826,7 +826,7 @@ export function renderComposition(
       : catalogHeadline(spec);
     const headlineSize = review ? (square ? 56 : 62) : square ? 62 : 70;
     const line = clamp(spec.subtitle, 80);
-    const stars = review && spec.rating ? spec.rating : 0;
+    const stars = review && spec.rating ? Math.round(spec.rating) : 0;
     content = (
       <div
         style={{
@@ -926,6 +926,152 @@ export function renderComposition(
             >
               {line ? <div style={{ display: "flex" }}>{line}</div> : null}
               {stars ? <Stars count={stars} size={square ? 22 : 24} /> : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  } else if (spec.templateId === "catalog-place") {
+    // The listing card: a quiet lead-in, the place large, the facts, and the
+    // guest rating as a pill in the accent colour. Same photo and scrim
+    // treatment as the other catalog cards so a feed of them reads as one set.
+    const pad = square ? 56 : 64;
+    const scale = square ? 0.9 : 1;
+    const eyebrow = wrapText(clamp(spec.eyebrow, 60), 30);
+    const place = wrapText(clamp(spec.title, 60), square ? 20 : 18);
+    const facts = clamp(spec.subtitle, 80);
+    const rating = spec.rating ? Math.round(spec.rating * 10) / 10 : null;
+    content = (
+      <div
+        style={{
+          display: "flex",
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: "#000000",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: "58%",
+            background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.5)} 40%, ${scrim(0.85)} 100%)`,
+          }}
+        />
+        {spec.mark !== "none" ? (
+          <>
+            <div
+              style={{
+                display: "flex",
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: 0,
+                height: "24%",
+                background: `linear-gradient(180deg, ${scrim(0.4)} 0%, ${scrim(0)} 100%)`,
+              }}
+            />
+            <div style={{ display: "flex", position: "absolute", top: pad, left: pad }}>
+              <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
+            </div>
+          </>
+        ) : null}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            position: "absolute",
+            left: pad,
+            right: pad,
+            bottom: pad,
+            color: "#ffffff",
+          }}
+        >
+          {eyebrow.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                fontSize: Math.round(46 * scale),
+                fontWeight: 500,
+                lineHeight: 1.12,
+                letterSpacing: "-0.02em",
+                opacity: 0.95,
+              }}
+            >
+              {eyebrow.map((text) => (
+                <div key={text} style={{ display: "flex" }}>
+                  {text}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: Math.round(72 * scale),
+              fontWeight: 700,
+              lineHeight: 1.04,
+              letterSpacing: "-0.03em",
+              marginTop: 4,
+            }}
+          >
+            {place.map((text) => (
+              <div key={text} style={{ display: "flex" }}>
+                {text}
+              </div>
+            ))}
+          </div>
+          {facts ? (
+            <div
+              style={{
+                display: "flex",
+                marginTop: 18,
+                fontSize: Math.round(28 * scale),
+                fontWeight: 500,
+                opacity: 0.9,
+              }}
+            >
+              {facts}
+            </div>
+          ) : null}
+          {rating ? (
+            <div style={{ display: "flex", marginTop: 20 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: `${Math.round(12 * scale)}px ${Math.round(26 * scale)}px`,
+                  borderRadius: 999,
+                  background: accent,
+                  fontSize: Math.round(28 * scale),
+                  fontWeight: 600,
+                }}
+              >
+                <Stars count={1} size={Math.round(26 * scale)} />
+                <div style={{ display: "flex" }}>{`${rating.toFixed(1)} guest rating`}</div>
+              </div>
             </div>
           ) : null}
         </div>

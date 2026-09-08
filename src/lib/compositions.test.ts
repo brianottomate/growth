@@ -195,10 +195,10 @@ describe("the fields a blueprint declares", () => {
     }
   });
 
-  test("the review card is the only one with stars", () => {
+  test("the place and review cards are the ones with a rating", () => {
     expect(
       COMPOSITION_TEMPLATES.filter((t) => compositionHasField(t.id, "rating")).map((t) => t.id),
-    ).toEqual(["catalog-review"]);
+    ).toEqual(["catalog-place", "catalog-review"]);
   });
 });
 

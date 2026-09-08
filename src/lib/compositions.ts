@@ -47,6 +47,13 @@ export const COMPOSITION_TEMPLATES = [
       "Logo top left, the home's name and facts over a dark gradient at the foot. The feed card.",
   },
   {
+    id: "catalog-place",
+    version: 1,
+    label: "Catalog · place",
+    description:
+      "A lead-in line, the place in large type, the facts, and a guest-rating pill over a dark foot gradient. The listing card.",
+  },
+  {
     id: "catalog-review",
     version: 1,
     label: "Catalog · review",
@@ -146,6 +153,14 @@ export const COMPOSITION_FIELDS: Record<CompositionTemplateId, CompositionField[
     { key: "title", label: "Home name" },
     { key: "subtitle", label: "Facts", hint: "3 bedrooms · 2 baths · 8 guests" },
   ],
+  "catalog-place": [
+    mark,
+    { key: "eyebrow", label: "Lead-in", hint: "A mountain-view villa in" },
+    { key: "title", label: "Place", hint: "Winter Park, CO" },
+    { key: "subtitle", label: "Facts", hint: "3 bedrooms · 3.5 baths · 14 guests" },
+    { key: "rating", label: "Guest rating", hint: "4.9" },
+    accent("colours the rating pill"),
+  ],
   "catalog-review": [
     mark,
     { key: "title", label: "Guest quote", hint: "Without the quotation marks" },
@@ -227,8 +242,11 @@ const compositionShape = {
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
-  /** Stars on the review card. Drawn only by blueprints that show a review. */
-  rating: z.number().int().min(1).max(5).optional(),
+  /**
+   * Guest rating, 1 to 5 with one decimal: stars on the review card, a
+   * "4.9 guest rating" pill on the place card.
+   */
+  rating: z.number().min(1).max(5).multipleOf(0.1).optional(),
   /**
    * Which version of the brand mark a card draws. `auto` picks white over a
    * photo and colour on a light ground; the rest force it or drop it.

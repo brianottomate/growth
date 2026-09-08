@@ -589,6 +589,20 @@ export function CompositionWorkbench({
                   maxLength={60}
                   placeholder={field.hint}
                 />
+              ) : field.key === "rating" && templateId === "catalog-place" ? (
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  step={0.1}
+                  value={rating ?? ""}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    setRating(event.target.value === "" || Number.isNaN(next) ? undefined : Math.round(next * 10) / 10);
+                  }}
+                  placeholder={field.hint}
+                  className="w-28"
+                />
               ) : field.key === "rating" ? (
                 <div className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((n) => (
