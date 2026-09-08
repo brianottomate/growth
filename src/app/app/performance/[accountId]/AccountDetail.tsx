@@ -618,7 +618,7 @@ function SponsoredAbandonment({ accountId }: { accountId: string }) {
         </p>
       )}
 
-      {data && data.events.length === 0 && data.matchedProperties > 0 && (
+      {data?.events.length === 0 && data.matchedProperties > 0 && (
         <p className="text-muted-foreground text-sm">
           No abandoned checkouts on the {data.matchedProperties} matched home
           {data.matchedProperties === 1 ? "" : "s"} in this window.

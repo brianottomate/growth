@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { makeSignature } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
+import { env } from "@/env";
 import { auth } from "@/server/better-auth/config";
 import { db } from "@/server/db";
 import { userTable } from "@/server/db/schema";
+import { isDevLoginAllowed } from "@/server/dev-login-access";
 
 /**
- * Dev-only passwordless login for local agent testing.
+ * Passwordless login for agent testing — local dev and Vercel previews.
  * Mints a real Better Auth session for an existing user using Better Auth's
  * own primitives — internalAdapter.createSession + a cookie signed exactly
  * like setSessionCookie's (`encodeURIComponent(token + "." + HMAC)`), so the
@@ -22,11 +24,17 @@ import { userTable } from "@/server/db/schema";
  * NOTE: no bearer plugin is enabled here — use the Cookie header:
  *   curl -H "Cookie: <cookieName>=<cookieValue>" http://localhost:<port>/app/...
  *
- * Hard-gated: bare 404 unless NODE_ENV === "development" (Vercel preview and
- * prod build with NODE_ENV=production, so this is inert everywhere deployed).
+ * Gate: see `@/server/dev-login-access` — open in local dev; on Vercel
+ * *preview* deploys only with ADMIN_TOKEN (Bearer header, ?token=, or
+ * x-admin-token); a bare 404 everywhere else, production included.
  */
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV !== "development") {
+  const allowed = isDevLoginAllowed(req, {
+    nodeEnv: process.env.NODE_ENV,
+    vercelEnv: process.env.VERCEL_ENV,
+    adminToken: env.ADMIN_TOKEN,
+  });
+  if (!allowed) {
     return new Response(null, { status: 404 });
   }
 

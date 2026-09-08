@@ -829,7 +829,7 @@ export function LeadsClient() {
             </tbody>
           </table>
 
-          {list.data && list.data.items.length === 0 && (
+          {list.data?.items.length === 0 && (
             <div className="text-muted-foreground py-12 text-center text-sm">
               No domains match these filters.
             </div>
