@@ -7,10 +7,7 @@ import {
   geographyFromProperties,
   withPropertyAddresses,
   ACCESS_CHECK_INTERVAL_MS,
-  answersFingerprint,
   applyBlockers,
-  DUPLICATE_SUBMIT_WINDOW_MS,
-  isDuplicateSubmission,
   currentPeriod,
   matchBrandPage,
   normalizePageName,
@@ -194,60 +191,6 @@ describe("prefill contact fields", () => {
   });
 });
 
-describe("duplicate submissions", () => {
-  const now = new Date("2026-09-02T18:00:00Z");
-  const answers = { budget: "$5,000", propertyUrls: ["https://a.com/x"] };
-  const fp = answersFingerprint(answers);
-
-  it("fingerprints identically regardless of key order", () => {
-    // The form may serialise keys differently between renders; it is still
-    // the same submission.
-    expect(answersFingerprint({ budget: "$5,000", propertyUrls: ["https://a.com/x"] })).toBe(
-      answersFingerprint({ propertyUrls: ["https://a.com/x"], budget: "$5,000" }),
-    );
-  });
-
-  it("treats an immediate repeat as the same submission", () => {
-    expect(
-      isDuplicateSubmission(
-        fp,
-        { answersFingerprint: fp, submittedAt: new Date(now.getTime() - 2_000) },
-        now,
-      ),
-    ).toBe(true);
-  });
-
-  it("files revised answers as their own receipt", () => {
-    // Different answers are a new fact, which is the point of keeping receipts.
-    expect(
-      isDuplicateSubmission(
-        answersFingerprint({ ...answers, budget: "$10,000" }),
-        { answersFingerprint: fp, submittedAt: new Date(now.getTime() - 2_000) },
-        now,
-      ),
-    ).toBe(false);
-  });
-
-  it("files the same answers again once the window has passed", () => {
-    expect(
-      isDuplicateSubmission(
-        fp,
-        {
-          answersFingerprint: fp,
-          submittedAt: new Date(now.getTime() - DUPLICATE_SUBMIT_WINDOW_MS - 1),
-        },
-        now,
-      ),
-    ).toBe(false);
-  });
-
-  it("never matches a row written before fingerprints existed", () => {
-    expect(
-      isDuplicateSubmission(fp, { answersFingerprint: null, submittedAt: now }, now),
-    ).toBe(false);
-    expect(isDuplicateSubmission(fp, undefined, now)).toBe(false);
-  });
-});
 
 describe("property addresses", () => {
   const addresses = new Map([

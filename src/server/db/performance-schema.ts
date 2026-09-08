@@ -429,11 +429,7 @@ export const performanceIntakeTable = pgTable(
     submittedByEmail: t.text(),
 
     answers: t.jsonb().$type<PerformanceIntakeAnswers>().notNull(),
-    /**
-     * SHA-256 of the answers, so a double-clicked submit or a retried request
-     * is recognisable as the same submission. Nullable for rows written before
-     * this existed.
-     */
+    /** No longer written: the ten-minute duplicate check it served was removed. */
     answersFingerprint: t.text(),
 
     /** Whole dollars per month that reach the ad platforms. */
