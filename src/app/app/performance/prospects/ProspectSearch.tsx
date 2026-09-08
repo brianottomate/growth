@@ -26,16 +26,25 @@ export function ProspectSearch({ prospectDomains }: { prospectDomains: string[] 
     ...trpc.leads.listDomains.queryOptions({ q: term, limit: 8, includeExcluded: true }),
     enabled: term.length >= 2,
   });
-  const enrich = useMutation(trpc.brand.enrich.mutationOptions());
+  const enrich = useMutation(
+    trpc.brand.enrich.mutationOptions({
+      // The logo and colours arrive a while after the row does; refresh again
+      // so the row picks them up without anyone reloading.
+      onSettled: () => router.refresh(),
+    }),
+  );
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const create = useMutation(
     trpc.leads.createProspect.mutationOptions({
-      onSuccess: async (result) => {
+      onMutate: (input) => setPendingId(input.domainId),
+      onSuccess: (result) => {
         toast.success(result.created ? `${result.name} added` : `${result.name} is already a prospect`);
-        if (result.enrichable) await enrich.mutateAsync({ id: result.brandId }).catch(() => undefined);
-        setQ("");
+        // The row appears now; the site read runs behind it.
         router.refresh();
+        if (result.enrichable) enrich.mutate({ id: result.brandId });
       },
       onError: (error) => toast.error(error.message),
+      onSettled: () => setPendingId(null),
     }),
   );
 
@@ -63,6 +72,7 @@ export function ProspectSearch({ prospectDomains }: { prospectDomains: string[] 
           <ul className="bg-card divide-y overflow-hidden rounded-2xl border">
             {items.map((lead) => {
               const added = have.has(lead.domain.toLowerCase());
+              const pending = pendingId === lead.id;
               return (
                 <li key={lead.id} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="min-w-0 flex-1">
@@ -85,6 +95,10 @@ export function ProspectSearch({ prospectDomains }: { prospectDomains: string[] 
                     {added ? (
                       <span className="inline-flex items-center gap-1">
                         <Check className="size-3" /> In your list
+                      </span>
+                    ) : pending ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Loader2 className="size-3 animate-spin" /> Adding
                       </span>
                     ) : (
                       "+ Add as prospect"
