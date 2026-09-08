@@ -34,6 +34,7 @@ import { cn } from "@/components/ui/lib/utils";
 import type { BrandIdentity } from "@/server/db/brand-schema";
 import { useTRPC } from "@/trpc/react";
 import { ListingSamplesDialog } from "./ListingSamplesDialog";
+import { SiteImagesDialog } from "./SiteImagesDialog";
 
 type Brand = {
   id: string;
@@ -678,6 +679,15 @@ export function CompositionWorkbench({
             </p>
             <div className="flex flex-wrap gap-2">
               <ListingSamplesDialog
+                brandId={brandId}
+                onImported={async (imported) => {
+                  await queryClient.invalidateQueries({
+                    queryKey: sourceListOptions.queryKey,
+                  });
+                  if (imported[0]) chooseSource(imported[0].id);
+                }}
+              />
+              <SiteImagesDialog
                 brandId={brandId}
                 onImported={async (imported) => {
                   await queryClient.invalidateQueries({

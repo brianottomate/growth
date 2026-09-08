@@ -8,6 +8,7 @@ import { ImagePlus, Images } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListingSamplesDialog } from "@/app/app/compositions/ListingSamplesDialog";
+import { SiteImagesDialog } from "@/app/app/compositions/SiteImagesDialog";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
@@ -109,6 +110,7 @@ export function CreativePool({
       {pool.length > 0 ? (
         <div className="flex items-center justify-end gap-2">
           <ListingSamplesDialog brandId={brandId} onImported={addImported} />
+          <SiteImagesDialog brandId={brandId} onImported={addImported} />
           <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
             <ImagePlus className="size-3.5" />
             From the library
@@ -125,6 +127,7 @@ export function CreativePool({
           actions={
             <>
               <ListingSamplesDialog brandId={brandId} onImported={addImported} />
+              <SiteImagesDialog brandId={brandId} onImported={addImported} />
               <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
                 <ImagePlus className="size-3.5" />
                 From the library

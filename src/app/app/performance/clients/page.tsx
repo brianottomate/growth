@@ -22,6 +22,7 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel, tile } from "../_components";
 import { StageChip } from "../StageChip";
+import { StartCampaignInChat } from "../StartCampaignInChat";
 import { BrandRowMenu } from "../BrandRowMenu";
 import { SendLink } from "../SendLink";
 
@@ -192,9 +193,13 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
       <div className="mt-4 space-y-2 border-t pt-3">
         <div className="flex items-baseline justify-between">
           <SectionLabel>Campaigns{brand.campaigns.length ? ` · ${brand.campaigns.length}` : ""}</SectionLabel>
-          <Link href={brandAdsHref(brand)} className="text-[11.5px] text-sky-300 hover:underline">
-            {brand.campaigns.length === 0 ? "Start a campaign" : "New campaign"}
-          </Link>
+          {brand.campaigns.length === 0 ? (
+            <StartCampaignInChat brandId={brand.id} brandName={brand.name} />
+          ) : (
+            <Link href={brandAdsHref(brand)} className="text-[11.5px] text-sky-300 hover:underline">
+              New campaign
+            </Link>
+          )}
         </div>
         {brand.campaigns.length > 0 ? (
           <ul className="divide-y rounded-xl border">

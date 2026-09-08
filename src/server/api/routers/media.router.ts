@@ -1,3 +1,4 @@
+import { scrapeSiteImages } from "@/server/clients/firecrawl.client";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -356,6 +357,69 @@ export const mediaRouter = createTRPCRouter({
           importedAssetId: importedByUrl.get(row.imageUrl!) ?? null,
         })),
       };
+    }),
+
+  /**
+   * The images on the brand's own website, read on demand, marked where the
+   * library already holds one. Nothing is imported until the operator ticks.
+   */
+  siteImages: protectedProcedure
+    .input(z.object({ brandId: z.string(), url: z.string().url().optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx, input.brandId);
+      const brand = await ctx.db.query.brandTable.findFirst({
+        where: eq(brandTable.id, input.brandId),
+        columns: { id: true, website: true },
+      });
+      const site = input.url ?? brand?.website ?? null;
+      if (!site) return { site: null, images: [] as { url: string; importedAssetId: string | null }[] };
+      const urls = (await scrapeSiteImages(site)).slice(0, 60);
+      const imported = urls.length
+        ? await ctx.db.query.mediaAssetTable.findMany({
+            where: and(
+              eq(mediaAssetTable.brandId, input.brandId),
+              eq(mediaAssetTable.status, "ready"),
+              isNull(mediaAssetTable.deletedAt),
+              sql`${mediaAssetTable.metadata} ->> 'sourceUrl' in (${sql.join(
+                urls.map((url) => sql`${url}`),
+                sql`, `,
+              )})`,
+            ),
+            columns: { id: true, metadata: true },
+          })
+        : [];
+      const byUrl = new Map(
+        imported.map((row) => [(row.metadata as { sourceUrl?: string } | null)?.sourceUrl ?? "", row.id]),
+      );
+      return {
+        site,
+        images: urls.map((url) => ({ url, importedAssetId: byUrl.get(url) ?? null })),
+      };
+    }),
+
+  /** Import the site images the operator ticked. Idempotent per URL. */
+  importUrls: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string(),
+        images: z.array(z.object({ url: z.string().url(), title: z.string().max(180).optional() })).min(1).max(60),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandAccess(ctx, input.brandId);
+      const assets: { id: string; url: string | null }[] = [];
+      for (const image of input.images) {
+        const asset =
+          (await findImportedImage({ brandId: input.brandId, url: image.url })) ??
+          (await importRemoteImage({
+            brandId: input.brandId,
+            uploadedBy: ctx.session.user.id,
+            url: image.url,
+            title: image.title ?? "From their site",
+          }));
+        assets.push({ id: asset.id, url: asset.url });
+      }
+      return { assets };
     }),
 
   /**

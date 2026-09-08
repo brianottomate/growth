@@ -76,7 +76,16 @@ export type DefinePersonasIntent = {
   visibleText: string;
 };
 
+/** "Start this client's first campaign": the chat runs the client-first-campaign playbook. */
+export type StartClientCampaignIntent = {
+  type: "start_client_campaign";
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+};
+
 export type AssistantIntent =
+  | StartClientCampaignIntent
   | DefinePersonasIntent
   | SetUpClientIntent
   | PlanTwoWeeksIntent

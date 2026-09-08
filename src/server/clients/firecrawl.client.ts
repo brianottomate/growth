@@ -69,6 +69,46 @@ export async function scrapeForEnrichment(url: string): Promise<{
   };
 }
 
+/**
+ * The image URLs a page carries, for an operator to pick from.
+ *
+ * Firecrawl's `images` format splits srcsets on commas, and WanderOS sites
+ * serve every photo through `/i/width=…,height=…,format=webp?src=<original>`,
+ * so what comes back is mostly fragments like `/quality=85`. Anything carrying
+ * a `src` parameter yields its original asset; anything else must look like an
+ * image file to survive.
+ */
+export async function scrapeSiteImages(url: string): Promise<string[]> {
+  if (!isFirecrawlConfigured) return [];
+  const result = (await firecrawl.scrape(url, {
+    formats: ["images"],
+    onlyMainContent: false,
+  })) as { images?: string[] };
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of result.images ?? []) {
+    const candidate = raw.trim().split(/\s+/)[0] ?? "";
+    if (!/^https?:\/\//i.test(candidate)) continue;
+    let resolved: string | null = null;
+    try {
+      const parsed = new URL(candidate);
+      const src = parsed.searchParams.get("src");
+      if (src && /^https?:\/\//i.test(src)) resolved = src;
+      else if (/\.(jpe?g|png|webp|avif)(\?|$)/i.test(parsed.pathname + parsed.search)) resolved = candidate;
+      else if (/images\.unsplash\.com|assets\.wander\.com|cloudinary|imgix/i.test(parsed.hostname)) resolved = candidate;
+    } catch {
+      continue;
+    }
+    if (!resolved) continue;
+    if (/favicon|sprite|pixel|tracking|1x1|\.(svg|ico|gif)(\?|$)/i.test(resolved)) continue;
+    const key = resolved.replace(/[?#].*$/, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(resolved);
+  }
+  return out;
+}
+
 // =====================================================
 // TYPE DEFINITIONS
 // =====================================================

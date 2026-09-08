@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { Check, Radio } from "lucide-react";
+import { Radio } from "lucide-react";
 
 import { db } from "@/server/db";
 import { memberTable, platformAdTable } from "@/server/db/schema";
@@ -128,21 +128,8 @@ export async function CampaignView({
     />
   );
 
-  // The first step without content is the one to do next.
-  const filled = {
-    photos: pool.length > 0,
-    ads: ads.length > 0,
-    audiences: audiences.length > 0,
-    platforms: planned.length > 0,
-    live: anyPushed,
-  };
-  const order = ["photos", "ads", "audiences", "platforms", "live"] as const;
-  const next = order.find((key) => !filled[key]) ?? null;
-  const stateOf = (key: (typeof order)[number]) =>
-    filled[key] ? "done" : key === next ? "next" : "todo";
-
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 p-6">
+    <div className="space-y-8">
       <header className="space-y-3">
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <Link href="/app/brands" className="hover:underline">
@@ -214,8 +201,6 @@ export async function CampaignView({
 
       <ol className="space-y-8">
         <Step
-          n={1}
-          state={stateOf("photos")}
           title="Photos"
           meta={pool.length > 0 ? `${pool.length} in the pool` : undefined}
         >
@@ -228,8 +213,6 @@ export async function CampaignView({
         </Step>
 
         <Step
-          n={2}
-          state={stateOf("ads")}
           title="Ads"
           meta={
             ads.length > 0
@@ -291,8 +274,6 @@ export async function CampaignView({
         </Step>
 
         <Step
-          n={3}
-          state={stateOf("audiences")}
           title="Audiences"
           meta={audiences.length > 0 ? `${audiences.length} ad set${audiences.length === 1 ? "" : "s"}` : "broad"}
         >
@@ -306,8 +287,6 @@ export async function CampaignView({
         </Step>
 
         <Step
-          n={4}
-          state={stateOf("platforms")}
           title="Platforms"
           meta={
             planned.length > 0
@@ -352,8 +331,6 @@ export async function CampaignView({
 
         {anyPushed ? (
           <Step
-            n={5}
-            state="done"
             title="Live"
             meta={anyLive ? "spending" : "paused"}
             actions={ask("live", `How is “${campaign.name}” doing?`)}
@@ -378,57 +355,28 @@ export async function CampaignView({
   );
 }
 
-/**
- * One step of the sequence. The number shows where the operator is: filled
- * when the step has content, ringed when it is the next thing to do.
- */
+/** One section of the campaign: a small label with its count, its actions, its content. */
 function Step({
-  n,
-  state,
   title,
   meta,
   actions,
   children,
 }: {
-  n: number;
-  state: "done" | "next" | "todo";
   title: string;
   meta?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <li className="grid gap-3 @lg:grid-cols-[2rem_minmax(0,1fr)]">
-      <div className="hidden @lg:block">
-        <span
-          className={cn(
-            "flex size-7 items-center justify-center rounded-full border text-xs font-semibold tabular-nums",
-            state === "done" && "bg-foreground text-background border-foreground",
-            state === "next" && "border-primary text-primary ring-primary/25 ring-4",
-            state === "todo" && "text-muted-foreground",
-          )}
-          aria-label={
-            state === "done" ? "Done" : state === "next" ? "Next step" : "Later"
-          }
-        >
-          {state === "done" ? <Check className="size-3.5" /> : n}
-        </span>
+    <li className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <p className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.09em] uppercase">
+          {title}
+          {meta ? <span className="ml-1.5 font-medium normal-case tracking-normal">· {meta}</span> : null}
+        </p>
+        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
       </div>
-      <div className="min-w-0 space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold">
-              <span className="@lg:hidden">{n}.</span>
-              {title}
-              {meta ? (
-                <span className="text-muted-foreground text-sm font-normal">{meta}</span>
-              ) : null}
-            </h2>
-          </div>
-          {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-        </div>
-        {children}
-      </div>
+      {children}
     </li>
   );
 }
