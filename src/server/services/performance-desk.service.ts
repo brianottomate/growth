@@ -2,6 +2,12 @@ import "server-only";
 
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
+import {
+  isClientStage,
+  isClosedStage,
+  laterStage,
+  type PerformanceStage,
+} from "@/lib/performance-stage";
 import { db } from "@/server/db";
 import { brandIntakeUrl, brandPitchUrl } from "@/server/services/brand-connect.service";
 import {
@@ -46,6 +52,13 @@ export type DeskBrand = {
   logo: string | null;
   website: string | null;
   relationship: "internal" | "client" | "prospect" | "reference";
+  /**
+   * Where the brand is on its way to live: the stored stage, or further along
+   * when the campaigns say so (ads ready to review, live, paused). Closed
+   * stages stay as set.
+   */
+  stage: PerformanceStage;
+  stageAt: Date | null;
   hasMark: boolean;
   /** The client-facing intake form on wander.com, by slug or by connect token. */
   intakeUrl: string | null;
@@ -115,6 +128,8 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
       relationship: true,
       brandMark: true,
       connectToken: true,
+      performanceStage: true,
+      performanceStageAt: true,
     },
     orderBy: (brand, { asc }) => [asc(brand.name)],
   });
@@ -210,6 +225,8 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
       const own = campaignsByBrand.get(brand.id) ?? [];
       const account = accountByBrand.get(brand.id);
       return {
+        stage: effectiveStage(brand.performanceStage, brand.relationship, own),
+        stageAt: brand.performanceStageAt,
         id: brand.id,
         name: brand.name,
         slug: brand.slug,
@@ -248,17 +265,50 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
     live,
     liveSpend: live.reduce((sum, campaign) => sum + campaign.spend, 0),
     liveBudget: live.reduce((sum, campaign) => sum + campaign.budget, 0),
-    clients: brands.filter((brand) => brand.relationship === "client").length,
-    prospects: brands.filter((brand) => brand.relationship === "prospect").length,
+    clients: brands.filter((brand) => !isClosedStage(brand.stage) && isClientStage(brand.stage)).length,
+    prospects: brands.filter((brand) => !isClosedStage(brand.stage) && !isClientStage(brand.stage)).length,
   };
 }
 
-/** The desk for one relationship only: clients on the working tabs, prospects on theirs. */
+/**
+ * What the campaigns say about a brand's stage, laid over what is stored. A
+ * stored stage never moves backwards here, and a closed stage is left alone.
+ */
+function effectiveStage(
+  stored: PerformanceStage | null,
+  relationship: "internal" | "client" | "prospect" | "reference",
+  campaigns: DeskCampaign[],
+): PerformanceStage {
+  const base: PerformanceStage =
+    stored ?? (relationship === "client" ? "signed" : "ready_to_pitch");
+  if (isClosedStage(base)) return base;
+  let derived: PerformanceStage | null = null;
+  if (campaigns.some((campaign) => campaign.state === "live")) derived = "live";
+  else if (campaigns.some((campaign) => campaign.state === "pushed" || campaign.state === "ended")) {
+    derived = "paused";
+  } else if (
+    campaigns.some(
+      (campaign) => campaign.state === "draft" && campaign.adCount > 0 && campaign.platforms.length > 0,
+    )
+  ) {
+    derived = "ads_review";
+  }
+  // Live and paused are only meaningful once the brand is a client; a
+  // prospect with a test draft does not become "ads ready for review".
+  if (derived && !isClientStage(base)) return base;
+  return derived ? laterStage(base, derived) : base;
+}
+
+/** The desk for one side of the client line; closed brands leave both. */
 export function narrowDesk(
   desk: PerformanceDesk,
   relationship: "client" | "prospect",
 ): PerformanceDesk {
-  const brands = desk.brands.filter((brand) => brand.relationship === relationship);
+  const brands = desk.brands.filter(
+    (brand) =>
+      !isClosedStage(brand.stage) &&
+      (relationship === "client" ? isClientStage(brand.stage) : !isClientStage(brand.stage)),
+  );
   const ids = new Set(brands.map((brand) => brand.id));
   const campaigns = desk.campaigns.filter((campaign) => ids.has(campaign.brandId));
   const live = campaigns.filter((campaign) => campaign.state === "live");

@@ -21,6 +21,23 @@ export type BrandType = (typeof brandTypeEnum.enumValues)[number];
 // the brand IS (`type`). Wander's own brands, paying Performance clients,
 // targets a rep is pitching, and competitors we merely watch all belong in
 // one table and none of them belong in the same list.
+/** Where a Performance brand is on its way from lead to live. See lib/performance-stage. */
+export const performanceStageEnum = pgEnum("performance_stage", [
+  "ready_to_pitch",
+  "pitch_sent",
+  "meeting_booked",
+  "ready_for_intake",
+  "intake_sent",
+  "signed",
+  "intake_submitted",
+  "access_verified",
+  "ads_review",
+  "live",
+  "paused",
+  "lost",
+  "churned",
+]);
+
 export const brandRelationshipEnum = pgEnum("brand_relationship", [
   "internal",
   "client",
@@ -214,6 +231,13 @@ export const brandTable = pgTable(
     type: brandTypeEnum().default("company").notNull(),
 
     relationship: brandRelationshipEnum().default("internal").notNull(),
+
+    /**
+     * The Performance journey stage. Null for brands that are not on the
+     * desk. Workflows only move it forward; the ⋯ dialog can set anything.
+     */
+    performanceStage: performanceStageEnum(),
+    performanceStageAt: t.timestamp({ withTimezone: true }),
 
     /**
      * The brand's WanderOS site, when they have one.

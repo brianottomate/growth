@@ -1,5 +1,7 @@
 import "server-only";
 
+import { advanceBrandStage } from "./brand-relationship.service";
+
 
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -228,6 +230,7 @@ export async function submitPerformanceIntake(input: {
   // Deliberately NOT touching the account's `status` or `signedAt`. Money is
   // tracked separately, and `signedAt` is a contract date that cohort reports
   // are built from — an intake submission is not a signature.
+  await advanceBrandStage(brand.id, "intake_submitted");
   if (brand.relationship === "prospect") {
     await db
       .update(brandTable)
@@ -707,6 +710,7 @@ export async function verifyIntakeAccess(
         verifiedPageId: match.id,
       })
       .where(eq(performanceIntakeTable.id, intake.id));
+    if (intake.brandId) await advanceBrandStage(intake.brandId, "access_verified");
   }
 
   return {
@@ -734,6 +738,7 @@ export async function setIntakeVerifiedPage(
       verifiedPageId: input.pageId,
     })
     .where(eq(performanceIntakeTable.id, intake.id));
+  if (intake.brandId) await advanceBrandStage(intake.brandId, "access_verified");
   return { intakeId: intake.id, pageId: input.pageId };
 }
 

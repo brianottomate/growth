@@ -55,6 +55,15 @@ export default async function PerformanceDashboardPage() {
   for (const brand of desk.brands) {
     if (brand.campaigns.length === 0) {
       hands.push({ key: brand.id, brand, href: brandAdsHref(brand), reason: "No campaign yet.", action: "Start a campaign" });
+    } else if (brand.stage === "ads_review") {
+      const campaign = brand.campaigns.find((row) => row.state === "draft" && row.adCount > 0);
+      hands.push({
+        key: `${brand.id}:review`,
+        brand,
+        href: campaign ? campaignHref(brand, campaign) : brandAdsHref(brand),
+        reason: "Ads drafted and a platform planned. Review, then push.",
+        action: "Review the ads",
+      });
     }
   }
   const uncapped = desk.live.filter((campaign) => campaign.budget === 0).length;

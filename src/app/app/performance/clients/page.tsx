@@ -20,7 +20,8 @@ import {
 } from "@/server/services/performance-desk.service";
 
 import { cn } from "@/components/ui/lib/utils";
-import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel, StateChip, tile } from "../_components";
+import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel, tile } from "../_components";
+import { StageChip } from "../StageChip";
 import { BrandRowMenu } from "../BrandRowMenu";
 import { SendLink } from "../SendLink";
 
@@ -161,23 +162,7 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
             <Link href={`/app/performance/brands/${brand.slug ?? brand.id}`} className="text-[14.5px] font-semibold hover:underline">
               {brand.name}
             </Link>
-            {brand.account?.plan ? (
-              <span className="border-border/80 text-muted-foreground rounded-full border px-2 py-0.5 text-[10.5px] capitalize">
-                {brand.account.plan.replace(/_/g, " ")}
-              </span>
-            ) : null}
-            {brand.account ? (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 text-[11.5px] capitalize",
-                  brand.account.status === "active" ? "text-emerald-300" : "text-muted-foreground",
-                )}
-              >
-                <span className={cn("size-1.5 rounded-full", brand.account.status === "active" ? "bg-emerald-400" : "bg-white/30")} />
-                {brand.account.status}
-              </span>
-            ) : null}
-            {brand.best ? <StateChip state={brand.best} /> : null}
+            <StageChip stage={brand.stage} />
           </div>
           <p className="text-muted-foreground mt-0.5 truncate text-xs">
             {brand.website ? (
@@ -192,12 +177,12 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         <div className="flex flex-wrap items-center gap-1.5">
           {brand.pitchUrl ? <SendLink label="Pitch page" url={brand.pitchUrl} /> : null}
           {brand.intakeUrl ? <SendLink label="Intake form" url={brand.intakeUrl} /> : null}
-          <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="client" />
+          <BrandRowMenu brandId={brand.id} brandName={brand.name} stage={brand.stage} />
         </div>
       </div>
 
       {intake ? (
-        <IntakeFacts intake={intake} />
+        <IntakeFacts intake={intake} plan={brand.account?.plan ?? null} />
       ) : (
         <p className="text-muted-foreground mt-4 text-xs">
           {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
@@ -234,8 +219,11 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
 }
 
 /** The intake as the client filed it, as tiles a rep reads before a call. */
-function IntakeFacts({ intake }: { intake: IntakeSummary }) {
+function IntakeFacts({ intake, plan }: { intake: IntakeSummary; plan: string | null }) {
   const tiles: { label: string; value: string; tone?: "ok" | "warn" | "muted" }[] = [
+    ...(plan
+      ? [{ label: "Plan", value: plan.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), tone: "ok" as const }]
+      : []),
     {
       label: "Budget",
       value:
@@ -286,7 +274,7 @@ function IntakeFacts({ intake }: { intake: IntakeSummary }) {
   ];
   return (
     <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3 @4xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3 @4xl:grid-cols-6">
         {tiles.map((row) => (
           <div key={row.label} className={tile}>
             <SectionLabel className="text-[10px] tracking-[0.07em]">{row.label}</SectionLabel>

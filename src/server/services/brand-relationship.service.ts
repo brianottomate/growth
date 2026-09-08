@@ -10,6 +10,12 @@ import {
   type Brand,
   type BrandRelationship,
 } from "@/server/db/schema";
+import {
+  isClientStage,
+  isClosedStage,
+  laterStage,
+  type PerformanceStage,
+} from "@/lib/performance-stage";
 import { createOwnedBrand, normalizeWebsiteUrl } from "./brand-ops.service";
 import {
   PerformanceError,
@@ -75,7 +81,58 @@ export async function createProspectFromLead(input: {
     relationship: "prospect",
     leadDomain: lead.domain,
   });
-  return { brand, created: true };
+  await advanceBrandStage(brand.id, "ready_to_pitch");
+  return { brand: { ...brand, performanceStage: "ready_to_pitch" as const }, created: true };
+}
+
+/**
+ * Set the stage from the ⋯ dialog: any stage, including backwards. The
+ * relationship follows it, so the tabs and everything gated on `client` agree
+ * with what the person just said.
+ */
+export async function setBrandStage(
+  actor: PerformanceActor,
+  input: { brandId: string; stage: PerformanceStage },
+): Promise<Brand> {
+  const brand = await requireBrand(actor, input.brandId);
+  const relationship =
+    brand.relationship === "internal" || brand.relationship === "reference"
+      ? brand.relationship
+      : isClientStage(input.stage)
+        ? "client"
+        : isClosedStage(input.stage)
+          ? brand.relationship
+          : "prospect";
+  const [updated] = await db
+    .update(brandTable)
+    .set({ performanceStage: input.stage, performanceStageAt: new Date(), relationship })
+    .where(eq(brandTable.id, brand.id))
+    .returning();
+  return updated!;
+}
+
+/**
+ * A workflow reached a stage: move the brand there if it is further along
+ * than where it stands, never backwards, never out of a closed stage.
+ */
+export async function advanceBrandStage(brandId: string, stage: PerformanceStage) {
+  const brand = await db.query.brandTable.findFirst({
+    where: eq(brandTable.id, brandId),
+    columns: { id: true, performanceStage: true, relationship: true },
+  });
+  if (!brand) return;
+  const current = brand.performanceStage;
+  if (current && isClosedStage(current)) return;
+  const next = laterStage(current, stage);
+  if (next === current) return;
+  await db
+    .update(brandTable)
+    .set({
+      performanceStage: next,
+      performanceStageAt: new Date(),
+      ...(brand.relationship === "prospect" && isClientStage(next) ? { relationship: "client" as const } : {}),
+    })
+    .where(eq(brandTable.id, brand.id));
 }
 
 /** Move a brand between relationships without touching anything else. */
@@ -89,6 +146,10 @@ export async function setBrandRelationship(
     .set({ relationship: input.relationship })
     .where(eq(brandTable.id, input.brandId))
     .returning();
+  // A brand that becomes a prospect starts its journey; one that becomes a
+  // client without a stage is at least past the intake line.
+  if (input.relationship === "prospect") await advanceBrandStage(brand!.id, "ready_to_pitch");
+  if (input.relationship === "client") await advanceBrandStage(brand!.id, "signed");
   return brand!;
 }
 

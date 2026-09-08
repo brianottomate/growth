@@ -40,7 +40,9 @@ import {
 import {
   promoteBrandToClient,
   setBrandRelationship,
+  setBrandStage,
 } from "@/server/services/brand-relationship.service";
+import { PERFORMANCE_STAGES } from "@/lib/performance-stage";
 
 import { protectedProcedure } from "../trpc";
 
@@ -217,6 +219,11 @@ export const performanceRouter = {
     .mutation(async ({ ctx, input }) =>
       promoteBrandToClient(await actorFor(ctx), input),
     ),
+
+  /** The ⋯ dialog: any stage, the relationship follows. */
+  setStage: protectedProcedure
+    .input(z.object({ brandId: z.string().min(1), stage: z.enum(PERFORMANCE_STAGES) }))
+    .mutation(async ({ ctx, input }) => setBrandStage(await actorFor(ctx), input)),
 
   setBrandRelationship: protectedProcedure
     .input(

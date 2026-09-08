@@ -23,34 +23,29 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
+import type { PerformanceStage } from "@/lib/performance-stage";
 import { useTRPC } from "@/trpc/react";
 
+import { StageDialog } from "./StageDialog";
+
 /**
- * The quiet menu on a client or prospect row: move it to the other list, or
+ * The quiet menu on a client or prospect row: set the stage by hand, or
  * delete the brand behind a confirmation. Delete is a soft delete; the brand
  * page's purge is the destructive one.
  */
 export function BrandRowMenu({
   brandId,
   brandName,
-  relationship,
+  stage,
 }: {
   brandId: string;
   brandName: string;
-  relationship: "client" | "prospect";
+  stage: PerformanceStage;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
-  const setRelationship = useMutation(
-    trpc.performance.setBrandRelationship.mutationOptions({
-      onSuccess: (brand) => {
-        toast.success(`${brandName} is now a ${brand.relationship}`);
-        router.refresh();
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
+  const [staging, setStaging] = useState(false);
   const remove = useMutation(
     trpc.brand.delete.mutationOptions({
       onSuccess: () => {
@@ -61,7 +56,6 @@ export function BrandRowMenu({
       onError: (error) => toast.error(error.message),
     }),
   );
-  const other = relationship === "client" ? "prospect" : "client";
   return (
     <>
       <DropdownMenu>
@@ -72,18 +66,20 @@ export function BrandRowMenu({
           <MoreHorizontal className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem
-            disabled={setRelationship.isPending}
-            onClick={() => setRelationship.mutate({ brandId, relationship: other })}
-          >
-            {other === "prospect" ? "Back to prospects" : "Mark as signed"}
-          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setStaging(true)}>Set stage…</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}>
             Delete brand…
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <StageDialog
+        brandId={brandId}
+        brandName={brandName}
+        stage={stage}
+        open={staging}
+        onOpenChange={setStaging}
+      />
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -9,7 +9,8 @@ import { getSession } from "@/server/better-auth/server";
 import { cn } from "@/components/ui/lib/utils";
 import { loadPerformanceDesk, narrowDesk } from "@/server/services/performance-desk.service";
 
-import { brandAdsHref, BrandLogo, panel, SectionLabel, StateChip } from "../_components";
+import { brandAdsHref, BrandLogo, panel, SectionLabel } from "../_components";
+import { StageChip } from "../StageChip";
 import { BrandRowMenu } from "../BrandRowMenu";
 import { SendLink } from "../SendLink";
 import { ProspectActions } from "./ProspectActions";
@@ -51,6 +52,7 @@ export default async function PerformanceProspectsPage() {
                     <Link href={`/app/performance/brands/${brand.slug ?? brand.id}`} className="text-[13px] font-semibold hover:underline">
                       {brand.name}
                     </Link>
+                    <StageChip stage={brand.stage} />
                     {brand.website ? (
                       <a href={brand.website} target="_blank" rel="noreferrer" className="text-muted-foreground text-[11.5px] hover:underline">
                         {host(brand.website)}
@@ -65,13 +67,12 @@ export default async function PerformanceProspectsPage() {
                     ) : (
                       <span>nothing started</span>
                     )}
-                    {brand.best ? <StateChip state={brand.best} /> : null}
                   </div>
                 </div>
                 {brand.pitchUrl ? <SendLink label="Pitch page" url={brand.pitchUrl} /> : null}
                 {brand.intakeUrl ? <SendLink label="Intake form" url={brand.intakeUrl} /> : null}
                 <ProspectActions website={brand.website} />
-                <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="prospect" />
+                <BrandRowMenu brandId={brand.id} brandName={brand.name} stage={brand.stage} />
               </li>
             ))}
           </ul>
