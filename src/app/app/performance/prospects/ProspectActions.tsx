@@ -10,27 +10,31 @@ import { sendAssistantIntent } from "@/lib/assistant-events";
 export function ProspectActions({
   website,
   intakeUrl,
+  pitchUrl,
 }: {
   website: string | null;
   intakeUrl: string | null;
+  pitchUrl: string | null;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"intake" | "pitch" | null>(null);
+  const copy = async (which: "intake" | "pitch", url: string) => {
+    await navigator.clipboard.writeText(url);
+    setCopied(which);
+    setTimeout(() => setCopied(null), 1500);
+  };
   const pillClass = "h-auto rounded-full px-3 py-1 text-[11.5px] font-semibold";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
+      {pitchUrl ? (
+        <Button size="sm" variant="outline" className={pillClass} onClick={() => copy("pitch", pitchUrl)}>
+          {copied === "pitch" ? <Check className="size-3" /> : <Copy className="size-3" />}
+          {copied === "pitch" ? "Copied" : "Copy pitch link"}
+        </Button>
+      ) : null}
       {intakeUrl ? (
-        <Button
-          size="sm"
-          variant="outline"
-          className={pillClass}
-          onClick={async () => {
-            await navigator.clipboard.writeText(intakeUrl);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          }}
-        >
-          {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-          {copied ? "Copied" : "Copy intake link"}
+        <Button size="sm" variant="outline" className={pillClass} onClick={() => copy("intake", intakeUrl)}>
+          {copied === "intake" ? <Check className="size-3" /> : <Copy className="size-3" />}
+          {copied === "intake" ? "Copied" : "Copy intake link"}
         </Button>
       ) : null}
       {website ? (

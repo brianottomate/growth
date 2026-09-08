@@ -207,6 +207,7 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
           >
             {brand.campaigns.length === 0 ? "Start a campaign" : "Campaigns"}
           </Link>
+          {brand.pitchUrl ? <IntakeLink url={brand.pitchUrl} label="Copy pitch link" /> : null}
           {brand.intakeUrl ? <IntakeLink url={brand.intakeUrl} /> : null}
           <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="client" />
         </div>

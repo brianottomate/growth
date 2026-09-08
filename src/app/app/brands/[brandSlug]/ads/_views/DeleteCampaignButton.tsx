@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useTRPC } from "@/trpc/react";
 
 /**
@@ -33,7 +39,7 @@ export function DeleteCampaignButton({
   campaignName: string;
   brandSlug: string;
   livePlatformCampaigns: number;
-  /** Icon only, for a row in a list. */
+  /** A ⋯ menu for a row in a list, with the delete inside it. */
   compact?: boolean;
   /** Where to go once it is gone: the brand's ads list, or stay and refresh. */
   afterDelete?: "list" | "refresh";
@@ -54,17 +60,31 @@ export function DeleteCampaignButton({
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="ghost"
-        className={compact ? "text-muted-foreground hover:text-foreground size-7 rounded-full p-0" : "text-muted-foreground"}
-        onClick={() => setOpen(true)}
-        aria-label={compact ? `Delete ${campaignName}` : undefined}
-        title={compact ? "Delete campaign" : undefined}
-      >
-        <Trash2 className="size-3.5" />
-        {compact ? null : "Delete"}
-      </Button>
+      {compact ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-full p-1.5"
+            aria-label={`More for ${campaignName}`}
+          >
+            <MoreHorizontal className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem variant="destructive" onClick={() => setOpen(true)}>
+              Delete campaign…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-muted-foreground"
+          onClick={() => setOpen(true)}
+        >
+          <Trash2 className="size-3.5" />
+          Delete
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
