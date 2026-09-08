@@ -15,11 +15,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { BrandSearch, type BrandSearchGroup } from "@/app/app/brands/BrandSearch";
 import {
   loadPerformanceDesk,
+  narrowDesk,
   type DeskBrand,
 } from "@/server/services/performance-desk.service";
 
 import { brandAdsHref, BrandLogo, StateChip } from "../_components";
-import { NewClientDialog } from "../NewClientDialog";
 import { IntakeLink } from "./IntakeLink";
 
 export const metadata: Metadata = { title: "Clients · Wander Performance" };
@@ -61,7 +61,7 @@ export default async function PerformanceClientsPage() {
   const org = membership?.organization;
   if (!org) return <div className="text-muted-foreground">No organization found.</div>;
 
-  const desk = await loadPerformanceDesk(org.id);
+  const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
   const accountIds = desk.brands
     .map((brand) => brand.account?.id)
     .filter((id): id is string => Boolean(id));
@@ -128,33 +128,15 @@ export default async function PerformanceClientsPage() {
       />
     ),
   });
-  const groups: BrandSearchGroup[] = [
-    {
-      label: "Clients",
-      entries: desk.brands.filter((brand) => brand.relationship === "client").map(entry),
-    },
-    {
-      label: "Prospects",
-      entries: desk.brands.filter((brand) => brand.relationship === "prospect").map(entry),
-    },
-    {
-      label: "Wander's own",
-      entries: desk.brands.filter((brand) => brand.relationship === "internal").map(entry),
-      defaultHidden: true,
-    },
-  ];
+  const groups: BrandSearchGroup[] = [{ label: "Clients", entries: desk.brands.map(entry) }];
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-end">
-        <NewClientDialog />
-      </div>
       {desk.brands.length === 0 ? (
         <EmptyState
           icon={Building2}
           title="No clients yet"
-          description="Add one by its website; the assistant sets it up."
-          actions={<NewClientDialog />}
+          description="Prospects become clients on the Prospects tab."
         />
       ) : (
         <BrandSearch groups={groups} />
@@ -226,15 +208,15 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         </div>
       </div>
 
-      {brand.relationship !== "internal" ? (
-        <div className="border-t px-4 py-3">
-          {intake ? <IntakeFacts intake={intake} /> : (
-            <p className="text-muted-foreground text-xs">
-              {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
-            </p>
-          )}
-        </div>
-      ) : null}
+      <div className="border-t px-4 py-3">
+        {intake ? (
+          <IntakeFacts intake={intake} />
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
+          </p>
+        )}
+      </div>
     </article>
   );
 }

@@ -12,6 +12,7 @@ const TABS = [
   { label: "Dashboard", href: "/app/performance", exact: true },
   { label: "Clients", href: "/app/performance/clients" },
   { label: "Campaigns", href: "/app/performance/campaigns" },
+  { label: "Prospects", href: "/app/performance/prospects" },
 ] as const;
 
 /** The section's tabs. */

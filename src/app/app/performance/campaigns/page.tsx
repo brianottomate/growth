@@ -9,6 +9,7 @@ import { getSession } from "@/server/better-auth/server";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   loadPerformanceDesk,
+  narrowDesk,
   type DeskCampaignState,
 } from "@/server/services/performance-desk.service";
 
@@ -35,7 +36,7 @@ export default async function PerformanceCampaignsPage() {
   const org = membership?.organization;
   if (!org) return <div className="text-muted-foreground">No organization found.</div>;
 
-  const desk = await loadPerformanceDesk(org.id);
+  const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
   const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
 
   if (desk.campaigns.length === 0) {

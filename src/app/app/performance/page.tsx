@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import {
   deskMoney,
   loadPerformanceDesk,
+  narrowDesk,
   type DeskBrand,
   type DeskCampaign,
 } from "@/server/services/performance-desk.service";
@@ -35,7 +36,7 @@ export default async function PerformanceDashboardPage() {
   const org = membership?.organization;
   if (!org) return <div className="text-muted-foreground">No organization found.</div>;
 
-  const desk = await loadPerformanceDesk(org.id);
+  const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
   const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
 
   // What needs a person: drafts with no ads, drafts with ads but no platform,
@@ -53,7 +54,7 @@ export default async function PerformanceDashboardPage() {
     }
   }
   for (const brand of desk.brands) {
-    if (brand.campaigns.length === 0 && brand.relationship !== "internal") {
+    if (brand.campaigns.length === 0) {
       attention.push({ key: brand.id, brand, href: brandAdsHref(brand), text: `${brand.name} has no campaign yet` });
     }
   }
@@ -77,7 +78,11 @@ export default async function PerformanceDashboardPage() {
                   ? `${deskMoney(desk.liveSpend)} spent of ${deskMoney(desk.liveBudget)}`
                   : `${deskMoney(desk.liveSpend)} spent, no budget set`
             } />
-          <Figure label="Clients" value={String(desk.clients)} sub={`${desk.prospects} prospect${desk.prospects === 1 ? "" : "s"}`} />
+          <Figure
+            label="Clients"
+            value={String(desk.clients)}
+            sub={`${desk.prospects} prospect${desk.prospects === 1 ? "" : "s"} on the Prospects tab`}
+          />
           <Figure label="Needs a hand" value={String(attention.length)} sub={attention.length ? "listed below" : "All caught up"} />
         </div>
         <div className="@4xl:pt-1">
@@ -89,7 +94,7 @@ export default async function PerformanceDashboardPage() {
         <EmptyState
           icon={Crosshair}
           title="No clients yet"
-          description="Add one by its website; the assistant sets it up and drafts the first ads."
+          description="Prospects become clients on the Prospects tab."
           actions={<NewClientDialog />}
         />
       ) : (

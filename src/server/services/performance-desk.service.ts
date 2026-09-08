@@ -98,8 +98,8 @@ function paceOf(rows: PlatformCampaign[], spend: number): DeskCampaign["pace"] {
 /**
  * Everything the Wander Performance section shows, read once: the clients and
  * prospects, their campaigns with where each stands, and the live totals.
- * Internal brands appear only once they run ads, so Wander's own campaigns are
- * on the desk without Wander's other brands crowding the client list.
+ * Wander's own brands are not on the desk at all; their campaigns live on the
+ * brand pages.
  */
 export async function loadPerformanceDesk(organizationId: string): Promise<PerformanceDesk> {
   const brandRows = await db.query.brandTable.findMany({
@@ -203,12 +203,7 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
   }
 
   const brands: DeskBrand[] = brandRows
-    .filter(
-      (brand) =>
-        brand.relationship === "client" ||
-        brand.relationship === "prospect" ||
-        (campaignsByBrand.get(brand.id)?.length ?? 0) > 0,
-    )
+    .filter((brand) => brand.relationship === "client" || brand.relationship === "prospect")
     .map((brand) => {
       const own = campaignsByBrand.get(brand.id) ?? [];
       const account = accountByBrand.get(brand.id);
@@ -252,6 +247,26 @@ export async function loadPerformanceDesk(organizationId: string): Promise<Perfo
     liveBudget: live.reduce((sum, campaign) => sum + campaign.budget, 0),
     clients: brands.filter((brand) => brand.relationship === "client").length,
     prospects: brands.filter((brand) => brand.relationship === "prospect").length,
+  };
+}
+
+/** The desk for one relationship only: clients on the working tabs, prospects on theirs. */
+export function narrowDesk(
+  desk: PerformanceDesk,
+  relationship: "client" | "prospect",
+): PerformanceDesk {
+  const brands = desk.brands.filter((brand) => brand.relationship === relationship);
+  const ids = new Set(brands.map((brand) => brand.id));
+  const campaigns = desk.campaigns.filter((campaign) => ids.has(campaign.brandId));
+  const live = campaigns.filter((campaign) => campaign.state === "live");
+  return {
+    brands,
+    campaigns,
+    live,
+    liveSpend: live.reduce((sum, campaign) => sum + campaign.spend, 0),
+    liveBudget: live.reduce((sum, campaign) => sum + campaign.budget, 0),
+    clients: desk.clients,
+    prospects: desk.prospects,
   };
 }
 

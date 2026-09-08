@@ -75,6 +75,7 @@ export const NAV_GROUPS: { label?: string; items: NavItem[] }[] = [
       { label: "Dashboard", href: "/app/performance", icon: Crosshair, exact: true, focus: ["performance"] },
       { label: "Clients", href: "/app/performance/clients", icon: Building2, focus: ["performance"] },
       { label: "Campaigns", href: "/app/performance/campaigns", icon: Megaphone, focus: ["performance"] },
+      { label: "Prospects", href: "/app/performance/prospects", icon: Target, focus: ["performance"] },
     ],
   },
   {

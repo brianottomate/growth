@@ -64,7 +64,7 @@ export function BrandSearch({ groups }: { groups: BrandSearchGroup[] }) {
           aria-label="Search brands"
           className="border-border bg-background focus:ring-ring w-72 rounded-md border px-3 py-1.5 text-sm focus:ring-1 focus:outline-none"
         />
-        {groups.map((group) => {
+        {groups.length > 1 && groups.map((group) => {
           const on = !hidden.includes(group.label);
           return (
             <button
