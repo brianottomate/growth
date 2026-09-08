@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { NewClientDialog } from "./NewClientDialog";
 import { PerformanceNav } from "./PerformanceNav";
 
 /**
@@ -11,7 +12,10 @@ import { PerformanceNav } from "./PerformanceNav";
 export default function PerformanceLayout({ children }: { children: ReactNode }) {
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold tracking-tight">Wander Performance</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold tracking-tight">Wander Performance</h1>
+        <NewClientDialog />
+      </div>
       <PerformanceNav />
       {children}
     </div>

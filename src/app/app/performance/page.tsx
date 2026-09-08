@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { Crosshair } from "lucide-react";
+import { ArrowRight, Crosshair } from "lucide-react";
 
 import { db } from "@/server/db";
 import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/components/ui/lib/utils";
 import {
   deskMoney,
   loadPerformanceDesk,
@@ -16,16 +17,14 @@ import {
   type DeskCampaign,
 } from "@/server/services/performance-desk.service";
 
-import { brandAdsHref, BrandLogo, CampaignRow, campaignHref } from "./_components";
-import { NewClientDialog } from "./NewClientDialog";
+import { brandAdsHref, BrandLogo, CampaignRow, campaignHref, panel, pill, SectionLabel } from "./_components";
 
 export const metadata: Metadata = { title: "Wander Performance" };
 export const dynamic = "force-dynamic";
 
-/**
- * The morning page: what is spending, what needs a hand, and the box that
- * starts a new client. Three numbers, two lists, one action.
- */
+type Hand = { key: string; brand: DeskBrand; href: string; reason: string; action: string };
+
+/** The morning page: what is spending, what needs a hand, what is in progress. */
 export default async function PerformanceDashboardPage() {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
@@ -39,27 +38,28 @@ export default async function PerformanceDashboardPage() {
   const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
   const brandById = new Map(desk.brands.map((brand) => [brand.id, brand]));
 
-  // What needs a person: drafts with no ads, drafts with ads but no platform,
-  // live campaigns behind pace, and clients with nothing started.
-  const attention: { key: string; text: string; href: string; brand: DeskBrand }[] = [];
+  // What needs a person, each with the one move that clears it.
+  const hands: Hand[] = [];
   for (const campaign of desk.campaigns) {
     const brand = brandById.get(campaign.brandId);
     if (!brand) continue;
+    const href = campaignHref(brand, campaign);
     if (campaign.state === "draft" && campaign.adCount === 0) {
-      attention.push({ key: campaign.id, brand, href: campaignHref(brand, campaign), text: `${campaign.name} has no ads yet` });
+      hands.push({ key: campaign.id, brand, href, reason: `${campaign.name} has no ads in it yet.`, action: "Add the first ad" });
     } else if (campaign.state === "draft" && campaign.platforms.length === 0) {
-      attention.push({ key: campaign.id, brand, href: campaignHref(brand, campaign), text: `${campaign.name} has ads but no platform planned` });
+      hands.push({ key: campaign.id, brand, href, reason: `${campaign.name} has ads but no platform planned.`, action: "Plan a platform" });
     } else if (campaign.state === "live" && campaign.pace === "behind") {
-      attention.push({ key: campaign.id, brand, href: campaignHref(brand, campaign), text: `${campaign.name} is behind pace` });
+      hands.push({ key: campaign.id, brand, href, reason: `${campaign.name} is spending behind pace.`, action: "Open campaign" });
     }
   }
   for (const brand of desk.brands) {
     if (brand.campaigns.length === 0) {
-      attention.push({ key: brand.id, brand, href: brandAdsHref(brand), text: `${brand.name} has no campaign yet` });
+      hands.push({ key: brand.id, brand, href: brandAdsHref(brand), reason: "No campaign yet.", action: "Start a campaign" });
     }
   }
+  const uncapped = desk.live.filter((campaign) => campaign.budget === 0).length;
 
-  const recent: { campaign: DeskCampaign; brand: DeskBrand }[] = desk.campaigns
+  const inProgress: { campaign: DeskCampaign; brand: DeskBrand }[] = desk.campaigns
     .filter((campaign) => campaign.state !== "live")
     .slice(0, 6)
     .flatMap((campaign) => {
@@ -68,97 +68,113 @@ export default async function PerformanceDashboardPage() {
     });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 @4xl:flex-row @4xl:items-start @4xl:justify-between">
-        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-3 @4xl:flex-1">
-          <Figure label="Live campaigns" value={String(desk.live.length)} sub={
+    <div className="space-y-7">
+      <div>
+        <div className="grid grid-cols-1 gap-3 @xl:grid-cols-3">
+          <Figure
+            href="/app/performance/campaigns"
+            label="Live campaigns"
+            value={String(desk.live.length)}
+            sub={
               desk.live.length === 0
                 ? "Nothing spending"
-                : desk.liveBudget > 0
-                  ? `${deskMoney(desk.liveSpend)} spent of ${deskMoney(desk.liveBudget)}`
-                  : `${deskMoney(desk.liveSpend)} spent, no budget set`
-            } />
+                : uncapped > 0
+                  ? `${deskMoney(desk.liveSpend)} spent · ${uncapped === desk.live.length ? "no" : `${desk.live.length - uncapped} of ${desk.live.length} with a`} budget cap`
+                  : `${deskMoney(desk.liveSpend)} spent of ${deskMoney(desk.liveBudget)}`
+            }
+            subTone={uncapped > 0 ? "amber" : "muted"}
+          />
           <Figure
+            href="/app/performance/clients"
             label="Clients"
             value={String(desk.clients)}
-            sub={`${desk.prospects} prospect${desk.prospects === 1 ? "" : "s"} on the Prospects tab`}
+            sub={`${desk.prospects} prospect${desk.prospects === 1 ? "" : "s"} courting`}
           />
-          <Figure label="Needs a hand" value={String(attention.length)} sub={attention.length ? "listed below" : "All caught up"} />
-        </div>
-        <div className="@4xl:pt-1">
-          <NewClientDialog size="default" />
+          <Figure
+            label="Needs a hand"
+            value={String(hands.length)}
+            sub={hands.length ? "listed below" : "nothing waiting"}
+            tone={hands.length ? "amber" : "muted"}
+          />
         </div>
       </div>
 
       {desk.brands.length === 0 ? (
-        <EmptyState
-          icon={Crosshair}
-          title="No clients yet"
-          description="Prospects become clients on the Prospects tab."
-          actions={<NewClientDialog />}
-        />
+        <EmptyState icon={Crosshair} title="No clients yet" description="Prospects become clients on the Prospects tab." />
       ) : (
-        <div className="grid gap-6 @4xl:grid-cols-2">
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold">Live now</h2>
-            {desk.live.length === 0 ? (
-              <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
-                Nothing live.
-              </p>
-            ) : (
-              <ul className="bg-card divide-y rounded-xl border">
-                {desk.live.map((campaign) => {
-                  const brand = brandById.get(campaign.brandId)!;
-                  return <CampaignRow key={campaign.id} brand={brand} campaign={campaign} showBrand />;
-                })}
-              </ul>
-            )}
-          </section>
+        <div className="grid gap-6 @4xl:grid-cols-[1.4fr_1fr]">
+          <div className="space-y-7">
+            <section className="space-y-2.5">
+              <SectionLabel>Live now</SectionLabel>
+              {desk.live.length === 0 ? (
+                <p className={cn(panel, "text-muted-foreground px-4 py-6 text-center text-xs")}>Nothing live.</p>
+              ) : (
+                <div className={panel}>
+                  <ul className="divide-y">
+                    {desk.live.map((campaign) => (
+                      <CampaignRow key={campaign.id} brand={brandById.get(campaign.brandId)!} campaign={campaign} showBrand />
+                    ))}
+                  </ul>
+                  {uncapped > 0 ? (
+                    <div className="flex items-center justify-between gap-3 border-t bg-amber-500/5 px-4 py-2.5 text-[11.5px]">
+                      <span className="text-amber-300">
+                        {uncapped === desk.live.length ? "Live with no budget cap; spend is unbounded." : `${uncapped} live with no budget cap.`}
+                      </span>
+                      <Link href="/app/performance/campaigns" className="text-sky-300 hover:underline">
+                        Set budgets
+                      </Link>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </section>
 
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold">Needs a hand</h2>
-            {attention.length === 0 ? (
-              <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
-                Nothing waiting.
-              </p>
+            <section className="space-y-2.5">
+              <div className="flex items-baseline justify-between">
+                <SectionLabel>In progress · {desk.campaigns.filter((c) => c.state !== "live").length}</SectionLabel>
+                <Link href="/app/performance/campaigns" className="inline-flex items-center gap-1 text-[11.5px] text-sky-300 hover:underline">
+                  All campaigns <ArrowRight className="size-3" />
+                </Link>
+              </div>
+              {inProgress.length === 0 ? (
+                <p className={cn(panel, "text-muted-foreground px-4 py-6 text-center text-xs")}>No drafts.</p>
+              ) : (
+                <ul className={cn(panel, "divide-y")}>
+                  {inProgress.map(({ campaign, brand }) => (
+                    <CampaignRow key={campaign.id} brand={brand} campaign={campaign} showBrand />
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          <section className="space-y-2.5">
+            <SectionLabel tone={hands.length ? "amber" : "muted"}>Needs a hand</SectionLabel>
+            {hands.length === 0 ? (
+              <p className={cn(panel, "text-muted-foreground px-4 py-6 text-center text-xs")}>Nothing waiting.</p>
             ) : (
-              <ul className="bg-card divide-y rounded-xl border">
-                {attention.slice(0, 8).map((item) => (
-                  <li key={item.key} className="flex items-center gap-3 px-4 py-2.5">
-                    <BrandLogo brand={item.brand} className="size-6" />
-                    <Link href={item.href} className="min-w-0 flex-1 truncate text-sm hover:underline">
-                      {item.text}
+              <div className="flex flex-col gap-2.5">
+                {hands.slice(0, 6).map((hand) => (
+                  <div key={hand.key} className={cn(panel, "p-4")}>
+                    <div className="flex items-center gap-2.5">
+                      <BrandLogo brand={hand.brand} className="size-8 text-[11px]" />
+                      <span className="truncate text-[12.5px] font-semibold">{hand.brand.name}</span>
+                    </div>
+                    <p className="text-muted-foreground mt-2 text-xs leading-relaxed">{hand.reason}</p>
+                    <Link
+                      href={hand.href}
+                      className={cn(pill, "border-border/80 hover:bg-muted/60 mt-2.5 inline-flex items-center border px-3 py-1 text-[11.5px] font-semibold")}
+                    >
+                      {hand.action}
                     </Link>
-                  </li>
+                  </div>
                 ))}
-                {attention.length > 8 ? (
-                  <li className="text-muted-foreground px-4 py-2 text-xs">
-                    <Link href="/app/performance/campaigns" className="hover:underline">
-                      {attention.length - 8} more on the campaigns page
-                    </Link>
-                  </li>
+                {hands.length > 6 ? (
+                  <Link href="/app/performance/campaigns" className="text-muted-foreground text-[11.5px] hover:underline">
+                    {hands.length - 6} more on Campaigns
+                  </Link>
                 ) : null}
-              </ul>
-            )}
-          </section>
-
-          <section className="space-y-2 @4xl:col-span-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">In progress</h2>
-              <Link href="/app/performance/campaigns" className="text-muted-foreground text-xs hover:underline">
-                All campaigns
-              </Link>
-            </div>
-            {recent.length === 0 ? (
-              <p className="text-muted-foreground bg-card rounded-xl border px-4 py-6 text-center text-xs">
-                No drafts.
-              </p>
-            ) : (
-              <ul className="bg-card divide-y rounded-xl border">
-                {recent.map(({ campaign, brand }) => (
-                  <CampaignRow key={campaign.id} brand={brand} campaign={campaign} showBrand />
-                ))}
-              </ul>
+              </div>
             )}
           </section>
         </div>
@@ -167,15 +183,41 @@ export default async function PerformanceDashboardPage() {
   );
 }
 
-function Figure({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="bg-card flex items-baseline justify-between gap-3 rounded-xl border p-4 @xl:block">
-      <div className="min-w-0">
-        <p className="text-muted-foreground text-xs">{label}</p>
-        <p className="text-muted-foreground text-[11px] @xl:hidden">{sub}</p>
-      </div>
-      <p className="text-2xl font-semibold tabular-nums @xl:mt-1">{value}</p>
-      <p className="text-muted-foreground hidden text-[11px] @xl:block">{sub}</p>
-    </div>
+/** A figure that opens its tab. The attention figure goes amber when there is something to do. */
+function Figure({
+  href,
+  label,
+  value,
+  sub,
+  tone = "muted",
+  subTone,
+}: {
+  href?: string;
+  label: string;
+  value: string;
+  sub: string;
+  tone?: "muted" | "amber";
+  subTone?: "muted" | "amber";
+}) {
+  const body = (
+    <>
+      <SectionLabel tone={tone} className="text-[10.5px] tracking-[0.07em]">
+        {label}
+      </SectionLabel>
+      <p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
+      <p className={cn("mt-1 text-xs", (subTone ?? tone) === "amber" ? "text-amber-300" : "text-muted-foreground")}>{sub}</p>
+    </>
+  );
+  const frame = cn(
+    "block rounded-2xl border p-4 text-left",
+    tone === "amber" ? "bg-card border-amber-500/35" : "bg-card",
+    href && "hover:border-foreground/25 transition-colors",
+  );
+  return href ? (
+    <Link href={href} className={frame}>
+      {body}
+    </Link>
+  ) : (
+    <div className={frame}>{body}</div>
   );
 }

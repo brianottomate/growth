@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { Building2, ExternalLink } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import { db } from "@/server/db";
 import {
@@ -19,7 +19,8 @@ import {
   type DeskBrand,
 } from "@/server/services/performance-desk.service";
 
-import { brandAdsHref, BrandLogo, StateChip } from "../_components";
+import { cn } from "@/components/ui/lib/utils";
+import { brandAdsHref, BrandLogo, panel, pill, SectionLabel, StateChip, tile } from "../_components";
 import { IntakeLink } from "./IntakeLink";
 
 export const metadata: Metadata = { title: "Clients · Wander Performance" };
@@ -145,142 +146,160 @@ export default async function PerformanceClientsPage() {
   );
 }
 
-/** One client: identity, what they filed, and where their campaigns stand. */
+/** One client: who they are on one line, what they filed as tiles, and what is missing. */
 function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary | null }) {
   const live = brand.campaigns.filter((campaign) => campaign.state === "live").length;
   const drafts = brand.campaigns.filter((campaign) => campaign.state === "draft").length;
+  const meta = [
+    brand.campaigns.length === 0
+      ? "no campaign yet"
+      : [
+          `${brand.campaigns.length} campaign${brand.campaigns.length === 1 ? "" : "s"}`,
+          live ? `${live} live` : null,
+          drafts ? `${drafts} draft${drafts === 1 ? "" : "s"}` : null,
+        ]
+          .filter(Boolean)
+          .join(", "),
+    intake ? `intake filed ${fmtDate(intake.submittedAt)}${intake.by ? ` by ${intake.by}` : ""}` : "no intake yet",
+  ];
   return (
-    <article className="bg-card rounded-xl border">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-        <BrandLogo brand={brand} className="size-10" />
+    <article className={cn(panel, "p-5")}>
+      <div className="flex flex-wrap items-center gap-3">
+        <BrandLogo brand={brand} className="size-10 text-[13px]" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/app/brands/${brand.slug ?? brand.id}`}
-              className="truncate text-sm font-semibold hover:underline"
-            >
+            <Link href={`/app/brands/${brand.slug ?? brand.id}`} className="text-[14.5px] font-semibold hover:underline">
               {brand.name}
             </Link>
-            <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium capitalize">
-              {brand.relationship}
-            </span>
+            {brand.account?.plan ? (
+              <span className="border-border/80 text-muted-foreground rounded-full border px-2 py-0.5 text-[10.5px] capitalize">
+                {brand.account.plan.replace(/_/g, " ")}
+              </span>
+            ) : null}
             {brand.account ? (
-              <span className="text-muted-foreground text-[11px] capitalize">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 text-[11.5px] capitalize",
+                  brand.account.status === "active" ? "text-emerald-300" : "text-muted-foreground",
+                )}
+              >
+                <span className={cn("size-1.5 rounded-full", brand.account.status === "active" ? "bg-emerald-400" : "bg-white/30")} />
                 {brand.account.status}
-                {brand.account.plan ? ` · ${brand.account.plan.replace(/_/g, " ")}` : ""}
               </span>
             ) : null}
             {brand.best ? <StateChip state={brand.best} /> : null}
           </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
+          <p className="text-muted-foreground mt-0.5 truncate text-xs">
             {brand.website ? (
-              <a
-                href={brand.website}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 hover:underline"
-              >
+              <a href={brand.website} target="_blank" rel="noreferrer" className="hover:underline">
                 {brand.website.replace(/^https?:\/\//, "")}
-                <ExternalLink className="size-3" />
               </a>
             ) : null}
-            <span>
-              {brand.campaigns.length === 0
-                ? "No campaign yet"
-                : [
-                    `${brand.campaigns.length} campaign${brand.campaigns.length === 1 ? "" : "s"}`,
-                    live ? `${live} live` : null,
-                    drafts ? `${drafts} draft${drafts === 1 ? "" : "s"}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-            </span>
-            <span className={brand.hasMark ? "" : "text-amber-300"}>
-              {brand.hasMark ? "Mark set" : "Mark missing"}
-            </span>
-          </div>
+            {brand.website ? " · " : ""}
+            {meta.join(" · ")}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Link href={brandAdsHref(brand)} className="font-medium hover:underline">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Link
+            href={brandAdsHref(brand)}
+            className={cn(pill, "border-border/80 hover:bg-muted/60 inline-flex items-center border px-3 py-1.5 text-xs font-semibold")}
+          >
             {brand.campaigns.length === 0 ? "Start a campaign" : "Campaigns"}
           </Link>
           {brand.intakeUrl ? <IntakeLink url={brand.intakeUrl} /> : null}
         </div>
       </div>
 
-      <div className="border-t px-4 py-3">
-        {intake ? (
-          <IntakeFacts intake={intake} />
-        ) : (
-          <p className="text-muted-foreground text-xs">
-            {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
-          </p>
-        )}
-      </div>
+      {intake ? (
+        <IntakeFacts intake={intake} />
+      ) : (
+        <p className="text-muted-foreground mt-4 text-xs">
+          {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
+        </p>
+      )}
+
+      {!brand.hasMark ? (
+        <div className="mt-4 flex items-center gap-2 border-t pt-3 text-xs text-amber-300">
+          <span className="size-1.5 rounded-full bg-amber-400" />
+          Brand mark missing, so cards render without the logo.
+          <Link href={`/app/brands/${brand.slug ?? brand.id}`} className="text-sky-300 hover:underline">
+            Fix
+          </Link>
+        </div>
+      ) : null}
     </article>
   );
 }
 
-/** The intake as the client filed it, the facts a rep reads before a call. */
+/** The intake as the client filed it, as tiles a rep reads before a call. */
 function IntakeFacts({ intake }: { intake: IntakeSummary }) {
-  const facts: [string, string, boolean?][] = [
-    [
-      "Budget",
-      intake.budget != null
-        ? `$${intake.budget.toLocaleString()}/mo media`
-        : intake.budgetIsRecommendation
-          ? "Asked us to recommend"
+  const tiles: { label: string; value: string; tone?: "ok" | "warn" | "muted" }[] = [
+    {
+      label: "Budget",
+      value:
+        intake.budget != null
+          ? `$${intake.budget.toLocaleString()}/mo media`
+          : intake.budgetIsRecommendation
+            ? "Asked us to recommend"
+            : "Not given",
+      tone: intake.budget != null ? "ok" : "muted",
+    },
+    {
+      label: "Ad access",
+      value: intake.accessVerified ? "Verified" : intake.accessClaimed ? "Claimed, not seen" : "Not granted",
+      tone: intake.accessVerified ? "ok" : intake.accessClaimed ? "warn" : "muted",
+    },
+    {
+      label: "Homes",
+      value:
+        intake.homes === "all"
+          ? "All of them"
+          : intake.homes
+            ? `${intake.homes} named${intake.homesOnRecord ? `, ${intake.homesOnRecord} on record` : ""}`
+            : intake.homesOnRecord
+              ? `${intake.homesOnRecord} on record`
+              : "None named",
+      tone: intake.homes !== null || intake.homesOnRecord > 0 ? "ok" : "muted",
+    },
+    {
+      label: "Reports · invoice",
+      value:
+        intake.reportEmails || intake.invoiceEmail
+          ? [intake.reportEmails, intake.invoiceEmail].filter(Boolean).join(" · ")
           : "Not given",
-      intake.budget != null,
-    ],
-    [
-      "Homes",
-      intake.homes === "all"
-        ? "All of them"
-        : intake.homes
-          ? `${intake.homes} named${intake.homesOnRecord ? ` · ${intake.homesOnRecord} on record` : ""}`
-          : intake.homesOnRecord
-            ? `${intake.homesOnRecord} on record`
-            : "None named",
-      intake.homes !== null || intake.homesOnRecord > 0,
-    ],
-    [
-      "Ad access",
-      intake.accessVerified
-        ? "Verified"
-        : intake.accessClaimed
-          ? "Claimed, not yet seen"
-          : "Not granted",
-      intake.accessVerified,
-    ],
-    ["Reports to", intake.reportEmails ?? "Not given", Boolean(intake.reportEmails)],
-    ["Invoice to", intake.invoiceEmail ?? "Not given", Boolean(intake.invoiceEmail)],
-    [
-      "Assets",
-      [intake.creative ? "creative folder" : null, intake.guestList ? "guest list" : null]
-        .filter(Boolean)
-        .join(", ") || "None shared",
-      intake.creative || intake.guestList,
-    ],
+      tone: intake.reportEmails || intake.invoiceEmail ? "ok" : "muted",
+    },
+    {
+      label: "Assets",
+      value:
+        [
+          intake.creative ? "creative folder" : null,
+          intake.guestList ? "guest list" : null,
+          intake.ugc ? `UGC ${intake.ugc}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || "None shared",
+      tone: intake.creative || intake.guestList ? "ok" : "muted",
+    },
   ];
   return (
-    <div className="space-y-2">
-      <p className="text-muted-foreground text-[11px]">
-        Intake filed {fmtDate(intake.submittedAt)}
-        {intake.by ? ` by ${intake.by}` : ""} ·{" "}
-        <span className="capitalize">{intake.status}</span>
-        {intake.ugc ? ` · UGC: ${intake.ugc}` : ""}
-      </p>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs @2xl:grid-cols-3 @4xl:grid-cols-6">
-        {facts.map(([label, value, ok]) => (
-          <div key={label} className="min-w-0">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className={ok === false ? "text-muted-foreground truncate" : "truncate font-medium"} title={value}>
-              {value}
-            </dd>
+    <div className="mt-4 space-y-3">
+      <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3 @4xl:grid-cols-5">
+        {tiles.map((row) => (
+          <div key={row.label} className={tile}>
+            <SectionLabel className="text-[10px] tracking-[0.07em]">{row.label}</SectionLabel>
+            <p
+              className={cn(
+                "mt-1 truncate text-[12.5px]",
+                row.tone === "ok" ? "font-semibold" : row.tone === "warn" ? "text-amber-300" : "text-muted-foreground",
+              )}
+              title={row.value}
+            >
+              {row.value}
+            </p>
           </div>
         ))}
-      </dl>
+      </div>
       {intake.notes ? (
         <p className="text-muted-foreground line-clamp-2 text-xs" title={intake.notes}>
           “{intake.notes}”

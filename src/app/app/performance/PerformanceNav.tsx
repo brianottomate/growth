@@ -23,7 +23,7 @@ export function PerformanceNav() {
   return (
     <nav
       aria-label="Wander Performance"
-      className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto border-b px-1 whitespace-nowrap"
+      className="scrollbar-thin -mx-1 flex gap-1 overflow-x-auto overflow-y-hidden border-b px-1 whitespace-nowrap"
     >
       {TABS.map((tab) => (
         <Link

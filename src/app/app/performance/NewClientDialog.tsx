@@ -58,7 +58,7 @@ export function NewClientDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={variant} size={size}>
+        <Button variant={variant} size={size} className="rounded-full">
           <Sparkles className="size-3.5" />
           New client
         </Button>

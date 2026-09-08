@@ -14,7 +14,7 @@ export function IntakeLink({ url }: { url: string }) {
         type="button"
         variant="outline"
         size="sm"
-        className="h-7 px-2 text-[11px]"
+        className="h-auto rounded-full px-3 py-1.5 text-xs font-semibold"
         onClick={async () => {
           await navigator.clipboard.writeText(url);
           setCopied(true);
