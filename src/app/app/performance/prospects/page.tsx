@@ -48,7 +48,7 @@ export default async function PerformanceProspectsPage() {
                 <BrandLogo brand={brand} className="size-8 text-[11px]" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2">
-                    <Link href={`/app/brands/${brand.slug ?? brand.id}`} className="text-[13px] font-semibold hover:underline">
+                    <Link href={`/app/performance/brands/${brand.slug ?? brand.id}`} className="text-[13px] font-semibold hover:underline">
                       {brand.name}
                     </Link>
                     {brand.website ? (

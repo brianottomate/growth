@@ -158,7 +158,7 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         <BrandLogo brand={brand} className="size-10 text-[13px]" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/app/brands/${brand.slug ?? brand.id}`} className="text-[14.5px] font-semibold hover:underline">
+            <Link href={`/app/performance/brands/${brand.slug ?? brand.id}`} className="text-[14.5px] font-semibold hover:underline">
               {brand.name}
             </Link>
             {brand.account?.plan ? (
