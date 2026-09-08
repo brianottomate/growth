@@ -11,6 +11,7 @@ import { loadPerformanceDesk, narrowDesk } from "@/server/services/performance-d
 
 import { brandAdsHref, BrandLogo, panel, SectionLabel, StateChip } from "../_components";
 import { BrandRowMenu } from "../BrandRowMenu";
+import { SendLink } from "../SendLink";
 import { ProspectActions } from "./ProspectActions";
 import { ProspectSearch } from "./ProspectSearch";
 
@@ -67,14 +68,10 @@ export default async function PerformanceProspectsPage() {
                     {brand.best ? <StateChip state={brand.best} /> : null}
                   </div>
                 </div>
+                {brand.pitchUrl ? <SendLink label="Pitch page" url={brand.pitchUrl} /> : null}
+                {brand.intakeUrl ? <SendLink label="Intake form" url={brand.intakeUrl} /> : null}
                 <ProspectActions website={brand.website} />
-                <BrandRowMenu
-                  brandId={brand.id}
-                  brandName={brand.name}
-                  relationship="prospect"
-                  pitchUrl={brand.pitchUrl}
-                  intakeUrl={brand.intakeUrl}
-                />
+                <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="prospect" />
               </li>
             ))}
           </ul>

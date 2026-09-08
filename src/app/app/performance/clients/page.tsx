@@ -22,6 +22,7 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel, StateChip, tile } from "../_components";
 import { BrandRowMenu } from "../BrandRowMenu";
+import { SendLink } from "../SendLink";
 
 export const metadata: Metadata = { title: "Clients · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -188,13 +189,11 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
             {meta.join(" · ")}
           </p>
         </div>
-        <BrandRowMenu
-          brandId={brand.id}
-          brandName={brand.name}
-          relationship="client"
-          pitchUrl={brand.pitchUrl}
-          intakeUrl={brand.intakeUrl}
-        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          {brand.pitchUrl ? <SendLink label="Pitch page" url={brand.pitchUrl} /> : null}
+          {brand.intakeUrl ? <SendLink label="Intake form" url={brand.intakeUrl} /> : null}
+          <BrandRowMenu brandId={brand.id} brandName={brand.name} relationship="client" />
+        </div>
       </div>
 
       {intake ? (

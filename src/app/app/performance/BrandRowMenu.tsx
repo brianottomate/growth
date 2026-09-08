@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Copy, ExternalLink, MoreHorizontal } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 
 import {
   AlertDialog,
@@ -34,16 +34,10 @@ export function BrandRowMenu({
   brandId,
   brandName,
   relationship,
-  pitchUrl = null,
-  intakeUrl = null,
 }: {
   brandId: string;
   brandName: string;
   relationship: "client" | "prospect";
-  /** The wander.com pitch page a rep sends before anything is signed. */
-  pitchUrl?: string | null;
-  /** The intake form the client fills in. */
-  intakeUrl?: string | null;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -68,14 +62,6 @@ export function BrandRowMenu({
     }),
   );
   const other = relationship === "client" ? "prospect" : "client";
-  const copy = async (label: string, url: string) => {
-    await navigator.clipboard.writeText(url);
-    toast.success(`${label} copied`);
-  };
-  const links = [
-    pitchUrl ? { label: "Pitch page", url: pitchUrl } : null,
-    intakeUrl ? { label: "Intake form", url: intakeUrl } : null,
-  ].filter((row): row is { label: string; url: string } => row !== null);
   return (
     <>
       <DropdownMenu>
@@ -85,22 +71,7 @@ export function BrandRowMenu({
         >
           <MoreHorizontal className="size-4" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          {links.map((link) => (
-            <div key={link.label} className="flex items-stretch">
-              <DropdownMenuItem className="flex-1" onClick={() => void copy(link.label, link.url)}>
-                <Copy className="size-3.5" />
-                Copy {link.label.toLowerCase()} link
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                aria-label={`Open ${link.label.toLowerCase()}`}
-                onClick={() => window.open(link.url, "_blank", "noopener,noreferrer")}
-              >
-                <ExternalLink className="size-3.5" />
-              </DropdownMenuItem>
-            </div>
-          ))}
-          {links.length > 0 ? <DropdownMenuSeparator /> : null}
+        <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem
             disabled={setRelationship.isPending}
             onClick={() => setRelationship.mutate({ brandId, relationship: other })}
