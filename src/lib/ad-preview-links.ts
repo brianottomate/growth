@@ -20,6 +20,9 @@ export function adPreviewStudioHref(input: {
   sourceAssetId?: string | null;
   templateId?: CompositionTemplateId;
   formatId?: CompositionFormatId;
+  /** Copy to open the Studio with, so a preview tile continues as it looked. */
+  title?: string;
+  cta?: string;
 }) {
   const params = new URLSearchParams({
     brandId: input.brandId,
@@ -29,6 +32,8 @@ export function adPreviewStudioHref(input: {
     back: performanceBrandPath({ id: input.brandId, slug: input.brandSlug }),
   });
   if (input.sourceAssetId) params.set("source", input.sourceAssetId);
+  if (input.title) params.set("title", input.title);
+  if (input.cta) params.set("cta", input.cta);
   return `/app/compositions?${params.toString()}`;
 }
 

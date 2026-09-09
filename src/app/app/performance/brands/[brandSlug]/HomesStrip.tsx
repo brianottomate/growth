@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, ExternalLink, PenLine, ZoomIn } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, LayoutGrid, PenLine, ZoomIn } from "lucide-react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
@@ -18,6 +18,8 @@ import { toast } from "@/components/ui/toast";
 import { adPreviewStudioHref } from "@/lib/ad-preview-links";
 import { useTRPC } from "@/trpc/react";
 
+import { HomeAdPreviews } from "./HomeAdPreviews";
+
 /** A home as the listing feed reports it; only what the tile and lightbox draw. */
 export type StripHome = {
   id: string;
@@ -26,6 +28,11 @@ export type StripHome = {
   imageUrl: string;
   thumbUrl: string | null;
   facts: string;
+  city: string | null;
+  state: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  guests: number | null;
 };
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
@@ -58,6 +65,25 @@ export function HomesStrip({
           return;
         }
         router.push(adPreviewStudioHref({ brandId, brandSlug, sourceAssetId: asset.id }));
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  // The preview grid draws from a library copy of the hero, so the same
+  // import as the Studio door runs first; it finds the earlier copy when
+  // there is one.
+  const [previews, setPreviews] = useState<{ home: StripHome; assetId: string } | null>(null);
+  const previewAds = useMutation(
+    trpc.media.importUrls.mutationOptions({
+      onSuccess: (result, variables) => {
+        const asset = result.assets[0];
+        const home = homes.find((row) => row.imageUrl === variables.images[0]?.url);
+        if (!asset || !home) {
+          toast.error("The photo could not be brought into the library");
+          return;
+        }
+        setPreviews({ home, assetId: asset.id });
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -133,6 +159,18 @@ export function HomesStrip({
                   <PenLine className="size-3.5" />
                   {design.isPending ? "Bringing the photo in…" : "Design an ad from this photo"}
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
+                  loading={previewAds.isPending}
+                  onClick={() =>
+                    previewAds.mutate({ brandId, images: [{ url: open.imageUrl, title: open.name }] })
+                  }
+                >
+                  <LayoutGrid className="size-3.5" />
+                  Preview ads
+                </Button>
                 <ButtonLink
                   href={open.url}
                   target="_blank"
@@ -181,6 +219,15 @@ export function HomesStrip({
           </DialogContent>
         ) : null}
       </Dialog>
+
+      <HomeAdPreviews
+        open={previews !== null}
+        onOpenChange={(next) => !next && setPreviews(null)}
+        brandId={brandId}
+        brandSlug={brandSlug}
+        sourceAssetId={previews?.assetId ?? null}
+        home={previews?.home ?? null}
+      />
     </>
   );
 }

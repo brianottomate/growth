@@ -534,7 +534,112 @@ export function renderComposition(
   const scrim = scrimRgba(spec.scrim);
 
   let content: React.ReactNode;
-  if (spec.templateId === "image-hero") {
+  if (spec.templateId === "hero-overlay") {
+    // Silvina's awareness template (2026-09): headline top left over a soft
+    // top scrim, a white pill at the foot; the story canvas centres the
+    // headline and drops the pill for plain text.
+    const story = spec.formatId === "story";
+    const wide = format.width > format.height;
+    const overlayPadding = story ? 96 : wide ? 72 : 68;
+    const headlineSize = story ? 80 : wide ? 60 : square ? 68 : 72;
+    // Character budgets that keep satori from wrapping a line a second time
+    // at these sizes; the break then falls where the words say.
+    const perLine = story ? 18 : wide ? 30 : 20;
+    const headlineLines = wrapText(clamp(spec.title, 90), perLine);
+    const button = spec.cta?.trim();
+    content = (
+      <div
+        style={{
+          display: "flex",
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          background: "#111111",
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={context.sourceImage!}
+          alt=""
+          width={format.width}
+          height={format.height}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: imagePosition,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            position: "absolute",
+            inset: 0,
+            background: `linear-gradient(180deg, ${scrim(0.62)} 0%, ${scrim(0.28)} 30%, ${scrim(0)} 52%, ${scrim(0)} 72%, ${scrim(0.4)} 100%)`,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            alignItems: story ? "center" : "flex-start",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: format.width,
+            height: format.height,
+            padding: overlayPadding,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              maxWidth: story ? "88%" : wide ? "60%" : "90%",
+              marginTop: story ? 60 : 0,
+              color: "#ffffff",
+              fontSize: headlineSize,
+              fontWeight: 700,
+              lineHeight: 1.08,
+              letterSpacing: "-0.02em",
+              textAlign: story ? "center" : "left",
+            }}
+          >
+            {headlineLines.map((line, index) => (
+              <div key={index} style={{ display: "flex", justifyContent: story ? "center" : "flex-start" }}>
+                {line}
+              </div>
+            ))}
+          </div>
+          {button ? (
+            story ? (
+              <div style={{ display: "flex", color: "#ffffff", fontSize: 34, fontWeight: 600, marginBottom: 40 }}>
+                {button}
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: wide ? "20px 38px" : "24px 44px",
+                  borderRadius: 999,
+                  background: "#ffffff",
+                  color: "#111111",
+                  fontSize: wide ? 30 : 34,
+                  fontWeight: 600,
+                }}
+              >
+                {button}
+              </div>
+            )
+          ) : (
+            <div style={{ display: "flex" }} />
+          )}
+        </div>
+      </div>
+    );
+  } else if (spec.templateId === "image-hero") {
     content = (
       <div
         style={{

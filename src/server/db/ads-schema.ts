@@ -108,6 +108,8 @@ export type AdCreativeContent = {
   /** Falls back to the campaign's landing URL. */
   linkUrl?: string;
   callToAction?: string;
+  /** The home the ad is about, as the onboarding list names it; the push names the ad by it. */
+  propertyName?: string;
   /** One item = static image; several = carousel, in this order. */
   media: MediaItem[];
 };

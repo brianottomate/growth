@@ -538,6 +538,7 @@ async function draftAdsFromChosenHomes({
       // A single-home ad goes to that home's page. Paid traffic landing on a
       // homepage has to find the home again by itself.
       linkUrl: first.listing.url,
+      propertyName: first.listing.name,
       callToAction: "Book now",
       media: [first.media],
     } satisfies AdCreativeContent,

@@ -29,6 +29,13 @@ export const COMPOSITION_FORMATS = [
     width: 1080,
     height: 1920,
   },
+  {
+    id: "wide",
+    label: "Wide",
+    detail: "Video · 16:9",
+    width: 1920,
+    height: 1080,
+  },
 ] as const;
 
 export const COMPOSITION_TEMPLATES = [
@@ -73,6 +80,13 @@ export const COMPOSITION_TEMPLATES = [
     label: "Tall · welcome",
     description:
       "Left-set headline and supporting line under the logo, a pill button at the base.",
+  },
+  {
+    id: "hero-overlay",
+    version: 1,
+    label: "Hero · overlay",
+    description:
+      "The photo full-bleed, a bold headline top left under a soft scrim, a white pill button at the foot. Centred on the story canvas. The awareness card, in every size.",
   },
   {
     id: "image-hero",
@@ -177,6 +191,10 @@ export const COMPOSITION_FIELDS: Record<CompositionTemplateId, CompositionField[
     { key: "title", label: "Headline" },
     { key: "subtitle", label: "Supporting line", hint: "Optional" },
     { key: "cta", label: "Button", hint: "Optional" },
+  ],
+  "hero-overlay": [
+    { key: "title", label: "Headline" },
+    { key: "cta", label: "Button", hint: "Optional; plain text on the story canvas" },
   ],
   "image-hero": [mark, ...message],
   "split-frame": [mark, ...message],

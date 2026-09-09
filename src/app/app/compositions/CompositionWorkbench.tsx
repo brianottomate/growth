@@ -92,6 +92,8 @@ export function CompositionWorkbench({
   initialTemplateId = null,
   initialFormatId = null,
   initialSourceId = null,
+  initialTitle = null,
+  initialCta = null,
   adPreviewTarget = null,
 }: {
   brands: Brand[];
@@ -105,6 +107,8 @@ export function CompositionWorkbench({
   initialTemplateId?: CompositionTemplateId | null;
   initialFormatId?: CompositionFormatId | null;
   initialSourceId?: string | null;
+  initialTitle?: string | null;
+  initialCta?: string | null;
   /**
    * Designing an ad preview for the brand: a freeze keeps the card on the
    * brand and goes back to its page.
@@ -126,12 +130,12 @@ export function CompositionWorkbench({
   // Copy lives outside the blueprint: switching layouts keeps it, and a field
   // reappears with its text when a layout uses it again. The standard
   // placeholder copy stands until the operator types or asks for copy.
-  const [title, setTitle] = useState("The view is only the beginning.");
+  const [title, setTitle] = useState(initialTitle ?? "The view is only the beginning.");
   const [subtitle, setSubtitle] = useState(
     "Turn a strong property image into channel-ready creative without rebuilding the layout.",
   );
   const [eyebrow, setEyebrow] = useState("Stay with Wander");
-  const [cta, setCta] = useState("Explore the stay");
+  const [cta, setCta] = useState(initialCta ?? "Explore the stay");
   const [rating, setRating] = useState<number | undefined>(5);
   const [assetTitle, setAssetTitle] = useState(
     adPreviewTarget ? "Ad preview" : "Wander social composition",

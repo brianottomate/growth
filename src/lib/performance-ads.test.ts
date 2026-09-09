@@ -1,46 +1,87 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  adFormatFor,
+  audienceLabelForKind,
+  audienceLabelForPlan,
   audiencePlanFor,
   performanceAdBusinessKey,
   buildPerformanceAdPlan,
   dailyBudgetFromMedia,
   performanceAdName,
+  performanceAdSetName,
   campaignDraftName,
   performanceCampaignName,
-  propertySlot,
+  performanceNamePrefix,
+  performancePeriod,
 } from "./performance-ads";
 
 // The live Away & Stay build is the reference these conventions come from, so
 // the tests assert against its actual names and structure.
 
+// Brooke's convention (2026-09-09): every level starts with the platform and
+// the brand; PERF+ marks client spend for finance.
 describe("naming", () => {
-  it("reproduces the live campaign name", () => {
-    expect(performanceCampaignName({ customer: "Away & Stay" })).toBe(
-      "OSPERF+AWAY+STAY_PROSPECTING_PURCHASES",
+  it("names a client campaign by sale, purchase and month", () => {
+    expect(
+      performanceCampaignName({ customer: "Winter Park Escapes", period: "202609" }),
+    ).toBe("META_PERF+WINTER+PARK+ESCAPES_SALES_PURCHASE_202609");
+  });
+
+  it("defaults the period to the current month", () => {
+    expect(performancePeriod(new Date("2026-09-09T12:00:00Z"))).toBe("202609");
+    expect(performanceCampaignName({ customer: "Away & Stay" })).toEndWith(
+      `_${performancePeriod()}`,
     );
   });
 
-  it("keeps the finance-filterable prefix when a period is added", () => {
-    expect(
-      performanceCampaignName({ customer: "Away & Stay", period: "2026-08" }),
-    ).toStartWith("OSPERF+AWAY+STAY_");
+  it("keeps PERF+ off Wander's own brands", () => {
+    expect(performanceNamePrefix({ brandName: "Wander", isClient: false })).toBe("META_WANDER");
+    expect(performanceNamePrefix({ brandName: "", isClient: false })).toBe("META_WANDER");
+    expect(performanceNamePrefix({ brandName: "Away & Stay", isClient: true })).toBe(
+      "META_PERF+AWAY+STAY",
+    );
   });
 
-  it("reproduces live ad names", () => {
+  it("names an ad set by audience family and booking states", () => {
+    expect(
+      performanceAdSetName({
+        customer: "Winter Park Escapes",
+        audience: "LOOKALIKE",
+        states: ["tx", "CO", "Florida"],
+      }),
+    ).toBe("META_PERF+WINTER+PARK+ESCAPES_LOOKALIKE_TX+CO");
+    expect(
+      performanceAdSetName({ customer: "Winter Park Escapes", audience: "BROAD" }),
+    ).toBe("META_PERF+WINTER+PARK+ESCAPES_BROAD_US");
+  });
+
+  it("maps audiences onto the three families", () => {
+    expect(audienceLabelForKind("lookalike_booker_seed")).toBe("LOOKALIKE");
+    expect(audienceLabelForKind("prospecting_list")).toBe("BROAD");
+    expect(audienceLabelForPlan({ type: "lookalike" })).toBe("LOOKALIKE");
+    expect(audienceLabelForPlan({ type: "custom" })).toBe("RETARGETING");
+    expect(audienceLabelForPlan({ type: "segment" })).toBe("BROAD");
+    expect(audienceLabelForPlan(null)).toBe("BROAD");
+  });
+
+  it("names an ad by format and property, property kept readable", () => {
     expect(
       performanceAdName({
-        index: 1,
-        format: "Static",
-        propertyName: "Wander Pawleys Island",
+        customer: "Winter Park Escapes",
+        format: "Carousel",
+        propertyName: "Roam River Mansion",
       }),
-    ).toBe("PropertyB_Static_Wander Pawleys Island");
+    ).toBe("META_PERF+WINTER+PARK+ESCAPES_CAROUSEL_Roam River Mansion");
+    expect(
+      performanceAdName({ customer: "X", format: "Influencer Video", propertyName: "Villa 9" }),
+    ).toBe("META_PERF+X_INFLUENCER_VIDEO_Villa 9");
   });
 
-  it("keeps slots sortable past 26 properties", () => {
-    expect(propertySlot(0)).toBe("A");
-    expect(propertySlot(25)).toBe("Z");
-    expect(propertySlot(26)).toBe("AA");
+  it("reads the format off the ad's media", () => {
+    expect(adFormatFor({ media: [{ type: "image" }] })).toBe("Static");
+    expect(adFormatFor({ media: [{ type: "image" }, { type: "image" }] })).toBe("Carousel");
+    expect(adFormatFor({ media: [{ type: "video" }] })).toBe("Video");
   });
 });
 
@@ -152,18 +193,18 @@ describe("ad plan", () => {
 describe("the name a draft is born with", () => {
   it("leads with the finance prefix for a paying client", () => {
     expect(
-      campaignDraftName({ brandName: "Forever Stays", isClient: true }),
-    ).toBe("OSPERF+FOREVER+STAYS_PROSPECTING_PURCHASES");
+      campaignDraftName({ brandName: "Forever Stays", isClient: true, period: "202609" }),
+    ).toBe("META_PERF+FOREVER+STAYS_SALES_PURCHASE_202609");
   });
 
-  it("keeps the same shape without the prefix for Wander's own brands", () => {
-    // Finance filters spend on OSPERF+; a Wander brand under that prefix would
+  it("keeps the same shape without PERF+ for Wander's own brands", () => {
+    // Finance filters spend on PERF+; a Wander brand under that prefix would
     // be billed to a client that does not exist.
-    expect(campaignDraftName({ brandName: "Wander", isClient: false })).toBe(
-      "WANDER_PROSPECTING_PURCHASES",
+    expect(campaignDraftName({ brandName: "Wander", isClient: false, period: "202609" })).toBe(
+      "META_WANDER_SALES_PURCHASE_202609",
     );
-    expect(campaignDraftName({ brandName: "", isClient: false })).toBe(
-      "WANDER_PROSPECTING_PURCHASES",
+    expect(campaignDraftName({ brandName: "", isClient: false, period: "202609" })).toBe(
+      "META_WANDER_SALES_PURCHASE_202609",
     );
   });
 });

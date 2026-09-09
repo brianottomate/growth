@@ -239,6 +239,11 @@ export default async function PerformanceBrandPage({
               url: home.url,
               imageUrl: home.imageUrl!,
               thumbUrl: home.thumbUrl ?? null,
+              city: home.city ?? null,
+              state: home.state ?? null,
+              bedrooms: home.bedrooms ?? null,
+              bathrooms: home.bathrooms ?? null,
+              guests: home.guests ?? null,
               facts: [
                 home.bedrooms ? `${home.bedrooms} bd` : null,
                 home.guests ? `${home.guests} guests` : null,

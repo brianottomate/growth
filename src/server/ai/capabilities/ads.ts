@@ -184,7 +184,7 @@ export const draftCampaignAction = growthAction({
       .max(300)
       .optional()
       .describe(
-        "Omit to use the house convention: BRAND_PROSPECTING_PURCHASES for a prospect, OSPERF+CUSTOMER_PROSPECTING_PURCHASES for a signed client.",
+        "Omit to use the house convention: META_PERF+BRAND_SALES_PURCHASE_YYYYMM for a signed client, META_BRAND_SALES_PURCHASE_YYYYMM otherwise.",
       ),
     platforms: z
       .array(z.enum(PLANNABLE_AD_PLATFORMS))

@@ -13,14 +13,23 @@ silently resolved.
 
 ## Adopted from the manual build
 
-**Campaign naming: `OSPERF+<CUSTOMER>_<STRATEGY>_<OBJECTIVE>`.** The `OSPERF+`
-prefix leads because finance filters spend on it. Recorded as an open question
-below: the live name carries no period.
+**Naming (Brooke, 2026-09-09): platform, brand, then the level's own facts.**
+Every level of a build starts `META_PERF+<BRAND>` for a client and `META_<BRAND>`
+for one of Wander's own brands, because finance filters client spend on `PERF+`.
 
-**Ad naming: `Property<Slot>_<Format>_<Property name>`.** Slot letter first so
-every asset for one property sorts together; format second so the static and
-carousel for a property sit adjacent. `AllProperties_Carousel` and
-`Catalog Ads_All<N>properties_<Customer>` for the two portfolio ads.
+- Campaign: `META_PERF+<BRAND>_SALES_PURCHASE_<YYYYMM>`. The month is in the
+  name; a Performance client is a monthly product.
+- Ad set: `META_PERF+<BRAND>_<AUDIENCE>_<GEOS>`. Audience is `BROAD`,
+  `LOOKALIKE` or `RETARGETING`; geos are the states most likely to book as
+  two-letter codes joined with `+`, or `US`.
+- Ad: `META_PERF+<BRAND>_<FORMAT>_<Property name>`. Format is `STATIC`,
+  `CAROUSEL`, `VIDEO` or `INFLUENCER_VIDEO`, read off the ad's media; the
+  property name stays human-readable because it is matched back to the
+  onboarding list, not parsed.
+
+The first live build (Away & Stay, August 2026) used `OSPERF+<CUSTOMER>_
+<STRATEGY>_<OBJECTIVE>` and `Property<Slot>_<Format>_<Name>`; those names stay
+on that campaign, and everything drafted since follows the convention above.
 
 **Ten ads for four properties, not nine.** A static and a carousel per property,
 then *both* a hand-built portfolio carousel and an Advantage+ catalog ad. These

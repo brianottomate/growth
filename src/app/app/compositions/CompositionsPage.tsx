@@ -65,6 +65,9 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
   const initialTemplateId = templateFromParam(searchParams.get("template"));
   const initialFormatId = formatFromParam(searchParams.get("format"));
   const initialSourceId = searchParams.get("source");
+  // Copy a preview tile was drawn with, so the Studio opens on the same card.
+  const initialTitle = searchParams.get("title");
+  const initialCta = searchParams.get("cta");
   // Designing an ad preview for the brand: freezing keeps the card on the
   // brand and goes back to its page.
   const adPreviewTarget =
@@ -96,6 +99,8 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
         initialTemplateId={initialTemplateId}
         initialFormatId={initialFormatId}
         initialSourceId={initialSourceId}
+        initialTitle={initialTitle}
+        initialCta={initialCta}
         adPreviewTarget={adPreviewTarget}
       />
     </div>

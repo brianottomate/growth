@@ -117,83 +117,138 @@ const upperSnake = (value: string) =>
     .replace(/\++/g, "+")
     .replace(/^\+|\+$/g, "");
 
+/** `202609`: the month a campaign is built for, as the names carry it. */
+export function performancePeriod(date = new Date()): string {
+  return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 /**
- * `OSPERF+AWAY+STAY_PROSPECTING_PURCHASES`
+ * `META_PERF+WINTER+PARK+ESCAPES` for a paying client, `META_WANDER` for one of
+ * Wander's own brands. Brooke's convention (2026-09-09): every level of the
+ * build starts with the platform and the brand, and `PERF+` is what finance
+ * filters client spend on, so a Wander brand must never carry it.
+ */
+export function performanceNamePrefix(input: {
+  brandName: string;
+  isClient: boolean;
+}): string {
+  const brand = upperSnake(input.brandName) || "WANDER";
+  return input.isClient ? `META_PERF+${brand}` : `META_${brand}`;
+}
+
+/**
+ * `META_PERF+WINTER+PARK+ESCAPES_SALES_PURCHASE_202609`
  *
- * The `OSPERF+` prefix is what finance filters spend on, so it leads. Period is
- * optional and off by default to match the live build; see the playbook for why
- * a recurring product probably wants it on.
+ * Campaign level: prefix, then what the campaign sells and how it is bought,
+ * then the month. The month is part of the name because a Performance client
+ * is a monthly product and the reporting cuts along that line.
  */
 export function performanceCampaignName(input: {
   customer: string;
-  strategy?: string;
-  objective?: string;
+  isClient?: boolean;
   period?: string;
 }): string {
   return [
-    `OSPERF+${upperSnake(input.customer)}`,
-    upperSnake(input.strategy ?? "PROSPECTING"),
-    upperSnake(input.objective ?? "PURCHASES"),
-    input.period ? upperSnake(input.period) : null,
-  ]
-    .filter(Boolean)
-    .join("_");
+    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    "SALES",
+    "PURCHASE",
+    input.period ?? performancePeriod(),
+  ].join("_");
 }
 
 /**
  * The name a new campaign draft starts with, so every draft is born in the
- * house convention instead of whatever was typed in the moment. A paying
- * client gets the finance-filterable `OSPERF+` form; Wander's own brands get
- * the same shape without the prefix, `WANDER_PROSPECTING_PURCHASES`. Always
+ * house convention instead of whatever was typed in the moment. Always
  * editable in the form; this is the default, not a rule.
  */
 export function campaignDraftName(input: {
   brandName: string;
   isClient: boolean;
+  period?: string;
 }): string {
-  if (input.isClient) {
-    return performanceCampaignName({ customer: input.brandName });
-  }
-  return [upperSnake(input.brandName) || "WANDER", "PROSPECTING", "PURCHASES"].join("_");
+  return performanceCampaignName({
+    customer: input.brandName,
+    isClient: input.isClient,
+    period: input.period,
+  });
 }
 
-/** `LOOKALIKE_SEEDLIST`, `PROSPECTING_LIST`, `THIRD_PARTY_INTENT`. */
-export function performanceAdSetName(kind: PerformanceAudienceKind): string {
-  const names: Record<PerformanceAudienceKind, string> = {
-    lookalike_booker_seed: "LOOKALIKE_SEEDLIST",
-    prospecting_list: "PROSPECTING_LIST",
-    third_party_intent: "THIRD_PARTY_INTENT",
+/** The three audience families an ad set is named by. */
+export type PerformanceAudienceLabel = "BROAD" | "LOOKALIKE" | "RETARGETING";
+
+/** How the planned audience kinds read in an ad set name. */
+export function audienceLabelForKind(kind: PerformanceAudienceKind): PerformanceAudienceLabel {
+  const labels: Record<PerformanceAudienceKind, PerformanceAudienceLabel> = {
+    lookalike_booker_seed: "LOOKALIKE",
+    prospecting_list: "BROAD",
+    third_party_intent: "BROAD",
   };
-  return names[kind];
+  return labels[kind];
 }
-
-/** Property slot letters, so ad names sort by property: A, B, … Z, AA. */
-export function propertySlot(index: number): string {
-  if (index < 0) throw new Error("property index must be >= 0");
-  let slot = "";
-  let n = index;
-  do {
-    slot = String.fromCharCode(65 + (n % 26)) + slot;
-    n = Math.floor(n / 26) - 1;
-  } while (n >= 0);
-  return slot;
-}
-
-export type PerformanceAdFormat = "Static" | "Carousel";
 
 /**
- * `PropertyB_Static_Wander Pawleys Island`
+ * How a plan audience reads in an ad set name. Lookalikes name themselves;
+ * a custom audience is people who already met the brand, so it retargets;
+ * everything else (segments, intent, keywords) is prospecting, which the
+ * convention calls broad.
+ */
+export function audienceLabelForPlan(audience: { type: string } | null | undefined): PerformanceAudienceLabel {
+  if (!audience) return "BROAD";
+  if (audience.type === "lookalike") return "LOOKALIKE";
+  if (audience.type === "custom") return "RETARGETING";
+  return "BROAD";
+}
+
+/**
+ * `META_PERF+WINTER+PARK+ESCAPES_LOOKALIKE_TX+CO+FL`
  *
- * Slot first so every asset for one property sorts together, format second so
- * the pair is adjacent. The property name is kept human-readable rather than
- * slugged — this string is read in Ads Manager, not parsed.
+ * Ad set level: the audience family and the states most likely to book, as
+ * two-letter codes joined with `+`. `US` when the set is national.
+ */
+export function performanceAdSetName(input: {
+  customer: string;
+  isClient?: boolean;
+  audience: PerformanceAudienceLabel;
+  states?: string[] | null;
+}): string {
+  const states = (input.states ?? [])
+    .map((state) => state.trim().toUpperCase())
+    .filter((state) => /^[A-Z]{2}$/.test(state));
+  return [
+    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    input.audience,
+    states.length > 0 ? states.join("+") : "US",
+  ].join("_");
+}
+
+export type PerformanceAdFormat = "Static" | "Carousel" | "Video" | "Influencer Video";
+
+/** The format a creative ad compiles to, read off its media. */
+export function adFormatFor(content: {
+  media: { type: string }[];
+}): PerformanceAdFormat {
+  if (content.media.some((item) => item.type === "video")) return "Video";
+  return content.media.length > 1 ? "Carousel" : "Static";
+}
+
+/**
+ * `META_PERF+WINTER+PARK+ESCAPES_CAROUSEL_Roam River Mansion`
+ *
+ * Ad level: the format, then the property. The property name is kept
+ * human-readable rather than slugged: this string is read in Ads Manager and
+ * matched back to the onboarding list, not parsed.
  */
 export function performanceAdName(input: {
-  index: number;
+  customer: string;
+  isClient?: boolean;
   format: PerformanceAdFormat;
   propertyName: string;
 }): string {
-  return `Property${propertySlot(input.index)}_${input.format}_${input.propertyName.trim()}`;
+  return [
+    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    upperSnake(input.format).replace(/\+/g, "_"),
+    input.propertyName.trim(),
+  ].join("_");
 }
 
 /**
@@ -237,7 +292,7 @@ export function buildPerformanceAdPlan(input: {
   }
   const perProperty = input.properties.flatMap((property, index) =>
     (["Static", "Carousel"] as const).map((format) => ({
-      name: performanceAdName({ index, format, propertyName: property.name }),
+      name: performanceAdName({ customer: input.customer, format, propertyName: property.name }),
       kind: format === "Static" ? ("static" as const) : ("carousel" as const),
       propertyIndex: index,
       linkUrl: property.url,
@@ -246,13 +301,21 @@ export function buildPerformanceAdPlan(input: {
   return [
     ...perProperty,
     {
-      name: "AllProperties_Carousel",
+      name: performanceAdName({
+        customer: input.customer,
+        format: "Carousel",
+        propertyName: "All properties",
+      }),
       kind: "all_properties_carousel",
       propertyIndex: null,
       linkUrl: null,
     },
     {
-      name: `Catalog Ads_All${input.properties.length}properties_${input.customer.trim()}`,
+      name: performanceAdName({
+        customer: input.customer,
+        format: "Carousel",
+        propertyName: `Catalog ${input.properties.length} properties`,
+      }),
       kind: "catalog",
       propertyIndex: null,
       linkUrl: null,

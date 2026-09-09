@@ -129,7 +129,7 @@ export function NewCampaignButton({
             />
             <p className="text-muted-foreground text-xs">
               {isClient
-                ? "OSPERF+CUSTOMER_STRATEGY_OBJECTIVE. Finance filters spend on the OSPERF+ prefix, so it leads."
+                ? "META_PERF+BRAND_SALES_PURCHASE_YYYYMM. Finance filters client spend on PERF+, so it leads."
                 : "BRAND_STRATEGY_OBJECTIVE, upper snake case. Change the strategy or objective to match the campaign."}
             </p>
           </div>

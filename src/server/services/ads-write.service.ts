@@ -61,6 +61,12 @@ import {
 import { db } from "@/server/db";
 import { usStateName } from "@/lib/us-states";
 import {
+  adFormatFor,
+  audienceLabelForPlan,
+  performanceAdName,
+  performanceAdSetName,
+} from "@/lib/performance-ads";
+import {
   adAccountTable,
   adTable,
   audienceTable,
@@ -2260,6 +2266,26 @@ async function pushToMeta(args: PushArgs) {
   const metaCallToAction = (content: AdCreativeContent) =>
     content.callToAction ?? META_DEFAULT_CALL_TO_ACTION;
 
+  // House naming at every level below the campaign (the campaign carries the
+  // name it was drafted with). An ad already in the convention keeps its name.
+  const isClient = brand.relationship === "client";
+  const adSetNameFor = (audience: PlanAudience | null) =>
+    performanceAdSetName({
+      customer: brand.name,
+      isClient,
+      audience: audienceLabelForPlan(audience),
+      states: audience?.geography?.states ?? null,
+    });
+  const adNameFor = (ad: Ad, content: AdCreativeContent) =>
+    ad.name.startsWith("META_")
+      ? ad.name
+      : performanceAdName({
+          customer: brand.name,
+          isClient,
+          format: adFormatFor(content),
+          propertyName: content.propertyName ?? ad.name,
+        });
+
   const carouselCardsFor = (content: AdCreativeContent) =>
     content.media.slice(0, 10).map((item, index) => ({
       imageUrl: item.url,
@@ -2271,7 +2297,7 @@ async function pushToMeta(args: PushArgs) {
 
   const creativesFor = (subset: typeof usable) =>
     subset.map(({ ad, content }) => ({
-      name: ad.name,
+      name: adNameFor(ad, content),
       // Every creative carries its own headline and body in the
       // multi-creative shape; Meta does not fall back per creative.
       headline: content.headline,
@@ -2296,9 +2322,9 @@ async function pushToMeta(args: PushArgs) {
       ? { existingCampaignId: setArgs.existingCampaignId }
       : { campaignName: campaign.name }),
     name: setArgs.existingCampaignId
-      ? (setArgs.audience?.name ?? campaign.name)
+      ? adSetNameFor(setArgs.audience)
       : campaign.name,
-    adSetName: setArgs.audience?.name,
+    adSetName: adSetNameFor(setArgs.audience),
     goal: input.goal,
     // Under CBO the campaign owns the money; an ad set that also sends a
     // budget is fighting the thing that makes CBO worth using.
@@ -2372,7 +2398,7 @@ async function pushToMeta(args: PushArgs) {
           accountId: input.connectionAccountId,
           adAccountId: destination.adAccount.id,
           adSetId: writtenAdSetId(result)!,
-          name: ad.name,
+          name: adNameFor(ad, content),
           goal: input.goal,
           headline: content.headline,
           body: content.body,

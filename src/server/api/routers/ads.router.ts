@@ -475,6 +475,8 @@ export const adsRouter = {
         linkUrl: z.string().url().nullish(),
         /** Meta call to action, e.g. BOOK_NOW; the push falls back to LEARN_MORE. */
         callToAction: z.string().trim().max(40).nullish(),
+        /** The home the ad is about; the push names the ad `<prefix>_<FORMAT>_<property>`. */
+        propertyName: z.string().trim().max(200).nullish(),
         headlines: z.array(z.string().trim().min(1).max(30)).max(15).nullish(),
         descriptions: z
           .array(z.string().trim().min(1).max(90))
@@ -508,6 +510,7 @@ export const adsRouter = {
               body: input.body ?? "",
               linkUrl: input.linkUrl ?? undefined,
               callToAction: input.callToAction ?? undefined,
+              propertyName: input.propertyName ?? undefined,
               media: input.media ?? [],
             };
       return addDraftAd({
