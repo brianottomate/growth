@@ -223,3 +223,32 @@ describe("photo only", () => {
     expect(other.error?.issues[0]?.path).toEqual(["title"]);
   });
 });
+
+import { homeCatalogCopy, ratingOutOfFive } from "./home-ad-previews";
+
+// WanderOS feeds score guests out of 10; the listing card's pill is out of 5.
+describe("home preview copy", () => {
+  test("brings a ten-point feed rating onto the card's five-point pill", () => {
+    expect(ratingOutOfFive(10)).toBe(5);
+    expect(ratingOutOfFive(9.758620689655173)).toBe(4.9);
+    expect(ratingOutOfFive(4.8)).toBe(4.8);
+    expect(ratingOutOfFive(null)).toBeNull();
+    expect(ratingOutOfFive(0)).toBeNull();
+  });
+
+  test("writes the place with the state code the cards use", () => {
+    const copy = homeCatalogCopy({
+      name: "Arrow Rooftop Villa 290",
+      city: "Winter Park",
+      state: "Colorado",
+      bedrooms: 4,
+      bathrooms: 3,
+      guests: 8,
+      rating: 10,
+    });
+    expect(copy.title).toBe("Winter Park, CO");
+    expect(copy.eyebrow).toBe("Arrow Rooftop Villa 290 in");
+    expect(copy.subtitle).toBe("4 bedrooms · 3 baths · 8 guests");
+    expect(copy.rating).toBe(5);
+  });
+});

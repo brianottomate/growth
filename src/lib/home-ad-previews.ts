@@ -1,4 +1,5 @@
 import type { CompositionFormatId } from "@/lib/compositions";
+import { usStateCode } from "@/lib/us-states";
 
 // On-demand ad previews from one home. Client-safe: the brand page builds the
 // grid in the browser and each tile is the Studio's own preview route with a
@@ -28,14 +29,27 @@ export type HomeForPreview = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   guests?: number | null;
-  /** 0 to 5 as the feed reports it; the listing card shows it as a pill. */
+  /**
+   * The guest rating as the feed reports it. WanderOS feeds score out of 10;
+   * the listing card shows it out of 5, so anything above 5 is halved.
+   */
   rating?: number | null;
 };
+
+/** A feed rating on the card's five-point scale, or null when there is none. */
+export function ratingOutOfFive(rating: number | null | undefined): number | null {
+  if (typeof rating !== "number" || !Number.isFinite(rating) || rating <= 0) return null;
+  const scaled = rating > 5 ? rating / 2 : rating;
+  const rounded = Math.round(Math.min(5, scaled) * 10) / 10;
+  return rounded >= 1 ? rounded : null;
+}
 
 const BUTTON = "Find your next escape";
 
 function place(home: HomeForPreview) {
-  return [home.city, home.state].filter(Boolean).join(", ");
+  // "Winter Park, CO": the feed says "Colorado", the cards say the code.
+  const state = usStateCode(home.state) ?? home.state;
+  return [home.city, state].filter(Boolean).join(", ");
 }
 
 function count(n: number | null | undefined, one: string, many: string) {
@@ -119,10 +133,7 @@ export function homeCatalogCopy(home: HomeForPreview): HomeCatalogCopy {
     home.bathrooms ? `${home.bathrooms} ${home.bathrooms === 1 ? "bath" : "baths"}` : null,
     home.guests ? `${home.guests} guests` : null,
   ].filter((part): part is string => Boolean(part));
-  const rating =
-    typeof home.rating === "number" && home.rating >= 1 && home.rating <= 5
-      ? Math.round(home.rating * 10) / 10
-      : null;
+  const rating = ratingOutOfFive(home.rating);
   return {
     eyebrow: where ? `${home.name} in` : home.name,
     title: where || home.name,

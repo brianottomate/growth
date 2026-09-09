@@ -7,6 +7,7 @@ import { ExternalLink } from "lucide-react";
 import { db } from "@/server/db";
 import {
   brandTable,
+  mediaAssetTable,
   memberTable,
   performanceAccountTable,
   performanceIntakeTable,
@@ -135,6 +136,19 @@ export default async function PerformanceBrandPage({
       !superseded.has(asset.id),
   );
   const images = shown.slice(0, 18);
+  // The mark's variants are library asset ids, not URLs; the feed mock wants
+  // a URL. The traced vector draws sharpest, the colour PNG is the fallback,
+  // and a brand with no mark shows its logo.
+  const avatarUrl = brand.brandMark
+    ? brand.brandMark.vector?.color
+      ? `data:image/svg+xml;base64,${Buffer.from(brand.brandMark.vector.color).toString("base64")}`
+      : ((
+          await db.query.mediaAssetTable.findFirst({
+            where: eq(mediaAssetTable.id, brand.brandMark.variants.color),
+            columns: { url: true },
+          })
+        )?.url ?? brand.logo)
+    : brand.logo;
   const withPhoto = homes.filter((home) => home.imageUrl);
   // Until a card is frozen, the previews section draws ONE of their homes on
   // the awareness card in each placement's own canvas, so the headline and
@@ -234,7 +248,7 @@ export default async function PerformanceBrandPage({
         brandId={brand.id}
         brandSlug={brand.slug ?? brand.id}
         brandName={brand.name}
-        brandLogo={brand.brandMark?.variants.color ?? brand.logo}
+        brandLogo={avatarUrl}
         website={brand.website}
         cards={adPreviews}
         onDemand={onDemandPreview}
