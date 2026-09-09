@@ -51,6 +51,7 @@ import {
   createProspectAction,
   setBrandRelationshipAction,
   setBrandMarkAction,
+  addBrandAdPreviewAction,
 } from "./brands";
 import { listPlaybooksAction, readPlaybookAction } from "./playbooks";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
@@ -66,6 +67,7 @@ import {
   finishContentMediaUploads,
   freezeCompositionToLibrary,
   directCompositionAction,
+  writeCompositionCopyAction,
   extendCompositionAction,
   getContentWorkItem,
   importRemoteImagesToContent,
@@ -183,6 +185,7 @@ export const brandWrite = growthDomainTool({
     setRelationship: setBrandRelationshipAction,
     enrich: enrichBrandAction,
     setMark: setBrandMarkAction,
+    addAdPreview: addBrandAdPreviewAction,
     previewPurge: previewBrandPurgeAction,
     purge: purgeBrandAction,
   },
@@ -320,6 +323,7 @@ export const contentMediaWrite = growthDomainTool({
     attachLibraryMedia: attachLibraryMediaToContent,
     freezeComposition: freezeCompositionToLibrary,
     directComposition: directCompositionAction,
+    writeCopy: writeCompositionCopyAction,
     extendComposition: extendCompositionAction,
     recoverArchiveMedia: recoverArchiveMediaToContent,
     makeCarousel: makeCarouselFromPool,

@@ -477,8 +477,39 @@ function renderInputs(
  * The lines a catalog card breaks its headline into. Exported so the art
  * director can be told where the breaks fall instead of having to see them.
  */
-export function catalogHeadline(spec: Pick<CompositionSpec, "title" | "formatId">) {
+export function catalogHeadline(
+  spec: Pick<CompositionSpec, "title" | "formatId"> &
+    Partial<Pick<CompositionSpec, "templateId" | "eyebrow">>,
+) {
+  if (spec.templateId === "catalog-place") return placeStatement(spec);
   return wrapText(clamp(spec.title, 90), spec.formatId === "square" ? 24 : 22);
+}
+
+/** Where a hook hands over to the place: the word that goes down with the place. */
+const HOOK_PREPOSITIONS = new Set([
+  "in", "at", "on", "near", "by", "above", "below", "beside", "overlooking",
+  "outside", "inside", "from", "of", "for", "to", "off", "along", "across",
+]);
+
+/**
+ * The place card's one headline: the hook and the place read as a single
+ * statement, set on two lines that break where the sense does ("A 4-bedroom
+ * villa sleeping 8" / "in Winter Park, CO"), never mid-phrase by character
+ * count. A hook too long for one line wraps first and the place still takes
+ * its own line. Exported so the art director is told the same breaks.
+ */
+export function placeStatement(
+  spec: Pick<CompositionSpec, "title" | "formatId"> & Partial<Pick<CompositionSpec, "eyebrow">>,
+) {
+  const perLine = spec.formatId === "square" ? 24 : 28;
+  const place = clamp(spec.title.trim(), 40);
+  const hook = clamp(spec.eyebrow?.trim() ?? "", 60);
+  if (!hook) return wrapText(place, perLine);
+  const words = hook.split(/\s+/);
+  const last = words.at(-1)?.toLowerCase() ?? "";
+  const handover = HOOK_PREPOSITIONS.has(last) ? words.pop()! : null;
+  const placeLine = handover ? `${handover} ${place}` : place;
+  return [...wrapText(words.join(" "), perLine), ...wrapText(placeLine, perLine)].slice(0, 3);
 }
 
 export function renderComposition(
@@ -932,13 +963,14 @@ export function renderComposition(
       </div>
     );
   } else if (spec.templateId === "catalog-place") {
-    // The listing card: a quiet lead-in, the place large, the facts, and the
-    // guest rating as a pill in the accent colour. Same photo and scrim
-    // treatment as the other catalog cards so a feed of them reads as one set.
+    // The listing card: one bold statement (the hook and the place as a single
+    // headline, the way the reference layouts set it), the facts, and the
+    // guest rating as a pill in the accent colour over the foot gradient. No
+    // mark and no top scrim: this is a feed card, and the feed already shows
+    // the brand's name and avatar above the creative.
     const pad = square ? 56 : 64;
     const scale = square ? 0.9 : 1;
-    const eyebrow = wrapText(clamp(spec.eyebrow, 60), 30);
-    const place = wrapText(clamp(spec.title, 60), square ? 20 : 18);
+    const statement = placeStatement(spec);
     const facts = clamp(spec.subtitle, 80);
     const rating = spec.rating ? Math.round(spec.rating * 10) / 10 : null;
     content = (
@@ -977,24 +1009,6 @@ export function renderComposition(
             background: `linear-gradient(180deg, ${scrim(0)} 0%, ${scrim(0.5)} 40%, ${scrim(0.85)} 100%)`,
           }}
         />
-        {spec.mark !== "none" ? (
-          <>
-            <div
-              style={{
-                display: "flex",
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: 0,
-                height: "24%",
-                background: `linear-gradient(180deg, ${scrim(0.4)} 0%, ${scrim(0)} 100%)`,
-              }}
-            />
-            <div style={{ display: "flex", position: "absolute", top: pad, left: pad }}>
-              <BrandMark brandName={context.brand.name} logo={context.logo} tone={spec.mark} inverse />
-            </div>
-          </>
-        ) : null}
         <div
           style={{
             display: "flex",
@@ -1006,37 +1020,17 @@ export function renderComposition(
             color: "#ffffff",
           }}
         >
-          {eyebrow.length > 0 ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                fontSize: Math.round(46 * scale),
-                fontWeight: 500,
-                lineHeight: 1.12,
-                letterSpacing: "-0.02em",
-                opacity: 0.95,
-              }}
-            >
-              {eyebrow.map((text) => (
-                <div key={text} style={{ display: "flex" }}>
-                  {text}
-                </div>
-              ))}
-            </div>
-          ) : null}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              fontSize: Math.round(72 * scale),
+              fontSize: Math.round(60 * scale),
               fontWeight: 700,
-              lineHeight: 1.04,
+              lineHeight: 1.08,
               letterSpacing: "-0.03em",
-              marginTop: 4,
             }}
           >
-            {place.map((text) => (
+            {statement.map((text) => (
               <div key={text} style={{ display: "flex" }}>
                 {text}
               </div>

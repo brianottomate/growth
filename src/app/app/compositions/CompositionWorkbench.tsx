@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,6 +11,7 @@ import {
   ImageIcon,
   Layers3,
   Loader2,
+  PenLine,
   Snowflake,
   Star,
   Wand2,
@@ -87,6 +89,10 @@ export function CompositionWorkbench({
   onBrandChange,
   openAssetId = null,
   replaceTarget = null,
+  initialTemplateId = null,
+  initialFormatId = null,
+  initialSourceId = null,
+  adPreviewTarget = null,
 }: {
   brands: Brand[];
   brandId: string;
@@ -95,15 +101,31 @@ export function CompositionWorkbench({
   openAssetId?: string | null;
   /** The ad card the reopened composition came from; a freeze goes back there. */
   replaceTarget?: { adId: string; index: number; back: string | null } | null;
+  /** A blueprint, canvas and photo chosen by the link that opened the Studio. */
+  initialTemplateId?: CompositionTemplateId | null;
+  initialFormatId?: CompositionFormatId | null;
+  initialSourceId?: string | null;
+  /**
+   * Designing an ad preview for the brand: a freeze keeps the card on the
+   * brand and goes back to its page.
+   */
+  adPreviewTarget?: { back: string | null } | null;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [templateId, setTemplateId] =
-    useState<CompositionTemplateId>("photo-only");
-  const [formatId, setFormatId] = useState<CompositionFormatId>("portrait");
-  const [sourceMediaAssetId, setSourceMediaAssetId] = useState("");
+  const router = useRouter();
+  const [templateId, setTemplateId] = useState<CompositionTemplateId>(
+    initialTemplateId ?? "photo-only",
+  );
+  const [formatId, setFormatId] = useState<CompositionFormatId>(
+    initialFormatId ?? "portrait",
+  );
+  const [sourceMediaAssetId, setSourceMediaAssetId] = useState(
+    initialSourceId ?? "",
+  );
   // Copy lives outside the blueprint: switching layouts keeps it, and a field
-  // reappears with its text when a layout uses it again.
+  // reappears with its text when a layout uses it again. The standard
+  // placeholder copy stands until the operator types or asks for copy.
   const [title, setTitle] = useState("The view is only the beginning.");
   const [subtitle, setSubtitle] = useState(
     "Turn a strong property image into channel-ready creative without rebuilding the layout.",
@@ -111,7 +133,11 @@ export function CompositionWorkbench({
   const [eyebrow, setEyebrow] = useState("Stay with Wander");
   const [cta, setCta] = useState("Explore the stay");
   const [rating, setRating] = useState<number | undefined>(5);
-  const [assetTitle, setAssetTitle] = useState("Wander social composition");
+  const [assetTitle, setAssetTitle] = useState(
+    adPreviewTarget ? "Ad preview" : "Wander social composition",
+  );
+  // The home the copywriter matched the photo to, kept for the brand row.
+  const [homeUrl, setHomeUrl] = useState<string | null>(null);
   const [sourceSearch, setSourceSearch] = useState("");
   const [mark, setMark] = useState<"auto" | "color" | "white" | "dark" | "none">("auto");
   // The crop is a focal point: the point of the photo that must stay in
@@ -205,7 +231,12 @@ export function CompositionWorkbench({
           Boolean(asset.url) &&
           // The brand mark's own renders live in the library too; they are
           // drawn onto cards, never used as the photo under one.
-          (asset.metadata as { source?: string } | null)?.source !== "brand_mark",
+          (asset.metadata as { source?: string } | null)?.source !== "brand_mark" &&
+          // Nor is a card the Studio already rendered: type over type. Every
+          // freeze lands at the top of the library, so without this the
+          // newest "photo" is always the last card and each render stacks on
+          // the one before. Reopen a card to edit it; do not compose over it.
+          !(asset.metadata as { composition?: unknown } | null)?.composition,
       ),
     [assets],
   );
@@ -301,6 +332,20 @@ export function CompositionWorkbench({
       onError: (error) => toast.error(`Frozen, but not put on the ad: ${error.message}`),
     }),
   );
+  const addAdPreview = useMutation(
+    trpc.brand.addAdPreview.mutationOptions({
+      onSuccess: () => {
+        if (adPreviewTarget?.back) {
+          toast.success("Kept as an ad preview");
+          router.push(adPreviewTarget.back);
+        } else {
+          toast.success("Kept as one of the brand's ad previews");
+        }
+      },
+      onError: (error) =>
+        toast.error(`Frozen, but not kept as a preview: ${error.message}`),
+    }),
+  );
   const freeze = useMutation(
     trpc.composition.freeze.mutationOptions({
       onSuccess: async (asset) => {
@@ -310,12 +355,35 @@ export function CompositionWorkbench({
             index: replaceTarget.index,
             mediaAssetId: asset.id,
           });
+        } else if (adPreviewTarget) {
+          addAdPreview.mutate({ id: brandId, assetId: asset.id, homeUrl });
         } else {
           toast.success("Frozen into the media library");
         }
         await queryClient.invalidateQueries({
           queryKey: sourceListOptions.queryKey,
         });
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  // Words from the brand, on request: the blueprint's fields filled from their
+  // voice and the home behind the photo. The art director then judges them.
+  const writeCopy = useMutation(
+    trpc.composition.writeCopy.mutationOptions({
+      onSuccess: (copy) => {
+        setTitle(copy.title);
+        setEyebrow(copy.eyebrow ?? "");
+        setSubtitle(copy.subtitle ?? "");
+        setCta(copy.cta ?? "");
+        if (copy.rating != null) setRating(copy.rating);
+        setHomeUrl(copy.homeUrl);
+        resetDirection();
+        if (adPreviewTarget && selectedBrand) {
+          setAssetTitle(`${copy.title} — ${selectedBrand.name} ad preview`);
+        }
+        toast.success(copy.note);
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -378,18 +446,26 @@ export function CompositionWorkbench({
   return (
     <div className="grid gap-6 2xl:grid-cols-[440px_minmax(0,1fr)]">
       <div className="space-y-5">
-        {openAssetId ? (
+        {openAssetId || adPreviewTarget ? (
           <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs">
             <span>
-              {reopened.isLoading
+              {openAssetId && reopened.isLoading
                 ? "Opening the card…"
                 : replaceTarget
                   ? `Editing card ${replaceTarget.index + 1} of an ad. Freezing puts the new render in its place.`
-                  : "Reopened from the library. Freezing makes a new card; the old one stays."}
+                  : adPreviewTarget && openAssetId
+                    ? `Reopened one of ${selectedBrand?.name ?? "the brand"}'s ad previews. Freezing makes a new card and keeps it as a preview too.`
+                    : adPreviewTarget
+                      ? `Designing an ad preview for ${selectedBrand?.name ?? "the brand"}: their photo on the house card. Write copy fills the fields in their voice; freezing keeps the card on the brand page.`
+                      : "Reopened from the library. Freezing makes a new card; the old one stays."}
             </span>
             {replaceTarget?.back ? (
               <Link href={replaceTarget.back} className="text-primary shrink-0 hover:underline">
                 Back to the campaign
+              </Link>
+            ) : adPreviewTarget?.back ? (
+              <Link href={adPreviewTarget.back} className="text-primary shrink-0 hover:underline">
+                Back to the brand
               </Link>
             ) : null}
           </div>
@@ -831,6 +907,29 @@ export function CompositionWorkbench({
               maxLength={180}
               className="flex-1"
             />
+            {requiresImage && needsTitle ? (
+              <Button
+                variant="outline"
+                disabled={
+                  !renderSourceId ||
+                  writeCopy.isPending ||
+                  direct.isPending ||
+                  freeze.isPending
+                }
+                onClick={() =>
+                  writeCopy.mutate({
+                    brandId,
+                    templateId,
+                    formatId,
+                    sourceMediaAssetId: renderSourceId,
+                  })
+                }
+                title="Fill the fields from the brand's voice and the home behind the photo"
+              >
+                <PenLine className={cn("size-4", writeCopy.isPending && "animate-pulse")} />
+                {writeCopy.isPending ? "Writing…" : "Write copy"}
+              </Button>
+            ) : null}
             {requiresImage && fields.length > 0 ? (
               <Button
                 variant="outline"
@@ -844,13 +943,17 @@ export function CompositionWorkbench({
             ) : null}
             <Button
               disabled={!canRender || !assetTitle.trim()}
-              loading={freeze.isPending || replaceCard.isPending}
+              loading={freeze.isPending || replaceCard.isPending || addAdPreview.isPending}
               onClick={() =>
                 freeze.mutate({ ...spec, assetTitle: assetTitle.trim() })
               }
             >
               <Snowflake className="size-4" />
-              {replaceTarget ? `Freeze and put on card ${replaceTarget.index + 1}` : "Freeze to library"}
+              {replaceTarget
+                ? `Freeze and put on card ${replaceTarget.index + 1}`
+                : adPreviewTarget
+                  ? "Freeze and keep as a preview"
+                  : "Freeze to library"}
             </Button>
           </div>
         </section>

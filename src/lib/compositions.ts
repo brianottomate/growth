@@ -48,10 +48,10 @@ export const COMPOSITION_TEMPLATES = [
   },
   {
     id: "catalog-place",
-    version: 1,
+    version: 2,
     label: "Catalog · place",
     description:
-      "A lead-in line, the place in large type, the facts, and a guest-rating pill over a dark foot gradient. The listing card.",
+      "One bold statement, the hook and the place, then the facts and a guest-rating pill over a dark foot gradient. No mark: the feed shows the brand above the card. The listing card.",
   },
   {
     id: "catalog-review",
@@ -154,8 +154,7 @@ export const COMPOSITION_FIELDS: Record<CompositionTemplateId, CompositionField[
     { key: "subtitle", label: "Facts", hint: "3 bedrooms · 2 baths · 8 guests" },
   ],
   "catalog-place": [
-    mark,
-    { key: "eyebrow", label: "Lead-in", hint: "A mountain-view villa in" },
+    { key: "eyebrow", label: "Lead-in", hint: "Arcade games & firepit in" },
     { key: "title", label: "Place", hint: "Winter Park, CO" },
     { key: "subtitle", label: "Facts", hint: "3 bedrooms · 3.5 baths · 14 guests" },
     { key: "rating", label: "Guest rating", hint: "4.9" },
@@ -207,6 +206,7 @@ const formatIds = COMPOSITION_FORMATS.map((format) => format.id) as [
 ];
 
 export const compositionFormatIdSchema = z.enum(formatIds);
+export const compositionTemplateIdSchema = z.enum(templateIds);
 
 const compositionShape = {
   brandId: z.string().min(1),

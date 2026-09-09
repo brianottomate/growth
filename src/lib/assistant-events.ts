@@ -84,7 +84,21 @@ export type StartClientCampaignIntent = {
   visibleText: string;
 };
 
+/**
+ * "Design an ad preview for this brand": the chat runs the brand-ad-preview
+ * playbook (a home's photo, the house card, copy in their voice, the art
+ * director, then the card saved onto the brand). Fired from the Performance
+ * brand page's Ad previews section.
+ */
+export type DesignAdPreviewIntent = {
+  type: "design_ad_preview";
+  brandId: string;
+  brandName: string;
+  visibleText: string;
+};
+
 export type AssistantIntent =
+  | DesignAdPreviewIntent
   | StartClientCampaignIntent
   | DefinePersonasIntent
   | SetUpClientIntent

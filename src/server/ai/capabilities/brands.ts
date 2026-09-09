@@ -19,6 +19,10 @@ import {
   critiqueBrandMark,
   setBrandMark,
 } from "@/server/services/brand-mark.service";
+import {
+  addBrandAdPreview,
+  performanceBrandPath,
+} from "@/server/services/brand-ad-previews.service";
 import { growthAction } from "./types";
 
 /** Brand ids for the org — shared by other org-scoped capabilities. */
@@ -70,6 +74,43 @@ export const createBrandAction = growthAction({
       slug: brand.slug,
       name: brand.name,
       path: `/app/brands/${brand.slug}`,
+    };
+  },
+});
+
+export const addBrandAdPreviewAction = growthAction({
+  description:
+    "Keep a frozen card as one of the brand's ad previews: what their ads will look like, shown inside feed mocks on the Performance brand page before any campaign exists. mediaAssetId is a card from contentMediaWrite.freezeComposition; homeUrl is the listing it shows when known. Saving the same card again moves it to the front. Read the brand-ad-preview playbook for the whole job.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    mediaAssetId: z.string().min(1),
+    homeUrl: z.string().url().nullish(),
+  }),
+  execute: async (input, ctx) => {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, input.brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true, slug: true },
+    });
+    if (!brand) {
+      throw new Error(
+        "That brand is not available in the active organization.",
+      );
+    }
+    const previews = await addBrandAdPreview({
+      brandId: brand.id,
+      assetId: input.mediaAssetId,
+      userId: ctx.userId,
+      homeUrl: input.homeUrl ?? null,
+    });
+    return {
+      ok: true as const,
+      brandId: brand.id,
+      count: previews.length,
+      path: performanceBrandPath(brand),
     };
   },
 });

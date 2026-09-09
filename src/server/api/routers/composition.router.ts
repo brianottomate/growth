@@ -13,6 +13,10 @@ import {
   extendCompositionSource,
 } from "@/server/services/composition-direct.service";
 import {
+  writeCompositionCopy,
+  writeCompositionCopySchema,
+} from "@/server/services/composition-copy.service";
+import {
   CompositionAccessError,
   freezeComposition,
   openComposition,
@@ -93,6 +97,35 @@ export const compositionRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         return await directComposition({ userId: ctx.session.user.id, spec: input });
+      } catch (error) {
+        rethrowAccess(error);
+      }
+    }),
+
+  /**
+   * Words for the card before the art director judges it: the blueprint's
+   * fields filled from the brand's voice and the home behind the photo.
+   * Nothing is saved; the Studio puts the values in the form.
+   */
+  writeCopy: protectedProcedure
+    .input(writeCompositionCopySchema)
+    .output(
+      z.object({
+        eyebrow: z.string().nullable(),
+        title: z.string(),
+        subtitle: z.string().nullable(),
+        cta: z.string().nullable(),
+        rating: z.number().nullable(),
+        note: z.string(),
+        homeUrl: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await writeCompositionCopy({
+          userId: ctx.session.user.id,
+          spec: input,
+        });
       } catch (error) {
         rethrowAccess(error);
       }

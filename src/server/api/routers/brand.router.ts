@@ -26,6 +26,11 @@ import { type db } from "@/server/db";
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 import {
+  addBrandAdPreview,
+  BrandAdPreviewError,
+  removeBrandAdPreview,
+} from "@/server/services/brand-ad-previews.service";
+import {
   clearBrandMark,
   critiqueBrandMark,
   setBrandMark,
@@ -517,6 +522,50 @@ export const brandRouter = createTRPCRouter({
       await assertBrandManageable(ctx, input.id);
       await clearBrandMark(input.id);
       return { id: input.id };
+    }),
+
+  /**
+   * Keep a frozen card as one of the brand's ad previews: what their ads will
+   * look like, shown on the Performance brand page before any campaign.
+   */
+  addAdPreview: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        assetId: z.string().min(1),
+        homeUrl: z.string().url().nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.id);
+      try {
+        const previews = await addBrandAdPreview({
+          brandId: input.id,
+          assetId: input.assetId,
+          userId: ctx.session.user.id,
+          homeUrl: input.homeUrl ?? null,
+        });
+        return { id: input.id, count: previews.length };
+      } catch (error) {
+        if (error instanceof BrandAdPreviewError) {
+          throw new TRPCError({
+            code: error.status === 404 ? "NOT_FOUND" : "UNPROCESSABLE_CONTENT",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
+    }),
+
+  removeAdPreview: protectedProcedure
+    .input(z.object({ id: z.string(), assetId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBrandManageable(ctx, input.id);
+      const previews = await removeBrandAdPreview({
+        brandId: input.id,
+        assetId: input.assetId,
+      });
+      return { id: input.id, count: previews.length };
     }),
 
   /** Scrape the brand's website and refresh its fields. Runs inline. */

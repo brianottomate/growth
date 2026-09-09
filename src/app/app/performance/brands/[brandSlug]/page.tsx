@@ -14,6 +14,7 @@ import {
 import { getSession } from "@/server/better-auth/server";
 import { BrandBrandingCard } from "@/app/app/brands/[brandSlug]/BrandBrandingCard";
 import { cn } from "@/components/ui/lib/utils";
+import { listBrandAdPreviews } from "@/server/services/brand-ad-previews.service";
 import { listMedia } from "@/server/services/media.service";
 import { loadPerformanceDesk } from "@/server/services/performance-desk.service";
 import { brandListings } from "@/server/services/wanderos-listings.service";
@@ -21,6 +22,9 @@ import { brandListings } from "@/server/services/wanderos-listings.service";
 import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel } from "../../_components";
 import { StageChip } from "../../StageChip";
 import { StartCampaignInChat } from "../../StartCampaignInChat";
+import { AdPreviewsSection } from "./AdPreviewsSection";
+import { HomesStrip } from "./HomesStrip";
+import { MediaStrip } from "./MediaStrip";
 
 export const metadata: Metadata = { title: "Brand · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -66,7 +70,7 @@ export default async function PerformanceBrandPage({
   });
   if (!brand) notFound();
 
-  const [homes, media, desk, account] = await Promise.all([
+  const [homes, media, desk, account, adPreviews] = await Promise.all([
     brandListings({ id: brand.id, website: brand.website }),
     listMedia({ brandId: brand.id, kind: "image" }),
     loadPerformanceDesk(org.id),
@@ -74,6 +78,7 @@ export default async function PerformanceBrandPage({
       where: and(eq(performanceAccountTable.brandId, brand.id), isNull(performanceAccountTable.deletedAt)),
       columns: { id: true, contactName: true, contactEmail: true },
     }),
+    listBrandAdPreviews(brand.id),
   ]);
   const deskBrand = desk.brands.find((row) => row.id === brand.id) ?? null;
   const intake = account
@@ -97,16 +102,28 @@ export default async function PerformanceBrandPage({
       ? { role: "Wander rep", name: brand.connectTokenIssuedByName, email: brand.connectTokenIssuedByEmail }
       : null,
   ].filter((row): row is { role: string; name: string | null; email: string | null } => row !== null);
-  const images = media
-    .filter(
-      (asset) =>
-        asset.status === "ready" &&
-        (asset.thumbnailUrl ?? asset.url) &&
-        // The brand mark's own renders live in the library too; they are not
-        // photos of anything and read as noise in a strip.
-        (asset.metadata as { source?: string } | null)?.source !== "brand_mark",
-    )
-    .slice(0, 18);
+  type CardMeta = { composition?: { directedFrom?: string | null } };
+  const isCard = (asset: (typeof media)[number]) =>
+    Boolean((asset.metadata as CardMeta | null)?.composition);
+  // When the art director re-cut a card, the homes run kept the first render
+  // and pointed the corrected one back at it. The first is superseded: it is
+  // not what any ad shows, and beside its replacement it reads as a double.
+  const superseded = new Set(
+    media.flatMap((asset) => {
+      const from = (asset.metadata as CardMeta | null)?.composition?.directedFrom;
+      return from ? [from] : [];
+    }),
+  );
+  const shown = media.filter(
+    (asset) =>
+      asset.status === "ready" &&
+      (asset.thumbnailUrl ?? asset.url) &&
+      // The brand mark's own renders live in the library too; they are not
+      // photos of anything and read as noise in a strip.
+      (asset.metadata as { source?: string } | null)?.source !== "brand_mark" &&
+      !superseded.has(asset.id),
+  );
+  const images = shown.slice(0, 18);
   const withPhoto = homes.filter((home) => home.imageUrl);
 
   return (
@@ -137,7 +154,7 @@ export default async function PerformanceBrandPage({
 
       <section className="space-y-2.5">
         <div className="flex items-baseline justify-between">
-          <SectionLabel>Media library{media.length ? ` · ${media.length}` : ""}</SectionLabel>
+          <SectionLabel>Media library{shown.length ? ` · ${shown.length}` : ""}</SectionLabel>
           <div className="flex items-center gap-3 text-[11.5px]">
             <Link href={`/app/compositions?brandId=${encodeURIComponent(brand.id)}`} className="text-sky-300 hover:underline">
               Studio
@@ -150,22 +167,31 @@ export default async function PerformanceBrandPage({
         {images.length === 0 ? (
           <p className={cn(panel, "text-muted-foreground px-4 py-6 text-center text-xs")}>Nothing in the library yet.</p>
         ) : (
-          <ul className="grid grid-cols-3 gap-2 @xl:grid-cols-6 @4xl:grid-cols-9">
-            {images.map((asset) => (
-              <li key={asset.id} className="bg-muted aspect-square overflow-hidden rounded-xl border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={asset.thumbnailUrl ?? asset.url!}
-                  alt={asset.alt ?? asset.title ?? ""}
-                  loading="lazy"
-                  className="size-full object-cover"
-                  title={asset.title ?? asset.filename ?? undefined}
-                />
-              </li>
-            ))}
-          </ul>
+          <MediaStrip
+            images={images.map((asset) => ({
+              id: asset.id,
+              url: asset.url!,
+              thumbnailUrl: asset.thumbnailUrl ?? null,
+              title: asset.title ?? asset.filename ?? null,
+              alt: asset.alt ?? null,
+              width: asset.width ?? null,
+              height: asset.height ?? null,
+              isCard: isCard(asset),
+            }))}
+            brandId={brand.id}
+            brandSlug={brand.slug}
+          />
         )}
       </section>
+
+      <AdPreviewsSection
+        brandId={brand.id}
+        brandSlug={brand.slug ?? brand.id}
+        brandName={brand.name}
+        brandLogo={brand.brandMark?.variants.color ?? brand.logo}
+        website={brand.website}
+        cards={adPreviews}
+      />
 
       <section className="space-y-2.5">
         <div className="flex items-baseline justify-between">
@@ -203,33 +229,24 @@ export default async function PerformanceBrandPage({
             {brand.website ? "Not a WanderOS site, so there is no listing feed to read." : "No website on record."}
           </p>
         ) : (
-          <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-6">
-            {withPhoto.slice(0, 12).map((home) => (
-              <li key={home.id} className={cn(panel, "group")}>
-                <a href={home.url} target="_blank" rel="noreferrer" className="block">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={home.thumbUrl ?? home.imageUrl!}
-                    alt={home.name}
-                    loading="lazy"
-                    className="aspect-[4/3] w-full object-cover transition-opacity group-hover:opacity-90"
-                  />
-                  <div className="px-2.5 py-2">
-                    <p className="truncate text-xs font-semibold">{home.name}</p>
-                    <p className="text-muted-foreground truncate text-[11px]">
-                      {[
-                        home.bedrooms ? `${home.bedrooms} bd` : null,
-                        home.guests ? `${home.guests} guests` : null,
-                        [home.city, home.state].filter(Boolean).join(", ") || null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                </a>
-              </li>
-            ))}
-          </ul>
+          <HomesStrip
+            homes={withPhoto.slice(0, 12).map((home) => ({
+              id: home.id,
+              name: home.name,
+              url: home.url,
+              imageUrl: home.imageUrl!,
+              thumbUrl: home.thumbUrl ?? null,
+              facts: [
+                home.bedrooms ? `${home.bedrooms} bd` : null,
+                home.guests ? `${home.guests} guests` : null,
+                [home.city, home.state].filter(Boolean).join(", ") || null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            }))}
+            brandId={brand.id}
+            brandSlug={brand.slug}
+          />
         )}
         {withPhoto.length > 12 ? (
           <p className="text-muted-foreground text-[11px]">{withPhoto.length - 12} more on their site.</p>

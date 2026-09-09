@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Globe, MoreHorizontal } from "lucide-react";
 
+import {
+  AD_MOCK_SURFACES,
+  AdMock,
+  type AdMockMedia,
+  type AdMockSurface,
+} from "@/components/ad-mock";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,11 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/components/ui/lib/utils";
 import { useTRPC } from "@/trpc/react";
-import { posterForMedia } from "@/lib/media-url";
-
-type Media = { url: string; thumbnail?: string; type?: string };
 
 export type PreviewAd = {
   id: string;
@@ -25,39 +26,7 @@ export type PreviewAd = {
   body: string | null;
   linkUrl: string | null;
   callToAction: string | null;
-  media: Media[];
-};
-
-/**
- * Placements a drafted creative can land in, with the crop each one applies.
- * Local previews render all three; Meta's own preview API renders the feed
- * shapes only from a pre-push draft, because story formats need the image
- * uploaded to the ad account first.
- */
-const SURFACES = [
-  { id: "facebook", label: "Facebook feed", crop: "aspect-[1.91/1]" },
-  { id: "instagram", label: "Instagram feed", crop: "aspect-square" },
-  { id: "story", label: "Story / Reel", crop: "aspect-[9/16]" },
-] as const;
-
-type SurfaceId = (typeof SURFACES)[number]["id"];
-
-const ctaLabel = (cta: string | null) =>
-  cta
-    ? cta
-        .toLowerCase()
-        .split("_")
-        .map((word) => word[0]?.toUpperCase() + word.slice(1))
-        .join(" ")
-    : "Learn more";
-
-const domainOf = (url: string | null) => {
-  if (!url) return "";
-  try {
-    return new URL(url).hostname.replace(/^www\./, "").toUpperCase();
-  } catch {
-    return "";
-  }
+  media: AdMockMedia[];
 };
 
 /**
@@ -86,7 +55,7 @@ export function AdPreviewDialog({
   onOpenChange: (next: boolean) => void;
 }) {
   const trpc = useTRPC();
-  const [surface, setSurface] = useState<SurfaceId>("facebook");
+  const [surface, setSurface] = useState<AdMockSurface>("facebook");
   const [card, setCard] = useState(0);
   const [showMeta, setShowMeta] = useState(false);
 
@@ -100,12 +69,6 @@ export function AdPreviewDialog({
   const metaPreview = useMutation(trpc.ads.previewAd.mutationOptions());
 
   const isVideo = ad.media[0]?.type === "video";
-  const isCarousel = !isVideo && ad.media.length > 1;
-  const active = ad.media[Math.min(card, ad.media.length - 1)];
-  const image = posterForMedia(active);
-  const link = ad.linkUrl ?? landingUrl;
-  const crop = SURFACES.find((s) => s.id === surface)!.crop;
-  const isStory = surface === "story";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,7 +81,7 @@ export function AdPreviewDialog({
         </DialogHeader>
 
         <div className="flex flex-wrap gap-1.5">
-          {SURFACES.map((option) => (
+          {AD_MOCK_SURFACES.map((option) => (
             <Button
               key={option.id}
               size="sm"
@@ -131,133 +94,18 @@ export function AdPreviewDialog({
         </div>
 
         <div className="flex justify-center py-2">
-          <div
-            className={cn(
-              "overflow-hidden bg-white text-black shadow-lg",
-              isStory ? "w-64 rounded-2xl" : "w-80 rounded-lg",
-            )}
-          >
-            {/* Story places its chrome over the creative; feed stacks it. */}
-            {!isStory && (
-              <div className="flex items-center gap-2 p-3">
-                {brandLogo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={brandLogo}
-                    alt=""
-                    className="size-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="grid size-8 place-items-center rounded-full bg-neutral-200 text-xs font-semibold">
-                    {brandName.slice(0, 2)}
-                  </div>
-                )}
-                <div className="min-w-0 leading-tight">
-                  <p className="truncate text-[13px] font-semibold">
-                    {brandName}
-                  </p>
-                  <p className="flex items-center gap-1 text-[11px] text-neutral-500">
-                    Sponsored · <Globe className="size-2.5" />
-                  </p>
-                </div>
-                <MoreHorizontal className="ml-auto size-4 text-neutral-400" />
-              </div>
-            )}
-
-            {!isStory && ad.body && (
-              <p className="line-clamp-4 px-3 pb-2 text-[13px] leading-snug">
-                {ad.body}
-              </p>
-            )}
-
-            <div className={cn("relative bg-neutral-100", crop)}>
-              {/* This is the surface an operator checks the creative on, so a
-              video plays here rather than showing its poster. */}
-              {isVideo && active?.url ? (
-                <video
-                  src={active.url}
-                  poster={
-                    active.thumbnail && active.thumbnail !== active.url
-                      ? active.thumbnail
-                      : undefined
-                  }
-                  className="h-full w-full bg-black object-cover"
-                  controls
-                  playsInline
-                  preload="metadata"
-                />
-              ) : image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={image}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="grid h-full place-items-center text-xs text-neutral-400">
-                  No creative
-                </div>
-              )}
-              {isVideo && (
-                <span className="absolute top-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                  video
-                </span>
-              )}
-              {isCarousel && (
-                <>
-                  <button
-                    type="button"
-                    disabled={card === 0}
-                    onClick={() => setCard((c) => Math.max(0, c - 1))}
-                    className="absolute top-1/2 left-1 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-white/90 disabled:opacity-30"
-                  >
-                    <ChevronLeft className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={card >= ad.media.length - 1}
-                    onClick={() =>
-                      setCard((c) => Math.min(ad.media.length - 1, c + 1))
-                    }
-                    className="absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-white/90 disabled:opacity-30"
-                  >
-                    <ChevronRight className="size-3.5" />
-                  </button>
-                  <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] text-white">
-                    {card + 1} / {ad.media.length}
-                  </span>
-                </>
-              )}
-              {isStory && (
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8 text-white">
-                  {ad.body && (
-                    <p className="line-clamp-3 text-[12px] leading-snug">
-                      {ad.body}
-                    </p>
-                  )}
-                  <div className="mt-2 rounded-full bg-white px-3 py-1.5 text-center text-[12px] font-semibold text-black">
-                    {ctaLabel(ad.callToAction)}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {!isStory && (
-              <div className="flex items-center gap-2 bg-neutral-100 px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] tracking-wide text-neutral-500">
-                    {domainOf(link)}
-                  </p>
-                  <p className="truncate text-[13px] font-semibold">
-                    {ad.headline ?? ad.name}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded bg-neutral-200 px-2.5 py-1 text-[12px] font-medium">
-                  {ctaLabel(ad.callToAction)}
-                </span>
-              </div>
-            )}
-          </div>
+          <AdMock
+            surface={surface}
+            brandName={brandName}
+            brandLogo={brandLogo}
+            body={ad.body}
+            headline={ad.headline ?? ad.name}
+            link={ad.linkUrl ?? landingUrl}
+            callToAction={ad.callToAction}
+            media={ad.media}
+            card={card}
+            onCard={setCard}
+          />
         </div>
 
         <div className="border-t pt-3">

@@ -5,6 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { CompositionWorkbench } from "./CompositionWorkbench";
 
+import {
+  COMPOSITION_FORMATS,
+  COMPOSITION_TEMPLATES,
+  type CompositionFormatId,
+  type CompositionTemplateId,
+} from "@/lib/compositions";
 import type { BrandIdentity } from "@/server/db/brand-schema";
 
 type Brand = {
@@ -14,6 +20,24 @@ type Brand = {
   logo: string | null;
   brandIdentity: BrandIdentity | null;
 };
+
+/** A blueprint id from the URL, or nothing: an unknown id is ignored, not an error. */
+function templateFromParam(value: string | null): CompositionTemplateId | null {
+  return COMPOSITION_TEMPLATES.some((template) => template.id === value)
+    ? (value as CompositionTemplateId)
+    : null;
+}
+
+function formatFromParam(value: string | null): CompositionFormatId | null {
+  return COMPOSITION_FORMATS.some((format) => format.id === value)
+    ? (value as CompositionFormatId)
+    : null;
+}
+
+/** Only paths inside the app can be a way back; anything else is dropped. */
+function backFromParam(value: string | null) {
+  return value?.startsWith("/app/") ? value : null;
+}
 
 export function CompositionsPage({ brands }: { brands: Brand[] }) {
   const router = useRouter();
@@ -35,6 +59,17 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
   const replaceTarget =
     adId && cardIndex !== null && /^\d+$/.test(cardIndex)
       ? { adId, index: Number(cardIndex), back: searchParams.get("back") }
+      : null;
+  // A link that arrives with a blueprint, canvas or photo already chosen:
+  // the brand page opening the house card on one of their homes.
+  const initialTemplateId = templateFromParam(searchParams.get("template"));
+  const initialFormatId = formatFromParam(searchParams.get("format"));
+  const initialSourceId = searchParams.get("source");
+  // Designing an ad preview for the brand: freezing keeps the card on the
+  // brand and goes back to its page.
+  const adPreviewTarget =
+    searchParams.get("adPreview") === "1" && !replaceTarget
+      ? { back: backFromParam(searchParams.get("back")) }
       : null;
   const changeBrand = (next: string) => {
     setBrandId(next);
@@ -58,6 +93,10 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
         onBrandChange={changeBrand}
         openAssetId={openAssetId}
         replaceTarget={replaceTarget}
+        initialTemplateId={initialTemplateId}
+        initialFormatId={initialFormatId}
+        initialSourceId={initialSourceId}
+        adPreviewTarget={adPreviewTarget}
       />
     </div>
   );

@@ -100,6 +100,8 @@ export const growthActionPolicies = {
     // Renders three tones into our own library and points the brand at them;
     // the model-write consequence covers the lockup critique.
     setMark: write({ idempotent: true, consequence: "model-write" }),
+    // A reference onto the brand row; the card already exists in the library.
+    addAdPreview: write({ idempotent: true }),
     previewPurge: read(),
     // Offboarding. Deletes rows, R2 bytes and the Zernio connection, none of
     // which come back, so it is approval-gated and kept off MCP: a hard delete
@@ -220,6 +222,8 @@ export const growthActionPolicies = {
     freezeComposition: write({ consequence: "provider-write" }),
     // A render and a vision pass; nothing is saved.
     directComposition: read("model-read", PRODUCT),
+    // A copy pass over known facts; nothing is saved.
+    writeCopy: read("model-read", PRODUCT),
     // Gemini paints the photo out to the canvas; the result is a library asset.
     extendComposition: write({ idempotent: true, consequence: "model-write" }),
     recoverArchiveMedia: write({ consequence: "provider-write" }),

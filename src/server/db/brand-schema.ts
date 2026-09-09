@@ -136,6 +136,24 @@ export type BrandMark = {
   updatedAt: string;
 };
 
+/**
+ * One card kept as a preview of the brand's ads: what they will look like
+ * before any campaign exists, the way the mark shows what the lockup looks
+ * like before anything is published. A reference, not a copy: the card is a
+ * library asset whose composition metadata already holds the spec that made
+ * it, so the Studio can reopen it and a homes run can read its blueprint.
+ */
+export type BrandAdPreview = {
+  assetId: string;
+  /** The blueprint and canvas the card was rendered with, for the caption. */
+  templateId: string;
+  formatId: string;
+  /** The listing the photo came from, when it came from one. */
+  homeUrl?: string | null;
+  savedAt: string;
+  savedBy?: string | null;
+};
+
 export type BrandIdentity = {
   /** Firecrawl's whole branding profile, kept so nothing it read is lost. */
   raw?: BrandingProfile;
@@ -302,6 +320,11 @@ export const brandTable = pgTable(
     websiteMeta: t.jsonb().$type<BrandWebsiteMeta>(),
     brandIdentity: t.jsonb().$type<BrandIdentity>(),
     brandMark: t.jsonb().$type<BrandMark>(),
+    /**
+     * Cards saved as previews of the brand's ads, newest first. Applied with
+     * scripts/apply-brand-ad-previews-schema.ts; see that file for why.
+     */
+    adPreviews: t.jsonb().$type<BrandAdPreview[]>(),
     brandFingerprint: t.jsonb().$type<BrandFingerprint>(),
     // Shared listening judgment + reply guidance (voice still from brandFingerprint).
     brandListeningStory: t.jsonb().$type<BrandListeningStory>(),

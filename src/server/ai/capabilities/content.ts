@@ -56,6 +56,10 @@ import {
 } from "@/server/content/formats";
 import { groupPlatformThreads } from "@/lib/platform-thread";
 import { freezeComposition } from "@/server/services/composition.service";
+import {
+  writeCompositionCopy,
+  writeCompositionCopySchema,
+} from "@/server/services/composition-copy.service";
 import { growthAction, GrowthActionError } from "./types";
 import type { CapabilityContext } from "./types";
 import { orgBrandIds } from "./brands";
@@ -1300,6 +1304,25 @@ export const directCompositionAction = growthAction({
   execute: async (input, ctx) => {
     await requireOwnedBrandId(input.brandId, ctx);
     return directComposition({ userId: ctx.userId, spec: input });
+  },
+});
+
+export const writeCompositionCopyAction = growthAction({
+  description:
+    "Words for a card before it is judged: fills the blueprint's fields (eyebrow, title, subtitle, cta, rating) from the brand's voice and the home behind the photo, using only known facts. Give the brandId, templateId, formatId and the library photo (sourceMediaAssetId). Returns the values to put in a composition spec, a note saying what they were written from, and the matched home's URL when the photo came from a listing. Nothing is saved: pass the values to contentMediaWrite.directComposition, then freezeComposition.",
+  inputSchema: writeCompositionCopySchema,
+  outputSchema: z.object({
+    eyebrow: z.string().nullable(),
+    title: z.string(),
+    subtitle: z.string().nullable(),
+    cta: z.string().nullable(),
+    rating: z.number().nullable(),
+    note: z.string(),
+    homeUrl: z.string().nullable(),
+  }),
+  execute: async (input, ctx) => {
+    await requireOwnedBrandId(input.brandId, ctx);
+    return writeCompositionCopy({ userId: ctx.userId, spec: input });
   },
 });
 
