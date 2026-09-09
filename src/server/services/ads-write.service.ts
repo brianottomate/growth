@@ -16,6 +16,7 @@ import {
   LINKEDIN_PUSH_GOALS,
   linkedInCreativeRequirement,
   linkedInDraftProviderControls,
+  META_DEFAULT_CALL_TO_ACTION,
   metaDraftProviderControls,
   sameAdAccountId,
   type ZernioAdPlatform,
@@ -508,6 +509,13 @@ export function assertMetaAdPayload(
     (payload.carouselCards.length < 2 || payload.carouselCards.length > 10)
   ) {
     throw new Error("Meta carousels take 2\u201310 cards");
+  }
+  // Zernio refuses a Meta ad without one; the attach shape inherits it, and
+  // the catalog shape has no button of its own.
+  if (!payload.adSetId && goal !== "catalog_sales" && !payload.callToAction) {
+    throw new Error(
+      "callToAction is required for Meta ads, e.g. LEARN_MORE or BOOK_NOW",
+    );
   }
   payload.creatives?.forEach((creative, index) => {
     for (const field of ["headline", "body"] as const) {
@@ -2248,12 +2256,17 @@ async function pushToMeta(args: PushArgs) {
   const isCarousel = (content: AdCreativeContent) =>
     !isVideoContent(content) && (content.media?.length ?? 0) >= 2;
 
+  // Zernio rejects a Meta ad with no call to action, on every shape.
+  const metaCallToAction = (content: AdCreativeContent) =>
+    content.callToAction ?? META_DEFAULT_CALL_TO_ACTION;
+
   const carouselCardsFor = (content: AdCreativeContent) =>
     content.media.slice(0, 10).map((item, index) => ({
       imageUrl: item.url,
       headline:
         index === 0 ? content.headline : (content.headline ?? campaign.name),
       linkUrl: content.linkUrl ?? linkUrl,
+      callToAction: metaCallToAction(content),
     }));
 
   const creativesFor = (subset: typeof usable) =>
@@ -2267,7 +2280,7 @@ async function pushToMeta(args: PushArgs) {
         ? { video: videoPayloadFor(ad.name, content) }
         : { imageUrl: content.media[0]!.url }),
       linkUrl: content.linkUrl ?? linkUrl,
-      callToAction: content.callToAction,
+      callToAction: metaCallToAction(content),
     }));
 
   /** One ad set as the API sees it. */
@@ -2295,6 +2308,7 @@ async function pushToMeta(args: PushArgs) {
     headline: usable[0]!.content.headline,
     body: usable[0]!.content.body,
     linkUrl,
+    callToAction: metaCallToAction(usable[0]!.content),
     creatives: creativesFor(usable),
     targeting: setArgs.spec,
     startDate,
@@ -2363,7 +2377,7 @@ async function pushToMeta(args: PushArgs) {
           headline: content.headline,
           body: content.body,
           linkUrl: content.linkUrl ?? linkUrl,
-          callToAction: content.callToAction,
+          callToAction: metaCallToAction(content),
           carouselCards: carouselCardsFor(content),
           ...metaDraftProviderControls(false),
         };

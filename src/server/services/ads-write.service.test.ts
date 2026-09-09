@@ -22,6 +22,7 @@ const base: CreateZernioStandaloneAdInput = {
   adAccountId: "act_1",
   name: "Spring",
   goal: "traffic",
+  callToAction: "LEARN_MORE",
   budgetAmount: 50,
   budgetType: "daily",
   headline: "Spring",
@@ -40,6 +41,19 @@ const creative = {
 describe("assertMetaAdPayload", () => {
   it("accepts a minimal single-creative ad", () => {
     expect(() => assertMetaAdPayload(base, account)).not.toThrow();
+  });
+
+  it("requires a call to action, which Zernio rejects a Meta ad without", () => {
+    expect(() =>
+      assertMetaAdPayload({ ...base, callToAction: undefined }, account),
+    ).toThrow(/callToAction/);
+    // The attach shape inherits the ad set's button.
+    expect(() =>
+      assertMetaAdPayload(
+        { ...base, callToAction: undefined, adSetId: "set_1" },
+        account,
+      ),
+    ).not.toThrow();
   });
 
   it("requires an end date for a lifetime budget", () => {

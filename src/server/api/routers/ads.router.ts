@@ -473,6 +473,8 @@ export const adsRouter = {
         headline: z.string().trim().max(255).nullish(),
         body: z.string().trim().max(2_200).nullish(),
         linkUrl: z.string().url().nullish(),
+        /** Meta call to action, e.g. BOOK_NOW; the push falls back to LEARN_MORE. */
+        callToAction: z.string().trim().max(40).nullish(),
         headlines: z.array(z.string().trim().min(1).max(30)).max(15).nullish(),
         descriptions: z
           .array(z.string().trim().min(1).max(90))
@@ -505,6 +507,7 @@ export const adsRouter = {
               headline: input.headline ?? input.name,
               body: input.body ?? "",
               linkUrl: input.linkUrl ?? undefined,
+              callToAction: input.callToAction ?? undefined,
               media: input.media ?? [],
             };
       return addDraftAd({

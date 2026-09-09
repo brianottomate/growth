@@ -94,6 +94,13 @@ export const LINKEDIN_PUSH_GOALS = [
   "video_views",
 ] as const satisfies readonly AdPushGoal[];
 
+/**
+ * Zernio requires a call to action on every Meta ad. Ours carry one when the
+ * operator chose it; this is the neutral fallback so a carousel or a static
+ * without a choice still compiles instead of failing at the provider.
+ */
+export const META_DEFAULT_CALL_TO_ACTION = "LEARN_MORE";
+
 export const LINKEDIN_CALL_TO_ACTIONS = [
   "LEARN_MORE",
   "SIGN_UP",
