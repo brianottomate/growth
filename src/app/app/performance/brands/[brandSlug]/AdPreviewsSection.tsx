@@ -31,6 +31,8 @@ export type OnDemandPreview = {
   imageUrl: string;
   headline: string;
   cta: string;
+  /** An operator chose this home; false means the first on their feed stood in. */
+  picked: boolean;
   previews: Record<AdMockSurface, string>;
 };
 
@@ -208,8 +210,10 @@ export function AdPreviewsSection({
           </ul>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-muted-foreground text-[11px]">
-              {drawn.homeName}, drawn as it would run in each placement. Nothing is kept until a card is
-              frozen in the Studio; open any home below for every canvas.
+              {drawn.picked
+                ? `${drawn.homeName}, the featured home, drawn as it would run in each placement.`
+                : `${drawn.homeName}, the first home on their site. Feature a home below to draw that one instead.`}{" "}
+              Nothing is kept until a card is frozen in the Studio.
             </p>
             {designInChat}
           </div>

@@ -65,6 +65,7 @@ export default async function PerformanceBrandPage({
       logo: true,
       website: true,
       leadDomain: true,
+      featuredListingUrl: true,
       relationship: true,
       brandIdentity: true,
       brandMark: true,
@@ -133,7 +134,10 @@ export default async function PerformanceBrandPage({
   // Until a card is frozen, the previews section draws ONE of their homes on
   // the awareness card in each placement's own canvas, so the headline and
   // the button survive the feed's crop. Nothing is saved.
-  const featured = withPhoto[0] ?? null;
+  const picked = brand.featuredListingUrl
+    ? (withPhoto.find((home) => home.url === brand.featuredListingUrl) ?? null)
+    : null;
+  const featured = picked ?? withPhoto[0] ?? null;
   const onDemandPreview = featured
     ? (() => {
         const recipe = homePreviewRecipes(featured)[0]!;
@@ -151,6 +155,8 @@ export default async function PerformanceBrandPage({
           imageUrl: featured.imageUrl!,
           headline: recipe.title,
           cta: recipe.cta,
+          /** False while the page is falling back to the first home on their feed. */
+          picked: picked !== null,
           previews: { facebook: url("landscape"), instagram: url("square"), story: url("story") },
         };
       })()
@@ -282,6 +288,7 @@ export default async function PerformanceBrandPage({
             }))}
             brandId={brand.id}
             brandSlug={brand.slug}
+            featuredUrl={brand.featuredListingUrl}
           />
         )}
         {withPhoto.length > 12 ? (

@@ -293,6 +293,13 @@ export const brandTable = pgTable(
     // the connect flow re-selects this one when a client's connection lands
     // on the wrong Page.
     metaPageId: t.text(),
+    /**
+     * The home an operator chose to stand for the brand: its listing URL on
+     * their site. The Performance brand page draws the on-demand ad previews
+     * from it. Null means nobody has picked yet and the page falls back to
+     * the first home on their feed, saying so.
+     */
+    featuredListingUrl: t.text(),
 
     // Bearer secret for /connect/[token], the no-login page where a client
     // connects their own accounts into this brand's Zernio profile. The link

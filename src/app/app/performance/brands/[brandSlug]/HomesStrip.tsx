@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, ExternalLink, LayoutGrid, PenLine, ZoomIn } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, LayoutGrid, PenLine, Star, ZoomIn } from "lucide-react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
@@ -47,10 +47,13 @@ export function HomesStrip({
   homes,
   brandId,
   brandSlug,
+  featuredUrl,
 }: {
   homes: StripHome[];
   brandId: string;
   brandSlug: string | null;
+  /** The home that stands for the brand; its tile and lightbox say so. */
+  featuredUrl: string | null;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const open = openIndex !== null ? (homes[openIndex] ?? null) : null;
@@ -84,6 +87,21 @@ export function HomesStrip({
           return;
         }
         setPreviews({ home, assetId: asset.id });
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  // Featuring is a saved choice on the brand: the ad previews draw from it.
+  const feature = useMutation(
+    trpc.brand.setFeaturedListing.mutationOptions({
+      onSuccess: (result) => {
+        toast.success(
+          result.featuredListingUrl
+            ? "Featured. The ad previews draw from this home now."
+            : "No longer featured",
+        );
+        router.refresh();
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -133,7 +151,12 @@ export function HomesStrip({
                 </span>
               </span>
               <span className="block px-2.5 py-2">
-                <span className="block truncate text-xs font-semibold">{home.name}</span>
+                <span className="flex items-center gap-1 text-xs font-semibold">
+                  {home.url === featuredUrl ? (
+                    <Star className="size-3 shrink-0 fill-amber-300 text-amber-300" aria-label="Featured" />
+                  ) : null}
+                  <span className="truncate">{home.name}</span>
+                </span>
                 <span className="text-muted-foreground block truncate text-[11px]">{home.facts}</span>
               </span>
             </button>
@@ -158,6 +181,25 @@ export function HomesStrip({
                 >
                   <PenLine className="size-3.5" />
                   {design.isPending ? "Bringing the photo in…" : "Design an ad from this photo"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
+                  loading={feature.isPending}
+                  onClick={() =>
+                    feature.mutate({
+                      id: brandId,
+                      listingUrl: open.url === featuredUrl ? null : open.url,
+                    })
+                  }
+                >
+                  <Star
+                    className={
+                      open.url === featuredUrl ? "size-3.5 fill-amber-300 text-amber-300" : "size-3.5"
+                    }
+                  />
+                  {open.url === featuredUrl ? "Featured" : "Feature this home"}
                 </Button>
                 <Button
                   size="sm"

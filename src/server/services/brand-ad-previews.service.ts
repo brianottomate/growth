@@ -225,3 +225,19 @@ export async function removeBrandAdPreview(input: {
     .where(eq(brandTable.id, input.brandId));
   return next;
 }
+
+/**
+ * Remember which home stands for the brand. The on-demand previews draw from
+ * it; null clears the pick and the page goes back to the first home on their
+ * feed. The URL is stored as given, since the feed is what it is matched to.
+ */
+export async function setBrandFeaturedListing(input: {
+  brandId: string;
+  listingUrl: string | null;
+}) {
+  await db
+    .update(brandTable)
+    .set({ featuredListingUrl: input.listingUrl })
+    .where(eq(brandTable.id, input.brandId));
+  return { featuredListingUrl: input.listingUrl };
+}
