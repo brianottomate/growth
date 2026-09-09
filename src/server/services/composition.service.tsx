@@ -573,10 +573,11 @@ export function renderComposition(
     const story = spec.formatId === "story";
     const wide = format.width > format.height;
     const overlayPadding = story ? 96 : wide ? 72 : 68;
-    const headlineSize = story ? 80 : wide ? 60 : square ? 68 : 72;
+    const link = spec.formatId === "landscape";
+    const headlineSize = story ? 80 : link ? 54 : wide ? 60 : square ? 68 : 72;
     // Character budgets that keep satori from wrapping a line a second time
     // at these sizes; the break then falls where the words say.
-    const perLine = story ? 18 : wide ? 30 : 20;
+    const perLine = story ? 18 : link ? 26 : wide ? 30 : 20;
     const headlineLines = wrapText(clamp(spec.title, 90), perLine);
     const button = spec.cta?.trim();
     content = (
@@ -628,7 +629,7 @@ export function renderComposition(
             style={{
               display: "flex",
               flexDirection: "column",
-              maxWidth: story ? "88%" : wide ? "60%" : "90%",
+              maxWidth: story ? "88%" : link ? "72%" : wide ? "60%" : "90%",
               marginTop: story ? 60 : 0,
               color: "#ffffff",
               fontSize: headlineSize,
