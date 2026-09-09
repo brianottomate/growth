@@ -15,6 +15,7 @@ import { getSession } from "@/server/better-auth/server";
 import { BrandBrandingCard } from "@/app/app/brands/[brandSlug]/BrandBrandingCard";
 import { cn } from "@/components/ui/lib/utils";
 import { listBrandAdPreviews } from "@/server/services/brand-ad-previews.service";
+import { loadBrandContacts } from "@/server/services/brand-contacts.service";
 import { listMedia } from "@/server/services/media.service";
 import { loadPerformanceDesk } from "@/server/services/performance-desk.service";
 import { brandListings } from "@/server/services/wanderos-listings.service";
@@ -61,6 +62,7 @@ export default async function PerformanceBrandPage({
       slug: true,
       logo: true,
       website: true,
+      leadDomain: true,
       relationship: true,
       brandIdentity: true,
       brandMark: true,
@@ -70,7 +72,7 @@ export default async function PerformanceBrandPage({
   });
   if (!brand) notFound();
 
-  const [homes, media, desk, account, adPreviews] = await Promise.all([
+  const [homes, media, desk, account, adPreviews, people] = await Promise.all([
     brandListings({ id: brand.id, website: brand.website }),
     listMedia({ brandId: brand.id, kind: "image" }),
     loadPerformanceDesk(org.id),
@@ -79,6 +81,7 @@ export default async function PerformanceBrandPage({
       columns: { id: true, contactName: true, contactEmail: true },
     }),
     listBrandAdPreviews(brand.id),
+    loadBrandContacts({ leadDomain: brand.leadDomain, website: brand.website }),
   ]);
   const deskBrand = desk.brands.find((row) => row.id === brand.id) ?? null;
   const intake = account
@@ -192,6 +195,79 @@ export default async function PerformanceBrandPage({
         website={brand.website}
         cards={adPreviews}
       />
+
+      {people ? (
+        <section className="space-y-2.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <SectionLabel>
+              CRM contacts{people.contacts.length ? ` · ${people.contacts.length + people.moreCount}` : ""}
+            </SectionLabel>
+            {people.company ? (
+              <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-xs">
+                {people.company.leadStatus ? <span>{people.company.leadStatus}</span> : null}
+                {people.company.owner ? <span>Owner {people.company.owner}</span> : null}
+                {people.company.isCustomer ? <span>Customer</span> : people.company.hasDeal ? <span>Deal open</span> : null}
+                {people.company.pms ? (
+                  <span>
+                    {people.company.pms}
+                    {people.company.unitCount ? ` · ${people.company.unitCount} units` : ""}
+                  </span>
+                ) : null}
+                {people.company.hubspotUrl ? (
+                  <a
+                    href={people.company.hubspotUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    HubSpot
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          {people.contacts.length === 0 ? (
+            <p className={cn(panel, "text-muted-foreground px-4 py-6 text-center text-xs")}>
+              No contacts on file for {people.domain}.
+            </p>
+          ) : (
+            <ul className={cn(panel, "divide-y")}>
+              {people.contacts.map((person) => (
+                <li key={person.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* A nameless contact is shown by email once, on the right. */}
+                      <span className={person.name ? "font-medium" : "text-muted-foreground"}>
+                        {person.name ?? "No name on file"}
+                      </span>
+                      {person.jobTitle ? <span className="text-muted-foreground text-xs">{person.jobTitle}</span> : null}
+                      {person.optedOut ? (
+                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
+                          Opted out
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <a href={`mailto:${person.email}`} className="text-muted-foreground text-xs hover:underline">
+                    {person.email}
+                  </a>
+                  {person.phone ? (
+                    <a href={`tel:${person.phone}`} className="text-muted-foreground text-xs hover:underline">
+                      {person.phone}
+                    </a>
+                  ) : null}
+                </li>
+              ))}
+              {people.moreCount > 0 ? (
+                <li className="text-muted-foreground px-4 py-2 text-xs">
+                  {people.moreCount} more in HubSpot
+                </li>
+              ) : null}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       <section className="space-y-2.5">
         <div className="flex items-baseline justify-between">
