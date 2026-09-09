@@ -28,6 +28,12 @@ import { createId } from "./utils";
 // content — show them prominently; the denied rows are just an audit trail —
 // tuck them into a small collapsed "denied / ignored" section. Enforcement is
 // default-deny either way, so the deny list is documentation, not a control.
+//
+// One account, several brands (2026-09-09): Performance clients run from
+// Wander's shared Meta ad account as their own Page, so the same external id
+// carries one row per brand. A row with `isShared` marks a brand that borrows
+// the account: sync attributes it only the campaigns this app pushed for that
+// brand, never the account's other campaigns.
 
 export const adAccountTable = pgTable(
   "ad_account",
@@ -50,6 +56,12 @@ export const adAccountTable = pgTable(
 
     /** Default-deny: only rows with isAllowed = true are consumed. */
     isAllowed: t.boolean().notNull().default(false),
+    /**
+     * The brand borrows an account another brand owns. Sync then claims only
+     * campaigns this app pushed for the brand; the owner keeps everything
+     * else. False for the account's own brand.
+     */
+    isShared: t.boolean().notNull().default(false),
     /** Why this row exists — provenance of the allow/deny decision. */
     note: t.text(),
 
@@ -66,9 +78,15 @@ export const adAccountTable = pgTable(
       sql`${table.isAllowed} = false OR ${table.brandId} IS NOT NULL`,
     ),
     index("ad_account_brand_idx").on(table.brandId),
-    uniqueIndex("ad_account_platform_external_id_idx").on(
+    // One row per (account, brand). Unbranded denial records stay unique on
+    // the account alone, since NULL brand ids never collide in a unique index.
+    uniqueIndex("ad_account_platform_external_brand_idx").on(
       table.platform,
       table.externalId,
+      table.brandId,
     ),
+    uniqueIndex("ad_account_platform_external_unbranded_idx")
+      .on(table.platform, table.externalId)
+      .where(sql`${table.brandId} IS NULL`),
   ],
 );

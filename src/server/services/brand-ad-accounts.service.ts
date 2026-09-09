@@ -21,6 +21,11 @@ import {
 // (ad_account is default-deny; see ad-account-allowlist.service.ts). This
 // service is the brand-page surface for that decision: enumerate what the
 // connection can see, record an allow or an explicit deny.
+//
+// An account can be allowed for several brands. A Performance client runs
+// from Wander's ad account as its own Page, so allowing Wander's account on
+// the client's brand writes a SHARED row: sync then attributes the client
+// only the campaigns this app pushed for it (see ads-sync.service).
 
 /** Zernio ads connection platform → ad_account.platform key, for every pushable platform. */
 const CONNECTION_PLATFORMS: Record<string, AdAccountPlatform> =
@@ -46,8 +51,11 @@ export type BrandAdAccount = {
   name: string | null;
   /** null = no row yet (undecided); the allowlist treats that as deny. */
   allowed: boolean | null;
-  /** Set when the account is already registered to a different brand. */
-  ownedByBrand: string | null;
+  /**
+   * Another brand owns this account. Allowing it here shares it: the brand
+   * runs from it and is attributed only what this app pushes for it.
+   */
+  sharedFrom: string | null;
   /** False for rows that exist in the registry but no connection can see. */
   discovered: boolean;
 };
@@ -55,7 +63,9 @@ export type BrandAdAccount = {
 /**
  * Everything the brand's ads connections can reach, merged with the registry.
  * Live Zernio enumeration; a connection that errors is skipped rather than
- * failing the page.
+ * failing the page. A brand with no Zernio profile of its own enumerates
+ * through every connection in the workspace, since a client without a
+ * connection is exactly the one that will borrow Wander's account.
  */
 export async function listBrandAdAccounts(
   brandId: string,
@@ -77,10 +87,11 @@ export async function listBrandAdAccounts(
 
   // discover=false skips the live Zernio enumeration — the cheap path for
   // rendering what is already decided (the page); the dialog discovers.
-  if (discover && brand.zernioProfileId && isZernioConfigured) {
+  if (discover && isZernioConfigured) {
     const connections = (await listZernioAccounts()).filter(
       (account) =>
-        zernioAccountProfileId(account) === brand.zernioProfileId &&
+        (!brand.zernioProfileId ||
+          zernioAccountProfileId(account) === brand.zernioProfileId) &&
         CONNECTION_PLATFORMS[account.platform?.toLowerCase() ?? ""],
     );
     const results = await Promise.allSettled(
@@ -130,28 +141,60 @@ export async function listBrandAdAccounts(
         })
       : [];
 
+  const ownRow = (platform: string, externalId: string) =>
+    registryRows.find(
+      (row) =>
+        row.platform === platform &&
+        row.externalId === externalId &&
+        row.brandId === brandId,
+    );
+  // The account's owner: the brand allowed on it without borrowing it.
+  const ownerOf = (platform: string, externalId: string) => {
+    const owner = registryRows.find(
+      (row) =>
+        row.platform === platform &&
+        row.externalId === externalId &&
+        row.brandId &&
+        row.brandId !== brandId &&
+        row.isAllowed &&
+        !row.isShared,
+    );
+    return owner
+      ? (foreignBrands.find((b) => b.id === owner.brandId)?.name ??
+        "another brand")
+      : null;
+  };
+
   const seen = new Set<string>();
-  const merged: BrandAdAccount[] = discovered.map((row) => {
-    seen.add(`${row.platform}:${row.externalId}`);
-    const registry = registryRows.find(
+  const merged: BrandAdAccount[] = [];
+  const dedupedDiscovered = discovered.filter((row) => {
+    const key = `${row.platform}:${row.externalId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  for (const row of dedupedDiscovered) {
+    const registry = ownRow(row.platform, row.externalId);
+    // An unbranded denial (a foreign account nobody claims) is a decision too.
+    const unbranded = registryRows.find(
       (candidate) =>
         candidate.platform === row.platform &&
-        candidate.externalId === row.externalId,
+        candidate.externalId === row.externalId &&
+        candidate.brandId === null,
     );
-    const foreign =
-      registry?.brandId && registry.brandId !== brandId
-        ? (foreignBrands.find((b) => b.id === registry.brandId)?.name ??
-          "another brand")
-        : null;
-    return {
+    merged.push({
       platform: row.platform,
       externalId: row.externalId,
-      name: row.name ?? registry?.name ?? null,
-      allowed: foreign ? false : (registry?.isAllowed ?? null),
-      ownedByBrand: foreign,
+      name: row.name ?? registry?.name ?? unbranded?.name ?? null,
+      allowed: registry
+        ? registry.isAllowed
+        : unbranded
+          ? false
+          : null,
+      sharedFrom: ownerOf(row.platform, row.externalId),
       discovered: true,
-    };
-  });
+    });
+  }
 
   // Registry rows for this brand that no live connection reaches — kept
   // visible so a stale allow is a decision on screen, not a hidden grant.
@@ -159,12 +202,13 @@ export async function listBrandAdAccounts(
     if (registry.brandId !== brandId) continue;
     const key = `${registry.platform}:${registry.externalId}`;
     if (seen.has(key)) continue;
+    seen.add(key);
     merged.push({
       platform: registry.platform as AdAccountPlatform,
       externalId: registry.externalId,
       name: registry.name,
       allowed: registry.isAllowed,
-      ownedByBrand: null,
+      sharedFrom: ownerOf(registry.platform, registry.externalId),
       discovered: false,
     });
   }
@@ -173,9 +217,9 @@ export async function listBrandAdAccounts(
 }
 
 /**
- * Record the operator's decision. Never reassigns an account that belongs to
- * a different brand — that conflict has to be resolved deliberately, not by
- * a click on the wrong page.
+ * Record the operator's decision for THIS brand. An account another brand
+ * already owns is allowed as a shared row, so the brand runs from it without
+ * taking it over; an unbranded denial record is adopted rather than doubled.
  */
 export async function setBrandAdAccountAllowed(input: {
   brandId: string;
@@ -185,35 +229,36 @@ export async function setBrandAdAccountAllowed(input: {
   isAllowed: boolean;
   decidedBy: string;
 }) {
-  const existing = await db.query.adAccountTable.findFirst({
+  const rows = await db.query.adAccountTable.findMany({
     where: and(
       eq(adAccountTable.platform, input.platform),
       eq(adAccountTable.externalId, input.externalId),
     ),
   });
+  const own = rows.find((row) => row.brandId === input.brandId);
+  const unbranded = rows.find((row) => row.brandId === null);
+  const ownedElsewhere = rows.some(
+    (row) =>
+      row.brandId && row.brandId !== input.brandId && row.isAllowed && !row.isShared,
+  );
 
-  const note = `${input.isAllowed ? "Allowed" : "Denied"} from the brand page by ${input.decidedBy}`;
+  const note = `${input.isAllowed ? "Allowed" : "Denied"}${
+    ownedElsewhere && input.isAllowed ? " (shared)" : ""
+  } from the brand page by ${input.decidedBy}`;
 
+  const existing = own ?? unbranded;
   if (existing) {
-    if (existing.brandId && existing.brandId !== input.brandId) {
-      const owner = await db.query.brandTable.findFirst({
-        where: eq(brandTable.id, existing.brandId),
-        columns: { name: true },
-      });
-      throw new Error(
-        `That ad account is registered to ${owner?.name ?? "another brand"}`,
-      );
-    }
     await db
       .update(adAccountTable)
       .set({
         brandId: input.brandId,
         isAllowed: input.isAllowed,
+        isShared: ownedElsewhere,
         name: input.name ?? existing.name,
         note,
       })
       .where(eq(adAccountTable.id, existing.id));
-    return { updated: true };
+    return { updated: true, shared: ownedElsewhere };
   }
 
   await db.insert(adAccountTable).values({
@@ -223,7 +268,8 @@ export async function setBrandAdAccountAllowed(input: {
     name: input.name,
     brandId: input.brandId,
     isAllowed: input.isAllowed,
+    isShared: ownedElsewhere,
     note,
   });
-  return { updated: false };
+  return { updated: false, shared: ownedElsewhere };
 }

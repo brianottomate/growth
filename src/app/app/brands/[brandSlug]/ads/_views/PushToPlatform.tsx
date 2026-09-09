@@ -69,9 +69,16 @@ export function PushToPlatform({
       { enabled: open },
     ),
   );
+  // A Meta destination names the Page it runs as, because that is the
+  // identity the client's ads will carry; one bound to the wrong Page is
+  // listed so the mismatch is visible, and the push refuses it.
   const options = (destinations.data?.destinations ?? []).map((row) => ({
     key: `${row.connectionAccountId}:${row.adAccountId}`,
-    label: `${row.adAccountName ?? row.adAccountId}`,
+    label: `${row.adAccountName ?? row.adAccountId}${
+      row.pageId
+        ? ` · as Page ${row.pageId}${row.runsAsBrandPage ? "" : " (not this brand's Page)"}`
+        : ""
+    }`,
     connectionAccountId: row.connectionAccountId,
     adAccountId: row.adAccountId,
   }));

@@ -24,8 +24,23 @@ import { adAccountTable } from "@/server/db/schema";
 export async function getAllowedAdAccountIds(
   brandId: string,
 ): Promise<Set<string>> {
-  const rows = await db
-    .select({ externalId: adAccountTable.externalId })
+  const rows = await getAllowedAdAccounts(brandId);
+  return new Set(rows.map((r) => r.externalId));
+}
+
+/**
+ * Allowed accounts for one brand with the borrow flag. A shared row means
+ * the brand runs from another brand's account and may only be attributed the
+ * campaigns this app pushed for it.
+ */
+export async function getAllowedAdAccounts(
+  brandId: string,
+): Promise<Array<{ externalId: string; isShared: boolean }>> {
+  return db
+    .select({
+      externalId: adAccountTable.externalId,
+      isShared: adAccountTable.isShared,
+    })
     .from(adAccountTable)
     .where(
       and(
@@ -33,7 +48,6 @@ export async function getAllowedAdAccountIds(
         eq(adAccountTable.brandId, brandId),
       ),
     );
-  return new Set(rows.map((r) => r.externalId));
 }
 
 /** Operational sync may ingest every explicitly allowed owned account. */

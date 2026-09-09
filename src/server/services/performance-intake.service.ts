@@ -670,8 +670,14 @@ export async function verifyIntakeAccess(
   const brandName = intake.brand?.name ?? intake.account.name;
 
   const accounts = await listZernioAccounts();
-  const metaConnections = accounts.filter((account) =>
-    zernioConnectionMatchesPlatform("meta", account.platform),
+  // The Page list hangs off the Facebook account; its metaads sibling shares
+  // the token but answers 404 on the pages endpoint, so asking it only adds
+  // a spurious error to every check.
+  const metaConnections = accounts.filter(
+    (account) =>
+      account.platform.toLowerCase() === "facebook" ||
+      (zernioConnectionMatchesPlatform("meta", account.platform) &&
+        account.platform.toLowerCase() !== "metaads"),
   );
 
   const seen = new Map<string, ZernioFacebookPage>();
@@ -710,7 +716,7 @@ export async function verifyIntakeAccess(
         verifiedPageId: match.id,
       })
       .where(eq(performanceIntakeTable.id, intake.id));
-    if (intake.brandId) await advanceBrandStage(intake.brandId, "access_verified");
+    if (intake.brandId) await bindBrandPage(intake.brandId, match.id);
   }
 
   return {
@@ -738,8 +744,22 @@ export async function setIntakeVerifiedPage(
       verifiedPageId: input.pageId,
     })
     .where(eq(performanceIntakeTable.id, intake.id));
-  if (intake.brandId) await advanceBrandStage(intake.brandId, "access_verified");
+  if (intake.brandId) await bindBrandPage(intake.brandId, input.pageId);
   return { intakeId: intake.id, pageId: input.pageId };
+}
+
+/**
+ * The verified Page becomes the brand's delivery identity. The intake keeps
+ * its own copy as the record of the check; the brand column is what the push
+ * and the connect flow read, so a brand verified once stays bound even after
+ * the intake is re-submitted.
+ */
+async function bindBrandPage(brandId: string, pageId: string) {
+  await db
+    .update(brandTable)
+    .set({ metaPageId: pageId })
+    .where(eq(brandTable.id, brandId));
+  await advanceBrandStage(brandId, "access_verified");
 }
 
 /** Minimum gap between public access checks for one brand. */

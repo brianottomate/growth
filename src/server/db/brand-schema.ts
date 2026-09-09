@@ -268,6 +268,13 @@ export const brandTable = pgTable(
     // One Zernio workspace is shared by Wander. Each owned brand maps to
     // one profile in that workspace; its connected accounts live on `channel`.
     zernioProfileId: t.text(),
+    // The Facebook Page this brand's ads and posts run as. A Performance
+    // client grants it through Leadsie, and Verify access records it here.
+    // Zernio binds a Meta connection to ONE Page and offers no per-ad
+    // override, so the push refuses a connection bound to any other Page, and
+    // the connect flow re-selects this one when a client's connection lands
+    // on the wrong Page.
+    metaPageId: t.text(),
 
     // Bearer secret for /connect/[token], the no-login page where a client
     // connects their own accounts into this brand's Zernio profile. The link

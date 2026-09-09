@@ -11,7 +11,10 @@ import {
   createZernioProfile,
   getZernioConnectUrl,
   isZernioConfigured,
+  listZernioAccounts,
+  listZernioFacebookPages,
   listZernioProfiles,
+  updateZernioFacebookPage,
   type ZernioConnectPlatform,
 } from "@/server/clients/zernio.client";
 import { connectBrandToZernioProfile } from "@/server/services/zernio-brand.service";
@@ -302,8 +305,68 @@ export async function getBrandConnectStatus(brandId: string) {
 export async function syncBrandConnect(brandId: string) {
   const brand = await db.query.brandTable.findFirst({
     where: eq(brandTable.id, brandId),
-    columns: { id: true, zernioProfileId: true },
+    columns: { id: true, name: true, zernioProfileId: true, metaPageId: true },
   });
   if (!brand?.zernioProfileId) return;
+  const moved = await selectBrandPageOnConnections(brand);
   await connectBrandToZernioProfile(brand.id, brand.zernioProfileId);
+  return { pageSelected: moved };
+}
+
+/**
+ * Make the brand's Facebook connections act as the brand's Page.
+ *
+ * The Meta Ads connect flow binds the FIRST Page the login can manage, and a
+ * Wander employee connecting on a client's behalf manages dozens. Zernio
+ * creates every ad as the bound Page with no per-ad override, so a wrong
+ * binding here would run the client's campaigns as someone else. Verify
+ * access already recorded which Page is theirs; this moves the connection to
+ * it when Zernio can reach it, and leaves it alone (for the push to refuse)
+ * when it cannot.
+ */
+async function selectBrandPageOnConnections(brand: {
+  id: string;
+  name: string;
+  zernioProfileId: string | null;
+  metaPageId: string | null;
+}): Promise<string[]> {
+  if (!brand.metaPageId || !brand.zernioProfileId || !isZernioConfigured) {
+    return [];
+  }
+  const accounts = await listZernioAccounts();
+  const facebook = accounts.filter((account) => {
+    const profileId =
+      typeof account.profileId === "string"
+        ? account.profileId
+        : account.profileId?._id;
+    return (
+      profileId === brand.zernioProfileId &&
+      account.platform.toLowerCase() === "facebook"
+    );
+  });
+  const moved: string[] = [];
+  for (const account of facebook) {
+    const accountId = account._id ?? account.id;
+    if (!accountId) continue;
+    try {
+      const { pages, selectedPageId } = await listZernioFacebookPages({
+        accountId,
+      });
+      if (selectedPageId === brand.metaPageId) continue;
+      if (!pages.some((page) => page.id === brand.metaPageId)) {
+        console.warn(
+          `brand connect: ${brand.name}'s connection ${accountId} cannot reach Page ${brand.metaPageId}; left as is`,
+        );
+        continue;
+      }
+      await updateZernioFacebookPage({
+        accountId,
+        selectedPageId: brand.metaPageId,
+      });
+      moved.push(accountId);
+    } catch (error) {
+      console.error("brand connect: page select failed", accountId, error);
+    }
+  }
+  return moved;
 }

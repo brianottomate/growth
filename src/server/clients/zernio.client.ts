@@ -915,6 +915,26 @@ export async function listZernioFacebookPages(options: {
 }
 
 /**
+ * Switch the Page a Facebook connection acts as. The Page must be in the
+ * connection's own list; Zernio answers 400 otherwise. The sibling metaads
+ * connection shares the identity, so this is also how an ads connection that
+ * landed on the wrong Page gets moved to the right one, with no new OAuth.
+ * https://docs.zernio.com/connect/update-facebook-page
+ */
+export async function updateZernioFacebookPage(options: {
+  accountId: string;
+  selectedPageId: string;
+}): Promise<{ selectedPage?: { id?: string; name?: string } }> {
+  return zernioFetch(
+    `/accounts/${encodeURIComponent(options.accountId)}/facebook-page`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ selectedPageId: options.selectedPageId }),
+    },
+  );
+}
+
+/**
  * Enumerate the platform ad accounts one connected Zernio account can reach.
  * Callers must still apply Growth's brand-scoped default-deny allowlist.
  * https://docs.zernio.com/ad-accounts/list-ad-accounts

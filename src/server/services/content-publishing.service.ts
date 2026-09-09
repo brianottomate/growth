@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
 import {
   createZernioPost,
@@ -15,6 +15,7 @@ import {
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
 import {
+  brandTable,
   channelTable,
   type MediaItem,
   platformPostTable,
@@ -314,12 +315,32 @@ async function loadSocialSpot(platformPostId: string) {
     throw new Error("Facebook publishing is currently available for Stories");
   }
   if (!isZernioConfigured) throw new Error("Zernio is not configured");
-  if (!spot.brand?.zernioProfileId) {
-    throw new Error("Connect this brand to a Zernio profile first");
-  }
 
+  // A brand with no Zernio profile of its own can still post to its Facebook
+  // Page through a connection that manages the Page — Wander's, once the
+  // client's Leadsie grant put the Page in Wander's Business Portfolio.
+  // Zernio takes the Page per post (platformSpecificData.pageId), which is
+  // the one place it lets the account and the identity differ. Instagram,
+  // LinkedIn and X have no such switch, so they still need the brand's own
+  // connection.
+  let pageId: string | null = null;
   let channel = spot.channel;
-  if (
+  if (!spot.brand?.zernioProfileId) {
+    if (platform !== "facebook" || !spot.brand?.metaPageId) {
+      throw new Error("Connect this brand to a Zernio profile first");
+    }
+    const shared = await sharedFacebookChannel(
+      spot.brand.organizationId,
+      spot.brandId,
+    );
+    if (!shared) {
+      throw new Error(
+        "No Facebook connection in this organisation can post as this brand's Page",
+      );
+    }
+    channel = shared;
+    pageId = spot.brand.metaPageId;
+  } else if (
     !channel?.externalId ||
     channel.platform !== platform ||
     channel.defaultProvider !== "zernio" ||
@@ -377,10 +398,42 @@ async function loadSocialSpot(platformPostId: string) {
     channel,
     platform,
     connectedAccountId: channel.externalId,
+    /** Set only when posting as a Page through another brand's connection. */
+    pageId,
     items,
     payload,
     story,
   };
+}
+
+/**
+ * A connected Facebook channel elsewhere in the organisation whose token can
+ * carry a post for another brand's Page. Any will do: Zernio checks the Page
+ * against the connection's own list at publish time.
+ */
+async function sharedFacebookChannel(
+  organizationId: string | null,
+  excludeBrandId: string,
+) {
+  if (!organizationId) return null;
+  const rows = await db
+    .select({ channel: channelTable })
+    .from(channelTable)
+    .innerJoin(brandTable, eq(brandTable.id, channelTable.brandId))
+    .where(
+      and(
+        eq(brandTable.organizationId, organizationId),
+        ne(channelTable.brandId, excludeBrandId),
+        eq(channelTable.platform, "facebook"),
+        eq(channelTable.defaultProvider, "zernio"),
+        eq(channelTable.connectionStatus, "connected"),
+        eq(channelTable.isActive, true),
+        isNull(channelTable.deletedAt),
+        isNotNull(channelTable.externalId),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.channel ?? null;
 }
 
 async function persistDelivery(
@@ -470,8 +523,16 @@ export async function deliverSocialPost(input: {
   accountValidated?: boolean;
 }) {
   const loaded = await loadSocialSpot(input.platformPostId);
-  const { spot, channel, platform, connectedAccountId, items, payload, story } =
-    loaded;
+  const {
+    spot,
+    channel,
+    platform,
+    connectedAccountId,
+    pageId,
+    items,
+    payload,
+    story,
+  } = loaded;
   if (!input.accountValidated) {
     await requireActiveZernioAccount({
       channelId: channel.id,
@@ -513,7 +574,10 @@ export async function deliverSocialPost(input: {
               {
                 platform: ZERNIO_PLATFORM[platform],
                 accountId: connectedAccountId,
-                platformSpecificData: { contentType: "story" },
+                platformSpecificData: {
+                  contentType: "story",
+                  ...(pageId ? { pageId } : {}),
+                },
               },
             ],
             scheduledFor,
@@ -600,7 +664,9 @@ export async function deliverSocialPost(input: {
         {
           platform: ZERNIO_PLATFORM[platform],
           accountId: connectedAccountId,
-          platformSpecificData: payload.platformSpecificData,
+          platformSpecificData: pageId
+            ? { ...payload.platformSpecificData, pageId }
+            : payload.platformSpecificData,
         },
       ],
       scheduledFor,

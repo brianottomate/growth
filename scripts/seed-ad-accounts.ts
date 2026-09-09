@@ -135,16 +135,34 @@ for (const row of ROWS) {
       note: row.note,
       brandId: brand?.id ?? null,
     })
-    .onConflictDoUpdate({
-      target: [adAccountTable.platform, adAccountTable.externalId],
-      set: {
-        name: row.name,
-        isAllowed: row.isAllowed,
-        note: row.note,
-        brandId: brand?.id ?? null,
-        updatedAt: sql`now()`,
-      },
-    });
+    .onConflictDoUpdate(
+      // One row per (account, brand). Unbranded denials sit on their own
+      // partial unique index, which the conflict target must name to match.
+      brand
+        ? {
+            target: [
+              adAccountTable.platform,
+              adAccountTable.externalId,
+              adAccountTable.brandId,
+            ],
+            set: {
+              name: row.name,
+              isAllowed: row.isAllowed,
+              note: row.note,
+              updatedAt: sql`now()`,
+            },
+          }
+        : {
+            target: [adAccountTable.platform, adAccountTable.externalId],
+            targetWhere: sql`${adAccountTable.brandId} IS NULL`,
+            set: {
+              name: row.name,
+              isAllowed: row.isAllowed,
+              note: row.note,
+              updatedAt: sql`now()`,
+            },
+          },
+    );
   console.log(
     `${row.isAllowed ? "✅ allow" : "⛔ deny "} ${row.platform}/${row.externalId} (${row.name ?? "?"})`,
   );

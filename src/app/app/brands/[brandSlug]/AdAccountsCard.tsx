@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DownloadCloud, TriangleAlert } from "lucide-react";
@@ -18,7 +17,7 @@ type Row = {
   externalId: string;
   name: string | null;
   allowed: boolean | null;
-  ownedByBrand: string | null;
+  sharedFrom: string | null;
   discovered: boolean;
 };
 
@@ -43,7 +42,6 @@ export function AdAccountsCard({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [showForeign, setShowForeign] = useState(false);
 
   const registryQuery = useQuery(
     trpc.brand.adAccounts.queryOptions({ brandId, discover: false }),
@@ -68,14 +66,12 @@ export function AdAccountsCard({
   // rather than reading the field off whichever query answered.
   const enumerated = discoverQuery.data !== undefined;
   const rows: Row[] = discoverQuery.data ?? registryQuery.data ?? [];
-  const mine = rows.filter((row) => !row.ownedByBrand);
-  const foreign = rows.filter((row) => row.ownedByBrand);
-  const allowedCount = mine.filter((row) => row.allowed === true).length;
+  const allowedCount = rows.filter((row) => row.allowed === true).length;
 
   // Allowed first, then the ones still to decide, then the refused.
   const rank = (row: Row) =>
     row.allowed === true ? 0 : row.allowed === null ? 1 : 2;
-  const ordered = [...mine].sort(
+  const ordered = [...rows].sort(
     (a, b) => rank(a) - rank(b) || (a.name ?? "").localeCompare(b.name ?? ""),
   );
 
@@ -131,6 +127,7 @@ export function AdAccountsCard({
                       {adPlatformByAllowlistPlatform(row.platform)
                         ?.shortLabel ?? row.platform}{" "}
                       · {row.externalId}
+                      {row.sharedFrom ? ` · ${row.sharedFrom}'s account` : ""}
                     </p>
                   </label>
                   <div className="flex shrink-0 items-center gap-2.5">
@@ -168,29 +165,6 @@ export function AdAccountsCard({
         <p className="text-muted-foreground text-xs">
           Asking the connections what else they can see…
         </p>
-      )}
-
-      {foreign.length > 0 && (
-        <div className="text-muted-foreground text-xs">
-          <button
-            type="button"
-            className="hover:text-foreground underline"
-            onClick={() => setShowForeign((open) => !open)}
-          >
-            {foreign.length} account{foreign.length === 1 ? "" : "s"} registered
-            to another brand
-          </button>
-          {showForeign && (
-            <ul className="mt-1.5 space-y-1">
-              {foreign.map((row) => (
-                <li key={`${row.platform}:${row.externalId}`}>
-                  <span className="font-mono">{row.externalId}</span>{" "}
-                  {row.name ?? "unnamed"} · {row.ownedByBrand}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       )}
 
       {decide.error && (

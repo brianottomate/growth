@@ -36,3 +36,40 @@ describe("treeIsCompleteEnoughToReconcile", () => {
     ).toBe(false);
   });
 });
+
+import { campaignBelongsToBrand } from "@/server/services/ads-sync.service";
+
+/**
+ * One ad account can serve several brands. Attribution follows the rows that
+ * already exist: a claimed campaign stays with its claimant, a borrowed
+ * account yields only what was pushed for the borrower, and the owner keeps
+ * the rest.
+ */
+describe("campaignBelongsToBrand", () => {
+  const mine = new Set(["me"]);
+  const theirs = new Set(["other"]);
+
+  it("keeps a campaign the brand already claims, shared account or not", () => {
+    expect(
+      campaignBelongsToBrand({ brandId: "me", accountShared: true, claimants: mine }),
+    ).toBe(true);
+    expect(
+      campaignBelongsToBrand({ brandId: "me", accountShared: false, claimants: mine }),
+    ).toBe(true);
+  });
+
+  it("never takes a campaign another brand claims", () => {
+    expect(
+      campaignBelongsToBrand({ brandId: "me", accountShared: false, claimants: theirs }),
+    ).toBe(false);
+  });
+
+  it("gives unclaimed campaigns to the owner only", () => {
+    expect(
+      campaignBelongsToBrand({ brandId: "me", accountShared: false, claimants: undefined }),
+    ).toBe(true);
+    expect(
+      campaignBelongsToBrand({ brandId: "me", accountShared: true, claimants: new Set() }),
+    ).toBe(false);
+  });
+});

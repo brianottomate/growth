@@ -119,3 +119,40 @@ place to add product names.
 **Rollback** is a re-run of the Deploy workflow run for the previous release,
 which triggers a Vercel instant rollback. Production actions need Kristian's
 explicit go.
+
+## Running as a client's Page (2026-09-09)
+
+A Performance client grants Wander access through Leadsie, which puts their
+Facebook Page in Wander's Business Portfolio. Wander's existing Zernio Meta
+connection can then see the Page, and Verify access on the intake records it
+on `brand.meta_page_id`.
+
+**Zernio creates every ad as the Page its connection is bound to.** There is
+no per-ad Page override on `/ads/create` (only `instagramAccountId` for the
+IG actor), so a Leadsie grant alone cannot run ads as the client. The client
+brand needs a Zernio connection of its own, bound to its Page. Growth's own
+connect link (`/connect/[token]`, on the brand page) makes that in two clicks
+for anyone whose Meta login can manage the Page, which after Leadsie includes
+Wander staff: connect Facebook, pick the client's Page, then connect Meta Ads.
+
+What the code guarantees around that:
+
+- **Auto-select.** After a connect callback, `syncBrandConnect` moves the
+  brand's Facebook connection to `meta_page_id` when it landed on another Page
+  (the Meta Ads flow binds the first Page the login can manage).
+- **Refusal.** `requireAdDestination` refuses a Meta connection bound to any
+  Page other than the brand's. A client's campaign never runs as Wander by
+  accident. Destinations carry `pageId` and `runsAsBrandPage` so the push
+  dialog and the agent can see the mismatch before trying.
+- **Shared ad accounts.** `ad_account` is one row per (account, brand). A
+  client borrowing Wander's account has `is_shared = true`; sync attributes it
+  only the campaigns this app pushed for it, and never re-attributes a
+  campaign another brand's row already claims. Wander keeps everything
+  unclaimed, including campaigns made by hand in Ads Manager.
+- **Facebook posting without a profile.** Zernio takes `pageId` per post on
+  Facebook, so a brand with no profile but a bound Page posts through any
+  connected Facebook channel in the organisation. Instagram, LinkedIn and X
+  have no such switch and still need the brand's own connection.
+
+Winter Park Escapes is the first brand on this path: Page 410431762630458,
+Wander's `act_885632589057558` allowed as shared, intake verified 2026-09-09.

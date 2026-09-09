@@ -160,7 +160,7 @@ const schedulingSchema = {
 
 export const listAdsDestinations = growthAction({
   description:
-    "List the active Zernio Meta, Google or LinkedIn connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id.",
+    "List the active Zernio Meta, Google or LinkedIn connection and the live provider ad accounts that are explicitly allowlisted for one owned brand. Use this before any adsWrite action; never guess either account id. Each Meta destination carries the Facebook Page it runs as (pageId) and runsAsBrandPage; a false value means the push will refuse it because the brand is bound to a different Page.",
   inputSchema: z.object({
     brandSlug: destinationSchema.brandSlug,
     platform: platformSchema,

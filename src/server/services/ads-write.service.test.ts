@@ -5,6 +5,7 @@ import {
   estimateMonthlyKeywordCost,
   extractPreviewFrames,
   metaPageIdFromConnection,
+  connectionRunsAsBrandPage,
   googlePauseOutcome,
   matchResponseAdsToPlan,
   videoPayloadFor,
@@ -424,5 +425,43 @@ describe("metaPageIdFromConnection", () => {
     expect(metaPageIdFromConnection("27501783656071882")).toBeNull();
     expect(metaPageIdFromConnection(undefined)).toBeNull();
     expect(metaPageIdFromConnection(null)).toBeNull();
+  });
+});
+
+/**
+ * Zernio creates every ad as the Page its connection is bound to, with no
+ * per-ad override, so this guard is the only thing between a client's
+ * campaign and someone else's identity.
+ */
+describe("connectionRunsAsBrandPage", () => {
+  const winterPark = { metaPageId: "410431762630458" };
+
+  it("passes a connection bound to the brand's Page", () => {
+    expect(
+      connectionRunsAsBrandPage(winterPark, {
+        platformUserId: "27501783656071882:page:410431762630458",
+      }),
+    ).toBe(true);
+  });
+
+  it("refuses a connection bound to another Page", () => {
+    expect(
+      connectionRunsAsBrandPage(winterPark, {
+        platformUserId: "27501783656071882:page:101399685529192",
+      }),
+    ).toBe(false);
+  });
+
+  it("refuses an unreadable identity rather than assuming", () => {
+    expect(connectionRunsAsBrandPage(winterPark, { platformUserId: undefined })).toBe(false);
+  });
+
+  it("passes any connection while the brand has no Page bound", () => {
+    expect(
+      connectionRunsAsBrandPage(
+        { metaPageId: null },
+        { platformUserId: "27501783656071882:page:101399685529192" },
+      ),
+    ).toBe(true);
   });
 });

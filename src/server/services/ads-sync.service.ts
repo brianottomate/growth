@@ -13,7 +13,7 @@ import {
 } from "@/server/db/ads-schema";
 import { brandTable } from "@/server/db/brand-schema";
 import { type ChannelPlatform, channelTable } from "@/server/db/channel-schema";
-import { getAllowedAdAccountIds } from "@/server/services/ad-account-allowlist.service";
+import { getAllowedAdAccounts } from "@/server/services/ad-account-allowlist.service";
 import { recomputeAllPerformanceCycleSpend } from "@/server/services/performance.service";
 import {
   getZernioAdsTree,
@@ -210,6 +210,25 @@ export type AdsSyncFilters = {
  * accounts on one channel row — so the reconcile query would sweep campaigns
  * this tree was never asked about.
  */
+/**
+ * Whether a campaign in an allowed ad account is this brand's to ingest.
+ *
+ * `claimants` are the brands whose platform_campaign rows already carry the
+ * campaign's external id. A campaign another brand claims stays theirs. On a
+ * shared account the brand takes only campaigns it already claims, i.e. the
+ * ones this app pushed for it; the owning brand takes the rest.
+ */
+export function campaignBelongsToBrand(input: {
+  brandId: string;
+  accountShared: boolean;
+  claimants: ReadonlySet<string> | undefined;
+}): boolean {
+  const claimants = input.claimants ?? new Set<string>();
+  if (claimants.has(input.brandId)) return true;
+  if (claimants.size > 0) return false;
+  return !input.accountShared;
+}
+
 export function treeIsCompleteEnoughToReconcile(input: {
   filteredOut: number;
   errorCount: number;
@@ -482,16 +501,22 @@ export async function syncZernioAds(
   // (caught on the first client-brand sync, 2026-08-27). Cross-brand
   // attribution is worse than under-ingesting; a campaign nobody's brand
   // claims stays out until its account is allowed on the right brand.
-  const allowedAccounts = await getAllowedAdAccountIds(brand.id);
+  const allowedRows = await getAllowedAdAccounts(brand.id);
   // Allowlist rows and the tree can spell the same account differently (Meta
   // `act_` prefix, Google dashes, LinkedIn URNs); compare canonical forms.
   const normalize =
     adPlatformSpec(platform)?.zernio?.normalizeAccountId ??
     ((value: string) => value);
   const allowedNormalized = new Set(
-    [...allowedAccounts].map((value) => normalize(value)),
+    allowedRows.map((row) => normalize(row.externalId)),
+  );
+  const sharedNormalized = new Set(
+    allowedRows
+      .filter((row) => row.isShared)
+      .map((row) => normalize(row.externalId)),
   );
   const isAllowed = (acct: string) => allowedNormalized.has(normalize(acct));
+  const isShared = (acct: string) => sharedNormalized.has(normalize(acct));
   const sameAccount = (a: string, b: string) => normalize(a) === normalize(b);
 
   const sinceDays =
@@ -523,7 +548,7 @@ export async function syncZernioAds(
   };
 
   const fullTree = await getZernioAdsTree();
-  const scoped = fullTree.filter((c) => {
+  const accountScoped = fullTree.filter((c) => {
     const obj = c as Record<string, unknown>;
     if (campaignPlatform(obj) !== platform) return false;
     const acct = str(obj.platformAdAccountId);
@@ -531,6 +556,49 @@ export async function syncZernioAds(
     if (options?.adAccountId && !sameAccount(acct, options.adAccountId))
       return false;
     return true;
+  });
+
+  // One ad account can serve several brands (a Performance client runs from
+  // Wander's account as its own Page). Campaign rows already say who owns
+  // what, so a campaign another brand claims is never re-attributed, and a
+  // brand that merely borrows the account gets only what this app pushed for
+  // it. The owner keeps everything unclaimed, including what was made by hand
+  // in Ads Manager.
+  const treeExternalIds = accountScoped.flatMap((c) => {
+    const obj = c as Record<string, unknown>;
+    const id = str(obj.platformCampaignId) ?? c.id ?? c._id;
+    return id ? [id] : [];
+  });
+  const claims = treeExternalIds.length
+    ? await db
+        .select({
+          brandId: platformCampaignTable.brandId,
+          externalId: platformCampaignTable.externalId,
+        })
+        .from(platformCampaignTable)
+        .where(
+          and(
+            eq(platformCampaignTable.platform, platform),
+            inArray(platformCampaignTable.externalId, treeExternalIds),
+          ),
+        )
+    : [];
+  const claimedBy = new Map<string, Set<string>>();
+  for (const claim of claims) {
+    if (!claim.externalId) continue;
+    const owners = claimedBy.get(claim.externalId) ?? new Set<string>();
+    owners.add(claim.brandId);
+    claimedBy.set(claim.externalId, owners);
+  }
+  const scoped = accountScoped.filter((c) => {
+    const obj = c as Record<string, unknown>;
+    const externalId = str(obj.platformCampaignId) ?? c.id ?? c._id;
+    const acct = str(obj.platformAdAccountId) ?? "";
+    return campaignBelongsToBrand({
+      brandId: brand.id,
+      accountShared: isShared(acct),
+      claimants: externalId ? claimedBy.get(externalId) : undefined,
+    });
   });
 
   // Window applied after the allowlist so default-deny is never widened by it.

@@ -88,7 +88,7 @@ import { createId } from "@/server/db/utils";
 type AdsWriteContext = { organizationId: string; runId: string };
 
 type AdDestination = {
-  brand: Pick<Brand, "id" | "slug" | "name" | "zernioProfileId">;
+  brand: Pick<Brand, "id" | "slug" | "name" | "zernioProfileId" | "metaPageId">;
   connection: ZernioAccount;
   adAccount: {
     id: string;
@@ -128,13 +128,34 @@ async function resolveOwnedBrand(organizationId: string, brandSlug: string) {
       slug: true,
       name: true,
       zernioProfileId: true,
+      metaPageId: true,
     },
   });
   if (!brand) throw new Error(`Owned brand not found: ${brandSlug}`);
   if (!brand.zernioProfileId) {
-    throw new Error(`Connect ${brand.name} to its Zernio profile first`);
+    // Zernio creates every ad as the Page its connection is bound to and
+    // offers no per-ad override, so a Leadsie grant alone (their Page visible
+    // through Wander's connection) cannot run ads as the client. The brand
+    // needs a connection of its own, which the connect link makes in two
+    // clicks for anyone whose Meta login can manage the client's Page.
+    throw new Error(
+      `${brand.name} has no Zernio connection of its own. Open its connect link from the brand page and connect Facebook and Meta Ads with a Wander login that can manage the ${brand.name} Page; the connection then runs as that Page.`,
+    );
   }
   return brand;
+}
+
+/**
+ * Whether a Meta connection runs as the Page a brand is bound to. A brand
+ * with no Page recorded yet passes; an unreadable connection identity fails,
+ * because "unknown" is not "theirs". Pure, so the guard is testable.
+ */
+export function connectionRunsAsBrandPage(
+  brand: { metaPageId: string | null },
+  connection: { platformUserId?: string | null },
+): boolean {
+  if (!brand.metaPageId) return true;
+  return metaPageIdFromConnection(connection.platformUserId) === brand.metaPageId;
 }
 
 async function allowedAccountsForBrand(
@@ -198,6 +219,10 @@ export async function listAdsWriteDestinations(input: {
           sameAdAccountId(input.platform, row.externalId, adAccount.id),
         );
         if (!allowedRow || adAccount.selectable === false) return [];
+        const pageId =
+          input.platform === "meta"
+            ? metaPageIdFromConnection(connection.platformUserId)
+            : null;
         return [
           {
             connectionAccountId: connectionId,
@@ -207,6 +232,13 @@ export async function listAdsWriteDestinations(input: {
             adAccountName: adAccount.name ?? allowedRow.name ?? undefined,
             currency: adAccount.currency,
             minimumDailyBudget: adAccount.minimumDailyBudget,
+            /** Meta: the Page the ads would run as, read off the connection. */
+            pageId,
+            /** False when the brand is bound to a different Page; the push refuses it. */
+            runsAsBrandPage:
+              input.platform === "meta"
+                ? connectionRunsAsBrandPage(brand, connection)
+                : true,
           },
         ];
       });
@@ -230,7 +262,12 @@ export async function listAdsWriteDestinations(input: {
   );
 
   return {
-    brand: { id: brand.id, slug: brand.slug, name: brand.name },
+    brand: {
+      id: brand.id,
+      slug: brand.slug,
+      name: brand.name,
+      metaPageId: brand.metaPageId,
+    },
     platform: input.platform,
     destinations,
     connectionErrors,
@@ -284,6 +321,18 @@ async function requireAdDestination(input: {
   ) {
     throw new Error(
       `Ad account ${input.adAccountId} is outside ${brand.name}'s allowlist`,
+    );
+  }
+  // A client's ads must never run as someone else's Page. The connection
+  // decides the Page and nothing on the push can change it, so the only
+  // safe answer to a mismatch is to refuse and say which Page to select.
+  if (
+    input.platform === "meta" &&
+    !connectionRunsAsBrandPage(brand, connection)
+  ) {
+    const bound = metaPageIdFromConnection(connection.platformUserId);
+    throw new Error(
+      `Connection ${input.connectionAccountId} runs as Facebook Page ${bound ?? "(unknown)"}, but ${brand.name} is bound to Page ${brand.metaPageId}. Re-select ${brand.name}'s Page on that connection in Zernio, or reconnect it from the brand's connect link.`,
     );
   }
 
@@ -1438,11 +1487,12 @@ export async function previewDraftAd(
     adAccountId: input.adAccountId,
   });
 
+  // The brand's own Page first: a destination that passed requireAdDestination
+  // runs as it anyway, and a preview should show the ad the way it will run.
   const pageId =
     input.pageId ??
-    metaPageIdFromConnection(
-      (destination.connection as { platformUserId?: string }).platformUserId,
-    );
+    destination.brand.metaPageId ??
+    metaPageIdFromConnection(destination.connection.platformUserId);
   if (!pageId) {
     throw new Error(
       "Could not resolve the Facebook page from this connection — pass pageId explicitly",
