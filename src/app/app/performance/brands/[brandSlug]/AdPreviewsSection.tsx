@@ -15,9 +15,20 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
+import { adPreviewStudioHref } from "@/lib/ad-preview-links";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import type { AdPreviewCard } from "@/server/services/brand-ad-previews.service";
 import { useTRPC } from "@/trpc/react";
+
+/** A home drawn on the awareness card straight from the listing feed. */
+export type OnDemandPreview = {
+  homeId: string;
+  homeName: string;
+  homeUrl: string;
+  imageUrl: string;
+  headline: string;
+  previewUrl: string;
+};
 
 // The section's label and panel match `_components.tsx`, which cannot be
 // imported here: it reads the desk service, and this is a client component.
@@ -45,6 +56,7 @@ export function AdPreviewsSection({
   brandLogo,
   website,
   cards,
+  onDemand,
 }: {
   brandId: string;
   brandSlug: string;
@@ -52,10 +64,41 @@ export function AdPreviewsSection({
   brandLogo: string | null;
   website: string | null;
   cards: AdPreviewCard[];
+  /** Shown while nothing is frozen: their homes, rendered on demand. */
+  onDemand?: OnDemandPreview[];
 }) {
   const [surface, setSurface] = useState<AdMockSurface>("facebook");
   const trpc = useTRPC();
   const router = useRouter();
+  // The Studio works from a library copy of the photo, so opening an
+  // on-demand card imports its hero first (or finds the earlier import).
+  const openInStudio = useMutation(
+    trpc.media.importUrls.mutationOptions({
+      onSuccess: (result, variables) => {
+        const asset = result.assets[0];
+        if (!asset) {
+          toast.error("The photo could not be brought into the library");
+          return;
+        }
+        const preview = (onDemand ?? []).find(
+          (row) => row.imageUrl === variables.images[0]?.url,
+        );
+        router.push(
+          adPreviewStudioHref({
+            brandId,
+            brandSlug,
+            sourceAssetId: asset.id,
+            templateId: "hero-overlay",
+            formatId: "portrait",
+            title: preview?.headline,
+            cta: "Find your next escape",
+          }),
+        );
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const drawn = cards.length === 0 ? (onDemand ?? []) : [];
   const remove = useMutation(
     trpc.brand.removeAdPreview.mutationOptions({
       onSuccess: () => {
@@ -94,7 +137,7 @@ export function AdPreviewsSection({
           Ad previews{cards.length ? ` · ${cards.length}` : ""}
         </SectionLabel>
         <div className="flex flex-wrap items-center gap-2">
-          {cards.length > 0 ? (
+          {cards.length > 0 || drawn.length > 0 ? (
             <div className="flex items-center gap-0.5 rounded-full border p-0.5">
               {AD_MOCK_SURFACES.map((option) => (
                 <button
@@ -118,7 +161,47 @@ export function AdPreviewsSection({
         </div>
       </div>
 
-      {cards.length === 0 ? (
+      {cards.length === 0 && drawn.length > 0 ? (
+        <div className="space-y-2.5">
+          <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
+            {drawn.map((preview) => (
+              <li key={preview.homeId} className="flex flex-col items-center gap-2">
+                <AdMock
+                  surface={surface}
+                  brandName={brandName}
+                  brandLogo={brandLogo}
+                  body={null}
+                  headline={preview.homeName}
+                  link={preview.homeUrl}
+                  callToAction="Book now"
+                  media={[{ url: preview.previewUrl, thumbnail: null, type: "image" }]}
+                  className={surface === "story" ? "w-full max-w-60" : "w-full max-w-80"}
+                />
+                <div className="text-muted-foreground flex w-full max-w-80 items-center justify-between gap-2 text-[11px]">
+                  <span className="truncate">Hero · overlay · drawn now</span>
+                  <button
+                    type="button"
+                    disabled={openInStudio.isPending}
+                    onClick={() =>
+                      openInStudio.mutate({
+                        brandId,
+                        images: [{ url: preview.imageUrl, title: preview.homeName }],
+                      })
+                    }
+                    className="shrink-0 text-sky-300 hover:underline disabled:opacity-50"
+                  >
+                    Studio
+                  </button>
+                </div>
+              </li>
+            ))}
+            <li className="flex items-center justify-center">{designInChat}</li>
+          </ul>
+          <p className="text-muted-foreground text-[11px]">
+            Drawn from their homes as they would run. Nothing is kept until a card is frozen in the Studio.
+          </p>
+        </div>
+      ) : cards.length === 0 ? (
         <div className={panel}>
           <EmptyState
             compact

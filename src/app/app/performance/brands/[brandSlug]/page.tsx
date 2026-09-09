@@ -23,6 +23,8 @@ import { brandListings } from "@/server/services/wanderos-listings.service";
 import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel } from "../../_components";
 import { StageChip } from "../../StageChip";
 import { StartCampaignInChat } from "../../StartCampaignInChat";
+import { homePreviewRecipes, homePreviewUrl } from "@/lib/home-ad-previews";
+
 import { AdPreviewsSection } from "./AdPreviewsSection";
 import { HomesStrip } from "./HomesStrip";
 import { MediaStrip } from "./MediaStrip";
@@ -128,6 +130,24 @@ export default async function PerformanceBrandPage({
   );
   const images = shown.slice(0, 18);
   const withPhoto = homes.filter((home) => home.imageUrl);
+  // Until a card is frozen, the previews section draws three of their homes
+  // on the awareness card straight from the listing feed. Nothing is saved.
+  const onDemandPreviews = withPhoto.slice(0, 3).map((home) => {
+    const recipe = homePreviewRecipes(home)[0]!;
+    return {
+      homeId: home.id,
+      homeName: home.name,
+      homeUrl: home.url,
+      imageUrl: home.imageUrl!,
+      headline: recipe.title,
+      previewUrl: homePreviewUrl({
+        brandId: brand.id,
+        source: { url: home.imageUrl! },
+        formatId: "portrait",
+        recipe,
+      }),
+    };
+  });
 
   return (
     <div className="space-y-7">
@@ -194,6 +214,7 @@ export default async function PerformanceBrandPage({
         brandLogo={brand.brandMark?.variants.color ?? brand.logo}
         website={brand.website}
         cards={adPreviews}
+        onDemand={onDemandPreviews}
       />
 
       <section className="space-y-2.5">

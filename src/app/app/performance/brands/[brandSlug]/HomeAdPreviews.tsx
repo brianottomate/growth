@@ -67,7 +67,12 @@ export function HomeAdPreviews({
                   {HOME_PREVIEW_FORMATS.map((formatId) => {
                     const format = getCompositionFormat(formatId);
                     const key = `${recipe.id}:${formatId}`;
-                    const src = homePreviewUrl({ brandId, sourceMediaAssetId: sourceAssetId, formatId, recipe });
+                    const src = homePreviewUrl({
+                      brandId,
+                      source: { assetId: sourceAssetId },
+                      formatId,
+                      recipe,
+                    });
                     return (
                       <li key={key} className="group flex flex-col gap-1.5">
                         <div

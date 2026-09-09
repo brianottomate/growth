@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { compositionSpecSchema } from "@/lib/compositions";
+import { compositionPreviewSchema } from "@/lib/compositions";
 import { getSession } from "@/server/better-auth/server";
 import {
   CompositionAccessError,
@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
-  const parsed = compositionSpecSchema.safeParse({
+  // A photo by URL instead of a library asset: the on-demand previews on the
+  // brand page draw straight from a client's listing feed. The service checks
+  // the host; here it only has to be present when no asset is.
+  const sourceUrl = params.get("sourceUrl") || null;
+  const parsed = compositionPreviewSchema.safeParse({
     brandId: params.get("brandId"),
     templateId: params.get("templateId"),
     formatId: params.get("formatId"),
@@ -43,11 +47,22 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   }
+  if (
+    parsed.data.templateId !== "brand-statement" &&
+    !parsed.data.sourceMediaAssetId &&
+    !sourceUrl
+  ) {
+    return NextResponse.json(
+      { error: "This blueprint needs a source image" },
+      { status: 400 },
+    );
+  }
 
   try {
     const context = await resolveCompositionContext(
       session.user.id,
       parsed.data,
+      { sourceUrl },
     );
     return renderComposition(parsed.data, await loadCompositionSource(context));
   } catch (error) {

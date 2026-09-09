@@ -305,6 +305,16 @@ export const compositionSpecSchema = z
   .superRefine(requireSourceImage)
   .superRefine(requireTitle);
 
+/**
+ * A spec for an on-demand preview, where the photo may come from a URL the
+ * server vouches for (a brand's own listing hero) instead of the library.
+ * Everything else is the ordinary spec; only the source requirement moves to
+ * the route, which knows whether it was given a URL.
+ */
+export const compositionPreviewSchema = z
+  .object(compositionShape)
+  .superRefine(requireTitle);
+
 export const freezeCompositionSchema = z
   .object({
     ...compositionShape,

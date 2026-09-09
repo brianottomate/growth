@@ -103,9 +103,33 @@ function wrapText(value: string, maxCharacters: number) {
   }, []);
 }
 
+/**
+ * Hosts an on-demand preview may draw a photo from without importing it: a
+ * brand's own listing photos on WanderOS and our own library. Anything else
+ * is refused, so the preview route cannot be pointed at an arbitrary server.
+ */
+const PREVIEW_SOURCE_HOSTS = new Set([
+  "assets.wander.com",
+  "assets-websites.wander.com",
+]);
+
+export function isAllowedPreviewSource(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    return PREVIEW_SOURCE_HOSTS.has(parsed.hostname) || R2.isPublicUrl(url);
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveCompositionContext(
   userId: string,
   spec: CompositionSpec,
+  options: {
+    /** A vouched-for photo URL, used when the spec names no library asset. */
+    sourceUrl?: string | null;
+  } = {},
 ): Promise<CompositionContext> {
   const brand = await db.query.brandTable.findFirst({
     where: and(eq(brandTable.id, spec.brandId), isNull(brandTable.deletedAt)),
@@ -153,6 +177,14 @@ export async function resolveCompositionContext(
       );
     }
     sourceUrl = source.url;
+  } else if (options.sourceUrl) {
+    if (!isAllowedPreviewSource(options.sourceUrl)) {
+      throw new CompositionAccessError(
+        "Previews draw only from the brand's own listing photos or the library",
+        422,
+      );
+    }
+    sourceUrl = options.sourceUrl;
   }
 
   if (spec.templateId !== "brand-statement" && !sourceUrl) {

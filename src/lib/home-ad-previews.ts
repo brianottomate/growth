@@ -77,10 +77,15 @@ export function homePreviewRecipes(home: HomeForPreview): HomePreviewRecipe[] {
   ];
 }
 
-/** The Studio's preview route for one tile. */
+/**
+ * The Studio's preview route for one tile. The photo is a library asset when
+ * the home's hero has been imported, or the hero's own URL on their site when
+ * it has not; the route vouches for WanderOS hosts, so nothing is saved to
+ * draw a preview.
+ */
 export function homePreviewUrl(input: {
   brandId: string;
-  sourceMediaAssetId: string;
+  source: { assetId: string } | { url: string };
   formatId: CompositionFormatId;
   recipe: HomePreviewRecipe;
 }) {
@@ -88,10 +93,11 @@ export function homePreviewUrl(input: {
     brandId: input.brandId,
     templateId: "hero-overlay",
     formatId: input.formatId,
-    sourceMediaAssetId: input.sourceMediaAssetId,
     title: input.recipe.title,
     cta: input.recipe.cta,
     mark: "none",
   });
+  if ("assetId" in input.source) params.set("sourceMediaAssetId", input.source.assetId);
+  else params.set("sourceUrl", input.source.url);
   return `/api/compositions/preview?${params.toString()}`;
 }
