@@ -23,7 +23,12 @@ import { brandListings } from "@/server/services/wanderos-listings.service";
 import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel } from "../../_components";
 import { StageChip } from "../../StageChip";
 import { StartCampaignInChat } from "../../StartCampaignInChat";
-import { homePreviewRecipes, homePreviewUrl } from "@/lib/home-ad-previews";
+import {
+  homeCatalogCopy,
+  homeCatalogPreviewUrl,
+  homePreviewRecipes,
+  homePreviewUrl,
+} from "@/lib/home-ad-previews";
 
 import { AdPreviewsSection } from "./AdPreviewsSection";
 import { HomesStrip } from "./HomesStrip";
@@ -141,13 +146,12 @@ export default async function PerformanceBrandPage({
   const onDemandPreview = featured
     ? (() => {
         const recipe = homePreviewRecipes(featured)[0]!;
+        const catalog = homeCatalogCopy(featured);
+        const source = { url: featured.imageUrl! };
         const url = (formatId: "landscape" | "square" | "story") =>
-          homePreviewUrl({
-            brandId: brand.id,
-            source: { url: featured.imageUrl! },
-            formatId,
-            recipe,
-          });
+          homePreviewUrl({ brandId: brand.id, source, formatId, recipe });
+        const catalogUrl = (formatId: "landscape" | "square" | "story") =>
+          homeCatalogPreviewUrl({ brandId: brand.id, source, formatId, copy: catalog });
         return {
           homeId: featured.id,
           homeName: featured.name,
@@ -158,6 +162,12 @@ export default async function PerformanceBrandPage({
           /** False while the page is falling back to the first home on their feed. */
           picked: picked !== null,
           previews: { facebook: url("landscape"), instagram: url("square"), story: url("story") },
+          catalog,
+          catalogPreviews: {
+            facebook: catalogUrl("landscape"),
+            instagram: catalogUrl("square"),
+            story: catalogUrl("story"),
+          },
         };
       })()
     : null;

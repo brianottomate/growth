@@ -94,6 +94,9 @@ export function CompositionWorkbench({
   initialSourceId = null,
   initialTitle = null,
   initialCta = null,
+  initialEyebrow = null,
+  initialSubtitle = null,
+  initialRating = null,
   adPreviewTarget = null,
 }: {
   brands: Brand[];
@@ -109,6 +112,9 @@ export function CompositionWorkbench({
   initialSourceId?: string | null;
   initialTitle?: string | null;
   initialCta?: string | null;
+  initialEyebrow?: string | null;
+  initialSubtitle?: string | null;
+  initialRating?: number | null;
   /**
    * Designing an ad preview for the brand: a freeze keeps the card on the
    * brand and goes back to its page.
@@ -132,11 +138,12 @@ export function CompositionWorkbench({
   // placeholder copy stands until the operator types or asks for copy.
   const [title, setTitle] = useState(initialTitle ?? "The view is only the beginning.");
   const [subtitle, setSubtitle] = useState(
+    initialSubtitle ??
     "Turn a strong property image into channel-ready creative without rebuilding the layout.",
   );
-  const [eyebrow, setEyebrow] = useState("Stay with Wander");
+  const [eyebrow, setEyebrow] = useState(initialEyebrow ?? "Stay with Wander");
   const [cta, setCta] = useState(initialCta ?? "Explore the stay");
-  const [rating, setRating] = useState<number | undefined>(5);
+  const [rating, setRating] = useState<number | undefined>(initialRating ?? 5);
   const [assetTitle, setAssetTitle] = useState(
     adPreviewTarget ? "Ad preview" : "Wander social composition",
   );

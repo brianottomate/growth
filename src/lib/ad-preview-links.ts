@@ -23,6 +23,9 @@ export function adPreviewStudioHref(input: {
   /** Copy to open the Studio with, so a preview tile continues as it looked. */
   title?: string;
   cta?: string;
+  eyebrow?: string;
+  subtitle?: string;
+  rating?: number | null;
 }) {
   const params = new URLSearchParams({
     brandId: input.brandId,
@@ -34,6 +37,9 @@ export function adPreviewStudioHref(input: {
   if (input.sourceAssetId) params.set("source", input.sourceAssetId);
   if (input.title) params.set("title", input.title);
   if (input.cta) params.set("cta", input.cta);
+  if (input.eyebrow) params.set("eyebrow", input.eyebrow);
+  if (input.subtitle) params.set("subtitle", input.subtitle);
+  if (input.rating != null) params.set("rating", String(input.rating));
   return `/app/compositions?${params.toString()}`;
 }
 

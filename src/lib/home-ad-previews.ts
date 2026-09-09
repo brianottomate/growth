@@ -28,6 +28,8 @@ export type HomeForPreview = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   guests?: number | null;
+  /** 0 to 5 as the feed reports it; the listing card shows it as a pill. */
+  rating?: number | null;
 };
 
 const BUTTON = "Find your next escape";
@@ -97,6 +99,55 @@ export function homePreviewUrl(input: {
     cta: input.recipe.cta,
     mark: "none",
   });
+  if ("assetId" in input.source) params.set("sourceMediaAssetId", input.source.assetId);
+  else params.set("sourceUrl", input.source.url);
+  return `/api/compositions/preview?${params.toString()}`;
+}
+
+/** The listing card's fields for one home, written from the feed facts. */
+export type HomeCatalogCopy = {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  rating: number | null;
+};
+
+export function homeCatalogCopy(home: HomeForPreview): HomeCatalogCopy {
+  const where = place(home);
+  const facts = [
+    home.bedrooms ? `${home.bedrooms} ${home.bedrooms === 1 ? "bedroom" : "bedrooms"}` : null,
+    home.bathrooms ? `${home.bathrooms} ${home.bathrooms === 1 ? "bath" : "baths"}` : null,
+    home.guests ? `${home.guests} guests` : null,
+  ].filter((part): part is string => Boolean(part));
+  const rating =
+    typeof home.rating === "number" && home.rating >= 1 && home.rating <= 5
+      ? Math.round(home.rating * 10) / 10
+      : null;
+  return {
+    eyebrow: where ? `${home.name} in` : home.name,
+    title: where || home.name,
+    subtitle: facts.join(" · "),
+    rating,
+  };
+}
+
+/** The Studio's preview route for the listing card of one home. */
+export function homeCatalogPreviewUrl(input: {
+  brandId: string;
+  source: { assetId: string } | { url: string };
+  formatId: CompositionFormatId;
+  copy: HomeCatalogCopy;
+}) {
+  const params = new URLSearchParams({
+    brandId: input.brandId,
+    templateId: "catalog-place",
+    formatId: input.formatId,
+    eyebrow: input.copy.eyebrow,
+    title: input.copy.title,
+    subtitle: input.copy.subtitle,
+    mark: "none",
+  });
+  if (input.copy.rating !== null) params.set("rating", String(input.copy.rating));
   if ("assetId" in input.source) params.set("sourceMediaAssetId", input.source.assetId);
   else params.set("sourceUrl", input.source.url);
   return `/api/compositions/preview?${params.toString()}`;

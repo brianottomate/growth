@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { adPreviewStudioHref } from "@/lib/ad-preview-links";
+import type { HomeCatalogCopy } from "@/lib/home-ad-previews";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import type { AdPreviewCard } from "@/server/services/brand-ad-previews.service";
 import { useTRPC } from "@/trpc/react";
@@ -33,8 +34,14 @@ export type OnDemandPreview = {
   cta: string;
   /** An operator chose this home; false means the first on their feed stood in. */
   picked: boolean;
+  /** The awareness card, one canvas per placement. */
   previews: Record<AdMockSurface, string>;
+  /** The listing card for the same home, one canvas per placement. */
+  catalog: HomeCatalogCopy;
+  catalogPreviews: Record<AdMockSurface, string>;
 };
+
+type OnDemandRow = "awareness" | "listing";
 
 /** The canvas each placement's on-demand card is drawn on. */
 const SURFACE_FORMAT: Record<AdMockSurface, "landscape" | "square" | "story"> = {
@@ -85,7 +92,10 @@ export function AdPreviewsSection({
   const router = useRouter();
   // The Studio works from a library copy of the photo, so opening an
   // on-demand card imports its hero first (or finds the earlier import).
-  const [studioSurface, setStudioSurface] = useState<AdMockSurface>("instagram");
+  const [studioTarget, setStudioTarget] = useState<{ row: OnDemandRow; surface: AdMockSurface }>({
+    row: "awareness",
+    surface: "instagram",
+  });
   const openInStudio = useMutation(
     trpc.media.importUrls.mutationOptions({
       onSuccess: (result) => {
@@ -94,16 +104,29 @@ export function AdPreviewsSection({
           toast.error("The photo could not be brought into the library");
           return;
         }
+        const formatId = SURFACE_FORMAT[studioTarget.surface];
         router.push(
-          adPreviewStudioHref({
-            brandId,
-            brandSlug,
-            sourceAssetId: asset.id,
-            templateId: "hero-overlay",
-            formatId: SURFACE_FORMAT[studioSurface],
-            title: onDemand.headline,
-            cta: onDemand.cta,
-          }),
+          studioTarget.row === "awareness"
+            ? adPreviewStudioHref({
+                brandId,
+                brandSlug,
+                sourceAssetId: asset.id,
+                templateId: "hero-overlay",
+                formatId,
+                title: onDemand.headline,
+                cta: onDemand.cta,
+              })
+            : adPreviewStudioHref({
+                brandId,
+                brandSlug,
+                sourceAssetId: asset.id,
+                templateId: "catalog-place",
+                formatId,
+                eyebrow: onDemand.catalog.eyebrow,
+                title: onDemand.catalog.title,
+                subtitle: onDemand.catalog.subtitle,
+                rating: onDemand.catalog.rating,
+              }),
         );
       },
       onError: (error) => toast.error(error.message),
@@ -173,41 +196,51 @@ export function AdPreviewsSection({
       </div>
 
       {cards.length === 0 && drawn ? (
-        <div className="space-y-2.5">
-          <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
-            {AD_MOCK_SURFACES.map((option) => (
-              <li key={option.id} className="flex flex-col items-center gap-2">
-                <AdMock
-                  surface={option.id}
-                  brandName={brandName}
-                  brandLogo={brandLogo}
-                  body={null}
-                  headline={drawn.homeName}
-                  link={drawn.homeUrl}
-                  callToAction="Book now"
-                  media={[{ url: drawn.previews[option.id], thumbnail: null, type: "image" }]}
-                  className={option.id === "story" ? "w-full max-w-60" : "w-full max-w-80"}
-                />
-                <div className="text-muted-foreground flex w-full max-w-80 items-center justify-between gap-2 text-[11px]">
-                  <span className="truncate">{option.label} · drawn now</span>
-                  <button
-                    type="button"
-                    disabled={openInStudio.isPending}
-                    onClick={() => {
-                      setStudioSurface(option.id);
-                      openInStudio.mutate({
-                        brandId,
-                        images: [{ url: drawn.imageUrl, title: drawn.homeName }],
-                      });
-                    }}
-                    className="shrink-0 text-sky-300 hover:underline disabled:opacity-50"
-                  >
-                    Studio
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+        <div className="space-y-4">
+          {(
+            [
+              { row: "awareness", label: "Awareness · Hero overlay", previews: drawn.previews },
+              { row: "listing", label: "Listing card · Catalog place", previews: drawn.catalogPreviews },
+            ] as const
+          ).map((group) => (
+            <div key={group.row} className="space-y-2">
+              <p className="text-muted-foreground text-[11px]">{group.label}</p>
+              <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
+                {AD_MOCK_SURFACES.map((option) => (
+                  <li key={option.id} className="flex flex-col items-center gap-2">
+                    <AdMock
+                      surface={option.id}
+                      brandName={brandName}
+                      brandLogo={brandLogo}
+                      body={null}
+                      headline={drawn.homeName}
+                      link={drawn.homeUrl}
+                      callToAction="Book now"
+                      media={[{ url: group.previews[option.id], thumbnail: null, type: "image" }]}
+                      className={option.id === "story" ? "w-full max-w-60" : "w-full max-w-80"}
+                    />
+                    <div className="text-muted-foreground flex w-full max-w-80 items-center justify-between gap-2 text-[11px]">
+                      <span className="truncate">{option.label} · drawn now</span>
+                      <button
+                        type="button"
+                        disabled={openInStudio.isPending}
+                        onClick={() => {
+                          setStudioTarget({ row: group.row, surface: option.id });
+                          openInStudio.mutate({
+                            brandId,
+                            images: [{ url: drawn.imageUrl, title: drawn.homeName }],
+                          });
+                        }}
+                        className="shrink-0 text-sky-300 hover:underline disabled:opacity-50"
+                      >
+                        Studio
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-muted-foreground text-[11px]">
               {drawn.picked

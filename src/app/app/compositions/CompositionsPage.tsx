@@ -68,6 +68,10 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
   // Copy a preview tile was drawn with, so the Studio opens on the same card.
   const initialTitle = searchParams.get("title");
   const initialCta = searchParams.get("cta");
+  const initialEyebrow = searchParams.get("eyebrow");
+  const initialSubtitle = searchParams.get("subtitle");
+  const ratingParam = Number(searchParams.get("rating"));
+  const initialRating = ratingParam >= 1 && ratingParam <= 5 ? ratingParam : null;
   // Designing an ad preview for the brand: freezing keeps the card on the
   // brand and goes back to its page.
   const adPreviewTarget =
@@ -101,6 +105,9 @@ export function CompositionsPage({ brands }: { brands: Brand[] }) {
         initialSourceId={initialSourceId}
         initialTitle={initialTitle}
         initialCta={initialCta}
+        initialEyebrow={initialEyebrow}
+        initialSubtitle={initialSubtitle}
+        initialRating={initialRating}
         adPreviewTarget={adPreviewTarget}
       />
     </div>
