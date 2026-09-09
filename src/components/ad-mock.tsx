@@ -98,7 +98,9 @@ export function AdMock({
             <img
               src={brandLogo}
               alt=""
-              className="size-8 rounded-full object-cover"
+              // Contained, not covered: a wide lockup cropped to a circle
+              // shows three letters of the middle of the brand's name.
+              className="size-8 rounded-full border border-black/5 bg-white object-contain p-0.5"
             />
           ) : (
             <div className="grid size-8 place-items-center rounded-full bg-neutral-200 text-xs font-semibold">

@@ -647,7 +647,9 @@ export function renderComposition(
           </div>
           {button ? (
             story ? (
-              <div style={{ display: "flex", color: "#ffffff", fontSize: 34, fontWeight: 600, marginBottom: 40 }}>
+              // Stories and Reels lay their own UI over the bottom fifth of
+              // the frame, so the line sits above that band.
+              <div style={{ display: "flex", color: "#ffffff", fontSize: 34, fontWeight: 600, marginBottom: 300 }}>
                 {button}
               </div>
             ) : (
@@ -1154,7 +1156,9 @@ export function renderComposition(
             position: "absolute",
             left: pad,
             right: pad,
-            bottom: pad,
+            // Stories and Reels lay their own UI over the bottom fifth of the
+            // frame; the foot block sits above that band on the story canvas.
+            bottom: spec.formatId === "story" ? pad + 240 : pad,
             color: "#ffffff",
           }}
         >
