@@ -5,7 +5,9 @@ into `platform_post` (`source = "scraped"`, `brandId = <reference brand>`,
 `channelId = null`, `platform` denormalized) — the exact shape the schema already
 documents for "competitor scraped" rows.
 
-Status: **discovery only.** No production client yet. Test harness lives at
+Status: **in production** — client `src/server/clients/brightdata.client.ts`, service
+`src/server/services/peer-scrape.service.ts` (LinkedIn, X, Instagram, Facebook mappers).
+The notes below are the dataset reference the implementation was built from. Test harness lives at
 `scripts/brightdata-scrape-test.ts` (`bun run scripts/brightdata-scrape-test.ts <key|all>`).
 Each run dumps raw JSONL to `scripts/.brightdata-<key>.json` (gitignored). Focus brand
 for discovery = **Airbnb**.
@@ -152,8 +154,8 @@ returned 752 going back to 2021 — **bound the window** to control cost). Async
 | `metadata` | `hashtags`, `tagged_users`, `quoted_post`, `parent_post_details`, `quotes`, `verification_type` | |
 
 Also surfaces profile-level `followers`, `posts_count`, `is_verified` for brand/channel enrich.
-NB: an X mapper already exists for the Apify path (`twitter-scraper.client.ts` →
-`mapTweetToPlatformPost`) and is the same target shape.
+NB: the production mapper is `mapXRecord` in `peer-scrape.service.ts`; the X API
+path (`x.client.ts` → `mapXTweetToPlatformPost`) targets the same shape.
 
 ### Facebook (`gd_lkaxegm826bjpoo9m5`) — VERIFIED (50 posts, 46 w/ attachments, 20 w/ images)
 

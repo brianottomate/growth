@@ -80,7 +80,7 @@ Result: 73 original Wander posts with full metrics + 68 media items, clean. `sin
 
 **Limit:** `GET /2/users/:id/tweets` only reaches the most recent ~3200 tweets; deeper history needs full-archive search (Pro/Enterprise tier). Plenty for the feed going forward.
 
-**Fallback (Apify):** `src/server/clients/twitter-scraper.client.ts` (`scrapeTweets` + `mapTweetToPlatformPost`) wraps `apidojo/tweet-scraper`. Kept as backup, but the org's Apify is on the Free plan and that actor is API-blocked for free users — so X API is the live path. Use Apify only if we need >3200-tweet history or X API access lapses.
+**Fallback (Apify):** none. The Apify `apidojo/tweet-scraper` wrapper (`twitter-scraper.client.ts`) was removed on 2026-09-08 — it had no importers and the actor is API-blocked on the org's Apify plan. If X API access lapses or >3200-tweet history is needed, Bright Data's X posts dataset (`gd_lwxkxvnf1cynvib9co`, see brightdata-peer-scraping.md) is the fallback.
 
 ## Next step (not yet built)
 

@@ -9,29 +9,22 @@ import {
   FileText,
   LayoutDashboard,
   Link2,
-  Pencil,
-  Plus,
   Shapes,
-  Trash2,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
 import {
   type BrandLink,
@@ -46,15 +39,7 @@ const CATEGORY_ICON: Record<BrandLinkCategory, typeof Link2> = {
   other: Link2,
 };
 
-const CATEGORY_OPTIONS: { value: BrandLinkCategory; label: string }[] = [
-  { value: "sheet", label: "Sheet" },
-  { value: "doc", label: "Doc" },
-  { value: "dashboard", label: "Dashboard" },
-  { value: "design", label: "Design" },
-  { value: "other", label: "Link" },
-];
-
-/** Guess a category from a URL's host so the user rarely has to set it. */
+/** Guess a category from a URL's host so the user never has to set it. */
 function detectCategory(url: string): BrandLinkCategory {
   const u = url.toLowerCase();
   if (u.includes("docs.google.com/spreadsheets") || u.includes("airtable.com"))
@@ -77,227 +62,155 @@ function detectCategory(url: string): BrandLinkCategory {
   return "other";
 }
 
-const NEW = -1;
-
 /**
- * Links rail on a brand card. The brand becomes the index; the linked tool (a
- * tracker Sheet, a doc, a dashboard) stays the system-of-record. A link with no
- * URL is a deliberate placeholder — it renders as a dashed "pending" chip whose
- * only action is to fill in the URL later.
+ * The brand's linked tools (a tracker Sheet, a doc, a dashboard). The brand is
+ * the index; the linked tool stays the system-of-record. Links open from the
+ * card's ··· menu; this dialog is where the list is edited. Links are a small
+ * bounded array, so every change sends the whole list.
  */
-export function BrandLinks({
+export function BrandLinksDialog({
   brandId,
   links: initial,
+  open,
+  onOpenChange,
 }: {
   brandId: string;
   links: BrandLink[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
   const [links, setLinks] = useState<BrandLink[]>(initial);
-  // null = closed; NEW = adding; >=0 = editing that index.
-  const [editing, setEditing] = useState<number | null>(null);
-  const [form, setForm] = useState<{
-    label: string;
-    url: string;
-    category: BrandLinkCategory;
-  }>({ label: "", url: "", category: "other" });
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
 
   const updateM = useMutation(
-    trpc.brand.update.mutationOptions({ onSuccess: () => router.refresh() }),
+    trpc.brand.update.mutationOptions({
+      onSuccess: () => router.refresh(),
+      onError: (e) => toast.error(e.message),
+    }),
   );
 
-  // Send the whole array on every change — links are a small bounded list.
   const persist = (next: BrandLink[]) => {
     setLinks(next);
     updateM.mutate({ id: brandId, links: next });
   };
 
-  const openNew = () => {
-    setForm({ label: "", url: "", category: "other" });
-    setEditing(NEW);
-  };
-  const openEdit = (i: number) => {
-    const l = links[i]!;
-    setForm({
-      label: l.label,
-      url: l.url ?? "",
-      category: l.category ?? "other",
-    });
-    setEditing(i);
-  };
-
-  const save = () => {
-    const label = form.label.trim();
-    if (!label) return;
-    const url = form.url.trim();
-    const link: BrandLink = {
-      label,
-      ...(url && { url }),
-      // Auto-detect on save when the user left the category untouched.
-      category:
-        url && form.category === "other" ? detectCategory(url) : form.category,
-    };
-    persist(
-      editing === NEW
-        ? [...links, link]
-        : links.map((l, i) => (i === editing ? link : l)),
-    );
-    setEditing(null);
-  };
-
-  const remove = () => {
-    if (editing === null || editing < 0) return;
-    persist(links.filter((_, i) => i !== editing));
-    setEditing(null);
+  const add = () => {
+    const trimmedLabel = label.trim();
+    const trimmedUrl = url.trim();
+    if (!trimmedLabel) return;
+    persist([
+      ...links,
+      {
+        label: trimmedLabel,
+        ...(trimmedUrl && { url: trimmedUrl }),
+        category: trimmedUrl ? detectCategory(trimmedUrl) : "other",
+      },
+    ]);
+    setLabel("");
+    setUrl("");
   };
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      {links.map((l, i) => {
-        const Icon = CATEGORY_ICON[l.category ?? "other"];
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Links</DialogTitle>
+          <DialogDescription>
+            Trackers, docs and dashboards that belong to this brand. A link
+            without a URL is a placeholder to fill in later.
+          </DialogDescription>
+        </DialogHeader>
 
-        if (l.url) {
-          return (
-            <span
-              key={i}
-              className="group/link bg-background hover:border-foreground/20 inline-flex items-center gap-1.5 rounded-lg border py-1 pr-1 pl-2 text-xs transition-colors"
-            >
-              <a
-                href={l.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-foreground inline-flex items-center gap-1.5 font-medium"
-              >
-                <Icon className="text-muted-foreground size-3.5" />
-                {l.label}
-                <ExternalLink className="text-muted-foreground size-3" />
-              </a>
-              <button
-                type="button"
-                onClick={() => openEdit(i)}
-                title="Edit link"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted ml-0.5 rounded p-0.5 opacity-0 transition group-hover/link:opacity-100"
-              >
-                <Pencil className="size-3" />
-              </button>
-            </span>
-          );
-        }
+        <div className="flex flex-col gap-4 py-2">
+          {links.length > 0 ? (
+            <div className="flex flex-col gap-1 rounded-md border p-1.5">
+              {links.map((l, i) => {
+                const Icon = CATEGORY_ICON[l.category ?? "other"];
+                return (
+                  <div
+                    key={`${l.label}-${i}`}
+                    className="hover:bg-accent group flex items-center gap-2 rounded px-2 py-1.5 text-sm"
+                  >
+                    <Icon className="text-muted-foreground size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {l.label}
+                      {!l.url && (
+                        <span className="text-muted-foreground ml-1.5 text-[11px]">
+                          no URL yet
+                        </span>
+                      )}
+                    </span>
+                    {l.url && (
+                      <a
+                        href={l.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-foreground"
+                        title={l.url}
+                      >
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      title="Remove"
+                      onClick={() => persist(links.filter((_, j) => j !== i))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-xs">No links yet.</p>
+          )}
 
-        // Label-only — a pending to-do. The whole chip opens the editor.
-        return (
-          <button
-            key={i}
-            type="button"
-            onClick={() => openEdit(i)}
-            title="Add the link"
-            className="text-muted-foreground hover:text-foreground hover:border-foreground/30 inline-flex items-center gap-1.5 rounded-lg border border-dashed px-2 py-1 text-xs"
-          >
-            <Icon className="size-3.5" />
-            {l.label}
-            <span className="text-[10px] opacity-70">add link</span>
-          </button>
-        );
-      })}
-
-      <button
-        type="button"
-        onClick={openNew}
-        className="text-muted-foreground hover:text-foreground hover:border-foreground/30 inline-flex items-center gap-1 rounded-lg border border-dashed px-2 py-1 text-xs"
-      >
-        <Plus className="size-3.5" />
-        Add link
-      </button>
-
-      <Dialog
-        open={editing !== null}
-        onOpenChange={(o) => !o && setEditing(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editing === NEW ? "Add link" : "Edit link"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4 py-2">
+          <div className="grid grid-cols-[1fr_1.6fr_auto] items-end gap-2">
             <div className="flex flex-col gap-1.5">
               <Label>Label</Label>
               <Input
-                autoFocus
-                value={form.label}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, label: e.target.value }))
-                }
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
                 placeholder="Podcast tour"
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>URL</Label>
               <Input
-                value={form.url}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, url: e.target.value }))
-                }
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    add();
+                  }
+                }}
                 placeholder="https://docs.google.com/…"
               />
-              <p className="text-muted-foreground text-xs">
-                Optional — leave blank to add it as a placeholder and fill in
-                later.
-              </p>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Type</Label>
-              <Select
-                value={form.category}
-                onValueChange={(v) =>
-                  setForm((f) => ({ ...f, category: v as BrandLinkCategory }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORY_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={add}
+              disabled={!label.trim() || updateM.isPending}
+            >
+              Add
+            </Button>
           </div>
+        </div>
 
-          <DialogFooter className="sm:justify-between">
-            {editing !== NEW ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive gap-1.5"
-                onClick={remove}
-              >
-                <Trash2 className="size-3.5" />
-                Remove
-              </Button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditing(null)}
-              >
-                Cancel
-              </Button>
-              <Button size="sm" onClick={save} disabled={!form.label.trim()}>
-                {editing === NEW ? "Add" : "Save"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <DialogFooter>
+          <Button size="sm" onClick={() => onOpenChange(false)}>
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

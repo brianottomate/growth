@@ -26,7 +26,7 @@
     "db:seed:product-storefronts": "bun --conditions=react-server scripts/seed-product-storefronts.ts",
     "db:unseed": "bun run scripts/unseed.ts",
     "db:studio": "drizzle-kit studio",
-    "dev": "next dev --turbo",
+    "dev": "velite build && next dev --turbo",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx,json}\" --cache",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx,json}\" --cache",
     "lint": "eslint . --cache",

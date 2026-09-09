@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import { and, count, eq, inArray, isNull, max } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import {
@@ -10,7 +9,9 @@ import {
   brandTable,
   channelSuggestionTable,
   channelTable,
+  mediaAssetTable,
   memberTable,
+  platformAdTable,
   performanceAccountTable,
   performanceCycleTable,
   performanceIntakeTable,
@@ -18,12 +19,18 @@ import {
   platformPostTable,
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
-import { BrandChannels, type ChannelLite } from "./BrandChannels";
-import { BrandLinks } from "./BrandLinks";
-import { BrandActions } from "./BrandActions";
+import { listBrandPillars } from "@/server/services/content-strategy.service";
+import type { ChannelLite } from "./BrandChannels";
+import {
+  BrandCard,
+  type BrandReadiness,
+  type MediaLite,
+  type PersonaLite,
+  type PillarLite,
+} from "./BrandCard";
 import { NewBrandButton } from "./NewBrandButton";
 import { ImportZernioBrands } from "./ImportZernioBrands";
-import { TrackedBrands, type TrackedLite } from "./TrackedBrands";
+import type { TrackedLite } from "./TrackedBrands";
 import { SuggestedChannels, type SuggestionLite } from "./SuggestedChannels";
 import { PeerScrapeButton } from "./PeerScrapeButton";
 import { AmplifierRolodex } from "./AmplifierRolodex";
@@ -34,195 +41,6 @@ const compactFmt = new Intl.NumberFormat("en-US", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
-
-/**
- * What still has to happen before a client's ads can run. Every item is a
- * column we already store, so this is a read of the record rather than a new
- * kind of state to keep in step with it.
- */
-export type BrandReadiness = {
-  accountId: string;
-  intake: boolean;
-  access: boolean;
-  page: boolean;
-  adAccount: boolean;
-  homes: number;
-  budget: number | null;
-  creative: boolean;
-};
-
-function ReadinessStrip({ readiness }: { readiness: BrandReadiness }) {
-  const items: [string, boolean][] = [
-    ["Intake", readiness.intake],
-    ["Access", readiness.access],
-    ["Page", readiness.page],
-    ["Ad account", readiness.adAccount],
-    [
-      readiness.homes > 0 ? `${readiness.homes} homes` : "Homes",
-      readiness.homes > 0,
-    ],
-    [
-      readiness.budget != null ? `$${readiness.budget}/mo` : "Budget",
-      readiness.budget != null,
-    ],
-    ["Creative", readiness.creative],
-  ];
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3">
-      {items.map(([label, done]) => (
-        <span
-          key={label}
-          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-            done
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-              : "border-border text-muted-foreground"
-          }`}
-        >
-          {done ? "✓ " : ""}
-          {label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function BrandCard({
-  brand,
-  channels,
-  tracked,
-  suggestions,
-  audienceCount,
-  postCount,
-  postCountByPlatform,
-  readiness,
-}: {
-  brand: typeof brandTable.$inferSelect;
-  channels: ChannelLite[];
-  tracked: TrackedLite[];
-  suggestions: SuggestionLite[];
-  audienceCount: number;
-  postCount: number;
-  postCountByPlatform: Record<string, number>;
-  readiness: BrandReadiness | null;
-}) {
-  const socialReach = channels
-    .filter((c) => c.kind === "social")
-    .reduce((sum, c) => sum + (c.followerCount ?? 0), 0);
-  const adCount = channels.filter((c) => c.kind === "ad").length;
-  const summary = [
-    socialReach > 0 && `${compactFmt.format(socialReach)} reach`,
-    channels.length > 0 && `${channels.length} channels`,
-    adCount > 0 && `${adCount} ad ${adCount === 1 ? "account" : "accounts"}`,
-    audienceCount > 0 &&
-      `${audienceCount} ${audienceCount === 1 ? "persona" : "personas"}`,
-    postCount > 0 && `${compactFmt.format(postCount)} posts`,
-  ].filter(Boolean) as string[];
-
-  return (
-    <div className="bg-card rounded-2xl border p-5 shadow-sm transition-colors">
-      <div className="flex items-start gap-3.5">
-        {brand.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={brand.logo}
-            alt=""
-            className="size-11 shrink-0 rounded-xl object-cover"
-          />
-        ) : (
-          <div className="bg-muted text-foreground flex size-11 shrink-0 items-center justify-center rounded-xl text-base font-semibold">
-            {brand.name.slice(0, 2)}
-          </div>
-        )}
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {brand.slug ? (
-              <Link
-                href={`/app/brands/${brand.slug}`}
-                className="text-base font-semibold hover:underline"
-              >
-                {brand.name}
-              </Link>
-            ) : (
-              <span className="text-base font-semibold">{brand.name}</span>
-            )}
-            <span className="border-border text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium">
-              {brand.type}
-            </span>
-            {brand.website && (
-              <a
-                href={brand.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground text-xs"
-              >
-                {brand.website.replace(/^https?:\/\//, "")}
-              </a>
-            )}
-            {brand.slug && (
-              <>
-                <Link
-                  href={`/app/brands/${brand.slug}`}
-                  className="text-foreground text-xs hover:underline"
-                >
-                  Strategy ↗
-                </Link>
-                <Link
-                  href={`/app/brands/${brand.slug}/ads`}
-                  className="text-foreground text-xs hover:underline"
-                >
-                  Ads ↗
-                </Link>
-                {readiness && (
-                  <Link
-                    href={`/app/performance/${readiness.accountId}`}
-                    className="text-foreground text-xs hover:underline"
-                  >
-                    Account ↗
-                  </Link>
-                )}
-              </>
-            )}
-          </div>
-          {brand.tagline && (
-            <p className="text-muted-foreground mt-1 text-sm">
-              {brand.tagline}
-            </p>
-          )}
-          {summary.length > 0 && (
-            <p className="text-muted-foreground mt-1 text-xs">
-              {summary.join(" · ")}
-            </p>
-          )}
-        </div>
-        <BrandActions
-          brand={{
-            id: brand.id,
-            name: brand.name,
-            tagline: brand.tagline,
-            description: brand.description,
-            website: brand.website,
-            logo: brand.logo,
-            relationship: brand.relationship,
-          }}
-        />
-      </div>
-
-      <BrandChannels
-        brandId={brand.id}
-        channels={channels}
-        suggestions={suggestions}
-        postCountByPlatform={postCountByPlatform}
-        zernioProfileId={brand.zernioProfileId}
-      />
-
-      <BrandLinks brandId={brand.id} links={brand.links ?? []} />
-
-      <TrackedBrands ownerBrandId={brand.id} tracked={tracked} />
-
-      {readiness && <ReadinessStrip readiness={readiness} />}
-    </div>
-  );
-}
 
 /**
  * Peer/reference brand card — read-only channel chips + handle discovery. Peer
@@ -485,23 +303,145 @@ export default async function BrandsPage() {
     });
   }
 
-  // Persona counts per owned brand for the card summary line.
+  // Strategy band: pillars (defaults + custom rows) with post counts, and the
+  // first persona per brand. Both read the same tables the detail page uses.
+  const pillarLists = await Promise.all(
+    brands.map((b) => listBrandPillars({ brandId: b.id, brandSlug: b.slug })),
+  );
+  const pillarPostRollup = brandIds.length
+    ? await db
+        .select({
+          brandId: platformPostTable.brandId,
+          pillar: platformPostTable.pillar,
+          posts: count(),
+        })
+        .from(platformPostTable)
+        .where(
+          and(
+            inArray(platformPostTable.brandId, brandIds),
+            eq(platformPostTable.isSeed, false),
+            isNotNull(platformPostTable.pillar),
+          ),
+        )
+        .groupBy(platformPostTable.brandId, platformPostTable.pillar)
+    : [];
+  const pillarsByBrand = new Map<string, PillarLite[]>();
+  brands.forEach((b, i) => {
+    pillarsByBrand.set(
+      b.id,
+      (pillarLists[i] ?? []).map((p) => ({
+        slug: p.slug,
+        name: p.name,
+        color: p.color,
+        posts:
+          pillarPostRollup.find(
+            (r) => r.brandId === b.id && r.pillar === p.slug,
+          )?.posts ?? 0,
+      })),
+    );
+  });
+
   const personas = brandIds.length
     ? await db.query.personaTable.findMany({
         where: and(
           inArray(personaTable.brandId, brandIds),
           isNull(personaTable.deletedAt),
         ),
-        columns: { brandId: true },
+        orderBy: (t, { asc }) => asc(t.createdAt),
+        columns: { brandId: true, name: true, description: true, ageRanges: true },
       })
     : [];
-  const audienceCountByBrand = new Map<string, number>();
-  for (const t of personas) {
-    audienceCountByBrand.set(
-      t.brandId,
-      (audienceCountByBrand.get(t.brandId) ?? 0) + 1,
-    );
+  const personaByBrand = new Map<string, PersonaLite>();
+  for (const p of personas) {
+    const existing = personaByBrand.get(p.brandId);
+    if (existing) existing.count += 1;
+    else
+      personaByBrand.set(p.brandId, {
+        name: p.name,
+        description: p.description,
+        ageRanges: p.ageRanges ?? null,
+        count: 1,
+      });
   }
+
+  // Media zone: library size, the six newest usable assets, and which of them
+  // are in a live ad right now. Ranked in SQL so one large library cannot
+  // crowd out the others.
+  const usableMedia = and(
+    inArray(mediaAssetTable.brandId, brandIds),
+    isNull(mediaAssetTable.deletedAt),
+    eq(mediaAssetTable.status, "ready"),
+    inArray(mediaAssetTable.kind, ["image", "video"]),
+  );
+  const rankedMedia = db
+    .select({
+      id: mediaAssetTable.id,
+      brandId: mediaAssetTable.brandId,
+      url: mediaAssetTable.url,
+      thumbnailUrl: mediaAssetTable.thumbnailUrl,
+      kind: mediaAssetTable.kind,
+      rn: sql<number>`row_number() over (partition by ${mediaAssetTable.brandId} order by ${mediaAssetTable.createdAt} desc)`.as(
+        "rn",
+      ),
+    })
+    .from(mediaAssetTable)
+    .where(usableMedia)
+    .as("ranked_media");
+  const [mediaCounts, mediaThumbs, adRows] = brandIds.length
+    ? await Promise.all([
+        db
+          .select({ brandId: mediaAssetTable.brandId, total: count() })
+          .from(mediaAssetTable)
+          .where(usableMedia)
+          .groupBy(mediaAssetTable.brandId),
+        db.select().from(rankedMedia).where(sql`${rankedMedia.rn} <= 6`),
+        db
+          .select({
+            brandId: platformAdTable.brandId,
+            status: platformAdTable.status,
+            media: platformAdTable.media,
+            thumbnailUrl: platformAdTable.thumbnailUrl,
+          })
+          .from(platformAdTable)
+          .where(inArray(platformAdTable.brandId, brandIds)),
+      ])
+    : [[], [], []];
+  const liveAdsByBrand = new Map<string, { count: number; urls: Set<string> }>();
+  for (const ad of adRows) {
+    if (!ad.brandId || ad.status?.toLowerCase() !== "active") continue;
+    const entry = liveAdsByBrand.get(ad.brandId) ?? { count: 0, urls: new Set() };
+    entry.count += 1;
+    for (const m of ad.media ?? []) {
+      entry.urls.add(m.url);
+      if (m.thumbnail) entry.urls.add(m.thumbnail);
+    }
+    if (ad.thumbnailUrl) entry.urls.add(ad.thumbnailUrl);
+    liveAdsByBrand.set(ad.brandId, entry);
+  }
+  const mediaFor = (brandId: string): MediaLite => {
+    const live = liveAdsByBrand.get(brandId);
+    return {
+      total: mediaCounts.find((m) => m.brandId === brandId)?.total ?? 0,
+      liveAds: live?.count ?? 0,
+      thumbs: mediaThumbs
+        .filter((m) => m.brandId === brandId)
+        .sort((a, b) => a.rn - b.rn)
+        .flatMap((m) => {
+          const src = m.kind === "image" ? m.url : m.thumbnailUrl;
+          if (!src) return [];
+          return [
+            {
+              id: m.id,
+              src,
+              kind: m.kind,
+              inLiveAd:
+                !!live &&
+                ((m.url != null && live.urls.has(m.url)) || live.urls.has(src)),
+            },
+          ];
+        }),
+    };
+  };
 
   // Saved platform_post rollup per brand × platform (excl. seed demo rows).
   // Powers the brand-total summary AND the per-provider count on each channel
@@ -603,10 +543,11 @@ export default async function BrandsPage() {
       channels={channels.filter((c) => c.brandId === brand.id).map(toLite)}
       tracked={trackedByOwner.get(brand.id) ?? []}
       suggestions={suggestionsFor(brand.id)}
-      audienceCount={audienceCountByBrand.get(brand.id) ?? 0}
-      postCount={postCountByBrand.get(brand.id) ?? 0}
       postCountByPlatform={postCountsForBrand(brand.id)}
       readiness={readinessByBrand.get(brand.id) ?? null}
+      pillars={pillarsByBrand.get(brand.id) ?? []}
+      persona={personaByBrand.get(brand.id) ?? null}
+      media={mediaFor(brand.id)}
     />
   );
 

@@ -26,8 +26,8 @@ have been removed.
 Package manager is **Bun** (not npm/yarn/pnpm).
 
 ```bash
-bun dev                 # Next.js dev server (Turbopack)
-bun run velite:dev      # Watch MDX/blog content (run alongside dev)
+bun dev                 # velite build + Next.js dev server (Turbopack)
+bun run velite:dev      # Re-run velite on MDX/blog content changes (only if editing content alongside dev)
 bun run email:dev       # Preview React Email templates
 
 bun run check           # eslint + tsc --noEmit — run this before considering work done
@@ -211,7 +211,7 @@ Each integration has a thin client; orchestration lives in `src/server/services/
 - **Instantly** (`instantly.client.ts`) — cold-email projection of the leads system-of-record.
 - **Outreach** (`outreach.client.ts`) — sales engagement (OAuth + webhooks).
 - **HubSpot** (`hubspot.client.ts`) — CRM pull/merge/write-back for leads.
-- **Apify / X / Twitter scraper / Reddit / Meta** — social listening & scraping.
+- **Bright Data / Apify / X / Reddit / Meta** — social discovery verification, post scraping (`peer-scrape.service.ts`), listening.
 - **BigQuery, Firecrawl, Minerva, Claude, PostHog, Slack, search providers** — supporting.
 
 The leads pipeline is the system-of-record in Neon (`leads.*`); Instantly/HubSpot are

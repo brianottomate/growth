@@ -13,6 +13,7 @@ import {
 } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { getBrandStrategy } from "@/server/services/cadence.service";
+import { backfillStateForBrand } from "@/server/services/peer-scrape.service";
 import { getBrandSurfaceSummary } from "@/server/services/brand-map.service";
 import { PILLARS } from "@/lib/pillars";
 import { ContentStructureAssistantButton } from "@/components/content-structure-assistant-button";
@@ -95,7 +96,10 @@ export default async function BrandPage({
       })()
     : null;
 
-  const strategy = await getBrandStrategy(brand.id, { peerBrandIds });
+  const [strategy, backfill] = await Promise.all([
+    getBrandStrategy(brand.id, { peerBrandIds }),
+    backfillStateForBrand(brand.id),
+  ]);
 
   const surfaceSummary = await getBrandSurfaceSummary(brand.id, {
     peers: strategy.peerBrandCount,
@@ -280,8 +284,10 @@ export default async function BrandPage({
         </div>
         <BrandStrategyClient
           brandId={brand.id}
+          brandName={brand.name}
           strategy={strategy}
           pillars={pillars}
+          backfill={backfill}
         />
       </section>
     </div>

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, count, desc, eq, max, sql } from "drizzle-orm";
 
 import { isApifyConfigured, runActor } from "@/server/clients/apify.client";
 import {
@@ -17,13 +17,20 @@ import { classifyFormatFromFields } from "@/server/content/formats";
 import { db } from "@/server/db";
 import {
   channelTable,
+  contentIngestRunTable,
   contentSuggestionTable,
   platformPostTable,
   type MediaItem,
   type PlatformPostInsert,
+  type PostStats,
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
-import { ingestPlatformPosts } from "./platform-post-ingest.service";
+import {
+  failContentIngestRun,
+  finishContentIngestRun,
+  ingestPlatformPosts,
+  startContentIngestRun,
+} from "./platform-post-ingest.service";
 
 /**
  * Peer/own social scrape → platform_post → AI suggestions.
@@ -41,7 +48,8 @@ import { ingestPlatformPosts } from "./platform-post-ingest.service";
 // ---- raw record + mapping ------------------------------------------
 
 /** Platforms with a Bright Data dataset mapper wired into this pipeline. */
-export type ScrapePlatform = "linkedin" | "x" | "instagram" | "facebook";
+export const SCRAPE_PLATFORMS = ["linkedin", "x", "instagram", "facebook"] as const;
+export type ScrapePlatform = (typeof SCRAPE_PLATFORMS)[number];
 export type PeerScrapeProvider = "brightdata" | "apify";
 
 type Raw = Record<string, unknown>;
@@ -785,4 +793,262 @@ export async function ingestXViaApi(opts: {
   }
 
   return result;
+}
+
+// ---- one brand × platform pull, with run bookkeeping ------------------------
+
+/** Setup problems a caller can explain to the operator (vs. provider failures). */
+export class ScrapeSetupError extends Error {
+  constructor(
+    message: string,
+    public readonly code: "missing_profile_url" | "no_provider",
+  ) {
+    super(message);
+    this.name = "ScrapeSetupError";
+  }
+}
+
+export type ScrapeBrandChannelResult = PeerScrapeResult & {
+  runId: string;
+  platform: ScrapePlatform;
+  limit: number;
+  sinceDays: number;
+};
+
+/**
+ * The single entry point for an on-demand pull of one brand's posts on one
+ * platform. The tRPC mutation, the agent tool and the probe all go through
+ * here so the durable `content_ingest_run` row is written the same way.
+ *
+ * `limit` is the sample size: 5 confirms a channel is wired up and costs a
+ * handful of records, 30+ is a real backfill. Instagram's profile dataset
+ * ignores it and returns the latest ~12 posts regardless.
+ */
+export async function scrapeBrandChannel(opts: {
+  brandId: string;
+  platform: ScrapePlatform;
+  sinceDays?: number;
+  limit?: number;
+  requestedById?: string;
+  skipTemplate?: boolean;
+}): Promise<ScrapeBrandChannelResult> {
+  const sinceDays = opts.sinceDays ?? 30;
+  const limit = opts.limit ?? 30;
+
+  const profileUrl = await profileUrlForBrand(opts.brandId, opts.platform);
+  if (!profileUrl) {
+    throw new ScrapeSetupError(
+      `No ${opts.platform} page link on this brand — add the channel's page URL first.`,
+      "missing_profile_url",
+    );
+  }
+  const provider = peerScrapeProviderFor(opts.platform);
+  if (!provider) {
+    throw new ScrapeSetupError(
+      `No available scraper supports ${opts.platform}. Configure Bright Data${
+        opts.platform === "instagram" ? " or Apify" : ""
+      }.`,
+      "no_provider",
+    );
+  }
+
+  const requestedTo = new Date();
+  const requestedFrom = new Date(requestedTo.getTime() - sinceDays * 86_400_000);
+  const runId = await startContentIngestRun({
+    brandId: opts.brandId,
+    requestedById: opts.requestedById,
+    mode: "peer_scrape",
+    provider,
+    requestedFrom,
+    requestedTo,
+    // Written up front so a failed run is still attributable to its platform.
+    result: { platform: opts.platform, limit, sinceDays },
+  });
+  try {
+    const result = await scrapeAndSuggest({
+      brandId: opts.brandId,
+      platform: opts.platform,
+      profileUrl,
+      sinceDays,
+      limit,
+      provider,
+      skipTemplate: opts.skipTemplate,
+    });
+    // The run row has no platform column; keeping platform + sample size in
+    // the result lets the brand page show "latest pull" per channel.
+    await finishContentIngestRun(
+      runId,
+      { platform: opts.platform, limit, sinceDays, ...result },
+      result.provider,
+    );
+    return { runId, platform: opts.platform, limit, sinceDays, ...result };
+  } catch (error) {
+    await failContentIngestRun(runId, error);
+    throw error;
+  }
+}
+
+// ---- what has been pulled so far, per channel ------------------------------
+
+export type ChannelBackfillRun = {
+  status: string;
+  provider: string;
+  startedAt: string;
+  completedAt: string | null;
+  inserted: number | null;
+  limit: number | null;
+  sinceDays: number | null;
+  error: string | null;
+};
+
+/** One pulled post, trimmed to what a preview card needs. */
+export type ChannelBackfillPost = {
+  id: string;
+  text: string | null;
+  media: MediaItem[];
+  externalUrl: string | null;
+  publishedAt: string | null;
+  stats: PostStats | null;
+  username: string | null;
+};
+
+export type ChannelBackfillState = {
+  platform: string;
+  profileUrl: string | null;
+  profileImageUrl: string | null;
+  handle: string | null;
+  /** A mapper + configured provider exist, and the channel has a page link. */
+  scrapable: boolean;
+  posts: number;
+  lastScrapedAt: string | null;
+  lastRun: ChannelBackfillRun | null;
+  /** Newest few posts in the store, so a sample pull can be eyeballed. */
+  recentPosts: ChannelBackfillPost[];
+};
+
+const RECENT_POSTS_PER_PLATFORM = 4;
+
+/**
+ * Per-platform ingest facts for one brand: how many posts are in the store,
+ * when the newest was pulled, and the latest run that targeted the platform.
+ * Read by the brand page so an operator can confirm a backfill worked without
+ * opening the timeline.
+ */
+export async function backfillStateForBrand(
+  brandId: string,
+): Promise<Record<string, ChannelBackfillState>> {
+  const [channels, rollup, runs, recent] = await Promise.all([
+    db
+      .select({
+        platform: channelTable.platform,
+        profileUrl: channelTable.profileUrl,
+        profileImageUrl: channelTable.profileImageUrl,
+        handle: channelTable.handle,
+      })
+      .from(channelTable)
+      .where(
+        and(
+          eq(channelTable.brandId, brandId),
+          eq(channelTable.kind, "social"),
+          eq(channelTable.isActive, true),
+        ),
+      ),
+    db
+      .select({
+        platform: platformPostTable.platform,
+        posts: count(),
+        lastScrapedAt: max(platformPostTable.scrapedAt),
+      })
+      .from(platformPostTable)
+      .where(
+        and(
+          eq(platformPostTable.brandId, brandId),
+          eq(platformPostTable.isSeed, false),
+        ),
+      )
+      .groupBy(platformPostTable.platform),
+    db
+      .select({
+        status: contentIngestRunTable.status,
+        provider: contentIngestRunTable.provider,
+        startedAt: contentIngestRunTable.startedAt,
+        completedAt: contentIngestRunTable.completedAt,
+        error: contentIngestRunTable.error,
+        result: contentIngestRunTable.result,
+        platform: sql<string | null>`${contentIngestRunTable.result} ->> 'platform'`,
+      })
+      .from(contentIngestRunTable)
+      .where(eq(contentIngestRunTable.brandId, brandId))
+      .orderBy(desc(contentIngestRunTable.startedAt))
+      .limit(60),
+    // Newest posts across platforms; grouped per platform below. 60 covers
+    // four per platform for every platform we can scrape, with headroom.
+    db
+      .select({
+        id: platformPostTable.id,
+        platform: platformPostTable.platform,
+        text: platformPostTable.text,
+        media: platformPostTable.media,
+        externalUrl: platformPostTable.externalUrl,
+        publishedAt: platformPostTable.publishedAt,
+        stats: platformPostTable.stats,
+        username: platformPostTable.username,
+      })
+      .from(platformPostTable)
+      .where(
+        and(
+          eq(platformPostTable.brandId, brandId),
+          eq(platformPostTable.isSeed, false),
+        ),
+      )
+      .orderBy(sql`${platformPostTable.publishedAt} desc nulls last`)
+      .limit(60),
+  ]);
+
+  const out: Record<string, ChannelBackfillState> = {};
+  for (const c of channels) {
+    const roll = rollup.find((r) => r.platform === c.platform);
+    const run = runs.find((r) => r.platform === c.platform);
+    const num = (v: unknown) => (typeof v === "number" ? v : null);
+    const isScrapePlatform = (SCRAPE_PLATFORMS as readonly string[]).includes(
+      c.platform,
+    );
+    out[c.platform] = {
+      platform: c.platform,
+      profileUrl: c.profileUrl,
+      profileImageUrl: c.profileImageUrl,
+      handle: c.handle,
+      scrapable:
+        isScrapePlatform &&
+        !!c.profileUrl &&
+        peerScrapeProviderFor(c.platform as ScrapePlatform) != null,
+      posts: roll?.posts ?? 0,
+      lastScrapedAt: roll?.lastScrapedAt?.toISOString() ?? null,
+      lastRun: run
+        ? {
+            status: run.status,
+            provider: run.provider,
+            startedAt: run.startedAt.toISOString(),
+            completedAt: run.completedAt?.toISOString() ?? null,
+            inserted: num(run.result?.inserted),
+            limit: num(run.result?.limit),
+            sinceDays: num(run.result?.sinceDays),
+            error: run.error,
+          }
+        : null,
+      recentPosts: recent
+        .filter((p) => p.platform === c.platform)
+        .slice(0, RECENT_POSTS_PER_PLATFORM)
+        .map((p) => ({
+          id: p.id,
+          text: p.text,
+          media: p.media ?? [],
+          externalUrl: p.externalUrl,
+          publishedAt: p.publishedAt?.toISOString() ?? null,
+          stats: p.stats ?? null,
+          username: p.username,
+        })),
+    };
+  }
+  return out;
 }

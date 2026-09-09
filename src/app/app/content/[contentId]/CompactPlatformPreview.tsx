@@ -131,6 +131,8 @@ export function CompactPlatformPreview({
   threadItems,
   linkCard,
   scheduled,
+  caption,
+  readiness,
 }: {
   className?: string;
   platform: string;
@@ -146,6 +148,14 @@ export function CompactPlatformPreview({
   threadItems?: CompactPreviewItem[];
   linkCard?: CompactPreviewLinkCard | null;
   scheduled: boolean;
+  /** Header note; defaults to the plan-mode "Representative" / item count. */
+  caption?: string;
+  /**
+   * Show the Visual / Copy / Schedule readiness dots. On for planned posts;
+   * off when the preview shows an already-published post pulled from a
+   * platform (the brand page's backfill samples).
+   */
+  readiness?: boolean;
 }) {
   const identity = channelName ?? username ?? brandName;
   const items =
@@ -174,10 +184,11 @@ export function CompactPlatformPreview({
           {platformLabel(platform)}{" "}
           {story ? "Story" : isThread ? "thread" : "preview"}
         </span>
-        <span className="text-muted-foreground text-[9px]">
-          {story || isThread
-            ? `${items.length} ${sequenceNoun(format, items.length)}`
-            : "Representative"}
+        <span className="text-muted-foreground truncate text-[9px]">
+          {caption ??
+            (story || isThread
+              ? `${items.length} ${sequenceNoun(format, items.length)}`
+              : "Representative")}
         </span>
       </div>
 
@@ -265,11 +276,13 @@ export function CompactPlatformPreview({
         )}
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
-        <ReadyDot ready={hasVisual} label="Visual" />
-        {!story && <ReadyDot ready={hasCopy} label="Copy" />}
-        <ReadyDot ready={scheduled} label="Schedule" />
-      </div>
+      {readiness !== false && (
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
+          <ReadyDot ready={hasVisual} label="Visual" />
+          {!story && <ReadyDot ready={hasCopy} label="Copy" />}
+          <ReadyDot ready={scheduled} label="Schedule" />
+        </div>
+      )}
     </aside>
   );
 }

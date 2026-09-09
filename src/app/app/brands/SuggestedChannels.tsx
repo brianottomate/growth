@@ -96,7 +96,7 @@ export function SuggestedChannels({
       {suggestions.length === 0 ? (
         <p className="text-muted-foreground text-[11px]">
           {discoverM.isPending
-            ? "Searching the web + verifying profiles…"
+            ? "Searching the web for profiles…"
             : "No pending suggestions. Run discovery to find this brand's social profiles."}
         </p>
       ) : (

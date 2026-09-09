@@ -214,6 +214,8 @@ export async function startContentIngestRun(input: {
   provider: string;
   requestedFrom?: Date;
   requestedTo?: Date;
+  /** Request facts (platform, sample size) so a failed run still says what it targeted. */
+  result?: Record<string, unknown>;
 }) {
   const [run] = await db
     .insert(contentIngestRunTable)

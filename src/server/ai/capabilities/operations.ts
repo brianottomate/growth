@@ -5,11 +5,7 @@ import { z } from "zod";
 import { growthAction, GrowthActionError } from "./types";
 import { requireOwnedBrand, requireVisibleBrand } from "./brand-access";
 import { discoverAndSaveSuggestions } from "@/server/services/social-discovery.service";
-import {
-  peerScrapeProviderFor,
-  profileUrlForBrand,
-  scrapeAndSuggest,
-} from "@/server/services/peer-scrape.service";
+import { scrapeBrandChannel } from "@/server/services/peer-scrape.service";
 import { syncBrandContent } from "@/server/services/content-sync.service";
 import { syncBrandWebsite as syncWebsite } from "@/server/services/website-sync.service";
 import { syncBrandBlog as syncBlog } from "@/server/services/blog-sync.service";
@@ -47,11 +43,6 @@ import {
   replaceSeriesCadence,
 } from "@/server/services/cadence-target.service";
 import { PILLARS } from "@/lib/pillars";
-import {
-  failContentIngestRun,
-  finishContentIngestRun,
-  startContentIngestRun,
-} from "@/server/services/platform-post-ingest.service";
 import {
   assertPostVisibleToOrganization,
   prepareVideoAnalysis,
@@ -134,56 +125,33 @@ const brandMixInput = z.object({
 
 export const discoverBrandChannels = growthAction({
   description:
-    "Discover and verify official social handles for an owned or tracked brand, then save them as pending suggestions for human review. Use only when the operator asks to discover or refresh channels.",
+    "Discover official social handles for an owned or tracked brand from its website and web search, then save them as pending, unverified suggestions with confidence and source evidence for review. Confirm a suggestion by reading its profile URL, or accept it and run a small scrape, which proves the profile exists. Use only when the operator asks to discover or refresh channels.",
   inputSchema: z.object({ brandId: z.string() }),
   execute: async ({ brandId }, ctx) => {
     await requireVisibleBrand(brandId, ctx);
-    return discoverAndSaveSuggestions(brandId, { verify: true });
+    return discoverAndSaveSuggestions(brandId);
   },
 });
 
 export const scrapeBrandPosts = growthAction({
   description:
-    "Start an on-demand scrape of recent public posts for one owned or tracked brand and platform. The durable ingest run records progress and failures; new posts also receive pending classification suggestions.",
+    "Pull recent public posts for one owned or tracked brand and platform into the canonical timeline. Use limit=5 first to confirm a channel is wired up cheaply (scraping bills per record; Instagram always returns its latest ~12), then a larger limit and sinceDays for a real backfill. The durable ingest run records progress and failures; new posts also receive pending classification suggestions.",
   inputSchema: z.object({
     brandId: z.string(),
     platform: socialPlatform,
     sinceDays: z.number().int().min(1).max(93).default(30),
+    limit: z.number().int().min(1).max(100).default(30),
   }),
-  execute: async ({ brandId, platform, sinceDays }, ctx) => {
+  execute: async ({ brandId, platform, sinceDays, limit }, ctx) => {
     await requireVisibleBrand(brandId, ctx);
-    const profileUrl = await profileUrlForBrand(brandId, platform);
-    if (!profileUrl)
-      throw new Error(`Add the ${platform} profile URL before scraping.`);
-    const provider = peerScrapeProviderFor(platform);
-    if (!provider)
-      throw new Error(`No configured scraper supports ${platform}.`);
-    const requestedTo = new Date();
-    const requestedFrom = new Date(
-      requestedTo.getTime() - sinceDays * 86_400_000,
-    );
-    const runId = await startContentIngestRun({
+    const result = await scrapeBrandChannel({
       brandId,
+      platform,
+      sinceDays,
+      limit,
       requestedById: ctx.userId,
-      mode: "peer_scrape",
-      provider,
-      requestedFrom,
-      requestedTo,
     });
-    try {
-      const result = await scrapeAndSuggest({
-        brandId,
-        platform,
-        profileUrl,
-        sinceDays,
-        provider,
-      });
-      await finishContentIngestRun(runId, result, result.provider);
-      return { runId, ...result, reviewUrl: "/app/review" };
-    } catch (error) {
-      await failContentIngestRun(runId, error);
-      throw error;
-    }
+    return { ...result, reviewUrl: "/app/review" };
   },
 });
 

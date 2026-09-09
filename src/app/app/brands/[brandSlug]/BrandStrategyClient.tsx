@@ -11,6 +11,8 @@ import type {
   ChannelCadence,
 } from "@/server/services/cadence.service";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import type { ChannelBackfillState } from "@/server/services/peer-scrape.service";
+import { ChannelBackfill } from "./ChannelBackfill";
 import { PILLAR_BY_SLUG } from "@/lib/pillars";
 import { useTRPC } from "@/trpc/react";
 import { cn } from "@/lib/utils";
@@ -463,9 +465,15 @@ function ChannelCard({
   editing,
   onSetCadence,
   pending,
+  brandId,
+  brandName,
+  backfill,
 }: {
   c: ChannelCadence;
   editing: boolean;
+  brandId: string;
+  brandName: string;
+  backfill: ChannelBackfillState | null;
   onSetCadence: (args: {
     channelId: string;
     archetype: string;
@@ -580,6 +588,14 @@ function ChannelCard({
             </div>
           ))}
         </div>
+      )}
+      {/* what has been pulled + on-demand pull controls */}
+      {backfill && (
+        <ChannelBackfill
+          brandId={brandId}
+          brandName={brandName}
+          state={backfill}
+        />
       )}
     </div>
   );
@@ -719,11 +735,16 @@ function MixCard({
 // ---- page ------------------------------------------------------------------
 export function BrandStrategyClient({
   brandId,
+  brandName,
   strategy,
+  backfill = {},
 }: {
   brandId: string;
+  brandName: string;
   strategy: BrandStrategy;
   pillars: { slug: string; name: string }[];
+  /** Per-platform ingest facts + pull controls (see ChannelBackfill). */
+  backfill?: Record<string, ChannelBackfillState>;
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -807,6 +828,9 @@ export function BrandStrategyClient({
             key={c.channelId}
             c={c}
             editing={editing}
+            brandId={brandId}
+            brandName={brandName}
+            backfill={backfill[c.platform] ?? null}
             pending={setCadence.isPending}
             onSetCadence={(args) =>
               setCadence.mutate({ brandId, period: "week", ...args })

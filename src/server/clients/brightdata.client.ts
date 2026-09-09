@@ -113,6 +113,9 @@ function parseRecords(text: string): unknown[] {
  * Throws if EVERY returned record is a crawler error (e.g. a dataset that's
  * down), so callers surface a real failure instead of silently ingesting zero.
  */
+/** Bright Data error strings that mean "no records", not "the crawl broke". */
+const NO_DATA_ERROR = /not found|no (posts|activities|data|results)/i;
+
 export async function runScrape(
   key: ScraperKey,
   input: Array<Record<string, unknown>>,
@@ -168,6 +171,11 @@ export async function runScrape(
     records.every((r) => !!(r as { error?: unknown })?.error)
   ) {
     const msg = (records[0] as { error?: string }).error ?? "unknown error";
+    // "Nothing there" is an answer, not a failure: a LinkedIn company page
+    // with no posts comes back as one error row reading "Activities are not
+    // found" (seen on the 2026-09-08 Winter Park Escapes pull). Return empty
+    // so the caller records a completed run with zero posts.
+    if (NO_DATA_ERROR.test(msg)) return [];
     throw new Error(`Bright Data ${key}: ${msg}`);
   }
   return records;

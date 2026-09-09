@@ -3,15 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import {
-  Check,
-  ExternalLink,
-  Plus,
-  Settings,
-  Sparkles,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, ExternalLink, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "@/components/ui/toast";
 import { useTRPC } from "@/trpc/react";
 import {
   ChannelLogo,
@@ -40,8 +33,6 @@ import {
 import type { FollowerSnapshot } from "@/server/db/channel-schema";
 import { AD_PLATFORM_VALUES } from "@/lib/ad-platforms";
 import type { SuggestionLite } from "./SuggestedChannels";
-import { ZernioConnection } from "./ZernioConnection";
-import { OwnedHistorySync } from "./OwnedHistorySync";
 
 export type ChannelLite = {
   id: string;
@@ -81,21 +72,12 @@ const PLATFORMS_BY_KIND: Record<string, string[]> = {
   blog: ["blog", "other"],
 };
 
-// Reverse lookup so an incoming suggestion's platform can be slotted into the
-// right sub-group. Discovery surfaces social profiles, so default to social.
-const KIND_BY_PLATFORM: Record<string, string> = Object.fromEntries(
-  Object.entries(PLATFORMS_BY_KIND).flatMap(([kind, platforms]) =>
-    platforms.map((p) => [p, kind]),
-  ),
-);
-
-// Display sub-groups for the unified Channels zone. Newsletter + blog collapse
-// into one "Owned" row since each brand usually has at most one of each.
-const GROUPS: { label: string; kinds: string[] }[] = [
-  { label: "Social", kinds: ["social"] },
-  { label: "Ads", kinds: ["ad"] },
-  { label: "Owned", kinds: ["newsletter", "blog"] },
-];
+const KIND_ORDER: Record<string, number> = {
+  social: 0,
+  ad: 1,
+  newsletter: 2,
+  blog: 2,
+};
 
 type FormState = {
   id: string | null;
@@ -122,6 +104,10 @@ const EMPTY: FormState = {
 };
 
 const followerFmt = new Intl.NumberFormat("en-US");
+const compactFmt = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 /** Latest snapshot's count (by capture date), or null if no history. */
 function latestCount(history: FollowerSnapshot[]): number | null {
@@ -129,18 +115,31 @@ function latestCount(history: FollowerSnapshot[]): number | null {
   return history.reduce((a, b) => (a.capturedAt >= b.capturedAt ? a : b)).count;
 }
 
+/**
+ * A social profile we found on the web and a human accepted, but nothing has
+ * confirmed yet — no provider connection and no scrape. Marked with a dot.
+ */
+const isDiscovered = (c: ChannelLite) =>
+  c.kind === "social" &&
+  c.defaultProvider !== "zernio" &&
+  c.connectionStatus !== "connected";
+
+/**
+ * Channels as one grid, one tile per network. A blue dot marks a discovered,
+ * unconfirmed profile; green text marks a connected ad account. Pending
+ * discovery suggestions sit in the same grid as dashed tiles with accept /
+ * reject, so the human confirmation step happens where the channels live.
+ */
 export function BrandChannels({
   brandId,
   channels,
   suggestions = [],
   postCountByPlatform = {},
-  zernioProfileId,
 }: {
   brandId: string;
   channels: ChannelLite[];
   suggestions?: SuggestionLite[];
   postCountByPlatform?: Record<string, number>;
-  zernioProfileId: string | null;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -148,7 +147,6 @@ export function BrandChannels({
   const [tab, setTab] = useState("details");
   const [newCount, setNewCount] = useState("");
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [discoverError, setDiscoverError] = useState<string | null>(null);
 
   const onDone = () => {
     setOpen(false);
@@ -167,19 +165,17 @@ export function BrandChannels({
   );
   const busy = createM.isPending || updateM.isPending || deleteM.isPending;
 
-  // Handle discovery + suggestion review live inline with the channels they
-  // relate to (ghost chips), so there's no detached "suggested handles" block.
-  const discoverM = useMutation(
-    trpc.channelSuggestion.discover.mutationOptions({
+  const acceptM = useMutation(
+    trpc.channelSuggestion.accept.mutationOptions({
       onSuccess: refresh,
-      onError: (e) => setDiscoverError(e.message),
+      onError: (e) => toast.error(e.message),
     }),
   );
-  const acceptM = useMutation(
-    trpc.channelSuggestion.accept.mutationOptions({ onSuccess: refresh }),
-  );
   const rejectM = useMutation(
-    trpc.channelSuggestion.reject.mutationOptions({ onSuccess: refresh }),
+    trpc.channelSuggestion.reject.mutationOptions({
+      onSuccess: refresh,
+      onError: (e) => toast.error(e.message),
+    }),
   );
   const suggBusyId = acceptM.isPending
     ? acceptM.variables?.id
@@ -210,7 +206,6 @@ export function BrandChannels({
     setOpen(true);
   };
 
-  // Append today's capture to the local list (persisted on Save).
   const addCapture = () => {
     const n = Math.round(Number(newCount.trim()));
     if (newCount.trim() === "" || !Number.isFinite(n) || n < 0) return;
@@ -254,228 +249,188 @@ export function BrandChannels({
       platform: PLATFORMS_BY_KIND[kind]?.[0] ?? "other",
     }));
 
-  // Follower captures only make sense for social channels.
   const showFollowers = form.kind === "social";
   const todayISO = new Date().toISOString().slice(0, 10);
 
-  const suggestionsForGroup = (kinds: readonly string[]) =>
-    suggestions.filter((s) =>
-      kinds.includes(KIND_BY_PLATFORM[s.platform] ?? "social"),
-    );
-
-  const hasAny = channels.length > 0 || suggestions.length > 0;
-  const connectedCount = channels.filter(
-    (channel) => channel.defaultProvider === "zernio",
-  ).length;
-  const discoveredCount = channels.filter(
-    (channel) =>
-      channel.kind === "social" && channel.defaultProvider !== "zernio",
-  ).length;
-  const connectionSummary = [
-    connectedCount > 0 && `${connectedCount} connected`,
-    discoveredCount > 0 && `${discoveredCount} discovered`,
-  ].filter(Boolean) as string[];
+  const sorted = [...channels].sort((a, b) => {
+    const k = (KIND_ORDER[a.kind] ?? 3) - (KIND_ORDER[b.kind] ?? 3);
+    if (k) return k;
+    return (b.followerCount ?? -1) - (a.followerCount ?? -1);
+  });
+  const reach = channels
+    .filter((c) => c.kind === "social")
+    .reduce((sum, c) => sum + (c.followerCount ?? 0), 0);
+  const discoveredCount = channels.filter(isDiscovered).length;
+  const total = channels.length + suggestions.length;
 
   return (
-    <div className="mt-3 flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 text-[11px]">
           <span className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
-            Channels{channels.length > 0 && ` · ${channels.length}`}
+            Channels{total > 0 && ` · ${total}`}
           </span>
-          {connectionSummary.length > 0 && (
-            <span className="text-muted-foreground text-[11px]">
-              {connectionSummary.join(" · ")}
+          {reach > 0 && (
+            <span className="text-muted-foreground tabular-nums">
+              {compactFmt.format(reach)} reach
+            </span>
+          )}
+          {(discoveredCount > 0 || suggestions.length > 0) && (
+            <span className="text-muted-foreground inline-flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-sky-400" />
+              discovered, unconfirmed
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
-          {zernioProfileId && <OwnedHistorySync brandId={brandId} />}
-          <ZernioConnection
-            brandId={brandId}
-            currentProfileId={zernioProfileId}
-          />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground gap-1.5"
-            onClick={openAdd}
-          >
-            <Plus className="size-3.5" />
-            Add
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground gap-1.5"
-            onClick={() => {
-              setDiscoverError(null);
-              discoverM.mutate({ brandId });
-            }}
-            loading={discoverM.isPending}
-          >
-            <Sparkles className="size-3.5" />
-            {discoverM.isPending ? "Discovering…" : "Find public profiles"}
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={openAdd}
+          className="text-xs font-medium text-sky-600 hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300"
+        >
+          + Add
+        </button>
       </div>
 
-      {discoverError && (
-        <p className="text-destructive text-[11px]">{discoverError}</p>
-      )}
-
-      {GROUPS.map(({ label, kinds }) => {
-        const group = channels.filter((c) => kinds.includes(c.kind));
-        const groupSuggestions = suggestionsForGroup(kinds);
-        if (group.length === 0 && groupSuggestions.length === 0) return null;
-        return (
-          <div key={label}>
-            <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold tracking-wide uppercase">
-              {label} · {group.length + groupSuggestions.length}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {group.map((c) => {
-                const posts = postCountByPlatform[c.platform] ?? 0;
-                return (
-                  <div
-                    key={c.id}
-                    className="hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
-                  >
-                    <button
-                      onClick={() => openEdit(c)}
-                      className="flex items-center gap-2 text-left"
-                    >
-                      <ChannelLogo platform={c.platform} />
-                      <span className="flex flex-col leading-tight">
-                        <span className="text-xs font-medium">
-                          {platformLabel(c.platform)}
-                          {c.kind === "social" &&
-                            c.defaultProvider !== "zernio" && (
-                              <span
-                                className="text-muted-foreground ml-1.5 rounded-full border px-1.5 py-0.5 text-[9px] font-normal"
-                                title="Discovered profile; not connected through Zernio"
-                              >
-                                Discovered
-                              </span>
-                            )}
-                        </span>
-                        {(c.handle || c.followerCount != null || posts > 0) && (
-                          <span className="text-muted-foreground text-[11px]">
-                            {c.handle}
-                            {c.handle && c.followerCount != null && " · "}
-                            {c.followerCount != null &&
-                              `${followerFmt.format(c.followerCount)} followers`}
-                            {posts > 0 &&
-                              `${c.handle || c.followerCount != null ? " · " : ""}${posts} ${posts === 1 ? "post" : "posts"}`}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                    {c.profileUrl && (
-                      <a
-                        href={c.profileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open page"
-                        className="text-muted-foreground hover:text-foreground hover:bg-background ml-0.5 rounded p-1"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    )}
-                    {c.manageUrl && (
-                      <a
-                        href={c.manageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open manage page"
-                        className="text-muted-foreground hover:text-foreground hover:bg-background rounded p-1"
-                      >
-                        <Settings className="size-3.5" />
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Pending suggestions render as dashed ghost chips alongside the
-                  real channels in their group — accept/reject inline. */}
-              {groupSuggestions.map((s) => {
-                const rowBusy = suggBusyId === s.id;
-                return (
-                  <div
-                    key={s.id}
-                    className="border-muted-foreground/30 bg-muted/30 flex items-center gap-2 rounded-lg border border-dashed px-2 py-1.5"
-                  >
-                    <ChannelLogo platform={s.platform} />
-                    <span className="flex flex-col leading-tight">
-                      <span className="text-xs font-medium">
-                        {platformLabel(s.platform)}
-                        {s.profileUrl ? (
-                          <a
-                            href={s.profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground ml-1.5 font-normal"
-                          >
-                            @{s.handle}
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground ml-1.5 font-normal">
-                            @{s.handle}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-muted-foreground text-[11px]">
-                        {s.confidence != null &&
-                          `${Math.round(s.confidence * 100)}% match`}
-                        {s.verified === true &&
-                          s.followerCount != null &&
-                          ` · ✓ ${followerFmt.format(s.followerCount)}`}
-                        {s.verified === false && " · unverified"}
-                      </span>
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive size-6"
-                      title="Reject"
-                      disabled={rowBusy}
-                      onClick={() => rejectM.mutate({ id: s.id })}
-                    >
-                      <X className="size-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      className="size-6"
-                      title="Accept — create channel"
-                      loading={rowBusy && acceptM.isPending}
-                      disabled={rowBusy}
-                      onClick={() => acceptM.mutate({ id: s.id })}
-                    >
-                      <Check className="size-3.5" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-
-      {!hasAny && (
-        <p className="text-muted-foreground text-[11px]">
-          {discoverM.isPending
-            ? "Searching the web + verifying profiles…"
-            : "No channels yet. Connect Zernio for owned accounts, or find public profiles on the web."}
+      {total === 0 ? (
+        <p className="text-muted-foreground text-xs">
+          No channels yet. Find public profiles or connect Zernio from the menu,
+          or add one by hand.
         </p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {sorted.map((c) => {
+            const posts = postCountByPlatform[c.platform] ?? 0;
+            const discovered = isDiscovered(c);
+            const connected = c.connectionStatus === "connected";
+            const label = platformLabel(c.platform);
+            const handle = c.handle && c.handle !== label ? c.handle : null;
+            return (
+              <div
+                key={c.id}
+                className="group bg-background/40 hover:border-foreground/20 flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-colors"
+              >
+                <ChannelLogo platform={c.platform} className="size-5" />
+                <button
+                  type="button"
+                  onClick={() => openEdit(c)}
+                  className="min-w-0 flex-1 text-left"
+                  title="Edit channel"
+                >
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium">
+                    {label}
+                    {discovered && (
+                      <span
+                        className="size-1.5 rounded-full bg-sky-400"
+                        title="Discovered on the web; not yet confirmed by a connection or a pull"
+                      />
+                    )}
+                  </span>
+                  <span className="text-muted-foreground block truncate text-[11px]">
+                    {c.kind === "ad" ? (
+                      <>
+                        <span
+                          className={
+                            connected
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : undefined
+                          }
+                        >
+                          {connected ? "connected" : "not connected"}
+                        </span>
+                        {handle && ` · ${handle}`}
+                      </>
+                    ) : (
+                      [
+                        handle,
+                        c.followerCount != null &&
+                          compactFmt.format(c.followerCount),
+                        posts > 0 && `${posts} ${posts === 1 ? "post" : "posts"}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") ||
+                      (connected ? "connected" : "no details yet")
+                    )}
+                  </span>
+                </button>
+                {(c.profileUrl ?? c.manageUrl) && (
+                  <a
+                    href={(c.profileUrl ?? c.manageUrl)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={c.profileUrl ? "Open page" : "Open manage page"}
+                    className="text-muted-foreground hover:text-foreground shrink-0 rounded p-1"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </a>
+                )}
+              </div>
+            );
+          })}
+
+          {suggestions.map((s) => {
+            const rowBusy = suggBusyId === s.id;
+            return (
+              <div
+                key={s.id}
+                className="border-sky-400/40 bg-sky-400/5 flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-2.5"
+              >
+                <ChannelLogo platform={s.platform} className="size-5" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium">
+                    {platformLabel(s.platform)}
+                    <span className="size-1.5 rounded-full bg-sky-400" />
+                  </span>
+                  <span className="text-muted-foreground block truncate text-[11px]">
+                    {s.profileUrl ? (
+                      <a
+                        href={s.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-foreground"
+                        title="Open to confirm"
+                      >
+                        @{s.handle}
+                      </a>
+                    ) : (
+                      `@${s.handle}`
+                    )}
+                    {s.confidence != null &&
+                      ` · ${Math.round(s.confidence * 100)}%`}
+                    {s.verified === true &&
+                      s.followerCount != null &&
+                      ` · ${compactFmt.format(s.followerCount)}`}
+                  </span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive size-6 shrink-0"
+                  title="Reject"
+                  disabled={rowBusy}
+                  onClick={() => rejectM.mutate({ id: s.id })}
+                >
+                  <X className="size-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  className="size-6 shrink-0"
+                  title="Accept — create channel"
+                  loading={rowBusy && acceptM.isPending}
+                  disabled={rowBusy}
+                  onClick={() => acceptM.mutate({ id: s.id })}
+                >
+                  <Check className="size-3.5" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {form.id ? "Edit channel" : "Add channel"}
-            </DialogTitle>
+            <DialogTitle>{form.id ? "Edit channel" : "Add channel"}</DialogTitle>
           </DialogHeader>
 
           <Tabs
@@ -630,9 +585,7 @@ export function BrandChannels({
                     <Label className="text-muted-foreground">History</Label>
                     <div className="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-md border p-1.5">
                       {[...form.followerHistory]
-                        .sort((a, b) =>
-                          b.capturedAt.localeCompare(a.capturedAt),
-                        )
+                        .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))
                         .map((snap) => (
                           <div
                             key={snap.capturedAt}

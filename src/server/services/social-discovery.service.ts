@@ -22,17 +22,8 @@ import {
 } from "@/server/clients/firecrawl.client";
 import {
   tavilySearch,
-  parallelSearch,
-  perplexitySearch,
-  exaSearch,
   isTavilyConfigured,
-  isParallelConfigured,
-  isPerplexityConfigured,
-  isExaConfigured,
   type TavilyResult,
-  type ParallelResult,
-  type PerplexityResult,
-  type ExaResult,
 } from "@/server/clients/search-providers.client";
 import { isClaudeConfigured } from "@/server/clients/claude.client";
 import { canVerify, verifyProfile } from "@/server/clients/brightdata.client";
@@ -67,25 +58,6 @@ function formatTavily(r: TavilyResult): string {
       .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.content, 500)}`)
       .join("\n")
   );
-}
-
-function formatParallel(r: ParallelResult): string {
-  return r.results
-    .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.excerpts.join(" "), 500)}`)
-    .join("\n");
-}
-
-function formatPerplexity(r: PerplexityResult): string {
-  const cites = r.citations.length
-    ? `\ncitations:\n${r.citations.map((c) => `- ${c}`).join("\n")}`
-    : "";
-  return clip(r.content, 4_000) + cites;
-}
-
-function formatExa(r: ExaResult): string {
-  return r.results
-    .map((x) => `- ${x.title} — ${x.url}\n  ${clip(x.text, 500)}`)
-    .join("\n");
 }
 
 function formatFirecrawlSearch(
@@ -135,7 +107,7 @@ const SCHEMA = z.object({
       sources: z
         .array(z.string())
         .describe(
-          "Which labelled sources (website/tavily/parallel/perplexity) this handle appears in",
+          "Which labelled sources (website/firecrawl-search/tavily) this handle appears in",
         ),
     }),
   ),
@@ -169,10 +141,12 @@ export async function discoverSocialHandles(input: {
     if (md) blocks.push(sourceBlock("website", clip(md, 8_000)));
   }
 
-  // Stage 2: search providers (fan out, each isolated). Firecrawl search is
-  // the built-in baseline because the same key already powers website reads;
-  // the specialist providers remain optional corroboration.
-  const query = `Official social media profile URLs for ${type === "personal" ? "the personal brand/person" : "the brand"} "${name}"${website ? ` (${website})` : ""}: LinkedIn, Instagram, X/Twitter, Facebook, TikTok, YouTube, Threads. Give full profile URLs.`;
+  // Stage 2: search (fan out, each isolated). Firecrawl's per-platform `site:`
+  // searches are the workhorse — on the 2026-09-08 Winter Park Escapes probe
+  // they alone surfaced every handle. Tavily stays as the one second opinion
+  // for confidence scoring. Parallel, Perplexity and Exa were dropped from this
+  // fan-out: they only ever echoed what Firecrawl had already found and added
+  // latency and spend (see scripts/probe-brand-baseline.ts).
   const domain = website
     ? (() => {
         try {
@@ -182,7 +156,7 @@ export async function discoverSocialHandles(input: {
         }
       })()
     : "";
-  const [firecrawlResults, tav, par, perp, exa] = await Promise.all([
+  const [firecrawlResults, tav] = await Promise.all([
     envelope(isFirecrawlConfigured, async () => {
       const siteQueries = [
         "instagram.com",
@@ -224,11 +198,6 @@ export async function discoverSocialHandles(input: {
     envelope(isTavilyConfigured, () =>
       tavilySearch(`${name} official social media accounts`),
     ),
-    envelope(isParallelConfigured, () =>
-      parallelSearch(query, [`${name} official social profiles`]),
-    ),
-    envelope(isPerplexityConfigured, () => perplexitySearch(query)),
-    envelope(isExaConfigured, () => exaSearch(query)),
   ]);
   if (firecrawlResults?.length) {
     blocks.push(
@@ -236,9 +205,6 @@ export async function discoverSocialHandles(input: {
     );
   }
   if (tav) blocks.push(sourceBlock("tavily", formatTavily(tav)));
-  if (par) blocks.push(sourceBlock("parallel", formatParallel(par)));
-  if (perp) blocks.push(sourceBlock("perplexity", formatPerplexity(perp)));
-  if (exa) blocks.push(sourceBlock("exa", formatExa(exa)));
 
   if (!blocks.length) {
     throw new Error(
@@ -320,10 +286,36 @@ async function enrichBrandIfSparse(brand: {
   }
 }
 
+/** Below this the model is guessing; a reviewer gains nothing from seeing it. */
+const MIN_PERSIST_CONFIDENCE = 0.3;
+
+/** A single post/video/status is never a profile, whatever the model says. */
+const NON_PROFILE_PATH = /\/(status|p|reel|reels|posts|watch|shorts|video|videos)\//i;
+
 /**
- * Discover handles for a brand, optionally verify each via Bright Data, and
- * upsert them into `channel_suggestion` for human review. Never resurrects a
- * `rejected` suggestion.
+ * Cheap floor applied before persisting: drops low-confidence guesses and
+ * "profiles" that are really a post URL. Motivated by a 2026-09-08 re-run that
+ * saved `x.com/<handle>/status/<id>` at 15% as a pending suggestion.
+ */
+function isPersistableSuggestion(s: SocialSuggestion): boolean {
+  if (s.confidence < MIN_PERSIST_CONFIDENCE) return false;
+  try {
+    if (NON_PROFILE_PATH.test(new URL(s.profileUrl).pathname)) return false;
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Discover handles for a brand and upsert them into `channel_suggestion` for
+ * human review. Never resurrects a `rejected` suggestion.
+ *
+ * Verification is opt-in (`verify: true`) and off by default: Bright Data only
+ * covers Instagram and LinkedIn, and its polling was the bulk of an 84s run on
+ * the 2026-09-08 probe. The reviewer (or an agent) confirms a suggestion by
+ * opening the link, and the first sample scrape after acceptance proves the
+ * profile exists and fills follower counts as a side effect.
  */
 export async function discoverAndSaveSuggestions(
   brandId: string,
@@ -348,6 +340,7 @@ export async function discoverAndSaveSuggestions(
   });
   const suggestions = discoveredSuggestions.filter(
     (suggestion) =>
+      isPersistableSuggestion(suggestion) &&
       !existingChannels.some(
         (channel) =>
           channel.platform === suggestion.platform &&

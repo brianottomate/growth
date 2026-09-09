@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -37,20 +37,18 @@ const PURPOSES = [
   { value: "inspiration", label: "Inspiration" },
 ];
 
-function PurposeTag({ purpose }: { purpose: string }) {
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-        purpose === "competitor"
-          ? "bg-amber-500/10 text-amber-500"
-          : "bg-sky-500/10 text-sky-400"
-      }`}
-    >
-      {purpose}
-    </span>
-  );
-}
+type TrackedPlatform =
+  | "linkedin"
+  | "instagram"
+  | "x"
+  | "facebook"
+  | "youtube"
+  | "tiktok";
 
+/**
+ * Peers this brand tracks, as one quiet footer line: names jump to the peer
+ * card further down, "+ track a brand" opens the dialog.
+ */
 export function TrackedBrands({
   ownerBrandId,
   tracked,
@@ -65,13 +63,6 @@ export function TrackedBrands({
   const [website, setWebsite] = useState("");
   const [purpose, setPurpose] = useState("competitor");
   const [referenceType, setReferenceType] = useState("company");
-  type TrackedPlatform =
-    | "linkedin"
-    | "instagram"
-    | "x"
-    | "facebook"
-    | "youtube"
-    | "tiktok";
   const [platform, setPlatform] = useState<TrackedPlatform>("linkedin");
   const [profileUrl, setProfileUrl] = useState("");
 
@@ -108,55 +99,42 @@ export function TrackedBrands({
     });
 
   return (
-    <div className="mt-4 border-t pt-4">
-      <div className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wide uppercase">
-        Tracking · {tracked.length}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {tracked.map((t) => (
-          <div
-            key={t.inspirationId}
-            className="group hover:bg-accent flex items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors"
-          >
-            <Link
-              href={`#tracked-brand-${t.id}`}
-              className="flex items-center gap-2"
-              title={`Jump to ${t.name}`}
-            >
-              <span className="bg-muted flex size-5 items-center justify-center rounded text-[10px] font-semibold">
-                {t.name.slice(0, 2)}
-              </span>
-              <span className="text-xs font-medium">{t.name}</span>
-              <PurposeTag purpose={t.purpose} />
-            </Link>
-            <button
-              onClick={() =>
-                untrackM.mutate({ inspirationId: t.inspirationId })
-              }
-              disabled={untrackM.isPending}
-              title="Stop tracking"
-              className="text-muted-foreground hover:text-foreground opacity-0 transition-opacity group-hover:opacity-100"
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        ))}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground gap-1.5"
-          onClick={() => setOpen(true)}
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+      <span className="text-muted-foreground">Tracking · {tracked.length}</span>
+      {tracked.map((t) => (
+        <span
+          key={t.inspirationId}
+          className="group inline-flex items-center gap-1"
         >
-          <Plus className="size-3.5" />
-          Add tracked brand
-        </Button>
-      </div>
+          <Link
+            href={`#tracked-brand-${t.id}`}
+            className="text-foreground/80 hover:text-foreground font-medium"
+            title={`${t.purpose} · jump to ${t.name}`}
+          >
+            {t.name}
+          </Link>
+          <button
+            onClick={() => untrackM.mutate({ inspirationId: t.inspirationId })}
+            disabled={untrackM.isPending}
+            title="Stop tracking"
+            className="text-muted-foreground hover:text-foreground opacity-0 transition-opacity group-hover:opacity-100"
+          >
+            <X className="size-3" />
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="font-medium text-sky-600 hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300"
+      >
+        + track a brand
+      </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add tracked brand</DialogTitle>
+            <DialogTitle>Track a brand</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-2">
@@ -169,32 +147,34 @@ export function TrackedBrands({
                 placeholder="Airbnb"
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Brand type</Label>
-              <Select value={referenceType} onValueChange={setReferenceType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="company">Company</SelectItem>
-                  <SelectItem value="personal">Personal brand</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Purpose</Label>
-              <Select value={purpose} onValueChange={setPurpose}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PURPOSES.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Brand type</Label>
+                <Select value={referenceType} onValueChange={setReferenceType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="company">Company</SelectItem>
+                    <SelectItem value="personal">Personal brand</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Purpose</Label>
+                <Select value={purpose} onValueChange={setPurpose}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PURPOSES.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Public profile</Label>

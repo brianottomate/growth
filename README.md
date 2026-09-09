@@ -103,7 +103,7 @@ cutover to checked-in migrations are documented in
 Other local tools:
 
 ```bash
-bun run velite:dev     # Watch MDX content
+bun run velite:dev     # Watch MDX content (bun dev already builds it once at startup)
 bun run email:dev      # Preview React Email templates
 ```
 

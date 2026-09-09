@@ -14,15 +14,9 @@ import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
 import { discoverAndSaveSuggestions } from "@/server/services/social-discovery.service";
 import {
-  peerScrapeProviderFor,
-  profileUrlForBrand,
-  scrapeAndSuggest,
+  ScrapeSetupError,
+  scrapeBrandChannel,
 } from "@/server/services/peer-scrape.service";
-import {
-  failContentIngestRun,
-  finishContentIngestRun,
-  startContentIngestRun,
-} from "@/server/services/platform-post-ingest.service";
 
 type Ctx = { db: typeof db; session: { user: { id: string } } };
 
@@ -84,19 +78,25 @@ export const channelSuggestionRouter = createTRPCRouter({
       });
     }),
 
-  /** Discover + verify + persist handle suggestions for a brand. */
+  /**
+   * Discover + persist handle suggestions for a brand. Unverified on purpose:
+   * the reviewer confirms by opening the link, and the first scrape after
+   * acceptance proves the profile and fills follower counts.
+   */
   discover: protectedProcedure
     .input(z.object({ brandId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
-      return discoverAndSaveSuggestions(input.brandId, { verify: true });
+      return discoverAndSaveSuggestions(input.brandId);
     }),
 
   /**
-   * On-demand Bright Data scrape of a brand's recent posts for one platform
-   * (up to 3 months) into platform_post + pending content_suggestion rows. Idempotent:
-   * dedups by externalId, so re-runs only ingest new posts. Works for peer
-   * brands (the access check mirrors discover/accept).
+   * On-demand pull of a brand's recent posts for one platform into
+   * platform_post + pending content_suggestion rows. `limit` is the sample
+   * size (5 = "does this channel work?", 30+ = backfill); `sinceDays` bounds
+   * the window (max 3 months). Idempotent: dedups by externalId, so re-runs
+   * only ingest new posts. Works for peer brands (the access check mirrors
+   * discover/accept).
    */
   scrapePosts: protectedProcedure
     .input(
@@ -104,53 +104,29 @@ export const channelSuggestionRouter = createTRPCRouter({
         brandId: z.string(),
         platform: z.enum(["instagram", "facebook", "linkedin", "x"]),
         sinceDays: z.number().int().min(1).max(93).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await assertBrandManageable(ctx, input.brandId);
-      const profileUrl = await profileUrlForBrand(
-        input.brandId,
-        input.platform,
-      );
-      if (!profileUrl) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `No ${input.platform} page link on this brand — add the channel's page URL first.`,
-        });
-      }
-      const to = new Date();
-      const from = new Date(
-        to.getTime() - (input.sinceDays ?? 30) * 86_400_000,
-      );
-      const provider = peerScrapeProviderFor(input.platform);
-      if (!provider) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `No available scraper supports ${input.platform}. Configure Bright Data${
-            input.platform === "instagram" ? " or Apify" : ""
-          }.`,
-        });
-      }
-      const runId = await startContentIngestRun({
-        brandId: input.brandId,
-        requestedById: ctx.session.user.id,
-        mode: "peer_scrape",
-        provider,
-        requestedFrom: from,
-        requestedTo: to,
-      });
       try {
-        const result = await scrapeAndSuggest({
+        return await scrapeBrandChannel({
           brandId: input.brandId,
           platform: input.platform,
-          profileUrl,
-          sinceDays: input.sinceDays ?? 30,
-          provider,
+          sinceDays: input.sinceDays,
+          limit: input.limit,
+          requestedById: ctx.session.user.id,
         });
-        await finishContentIngestRun(runId, result, result.provider);
-        return { runId, ...result };
       } catch (error) {
-        await failContentIngestRun(runId, error);
+        if (error instanceof ScrapeSetupError) {
+          throw new TRPCError({
+            code:
+              error.code === "missing_profile_url"
+                ? "BAD_REQUEST"
+                : "PRECONDITION_FAILED",
+            message: error.message,
+          });
+        }
         throw error;
       }
     }),
