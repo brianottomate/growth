@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ChevronLeft, ExternalLink } from "lucide-react";
 
 import { HomeError, loadBrandHome } from "@/server/services/homes.service";
 
-import { SectionLabel } from "../../../../_components";
 import {
   brandAvatarUrl,
   brandTabHref,
@@ -60,15 +59,16 @@ export default async function PerformanceHomePage({
   return (
     <div className="space-y-5">
       <div className="space-y-1">
+        {/* A way out, on its own line. Dressed as a section label beside the
+            title it read as a heading, so the only way back was the tab. */}
+        <Link
+          href={brandTabHref(slug, "homes")}
+          className="text-muted-foreground hover:text-foreground -ml-1 inline-flex items-center gap-1 text-xs"
+        >
+          <ChevronLeft className="size-3.5" />
+          All homes
+        </Link>
         <div className="flex flex-wrap items-baseline gap-x-3">
-          <SectionLabel>
-            <Link
-              href={brandTabHref(slug, "homes")}
-              className="hover:underline"
-            >
-              Homes
-            </Link>
-          </SectionLabel>
           <h3 className="text-base font-semibold tracking-tight">
             {home.name}
           </h3>
