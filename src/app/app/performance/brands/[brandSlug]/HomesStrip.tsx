@@ -148,12 +148,13 @@ export function HomesStrip({
     <>
       <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-6">
         {homes.map((home, index) => (
-          <li key={home.id} className={cn(panel, "group")}>
-            <button
-              type="button"
-              onClick={() => setOpenIndex(index)}
-              className="block w-full text-left"
-              aria-label={`Open ${home.name}`}
+          <li key={home.id} className={cn(panel, "group relative")}>
+            {/* The card is the way in to the home. The photo is a detail of
+                it, so zooming is a control ON the card rather than the whole
+                point of it. Siblings, so no interactive nests in another. */}
+            <Link
+              href={`/app/performance/brands/${brandSlug ?? brandId}/homes/${home.id}`}
+              className="block"
             >
               <span className="relative block">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -163,9 +164,6 @@ export function HomesStrip({
                   loading="lazy"
                   className="aspect-[4/3] w-full object-cover transition-opacity group-hover:opacity-90"
                 />
-                <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 transition group-hover:bg-black/25 group-hover:opacity-100">
-                  <ZoomIn className="size-4" />
-                </span>
               </span>
               <span className="block px-2.5 py-2">
                 <span className="flex items-center gap-1 text-xs font-semibold">
@@ -175,20 +173,24 @@ export function HomesStrip({
                       aria-label="Featured"
                     />
                   ) : null}
-                  <span className="truncate">{home.name}</span>
+                  <span className="truncate group-hover:underline">
+                    {home.name}
+                  </span>
                 </span>
                 <span className="text-muted-foreground block truncate text-[11px]">
                   {home.facts}
                 </span>
               </span>
-            </button>
-            {/* The photo opens the lightbox; the name of the work opens the home. */}
-            <Link
-              href={`/app/performance/brands/${brandSlug ?? brandId}/homes/${home.id}`}
-              className="block border-t px-2.5 py-1.5 text-[11px] text-sky-300 hover:underline"
-            >
-              Work on this home
             </Link>
+            <button
+              type="button"
+              onClick={() => setOpenIndex(index)}
+              aria-label={`See ${home.name} at full size`}
+              title="See the photo at full size"
+              className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full border border-white/50 bg-black/50 text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
+            >
+              <ZoomIn className="size-3.5" />
+            </button>
           </li>
         ))}
       </ul>

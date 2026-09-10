@@ -206,10 +206,15 @@ export function OnDemandTile({
           : null;
 
   return (
-    <li className="flex flex-col items-center gap-2">
+    <li
+      className={cn(
+        "flex flex-col gap-2",
+        variant === "canvas" ? "shrink-0" : "items-center",
+      )}
+    >
       {variant === "canvas" ? (
-        <div className="w-full">
-          <p className="text-muted-foreground/70 mb-1 text-[10px]">
+        <div className="flex flex-col gap-1">
+          <p className="text-muted-foreground/70 text-[10px] whitespace-nowrap">
             {format.label} · {format.width}×{format.height}
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -218,7 +223,7 @@ export function OnDemandTile({
             alt={`${home.name}, ${format.label}`}
             loading="lazy"
             style={{ aspectRatio: `${format.width} / ${format.height}` }}
-            className="w-full rounded-xl border bg-black/20 object-cover"
+            className="h-44 w-auto rounded-xl border bg-black/20 object-cover @3xl:h-56"
           />
         </div>
       ) : (
@@ -249,11 +254,15 @@ export function OnDemandTile({
         )}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate">
-            {busyLabel ??
-              (direction ? `directed · ${direction.verdict}` : "drawn now")}
-          </span>
-          <span className="flex shrink-0 items-center gap-2">
+          {/* A canvas is narrow, and "drawn now" truncated to one letter said
+              less than nothing; it only earns the room when there is news. */}
+          {variant === "mock" || busyLabel || direction ? (
+            <span className="truncate">
+              {busyLabel ??
+                (direction ? `directed · ${direction.verdict}` : "drawn now")}
+            </span>
+          ) : null}
+          <span className="ml-auto flex shrink-0 items-center gap-2">
             {direction ? (
               <button
                 type="button"

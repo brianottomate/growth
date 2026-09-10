@@ -156,7 +156,7 @@ export function AdPreviewsWorkspace({
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className={sectionLabel}>
-            Homes for the ads · {picked.length} of {MAX_PICKED}
+            Homes for the ads · {picked.length}/{MAX_PICKED}
           </p>
           <label className="relative block">
             <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />

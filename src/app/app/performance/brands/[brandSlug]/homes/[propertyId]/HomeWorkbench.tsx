@@ -172,6 +172,14 @@ export function HomeWorkbench({
                       loading="lazy"
                       className="aspect-[4/3] w-full object-cover"
                     />
+                    {inCarousel ? (
+                      <span
+                        className="absolute top-1.5 left-1.5 grid size-5 place-items-center rounded-full bg-sky-500 text-[10px] font-semibold text-white tabular-nums"
+                        title={`Card ${position} of the carousel`}
+                      >
+                        {position}
+                      </span>
+                    ) : null}
                     <button
                       type="button"
                       disabled={busy}
@@ -216,7 +224,7 @@ export function HomeWorkbench({
                           : "Add to the carousel"
                       }
                     >
-                      Carousel{inCarousel ? ` ${position}` : ""}
+                      Carousel
                     </Chip>
                   </div>
                 </li>
@@ -256,7 +264,7 @@ export function HomeWorkbench({
                     {recipe.title}
                   </span>
                 </div>
-                <ul className="grid grid-cols-2 gap-4 @2xl:grid-cols-4">
+                <ul className="flex scrollbar-thin gap-4 overflow-x-auto pb-1">
                   {FORMATS.map((formatId) => {
                     const spec: PreviewSpec = {
                       brandId,
@@ -294,7 +302,7 @@ export function HomeWorkbench({
       <section className="space-y-2.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className={sectionLabel}>
-            Carousel · {carousel.length} of {MAX_CAROUSEL}
+            Carousel · {carousel.length}/{MAX_CAROUSEL}
           </p>
           {carousel.length > 0 ? (
             <button
@@ -416,7 +424,7 @@ function Chip({
       onClick={onClick}
       title={title}
       className={cn(
-        "flex-1 rounded-full border px-2 py-1 text-[10.5px] font-medium transition disabled:opacity-40",
+        "flex-1 rounded-full border px-2 py-1 text-[10.5px] font-medium whitespace-nowrap transition disabled:opacity-40",
         on
           ? "border-sky-400 bg-sky-500/20 text-sky-200"
           : "text-muted-foreground hover:text-foreground hover:border-white/30",
