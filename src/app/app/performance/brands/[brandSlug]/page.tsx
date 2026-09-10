@@ -72,6 +72,7 @@ export default async function PerformanceBrandPage({
       website: true,
       leadDomain: true,
       featuredListingUrl: true,
+      previewSourceUrl: true,
       relationship: true,
       brandIdentity: true,
       brandMark: true,
@@ -157,11 +158,31 @@ export default async function PerformanceBrandPage({
     ? (withPhoto.find((home) => home.url === brand.featuredListingUrl) ?? null)
     : null;
   const featured = picked ?? withPhoto[0] ?? null;
-  const onDemandPreview = featured
+  // The photo: an explicit choice (a home's hero or a library image), else the
+  // featured home's own hero.
+  const sourceUrl = brand.previewSourceUrl ?? featured?.imageUrl ?? null;
+  const sourceImage = brand.previewSourceUrl
+    ? (images.find((asset) => asset.url === brand.previewSourceUrl) ?? null)
+    : null;
+  const sourceHome = brand.previewSourceUrl
+    ? (withPhoto.find((home) => home.imageUrl === brand.previewSourceUrl) ?? null)
+    : featured;
+  const pickerCurrent = {
+    sourceUrl: brand.previewSourceUrl,
+    label: sourceHome
+      ? sourceHome.name
+      : sourceImage
+        ? (sourceImage.title ?? "Library image")
+        : featured
+          ? `${featured.name} (first on their site)`
+          : "Choose a photo",
+    thumbUrl: sourceHome?.thumbUrl ?? sourceHome?.imageUrl ?? sourceImage?.thumbnailUrl ?? sourceImage?.url ?? null,
+  };
+  const onDemandPreview = featured && sourceUrl
     ? (() => {
         const recipe = homePreviewRecipes(featured)[0]!;
         const catalog = homeCatalogCopy(featured);
-        const source = { url: featured.imageUrl! };
+        const source = { url: sourceUrl };
         const url = (formatId: "landscape" | "square" | "story") =>
           homePreviewUrl({ brandId: brand.id, source, formatId, recipe });
         const catalogUrl = (formatId: "landscape" | "square" | "story") =>
@@ -252,6 +273,21 @@ export default async function PerformanceBrandPage({
         website={brand.website}
         cards={adPreviews}
         onDemand={onDemandPreview}
+        picker={{
+          homes: withPhoto.slice(0, 48).map((home) => ({
+            url: home.url,
+            name: home.name,
+            imageUrl: home.imageUrl!,
+            thumbUrl: home.thumbUrl ?? null,
+          })),
+          images: shown.slice(0, 48).map((asset) => ({
+            id: asset.id,
+            url: asset.url,
+            thumbnailUrl: asset.thumbnailUrl ?? null,
+            title: asset.title ?? null,
+          })),
+          current: pickerCurrent,
+        }}
       />
 
       <section className="space-y-2.5">

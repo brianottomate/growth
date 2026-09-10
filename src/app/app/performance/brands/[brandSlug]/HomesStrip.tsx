@@ -94,7 +94,7 @@ export function HomesStrip({
 
   // Featuring is a saved choice on the brand: the ad previews draw from it.
   const feature = useMutation(
-    trpc.brand.setFeaturedListing.mutationOptions({
+    trpc.brand.setPreviewSource.mutationOptions({
       onSuccess: (result) => {
         toast.success(
           result.featuredListingUrl
@@ -188,10 +188,11 @@ export function HomesStrip({
                   className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
                   loading={feature.isPending}
                   onClick={() =>
-                    feature.mutate({
-                      id: brandId,
-                      listingUrl: open.url === featuredUrl ? null : open.url,
-                    })
+                    feature.mutate(
+                      open.url === featuredUrl
+                        ? { id: brandId, listingUrl: null, sourceUrl: null }
+                        : { id: brandId, listingUrl: open.url, sourceUrl: open.imageUrl },
+                    )
                   }
                 >
                   <Star

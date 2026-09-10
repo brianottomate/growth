@@ -29,7 +29,7 @@ import {
   addBrandAdPreview,
   BrandAdPreviewError,
   removeBrandAdPreview,
-  setBrandFeaturedListing,
+  setBrandPreviewSource,
 } from "@/server/services/brand-ad-previews.service";
 import {
   clearBrandMark,
@@ -569,12 +569,25 @@ export const brandRouter = createTRPCRouter({
       return { id: input.id, count: previews.length };
     }),
 
-  /** The home that stands for the brand on its Performance page; null clears it. */
-  setFeaturedListing: protectedProcedure
-    .input(z.object({ id: z.string(), listingUrl: z.string().url().nullable() }))
+  /**
+   * What the on-demand ad previews are drawn from. A home passes its listing
+   * and hero URL; a library image passes its URL alone; nulls clear.
+   */
+  setPreviewSource: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        listingUrl: z.string().url().nullable().optional(),
+        sourceUrl: z.string().url().nullable(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       await assertBrandManageable(ctx, input.id);
-      return setBrandFeaturedListing({ brandId: input.id, listingUrl: input.listingUrl });
+      return setBrandPreviewSource({
+        brandId: input.id,
+        listingUrl: input.listingUrl,
+        sourceUrl: input.sourceUrl,
+      });
     }),
 
   /** Scrape the brand's website and refresh its fields. Runs inline. */

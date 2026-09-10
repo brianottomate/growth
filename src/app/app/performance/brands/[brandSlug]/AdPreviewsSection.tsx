@@ -21,6 +21,8 @@ import { sendAssistantIntent } from "@/lib/assistant-events";
 import type { AdPreviewCard } from "@/server/services/brand-ad-previews.service";
 import { useTRPC } from "@/trpc/react";
 
+import { type PickerHome, type PickerImage, PreviewSourcePicker } from "./PreviewSourcePicker";
+
 /**
  * One home drawn on the awareness card straight from the listing feed, in a
  * canvas per placement so each mock shows the whole card.
@@ -77,6 +79,7 @@ export function AdPreviewsSection({
   website,
   cards,
   onDemand,
+  picker,
 }: {
   brandId: string;
   brandSlug: string;
@@ -86,6 +89,12 @@ export function AdPreviewsSection({
   cards: AdPreviewCard[];
   /** Shown while nothing is frozen: one of their homes, rendered on demand. */
   onDemand?: OnDemandPreview | null;
+  /** The photo picker for the on-demand cards. */
+  picker?: {
+    homes: PickerHome[];
+    images: PickerImage[];
+    current: { sourceUrl: string | null; label: string; thumbUrl: string | null };
+  };
 }) {
   const [surface, setSurface] = useState<AdMockSurface>("facebook");
   const trpc = useTRPC();
@@ -171,6 +180,14 @@ export function AdPreviewsSection({
           Ad previews{cards.length ? ` · ${cards.length}` : ""}
         </SectionLabel>
         <div className="flex flex-wrap items-center gap-2">
+          {cards.length === 0 && picker ? (
+            <PreviewSourcePicker
+              brandId={brandId}
+              homes={picker.homes}
+              images={picker.images}
+              current={picker.current}
+            />
+          ) : null}
           {cards.length > 0 ? (
             <div className="flex items-center gap-0.5 rounded-full border p-0.5">
               {AD_MOCK_SURFACES.map((option) => (

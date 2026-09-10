@@ -227,17 +227,22 @@ export async function removeBrandAdPreview(input: {
 }
 
 /**
- * Remember which home stands for the brand. The on-demand previews draw from
- * it; null clears the pick and the page goes back to the first home on their
- * feed. The URL is stored as given, since the feed is what it is matched to.
+ * Remember what the on-demand previews are drawn from. A home sets both the
+ * featured listing (the copy) and the photo; a library image sets the photo
+ * alone and leaves the featured home to supply the copy; nulls clear. The URL
+ * is stored as given: the preview route vouches for the host when it draws.
  */
-export async function setBrandFeaturedListing(input: {
+export async function setBrandPreviewSource(input: {
   brandId: string;
-  listingUrl: string | null;
+  listingUrl?: string | null;
+  sourceUrl: string | null;
 }) {
   await db
     .update(brandTable)
-    .set({ featuredListingUrl: input.listingUrl })
+    .set({
+      previewSourceUrl: input.sourceUrl,
+      ...(input.listingUrl !== undefined ? { featuredListingUrl: input.listingUrl } : {}),
+    })
     .where(eq(brandTable.id, input.brandId));
-  return { featuredListingUrl: input.listingUrl };
+  return { previewSourceUrl: input.sourceUrl, featuredListingUrl: input.listingUrl ?? null };
 }

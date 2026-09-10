@@ -300,6 +300,14 @@ export const brandTable = pgTable(
      * the first home on their feed, saying so.
      */
     featuredListingUrl: t.text(),
+    /**
+     * The photo the on-demand ad previews are drawn on: a home's hero on
+     * their WanderOS site or a library image, by URL. Picking a home sets
+     * this and `featuredListingUrl` together; a library image sets this
+     * alone and the featured home keeps supplying the copy. Null means the
+     * featured home's own hero.
+     */
+    previewSourceUrl: t.text(),
 
     // Bearer secret for /connect/[token], the no-login page where a client
     // connects their own accounts into this brand's Zernio profile. The link
