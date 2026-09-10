@@ -6,10 +6,17 @@ import { useMutation } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 
 import { AdMock, type AdMockSurface } from "@/components/ad-mock";
+import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { adPreviewStudioHref } from "@/lib/ad-preview-links";
-import { getCompositionFormat, getCompositionTemplate } from "@/lib/compositions";
-import { compositionPreviewUrl, type PreviewSpec } from "@/lib/home-ad-previews";
+import {
+  getCompositionFormat,
+  getCompositionTemplate,
+} from "@/lib/compositions";
+import {
+  compositionPreviewUrl,
+  type PreviewSpec,
+} from "@/lib/home-ad-previews";
 import { useTRPC } from "@/trpc/react";
 
 type Direction = {
@@ -40,14 +47,22 @@ export function OnDemandTile({
   surface,
   spec,
   home,
+  variant = "mock",
 }: {
   brandId: string;
   brandSlug: string;
   brandName: string;
   brandLogo: string | null;
-  surface: AdMockSurface;
+  /** Only read by the mock variant; a canvas draws at its own size. */
+  surface?: AdMockSurface;
   spec: PreviewSpec;
   home: { name: string; url: string; imageUrl: string };
+  /**
+   * "mock" wraps the card in a feed, which is what sells it to someone who
+   * has not seen the ad yet. "canvas" shows the artwork alone at its true
+   * aspect, which is what you want comparing sizes side by side.
+   */
+  variant?: "mock" | "canvas";
 }) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -55,7 +70,9 @@ export function OnDemandTile({
     "assetId" in spec.source ? spec.source.assetId : null,
   );
   const [direction, setDirection] = useState<Direction | null>(null);
-  const [phase, setPhase] = useState<"idle" | "importing" | "directing" | "keeping">("idle");
+  const [phase, setPhase] = useState<
+    "idle" | "importing" | "directing" | "keeping"
+  >("idle");
 
   const directed: PreviewSpec | null =
     direction && assetId
@@ -85,7 +102,8 @@ export function OnDemandTile({
       images: [{ url: home.imageUrl, title: home.name }],
     });
     const asset = result.assets[0];
-    if (!asset) throw new Error("The photo could not be brought into the library");
+    if (!asset)
+      throw new Error("The photo could not be brought into the library");
     setAssetId(asset.id);
     return asset.id;
   };
@@ -113,7 +131,11 @@ export function OnDemandTile({
       const result = await direct.mutateAsync(fullSpec(id, spec));
       setDirection(result);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The art director could not be reached");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "The art director could not be reached",
+      );
     } finally {
       setPhase("idle");
     }
@@ -129,11 +151,17 @@ export function OnDemandTile({
         ...fullSpec(sourceAssetId, base),
         assetTitle: `${home.name} · ${template.label} · ${format.label}`,
       });
-      await addPreview.mutateAsync({ id: brandId, assetId: asset.id, homeUrl: home.url });
+      await addPreview.mutateAsync({
+        id: brandId,
+        assetId: asset.id,
+        homeUrl: home.url,
+      });
       toast.success("Kept. It is in the previews and the library.");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not keep the card");
+      toast.error(
+        error instanceof Error ? error.message : "Could not keep the card",
+      );
     } finally {
       setPhase("idle");
     }
@@ -159,7 +187,9 @@ export function OnDemandTile({
         }),
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not open the Studio");
+      toast.error(
+        error instanceof Error ? error.message : "Could not open the Studio",
+      );
     } finally {
       setPhase("idle");
     }
@@ -177,21 +207,51 @@ export function OnDemandTile({
 
   return (
     <li className="flex flex-col items-center gap-2">
-      <AdMock
-        surface={surface}
-        brandName={brandName}
-        brandLogo={brandLogo}
-        body={null}
-        headline={home.name}
-        link={home.url}
-        callToAction="Book now"
-        media={[{ url: compositionPreviewUrl(shown), thumbnail: null, type: "image" }]}
-        className={surface === "story" ? "w-full max-w-60" : "w-full max-w-80"}
-      />
-      <div className="text-muted-foreground flex w-full max-w-80 flex-col gap-1 text-[11px]">
+      {variant === "canvas" ? (
+        <div className="w-full">
+          <p className="text-muted-foreground/70 mb-1 text-[10px]">
+            {format.label} · {format.width}×{format.height}
+          </p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={compositionPreviewUrl(shown)}
+            alt={`${home.name}, ${format.label}`}
+            loading="lazy"
+            style={{ aspectRatio: `${format.width} / ${format.height}` }}
+            className="w-full rounded-xl border bg-black/20 object-cover"
+          />
+        </div>
+      ) : (
+        <AdMock
+          surface={surface ?? "instagram"}
+          brandName={brandName}
+          brandLogo={brandLogo}
+          body={null}
+          headline={home.name}
+          link={home.url}
+          callToAction="Book now"
+          media={[
+            {
+              url: compositionPreviewUrl(shown),
+              thumbnail: null,
+              type: "image",
+            },
+          ]}
+          className={
+            surface === "story" ? "w-full max-w-60" : "w-full max-w-80"
+          }
+        />
+      )}
+      <div
+        className={cn(
+          "text-muted-foreground flex w-full flex-col gap-1 text-[11px]",
+          variant === "mock" && "max-w-80",
+        )}
+      >
         <div className="flex items-center justify-between gap-2">
           <span className="truncate">
-            {busyLabel ?? (direction ? `directed · ${direction.verdict}` : "drawn now")}
+            {busyLabel ??
+              (direction ? `directed · ${direction.verdict}` : "drawn now")}
           </span>
           <span className="flex shrink-0 items-center gap-2">
             {direction ? (
@@ -238,7 +298,9 @@ export function OnDemandTile({
         {direction ? (
           <p className="text-[11px] leading-snug">
             {direction.note}
-            {direction.changes.length > 0 ? ` ${direction.changes.join("; ")}.` : ""}
+            {direction.changes.length > 0
+              ? ` ${direction.changes.join("; ")}.`
+              : ""}
           </p>
         ) : null}
       </div>

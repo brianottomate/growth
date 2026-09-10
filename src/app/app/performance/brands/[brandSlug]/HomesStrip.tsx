@@ -1,9 +1,19 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, ExternalLink, LayoutGrid, PenLine, Star, ZoomIn } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  LayoutGrid,
+  PenLine,
+  Star,
+  ZoomIn,
+} from "lucide-react";
 
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
@@ -67,7 +77,9 @@ export function HomesStrip({
           toast.error("The photo could not be brought into the library");
           return;
         }
-        router.push(adPreviewStudioHref({ brandId, brandSlug, sourceAssetId: asset.id }));
+        router.push(
+          adPreviewStudioHref({ brandId, brandSlug, sourceAssetId: asset.id }),
+        );
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -76,12 +88,17 @@ export function HomesStrip({
   // The preview grid draws from a library copy of the hero, so the same
   // import as the Studio door runs first; it finds the earlier copy when
   // there is one.
-  const [previews, setPreviews] = useState<{ home: StripHome; assetId: string } | null>(null);
+  const [previews, setPreviews] = useState<{
+    home: StripHome;
+    assetId: string;
+  } | null>(null);
   const previewAds = useMutation(
     trpc.media.importUrls.mutationOptions({
       onSuccess: (result, variables) => {
         const asset = result.assets[0];
-        const home = homes.find((row) => row.imageUrl === variables.images[0]?.url);
+        const home = homes.find(
+          (row) => row.imageUrl === variables.images[0]?.url,
+        );
         if (!asset || !home) {
           toast.error("The photo could not be brought into the library");
           return;
@@ -153,18 +170,33 @@ export function HomesStrip({
               <span className="block px-2.5 py-2">
                 <span className="flex items-center gap-1 text-xs font-semibold">
                   {home.url === featuredUrl ? (
-                    <Star className="size-3 shrink-0 fill-amber-300 text-amber-300" aria-label="Featured" />
+                    <Star
+                      className="size-3 shrink-0 fill-amber-300 text-amber-300"
+                      aria-label="Featured"
+                    />
                   ) : null}
                   <span className="truncate">{home.name}</span>
                 </span>
-                <span className="text-muted-foreground block truncate text-[11px]">{home.facts}</span>
+                <span className="text-muted-foreground block truncate text-[11px]">
+                  {home.facts}
+                </span>
               </span>
             </button>
+            {/* The photo opens the lightbox; the name of the work opens the home. */}
+            <Link
+              href={`/app/performance/brands/${brandSlug ?? brandId}/homes/${home.id}`}
+              className="block border-t px-2.5 py-1.5 text-[11px] text-sky-300 hover:underline"
+            >
+              Work on this home
+            </Link>
           </li>
         ))}
       </ul>
 
-      <Dialog open={open !== null} onOpenChange={(next) => !next && setOpenIndex(null)}>
+      <Dialog
+        open={open !== null}
+        onOpenChange={(next) => !next && setOpenIndex(null)}
+      >
         {open ? (
           <DialogContent className="flex h-[92vh] w-[96vw] max-w-[96vw] flex-col overflow-hidden border-white/10 bg-black/95 p-0 text-white sm:max-w-[96vw]">
             <DialogHeader className="shrink-0 border-b border-white/10 px-5 py-3 pr-12 text-left">
@@ -176,11 +208,16 @@ export function HomesStrip({
                   className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
                   loading={design.isPending}
                   onClick={() =>
-                    design.mutate({ brandId, images: [{ url: open.imageUrl, title: open.name }] })
+                    design.mutate({
+                      brandId,
+                      images: [{ url: open.imageUrl, title: open.name }],
+                    })
                   }
                 >
                   <PenLine className="size-3.5" />
-                  {design.isPending ? "Bringing the photo in…" : "Design an ad from this photo"}
+                  {design.isPending
+                    ? "Bringing the photo in…"
+                    : "Design an ad from this photo"}
                 </Button>
                 <Button
                   size="sm"
@@ -191,13 +228,19 @@ export function HomesStrip({
                     feature.mutate(
                       open.url === featuredUrl
                         ? { id: brandId, listingUrl: null, sourceUrl: null }
-                        : { id: brandId, listingUrl: open.url, sourceUrl: open.imageUrl },
+                        : {
+                            id: brandId,
+                            listingUrl: open.url,
+                            sourceUrl: open.imageUrl,
+                          },
                     )
                   }
                 >
                   <Star
                     className={
-                      open.url === featuredUrl ? "size-3.5 fill-amber-300 text-amber-300" : "size-3.5"
+                      open.url === featuredUrl
+                        ? "size-3.5 fill-amber-300 text-amber-300"
+                        : "size-3.5"
                     }
                   />
                   {open.url === featuredUrl ? "Featured" : "Feature this home"}
@@ -208,7 +251,10 @@ export function HomesStrip({
                   className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
                   loading={previewAds.isPending}
                   onClick={() =>
-                    previewAds.mutate({ brandId, images: [{ url: open.imageUrl, title: open.name }] })
+                    previewAds.mutate({
+                      brandId,
+                      images: [{ url: open.imageUrl, title: open.name }],
+                    })
                   }
                 >
                   <LayoutGrid className="size-3.5" />
@@ -227,7 +273,12 @@ export function HomesStrip({
                 </ButtonLink>
               </DialogTitle>
               <DialogDescription className="text-xs text-white/55">
-                {[`${(openIndex ?? 0) + 1} of ${homes.length}`, open.facts || null].filter(Boolean).join(" · ")}
+                {[
+                  `${(openIndex ?? 0) + 1} of ${homes.length}`,
+                  open.facts || null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </DialogDescription>
             </DialogHeader>
             <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">

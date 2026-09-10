@@ -23,6 +23,7 @@ import {
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
+import { setHomeHero, setHomeMedia } from "@/server/services/homes.service";
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 import {
@@ -73,6 +74,18 @@ async function userOrgIds(ctx: Ctx): Promise<string[]> {
     where: eq(memberTable.userId, ctx.session.user.id),
   });
   return memberships.map((m) => m.organizationId);
+}
+
+/** The caller's organization. Growth is single-org, so the first is it. */
+async function callerOrgId(ctx: Ctx): Promise<string> {
+  const [orgId] = await userOrgIds(ctx);
+  if (!orgId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "No organization for this user",
+    });
+  }
+  return orgId;
 }
 
 /**
@@ -587,6 +600,51 @@ export const brandRouter = createTRPCRouter({
         brandId: input.id,
         listingUrl: input.listingUrl,
         sourceUrl: input.sourceUrl,
+      });
+    }),
+
+  /**
+   * Which of a home's photos the ads draw on. The home is guarded by its own
+   * brand's organization, so a home id is enough. Null clears the pick back
+   * to the first photo on their feed.
+   */
+  setHomeHero: protectedProcedure
+    .input(
+      z.object({
+        homeId: z.string().min(1),
+        sourceUrl: z.string().url().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const orgId = await callerOrgId(ctx);
+      return setHomeHero({
+        homeId: input.homeId,
+        orgId,
+        sourceUrl: input.sourceUrl,
+      });
+    }),
+
+  /**
+   * A decision about one of a home's photos: where it sits in the gallery, or
+   * that it is out of it. Feed photos get their first row here.
+   */
+  setHomeMedia: protectedProcedure
+    .input(
+      z.object({
+        homeId: z.string().min(1),
+        assetId: z.string().min(1).nullish(),
+        sourceUrl: z.string().url().nullish(),
+        thumbUrl: z.string().url().nullish(),
+        role: z.enum(["hero", "gallery", "excluded"]).optional(),
+        sortOrder: z.number().int().min(0).nullish(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const orgId = await callerOrgId(ctx);
+      return setHomeMedia({
+        ...input,
+        orgId,
+        addedBy: ctx.session.user.id,
       });
     }),
 

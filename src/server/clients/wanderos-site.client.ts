@@ -30,6 +30,12 @@ export type WanderOsListing = {
   imageUrl?: string;
   /** The 640px variant of the same hero, for a picker that only looks. */
   thumbUrl?: string;
+  /**
+   * Every photo the feed carries, largest variant first, hero included. The
+   * feed has always returned the whole gallery; only photo zero used to be
+   * read. A carousel of one home's rooms needs the rest.
+   */
+  gallery?: { url: string; thumbUrl: string }[];
   /** Where the home is, as the feed states it. */
   city?: string;
   /** Two-letter state code, e.g. "CO". */
@@ -56,7 +62,9 @@ export function centsToDollars(value: number | undefined): number | undefined {
     : undefined;
 }
 
-export async function wanderOsWebsiteId(siteUrl: string): Promise<string | null> {
+export async function wanderOsWebsiteId(
+  siteUrl: string,
+): Promise<string | null> {
   try {
     const response = await fetch(siteUrl, {
       headers: { accept: "text/html" },
@@ -66,7 +74,10 @@ export async function wanderOsWebsiteId(siteUrl: string): Promise<string | null>
     const html = await response.text();
     // The id appears in asset URLs (assets-websites.wander.com/<id>/...),
     // which is the most stable place it shows up.
-    const asset = /(?:assets-websites|wander-upload-assets)\.wander\.com\/(\d{12,})\//.exec(html);
+    const asset =
+      /(?:assets-websites|wander-upload-assets)\.wander\.com\/(\d{12,})\//.exec(
+        html,
+      );
     return asset?.[1] ?? WEBSITE_ID_RE.exec(html)?.[1] ?? null;
   } catch {
     return null;
@@ -147,6 +158,12 @@ export async function listWanderOsListings(input: {
         // upscaled twice over, and the feed row it also feeds wants ≥500px.
         imageUrl: row.medias?.[0]?.mediumResUrl ?? row.medias?.[0]?.lowResUrl,
         thumbUrl: row.medias?.[0]?.lowResUrl ?? row.medias?.[0]?.mediumResUrl,
+        gallery: (row.medias ?? []).flatMap((media) => {
+          // Video rows carry no still we can draw a card on.
+          const url = media.mediumResUrl ?? media.lowResUrl;
+          if (!url) return [];
+          return [{ url, thumbUrl: media.lowResUrl ?? url }];
+        }),
         city: row.address?.city,
         state: row.address?.state,
         country: row.address?.countryShortCode ?? row.address?.country,
