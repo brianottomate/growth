@@ -93,6 +93,44 @@ export function homePreviewRecipes(home: HomeForPreview): HomePreviewRecipe[] {
   ];
 }
 
+/** Everything a preview tile needs to draw itself, and to be frozen as is. */
+export type PreviewSpec = {
+  brandId: string;
+  templateId: "hero-overlay" | "catalog-place";
+  formatId: CompositionFormatId;
+  source: { assetId: string } | { url: string };
+  title: string;
+  subtitle?: string | null;
+  eyebrow?: string | null;
+  cta?: string | null;
+  rating?: number | null;
+  focal?: { x: number; y: number } | null;
+  scrim?: string | null;
+};
+
+/** The Studio's preview route for any spec; the art director's fields ride along. */
+export function compositionPreviewUrl(spec: PreviewSpec) {
+  const params = new URLSearchParams({
+    brandId: spec.brandId,
+    templateId: spec.templateId,
+    formatId: spec.formatId,
+    title: spec.title,
+    mark: "none",
+  });
+  if (spec.subtitle) params.set("subtitle", spec.subtitle);
+  if (spec.eyebrow) params.set("eyebrow", spec.eyebrow);
+  if (spec.cta) params.set("cta", spec.cta);
+  if (spec.rating != null) params.set("rating", String(spec.rating));
+  if (spec.focal) {
+    params.set("focalX", String(spec.focal.x));
+    params.set("focalY", String(spec.focal.y));
+  }
+  if (spec.scrim) params.set("scrim", spec.scrim);
+  if ("assetId" in spec.source) params.set("sourceMediaAssetId", spec.source.assetId);
+  else params.set("sourceUrl", spec.source.url);
+  return `/api/compositions/preview?${params.toString()}`;
+}
+
 /**
  * The Studio's preview route for one tile. The photo is a library asset when
  * the home's hero has been imported, or the hero's own URL on their site when
@@ -105,17 +143,14 @@ export function homePreviewUrl(input: {
   formatId: CompositionFormatId;
   recipe: HomePreviewRecipe;
 }) {
-  const params = new URLSearchParams({
+  return compositionPreviewUrl({
     brandId: input.brandId,
     templateId: "hero-overlay",
     formatId: input.formatId,
+    source: input.source,
     title: input.recipe.title,
     cta: input.recipe.cta,
-    mark: "none",
   });
-  if ("assetId" in input.source) params.set("sourceMediaAssetId", input.source.assetId);
-  else params.set("sourceUrl", input.source.url);
-  return `/api/compositions/preview?${params.toString()}`;
 }
 
 /** The listing card's fields for one home, written from the feed facts. */
@@ -149,17 +184,14 @@ export function homeCatalogPreviewUrl(input: {
   formatId: CompositionFormatId;
   copy: HomeCatalogCopy;
 }) {
-  const params = new URLSearchParams({
+  return compositionPreviewUrl({
     brandId: input.brandId,
     templateId: "catalog-place",
     formatId: input.formatId,
+    source: input.source,
     eyebrow: input.copy.eyebrow,
     title: input.copy.title,
     subtitle: input.copy.subtitle,
-    mark: "none",
+    rating: input.copy.rating,
   });
-  if (input.copy.rating !== null) params.set("rating", String(input.copy.rating));
-  if ("assetId" in input.source) params.set("sourceMediaAssetId", input.source.assetId);
-  else params.set("sourceUrl", input.source.url);
-  return `/api/compositions/preview?${params.toString()}`;
 }

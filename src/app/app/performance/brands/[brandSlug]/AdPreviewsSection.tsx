@@ -15,16 +15,16 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
-import { adPreviewStudioHref } from "@/lib/ad-preview-links";
-import type { HomeCatalogCopy } from "@/lib/home-ad-previews";
+import type { HomeCatalogCopy, PreviewSpec } from "@/lib/home-ad-previews";
 import { sendAssistantIntent } from "@/lib/assistant-events";
 import type { AdPreviewCard } from "@/server/services/brand-ad-previews.service";
 import { useTRPC } from "@/trpc/react";
 
+import { OnDemandTile } from "./OnDemandTile";
 import { type PickerHome, type PickerImage, PreviewSourcePicker } from "./PreviewSourcePicker";
 
 /**
- * One home drawn on the awareness card straight from the listing feed, in a
+ * One home drawn on the two ad families straight from the listing feed, in a
  * canvas per placement so each mock shows the whole card.
  */
 export type OnDemandPreview = {
@@ -32,18 +32,14 @@ export type OnDemandPreview = {
   homeName: string;
   homeUrl: string;
   imageUrl: string;
+  /** The photo the cards draw on: the home's hero, or a chosen library image. */
+  sourceUrl: string;
   headline: string;
   cta: string;
   /** An operator chose this home; false means the first on their feed stood in. */
   picked: boolean;
-  /** The awareness card, one canvas per placement. */
-  previews: Record<AdMockSurface, string>;
-  /** The listing card for the same home, one canvas per placement. */
   catalog: HomeCatalogCopy;
-  catalogPreviews: Record<AdMockSurface, string>;
 };
-
-type OnDemandRow = "awareness" | "listing";
 
 /** The canvas each placement's on-demand card is drawn on. */
 const SURFACE_FORMAT: Record<AdMockSurface, "landscape" | "square" | "story"> = {
@@ -51,6 +47,9 @@ const SURFACE_FORMAT: Record<AdMockSurface, "landscape" | "square" | "story"> = 
   instagram: "square",
   story: "story",
 };
+
+
+
 
 // The section's label and panel match `_components.tsx`, which cannot be
 // imported here: it reads the desk service, and this is a client component.
@@ -101,47 +100,25 @@ export function AdPreviewsSection({
   const router = useRouter();
   // The Studio works from a library copy of the photo, so opening an
   // on-demand card imports its hero first (or finds the earlier import).
-  const [studioTarget, setStudioTarget] = useState<{ row: OnDemandRow; surface: AdMockSurface }>({
-    row: "awareness",
-    surface: "instagram",
-  });
-  const openInStudio = useMutation(
-    trpc.media.importUrls.mutationOptions({
-      onSuccess: (result) => {
-        const asset = result.assets[0];
-        if (!asset || !onDemand) {
-          toast.error("The photo could not be brought into the library");
-          return;
-        }
-        const formatId = SURFACE_FORMAT[studioTarget.surface];
-        router.push(
-          studioTarget.row === "awareness"
-            ? adPreviewStudioHref({
-                brandId,
-                brandSlug,
-                sourceAssetId: asset.id,
-                templateId: "hero-overlay",
-                formatId,
-                title: onDemand.headline,
-                cta: onDemand.cta,
-              })
-            : adPreviewStudioHref({
-                brandId,
-                brandSlug,
-                sourceAssetId: asset.id,
-                templateId: "catalog-place",
-                formatId,
-                eyebrow: onDemand.catalog.eyebrow,
-                title: onDemand.catalog.title,
-                subtitle: onDemand.catalog.subtitle,
-                rating: onDemand.catalog.rating,
-              }),
-        );
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-  const drawn = cards.length === 0 ? (onDemand ?? null) : null;
+  const drawn = onDemand ?? null;
+  const specFor = (row: "awareness" | "listing", surface: AdMockSurface): PreviewSpec | null => {
+    if (!drawn) return null;
+    const base = {
+      brandId,
+      formatId: SURFACE_FORMAT[surface],
+      source: { url: drawn.sourceUrl },
+    };
+    return row === "awareness"
+      ? { ...base, templateId: "hero-overlay", title: drawn.headline, cta: drawn.cta }
+      : {
+          ...base,
+          templateId: "catalog-place",
+          eyebrow: drawn.catalog.eyebrow,
+          title: drawn.catalog.title,
+          subtitle: drawn.catalog.subtitle,
+          rating: drawn.catalog.rating,
+        };
+  };
   const remove = useMutation(
     trpc.brand.removeAdPreview.mutationOptions({
       onSuccess: () => {
@@ -180,7 +157,7 @@ export function AdPreviewsSection({
           Ad previews{cards.length ? ` · ${cards.length}` : ""}
         </SectionLabel>
         <div className="flex flex-wrap items-center gap-2">
-          {cards.length === 0 && picker ? (
+          {drawn && picker ? (
             <PreviewSourcePicker
               brandId={brandId}
               homes={picker.homes}
@@ -212,73 +189,7 @@ export function AdPreviewsSection({
         </div>
       </div>
 
-      {cards.length === 0 && drawn ? (
-        <div className="space-y-4">
-          {(
-            [
-              { row: "awareness", label: "Awareness · Hero overlay", previews: drawn.previews },
-              { row: "listing", label: "Listing card · Catalog place", previews: drawn.catalogPreviews },
-            ] as const
-          ).map((group) => (
-            <div key={group.row} className="space-y-2">
-              <p className="text-muted-foreground text-[11px]">{group.label}</p>
-              <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
-                {AD_MOCK_SURFACES.map((option) => (
-                  <li key={option.id} className="flex flex-col items-center gap-2">
-                    <AdMock
-                      surface={option.id}
-                      brandName={brandName}
-                      brandLogo={brandLogo}
-                      body={null}
-                      headline={drawn.homeName}
-                      link={drawn.homeUrl}
-                      callToAction="Book now"
-                      media={[{ url: group.previews[option.id], thumbnail: null, type: "image" }]}
-                      className={option.id === "story" ? "w-full max-w-60" : "w-full max-w-80"}
-                    />
-                    <div className="text-muted-foreground flex w-full max-w-80 items-center justify-between gap-2 text-[11px]">
-                      <span className="truncate">{option.label} · drawn now</span>
-                      <button
-                        type="button"
-                        disabled={openInStudio.isPending}
-                        onClick={() => {
-                          setStudioTarget({ row: group.row, surface: option.id });
-                          openInStudio.mutate({
-                            brandId,
-                            images: [{ url: drawn.imageUrl, title: drawn.homeName }],
-                          });
-                        }}
-                        className="shrink-0 text-sky-300 hover:underline disabled:opacity-50"
-                      >
-                        Studio
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-muted-foreground text-[11px]">
-              {drawn.picked
-                ? `${drawn.homeName}, the featured home, drawn as it would run in each placement.`
-                : `${drawn.homeName}, the first home on their site. Feature a home below to draw that one instead.`}{" "}
-              Nothing is kept until a card is frozen in the Studio.
-            </p>
-            {designInChat}
-          </div>
-        </div>
-      ) : cards.length === 0 ? (
-        <div className={panel}>
-          <EmptyState
-            compact
-            icon={Megaphone}
-            title="No ad previews yet"
-            description="What their ads will look like before there is a campaign. Open a photo in the library or one of their homes above and choose “Design an ad from this photo”; the card you freeze lands here."
-            actions={designInChat}
-          />
-        </div>
-      ) : (
+      {cards.length > 0 ? (
         <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
           {cards.map((card) => (
             <li key={card.assetId} className="flex flex-col items-center gap-2">
@@ -329,11 +240,64 @@ export function AdPreviewsSection({
               </div>
             </li>
           ))}
-          <li className="flex items-center justify-center">
-            {cards.length < 8 ? designInChat : null}
-          </li>
         </ul>
-      )}
+      ) : null}
+
+      {drawn ? (
+        <div className="space-y-4">
+          {cards.length > 0 ? (
+            <p className="text-muted-foreground text-[11px]">Drawn from {drawn.homeName}, not kept</p>
+          ) : null}
+          {(
+            [
+              { row: "awareness", label: "Awareness · Hero overlay" },
+              { row: "listing", label: "Listing card · Catalog place" },
+            ] as const
+          ).map((group) => (
+            <div key={group.row} className="space-y-2">
+              <p className="text-muted-foreground text-[11px]">{group.label}</p>
+              <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
+                {AD_MOCK_SURFACES.map((option) => {
+                  const spec = specFor(group.row, option.id);
+                  return spec ? (
+                    <OnDemandTile
+                      key={`${group.row}:${option.id}`}
+                      brandId={brandId}
+                      brandSlug={brandSlug}
+                      brandName={brandName}
+                      brandLogo={brandLogo}
+                      surface={option.id}
+                      spec={spec}
+                      home={{ name: drawn.homeName, url: drawn.homeUrl, imageUrl: drawn.imageUrl }}
+                    />
+                  ) : null;
+                })}
+              </ul>
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground text-[11px]">
+              {drawn.picked
+                ? `${drawn.homeName}, the featured home, drawn as it would run in each placement.`
+                : `${drawn.homeName}, the first home on their site. Feature a home below to draw that one instead.`}{" "}
+              Direct asks the art director to judge and adjust a card; Keep freezes it into the previews.
+            </p>
+            {cards.length === 0 ? designInChat : null}
+          </div>
+        </div>
+      ) : null}
+
+      {!drawn && cards.length === 0 ? (
+        <div className={panel}>
+          <EmptyState
+            compact
+            icon={Megaphone}
+            title="No ad previews yet"
+            description="What their ads will look like before there is a campaign. Open a photo in the library or one of their homes above and choose “Design an ad from this photo”; the card you freeze lands here."
+            actions={designInChat}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
