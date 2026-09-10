@@ -52,6 +52,7 @@ import {
   setBrandRelationshipAction,
   setBrandMarkAction,
   addBrandAdPreviewAction,
+  setPerformanceSettingsAction,
 } from "./brands";
 import { listPlaybooksAction, readPlaybookAction } from "./playbooks";
 import { CONTENT_STRATEGY_TOOLS } from "./content-strategy";
@@ -186,6 +187,7 @@ export const brandWrite = growthDomainTool({
     enrich: enrichBrandAction,
     setMark: setBrandMarkAction,
     addAdPreview: addBrandAdPreviewAction,
+    setPerformanceSettings: setPerformanceSettingsAction,
     previewPurge: previewBrandPurgeAction,
     purge: purgeBrandAction,
   },

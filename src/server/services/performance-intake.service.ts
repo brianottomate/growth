@@ -2,11 +2,11 @@ import "server-only";
 
 import { advanceBrandStage } from "./brand-relationship.service";
 
-
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/server/db";
+import { fillSettingsFromIntake } from "./performance-settings.service";
 import {
   brandTable,
   performanceAccountTable,
@@ -600,6 +600,19 @@ export async function applyPerformanceIntake(
     written.push(
       `Added ${rows.length} home(s)${located > 0 ? `, ${located} with a location` : ""}`,
     );
+  }
+
+  // 4. Settings onto the brand, filling only what is still empty: the
+  //    receipt never overwrites a deliberate edit. Replacing one is the
+  //    agent's call, made with the explicit settings verb.
+  if (intake.brand) {
+    const filled = await fillSettingsFromIntake({
+      brandId: intake.brand.id,
+      orgId: actor.orgId,
+      answers,
+    });
+    if (filled.length > 0)
+      written.push(`Settings filled: ${filled.join(", ")}`);
   }
 
   await db

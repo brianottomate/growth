@@ -119,12 +119,12 @@ export const contentRouter = createTRPCRouter({
    */
   searchIndex: protectedProcedure.query(async ({ ctx }) => {
     const { org, brands } = await orgContext(ctx);
-    if (!org) return { ideas: [], posts: [] };
+    if (!org) return { ideas: [], posts: [], clients: [] };
     const brandIds = brands.map((brand) => brand.id);
-    if (!brandIds.length) return { ideas: [], posts: [] };
+    if (!brandIds.length) return { ideas: [], posts: [], clients: [] };
     const brandName = new Map(brands.map((brand) => [brand.id, brand.name]));
 
-    const [ideas, posts] = await Promise.all([
+    const [ideas, posts, clients] = await Promise.all([
       ctx.db.query.contentPostTable.findMany({
         where: and(
           inArray(contentPostTable.brandId, brandIds),
@@ -167,6 +167,23 @@ export const contentRouter = createTRPCRouter({
         },
         orderBy: [desc(platformPostTable.updatedAt)],
       }),
+      // Performance clients and prospects, so ⌘K is a door into a brand.
+      ctx.db.query.brandTable.findMany({
+        where: and(
+          eq(brandTable.organizationId, org.id),
+          isNull(brandTable.deletedAt),
+          inArray(brandTable.relationship, ["client", "prospect"]),
+        ),
+        columns: {
+          id: true,
+          name: true,
+          slug: true,
+          website: true,
+          relationship: true,
+          performanceStage: true,
+        },
+        orderBy: [asc(brandTable.name)],
+      }),
     ]);
 
     return {
@@ -197,6 +214,14 @@ export const contentRouter = createTRPCRouter({
           brandName: brandName.get(post.brandId) ?? "—",
           href: `/app/content/${post.contentPostId}#post-${post.id}`,
         })),
+      clients: clients.map((client) => ({
+        id: client.id,
+        name: client.name,
+        website: client.website,
+        relationship: client.relationship,
+        stage: client.performanceStage,
+        href: `/app/performance/brands/${client.slug ?? client.id}`,
+      })),
     };
   }),
 

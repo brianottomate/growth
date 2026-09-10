@@ -143,6 +143,39 @@ export type BrandMark = {
  * library asset whose composition metadata already holds the spec that made
  * it, so the Studio can reopen it and a homes run can read its blueprint.
  */
+/**
+ * A Performance client's settings: the live state a person or the agent
+ * sets, or that an intake is promoted into. The intake itself stays a
+ * client-only receipt. Facts with a table of their own are not repeated here:
+ * budget is on the cycle, access on the intake verification, homes on
+ * performance_property, spend on the platform rows.
+ * Applied with scripts/apply-performance-settings-schema.ts.
+ */
+export type PerformanceSettings = {
+  /** Who receives the monthly report; free text, commas between addresses. */
+  reportEmails?: string | null;
+  invoiceEmail?: string | null;
+  /** What the client said about reusing guest content, in their words. */
+  ugcPermission?: string | null;
+  /** The client's own creative and guest-list folders, from the intake or a rep. */
+  creativeDriveUrl?: string | null;
+  guestListDriveUrl?: string | null;
+  /** The tracker sheet's creative columns. */
+  catalogCreativeUrl?: string | null;
+  carouselCreativeUrl?: string | null;
+  heroCreativeUrl?: string | null;
+  adCopiesUrl?: string | null;
+  dedicatedNewsletter?: string | null;
+  influencer?: string | null;
+  socialMediaPosts?: string | null;
+  /** Bookings reported by hand, until the platform counts them. */
+  bookings?: number | null;
+  updatedAt?: string;
+  updatedBy?: string | null;
+  /** What last wrote here: the intake being applied, a person, or the agent. */
+  updatedFrom?: "intake" | "operator" | "agent";
+};
+
 export type BrandAdPreview = {
   assetId: string;
   /** The blueprint and canvas the card was rendered with, for the caption. */
@@ -340,6 +373,8 @@ export const brandTable = pgTable(
      * scripts/apply-brand-ad-previews-schema.ts; see that file for why.
      */
     adPreviews: t.jsonb().$type<BrandAdPreview[]>(),
+    /** Live client settings; see PerformanceSettings. */
+    performanceSettings: t.jsonb().$type<PerformanceSettings>(),
     brandFingerprint: t.jsonb().$type<BrandFingerprint>(),
     // Shared listening judgment + reply guidance (voice still from brandFingerprint).
     brandListeningStory: t.jsonb().$type<BrandListeningStory>(),

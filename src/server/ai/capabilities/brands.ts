@@ -23,6 +23,10 @@ import {
   addBrandAdPreview,
   performanceBrandPath,
 } from "@/server/services/brand-ad-previews.service";
+import {
+  performanceSettingsPatchSchema,
+  setPerformanceSettings,
+} from "@/server/services/performance-settings.service";
 import { growthAction } from "./types";
 
 /** Brand ids for the org — shared by other org-scoped capabilities. */
@@ -111,6 +115,44 @@ export const addBrandAdPreviewAction = growthAction({
       brandId: brand.id,
       count: previews.length,
       path: performanceBrandPath(brand),
+    };
+  },
+});
+
+export const setPerformanceSettingsAction = growthAction({
+  description:
+    "Set a Performance client's live settings on the brand: report emails, invoice email, UGC permission, the client's creative and guest-list folders, the catalog / carousel / hero creative folders, the ad copies doc, dedicated newsletter, influencer, social posts, and hand-counted bookings. Send only the keys to change; an empty string clears one. This is the only writer besides an applied intake, which fills empty cells and never overwrites, so replacing a value the client gave is your decision to make and to say.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    patch: performanceSettingsPatchSchema,
+  }),
+  execute: async (input, ctx) => {
+    const brand = await db.query.brandTable.findFirst({
+      where: and(
+        eq(brandTable.id, input.brandId),
+        eq(brandTable.organizationId, ctx.orgId),
+        isNull(brandTable.deletedAt),
+      ),
+      columns: { id: true, slug: true },
+    });
+    if (!brand) {
+      throw new Error(
+        "That brand is not available in the active organization.",
+      );
+    }
+    const result = await setPerformanceSettings({
+      brandId: brand.id,
+      orgId: ctx.orgId,
+      patch: input.patch,
+      by: ctx.userId,
+      from: "agent",
+    });
+    return {
+      ok: true as const,
+      brandId: brand.id,
+      changed: result.changed,
+      settings: result.settings,
+      path: `${performanceBrandPath(brand)}/settings`,
     };
   },
 });
@@ -207,7 +249,11 @@ export const setBrandMarkAction = growthAction({
   outputSchema: z.object({
     brandId: z.string(),
     source: z.enum(["logo", "favicon", "lockup"]),
-    variants: z.object({ color: z.string(), white: z.string(), dark: z.string() }),
+    variants: z.object({
+      color: z.string(),
+      white: z.string(),
+      dark: z.string(),
+    }),
     note: z.string().nullable(),
     path: z.string(),
   }),
@@ -227,10 +273,15 @@ export const setBrandMarkAction = growthAction({
     // Fix with AI runs, applied before the tones are rendered.
     const tuning =
       input.source === "lockup"
-        ? await critiqueBrandMark({ brandId: brand.id, recipe }).catch((error: unknown) => {
-            console.error("lockup critique failed, saving as measured", error);
-            return null;
-          })
+        ? await critiqueBrandMark({ brandId: brand.id, recipe }).catch(
+            (error: unknown) => {
+              console.error(
+                "lockup critique failed, saving as measured",
+                error,
+              );
+              return null;
+            },
+          )
         : null;
     const mark = await setBrandMark({
       brandId: brand.id,

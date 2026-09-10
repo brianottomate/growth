@@ -91,3 +91,6 @@ scripts/.social-handles-*.json
 # Lab media (mp4 renders, motion studies) stays out of git; history rewritten 2026-08-27 to purge it
 public/lab/
 scripts/.probe-*.json
+
+# Git worktrees for parallel dev servers live inside the repo, out of sight.
+.worktrees/

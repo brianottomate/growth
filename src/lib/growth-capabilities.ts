@@ -19,6 +19,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
     "enrich",
     "setMark",
     "addAdPreview",
+    "setPerformanceSettings",
     "previewPurge",
     "purge",
   ],

@@ -102,6 +102,8 @@ export const growthActionPolicies = {
     setMark: write({ idempotent: true, consequence: "model-write" }),
     // A reference onto the brand row; the card already exists in the library.
     addAdPreview: write({ idempotent: true }),
+    // A merge into the brand's settings JSONB; the same patch twice is a no-op.
+    setPerformanceSettings: write({ idempotent: true }),
     previewPurge: read(),
     // Offboarding. Deletes rows, R2 bytes and the Zernio connection, none of
     // which come back, so it is approval-gated and kept off MCP: a hard delete

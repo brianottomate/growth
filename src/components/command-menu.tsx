@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { FileText } from "lucide-react";
+import { Building2, FileText } from "lucide-react";
 
 import { NAV_GROUPS } from "@/components/app-nav";
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
@@ -18,6 +18,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { STAGE_LABEL } from "@/lib/performance-stage";
 import { useTRPC } from "@/trpc/react";
 
 export const OPEN_COMMAND_MENU_EVENT = "growth-command-menu:open";
@@ -91,6 +92,37 @@ export function CommandMenu() {
               )),
             )}
           </CommandGroup>
+
+          {data?.clients.length ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading={`Clients · ${data.clients.length}`}>
+                {data.clients.map((client) => (
+                  <CommandItem
+                    key={client.id}
+                    value={[
+                      client.name,
+                      client.website,
+                      client.relationship,
+                      client.stage ? STAGE_LABEL[client.stage] : null,
+                      "performance",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onSelect={() => go(client.href)}
+                  >
+                    <Building2 />
+                    <span className="min-w-0 flex-1 truncate">
+                      {client.name}
+                    </span>
+                    <CommandShortcut className="max-w-32 truncate tracking-normal">
+                      {client.stage ? STAGE_LABEL[client.stage] : client.relationship}
+                    </CommandShortcut>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          ) : null}
 
           {data?.ideas.length ? (
             <>

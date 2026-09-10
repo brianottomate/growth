@@ -111,6 +111,22 @@ Never: commit directly on `canary`, branch a feature from `canary`, or merge
 `dev` into `canary`. If canary ever holds a commit that is not on `dev`, it is
 already wrong — reset it rather than merging it.
 
+### Worktrees for a second dev server
+
+Next.js 16 refuses a second `next dev` in the same directory (`.next/dev/lock`),
+so running two branches at once needs a git worktree. Keep them **inside the
+repo, out of sight**, never as siblings at the Wander root:
+
+```bash
+git worktree add .worktrees/<name> -b feat/<name> origin/dev
+cp .env mise.toml .worktrees/<name>/ && (cd .worktrees/<name> && bun install)
+```
+
+`.worktrees/` is gitignored. Give the copy its own `.claude/launch.json` entry
+with `autoPort: true`. **Clean up the day the PR merges**: `git worktree remove
+.worktrees/<name>`, delete the branch, and drop the launch entry. A worktree
+that outlives its PR is a few gigabytes of caches with nothing in them.
+
 ## Stack
 
 Next.js 16 (App Router, React 19) · tRPC v11 + TanStack Query (SuperJSON) · Drizzle ORM on

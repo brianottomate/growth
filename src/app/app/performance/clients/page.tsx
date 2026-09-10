@@ -1,26 +1,39 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Building2 } from "lucide-react";
 
 import { db } from "@/server/db";
-import {
-  memberTable,
-  performanceIntakeTable,
-  performancePropertyTable,
-} from "@/server/db/schema";
+import { memberTable } from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BrandSearch, type BrandSearchGroup } from "@/app/app/brands/BrandSearch";
+import {
+  BrandSearch,
+  type BrandSearchGroup,
+} from "@/app/app/brands/BrandSearch";
 import {
   loadPerformanceDesk,
   narrowDesk,
   type DeskBrand,
 } from "@/server/services/performance-desk.service";
+import {
+  loadBrandReadiness,
+  readinessLinks,
+  type BrandReadiness,
+  type IntakeSummary,
+} from "@/server/services/performance-readiness.service";
 
 import { cn } from "@/components/ui/lib/utils";
-import { brandAdsHref, BrandLogo, CampaignRow, panel, SectionLabel, tile } from "../_components";
+import {
+  brandAdsHref,
+  BrandLogo,
+  CampaignRow,
+  panel,
+  SectionLabel,
+  tile,
+} from "../_components";
+import { ReadinessChecklist } from "../ReadinessChecklist";
 import { StageChip } from "../StageChip";
 import { StartCampaignInChat } from "../StartCampaignInChat";
 import { BrandRowMenu } from "../BrandRowMenu";
@@ -29,31 +42,14 @@ import { SendLink } from "../SendLink";
 export const metadata: Metadata = { title: "Clients · Wander Performance" };
 export const dynamic = "force-dynamic";
 
-type IntakeSummary = {
-  status: string;
-  submittedAt: Date;
-  by: string | null;
-  budget: number | null;
-  budgetIsRecommendation: boolean;
-  homes: number | "all" | null;
-  homesOnRecord: number;
-  reportEmails: string | null;
-  invoiceEmail: string | null;
-  creative: boolean;
-  guestList: boolean;
-  ugc: string | null;
-  accessClaimed: boolean;
-  accessVerified: boolean;
-  notes: string | null;
-};
-
 const fmtDate = (d: Date) =>
   d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 
 /**
  * The clients as a list, filtered on the page the way /brands is: one row per
- * client or prospect with what they filed on the intake form, where their
- * campaigns stand, and the intake link to send when they have not filed yet.
+ * client or prospect with what they filed on the intake form, where they
+ * stand on the production checklist, where their campaigns are, and the
+ * intake link to send when they have not filed yet.
  */
 export default async function PerformanceClientsPage() {
   const session = await getSession();
@@ -63,76 +59,31 @@ export default async function PerformanceClientsPage() {
     with: { organization: true },
   });
   const org = membership?.organization;
-  if (!org) return <div className="text-muted-foreground">No organization found.</div>;
+  if (!org)
+    return <div className="text-muted-foreground">No organization found.</div>;
 
   const desk = narrowDesk(await loadPerformanceDesk(org.id), "client");
-  const accountIds = desk.brands
-    .map((brand) => brand.account?.id)
-    .filter((id): id is string => Boolean(id));
-  const [intakes, properties] = accountIds.length
-    ? await Promise.all([
-        db.query.performanceIntakeTable.findMany({
-          where: inArray(performanceIntakeTable.accountId, accountIds),
-          orderBy: (t, { desc }) => desc(t.submittedAt),
-        }),
-        db.query.performancePropertyTable.findMany({
-          where: and(
-            inArray(performancePropertyTable.accountId, accountIds),
-            isNull(performancePropertyTable.deletedAt),
-          ),
-          columns: { accountId: true },
-        }),
-      ])
-    : [[], []];
-  const homesByAccount = new Map<string, number>();
-  for (const row of properties) {
-    homesByAccount.set(row.accountId, (homesByAccount.get(row.accountId) ?? 0) + 1);
-  }
-  // Newest intake per account; the receipt is verbatim, so read it whole.
-  const intakeByAccount = new Map<string, IntakeSummary>();
-  for (const row of intakes) {
-    if (intakeByAccount.has(row.accountId)) continue;
-    const answers = row.answers;
-    intakeByAccount.set(row.accountId, {
-      status: row.status,
-      submittedAt: row.submittedAt,
-      by: row.submittedByName ?? row.submittedByEmail ?? null,
-      budget: row.mediaBudgetDollars,
-      budgetIsRecommendation: row.budgetIsRecommendation,
-      homes: answers.allProperties
-        ? "all"
-        : answers.propertyUrls?.length
-          ? answers.propertyUrls.length
-          : null,
-      homesOnRecord: homesByAccount.get(row.accountId) ?? 0,
-      reportEmails: answers.reportEmails?.trim() || null,
-      invoiceEmail: answers.invoiceEmail?.trim() || null,
-      creative: Boolean(answers.creativeDriveUrl),
-      guestList: Boolean(answers.guestListDriveUrl),
-      ugc: answers.ugcPermission?.trim() || null,
-      accessClaimed: Boolean(row.accessClaimedAt),
-      accessVerified: Boolean(row.zernioVerifiedAt),
-      notes: [answers.propertyNotes, answers.anythingElse]
-        .map((value) => value?.trim())
-        .filter(Boolean)
-        .join(" · ") || null,
-    });
-  }
+  const readiness = await loadBrandReadiness(desk.brands);
 
   const entry = (brand: DeskBrand) => ({
     key: brand.id,
-    search: [brand.name, brand.slug, brand.website, brand.relationship, brand.account?.status]
+    search: [
+      brand.name,
+      brand.slug,
+      brand.website,
+      brand.relationship,
+      brand.account?.status,
+    ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase(),
     node: (
-      <ClientRow
-        brand={brand}
-        intake={brand.account ? (intakeByAccount.get(brand.account.id) ?? null) : null}
-      />
+      <ClientRow brand={brand} readiness={readiness.get(brand.id) ?? null} />
     ),
   });
-  const groups: BrandSearchGroup[] = [{ label: "Clients", entries: desk.brands.map(entry) }];
+  const groups: BrandSearchGroup[] = [
+    { label: "Clients", entries: desk.brands.map(entry) },
+  ];
 
   return (
     <div className="space-y-2">
@@ -150,9 +101,18 @@ export default async function PerformanceClientsPage() {
 }
 
 /** One client: who they are on one line, what they filed as tiles, and what is missing. */
-function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary | null }) {
+function ClientRow({
+  brand,
+  readiness,
+}: {
+  brand: DeskBrand;
+  readiness: BrandReadiness | null;
+}) {
+  const intake = readiness?.intake ?? null;
   const meta = [
-    intake ? `intake filed ${fmtDate(intake.submittedAt)}${intake.by ? ` by ${intake.by}` : ""}` : "no intake yet",
+    intake
+      ? `intake filed ${fmtDate(intake.submittedAt)}${intake.by ? ` by ${intake.by}` : ""}`
+      : "no intake yet",
   ];
   return (
     <article className={cn(panel, "p-5")}>
@@ -160,14 +120,22 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         <BrandLogo brand={brand} className="size-10 text-[13px]" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={`/app/performance/brands/${brand.slug ?? brand.id}`} className="text-[14.5px] font-semibold hover:underline">
+            <Link
+              href={`/app/performance/brands/${brand.slug ?? brand.id}`}
+              className="text-[14.5px] font-semibold hover:underline"
+            >
               {brand.name}
             </Link>
             <StageChip stage={brand.stage} />
           </div>
           <p className="text-muted-foreground mt-0.5 truncate text-xs">
             {brand.website ? (
-              <a href={brand.website} target="_blank" rel="noreferrer" className="hover:underline">
+              <a
+                href={brand.website}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:underline"
+              >
                 {brand.website.replace(/^https?:\/\//, "")}
               </a>
             ) : null}
@@ -176,9 +144,17 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {brand.pitchUrl ? <SendLink label="Pitch page" url={brand.pitchUrl} /> : null}
-          {brand.intakeUrl ? <SendLink label="Intake form" url={brand.intakeUrl} /> : null}
-          <BrandRowMenu brandId={brand.id} brandName={brand.name} stage={brand.stage} />
+          {brand.pitchUrl ? (
+            <SendLink label="Pitch page" url={brand.pitchUrl} />
+          ) : null}
+          {brand.intakeUrl ? (
+            <SendLink label="Intake form" url={brand.intakeUrl} />
+          ) : null}
+          <BrandRowMenu
+            brandId={brand.id}
+            brandName={brand.name}
+            stage={brand.stage}
+          />
         </div>
       </div>
 
@@ -186,17 +162,34 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         <IntakeFacts intake={intake} plan={brand.account?.plan ?? null} />
       ) : (
         <p className="text-muted-foreground mt-4 text-xs">
-          {brand.intakeUrl ? "No intake filed yet." : "No intake filed, and no intake link for this brand."}
+          {brand.intakeUrl
+            ? "No intake filed yet."
+            : "No intake filed, and no intake link for this brand."}
         </p>
       )}
 
+      {readiness ? (
+        <div className="mt-4 border-t pt-1">
+          <ReadinessChecklist
+            checklist={readiness.checklist}
+            links={readinessLinks(brand)}
+          />
+        </div>
+      ) : null}
+
       <div className="mt-4 space-y-2 border-t pt-3">
         <div className="flex items-baseline justify-between">
-          <SectionLabel>Campaigns{brand.campaigns.length ? ` · ${brand.campaigns.length}` : ""}</SectionLabel>
+          <SectionLabel>
+            Campaigns
+            {brand.campaigns.length ? ` · ${brand.campaigns.length}` : ""}
+          </SectionLabel>
           {brand.campaigns.length === 0 ? (
             <StartCampaignInChat brandId={brand.id} brandName={brand.name} />
           ) : (
-            <Link href={brandAdsHref(brand)} className="text-[11.5px] text-sky-300 hover:underline">
+            <Link
+              href={brandAdsHref(brand)}
+              className="text-[11.5px] text-sky-300 hover:underline"
+            >
               New campaign
             </Link>
           )}
@@ -204,7 +197,11 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         {brand.campaigns.length > 0 ? (
           <ul className="divide-y rounded-xl border">
             {brand.campaigns.map((campaign) => (
-              <CampaignRow key={campaign.id} brand={brand} campaign={campaign} />
+              <CampaignRow
+                key={campaign.id}
+                brand={brand}
+                campaign={campaign}
+              />
             ))}
           </ul>
         ) : null}
@@ -214,7 +211,10 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
         <div className="mt-4 flex items-center gap-2 border-t pt-3 text-xs text-amber-300">
           <span className="size-1.5 rounded-full bg-amber-400" />
           Brand mark missing, so cards render without the logo.
-          <Link href={`/app/brands/${brand.slug ?? brand.id}#brand-mark`} className="text-sky-300 hover:underline">
+          <Link
+            href={`/app/brands/${brand.slug ?? brand.id}#brand-mark`}
+            className="text-sky-300 hover:underline"
+          >
             Fix
           </Link>
         </div>
@@ -224,10 +224,28 @@ function ClientRow({ brand, intake }: { brand: DeskBrand; intake: IntakeSummary 
 }
 
 /** The intake as the client filed it, as tiles a rep reads before a call. */
-function IntakeFacts({ intake, plan }: { intake: IntakeSummary; plan: string | null }) {
-  const tiles: { label: string; value: string; tone?: "ok" | "warn" | "muted" }[] = [
+function IntakeFacts({
+  intake,
+  plan,
+}: {
+  intake: IntakeSummary;
+  plan: string | null;
+}) {
+  const tiles: {
+    label: string;
+    value: string;
+    tone?: "ok" | "warn" | "muted";
+  }[] = [
     ...(plan
-      ? [{ label: "Plan", value: plan.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), tone: "ok" as const }]
+      ? [
+          {
+            label: "Plan",
+            value: plan
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
+            tone: "ok" as const,
+          },
+        ]
       : []),
     {
       label: "Budget",
@@ -241,8 +259,16 @@ function IntakeFacts({ intake, plan }: { intake: IntakeSummary; plan: string | n
     },
     {
       label: "Ad access",
-      value: intake.accessVerified ? "Verified" : intake.accessClaimed ? "Claimed, not seen" : "Not granted",
-      tone: intake.accessVerified ? "ok" : intake.accessClaimed ? "warn" : "muted",
+      value: intake.accessVerified
+        ? "Verified"
+        : intake.accessClaimed
+          ? "Claimed, not seen"
+          : "Not granted",
+      tone: intake.accessVerified
+        ? "ok"
+        : intake.accessClaimed
+          ? "warn"
+          : "muted",
     },
     {
       label: "Homes",
@@ -260,7 +286,9 @@ function IntakeFacts({ intake, plan }: { intake: IntakeSummary; plan: string | n
       label: "Reports · invoice",
       value:
         intake.reportEmails || intake.invoiceEmail
-          ? [intake.reportEmails, intake.invoiceEmail].filter(Boolean).join(" · ")
+          ? [intake.reportEmails, intake.invoiceEmail]
+              .filter(Boolean)
+              .join(" · ")
           : "Not given",
       tone: intake.reportEmails || intake.invoiceEmail ? "ok" : "muted",
     },
@@ -282,11 +310,17 @@ function IntakeFacts({ intake, plan }: { intake: IntakeSummary; plan: string | n
       <div className="grid grid-cols-2 gap-2.5 @2xl:grid-cols-3 @4xl:grid-cols-6">
         {tiles.map((row) => (
           <div key={row.label} className={tile}>
-            <SectionLabel className="text-[10px] tracking-[0.07em]">{row.label}</SectionLabel>
+            <SectionLabel className="text-[10px] tracking-[0.07em]">
+              {row.label}
+            </SectionLabel>
             <p
               className={cn(
                 "mt-1 truncate text-[12.5px]",
-                row.tone === "ok" ? "font-semibold" : row.tone === "warn" ? "text-amber-300" : "text-muted-foreground",
+                row.tone === "ok"
+                  ? "font-semibold"
+                  : row.tone === "warn"
+                    ? "text-amber-300"
+                    : "text-muted-foreground",
               )}
               title={row.value}
             >
@@ -296,7 +330,10 @@ function IntakeFacts({ intake, plan }: { intake: IntakeSummary; plan: string | n
         ))}
       </div>
       {intake.notes ? (
-        <p className="text-muted-foreground line-clamp-2 text-xs" title={intake.notes}>
+        <p
+          className="text-muted-foreground line-clamp-2 text-xs"
+          title={intake.notes}
+        >
           “{intake.notes}”
         </p>
       ) : null}
