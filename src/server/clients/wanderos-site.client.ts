@@ -11,6 +11,7 @@ import "server-only";
 //   * that id is the only credential the search endpoint wants
 
 const SEARCH_URL = "https://api.wander.com/saas/website/search";
+const LISTING_URL = "https://api.wander.com/saas/website/listings";
 /** WanderOS ids are long numerics; 12+ digits avoids matching a price or year. */
 const WEBSITE_ID_RE = /\b(\d{12,})\b/;
 
@@ -177,4 +178,76 @@ export async function listWanderOsListings(input: {
   }
 
   return listings;
+}
+
+/** One photo on a listing, with the room it belongs to when the feed names it. */
+export type WanderOsPhoto = {
+  url: string;
+  thumbUrl: string;
+  /** "Master King Bedroom", "Cover photos" is dropped as a label. */
+  room: string | null;
+};
+
+/**
+ * Every photo on one listing, which is not what the search feed carries.
+ *
+ * `/search` returns a preview set per listing, around five, because it is
+ * built for a results page. The detail endpoint returns the gallery the
+ * property page itself shows: grouped, one group per room, forty-odd photos
+ * for a large home. This is Wander's own API, so there is nothing to scrape.
+ *
+ * Never throws: a home whose detail cannot be read falls back to the preview
+ * set the caller already has.
+ */
+export async function listWanderOsListingPhotos(input: {
+  websiteId: string;
+  propertyId: string;
+}): Promise<WanderOsPhoto[]> {
+  try {
+    const response = await fetch(`${LISTING_URL}/${input.propertyId}`, {
+      headers: {
+        "x-wander-client": "wander-customer-website",
+        "x-website-id": input.websiteId,
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as {
+      medias?: {
+        name?: string;
+        type?: string;
+        medias?: {
+          url?: string;
+          thumbnailUrl?: string;
+          type?: string;
+          status?: string;
+        }[];
+      }[];
+    };
+    const photos: WanderOsPhoto[] = [];
+    const seen = new Set<string>();
+    for (const group of body.medias ?? []) {
+      // The catch-all group is literally named "ROOM", and the hero group's
+      // name is a header rather than a place in the house.
+      const room =
+        group.name && group.name !== "ROOM" && group.type !== "HERO"
+          ? group.name
+          : null;
+      for (const media of group.medias ?? []) {
+        if (!media.url || media.type !== "IMAGE") continue;
+        if (media.status && media.status !== "READY") continue;
+        if (seen.has(media.url)) continue;
+        seen.add(media.url);
+        photos.push({
+          url: media.url,
+          thumbUrl: media.thumbnailUrl ?? media.url,
+          room,
+        });
+      }
+    }
+    return photos;
+  } catch (error) {
+    console.error("wanderos listing photos failed", input.propertyId, error);
+    return [];
+  }
 }

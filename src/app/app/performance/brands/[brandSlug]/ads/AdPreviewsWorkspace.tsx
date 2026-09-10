@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Check, Download, Search, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import {
   AD_MOCK_SURFACES,
@@ -18,8 +18,9 @@ import {
   homePreviewRecipes,
   type PreviewSpec,
 } from "@/lib/home-ad-previews";
-import { hotelFeedRows, type HotelFeedHome } from "@/lib/meta-hotel-feed";
+import type { HotelFeedHome } from "@/lib/meta-hotel-feed";
 
+import { HomePicker } from "../HomePicker";
 import { OnDemandTile } from "../OnDemandTile";
 
 export type WorkspaceHome = HotelFeedHome & {
@@ -30,8 +31,6 @@ export type WorkspaceHome = HotelFeedHome & {
 
 /** How many homes one campaign draws from; Meta's carousel holds ten cards. */
 export const MAX_PICKED = 10;
-/** Catalog cards drawn before "Show all"; every card is a server render. */
-const CATALOG_FIRST = 24;
 
 // `_components` reaches the desk service, which is server-only; the section
 // shapes are spelled out here.
@@ -48,16 +47,11 @@ const FORMAT_FOR_SURFACE: Record<AdMockSurface, CompositionFormatId> = {
 
 const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 
-/** What the download is, on hover; the page itself stays heading and data. */
-const FEED_TITLE =
-  "Meta Hotels and rentals feed, one row per home with a photo. Street address and coordinates are not on the WanderOS feed and export empty.";
-
 /**
- * The brand's ad draft space: pick up to ten homes from their WanderOS
- * catalog, see each one's static and the set's carousel drawn as they would
- * run, and below that the whole catalog as listing cards with the Meta feed
- * to download. Nothing here is saved until a card is kept; the pick lives in
- * the URL so a link carries it.
+ * The brand's ad draft space: the set of homes an ad runs on, and what that
+ * set makes. The roster and the catalog feed live on the Homes tab, so this
+ * page is only about the handful chosen. Nothing here is saved until a card
+ * is kept; the pick lives in the URL so a link carries it.
  */
 export function AdPreviewsWorkspace({
   brandId,
@@ -80,9 +74,7 @@ export function AdPreviewsWorkspace({
   const pathname = usePathname();
   const [picked, setPicked] = useState<string[]>(initialPicked);
   const [surface, setSurface] = useState<AdMockSurface>("instagram");
-  const [query, setQuery] = useState("");
   const [card, setCard] = useState(0);
-  const [showAll, setShowAll] = useState(false);
 
   const byId = useMemo(
     () => new Map(homes.map((home) => [home.id, home])),
@@ -91,17 +83,6 @@ export function AdPreviewsWorkspace({
   const pickedHomes = picked
     .map((id) => byId.get(id))
     .filter((home): home is WorkspaceHome => Boolean(home));
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return homes;
-    return homes.filter((home) =>
-      [home.name, home.city, home.state]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [homes, query]);
 
   const commit = (next: string[]) => {
     setPicked(next);
@@ -142,34 +123,46 @@ export function AdPreviewsWorkspace({
     return null;
   })();
 
-  const rows = useMemo(
-    () => hotelFeedRows(homes, brandName),
-    [homes, brandName],
-  );
-  const catalogShown = showAll ? homes : homes.slice(0, CATALOG_FIRST);
-  const exportHref = (format: "csv" | "xml") =>
-    `/api/performance/catalog/${encodeURIComponent(brandId)}?format=${format}`;
-
   return (
     <div className="space-y-7">
-      {/* 1 · The pick */}
+      {/* 1 · The set, as chips. Changing it is a dialog, because the set is
+             a handful chosen once and a permanent grid of two hundred tiles
+             was a lot of page to carry that. */}
       <section className="space-y-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className={sectionLabel}>
             Homes for the ads · {picked.length}/{MAX_PICKED}
           </p>
-          <label className="relative block">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={`Search ${homes.length} homes`}
-              className="bg-muted/40 h-8 w-56 rounded-full border pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
+          <div className="flex items-center gap-3">
+            {picked.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => commit([])}
+                className="text-[11.5px] text-sky-300 hover:underline"
+              >
+                Clear
+              </button>
+            ) : null}
+            <HomePicker
+              homes={homes}
+              picked={picked}
+              max={MAX_PICKED}
+              onChange={commit}
+              label={picked.length > 0 ? "Change homes" : "Add homes"}
             />
-          </label>
+          </div>
         </div>
 
-        {pickedHomes.length > 0 ? (
+        {pickedHomes.length === 0 ? (
+          <p
+            className={cn(
+              panel,
+              "text-muted-foreground px-4 py-6 text-center text-xs",
+            )}
+          >
+            No homes in the set yet.
+          </p>
+        ) : (
           <ul className="flex flex-wrap gap-1.5">
             {pickedHomes.map((home) => (
               <li key={home.id}>
@@ -177,7 +170,7 @@ export function AdPreviewsWorkspace({
                   type="button"
                   onClick={() => toggle(home.id)}
                   className="hover:bg-muted flex items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5 text-[11.5px]"
-                  title="Remove from the set"
+                  title="Take out of the set"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -191,81 +184,7 @@ export function AdPreviewsWorkspace({
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-muted-foreground text-xs">Pick up to ten homes.</p>
         )}
-
-        <div className={cn(panel, "max-h-[26rem] overflow-y-auto p-3")}>
-          {filtered.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-center text-xs">
-              No home matches “{query}”.
-            </p>
-          ) : (
-            <ul className="grid grid-cols-3 gap-2 @xl:grid-cols-4 @3xl:grid-cols-6 @5xl:grid-cols-8">
-              {filtered.map((home) => {
-                const on = picked.includes(home.id);
-                const full = !on && picked.length >= MAX_PICKED;
-                return (
-                  <li key={home.id}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(home.id)}
-                      disabled={full}
-                      className={cn(
-                        "group relative block w-full overflow-hidden rounded-xl border text-left transition",
-                        on
-                          ? "border-sky-400 ring-2 ring-sky-400/40"
-                          : "hover:border-white/30",
-                        full && "opacity-40",
-                      )}
-                      title={
-                        full
-                          ? `Ten homes is the most one set holds`
-                          : on
-                            ? "Remove from the set"
-                            : "Add to the set"
-                      }
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={home.thumbUrl ?? home.imageUrl}
-                        alt={home.name}
-                        loading="lazy"
-                        className="aspect-[4/3] w-full object-cover"
-                      />
-                      <span
-                        className={cn(
-                          "absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full border text-white",
-                          on
-                            ? "border-sky-400 bg-sky-500"
-                            : "border-white/60 bg-black/40 opacity-0 group-hover:opacity-100",
-                        )}
-                      >
-                        {on ? <Check className="size-3" /> : null}
-                      </span>
-                      <span className="block px-2 py-1.5">
-                        <span className="block truncate text-[11.5px] font-medium">
-                          {home.name}
-                        </span>
-                        <span className="text-muted-foreground block truncate text-[10.5px]">
-                          {[
-                            home.bedrooms ? `${home.bedrooms} bd` : null,
-                            home.guests ? `${home.guests} guests` : null,
-                            home.nightlyFrom
-                              ? `${money(home.nightlyFrom)}/nt`
-                              : null,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
         {withoutPhoto > 0 ? (
           <p className="text-muted-foreground text-[11px]">
             {withoutPhoto} {withoutPhoto === 1 ? "home has" : "homes have"} no
@@ -373,88 +292,6 @@ export function AdPreviewsWorkspace({
               </div>
             ) : null}
           </div>
-        )}
-      </section>
-
-      {/* 3 · The catalog */}
-      <section className="space-y-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className={sectionLabel}>
-            Catalog · {rows.length} {rows.length === 1 ? "home" : "homes"}
-          </p>
-          <div className="flex items-center gap-3 text-[11.5px]">
-            <a
-              href={exportHref("csv")}
-              download
-              title={FEED_TITLE}
-              className="inline-flex items-center gap-1 text-sky-300 hover:underline"
-            >
-              <Download className="size-3" />
-              Meta CSV
-            </a>
-            <a
-              href={exportHref("xml")}
-              download
-              title={FEED_TITLE}
-              className="inline-flex items-center gap-1 text-sky-300 hover:underline"
-            >
-              <Download className="size-3" />
-              Meta XML
-            </a>
-          </div>
-        </div>
-        {homes.length === 0 ? (
-          <p
-            className={cn(
-              panel,
-              "text-muted-foreground px-4 py-8 text-center text-xs",
-            )}
-          >
-            No homes with a photo on the feed.
-          </p>
-        ) : (
-          <>
-            <ul className="grid grid-cols-2 gap-3 @xl:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-6">
-              {catalogShown.map((home) => (
-                <li key={home.id} className={cn(panel)}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={homeCatalogPreviewUrl({
-                      brandId,
-                      source: { url: home.imageUrl },
-                      formatId: "square",
-                      copy: homeCatalogCopy(home),
-                    })}
-                    alt={home.name}
-                    loading="lazy"
-                    className="aspect-square w-full bg-black/20 object-cover"
-                  />
-                  <div className="px-2.5 py-2">
-                    <p className="truncate text-[11.5px] font-medium">
-                      {home.name}
-                    </p>
-                    <p className="text-muted-foreground truncate text-[10.5px]">
-                      {[
-                        home.id,
-                        home.nightlyFrom
-                          ? `${money(home.nightlyFrom)} USD`
-                          : "no rate",
-                      ].join(" · ")}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {!showAll && homes.length > CATALOG_FIRST ? (
-              <button
-                type="button"
-                onClick={() => setShowAll(true)}
-                className="text-[11.5px] text-sky-300 hover:underline"
-              >
-                Show all {homes.length}
-              </button>
-            ) : null}
-          </>
         )}
       </section>
     </div>

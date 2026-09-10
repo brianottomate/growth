@@ -6,6 +6,7 @@ import { cn } from "@/components/ui/lib/utils";
 import { brandListings } from "@/server/services/wanderos-listings.service";
 
 import { panel, SectionLabel } from "../../../_components";
+import { CatalogGrid, type CatalogHome } from "../CatalogGrid";
 import { HomesStrip } from "../HomesStrip";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 
@@ -31,6 +32,18 @@ export default async function PerformanceBrandHomesPage({
 
   const homes = await brandListings({ id: brand.id, website: brand.website });
   const withPhoto = homes.filter((home) => home.imageUrl);
+  const catalog: CatalogHome[] = withPhoto.map((home) => ({
+    id: home.id,
+    name: home.name,
+    imageUrl: home.imageUrl!,
+    city: home.city ?? null,
+    state: home.state ?? null,
+    bedrooms: home.bedrooms ?? null,
+    bathrooms: home.bathrooms ?? null,
+    guests: home.guests ?? null,
+    rating: home.rating ?? null,
+    nightlyFrom: home.nightlyFrom ?? null,
+  }));
   const slug = brand.slug ?? brand.id;
 
   return (
@@ -103,6 +116,12 @@ export default async function PerformanceBrandHomesPage({
           ) : null}
         </>
       )}
+
+      {withPhoto.length > 0 ? (
+        <div className="border-t pt-5">
+          <CatalogGrid brandId={brand.id} homes={catalog} />
+        </div>
+      ) : null}
     </div>
   );
 }

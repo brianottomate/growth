@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -11,6 +11,7 @@ import {
   ExternalLink,
   LayoutGrid,
   PenLine,
+  Search,
   Star,
   ZoomIn,
 } from "lucide-react";
@@ -65,8 +66,22 @@ export function HomesStrip({
   /** The home that stands for the brand; its tile and lightbox say so. */
   featuredUrl: string | null;
 }) {
+  const [query, setQuery] = useState("");
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return homes;
+    return homes.filter((home) =>
+      [home.name, home.city, home.state]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [homes, query]);
+  // The lightbox steps through what is on screen, so it indexes the filtered
+  // list rather than the whole roster.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const open = openIndex !== null ? (homes[openIndex] ?? null) : null;
+  const open = openIndex !== null ? (shown[openIndex] ?? null) : null;
   const router = useRouter();
   const trpc = useTRPC();
   const design = useMutation(
@@ -131,7 +146,7 @@ export function HomesStrip({
         return (current + delta + homes.length) % homes.length;
       });
     },
-    [homes.length],
+    [shown.length],
   );
 
   useEffect(() => {
@@ -146,8 +161,30 @@ export function HomesStrip({
 
   return (
     <>
+      <label className="relative mb-2.5 block">
+        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpenIndex(null);
+          }}
+          placeholder={`Search ${homes.length} homes`}
+          className="bg-muted/40 h-8 w-full max-w-72 rounded-full border pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
+        />
+      </label>
+      {shown.length === 0 ? (
+        <p
+          className={cn(
+            panel,
+            "text-muted-foreground px-4 py-8 text-center text-xs",
+          )}
+        >
+          No home matches “{query}”.
+        </p>
+      ) : null}
       <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-6">
-        {homes.map((home, index) => (
+        {shown.map((home, index) => (
           <li key={home.id} className={cn(panel, "group relative")}>
             {/* The card is the way in to the home. The photo is a detail of
                 it, so zooming is a control ON the card rather than the whole

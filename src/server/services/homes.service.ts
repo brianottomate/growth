@@ -5,10 +5,14 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { brandTable, homeMediaTable, homeTable } from "@/server/db/schema";
 import type { HomeMediaRole } from "@/server/db/home-schema";
-import type { WanderOsListing } from "@/server/clients/wanderos-site.client";
+import {
+  listWanderOsListingPhotos,
+  type WanderOsListing,
+} from "@/server/clients/wanderos-site.client";
 
 import {
   brandListings,
+  brandWebsiteId,
   normalizeListingUrl,
 } from "./wanderos-listings.service";
 
@@ -36,6 +40,8 @@ export type HomePhoto = {
   url: string;
   thumbUrl: string;
   from: "feed" | "library";
+  /** The room this photo is of, when the gallery groups it into one. */
+  room: string | null;
   role: HomeMediaRole;
   sortOrder: number | null;
   assetId: string | null;
@@ -180,8 +186,23 @@ export async function loadBrandHome(input: {
     ),
   );
 
+  // The search feed carries a preview set, around five. The listing's own
+  // endpoint carries the gallery the property page shows, forty-odd for a
+  // large home, grouped by room. Fall back to the preview when it fails.
+  const websiteId = listing ? await brandWebsiteId(brand.id) : null;
+  const detail = websiteId
+    ? await listWanderOsListingPhotos({
+        websiteId,
+        propertyId: input.propertyId,
+      })
+    : [];
+  const gallery =
+    detail.length > 0
+      ? detail
+      : (listing?.gallery ?? []).map((photo) => ({ ...photo, room: null }));
+
   const hero = row.heroSourceUrl;
-  const feedPhotos: HomePhoto[] = (listing?.gallery ?? []).flatMap((photo) => {
+  const feedPhotos: HomePhoto[] = gallery.flatMap((photo) => {
     const decided = bySourceUrl.get(photo.url);
     if (decided?.role === "excluded") return [];
     return [
@@ -190,6 +211,7 @@ export async function loadBrandHome(input: {
         url: photo.url,
         thumbUrl: decided?.thumbUrl ?? photo.thumbUrl,
         from: "feed" as const,
+        room: photo.room,
         role: decided?.role ?? "gallery",
         sortOrder: decided?.sortOrder ?? null,
         assetId: null,
@@ -208,6 +230,7 @@ export async function loadBrandHome(input: {
         url: asset.url,
         thumbUrl: asset.thumbnailUrl ?? asset.url,
         from: "library" as const,
+        room: null,
         role: media.role,
         sortOrder: media.sortOrder,
         assetId: media.assetId,

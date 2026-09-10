@@ -106,6 +106,7 @@ type MarkBrand = {
   organizationId: string | null;
   brandIdentity: {
     colors?: { primary?: string; accent?: string };
+    logo?: string | null;
     favicon?: string | null;
     fonts?: Array<{ family: string; role?: "body" | "heading" }>;
   } | null;
@@ -144,9 +145,17 @@ export async function resolveMarkIconUrl(
   brand: MarkBrand,
 ): Promise<string | null> {
   const favicon = brand.brandIdentity?.favicon ?? brand.websiteMeta?.favicon ?? null;
+  // Same fallback shape as the favicon above, and for the same reason. The
+  // `logo` COLUMN is whatever selectBrandLogo could offer at the time the
+  // brand was last enriched, which falls through to the OG image when no
+  // branding profile had been read yet, and an OG image is a photo, so the
+  // mark comes out a screenshot. `brandIdentity.logo` is the real artwork
+  // Firecrawl names, written by a later enrichment that never backfills the
+  // column. Prefer it; the column stays the fallback.
+  const logo = brand.brandIdentity?.logo ?? brand.logo;
   if (recipe.source === "favicon") return favicon;
-  if (recipe.source === "logo") return brand.logo;
-  if (recipe.iconFrom === "logo") return brand.logo;
+  if (recipe.source === "logo") return logo;
+  if (recipe.iconFrom === "logo") return logo;
   if (recipe.iconFrom === "favicon") return favicon;
   if (!recipe.iconAssetId) return null;
   const asset = await db.query.mediaAssetTable.findFirst({

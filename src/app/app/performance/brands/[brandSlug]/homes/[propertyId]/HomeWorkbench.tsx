@@ -196,6 +196,11 @@ export function HomeWorkbench({
                       <EyeOff className="size-3" />
                     </button>
                   </div>
+                  {photo.room ? (
+                    <p className="text-muted-foreground truncate px-2 pt-1.5 text-[10px]">
+                      {photo.room}
+                    </p>
+                  ) : null}
                   <div className="flex items-center gap-1 px-1.5 py-1.5">
                     <Chip
                       on={photo.isHero}
