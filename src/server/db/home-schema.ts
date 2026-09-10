@@ -28,11 +28,16 @@ export const homeSourceEnum = pgEnum("home_source", [
 ]);
 export type HomeSource = (typeof homeSourceEnum.enumValues)[number];
 
-/** What a photo is for on this home. Order within a role is `sortOrder`. */
+/**
+ * What a photo has been chosen for. The hero is not in here: it is one value
+ * per home, so it lives on `home.heroSourceUrl` where exactly one of them can
+ * exist without a rule to enforce it.
+ */
 export const homeMediaRoleEnum = pgEnum("home_media_role", [
-  "hero", // the one the statics draw on
-  "gallery", // the walk-through, in order, for a single-home carousel
-  "excluded", // seen and rejected, so the gallery stops offering it
+  "hero", // unused: kept because Postgres cannot drop an enum value
+  "gallery", // seen, and deliberately not in the carousel
+  "excluded", // hidden from the home's photos altogether
+  "carousel", // in the carousel, at `sortOrder`
 ]);
 export type HomeMediaRole = (typeof homeMediaRoleEnum.enumValues)[number];
 

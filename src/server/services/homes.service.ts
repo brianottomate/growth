@@ -39,7 +39,10 @@ export type HomePhoto = {
   role: HomeMediaRole;
   sortOrder: number | null;
   assetId: string | null;
+  /** The photo the creatives draw on. One per home, or none. */
   isHero: boolean;
+  /** Chosen for the carousel, at `sortOrder`. */
+  inCarousel: boolean;
 };
 
 export type HomeDetail = {
@@ -57,7 +60,12 @@ export type HomeDetail = {
   rating: number | null;
   nightlyFrom: number | null;
   heroSourceUrl: string | null;
+  /** Every photo worth showing: the feed's, plus uploads, minus the excluded. */
   photos: HomePhoto[];
+  /** The hero, or null while the creatives fall back to the first photo. */
+  hero: HomePhoto | null;
+  /** The carousel, in the order it runs. */
+  carousel: HomePhoto[];
   /** True when the feed no longer carries this listing. */
   offFeed: boolean;
 };
@@ -182,10 +190,11 @@ export async function loadBrandHome(input: {
         url: photo.url,
         thumbUrl: decided?.thumbUrl ?? photo.thumbUrl,
         from: "feed" as const,
-        role: decided?.role ?? ("gallery"),
+        role: decided?.role ?? "gallery",
         sortOrder: decided?.sortOrder ?? null,
         assetId: null,
         isHero: hero === photo.url,
+        inCarousel: decided?.role === "carousel",
       },
     ];
   });
@@ -203,17 +212,19 @@ export async function loadBrandHome(input: {
         sortOrder: media.sortOrder,
         assetId: media.assetId,
         isHero: hero === asset.url,
+        inCarousel: media.role === "carousel",
       },
     ];
   });
 
-  // The hero leads, then anything given an order, then the feed's own order.
-  const photos = [...libraryPhotos, ...feedPhotos].sort((a, b) => {
-    if (a.isHero !== b.isHero) return a.isHero ? -1 : 1;
-    const left = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
-    const right = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
-    return left - right;
-  });
+  const photos = [...libraryPhotos, ...feedPhotos];
+  const carousel = photos
+    .filter((photo) => photo.inCarousel)
+    .sort(
+      (a, b) =>
+        (a.sortOrder ?? Number.MAX_SAFE_INTEGER) -
+        (b.sortOrder ?? Number.MAX_SAFE_INTEGER),
+    );
 
   return {
     brand,
@@ -233,6 +244,8 @@ export async function loadBrandHome(input: {
       nightlyFrom: listing?.nightlyFrom ?? row.nightlyFrom,
       heroSourceUrl: row.heroSourceUrl,
       photos,
+      hero: photos.find((photo) => photo.isHero) ?? null,
+      carousel,
       offFeed: !listing,
     },
   };
@@ -291,7 +304,7 @@ export async function setHomeMedia(input: {
       );
   const existing = await db.query.homeMediaTable.findFirst({ where });
   const patch = {
-    role: input.role ?? existing?.role ?? ("gallery"),
+    role: input.role ?? existing?.role ?? "gallery",
     sortOrder: input.sortOrder ?? existing?.sortOrder ?? null,
     thumbUrl: input.thumbUrl ?? existing?.thumbUrl ?? null,
   };
@@ -313,6 +326,59 @@ export async function setHomeMedia(input: {
     })
     .returning();
   return { homeId: home.id, mediaId: created!.id };
+}
+
+/**
+ * The carousel, replaced wholesale in the order given. Anything that was in
+ * it and is not in the list drops back to being an ordinary photo.
+ *
+ * One call rather than one per photo: reordering is a single decision about
+ * a sequence, and sending it a nudge at a time invites half-saved orders.
+ */
+export async function setHomeCarousel(input: {
+  homeId: string;
+  orgId: string;
+  photos: {
+    sourceUrl?: string | null;
+    assetId?: string | null;
+    thumbUrl?: string | null;
+  }[];
+  addedBy?: string | null;
+}) {
+  const home = await ownedHome(input);
+  const existing = await db.query.homeMediaTable.findMany({
+    where: eq(homeMediaTable.homeId, home.id),
+  });
+  const keyOf = (row: { assetId?: string | null; sourceUrl?: string | null }) =>
+    row.assetId ?? row.sourceUrl ?? "";
+  const wanted = new Set(input.photos.map(keyOf).filter(Boolean));
+
+  // Out of the carousel, but still one of the home's photos.
+  for (const row of existing) {
+    if (row.role !== "carousel") continue;
+    if (wanted.has(keyOf(row))) continue;
+    await db
+      .update(homeMediaTable)
+      .set({ role: "gallery", sortOrder: null })
+      .where(eq(homeMediaTable.id, row.id));
+  }
+
+  let index = 0;
+  for (const photo of input.photos) {
+    if (!photo.assetId && !photo.sourceUrl) continue;
+    await setHomeMedia({
+      homeId: home.id,
+      orgId: input.orgId,
+      assetId: photo.assetId ?? null,
+      sourceUrl: photo.sourceUrl ?? null,
+      thumbUrl: photo.thumbUrl ?? null,
+      role: "carousel",
+      sortOrder: index,
+      addedBy: input.addedBy ?? null,
+    });
+    index += 1;
+  }
+  return { homeId: home.id, count: index };
 }
 
 /** The home, only when its brand belongs to the caller's organization. */

@@ -23,7 +23,11 @@ import {
 } from "@/server/db/schema";
 import { createId } from "@/server/db/utils";
 import { type db } from "@/server/db";
-import { setHomeHero, setHomeMedia } from "@/server/services/homes.service";
+import {
+  setHomeCarousel,
+  setHomeHero,
+  setHomeMedia,
+} from "@/server/services/homes.service";
 import { inspirationAddress } from "@/lib/inbound-email";
 import { enrichBrandFromWebsite } from "@/server/services/brand-enrichment.service";
 import {
@@ -635,7 +639,7 @@ export const brandRouter = createTRPCRouter({
         assetId: z.string().min(1).nullish(),
         sourceUrl: z.string().url().nullish(),
         thumbUrl: z.string().url().nullish(),
-        role: z.enum(["hero", "gallery", "excluded"]).optional(),
+        role: z.enum(["gallery", "excluded", "carousel"]).optional(),
         sortOrder: z.number().int().min(0).nullish(),
       }),
     )
@@ -644,6 +648,36 @@ export const brandRouter = createTRPCRouter({
       return setHomeMedia({
         ...input,
         orgId,
+        addedBy: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * The home's carousel, replaced in the order given. One call for the whole
+   * sequence: reordering is a single decision, and a write per nudge invites
+   * half-saved orders.
+   */
+  setHomeCarousel: protectedProcedure
+    .input(
+      z.object({
+        homeId: z.string().min(1),
+        photos: z
+          .array(
+            z.object({
+              assetId: z.string().min(1).nullish(),
+              sourceUrl: z.string().url().nullish(),
+              thumbUrl: z.string().url().nullish(),
+            }),
+          )
+          .max(10),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const orgId = await callerOrgId(ctx);
+      return setHomeCarousel({
+        homeId: input.homeId,
+        orgId,
+        photos: input.photos,
         addedBy: ctx.session.user.id,
       });
     }),

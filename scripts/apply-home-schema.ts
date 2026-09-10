@@ -20,7 +20,7 @@ await db.execute(sql`
       create type home_source as enum ('wanderos', 'wander', 'manual');
     end if;
     if not exists (select 1 from pg_type where typname = 'home_media_role') then
-      create type home_media_role as enum ('hero', 'gallery', 'excluded');
+      create type home_media_role as enum ('hero', 'gallery', 'excluded', 'carousel');
     end if;
   end
   $$;
@@ -96,6 +96,12 @@ await db.execute(
 );
 await db.execute(
   sql`alter table public.home alter column rating type real using rating::real;`,
+);
+
+// A photo chosen for the carousel. The first pass had only hero/gallery/
+// excluded, and the hero turned out to belong on the home rather than here.
+await db.execute(
+  sql`alter type home_media_role add value if not exists 'carousel';`,
 );
 
 console.log("home and home_media are ready.");
