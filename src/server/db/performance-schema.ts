@@ -553,3 +553,54 @@ export const performanceIntakeRelations = relations(
     }),
   }),
 );
+
+// ---- PERFORMANCE APPLICATION (the beta intake form) -------------------------
+
+/**
+ * Someone applied to the Performance beta from the pitch page.
+ *
+ * A plain record of what they typed, and nothing else. Deliberately NOT a
+ * prospect brand: an application is a claim someone made about themselves, and
+ * a brand is a thing Wander works on. Minting the second from the first put a
+ * stranger's form straight into the desk, and brought slug collisions, stage
+ * transitions and "what if they already exist" with it. A rep promoting an
+ * application into a brand is one call to the code that already does that.
+ *
+ * Nothing is unique here either. Two applications from one company are two
+ * facts, and the desk would rather see both than have the later one silently
+ * overwrite the earlier.
+ */
+export const performanceApplicationTable = pgTable(
+  "performance_application",
+  (t) => ({
+    id: t
+      .text()
+      .primaryKey()
+      .$defaultFn(() => createId("papp")),
+
+    email: t.text().notNull(),
+    name: t.text(),
+    /** Their own site, as given. Normalised for display, never fetched. */
+    websiteUrl: t.text(),
+    propertyCount: t.integer(),
+
+    /** The two qualifying answers, in their words. Free text on purpose. */
+    marketsToday: t.text(),
+    monthlySpend: t.text(),
+
+    /** Which CTA, and the raw ad attribution that came with it. */
+    source: t.text().notNull(),
+    queryParams: t.text(),
+
+    createdAt: t
+      .timestamp({ withTimezone: true })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  }),
+  (table) => [index("performance_application_created_idx").on(table.createdAt)],
+);
+
+export type PerformanceApplication =
+  typeof performanceApplicationTable.$inferSelect;
+export type PerformanceApplicationInsert =
+  typeof performanceApplicationTable.$inferInsert;
