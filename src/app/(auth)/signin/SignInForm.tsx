@@ -17,6 +17,11 @@ import { InAppBrowserAlert } from "../components/InAppBrowserAlert";
 import { GoogleSignInButton } from "../components/GoogleSignInButton";
 import { ForgotPasswordDialog } from "./ForgotPasswordDialog";
 
+/** Google sign-in is gated to @wander.com, so only those get the hint. */
+function isWanderEmail(email: string) {
+  return email.trim().toLowerCase().endsWith("@wander.com");
+}
+
 export function SignInForm({
   googleEnabled = false,
 }: {
@@ -29,6 +34,7 @@ export function SignInForm({
   const [password, setPassword] = useState("");
   const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestGoogle, setSuggestGoogle] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const isOAuthRequest =
     searchParams.has("client_id") && searchParams.has("redirect_uri");
@@ -40,6 +46,7 @@ export function SignInForm({
     e.preventDefault();
     setIsEmailLoading(true);
     setError(null);
+    setSuggestGoogle(false);
 
     // Determine callback URL based on invite context
     const callbackURL = getCallbackURL(searchParams);
@@ -54,6 +61,10 @@ export function SignInForm({
 
       if (error) {
         setError(error.message ?? "Failed to sign in");
+        // Everyone who joined before SSO has a password-only account, and
+        // account linking trusts Google, so Continue with Google lands them on
+        // that same user. Nothing said so, and they asked for a reset instead.
+        setSuggestGoogle(isWanderEmail(email));
       } else if (data) {
         router.push(callbackURL);
         router.refresh();
@@ -95,7 +106,15 @@ export function SignInForm({
 
               {error && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>
+                    {error}
+                    {suggestGoogle && googleEnabled && (
+                      <span className="mt-1 block">
+                        Wander accounts can sign in with Google above, whether
+                        or not they ever had a password.
+                      </span>
+                    )}
+                  </AlertDescription>
                 </Alert>
               )}
 
