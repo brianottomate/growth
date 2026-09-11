@@ -51,12 +51,12 @@ const authAllowedHosts = Array.from(
     [
       "localhost:3000",
       process.env.NODE_ENV === "development" ? "localhost:*" : undefined,
-      // Canonical production hosts, listed explicitly so auth URL resolution
+      // Canonical production host, listed explicitly so auth URL resolution
       // (and OAuth callback host) works even when the Vercel-injected env vars
-      // below don't cover a custom alias. growth.wander.com is pre-emptive:
-      // its DNS isn't live yet, but the host is trusted for when it is.
+      // below don't cover a custom alias. A custom domain would have to be
+      // added here AND to the Google client's redirect URIs before it could
+      // carry a session, so don't list one pre-emptively.
       "growth-red.vercel.app",
-      "growth.wander.com",
       authHost(env.NEXT_PUBLIC_BASE_URL),
       authHost(process.env.VERCEL_URL),
       authHost(process.env.VERCEL_BRANCH_URL),
@@ -315,7 +315,6 @@ export const auth = betterAuth({
     "http://localhost:3000",
     "https://kristianeboe-65.beta.localcan.dev",
     "https://growth-red.vercel.app",
-    "https://growth.wander.com",
     "https://chatgpt.com",
     "https://claude.ai",
     "https://*.claude.ai",

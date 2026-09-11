@@ -101,7 +101,7 @@ export const NODES: WanderNode[] = [
   },
   {
     id: "growth-app",
-    label: "growth.wander.com",
+    label: "Wander Growth",
     type: "surface",
     lenses: ["full", "sales-motion"],
     description:

@@ -162,7 +162,7 @@ export const GROUPS: EcoGroup[] = [
   {
     id: "growth-platform",
     label: "Growth Platform",
-    description: "growth.wander.com — CIO sync, recs, Outreach integration",
+    description: "Wander Growth — CIO sync, recs, Outreach integration",
     color: "#84cc16",
   },
 ];
@@ -489,7 +489,7 @@ export const NODES: EcoNode[] = [
     lenses: ["full", "sales-motion", "host-journey"],
     description: "Python/FastAPI — CIO sync, recs, BDR assignment (legacy)",
     owner: "Growth Engineering",
-    notes: "Being replaced by growth.wander.com (this app)",
+    notes: "Being replaced by Wander Growth (this app)",
     status: "legacy",
   },
   {
@@ -685,7 +685,7 @@ export const NODES: EcoNode[] = [
   // ── Growth Platform ──
   {
     id: "growth-app",
-    label: "growth.wander.com",
+    label: "Wander Growth",
     group: "growth-platform",
     category: "surface",
     lenses: ["full", "sales-motion", "data-spine"],
