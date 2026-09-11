@@ -196,80 +196,89 @@ export default async function PregenReviewPage({
   );
 
   return (
-    <div className="mx-auto max-w-6xl p-4 sm:p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Pregen review</h1>
-          <p className="text-muted-foreground text-sm">
-            {previews.length} preview{previews.length === 1 ? "" : "s"}
-            {requested?.length ? " (explicit list)" : " — next send wave, unjudged"} ·
-            no
-            view beacons fire from this page
-          </p>
+    // Wider than the rest of /app: these iframes are the artefact being judged,
+    // and the app layout's centered max-w-5xl column renders a desktop site at
+    // ~900px, which is narrow enough to change how the design reads. The cqw
+    // negative margin escapes that column (the layout's scroll div is the
+    // @container) exactly as the content Board does, then the inner cap keeps
+    // an ultrawide monitor from stretching a preview past readable.
+    <div className="mx-[calc(((100cqw-min(100cqw,64rem))/2+2rem)*-1)]">
+      <div className="mx-auto w-full max-w-[100rem] p-4 sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold">Pregen review</h1>
+            <p className="text-muted-foreground text-sm">
+              {previews.length} preview{previews.length === 1 ? "" : "s"}
+              {requested?.length
+                ? " (explicit list)"
+                : " — next send wave, unjudged"}{" "}
+              · no view beacons fire from this page
+            </p>
+          </div>
+          <Link
+            href="/app/pregen"
+            className="text-muted-foreground hover:text-foreground text-sm"
+          >
+            All builds
+          </Link>
         </div>
-        <Link
-          href="/app/pregen"
-          className="text-muted-foreground hover:text-foreground text-sm"
-        >
-          All builds
-        </Link>
-      </div>
 
-      {previews.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Nothing to review. Every READY build is sent, judged or excluded.
-        </p>
-      ) : (
-        <div className="space-y-10">
-          {previews.map((row, index) => (
-            <section key={row.domain}>
-              <div className="bg-background/95 border-border sticky top-0 z-10 mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2 backdrop-blur">
-                <span className="text-muted-foreground text-sm tabular-nums">
-                  {index + 1}/{previews.length}
-                </span>
-                <h2 className="font-medium">
-                  {row.businessName ?? row.companyName ?? row.domain}
-                </h2>
-                <span className="text-muted-foreground text-sm">
-                  {row.domain}
-                </span>
-                {row.sendScheduledFor ? (
-                  <span className="rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-xs text-sky-300">
-                    sends {row.sendScheduledFor}
+        {previews.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            Nothing to review. Every READY build is sent, judged or excluded.
+          </p>
+        ) : (
+          <div className="space-y-10">
+            {previews.map((row, index) => (
+              <section key={row.domain}>
+                <div className="bg-background/95 border-border sticky top-0 z-10 mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2 backdrop-blur">
+                  <span className="text-muted-foreground text-sm tabular-nums">
+                    {index + 1}/{previews.length}
                   </span>
-                ) : null}
-                <span className="ml-auto flex items-center gap-3 text-xs">
-                  <VerdictButtons
-                    buildId={row.buildId}
-                    initial={row.verdict ?? null}
-                  />
-                  <a
-                    href={row.previewUrl!}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Open preview
-                  </a>
-                  <Link
-                    href={`/app/leads/${encodeURIComponent(row.domain)}`}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Lead
-                  </Link>
-                </span>
-              </div>
-              <RecipientStrip row={row} pick={recipients.get(row.domain)} />
-              <iframe
-                src={row.previewUrl!}
-                title={`Preview for ${row.domain}`}
-                loading="lazy"
-                className="border-border h-[80vh] w-full rounded border bg-white"
-              />
-            </section>
-          ))}
-        </div>
-      )}
+                  <h2 className="font-medium">
+                    {row.businessName ?? row.companyName ?? row.domain}
+                  </h2>
+                  <span className="text-muted-foreground text-sm">
+                    {row.domain}
+                  </span>
+                  {row.sendScheduledFor ? (
+                    <span className="rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-xs text-sky-300">
+                      sends {row.sendScheduledFor}
+                    </span>
+                  ) : null}
+                  <span className="ml-auto flex items-center gap-3 text-xs">
+                    <VerdictButtons
+                      buildId={row.buildId}
+                      initial={row.verdict ?? null}
+                    />
+                    <a
+                      href={row.previewUrl!}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      Open preview
+                    </a>
+                    <Link
+                      href={`/app/leads/${encodeURIComponent(row.domain)}`}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      Lead
+                    </Link>
+                  </span>
+                </div>
+                <RecipientStrip row={row} pick={recipients.get(row.domain)} />
+                <iframe
+                  src={row.previewUrl!}
+                  title={`Preview for ${row.domain}`}
+                  loading="lazy"
+                  className="border-border h-[80vh] w-full rounded border bg-white"
+                />
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
