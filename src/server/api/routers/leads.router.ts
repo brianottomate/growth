@@ -1112,6 +1112,43 @@ export const leadsRouter = createTRPCRouter({
   }),
 
   /**
+   * Record an operator's verdict on a finished build, or clear it.
+   *
+   * `null` is an undo rather than a fourth state: the judge queue is keyboard
+   * driven at a few seconds per site, so a mis-keyed verdict has to be
+   * retractable without leaving a "someone unjudged this" artifact behind.
+   *
+   * Not a gate on sending. A rep who wants to mail an unjudged site is not
+   * blocked — see the column comment on `pregenBuild.verdict`.
+   */
+  setPregenVerdict: protectedProcedure
+    .input(
+      z.object({
+        buildId: z.string(),
+        verdict: z.enum(["send_worthy", "regenerate", "skip"]).nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(pregenBuildTable)
+        .set({
+          verdict: input.verdict,
+          verdictAt: input.verdict ? new Date() : null,
+          verdictBy: input.verdict ? ctx.session.user.id : null,
+        })
+        .where(eq(pregenBuildTable.id, input.buildId))
+        .returning({
+          id: pregenBuildTable.id,
+          domain: pregenBuildTable.domain,
+          verdict: pregenBuildTable.verdict,
+        });
+      if (!updated) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "No such build" });
+      }
+      return updated;
+    }),
+
+  /**
    * Pull current state for this prospect's latest build.
    *
    * On demand only. The webhook is the delivery path and there is no reconcile

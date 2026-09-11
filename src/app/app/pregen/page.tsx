@@ -25,6 +25,18 @@ import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
+const VERDICT_STYLES: Record<string, string> = {
+  send_worthy: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+  regenerate: "border-violet-500/40 bg-violet-500/10 text-violet-300",
+  skip: "border-border text-muted-foreground",
+};
+
+const VERDICT_LABELS: Record<string, string> = {
+  send_worthy: "send-worthy",
+  regenerate: "regenerate",
+  skip: "skip",
+};
+
 const STATUS_STYLES: Record<string, string> = {
   READY: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
   GENERATING: "border-violet-500/40 bg-violet-500/10 text-violet-300",
@@ -55,6 +67,7 @@ export default async function PregenPage() {
       settledAt: pregenBuildTable.settledAt,
       claimedAt: pregenBuildTable.claimedAt,
       viewCount: pregenBuildTable.viewCount,
+      verdict: pregenBuildTable.verdict,
       errorMessage: pregenBuildTable.errorMessage,
       batch: leadDomainTable.pregenBatch,
       companyName: leadDomainTable.companyName,
@@ -91,6 +104,9 @@ export default async function PregenPage() {
   const viewed = builds.filter((build) => build.viewCount > 0).length;
   // Companies, not builds: a rebuild leaves two rows on one domain, and this
   // number is compared against the sends in HubSpot.
+  const unjudged = builds.filter(
+    (build) => build.status === "READY" && !build.verdict,
+  ).length;
   const enrolled = new Set(
     builds
       .map((build) => build.domainId)
@@ -101,7 +117,17 @@ export default async function PregenPage() {
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <header className="flex items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">Pre-gen sites</h1>
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-2xl font-semibold">Pre-gen sites</h1>
+            {unjudged > 0 && (
+              <Link
+                href="/app/pregen/review"
+                className="text-sm underline underline-offset-2"
+              >
+                review {unjudged} →
+              </Link>
+            )}
+          </div>
           <p className="text-muted-foreground text-sm">
             {builds.length} built · {ready} ready · {viewed} opened by the prospect ·{" "}
             {enrolled} in sequence · newest first
@@ -136,6 +162,16 @@ export default async function PregenPage() {
               <span className="min-w-0 flex-1 truncate font-medium">
                 {build.companyName ?? build.businessName ?? build.domain}
               </span>
+
+              {build.verdict && (
+                <span
+                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${
+                    VERDICT_STYLES[build.verdict] ?? "border-border"
+                  }`}
+                >
+                  {VERDICT_LABELS[build.verdict] ?? build.verdict}
+                </span>
+              )}
 
               {enrolment ? (
                 <span

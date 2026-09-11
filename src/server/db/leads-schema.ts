@@ -467,6 +467,20 @@ export type LeadImportInsert = typeof leadImportTable.$inferInsert;
 // of lifecycle_program rows. `programId` is a soft reference to the lifecycle
 // strategy used (no cross-schema FK; lifecycle lives in `public`).
 
+/**
+ * An operator's verdict on a finished pregen site, recorded before anyone mails it.
+ *
+ * `regenerate` and `skip` are both refusals but they mean opposite things about the
+ * prospect: regenerate says the company is worth another build, skip says stop
+ * spending builds here. Collapsing them into one "rejected" state loses the only
+ * signal that tells a rebuild queue from a dead end.
+ */
+export const pregenVerdictEnum = leadsSchema.enum("pregen_verdict", [
+  "send_worthy",
+  "regenerate",
+  "skip",
+]);
+
 export const leadOutreachStatusEnum = leadsSchema.enum("lead_outreach_status", [
   "draft", // AI-generated, awaiting human review
   "approved", // human-approved, ready to queue
@@ -962,6 +976,22 @@ export const pregenBuildTable = leadsSchema.table(
     assignedOwnerId: t.text(),
     assignedAt: t.timestamp(),
 
+    /**
+     * Whether a human has looked at the finished site and judged it fit to send.
+     *
+     * Nothing recorded this before, so a build could be mailed without anyone
+     * having opened it — and a dead or ugly preview costs the one impression this
+     * motion gets. Null means unjudged, which is what the judge queue selects on.
+     *
+     * Deliberately not a gate in the send path: the queue exists to make judging
+     * fast, and a rep who wants to send an unjudged site should not be blocked by
+     * a workflow that is a day old. It is a record and a filter, not a lock.
+     */
+    verdict: pregenVerdictEnum(),
+    verdictAt: t.timestamp(),
+    /** Better Auth user id, so a verdict can be asked about rather than just counted. */
+    verdictBy: t.text(),
+
     createdAt: t
       .timestamp()
       .$defaultFn(() => new Date())
@@ -976,6 +1006,7 @@ export const pregenBuildTable = leadsSchema.table(
     uniqueIndex("pregen_build_prospect_id_idx").on(table.prospectId),
     index("pregen_build_domain_idx").on(table.domainId),
     index("pregen_build_status_idx").on(table.status),
+    index("pregen_build_verdict_idx").on(table.verdict),
   ],
 );
 

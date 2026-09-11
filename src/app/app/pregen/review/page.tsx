@@ -12,6 +12,8 @@ import {
 } from "@/server/db/leads-schema";
 import { pickBestPregenContact } from "@/server/services/pregen-send.service";
 
+import { VerdictButtons } from "./VerdictButtons";
+
 /**
  * A batch of previews stacked as live iframes, so a send wave can be reviewed
  * by scrolling one page instead of opening ten tabs.
@@ -20,8 +22,17 @@ import { pickBestPregenContact } from "@/server/services/pregen-send.service";
  * wrapper — the view beacon lives on the wrapper, so reviewing here cannot ping
  * sales or trip the on-open BDR rotation.
  *
+ * Each preview carries its verdict, so reviewing and recording are the same
+ * pass. A separate judge route was tried and dropped: its selling point was
+ * the prospect's own site beside ours, and most prospect sites refuse framing
+ * (`X-Frame-Options`) with no way to detect the refusal from the page, so the
+ * comparison silently became an empty box. This page already holds the context
+ * the decision needs — recipient, greeting defect, PMS, units, tier.
+ *
  * `?domains=a.com,b.com` reviews an explicit list; the default is the next
- * send wave: unsent READY builds, scheduled ones first, newest build last.
+ * send wave: unsent, UNJUDGED READY builds, scheduled ones first, newest build
+ * last. Excluding judged builds is what makes the default a queue that drains
+ * instead of a list that reopens on the same ten sites.
  */
 
 export const dynamic = "force-dynamic";
@@ -114,8 +125,10 @@ export default async function PregenReviewPage({
 
   const rows = await db
     .select({
+      buildId: pregenBuildTable.id,
       domainId: leadDomainTable.id,
       domain: pregenBuildTable.domain,
+      verdict: pregenBuildTable.verdict,
       businessName: pregenBuildTable.businessName,
       previewUrl: pregenBuildTable.previewUrl,
       sendScheduledFor: pregenBuildTable.sendScheduledFor,
@@ -138,6 +151,7 @@ export default async function PregenReviewPage({
         ? inArray(pregenBuildTable.domain, requested)
         : and(
             eq(pregenBuildTable.status, "READY"),
+            isNull(pregenBuildTable.verdict),
             eq(leadDomainTable.excludeFromOutreach, false),
             isNull(leadDomainTable.deletedAt),
             sql`not exists (select 1 from ${leadSequenceTable} where ${leadSequenceTable.domainId} = ${pregenBuildTable.domainId} and ${leadSequenceTable.hubspotEnrollmentId} is not null)`,
@@ -188,7 +202,8 @@ export default async function PregenReviewPage({
           <h1 className="text-lg font-semibold">Pregen review</h1>
           <p className="text-muted-foreground text-sm">
             {previews.length} preview{previews.length === 1 ? "" : "s"}
-            {requested?.length ? " (explicit list)" : " — next send wave"} · no
+            {requested?.length ? " (explicit list)" : " — next send wave, unjudged"} ·
+            no
             view beacons fire from this page
           </p>
         </div>
@@ -202,7 +217,7 @@ export default async function PregenReviewPage({
 
       {previews.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          Nothing to review. Every READY build is either sent or excluded.
+          Nothing to review. Every READY build is sent, judged or excluded.
         </p>
       ) : (
         <div className="space-y-10">
@@ -223,7 +238,11 @@ export default async function PregenReviewPage({
                     sends {row.sendScheduledFor}
                   </span>
                 ) : null}
-                <span className="ml-auto flex gap-3 text-xs">
+                <span className="ml-auto flex items-center gap-3 text-xs">
+                  <VerdictButtons
+                    buildId={row.buildId}
+                    initial={row.verdict ?? null}
+                  />
                   <a
                     href={row.previewUrl!}
                     target="_blank"
