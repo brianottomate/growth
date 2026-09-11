@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import {
   emptyLaunchBrief,
@@ -11,7 +11,7 @@ import {
   type LaunchSurface,
   type LaunchTier,
 } from "@/lib/launch";
-import { db } from "@/server/db";
+import { db, withTransaction } from "@/server/db";
 import {
   campaignTable,
   contentPostTable,
@@ -243,18 +243,14 @@ export async function createLaunch(input: {
 }
 
 /**
- * Upsert ONE deliverable by surface, as a single statement.
+ * Upsert ONE deliverable by surface.
  *
- * Read-modify-write in JS loses data here: the assistant fans several of these
- * out in ONE step (that is the point of small tools), each call reads the same
- * array, merges its own surface, and the last write drops the others. It cost
- * two owner assignments the first time a launch was filled from a brief.
- *
- * A transaction is not available — the Neon HTTP driver has none — so the
- * merge happens server-side instead. Every reference to `deliverables` below
- * is a correlated reference to the row being updated, which Postgres
- * re-evaluates against the new row version if a concurrent update commits
- * first, so the calls serialize rather than clobber.
+ * Locks the row for the read-modify-write. Deliverables share one jsonb
+ * column, and the assistant fans several of these out in ONE step (that is
+ * what small tools are for), so without the lock each call reads the same
+ * array, merges its own surface, and the last write drops the rest. That cost
+ * two of three owner assignments the first time a launch was filled from a
+ * brief.
  */
 export async function setDeliverable(
   orgId: string,
@@ -262,54 +258,42 @@ export async function setDeliverable(
   surface: LaunchSurface,
   patch: Partial<Omit<LaunchDeliverable, "surface">>,
 ) {
-  // Validate the patch on its own; merged with an already-valid element it
-  // stays valid, and the shape is what reaches the database.
-  //
-  // Then keep ONLY the keys the caller actually sent. `status` carries a zod
-  // default, which survives `.partial()` and would otherwise ride along in
-  // every patch — setting a ready-by date would quietly reset the status.
+  // Keep ONLY the keys the caller sent. `status` carries a zod default that
+  // survives `.partial()`, so parsing a patch alone reintroduces it and
+  // setting a ready-by date would quietly reset the surface's status.
   const parsed = launchDeliverableSchema.partial().parse({ ...patch, surface });
   const clean = Object.fromEntries(
     Object.entries(parsed).filter(([key]) => key === "surface" || key in patch),
   );
-  const patchJson = JSON.stringify(clean);
-  // A surface that does not exist yet is created, and only then does the
-  // default status apply.
-  const seed = JSON.stringify({ status: "not_started", ...clean });
 
-  const rows = await db
-    .update(launchTable)
-    .set({
-      deliverables: sql`
-        (
-          select coalesce(
-            jsonb_agg(
-              case when elem->>'surface' = ${surface}
-                   then elem || ${patchJson}::jsonb
-                   else elem end
-              order by ord
-            ),
-            '[]'::jsonb
-          )
-          from jsonb_array_elements(${launchTable.deliverables})
-            with ordinality as t(elem, ord)
-        )
-        ||
-        case
-          when ${launchTable.deliverables} @> jsonb_build_array(
-                 jsonb_build_object('surface', ${surface}::text))
-          then '[]'::jsonb
-          else jsonb_build_array(${seed}::jsonb)
-        end
-      `,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(eq(launchTable.id, launchId), eq(launchTable.organizationId, orgId)),
-    )
-    .returning();
+  return withTransaction(async (tx) => {
+    const [locked] = await tx
+      .select({ deliverables: launchTable.deliverables })
+      .from(launchTable)
+      .where(
+        and(
+          eq(launchTable.id, launchId),
+          eq(launchTable.organizationId, orgId),
+        ),
+      )
+      .for("update");
+    if (!locked) throw new Error("Launch not found");
 
-  const row = rows[0];
-  if (!row) throw new Error("Launch not found");
-  return row;
+    const existing = locked.deliverables.find((d) => d.surface === surface);
+    const merged = launchDeliverableSchema.parse({
+      status: "not_started",
+      ...(existing ?? {}),
+      ...clean,
+    });
+    const deliverables = existing
+      ? locked.deliverables.map((d) => (d.surface === surface ? merged : d))
+      : [...locked.deliverables, merged];
+
+    const [row] = await tx
+      .update(launchTable)
+      .set({ deliverables })
+      .where(eq(launchTable.id, launchId))
+      .returning();
+    return row!;
+  });
 }
