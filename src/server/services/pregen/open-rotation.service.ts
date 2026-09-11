@@ -22,8 +22,8 @@ import { pregenBuildTable } from "@/server/db/leads-schema";
  */
 
 /**
- * The demand BDRs the inbound router already routes 17-99 unit leads to
- * (`BDR_SMB_ROUND_ROBIN`), which is the band most of the pregen batch sits in.
+ * The BDRs Danny named for the pregen motion (2026-09-11); the rest of the
+ * demand team is on the orca accounts and must not be pinged for these.
  *
  * Order matters only as the tie-break when everyone is carrying the same load.
  * Edit this list to change the rotation; nothing else reads the roster.
@@ -31,7 +31,7 @@ import { pregenBuildTable } from "@/server/db/leads-schema";
 export const PREGEN_OPEN_ROTATION: Array<{ ownerId: string; name: string }> = [
   { ownerId: "430737561", name: "Karolina Tenorio" },
   { ownerId: "79859550", name: "Skyler Rickey" },
-  { ownerId: "93221525", name: "Paige Madigan" },
+  { ownerId: "80091646", name: "Justin Showalter" },
 ];
 
 /**
