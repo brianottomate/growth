@@ -165,7 +165,7 @@ export function AdPreviewsSection({
               current={picker.current}
             />
           ) : null}
-          {cards.length > 0 ? (
+          {cards.length > 0 || drawn ? (
             <div className="flex items-center gap-0.5 rounded-full border p-0.5">
               {AD_MOCK_SURFACES.map((option) => (
                 <button
@@ -248,33 +248,37 @@ export function AdPreviewsSection({
           {cards.length > 0 ? (
             <p className="text-muted-foreground text-[11px]">Drawn from {drawn.homeName}, not kept</p>
           ) : null}
-          {(
-            [
-              { row: "awareness", label: "Awareness · Hero overlay" },
-              { row: "listing", label: "Listing card · Catalog place" },
-            ] as const
-          ).map((group) => (
-            <div key={group.row} className="space-y-2">
-              <p className="text-muted-foreground text-[11px]">{group.label}</p>
-              <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
-                {AD_MOCK_SURFACES.map((option) => {
-                  const spec = specFor(group.row, option.id);
-                  return spec ? (
+          {/* The two families in the placement the toggle is on, rather than
+              every family in every placement: six mocks of one home was a wall,
+              and comparing placements is what the toggle is for. */}
+          <div className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3">
+            {(
+              [
+                { row: "awareness", label: "Awareness · Hero overlay" },
+                { row: "listing", label: "Listing card · Catalog place" },
+              ] as const
+            ).map((group) => {
+              const spec = specFor(group.row, surface);
+              return spec ? (
+                <div key={group.row} className="space-y-2">
+                  <p className="text-muted-foreground text-[11px]">
+                    {group.label}
+                  </p>
+                  <ul className="flex">
                     <OnDemandTile
-                      key={`${group.row}:${option.id}`}
                       brandId={brandId}
                       brandSlug={brandSlug}
                       brandName={brandName}
                       brandLogo={brandLogo}
-                      surface={option.id}
+                      surface={surface}
                       spec={spec}
                       home={{ name: drawn.homeName, url: drawn.homeUrl, imageUrl: drawn.imageUrl }}
                     />
-                  ) : null;
-                })}
-              </ul>
-            </div>
-          ))}
+                  </ul>
+                </div>
+              ) : null;
+            })}
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-muted-foreground text-[11px]">
               {drawn.picked

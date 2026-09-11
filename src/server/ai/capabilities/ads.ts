@@ -1192,10 +1192,10 @@ export const buildAdSetAction = growthAction({
 
 export const setAdStatusAction = growthAction({
   description:
-    "Move one drafted ad along: drawn (just built), kept (looked at and wanted), approved (cleared to run, and safe from a rebuild). This is production state on our side and touches no platform.",
+    "Approve one drafted ad, or put it back to drawn. Approved means someone wants it: it is safe from the next rebuild of the set. This is production state on our side and touches no platform.",
   inputSchema: z.object({
     adId: z.string().min(1),
-    status: z.enum(["drawn", "kept", "approved"]),
+    status: z.enum(["drawn", "approved"]),
   }),
   execute: (input, ctx) =>
     setAdStatus({ adId: input.adId, orgId: ctx.orgId, status: input.status }),

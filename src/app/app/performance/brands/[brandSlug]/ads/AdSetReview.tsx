@@ -17,7 +17,7 @@ export type ReviewCard = { url: string; thumbnail: string | null };
 export type ReviewAd = {
   id: string;
   name: string;
-  status: "drawn" | "kept" | "approved";
+  status: "drawn" | "approved";
   headline: string;
   body: string;
   callToAction: string | null;
@@ -171,29 +171,32 @@ function AdRow({
             {ad.cards.length === 1 ? "card" : "cards"} · {ad.name}
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
-          {(["drawn", "kept", "approved"] as const).map((status) => (
-            <button
-              key={status}
-              type="button"
-              disabled={busy}
-              onClick={() => setStatus.mutate({ adId: ad.id, status })}
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[10.5px] font-medium capitalize transition disabled:opacity-40",
-                ad.status === status
-                  ? status === "approved"
-                    ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                    : "border-sky-400 bg-sky-500/20 text-sky-200"
-                  : "text-muted-foreground hover:text-foreground hover:border-white/30",
-              )}
-            >
-              {ad.status === status && status === "approved" ? (
-                <Check className="mr-0.5 inline size-3 align-[-2px]" />
-              ) : null}
-              {status}
-            </button>
-          ))}
-        </div>
+        {/* One question, so one control: in the set, or not. Approved is
+            also what a rebuild leaves alone. */}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            setStatus.mutate({
+              adId: ad.id,
+              status: ad.status === "approved" ? "drawn" : "approved",
+            })
+          }
+          title={
+            ad.status === "approved"
+              ? "Approved. A rebuild leaves this one alone."
+              : "Approve. Keeps it through the next rebuild."
+          }
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10.5px] font-medium transition disabled:opacity-40",
+            ad.status === "approved"
+              ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
+              : "text-muted-foreground hover:text-foreground hover:border-white/30",
+          )}
+        >
+          <Check className="size-3" />
+          {ad.status === "approved" ? "Approved" : "Approve"}
+        </button>
       </div>
 
       <div className="mt-3 grid gap-4 @2xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">

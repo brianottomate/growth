@@ -8,8 +8,8 @@ import { useMutation } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronRight,
+  Download,
   ExternalLink,
-  LayoutGrid,
   PenLine,
   Search,
   Star,
@@ -27,9 +27,11 @@ import {
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import { adPreviewStudioHref } from "@/lib/ad-preview-links";
+import {
+  homeCatalogCopy,
+  homeCatalogPreviewUrl,
+} from "@/lib/home-ad-previews";
 import { useTRPC } from "@/trpc/react";
-
-import { HomeAdPreviews } from "./HomeAdPreviews";
 
 /** A home as the listing feed reports it; only what the tile and lightbox draw. */
 export type StripHome = {
@@ -44,14 +46,24 @@ export type StripHome = {
   bedrooms: number | null;
   bathrooms: number | null;
   guests: number | null;
+  rating: number | null;
 };
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
 
+/** A page of catalog cards. Every card is a server render, so they arrive in tens. */
+const CATALOG_PAGE = 10;
+
+/** What the download is, on hover; the page itself stays heading and data. */
+const FEED_TITLE =
+  "Meta Hotels and rentals feed, one row per home with a photo. Street address and coordinates are not on the WanderOS feed and export empty.";
+
 /**
- * The homes on their WanderOS site, each opening a lightbox on the hero photo
- * at full size. The hero lives on their site, not in our library, so the way
- * into the Studio imports it first: one click brings the photo in (or finds
+ * The homes on their WanderOS site, as their own photos or as the listing card
+ * an Advantage+ catalog ad would draw, which is one roster seen two ways rather
+ * than the same homes listed twice down the page. Each opens a lightbox on the
+ * hero at full size. The hero lives on their site, not in our library, so the
+ * way into the Studio imports it first: one click brings the photo in (or finds
  * the earlier import of the same URL) and opens the house card on it.
  */
 export function HomesStrip({
@@ -67,6 +79,10 @@ export function HomesStrip({
   featuredUrl: string | null;
 }) {
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<"photo" | "catalog">("photo");
+  // Only the catalog view pages: each of its tiles is a server render, while a
+  // hero is a URL the feed already gave us.
+  const [page, setPage] = useState(CATALOG_PAGE);
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return homes;
@@ -82,6 +98,8 @@ export function HomesStrip({
   // list rather than the whole roster.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const open = openIndex !== null ? (shown[openIndex] ?? null) : null;
+  const visible = view === "catalog" ? shown.slice(0, page) : shown;
+  const left = shown.length - visible.length;
   const router = useRouter();
   const trpc = useTRPC();
   const design = useMutation(
@@ -95,30 +113,6 @@ export function HomesStrip({
         router.push(
           adPreviewStudioHref({ brandId, brandSlug, sourceAssetId: asset.id }),
         );
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-
-  // The preview grid draws from a library copy of the hero, so the same
-  // import as the Studio door runs first; it finds the earlier copy when
-  // there is one.
-  const [previews, setPreviews] = useState<{
-    home: StripHome;
-    assetId: string;
-  } | null>(null);
-  const previewAds = useMutation(
-    trpc.media.importUrls.mutationOptions({
-      onSuccess: (result, variables) => {
-        const asset = result.assets[0];
-        const home = homes.find(
-          (row) => row.imageUrl === variables.images[0]?.url,
-        );
-        if (!asset || !home) {
-          toast.error("The photo could not be brought into the library");
-          return;
-        }
-        setPreviews({ home, assetId: asset.id });
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -142,8 +136,8 @@ export function HomesStrip({
   const step = useCallback(
     (delta: number) => {
       setOpenIndex((current) => {
-        if (current === null || homes.length === 0) return current;
-        return (current + delta + homes.length) % homes.length;
+        if (current === null || shown.length === 0) return current;
+        return (current + delta + shown.length) % shown.length;
       });
     },
     [shown.length],
@@ -161,18 +155,60 @@ export function HomesStrip({
 
   return (
     <>
-      <label className="relative mb-2.5 block">
-        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setOpenIndex(null);
-          }}
-          placeholder={`Search ${homes.length} homes`}
-          className="bg-muted/40 h-8 w-full max-w-72 rounded-full border pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
-        />
-      </label>
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <label className="relative min-w-0 flex-1">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpenIndex(null);
+              setPage(CATALOG_PAGE);
+            }}
+            placeholder={`Search ${homes.length} homes`}
+            className="bg-muted/40 h-8 w-full max-w-72 rounded-full border pr-3 pl-8 text-xs outline-none focus:ring-2 focus:ring-sky-400/40"
+          />
+        </label>
+        <div className="flex items-center gap-3 text-[11.5px]">
+          {view === "catalog"
+            ? (["csv", "xml"] as const).map((format) => (
+                <a
+                  key={format}
+                  href={`/api/performance/catalog/${encodeURIComponent(brandId)}?format=${format}`}
+                  download
+                  title={FEED_TITLE}
+                  className="inline-flex items-center gap-1 text-sky-300 hover:underline"
+                >
+                  <Download className="size-3" />
+                  Meta {format.toUpperCase()}
+                </a>
+              ))
+            : null}
+          <div className="flex items-center gap-0.5 rounded-full border p-0.5">
+            {(
+              [
+                { id: "photo", label: "Photos" },
+                { id: "catalog", label: "Catalog cards" },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setView(option.id)}
+                aria-pressed={view === option.id}
+                className={cn(
+                  "rounded-full px-2.5 py-0.5 text-[11px] transition-colors",
+                  view === option.id
+                    ? "bg-foreground text-background font-medium"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       {shown.length === 0 ? (
         <p
           className={cn(
@@ -183,8 +219,13 @@ export function HomesStrip({
           No home matches “{query}”.
         </p>
       ) : null}
-      <ul className="grid grid-cols-2 gap-2.5 @xl:grid-cols-3 @4xl:grid-cols-6">
-        {shown.map((home, index) => (
+      <ul
+        className={cn(
+          "grid grid-cols-2 gap-2.5 @xl:grid-cols-3",
+          view === "catalog" ? "@4xl:grid-cols-5" : "@4xl:grid-cols-6",
+        )}
+      >
+        {visible.map((home, index) => (
           <li key={home.id} className={cn(panel, "group relative")}>
             {/* The card is the way in to the home. The photo is a detail of
                 it, so zooming is a control ON the card rather than the whole
@@ -196,10 +237,22 @@ export function HomesStrip({
               <span className="relative block">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={home.thumbUrl ?? home.imageUrl}
+                  src={
+                    view === "catalog"
+                      ? homeCatalogPreviewUrl({
+                          brandId,
+                          source: { url: home.imageUrl },
+                          formatId: "square",
+                          copy: homeCatalogCopy(home),
+                        })
+                      : (home.thumbUrl ?? home.imageUrl)
+                  }
                   alt={home.name}
                   loading="lazy"
-                  className="aspect-[4/3] w-full object-cover transition-opacity group-hover:opacity-90"
+                  className={cn(
+                    "w-full bg-black/20 object-cover transition-opacity group-hover:opacity-90",
+                    view === "catalog" ? "aspect-square" : "aspect-[4/3]",
+                  )}
                 />
               </span>
               <span className="block px-2.5 py-2">
@@ -231,6 +284,26 @@ export function HomesStrip({
           </li>
         ))}
       </ul>
+      {left > 0 ? (
+        <div className="mt-2.5 flex items-center gap-3 text-[11.5px]">
+          <button
+            type="button"
+            onClick={() => setPage(page + CATALOG_PAGE)}
+            className="text-sky-300 hover:underline"
+          >
+            Load {Math.min(CATALOG_PAGE, left)} more
+          </button>
+          {left > CATALOG_PAGE ? (
+            <button
+              type="button"
+              onClick={() => setPage(shown.length)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Show all {shown.length}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <Dialog
         open={open !== null}
@@ -284,21 +357,6 @@ export function HomesStrip({
                   />
                   {open.url === featuredUrl ? "Featured" : "Feature this home"}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10"
-                  loading={previewAds.isPending}
-                  onClick={() =>
-                    previewAds.mutate({
-                      brandId,
-                      images: [{ url: open.imageUrl, title: open.name }],
-                    })
-                  }
-                >
-                  <LayoutGrid className="size-3.5" />
-                  Preview ads
-                </Button>
                 <ButtonLink
                   href={open.url}
                   target="_blank"
@@ -313,7 +371,7 @@ export function HomesStrip({
               </DialogTitle>
               <DialogDescription className="text-xs text-white/55">
                 {[
-                  `${(openIndex ?? 0) + 1} of ${homes.length}`,
+                  `${(openIndex ?? 0) + 1} of ${shown.length}`,
                   open.facts || null,
                 ]
                   .filter(Boolean)
@@ -353,14 +411,6 @@ export function HomesStrip({
         ) : null}
       </Dialog>
 
-      <HomeAdPreviews
-        open={previews !== null}
-        onOpenChange={(next) => !next && setPreviews(null)}
-        brandId={brandId}
-        brandSlug={brandSlug}
-        sourceAssetId={previews?.assetId ?? null}
-        home={previews?.home ?? null}
-      />
     </>
   );
 }

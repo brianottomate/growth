@@ -195,7 +195,7 @@ export const adsRouter = {
     .input(
       z.object({
         adId: z.string().min(1),
-        status: z.enum(["drawn", "kept", "approved"]),
+        status: z.enum(["drawn", "approved"]),
       }),
     )
     .mutation(async ({ ctx, input }) =>

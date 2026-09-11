@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { X } from "lucide-react";
 
-import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
 import type { HotelFeedHome } from "@/lib/meta-hotel-feed";
 import { useTRPC } from "@/trpc/react";
@@ -22,8 +21,7 @@ export type WorkspaceHome = HotelFeedHome & {
 };
 
 // `_components` reaches the desk service, which is server-only; the section
-// shapes are spelled out here.
-const panel = "bg-card overflow-hidden rounded-2xl border";
+// label is spelled out here.
 const sectionLabel =
   "text-muted-foreground text-[10.5px] font-semibold tracking-[0.09em] uppercase";
 
@@ -129,16 +127,7 @@ export function AdPreviewsWorkspace({
           </div>
         </div>
 
-        {pickedHomes.length === 0 ? (
-          <p
-            className={cn(
-              panel,
-              "text-muted-foreground px-4 py-6 text-center text-xs",
-            )}
-          >
-            No homes in the set yet.
-          </p>
-        ) : (
+        {pickedHomes.length > 0 ? (
           <ul className="flex flex-wrap gap-1.5">
             {pickedHomes.map((home) => (
               <li key={home.id}>
@@ -160,7 +149,7 @@ export function AdPreviewsWorkspace({
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
         {withoutPhoto > 0 ? (
           <p className="text-muted-foreground text-[11px]">
             {withoutPhoto} {withoutPhoto === 1 ? "home has" : "homes have"} no

@@ -6,7 +6,6 @@ import { cn } from "@/components/ui/lib/utils";
 import { brandListings } from "@/server/services/wanderos-listings.service";
 
 import { panel, SectionLabel } from "../../../_components";
-import { CatalogGrid, type CatalogHome } from "../CatalogGrid";
 import { HomesStrip } from "../HomesStrip";
 import { brandTabHref, loadPerformanceBrand } from "../_data";
 
@@ -14,9 +13,9 @@ export const metadata: Metadata = { title: "Homes · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * Every home on the client's WanderOS site, each opening on its hero at
- * full size, with the featured home marked. This is the catalog the ads
- * draw from; picking a set for a campaign happens on the Ads tab.
+ * Every home on the client's WanderOS site, as their own photos or as the
+ * listing card a catalog ad would draw, with the featured home marked. This is
+ * the catalog the ads read from; picking a set happens on the Ads tab.
  */
 export default async function PerformanceBrandHomesPage({
   params,
@@ -32,18 +31,6 @@ export default async function PerformanceBrandHomesPage({
 
   const homes = await brandListings({ id: brand.id, website: brand.website });
   const withPhoto = homes.filter((home) => home.imageUrl);
-  const catalog: CatalogHome[] = withPhoto.map((home) => ({
-    id: home.id,
-    name: home.name,
-    imageUrl: home.imageUrl!,
-    city: home.city ?? null,
-    state: home.state ?? null,
-    bedrooms: home.bedrooms ?? null,
-    bathrooms: home.bathrooms ?? null,
-    guests: home.guests ?? null,
-    rating: home.rating ?? null,
-    nightlyFrom: home.nightlyFrom ?? null,
-  }));
   const slug = brand.slug ?? brand.id;
 
   return (
@@ -96,6 +83,7 @@ export default async function PerformanceBrandHomesPage({
               bedrooms: home.bedrooms ?? null,
               bathrooms: home.bathrooms ?? null,
               guests: home.guests ?? null,
+              rating: home.rating ?? null,
               facts: [
                 home.bedrooms ? `${home.bedrooms} bd` : null,
                 home.guests ? `${home.guests} guests` : null,
@@ -116,12 +104,6 @@ export default async function PerformanceBrandHomesPage({
           ) : null}
         </>
       )}
-
-      {withPhoto.length > 0 ? (
-        <div className="border-t pt-5">
-          <CatalogGrid brandId={brand.id} homes={catalog} />
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -5,14 +5,6 @@ import { usStateCode } from "@/lib/us-states";
 // grid in the browser and each tile is the Studio's own preview route with a
 // spec in the URL, so nothing is saved until someone chooses a card.
 
-/** The canvases the grid shows, in reading order. */
-export const HOME_PREVIEW_FORMATS: CompositionFormatId[] = [
-  "portrait",
-  "square",
-  "story",
-  "wide",
-];
-
 export type HomePreviewRecipeId = "hero" | "amenities" | "cta";
 
 export type HomePreviewRecipe = {
@@ -129,28 +121,6 @@ export function compositionPreviewUrl(spec: PreviewSpec) {
   if ("assetId" in spec.source) params.set("sourceMediaAssetId", spec.source.assetId);
   else params.set("sourceUrl", spec.source.url);
   return `/api/compositions/preview?${params.toString()}`;
-}
-
-/**
- * The Studio's preview route for one tile. The photo is a library asset when
- * the home's hero has been imported, or the hero's own URL on their site when
- * it has not; the route vouches for WanderOS hosts, so nothing is saved to
- * draw a preview.
- */
-export function homePreviewUrl(input: {
-  brandId: string;
-  source: { assetId: string } | { url: string };
-  formatId: CompositionFormatId;
-  recipe: HomePreviewRecipe;
-}) {
-  return compositionPreviewUrl({
-    brandId: input.brandId,
-    templateId: "hero-overlay",
-    formatId: input.formatId,
-    source: input.source,
-    title: input.recipe.title,
-    cta: input.recipe.cta,
-  });
 }
 
 /** The listing card's fields for one home, written from the feed facts. */

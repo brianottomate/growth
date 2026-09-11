@@ -269,11 +269,11 @@ export async function listAdSet(input: { brandId: string; orgId: string }) {
   });
 }
 
-/** Move one ad along: drawn, kept, approved. */
+/** Approve one ad, or put it back. Approved is what survives a rebuild. */
 export async function setAdStatus(input: {
   adId: string;
   orgId: string;
-  status: "drawn" | "kept" | "approved";
+  status: "drawn" | "approved";
 }) {
   const ad = await db.query.adTable.findFirst({
     where: eq(adTable.id, input.adId),

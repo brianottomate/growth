@@ -14,10 +14,10 @@ export const metadata: Metadata = { title: "Ads · Wander Performance" };
 export const dynamic = "force-dynamic";
 
 /**
- * The client's ad draft space: a pick of homes from their WanderOS catalog,
- * the ads that pick would make, and the whole catalog as cards with the Meta
- * feed to download. The pick is carried in `?homes=`; the featured home, or
- * the first few on the feed, stand in until someone chooses.
+ * The client's ad draft space: a pick of homes from their WanderOS catalog and
+ * the ads that pick would make. The pick is carried in `?homes=` so a link
+ * opens on the same set, and otherwise reflects what the drafted set was
+ * built from.
  */
 export default async function PerformanceBrandAdsPage({
   params,
@@ -47,7 +47,8 @@ export default async function PerformanceBrandAdsPage({
       {
         id: ad.id,
         name: ad.name,
-        status: ad.status,
+        // `kept` is a retired middle state; anything not approved is a draft.
+        status: ad.status === "approved" ? ("approved" as const) : ("drawn" as const),
         headline: content.headline,
         body: content.body,
         callToAction: content.callToAction ?? null,
@@ -79,26 +80,27 @@ export default async function PerformanceBrandAdsPage({
     }));
   const withoutPhoto = listings.length - homes.length;
 
-  // The pick: the URL's ids that are still on the feed, else the featured
-  // home and the next few, so the page never opens empty for a brand with homes.
+  // The URL's ids if the link carries them, else the homes the drafted set was
+  // actually built from, else nothing. Never a guess: a set picked for them
+  // reads exactly like one they picked, and disagrees with the set below.
   const ids = new Set(homes.map((home) => home.id));
   const fromUrl = (query.homes ?? "")
     .split(",")
     .map((id) => id.trim())
-    .filter((id) => ids.has(id))
-    .slice(0, MAX_SET_HOMES);
-  const featured = brand.featuredListingUrl
-    ? homes.find((home) => home.url === brand.featuredListingUrl)
-    : undefined;
-  const initialPicked =
-    fromUrl.length > 0
-      ? fromUrl
-      : [
-          ...(featured ? [featured] : []),
-          ...homes.filter((home) => home.id !== featured?.id),
-        ]
-          .slice(0, 4)
-          .map((home) => home.id);
+    .filter((id) => ids.has(id));
+  const fromSet = [
+    ...new Set(
+      drafted.flatMap((ad) =>
+        ad.home?.externalId && ids.has(ad.home.externalId)
+          ? [ad.home.externalId]
+          : [],
+      ),
+    ),
+  ];
+  const initialPicked = (fromUrl.length > 0 ? fromUrl : fromSet).slice(
+    0,
+    MAX_SET_HOMES,
+  );
 
   if (listings.length === 0) {
     return (

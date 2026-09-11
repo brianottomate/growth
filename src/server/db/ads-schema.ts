@@ -56,9 +56,12 @@ export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
 
 /**
  * Where an ad is in production, which is not where its campaign is on the
- * platform. Drawn the moment a set is built, kept once someone has looked and
- * wants it, approved once it is cleared to run. Nothing here touches Meta;
- * `platform_ad` is the mirror of what does.
+ * platform. Drawn the moment a set is built, approved once someone wants it,
+ * which is also what makes it safe from the next rebuild. Nothing here touches
+ * Meta; `platform_ad` is the mirror of what does.
+ *
+ * `kept` sat between the two and carried no behaviour of its own. Nothing is
+ * written with it; it stays listed because Postgres cannot drop an enum value.
  */
 export const adStatusEnum = pgEnum("ad_status", ["drawn", "kept", "approved"]);
 export type AdStatus = (typeof adStatusEnum.enumValues)[number];
