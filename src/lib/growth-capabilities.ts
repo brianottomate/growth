@@ -62,7 +62,7 @@ export const GROWTH_CAPABILITY_ACTIONS = {
   ],
   personaWrite: ["create", "update", "delete"],
   researchRead: ["search", "readPage"],
-  driveRead: ["status", "browse"],
+  driveRead: ["status", "browse", "readDocument"],
   contentRead: [
     "pipeline",
     "upcoming",

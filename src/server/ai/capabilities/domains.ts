@@ -92,6 +92,7 @@ import {
   browseDrive,
   driveConnectionStatus,
   importDriveFilesToContent,
+  readDriveDocument,
 } from "./drive";
 import { EMAIL_TOOLS } from "./email";
 import { leadsRewriteSequence, leadsSequence, leadsSummary } from "./leads";
@@ -289,8 +290,12 @@ export const researchRead = growthDomainTool({
 
 export const driveRead = growthDomainTool({
   description:
-    "Check Google Drive connection status and browse the operator's Drive for importable images.",
-  actions: { status: driveConnectionStatus, browse: browseDrive },
+    "Check Google Drive connection status, browse the operator's Drive, and read a Doc, Sheet or Slides file as text.",
+  actions: {
+    status: driveConnectionStatus,
+    browse: browseDrive,
+    readDocument: readDriveDocument,
+  },
 });
 
 export const contentRead = growthDomainTool({

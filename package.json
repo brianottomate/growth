@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "velite build && bun run db:push:vercel-prod && next build",
-    "db:push:vercel-prod": "[ \"$VERCEL_ENV\" = production ] && drizzle-kit push || true",
+    "db:push:vercel-prod": "if [ \"$VERCEL_ENV\" = production ]; then drizzle-kit push --force; else echo \"Skipping schema push (VERCEL_ENV=$VERCEL_ENV, not production)\"; fi",
     "check": "eslint . --cache && tsc --noEmit",
     "clean": "rm -rf node_modules .next .turbo .cache .velite .eslintcache bun.lock",
     "reinstall": "bun run clean && bun install",

@@ -9,6 +9,8 @@ import {
 const DRIVE_ROOT = "https://www.googleapis.com/drive/v3";
 /** Same ceiling the media library enforces on direct uploads. */
 const MAX_DRIVE_FILE_BYTES = 25 * 1024 * 1024;
+// An exported Doc is prompt material, so cap it at something a model can read.
+const MAX_DRIVE_TEXT_CHARS = 200_000;
 
 export class GoogleDriveError extends Error {
   constructor(
@@ -104,6 +106,8 @@ export async function listDriveFiles(
     folderId?: string;
     search?: string;
     includeFolders?: boolean;
+    includeDocuments?: boolean;
+    excludeImages?: boolean;
     limit?: number;
   } = {},
 ): Promise<DriveFile[]> {
@@ -141,6 +145,63 @@ export async function getDriveFile(
     `/files/${encodeURIComponent(fileId)}?${params.toString()}`,
   );
   return toDriveFile(resource);
+}
+
+/**
+ * Native Google file types hold no bytes of their own, so `alt=media` returns
+ * a 403 for them. They have to be exported to a concrete format instead, and
+ * the export endpoint is a different path with a different parameter.
+ */
+const GOOGLE_EXPORT_TYPES: Record<string, string> = {
+  "application/vnd.google-apps.document": "text/plain",
+  "application/vnd.google-apps.spreadsheet": "text/csv",
+  "application/vnd.google-apps.presentation": "text/plain",
+};
+
+export function isGoogleNativeFile(mimeType: string | null | undefined) {
+  return Boolean(mimeType && mimeType in GOOGLE_EXPORT_TYPES);
+}
+
+/**
+ * Read a Google Doc, Sheet or Slides file as text.
+ *
+ * Separate from `downloadDriveFile` on purpose: that one returns raw bytes for
+ * an asset, this one returns an export of something that has no raw bytes.
+ * Collapsing them would hide which files can be read as text.
+ */
+export async function exportDriveFileAsText(
+  accessToken: string,
+  fileId: string,
+  mimeType: string,
+): Promise<string> {
+  const exportType = GOOGLE_EXPORT_TYPES[mimeType];
+  if (!exportType) {
+    throw new GoogleDriveError(
+      `Drive file type cannot be exported as text: ${mimeType}`,
+    );
+  }
+  const params = new URLSearchParams({
+    mimeType: exportType,
+    supportsAllDrives: "true",
+  });
+  const response = await fetch(
+    `${DRIVE_ROOT}/files/${encodeURIComponent(fileId)}/export?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(60_000),
+    },
+  );
+  if (!response.ok) {
+    throw new GoogleDriveError(
+      `Drive export failed (${response.status})`,
+      response.status,
+    );
+  }
+  const text = await response.text();
+  if (text.length > MAX_DRIVE_TEXT_CHARS) {
+    return text.slice(0, MAX_DRIVE_TEXT_CHARS);
+  }
+  return text;
 }
 
 /** Download a file's bytes. Size-capped so one huge asset can't blow up a job. */
@@ -203,5 +264,7 @@ export const GoogleDrive = {
   list: listDriveFiles,
   get: getDriveFile,
   download: downloadDriveFile,
+  exportText: exportDriveFileAsText,
+  isNative: isGoogleNativeFile,
   downloadThumbnail: downloadDriveThumbnail,
 } as const;

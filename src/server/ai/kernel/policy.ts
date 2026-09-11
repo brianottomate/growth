@@ -182,6 +182,7 @@ export const growthActionPolicies = {
   driveRead: {
     status: read("local-read", PRODUCT),
     browse: read("provider-read", PRODUCT),
+    readDocument: read("provider-read", PRODUCT),
   },
   contentRead: {
     pipeline: read(),

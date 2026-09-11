@@ -10,6 +10,7 @@ import {
   DRIVE_PROVIDER_ID,
   DRIVE_READONLY_SCOPE,
   isDriveFolder,
+  parseDriveFileId,
   resizeDriveThumbnail,
   sortDriveFiles,
   type DriveFile,
@@ -118,6 +119,8 @@ export async function browseDrive(input: {
   folderId?: string;
   search?: string;
   includeFolders?: boolean;
+  includeDocuments?: boolean;
+  excludeImages?: boolean;
   limit?: number;
 }): Promise<DriveFile[]> {
   const accessToken = await driveAccessToken(input.userId);
@@ -125,6 +128,8 @@ export async function browseDrive(input: {
     ...(input.folderId ? { folderId: input.folderId } : {}),
     ...(input.search ? { search: input.search } : {}),
     includeFolders: input.includeFolders ?? true,
+    ...(input.includeDocuments ? { includeDocuments: true } : {}),
+    ...(input.excludeImages ? { excludeImages: true } : {}),
     ...(input.limit ? { limit: input.limit } : {}),
   });
 }
@@ -217,10 +222,52 @@ export async function importDriveFolder(input: {
   });
 }
 
+/**
+ * Read a Google Doc, Sheet or Slides file as text.
+ *
+ * Metadata first, because the file type decides the transport: native Google
+ * files have no bytes and must be exported, everything else is a plain
+ * download. Asking the caller to know which is which would leak Drive's
+ * internals into every caller.
+ */
+export async function readDriveDocument(input: {
+  userId: string;
+  fileId: string;
+}): Promise<{ name: string; mimeType: string; text: string }> {
+  const fileId = parseDriveFileId(input.fileId);
+  const accessToken = await driveAccessToken(input.userId);
+  const meta = await GoogleDrive.get(accessToken, fileId);
+
+  if (GoogleDrive.isNative(meta.mimeType)) {
+    return {
+      name: meta.name,
+      mimeType: meta.mimeType,
+      text: await GoogleDrive.exportText(
+        accessToken,
+        fileId,
+        meta.mimeType,
+      ),
+    };
+  }
+
+  if (!meta.mimeType.startsWith("text/") && meta.mimeType !== "application/json") {
+    throw new GoogleDriveError(
+      `Not a readable document: ${meta.name} is ${meta.mimeType}`,
+    );
+  }
+  const file = await GoogleDrive.download(accessToken, fileId);
+  return {
+    name: meta.name,
+    mimeType: meta.mimeType,
+    text: file.body.toString("utf8"),
+  };
+}
+
 export const GoogleDriveService = {
   isConfigured: isDriveConfigured,
   connection: driveConnection,
   browse: browseDrive,
+  readDocument: readDriveDocument,
   importFiles: importDriveFiles,
   importFolder: importDriveFolder,
 } as const;

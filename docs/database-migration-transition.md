@@ -8,9 +8,34 @@ Wander Growth is `db:push`-managed, with a production-build backstop
 instead of leaving code that reads columns the database does not have. The
 guard matters because previews share the production database — an unmerged
 branch's schema must not land at preview-build time. Manual push from a
-current `main` checkout remains the deliberate path. Never add `--force`:
-without it, a destructive or ambiguous diff fails the production build
-loudly, which is the correct outcome.
+current `dev` checkout remains the deliberate path.
+
+**`--force` is on, reversing the 2026-08-18 rule (Kristian, 2026-09-11).** The
+old rule said never add it, on the reasoning that a destructive diff would
+then fail the production build loudly. It never did. The script was
+`[ "$VERCEL_ENV" = production ] && drizzle-kit push || true`, where `|| true`
+was load-bearing for preview builds (the env test fails there and would
+otherwise abort the build) and also swallowed every push failure. Because
+drizzle-kit answers a dropped or renamed table with an interactive prompt and
+the Vercel builder has no TTY, such a diff threw
+`Interactive prompts require a TTY terminal`, `|| true` hid it, and the build
+went green having applied NOTHING — push aborts while resolving the diff, so
+additive changes in the same deploy were skipped too. Seen on the v1.0.66
+deploy (2026-09-11), which shipped with no `launch` table; it existed only
+because `db:apply:launch` had been run by hand first. Worse, the orphaned
+tables re-armed the prompt on every later deploy, silently disabling all
+auto-migration until they were dropped.
+
+So the script is now an `if`/`else` (a non-production build skips and exits 0,
+a failing production push fails the build) with `--force`. A drop we intended
+is applied; we generally DO want the data loss when a table leaves the schema.
+
+⚠️ **The case `--force` gets wrong is a RENAME.** drizzle-kit cannot tell a
+rename from a drop-plus-create, and `--force` resolves that ambiguity as drop
+plus create, which loses the column's or table's data. Renames are rare here.
+When you do one, drive it yourself before merging: run `bunx drizzle-kit push`
+locally from a current `dev` checkout, where there IS a TTY, and answer the
+rename prompt. Then the deploy's push sees no diff.
 
 Development and production currently share the same database, so a local push
 is a production migration. This document records how to move to checked-in

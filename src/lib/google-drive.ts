@@ -40,6 +40,39 @@ export const DRIVE_IMAGE_MIME_TYPES = [
 
 export const DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 
+/**
+ * File types `readDocument` can turn into text. Google's own formats hold no
+ * bytes and are exported; the rest are downloaded and decoded as UTF-8.
+ */
+export const DRIVE_DOCUMENT_MIME_TYPES = [
+  "application/vnd.google-apps.document",
+  "application/vnd.google-apps.spreadsheet",
+  "application/vnd.google-apps.presentation",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "application/json",
+] as const;
+
+/**
+ * Accept what a person actually has to hand: a bare file id, or any of the
+ * Drive/Docs/Sheets/Slides URL shapes they copy out of the address bar.
+ */
+export function parseDriveFileId(input: string): string {
+  const value = input.trim();
+  if (!value.includes("/")) return value;
+  const patterns = [
+    /\/(?:document|spreadsheets|presentation|file)\/d\/([a-zA-Z0-9_-]{10,})/,
+    /[?&]id=([a-zA-Z0-9_-]{10,})/,
+    /\/folders\/([a-zA-Z0-9_-]{10,})/,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(value);
+    if (match?.[1]) return match[1];
+  }
+  return value;
+}
+
 export type DriveFile = {
   id: string;
   name: string;
@@ -71,14 +104,19 @@ export function buildDriveQuery(options: {
   search?: string;
   /** Include folders alongside images (for a browsable listing). */
   includeFolders?: boolean;
+  /** Include Docs/Sheets/Slides/text, which readDocument can read. */
+  includeDocuments?: boolean;
+  /** Drop images, for a documents-only listing. */
+  excludeImages?: boolean;
 }): string {
   const clauses = ["trashed = false"];
 
-  const types = DRIVE_IMAGE_MIME_TYPES.map(
-    (mime) => `mimeType = '${mime}'`,
-  ).concat(
-    options.includeFolders ? [`mimeType = '${DRIVE_FOLDER_MIME_TYPE}'`] : [],
-  );
+  const mimeTypes: string[] = [
+    ...(options.excludeImages ? [] : DRIVE_IMAGE_MIME_TYPES),
+    ...(options.includeDocuments ? DRIVE_DOCUMENT_MIME_TYPES : []),
+    ...(options.includeFolders ? [DRIVE_FOLDER_MIME_TYPE] : []),
+  ];
+  const types = mimeTypes.map((mime) => `mimeType = '${mime}'`);
   clauses.push(`(${types.join(" or ")})`);
 
   if (options.folderId) {
