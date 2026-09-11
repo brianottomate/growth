@@ -162,7 +162,9 @@ export function connectionRunsAsBrandPage(
   connection: { platformUserId?: string | null },
 ): boolean {
   if (!brand.metaPageId) return true;
-  return metaPageIdFromConnection(connection.platformUserId) === brand.metaPageId;
+  return (
+    metaPageIdFromConnection(connection.platformUserId) === brand.metaPageId
+  );
 }
 
 async function allowedAccountsForBrand(
@@ -1485,7 +1487,7 @@ export async function previewDraftAd(
       "Video preview needs an uploaded video id, which a pre-push draft does not have — push paused and preview from Ads Manager",
     );
   }
-  const link = content.linkUrl ?? ad.campaign.landingUrl;
+  const link = content.linkUrl ?? ad.campaign?.landingUrl;
   if (!link) {
     // Same rule as the push: a preview of a link the push would refuse is a
     // preview of an ad that cannot exist.

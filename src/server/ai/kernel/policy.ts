@@ -6,11 +6,7 @@ import type {
 } from "@/lib/growth-capabilities";
 
 export type GrowthSurface =
-  | "overview-chat"
-  | "plan-chat"
-  | "mcp"
-  | "invoke-growth"
-  | "test";
+  "overview-chat" | "plan-chat" | "mcp" | "invoke-growth" | "test";
 export type GrowthToolConsequence =
   | "local-read"
   | "provider-read"
@@ -276,6 +272,12 @@ export const growthActionPolicies = {
     // R2 bytes, no provider call, but it is a heavier call than the rest of
     // this domain and re-running adds another pair of drafts.
     draftAdsFromHomes: write(),
+    // Writes every ad in the set and one model call for the captions. Local
+    // rows only, no provider call; re-running replaces the last set rather
+    // than stacking a second one, which is why it is idempotent.
+    buildAdSet: write({ idempotent: true, consequence: "model-write" }),
+    setAdStatus: write({ idempotent: true }),
+    setAdCopy: write({ idempotent: true }),
     // Swaps one card slot on a local draft for a library asset.
     replaceAdCard: write({ idempotent: true }),
     addAudience: write(),
@@ -451,7 +453,10 @@ export const growthActionPolicies = {
     // model-write consequence covers the auto-tag analysis pass.
     saveChatMedia: write({ idempotent: true, consequence: "model-write" }),
     // Idempotent per photo URL: a hero already in the library is returned.
-    importListingPhotos: write({ idempotent: true, consequence: "provider-read" }),
+    importListingPhotos: write({
+      idempotent: true,
+      consequence: "provider-read",
+    }),
   },
   playbookRead: { list: read(), read: read() },
   strategyRead: { getTargets: read(), proposeTargets: read("model-read") },

@@ -59,6 +59,12 @@ import { and, eq, isNull } from "drizzle-orm";
 import { campaignDraftName } from "@/lib/performance-ads";
 import { db } from "@/server/db";
 import { brandTable, type MediaItem } from "@/server/db/schema";
+import {
+  buildAdSet,
+  setAdCopy,
+  setAdStatus,
+} from "@/server/services/ad-set.service";
+
 import { growthAction } from "./types";
 
 // Optional analysis window — both default to "last 365 days" (resolved in the
@@ -206,7 +212,9 @@ export const draftCampaignAction = growthAction({
   }),
   execute: async (input, ctx) => {
     // The convention lives in code so the model never has to spell it.
-    const name = input.name ?? (await conventionalCampaignName(input.brandSlug, ctx.orgId));
+    const name =
+      input.name ??
+      (await conventionalCampaignName(input.brandSlug, ctx.orgId));
     return createDraftCampaign({
       ...input,
       name,
@@ -225,7 +233,10 @@ async function conventionalCampaignName(brandSlug: string, orgId: string) {
     columns: { name: true, relationship: true },
   });
   if (!brand) throw new Error("No access to this brand");
-  return campaignDraftName({ brandName: brand.name, isClient: brand.relationship === "client" });
+  return campaignDraftName({
+    brandName: brand.name,
+    isClient: brand.relationship === "client",
+  });
 }
 
 export const createMetaAdDraftAction = growthAction({
@@ -810,7 +821,10 @@ export const replaceAdCardAction = growthAction({
   }),
   examples: [{ adId: "ad_01", index: 2, mediaAssetId: "media_01" }],
   execute: async (input, ctx) => {
-    const { ad, replaced } = await replaceDraftAdMedia({ organizationId: ctx.orgId, ...input });
+    const { ad, replaced } = await replaceDraftAdMedia({
+      organizationId: ctx.orgId,
+      ...input,
+    });
     return {
       adId: ad.id,
       index: input.index,
@@ -1155,5 +1169,51 @@ export const deletePlatformCampaignAction = growthAction({
     deletePlatformCampaign(input, {
       organizationId: ctx.orgId,
       runId: ctx.runId,
+    }),
+});
+
+export const buildAdSetAction = growthAction({
+  description:
+    "Draw a Performance client's whole ad set from the homes given: a static and a carousel per home, then BOTH a portfolio carousel and a catalog ad, which is the house plan and is not negotiable. Writes the captions in one pass from each home's own amenities and description, walks each home's carousel through its real room photos, and lands every ad as a draft against the brand with no campaign. Rebuilding replaces the last set and leaves anything already approved alone. propertyIds are WanderOS listing ids in the order the portfolio carousel should run.",
+  inputSchema: z.object({
+    brandId: z.string().min(1),
+    propertyIds: z.array(z.string().min(1)).min(1).max(10),
+  }),
+  execute: async (input, ctx) => {
+    const result = await buildAdSet({
+      brandId: input.brandId,
+      orgId: ctx.orgId,
+      propertyIds: input.propertyIds,
+      userId: ctx.userId,
+    });
+    return { ok: true as const, ...result };
+  },
+});
+
+export const setAdStatusAction = growthAction({
+  description:
+    "Move one drafted ad along: drawn (just built), kept (looked at and wanted), approved (cleared to run, and safe from a rebuild). This is production state on our side and touches no platform.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    status: z.enum(["drawn", "kept", "approved"]),
+  }),
+  execute: (input, ctx) =>
+    setAdStatus({ adId: input.adId, orgId: ctx.orgId, status: input.status }),
+});
+
+export const setAdCopyAction = growthAction({
+  description:
+    "Rewrite the words on one drafted ad: its headline, its primary text, or both. The cards are left alone. Emoji belong in primary text and never in the words drawn onto a card.",
+  inputSchema: z.object({
+    adId: z.string().min(1),
+    headline: z.string().max(60).optional(),
+    body: z.string().max(1200).optional(),
+  }),
+  execute: (input, ctx) =>
+    setAdCopy({
+      adId: input.adId,
+      orgId: ctx.orgId,
+      headline: input.headline,
+      body: input.body,
     }),
 });

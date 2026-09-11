@@ -4,6 +4,7 @@ import { index, pgEnum, pgTable, uniqueIndex } from "drizzle-orm/pg-core";
 import { brandTable, personaTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { MediaItem } from "./content-schema";
+import { homeTable } from "./home-schema";
 import { performanceCycleTable } from "./performance-schema";
 import { createId } from "./utils";
 
@@ -52,6 +53,15 @@ export const audienceSourceEnum = pgEnum("audience_source", [
   "lookalike_seed",
 ]);
 export type AudienceSource = (typeof audienceSourceEnum.enumValues)[number];
+
+/**
+ * Where an ad is in production, which is not where its campaign is on the
+ * platform. Drawn the moment a set is built, kept once someone has looked and
+ * wants it, approved once it is cleared to run. Nothing here touches Meta;
+ * `platform_ad` is the mirror of what does.
+ */
+export const adStatusEnum = pgEnum("ad_status", ["drawn", "kept", "approved"]);
+export type AdStatus = (typeof adStatusEnum.enumValues)[number];
 
 export const campaignStatusEnum = pgEnum("campaign_status", [
   "planned",
@@ -363,17 +373,26 @@ export const adTable = pgTable(
       .primaryKey()
       .$defaultFn(() => createId("ad")),
 
+    /**
+     * NULL until the ad is put in a campaign, which is what a draft is. A
+     * Performance set is drafted, reviewed and adjusted against the brand,
+     * and attached to the month it runs in only once someone has decided;
+     * requiring a campaign up front forced an empty one to exist first.
+     */
     campaignId: t
       .text()
-      .references(() => campaignTable.id, { onDelete: "cascade" })
-      .notNull(),
+      .references(() => campaignTable.id, { onDelete: "cascade" }),
     brandId: t
       .text()
       .references(() => brandTable.id, { onDelete: "cascade" })
       .notNull(),
 
+    /** The home this ad is about, when it is about one. */
+    homeId: t.text().references(() => homeTable.id, { onDelete: "set null" }),
+
     name: t.text().notNull(),
     type: adTypeEnum().default("creative").notNull(),
+    status: adStatusEnum().default("drawn").notNull(),
     content: t.jsonb().$type<AdContent>().notNull(),
 
     /**
@@ -743,6 +762,10 @@ export const adRelations = relations(adTable, ({ one, many }) => ({
   brand: one(brandTable, {
     fields: [adTable.brandId],
     references: [brandTable.id],
+  }),
+  home: one(homeTable, {
+    fields: [adTable.homeId],
+    references: [homeTable.id],
   }),
   platformAds: many(platformAdTable),
 }));

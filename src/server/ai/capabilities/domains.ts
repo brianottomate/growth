@@ -31,6 +31,9 @@ import {
   topAds,
   updateAudienceAction,
   draftAdsFromHomesAction,
+  buildAdSetAction,
+  setAdStatusAction,
+  setAdCopyAction,
   replaceAdCardAction,
 } from "./ads";
 import { diagnoseAlignment } from "./alignment";
@@ -396,6 +399,9 @@ export const adsWrite = growthDomainTool({
     draftCampaign: draftCampaignAction,
     draftAd: draftAdAction,
     draftAdsFromHomes: draftAdsFromHomesAction,
+    buildAdSet: buildAdSetAction,
+    setAdStatus: setAdStatusAction,
+    setAdCopy: setAdCopyAction,
     replaceAdCard: replaceAdCardAction,
     addAudience: addAudienceAction,
     updateAudience: updateAudienceAction,

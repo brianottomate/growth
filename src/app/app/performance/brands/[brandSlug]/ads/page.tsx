@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { brandListings } from "@/server/services/wanderos-listings.service";
+import { listAdSet } from "@/server/services/ad-set.service";
 
 import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 
-import {
-  AdPreviewsWorkspace,
-  MAX_PICKED,
-  type WorkspaceHome,
-} from "./AdPreviewsWorkspace";
+import { MAX_SET_HOMES } from "@/lib/performance-ads";
+
+import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
 
 export const metadata: Metadata = { title: "Ads · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -34,10 +33,33 @@ export default async function PerformanceBrandAdsPage({
     return <div className="text-muted-foreground">No organization found.</div>;
   if (!brand) notFound();
 
-  const [listings, avatarUrl] = await Promise.all([
+  const [listings, avatarUrl, drafted] = await Promise.all([
     brandListings({ id: brand.id, website: brand.website }),
     brandAvatarUrl(brand),
+    listAdSet({ brandId: brand.id, orgId: org.id }),
   ]);
+  // The mock needs the words and the cards; everything else about an ad row
+  // is either derivable or not the reviewer's business.
+  const ads = drafted.flatMap((ad) => {
+    const content = ad.content;
+    if (!("media" in content)) return [];
+    return [
+      {
+        id: ad.id,
+        name: ad.name,
+        status: ad.status,
+        headline: content.headline,
+        body: content.body,
+        callToAction: content.callToAction ?? null,
+        linkUrl: content.linkUrl ?? null,
+        homeName: ad.home?.name ?? content.propertyName ?? null,
+        cards: content.media.map((item) => ({
+          url: item.url,
+          thumbnail: item.thumbnail ?? null,
+        })),
+      },
+    ];
+  });
   const homes: WorkspaceHome[] = listings
     .filter((home) => home.imageUrl)
     .map((home) => ({
@@ -64,7 +86,7 @@ export default async function PerformanceBrandAdsPage({
     .split(",")
     .map((id) => id.trim())
     .filter((id) => ids.has(id))
-    .slice(0, MAX_PICKED);
+    .slice(0, MAX_SET_HOMES);
   const featured = brand.featuredListingUrl
     ? homes.find((home) => home.url === brand.featuredListingUrl)
     : undefined;
@@ -90,12 +112,12 @@ export default async function PerformanceBrandAdsPage({
   return (
     <AdPreviewsWorkspace
       brandId={brand.id}
-      brandSlug={brand.slug ?? brand.id}
       brandName={brand.name}
       brandLogo={avatarUrl}
       homes={homes}
       withoutPhoto={withoutPhoto}
       initialPicked={initialPicked}
+      ads={ads}
     />
   );
 }

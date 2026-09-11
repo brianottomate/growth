@@ -57,9 +57,7 @@ export const AUDIENCE_BUDGET_TIERS = [
 ] as const;
 
 export type PerformanceAudienceKind =
-  | "lookalike_booker_seed"
-  | "prospecting_list"
-  | "third_party_intent";
+  "lookalike_booker_seed" | "prospecting_list" | "third_party_intent";
 
 /**
  * Audience count follows the budget, not the ambition.
@@ -149,7 +147,10 @@ export function performanceCampaignName(input: {
   period?: string;
 }): string {
   return [
-    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    performanceNamePrefix({
+      brandName: input.customer,
+      isClient: input.isClient ?? true,
+    }),
     "SALES",
     "PURCHASE",
     input.period ?? performancePeriod(),
@@ -177,7 +178,9 @@ export function campaignDraftName(input: {
 export type PerformanceAudienceLabel = "BROAD" | "LOOKALIKE" | "RETARGETING";
 
 /** How the planned audience kinds read in an ad set name. */
-export function audienceLabelForKind(kind: PerformanceAudienceKind): PerformanceAudienceLabel {
+export function audienceLabelForKind(
+  kind: PerformanceAudienceKind,
+): PerformanceAudienceLabel {
   const labels: Record<PerformanceAudienceKind, PerformanceAudienceLabel> = {
     lookalike_booker_seed: "LOOKALIKE",
     prospecting_list: "BROAD",
@@ -192,7 +195,9 @@ export function audienceLabelForKind(kind: PerformanceAudienceKind): Performance
  * everything else (segments, intent, keywords) is prospecting, which the
  * convention calls broad.
  */
-export function audienceLabelForPlan(audience: { type: string } | null | undefined): PerformanceAudienceLabel {
+export function audienceLabelForPlan(
+  audience: { type: string } | null | undefined,
+): PerformanceAudienceLabel {
   if (!audience) return "BROAD";
   if (audience.type === "lookalike") return "LOOKALIKE";
   if (audience.type === "custom") return "RETARGETING";
@@ -215,13 +220,17 @@ export function performanceAdSetName(input: {
     .map((state) => state.trim().toUpperCase())
     .filter((state) => /^[A-Z]{2}$/.test(state));
   return [
-    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    performanceNamePrefix({
+      brandName: input.customer,
+      isClient: input.isClient ?? true,
+    }),
     input.audience,
     states.length > 0 ? states.join("+") : "US",
   ].join("_");
 }
 
-export type PerformanceAdFormat = "Static" | "Carousel" | "Video" | "Influencer Video";
+export type PerformanceAdFormat =
+  "Static" | "Carousel" | "Video" | "Influencer Video";
 
 /** The format a creative ad compiles to, read off its media. */
 export function adFormatFor(content: {
@@ -245,7 +254,10 @@ export function performanceAdName(input: {
   propertyName: string;
 }): string {
   return [
-    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    performanceNamePrefix({
+      brandName: input.customer,
+      isClient: input.isClient ?? true,
+    }),
     upperSnake(input.format).replace(/\+/g, "_"),
     input.propertyName.trim(),
   ].join("_");
@@ -266,6 +278,17 @@ export function performanceAdBusinessKey(input: {
     .map((part) => part.trim().toLowerCase().replace(/\s+/g, "-"))
     .join(":");
 }
+
+/**
+ * How many homes one set runs on. Meta's carousel holds ten cards, so ten
+ * homes is the ceiling for the portfolio ad.
+ *
+ * This lives here rather than beside the component that draws the picker: a
+ * server page importing a value from a `"use client"` module receives a
+ * client reference instead of the number, and `slice(0, reference)` silently
+ * returns nothing. That bug ate the whole `?homes=` pick.
+ */
+export const MAX_SET_HOMES = 10;
 
 export type PerformanceAdPlanItem = {
   name: string;
@@ -292,7 +315,11 @@ export function buildPerformanceAdPlan(input: {
   }
   const perProperty = input.properties.flatMap((property, index) =>
     (["Static", "Carousel"] as const).map((format) => ({
-      name: performanceAdName({ customer: input.customer, format, propertyName: property.name }),
+      name: performanceAdName({
+        customer: input.customer,
+        format,
+        propertyName: property.name,
+      }),
       kind: format === "Static" ? ("static" as const) : ("carousel" as const),
       propertyIndex: index,
       linkUrl: property.url,

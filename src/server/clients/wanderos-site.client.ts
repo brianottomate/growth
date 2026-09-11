@@ -199,10 +199,26 @@ export type WanderOsPhoto = {
  * Never throws: a home whose detail cannot be read falls back to the preview
  * set the caller already has.
  */
+export type WanderOsListingDetail = {
+  photos: WanderOsPhoto[];
+  /** The client's own words about the home, as their site shows them. */
+  description: string | null;
+  /** Amenity labels, deduplicated: "Hot tub", "Game Room", "Fire Place". */
+  amenities: string[];
+};
+
+/** Just the photos, for callers that do not need the rest. */
 export async function listWanderOsListingPhotos(input: {
   websiteId: string;
   propertyId: string;
 }): Promise<WanderOsPhoto[]> {
+  return (await fetchWanderOsListingDetail(input)).photos;
+}
+
+export async function fetchWanderOsListingDetail(input: {
+  websiteId: string;
+  propertyId: string;
+}): Promise<WanderOsListingDetail> {
   try {
     const response = await fetch(`${LISTING_URL}/${input.propertyId}`, {
       headers: {
@@ -211,8 +227,10 @@ export async function listWanderOsListingPhotos(input: {
       },
       cache: "no-store",
     });
-    if (!response.ok) return [];
+    if (!response.ok) return { photos: [], description: null, amenities: [] };
     const body = (await response.json()) as {
+      description?: string | null;
+      amenities?: { name?: string; amenities?: { label?: string }[] }[];
       medias?: {
         name?: string;
         type?: string;
@@ -245,9 +263,25 @@ export async function listWanderOsListingPhotos(input: {
         });
       }
     }
-    return photos;
+    // Amenity labels are what a caption's feature bullets are made of, and
+    // they are the difference between copy about this home and copy about
+    // any home. `label` carries them; `displayName` is usually null.
+    const amenities = [
+      ...new Set(
+        (body.amenities ?? []).flatMap((group) =>
+          (group.amenities ?? []).flatMap((amenity) =>
+            amenity.label?.trim() ? [amenity.label.trim()] : [],
+          ),
+        ),
+      ),
+    ];
+    return {
+      photos,
+      description: body.description?.trim() || null,
+      amenities,
+    };
   } catch (error) {
-    console.error("wanderos listing photos failed", input.propertyId, error);
-    return [];
+    console.error("wanderos listing detail failed", input.propertyId, error);
+    return { photos: [], description: null, amenities: [] };
   }
 }

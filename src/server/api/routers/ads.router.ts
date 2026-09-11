@@ -4,6 +4,12 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
+  buildAdSet,
+  setAdCopy,
+  setAdStatus,
+} from "@/server/services/ad-set.service";
+
+import {
   AD_PUSH_GOALS,
   PLANNABLE_AD_PLATFORMS,
   PUSHABLE_AD_PLATFORMS,
@@ -167,6 +173,57 @@ export const adsRouter = {
 
   // Experiment: build a static and a carousel from the client's own homes.
   // Drafts only; the push is still what decides whether any of it runs.
+  /** Draw the brand's whole set from the homes given. One model call. */
+  buildAdSet: protectedProcedure
+    .input(
+      z.object({
+        brandId: z.string().min(1),
+        propertyIds: z.array(z.string().min(1)).min(1).max(10),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      buildAdSet({
+        brandId: input.brandId,
+        orgId: await organizationIdFor(ctx),
+        propertyIds: input.propertyIds,
+        userId: ctx.session.user.id,
+      }),
+    ),
+
+  /** Production state on one drafted ad. Touches no platform. */
+  setAdStatus: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        status: z.enum(["drawn", "kept", "approved"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setAdStatus({
+        adId: input.adId,
+        orgId: await organizationIdFor(ctx),
+        status: input.status,
+      }),
+    ),
+
+  /** The words on one drafted ad; its cards are left alone. */
+  setAdCopy: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        headline: z.string().max(60).optional(),
+        body: z.string().max(1200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      setAdCopy({
+        adId: input.adId,
+        orgId: await organizationIdFor(ctx),
+        headline: input.headline,
+        body: input.body,
+      }),
+    ),
+
   draftAdsFromHomes: protectedProcedure
     .input(
       z.object({
