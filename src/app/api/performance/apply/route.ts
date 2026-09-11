@@ -20,9 +20,26 @@ import { requireGatewayAuth } from "@/server/services/hubspot-gateway.service";
  * leads.
  */
 
-/** Same channel the inbound lead router and the pregen beacon post to. */
-const RADIO_CORE_INBOUND_CHANNEL_ID = "C0A3PMXE3MG";
+/**
+ * #team-performance, by Kyle's call: the desk that works these wants to jump on
+ * every lead while the volume is low. Deliberately NOT #radio-core-inbound,
+ * which is the WanderOS AE rota's channel — routing there would have undone in
+ * Slack the separation this whole route exists to keep.
+ *
+ * Move to #radio-performance when it gets noisy enough to want its own feed.
+ *
+ */
+const PERFORMANCE_CHANNEL = "C0BSSECHK08";
 const SLACK_TESTING_CHANNEL = "radio-slack-testing";
+
+/**
+ * Kyle, mentioned on every application.
+ *
+ * The ping is the product here, not the room: volume is low and he wants to
+ * jump on each lead himself. It also means a message still reaches him if the
+ * channel above ever changes.
+ */
+const PERFORMANCE_OWNER_SLACK_ID = "U025DTBSU01";
 
 const body = z.object({
   email: z.string().trim().pipe(z.email("Enter a valid email")),
@@ -105,7 +122,7 @@ async function notify(
     .join(" · ");
 
   const result = await postOnSlack({
-    channel: test ? SLACK_TESTING_CHANNEL : RADIO_CORE_INBOUND_CHANNEL_ID,
+    channel: test ? SLACK_TESTING_CHANNEL : PERFORMANCE_CHANNEL,
     text: `🎯 ${application.name ?? application.email} applied to the Performance beta`,
     blocks: [
       {
@@ -113,7 +130,7 @@ async function notify(
         text: {
           type: "mrkdwn",
           text:
-            `🎯 New *Performance beta* application\n${facts}\n` +
+            `🎯 New *Performance beta* application <@${PERFORMANCE_OWNER_SLACK_ID}>\n${facts}\n` +
             (qualifying ? `${qualifying}\n` : "") +
             `from ${esc(application.source)}${application.queryParams ? ` · \`${esc(application.queryParams)}\`` : ""}`,
         },
