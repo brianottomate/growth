@@ -5,6 +5,7 @@ import { brandTable, personaTable } from "./brand-schema";
 import { channelPlatformEnum, channelTable } from "./channel-schema";
 import type { MediaItem } from "./content-schema";
 import { homeTable } from "./home-schema";
+import { launchTable } from "./launch-schema";
 import { performanceCycleTable } from "./performance-schema";
 import { createId } from "./utils";
 
@@ -266,6 +267,13 @@ export const campaignTable = pgTable(
     performanceCycleId: t
       .text()
       .references(() => performanceCycleTable.id, { onDelete: "set null" }),
+
+    // The product moment this ladders up to. A launch spans brands, so the FK
+    // lives here rather than the launch holding an array.
+    launchId: t
+      .text()
+      .references(() => launchTable.id, { onDelete: "set null" }),
+
 
     startAt: t.timestamp({ withTimezone: true }),
     endAt: t.timestamp({ withTimezone: true }),

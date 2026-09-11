@@ -15,13 +15,7 @@ export const growthExecutionContextSchema = z.object({
   orgId: z.string().min(1),
   userId: z.string().min(1),
   threadId: z.string().min(1).optional(),
-  surface: z.enum([
-    "overview-chat",
-    "plan-chat",
-    "mcp",
-    "invoke-growth",
-    "test",
-  ]),
+  surface: z.enum(["overview-chat", "mcp", "invoke-growth", "test"]),
   runId: z.string().min(1),
 });
 

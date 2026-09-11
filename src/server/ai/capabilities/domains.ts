@@ -124,6 +124,7 @@ import {
   listListingPhotos,
   importListingPhotos,
 } from "./operations";
+import { LAUNCH_TOOLS } from "./launch";
 import { PLANNING_TOOLS } from "./planning";
 import {
   applyLivePostMatchAction,
@@ -525,11 +526,32 @@ export const strategyWrite = growthDomainTool({
   },
 });
 
+export const launchRead = growthDomainTool({
+  description:
+    "Read launches: the list with tier, date and readiness, or one launch in full with its brief, per-surface owners, linked work, and what it still needs.",
+  actions: {
+    list: LAUNCH_TOOLS.listLaunches,
+    get: LAUNCH_TOOLS.readLaunch,
+  },
+});
+
+export const launchWrite = growthDomainTool({
+  description:
+    "Create a launch, merge fields into its brief, set its own fields, set one surface's owner and ready-by date, or point a surface at the draft that fulfils it. Small verbs — sequence them, never expect one call to plan a launch.",
+  actions: {
+    create: LAUNCH_TOOLS.createLaunch,
+    setBrief: LAUNCH_TOOLS.setBrief,
+    setFields: LAUNCH_TOOLS.setFields,
+    setFeatures: LAUNCH_TOOLS.setFeatures,
+    setDeliverable: LAUNCH_TOOLS.setDeliverable,
+    attach: LAUNCH_TOOLS.attach,
+  },
+});
+
 export const planningRead = growthDomainTool({
-  description: "Preview slots or draft a reviewable content-moment blueprint.",
+  description: "Preview the cadence-driven content slots a brand is missing.",
   actions: {
     previewSlots: PLANNING_TOOLS.previewTwoWeekSlots,
-    draftMomentBlueprint: PLANNING_TOOLS.draftMomentBlueprint,
   },
 });
 
@@ -604,6 +626,8 @@ export const DOMAIN_CAPABILITY_TOOLS = {
   mediaLibraryWrite,
   strategyRead,
   strategyWrite,
+  launchRead,
+  launchWrite,
   planningRead,
   planningWrite,
   amplificationRead,

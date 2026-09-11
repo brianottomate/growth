@@ -6,7 +6,7 @@ import type {
 } from "@/lib/growth-capabilities";
 
 export type GrowthSurface =
-  "overview-chat" | "plan-chat" | "mcp" | "invoke-growth" | "test";
+  "overview-chat" | "mcp" | "invoke-growth" | "test";
 export type GrowthToolConsequence =
   | "local-read"
   | "provider-read"
@@ -27,18 +27,11 @@ export interface GrowthActionPolicy {
 }
 
 const ALL = ["overview-chat", "mcp", "invoke-growth", "test"] as const;
-const PRODUCT = ["overview-chat", "plan-chat", "test"] as const;
+const PRODUCT = ["overview-chat", "test"] as const;
 // Provider-spend writes need the in-app approval card. The direct MCP
 // projection executes tools without that continuation, so it cannot advertise
 // these actions until the MCP route enforces an equivalent approval handshake.
 const APPROVAL_PRODUCT = ["overview-chat", "test"] as const;
-const PLAN_READ = [
-  "overview-chat",
-  "plan-chat",
-  "mcp",
-  "invoke-growth",
-  "test",
-] as const;
 const read = (
   consequence: GrowthToolConsequence = "local-read",
   surfaces: readonly GrowthSurface[] = ALL,
@@ -78,9 +71,9 @@ export const growthActionPolicies = {
   // an edit can be restored rather than lost.
   newsletterAgent: { run: write({ consequence: "local-write" }) },
   brandRead: {
-    list: read("local-read", PLAN_READ),
-    getMap: read("local-read", PLAN_READ),
-    next: read("local-read", PLAN_READ),
+    list: read("local-read", ALL),
+    getMap: read("local-read", ALL),
+    next: read("local-read", ALL),
   },
   brandWrite: {
     create: write(),
@@ -467,9 +460,29 @@ export const growthActionPolicies = {
     createBrandMix: write(),
     updateBrandMix: write({ idempotent: true }),
   },
+  launchRead: {
+    list: read("local-read", ALL),
+    get: read("local-read", ALL),
+  },
+  launchWrite: {
+    create: write(),
+    // Merging brief fields is a plain field edit: re-running with the same
+    // payload lands the same row, and the previous value is visible in the UI.
+    setBrief: write({ idempotent: true, undoWith: "launchWrite.setBrief" }),
+    setFields: write({ idempotent: true, undoWith: "launchWrite.setFields" }),
+    setFeatures: write({
+      idempotent: true,
+      undoWith: "launchWrite.setFeatures",
+    }),
+    setDeliverable: write({
+      idempotent: true,
+      undoWith: "launchWrite.setDeliverable",
+    }),
+    // Records a pointer; the referenced draft is untouched either way.
+    attach: write({ idempotent: true, undoWith: "launchWrite.setDeliverable" }),
+  },
   planningRead: {
-    previewSlots: read("model-read", PLAN_READ),
-    draftMomentBlueprint: read("model-read", PLAN_READ),
+    previewSlots: read("model-read", ALL),
   },
   planningWrite: { generateSlots: write() },
   amplificationRead: { list: read() },

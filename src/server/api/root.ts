@@ -21,9 +21,9 @@ import { newsletterRouter } from "@/server/api/routers/newsletter.router";
 import { orgRouter } from "@/server/api/routers/org.router";
 import { outreachRouter } from "@/server/api/routers/outreach.router";
 import { performanceRouter } from "@/server/api/routers/performance.router";
-import { planImportRouter } from "@/server/api/routers/planImport.router";
 import { productStorefrontRouter } from "@/server/api/routers/productStorefront.router";
 import { instantlyRouter } from "@/server/api/routers/instantly.router";
+import { launchRouter } from "@/server/api/routers/launch.router";
 import { leadsRouter } from "@/server/api/routers/leads.router";
 import { lifecycleRouter } from "@/server/api/routers/lifecycle.router";
 import { pregenNativeRouter } from "@/server/api/routers/pregen-native.router";
@@ -31,7 +31,6 @@ import { transactionalRouter } from "@/server/api/routers/transactional.router";
 import { listeningRouter } from "@/server/api/routers/listening.router";
 import { mediaRouter } from "@/server/api/routers/media.router";
 import { mentionRouter } from "@/server/api/routers/mention.router";
-import { momentRouter } from "@/server/api/routers/moment.router";
 import { redditRouter } from "@/server/api/routers/reddit.router";
 import { rescheduleRouter } from "@/server/api/routers/reschedule.router";
 import { seriesRouter } from "@/server/api/routers/series.router";
@@ -48,6 +47,7 @@ import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  launch: launchRouter,
   user: userRouter,
   ads: adsRouter,
   affiliate: affiliateRouter,
@@ -71,7 +71,6 @@ export const appRouter = createTRPCRouter({
   org: orgRouter,
   outreach: outreachRouter,
   performance: performanceRouter,
-  planImport: planImportRouter,
   productStorefront: productStorefrontRouter,
   instantly: instantlyRouter,
   leads: leadsRouter,
@@ -81,7 +80,6 @@ export const appRouter = createTRPCRouter({
   listening: listeningRouter,
   media: mediaRouter,
   mention: mentionRouter,
-  moment: momentRouter,
   reddit: redditRouter,
   reschedule: rescheduleRouter,
   series: seriesRouter,

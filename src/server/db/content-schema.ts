@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { campaignTable } from "./ads-schema";
+import { launchTable } from "./launch-schema";
 import { userTable } from "./auth-schema";
 import { brandTable } from "./brand-schema";
 import {
@@ -186,6 +187,12 @@ export const seriesTable = pgTable(
       .text()
       .references(() => campaignTable.id, { onDelete: "set null" }),
 
+    // The product moment this ladders up to. A launch spans brands, so the FK
+    // lives here rather than the launch holding an array.
+    launchId: t
+      .text()
+      .references(() => launchTable.id, { onDelete: "set null" }),
+
     name: t.text().notNull(),
     slug: t.text(), // url-safe, unique within a brand
     description: t.text(),
@@ -257,6 +264,12 @@ export const contentPostTable = pgTable(
     campaignId: t
       .text()
       .references(() => campaignTable.id, { onDelete: "set null" }),
+
+    // The product moment this ladders up to. A launch spans brands, so the FK
+    // lives here rather than the launch holding an array.
+    launchId: t
+      .text()
+      .references(() => launchTable.id, { onDelete: "set null" }),
 
     // Owner / assignee shown in the Feed.
     ownerId: t.text().references(() => userTable.id),

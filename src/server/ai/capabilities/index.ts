@@ -41,9 +41,3 @@ export const MCP_TOOLS = Object.fromEntries(
   ),
 ) as ToolSet;
 
-/** The focused, read-only projection used by the ephemeral moment planner. */
-export const PLAN_TOOLS = {
-  brandRead: OVERVIEW_TOOLS.brandRead,
-  researchRead: OVERVIEW_TOOLS.researchRead,
-  planningRead: OVERVIEW_TOOLS.planningRead,
-} as const satisfies ToolSet;

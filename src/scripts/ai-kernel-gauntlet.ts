@@ -10,7 +10,6 @@ import { z } from "zod";
 import {
   MCP_TOOLS,
   OVERVIEW_TOOLS,
-  PLAN_TOOLS,
 } from "@/server/ai/capabilities";
 import { composeGrowthContext } from "@/server/ai/kernel/context";
 import {
@@ -125,24 +124,6 @@ async function main() {
     !("researchRead" in MCP_TOOLS),
     "MCP must omit open-world research tools",
   );
-  assert(
-    JSON.stringify(Object.keys(PLAN_TOOLS).sort()) ===
-      JSON.stringify(["brandRead", "planningRead", "researchRead"]),
-    "Plan chat must use its deterministic canonical read projection",
-  );
-  for (const name of Object.keys(PLAN_TOOLS)) {
-    assert(
-      policyForGrowthTool(name, {
-        action:
-          name === "brandRead"
-            ? "list"
-            : name === "researchRead"
-              ? "readPage"
-              : "draftMomentBlueprint",
-      }).surfaces.includes("plan-chat"),
-      `${name} is missing plan-chat surface policy`,
-    );
-  }
 
   for (const [name, definition] of Object.entries(OVERVIEW_TOOLS)) {
     assert("run" in definition, `${name} is not a native Growth tool`);
@@ -306,7 +287,6 @@ async function main() {
       JSON.stringify({
         tools: overviewNames.length,
         mcpTools: Object.keys(MCP_TOOLS).length,
-        planTools: Object.keys(PLAN_TOOLS).length,
         schemas: "valid",
         actionPolicy: "valid",
         contextCharacters: composed.manifest.characters,
@@ -435,7 +415,6 @@ async function main() {
     JSON.stringify({
       tools: overviewNames.length,
       mcpTools: Object.keys(MCP_TOOLS).length,
-      planTools: Object.keys(PLAN_TOOLS).length,
       realBrands: first.data.brands.length,
       receiptReplay: true,
       permissionDenial: true,

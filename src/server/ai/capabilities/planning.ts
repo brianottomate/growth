@@ -2,10 +2,6 @@ import "server-only";
 
 import { z } from "zod";
 
-import {
-  generateMomentBlueprint,
-  momentSlotSchema,
-} from "@/server/services/plan-moment.service";
 import { requireOwnedBrand } from "./brand-access";
 import { growthAction } from "./types";
 import { generateRangeSlots } from "@/server/services/slot-generate.service";
@@ -106,50 +102,7 @@ export const generateTwoWeekSlots = growthAction({
   },
 });
 
-export const draftMomentBlueprint = growthAction({
-  description:
-    "Propose a reviewable content moment shape: verdict, scale, slots, channel renderings, and amplifier asks. Saves nothing. Use this after the brand context and desired outcome are clear; the operator can refine the blueprint before committing it.",
-  inputSchema: z.object({
-    brandId: z.string(),
-    name: z.string().optional(),
-    prompt: z.string().optional(),
-    imageUrls: z.array(z.string().url()).optional(),
-    goal: z.string().optional(),
-    scaleHint: z.enum(["single", "arc"]).optional(),
-    refine: z
-      .object({
-        keepSlots: z.array(momentSlotSchema),
-        blanks: z.number().int().min(0).optional(),
-        drop: z.array(z.string()).optional(),
-        steer: z.string().optional(),
-      })
-      .optional(),
-  }),
-  execute: async (input, ctx) => {
-    const brand = await requireOwnedBrand(input.brandId, ctx);
-    const blueprint = await generateMomentBlueprint({
-      brandName: brand.name,
-      brandTagline: brand.tagline,
-      name: input.name,
-      prompt: input.prompt,
-      imageUrls: input.imageUrls,
-      goal: input.goal,
-      scaleHint: input.scaleHint,
-      refine: input.refine,
-    });
-    // There is deliberately no commit macro: materialize the approved shape
-    // by composing the small verbs (saveContentSeries, setSeriesCadence,
-    // createIdea, generateSlots, requestAmplification) so each step stays
-    // reviewable and steerable.
-    return {
-      blueprint,
-      next: "Review or refine, then materialize the approved pieces with the granular write actions (series, cadence, ideas, slots, amplification).",
-    };
-  },
-});
-
 export const PLANNING_TOOLS = {
   previewTwoWeekSlots,
   generateTwoWeekSlots,
-  draftMomentBlueprint,
 } as const;

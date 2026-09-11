@@ -6,7 +6,6 @@ import type { GrowthPromptCacheTtl } from "./prompt-cache";
 
 export type GrowthSurface =
   | "overview-chat"
-  | "plan-chat"
   | "mcp"
   | "invoke-growth"
   | "test";

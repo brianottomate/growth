@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   CalendarPlus,
-  FileSpreadsheet,
   Image as ImageIcon,
   MessageSquare,
   Plus,
@@ -55,7 +54,6 @@ import { ContentSheet } from "./ContentSheet";
 import { ReshuffleDialog } from "./ReshuffleDialog";
 import { AddIdeaDrawer } from "./AddIdeaDrawer";
 import { GenerateSlotsDialog } from "./GenerateSlotsDialog";
-import { ImportPlanDialog } from "./ImportPlanDialog";
 import { MarkScheduledButton } from "./MarkScheduledButton";
 
 type Card = RouterOutputs["content"]["board"][number];
@@ -308,7 +306,6 @@ export function ContentBoard({
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [reshuffleOpen, setReshuffleOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
 
   const visible = useMemo(() => {
@@ -442,12 +439,6 @@ export function ContentBoard({
             </TooltipTrigger>
             <TooltipContent>Manual monthly slot fill</TooltipContent>
           </Tooltip>
-          <button
-            onClick={() => setImportOpen(true)}
-            className="border-border text-muted-foreground hover:bg-accent hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-          >
-            <FileSpreadsheet className="size-3.5" /> Import plan
-          </button>
           <Link
             href="/app/content/groupings"
             className="border-border text-muted-foreground hover:bg-accent hover:text-foreground rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
@@ -639,13 +630,6 @@ export function ContentBoard({
           void qc.invalidateQueries({ queryKey: boardOptions.queryKey });
           void invalidateSchedule();
         }}
-      />
-
-      <ImportPlanDialog
-        brands={brands}
-        defaultBrandId={createBrandId}
-        open={importOpen}
-        onOpenChange={setImportOpen}
       />
 
       <AddIdeaDrawer
