@@ -345,6 +345,17 @@ export const UNDER_10_ROUND_ROBIN: Record<string, number> = {
   "331879496": 1.0, // Kyle Tibbitts
 };
 
+/**
+ * Every 10+ unit Listed inbound lead, split evenly three ways between the non-orca BDRs.
+ * Karolina now gets the tiebreaker since the system previously picked Skyler every time.
+ * As of Sept '26
+ */
+export const BDR_INBOUND_ROUND_ROBIN: Record<string, number> = {
+  "430737561": 0.34, // Karolina Tenorio
+  "79859550": 0.33, // Skyler Rickey
+  "80091646": 0.33, // Justin Showalter
+};
+
 export const BDR_OTE_ROUND_ROBIN: Record<string, number> = {
   "82330443": 1.0, // Matt Montanti
 };
@@ -1625,28 +1636,17 @@ function getRoundRobinForProperties(
   if (!Number.isFinite(numProperties) || numProperties < 10)
     return { rr: UNDER_10_ROUND_ROBIN, sizeFilter: { max: 9 } };
 
-  // AEs run a single 200-unit split; BDRs keep the finer OTE/SMB/MM/
-  // Enterprise/Strategic bands.
+  // AEs run a single 200-unit split covering everything from 10 units up
+  // BDRs run one flat table across the whole 10+ range.
   if (role === "AE") {
-    if (numProperties < 15)
-      return { rr: AE_OTE_ROUND_ROBIN, sizeFilter: { min: 10, max: 14 } };
     return numProperties < 200
-      ? { rr: AE_UNDER_200_ROUND_ROBIN, sizeFilter: { min: 15, max: 199 } }
+      ? { rr: AE_UNDER_200_ROUND_ROBIN, sizeFilter: { min: 10, max: 199 } }
       : { rr: AE_ATLEAST_200_ROUND_ROBIN, sizeFilter: { min: 200 } };
   }
 
-  if (numProperties < 15)
-    return { rr: BDR_OTE_ROUND_ROBIN, sizeFilter: { min: 10, max: 14 } };
-  if (numProperties < 100)
-    return { rr: BDR_SMB_ROUND_ROBIN, sizeFilter: { min: 15, max: 99 } };
-  if (numProperties < 250)
-    return { rr: BDR_MM_ROUND_ROBIN, sizeFilter: { min: 100, max: 249 } };
-  if (numProperties < 500)
-    return {
-      rr: BDR_ENTERPRISE_ROUND_ROBIN,
-      sizeFilter: { min: 250, max: 499 },
-    };
-  return { rr: BDR_STRATEGIC_ROUND_ROBIN, sizeFilter: { min: 500 } };
+  // BDRs take every 10+ unit lead through one even four-way split, so the
+  // deficit is measured against the whole 10+ population rather than a band.
+  return { rr: BDR_INBOUND_ROUND_ROBIN, sizeFilter: { min: 10 } };
 }
 
 /**

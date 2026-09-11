@@ -599,11 +599,14 @@ export async function osInboundLeadRouter({
   const isListedSource =
     source === "Wander Listed Application" || intentMeta === "WANDER_LISTED";
 
+  // Listed inbound goes to the BDRs, wOS inbound to the AEs. The source
+  // also picks which `inbound_outbound` value the deficit count is measured
+  // against, so a rep's Listed load never offsets their wOS load.
   try {
     aeForRR =
       (await nextRepInRR(
         officialInboundUnits,
-        isListedSource ? "BDR" : "AE",
+        isListedSource && officialInboundUnits < 200 ? "BDR" : "AE",
         isListedSource ? "Listed" : "OS",
       )) ?? HS_USER_IDS.KYLE;
   } catch (err) {
