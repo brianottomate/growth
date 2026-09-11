@@ -67,8 +67,11 @@ Since 2026-08-28 this repo follows the org-wide release-drafter flow
 - `dev` is the default branch and the only branch to target. `main` no longer
   exists. Never push `prod`: it is the Vercel production branch, so a direct
   push deploys production outside the release flow.
-- Ship a change: branch from `dev`, open a PR to `dev`, squash-merge after one
-  approving review (branch ruleset; authors cannot self-approve).
+- Ship a change: branch from `dev`, open a PR to `dev`, squash-merge. The branch
+  ruleset requires a PR but, since 2026-09-11, no approving review, so authors
+  can merge their own. Nothing else gates the merge: there are no required
+  status checks, so read the Vercel preview build yourself before merging (it
+  runs `next build`, which type-checks and lints).
 - Every merge to `dev` deploys a preview build. Production only moves when a
   GitHub Release is published.
 - Merges to `dev` accumulate in a draft release. To deploy production, publish
