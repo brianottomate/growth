@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import {
   emptyLaunchBrief,
@@ -242,36 +242,74 @@ export async function createLaunch(input: {
   return row!;
 }
 
-/** Upsert ONE deliverable by surface. The set is small; rewriting it is fine. */
+/**
+ * Upsert ONE deliverable by surface, as a single statement.
+ *
+ * Read-modify-write in JS loses data here: the assistant fans several of these
+ * out in ONE step (that is the point of small tools), each call reads the same
+ * array, merges its own surface, and the last write drops the others. It cost
+ * two owner assignments the first time a launch was filled from a brief.
+ *
+ * A transaction is not available — the Neon HTTP driver has none — so the
+ * merge happens server-side instead. Every reference to `deliverables` below
+ * is a correlated reference to the row being updated, which Postgres
+ * re-evaluates against the new row version if a concurrent update commits
+ * first, so the calls serialize rather than clobber.
+ */
 export async function setDeliverable(
   orgId: string,
   launchId: string,
   surface: LaunchSurface,
   patch: Partial<Omit<LaunchDeliverable, "surface">>,
 ) {
-  const launch = await db.query.launchTable.findFirst({
-    where: and(
-      eq(launchTable.id, launchId),
-      eq(launchTable.organizationId, orgId),
-    ),
-    columns: { deliverables: true },
-  });
-  if (!launch) throw new Error("Launch not found");
+  // Validate the patch on its own; merged with an already-valid element it
+  // stays valid, and the shape is what reaches the database.
+  //
+  // Then keep ONLY the keys the caller actually sent. `status` carries a zod
+  // default, which survives `.partial()` and would otherwise ride along in
+  // every patch — setting a ready-by date would quietly reset the status.
+  const parsed = launchDeliverableSchema.partial().parse({ ...patch, surface });
+  const clean = Object.fromEntries(
+    Object.entries(parsed).filter(([key]) => key === "surface" || key in patch),
+  );
+  const patchJson = JSON.stringify(clean);
+  // A surface that does not exist yet is created, and only then does the
+  // default status apply.
+  const seed = JSON.stringify({ status: "not_started", ...clean });
 
-  const existing = launch.deliverables.find((d) => d.surface === surface);
-  const merged = launchDeliverableSchema.parse({
-    surface,
-    ...(existing ?? {}),
-    ...patch,
-  });
-  const deliverables = existing
-    ? launch.deliverables.map((d) => (d.surface === surface ? merged : d))
-    : [...launch.deliverables, merged];
-
-  const [row] = await db
+  const rows = await db
     .update(launchTable)
-    .set({ deliverables })
-    .where(eq(launchTable.id, launchId))
+    .set({
+      deliverables: sql`
+        (
+          select coalesce(
+            jsonb_agg(
+              case when elem->>'surface' = ${surface}
+                   then elem || ${patchJson}::jsonb
+                   else elem end
+              order by ord
+            ),
+            '[]'::jsonb
+          )
+          from jsonb_array_elements(${launchTable.deliverables})
+            with ordinality as t(elem, ord)
+        )
+        ||
+        case
+          when ${launchTable.deliverables} @> jsonb_build_array(
+                 jsonb_build_object('surface', ${surface}::text))
+          then '[]'::jsonb
+          else jsonb_build_array(${seed}::jsonb)
+        end
+      `,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(launchTable.id, launchId), eq(launchTable.organizationId, orgId)),
+    )
     .returning();
-  return row!;
+
+  const row = rows[0];
+  if (!row) throw new Error("Launch not found");
+  return row;
 }
