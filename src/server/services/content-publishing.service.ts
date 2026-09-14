@@ -25,10 +25,7 @@ import { buildZernioReschedulePayload } from "@/lib/zernio-reschedule";
 
 export type SocialDeliveryMode = "schedule" | "publish_now";
 export type SocialPublishingPlatform =
-  | "facebook"
-  | "instagram"
-  | "linkedin"
-  | "x";
+  "facebook" | "instagram" | "linkedin" | "x";
 
 const SUPPORTED_PLATFORMS = new Set<SocialPublishingPlatform>([
   "facebook",
@@ -36,6 +33,13 @@ const SUPPORTED_PLATFORMS = new Set<SocialPublishingPlatform>([
   "linkedin",
   "x",
 ]);
+
+// Zernio posts the first comment for these; X has no first-comment slot.
+const FIRST_COMMENT_LIMIT: Partial<Record<string, number>> = {
+  instagram: 2_200,
+  linkedin: 1_250,
+  facebook: 8_000,
+};
 
 const ZERNIO_PLATFORM: Record<SocialPublishingPlatform, string> = {
   facebook: "facebook",
@@ -155,6 +159,25 @@ function validateLinkedIn(item: DeliveryItem) {
   return { text, media };
 }
 
+function validateFacebook(item: DeliveryItem) {
+  const text = item.text?.trim() ?? "";
+  const media = publicMedia(item.media);
+  const images = media.filter((entry) => entry.type === "image");
+  const videos = media.filter((entry) => entry.type === "video");
+  if (!text && !media.length) {
+    throw new Error("Add copy or media before publishing");
+  }
+  if (text.length > 63_206) {
+    throw new Error("Facebook posts can contain at most 63,206 characters");
+  }
+  if (images.length > 10) {
+    throw new Error("Facebook supports at most 10 images per post");
+  }
+  if (videos.length > 1 || (videos.length > 0 && images.length > 0)) {
+    throw new Error("Facebook accepts either images or one video, not both");
+  }
+  return { text, media };
+}
 function validateInstagram(item: DeliveryItem, format: string | null) {
   const text = item.text?.trim() ?? "";
   const media = publicMedia(item.media);
@@ -213,12 +236,7 @@ function deliveryPayload(input: {
   const root = input.items[0];
   if (!root) throw new Error("Platform post not found");
   const firstComment = input.firstComment?.trim() || null;
-  const firstCommentLimit =
-    input.platform === "instagram"
-      ? 2_200
-      : input.platform === "linkedin"
-        ? 1_250
-        : null;
+  const firstCommentLimit = FIRST_COMMENT_LIMIT[input.platform] ?? null;
   if (firstComment && firstCommentLimit === null) {
     throw new Error("This platform format does not support a first comment");
   }
@@ -238,6 +256,15 @@ function deliveryPayload(input: {
     };
   }
 
+  if (input.platform === "facebook") {
+    if (input.items.length > 1) {
+      throw new Error("Facebook thread groups are not supported");
+    }
+    return {
+      ...validateFacebook(root),
+      platformSpecificData: firstComment ? { firstComment } : undefined,
+    };
+  }
   if (input.platform === "instagram") {
     if (input.items.length > 1) {
       throw new Error("Instagram thread groups are not supported");
@@ -311,9 +338,6 @@ async function loadSocialSpot(platformPostId: string) {
   }
   const platform = spot.platform as SocialPublishingPlatform;
   const story = isStoryFormat(spot.format);
-  if (platform === "facebook" && !story) {
-    throw new Error("Facebook publishing is currently available for Stories");
-  }
   if (!isZernioConfigured) throw new Error("Zernio is not configured");
 
   // A brand with no Zernio profile of its own can still post to its Facebook
@@ -715,14 +739,13 @@ export async function saveSocialFirstComment(input: {
   if (spot.parentPlatformPostId) {
     throw new Error("Prepare the first comment on the root post");
   }
-  if (
-    isStoryFormat(spot.format) ||
-    (spot.platform !== "instagram" && spot.platform !== "linkedin")
-  ) {
+  const limit = isStoryFormat(spot.format)
+    ? null
+    : (FIRST_COMMENT_LIMIT[spot.platform] ?? null);
+  if (limit === null) {
     throw new Error("This platform format does not support a first comment");
   }
   const firstComment = input.firstComment?.trim() || null;
-  const limit = spot.platform === "instagram" ? 2_200 : 1_250;
   if (firstComment && firstComment.length > limit) {
     throw new Error(`First comments can contain at most ${limit} characters`);
   }
@@ -748,7 +771,7 @@ export async function updateQueuedSocialFirstComment(input: {
 }) {
   const { spot, channel, platform, connectedAccountId, items, story } =
     await loadSocialSpot(input.platformPostId);
-  if (story || (platform !== "instagram" && platform !== "linkedin")) {
+  if (story || !(platform in FIRST_COMMENT_LIMIT)) {
     throw new Error("This platform format does not support a first comment");
   }
   if (!spot.deliveryExternalId) {

@@ -39,6 +39,11 @@ const PLATFORM_OPTIONS = [
   { platform: "facebook", format: "facebook.post", label: "Facebook feed" },
   {
     platform: "facebook",
+    format: "facebook.carousel",
+    label: "Facebook carousel",
+  },
+  {
+    platform: "facebook",
     format: "facebook.story",
     label: "Facebook Story",
   },

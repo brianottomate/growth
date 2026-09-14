@@ -2,6 +2,7 @@ import "server-only";
 
 import { env } from "@/env";
 import { AD_PLATFORM_SPECS } from "@/lib/ad-platforms";
+import { classifyFormatFromFields } from "@/server/content/formats";
 import type { MediaItem, PostStats } from "@/server/db/content-schema";
 
 const ZERNIO_API_BASE = "https://zernio.com/api/v1";
@@ -2034,10 +2035,16 @@ export function mapZernioPostToPlatformPosts(
 
   return entries.map((pe) => {
     const platform = mapZernioPlatform(pe.platform ?? post.platform);
+    const classified = classifyFormatFromFields(platform, {
+      media_type: post.mediaType,
+    });
     return {
       brandId: ctx.brandId,
       channelId: ctx.resolveChannelId?.(platform, pe.accountId),
       platform: platform as "x", // enum-validated string; cast for insert type
+      format: classified.confidence >= 0.9 ? classified.format : undefined,
+      archetype:
+        classified.confidence >= 0.9 ? classified.archetype : undefined,
       username: pe.accountUsername,
       source: source as "scraped",
       status: "published" as const,

@@ -791,7 +791,7 @@ export const contentRouter = createTRPCRouter({
     .input(
       z.object({
         platformPostId: z.string(),
-        firstComment: z.string().max(2_200).nullable(),
+        firstComment: z.string().max(8_000).nullable(),
         updateProvider: z.boolean().default(false),
       }),
     )

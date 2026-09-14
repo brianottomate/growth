@@ -148,12 +148,11 @@ export function SpotCard({
   const providerPublishingPlatform =
     spot.platform === "instagram" ||
     spot.platform === "linkedin" ||
-    spot.platform === "x"
+    spot.platform === "x" ||
+    spot.platform === "facebook"
       ? spot.platform
       : null;
-  const providerPublishing =
-    providerPublishingPlatform !== null ||
-    (spot.platform === "facebook" && story);
+  const providerPublishing = providerPublishingPlatform !== null;
   const isEmail =
     spot.platform === "newsletter" &&
     (spot.format === "newsletter.broadcast" ||

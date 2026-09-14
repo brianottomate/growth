@@ -247,7 +247,18 @@ export const PLATFORM_FORMATS: PlatformFormat[] = [
     platform: "facebook",
     archetype: "image",
     label: "Image Post",
-    media: { kinds: ["image"], min: 1 },
+    surface: "feed",
+    media: { kinds: ["image"], min: 1, max: 1 },
+  },
+  // A multi-photo Page post. Zernio takes it as one post with several
+  // mediaItems; the per-card link carousel is a different Meta product.
+  {
+    id: "facebook.carousel",
+    platform: "facebook",
+    archetype: "carousel",
+    label: "Carousel",
+    surface: "feed",
+    media: { kinds: ["image"], min: 2, max: 10, aspectRatios: ["1:1", "4:5"] },
   },
   {
     id: "facebook.video",
@@ -483,13 +494,20 @@ export function classifyFormatFromFields(
       return pick("linkedin.post", 0.7);
     }
     case "facebook": {
+      // Zernio's analytics rows carry `mediaType` (image | video | carousel).
+      const ct = lower(fields.content_type) || lower(fields.media_type);
+      if (ct === "carousel") return pick("facebook.carousel");
+      if (ct === "video") return pick("facebook.video");
+      if (ct === "image") return pick("facebook.image");
       const attachments = fields.attachments;
       if (Array.isArray(attachments)) {
         const kinds = attachments.map((a) =>
           lower((a as Record<string, unknown>)?.type),
         );
         if (kinds.includes("video")) return pick("facebook.video");
-        if (kinds.includes("photo")) return pick("facebook.image");
+        const photos = kinds.filter((kind) => kind === "photo").length;
+        if (photos > 1) return pick("facebook.carousel");
+        if (photos === 1) return pick("facebook.image");
       }
       return pick("facebook.post", 0.6);
     }

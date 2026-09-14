@@ -9,6 +9,7 @@ import { cn } from "@/components/ui/lib/utils";
 import { useTRPC } from "@/trpc/react";
 
 const LABELS: Record<string, string> = {
+  facebook: "Facebook",
   instagram: "Instagram",
   linkedin: "LinkedIn",
   x: "X",
@@ -32,7 +33,7 @@ export function SocialDeliveryControl({
   deliveryError,
 }: {
   spotId: string;
-  platform: "instagram" | "linkedin" | "x";
+  platform: "facebook" | "instagram" | "linkedin" | "x";
   status: string;
   scheduledAt: string | null;
   connected: boolean;

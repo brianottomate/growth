@@ -51,6 +51,12 @@ const SPOT_TARGETS = [
   { id: "x", platform: "x", label: "X" },
   { id: "facebook", platform: "facebook", label: "Facebook" },
   {
+    id: "facebook.carousel",
+    platform: "facebook",
+    format: "facebook.carousel",
+    label: "Facebook carousel",
+  },
+  {
     id: "facebook.story",
     platform: "facebook",
     format: "facebook.story",
