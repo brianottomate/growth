@@ -117,6 +117,7 @@ export type PostStats = {
   shares?: number;
   views?: number;
   impressions?: number;
+  reach?: number; // unique accounts; Meta surfaces it separately from impressions
   clicks?: number;
   saves?: number;
   // email (newsletter / broadcast) metrics

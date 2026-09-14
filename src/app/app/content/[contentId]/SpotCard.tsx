@@ -173,6 +173,7 @@ export function SpotCard({
   const via = spot.provider ? (VIA[spot.provider] ?? spot.provider) : null;
   const stats = spot.stats ?? {};
   const metrics = [
+    stats.reach != null ? `${formatMetric(stats.reach)} reach` : null,
     stats.views != null ? `${formatMetric(stats.views)} views` : null,
     stats.likes != null ? `${formatMetric(stats.likes)} likes` : null,
     stats.comments != null ? `${formatMetric(stats.comments)} comments` : null,
