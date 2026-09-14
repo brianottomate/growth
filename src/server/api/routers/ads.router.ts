@@ -432,6 +432,7 @@ export const adsRouter = {
           .object({
             pixelId: z.string().trim().max(64).optional(),
             customEventType: z.string().trim().max(64).optional(),
+            customConversionId: z.string().trim().max(64).optional(),
             budgetMode: z.enum(["cbo", "abo"]).optional(),
           })
           .nullish(),

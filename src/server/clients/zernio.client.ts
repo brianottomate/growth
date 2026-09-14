@@ -1321,6 +1321,47 @@ export async function createZernioStandaloneAd(
   });
 }
 
+export type CreateZernioCustomConversionInput = {
+  accountId: string;
+  adAccountId: string;
+  /** Also the reuse key together with pixelId. */
+  name: string;
+  pixelId: string;
+  /** Meta custom_event_type, e.g. PURCHASE or LEAD. */
+  customEventType: string;
+  /** Meta's own rule grammar, forwarded verbatim: `{ url: { i_contains: "host" } }`. */
+  rule: Record<string, unknown>;
+};
+
+/**
+ * Provision the Meta custom conversion an ad set optimises toward, or reuse
+ * the non-archived one with the same name on the same pixel. Meta's own
+ * create is not idempotent; Zernio does the matching, so a retried push does
+ * not mint a duplicate with none of the original's optimisation history.
+ * https://docs.zernio.com/ad-campaigns/create-custom-conversion
+ */
+export async function createZernioCustomConversion(
+  input: CreateZernioCustomConversionInput,
+): Promise<{ customConversionId: string; reused: boolean }> {
+  const { accountId, ...body } = input;
+  const result = await zernioFetch<{
+    customConversionId?: string;
+    reused?: boolean;
+  }>(`/accounts/${encodeURIComponent(accountId)}/custom-conversions`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!result.customConversionId) {
+    throw new Error(
+      `Zernio created custom conversion "${input.name}" but returned no customConversionId`,
+    );
+  }
+  return {
+    customConversionId: result.customConversionId,
+    reused: Boolean(result.reused),
+  };
+}
+
 export type BoostZernioMetaPostInput = {
   accountId: string;
   adAccountId: string;

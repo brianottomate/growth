@@ -36,6 +36,7 @@ import {
   boostZernioMetaPost,
   createZernioAdAudience,
   createZernioAdCampaign,
+  createZernioCustomConversion,
   deleteZernioCampaign,
   createZernioStandaloneAd,
   duplicateZernioMetaCampaign,
@@ -59,9 +60,12 @@ import {
   writtenCampaignId,
 } from "@/server/clients/zernio.client";
 import { db } from "@/server/db";
+import { normalizeDomain } from "@/server/services/hubspot-contact-mirror";
 import { usStateName } from "@/lib/us-states";
 import {
   adFormatFor,
+  hostScopedConversionRule,
+  performanceConversionName,
   audienceLabelForPlan,
   performanceAdName,
   performanceAdSetName,
@@ -2210,6 +2214,87 @@ async function pushToGoogle(args: PushArgs) {
   };
 }
 
+/**
+ * What a Meta ad set optimises toward.
+ *
+ * Wander's pixel is on wander.com and every WanderOS storefront, so a client
+ * ad set pointed at the raw Purchase event is credited with any booking in the
+ * fleet a viewer makes within the attribution window. Winter Park Escapes'
+ * first campaign reported nine purchases against two on its own host that
+ * way. A client brand with a website therefore gets a Custom Conversion
+ * scoped to its host, provisioned through Zernio (which reuses by name) and
+ * pinned on the ad set. Wander's own brands keep the raw event, and an
+ * explicit `customConversionId` in the settings always wins.
+ */
+export async function metaPromotedObjectFor(args: {
+  brand: Pick<Brand, "name" | "relationship" | "website">;
+  meta: {
+    pixelId?: string;
+    customEventType?: string;
+    customConversionId?: string;
+  };
+  /** A dry run must not provision anything, so it optimises on the event. */
+  validateOnly: boolean;
+  ensureCustomConversion: (input: {
+    name: string;
+    pixelId: string;
+    customEventType: string;
+    rule: Record<string, unknown>;
+  }) => Promise<{ customConversionId: string; reused: boolean }>;
+  warnings: string[];
+}): Promise<CreateZernioStandaloneAdInput["promotedObject"]> {
+  const { brand, meta, warnings } = args;
+  if (meta.customConversionId) {
+    return {
+      pixelId: meta.pixelId,
+      customConversionId: meta.customConversionId,
+    };
+  }
+  if (!meta.pixelId && !meta.customEventType) return undefined;
+
+  const onEvent = {
+    pixelId: meta.pixelId,
+    customEventType: meta.customEventType,
+  };
+  if (
+    brand.relationship !== "client" ||
+    !meta.pixelId ||
+    !meta.customEventType ||
+    args.validateOnly
+  ) {
+    return onEvent;
+  }
+
+  const host = normalizeDomain(brand.website);
+  if (!host) {
+    warnings.push(
+      `${brand.name} has no website on the brand, so Meta optimises on the raw ${meta.customEventType} event and will credit bookings made on any Wander site. Set the website and re-push to scope it.`,
+    );
+    return onEvent;
+  }
+
+  const name = performanceConversionName({
+    customer: brand.name,
+    isClient: true,
+    event: meta.customEventType,
+  });
+  const conversion = await args.ensureCustomConversion({
+    name,
+    pixelId: meta.pixelId,
+    customEventType: meta.customEventType,
+    rule: hostScopedConversionRule(host),
+  });
+  warnings.push(
+    `Meta optimises on ${name} (${meta.customEventType} on ${host}), ${
+      conversion.reused ? "reused" : "created"
+    } as custom conversion ${conversion.customConversionId}`,
+  );
+  return {
+    pixelId: meta.pixelId,
+    customConversionId: conversion.customConversionId,
+  };
+}
+
 // ---- META COMPILE ------------------------------------------------------
 //
 // Each plan audience becomes an ad set; every creative ad runs under every
@@ -2256,10 +2341,18 @@ async function pushToMeta(args: PushArgs) {
 
   const meta = settings.meta ?? {};
   const useCbo = (meta.budgetMode ?? "cbo") === "cbo";
-  const promotedObject =
-    meta.pixelId || meta.customEventType
-      ? { pixelId: meta.pixelId, customEventType: meta.customEventType }
-      : undefined;
+  const promotedObject = await metaPromotedObjectFor({
+    brand,
+    meta,
+    validateOnly: Boolean(input.validateOnly),
+    ensureCustomConversion: (conversion) =>
+      createZernioCustomConversion({
+        accountId: input.connectionAccountId,
+        adAccountId: destination.adAccount.id,
+        ...conversion,
+      }),
+    warnings,
+  });
 
   const isCarousel = (content: AdCreativeContent) =>
     !isVideoContent(content) && (content.media?.length ?? 0) >= 2;

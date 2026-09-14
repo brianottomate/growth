@@ -156,3 +156,19 @@ What the code guarantees around that:
 
 Winter Park Escapes is the first brand on this path: Page 410431762630458,
 Wander's `act_885632589057558` allowed as shared, intake verified 2026-09-09.
+
+## Conversion scoping for client brands (2026-09-14)
+
+Wander's pixel `340252052212435` fires `Purchase` on wander.com and on every
+WanderOS storefront (fleet rollout 2026-09-10). Winter Park Escapes' first ad
+set optimised on that raw event, so Meta credited it with nine purchases in
+four days while the pixel saw two on winterparkescapes.com: any viewer who
+booked anywhere in the fleet inside the 1-day view window counted.
+
+The push now pins a client ad set to a Custom Conversion scoped to the brand's
+host (`META_PERF+<BRAND>_<EVENT>`, rule `url i_contains <host>`), provisioned
+through Zernio's `POST /accounts/{id}/custom-conversions`, which reuses by name
+and pixel. Wander's own brands keep the raw event. A client brand with no
+`website` falls back to the event and the push warns. `settings.meta.customConversionId`
+pins one by hand. Existing ad sets are not rewritten: edit the conversion event
+in Ads Manager, which restarts learning.

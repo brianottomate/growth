@@ -191,6 +191,12 @@ export type PlatformCampaignSettings = {
     pixelId?: string;
     customEventType?: string;
     /**
+     * Optimise toward this Custom Conversion instead of the raw event. Set
+     * by hand to pin one; a client brand with a website gets a host-scoped
+     * one provisioned at push time when this is empty.
+     */
+    customConversionId?: string;
+    /**
      * Where the budget lives. CBO puts it on the campaign and lets Meta move
      * it between ad sets; ABO gives each ad set its own fixed budget.
      * Defaults to CBO.

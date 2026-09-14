@@ -229,6 +229,31 @@ export function performanceAdSetName(input: {
   ].join("_");
 }
 
+/**
+ * `META_PERF+WINTER+PARK+ESCAPES_PURCHASE`
+ *
+ * The custom conversion a Performance ad set optimises toward. Wander's pixel
+ * fires Purchase on wander.com and on every WanderOS storefront, so an ad set
+ * pointed at the raw event is credited with bookings made anywhere in the
+ * fleet within Meta's view window. The conversion narrows it to the client's
+ * own host, and the name is the reuse key so a re-push finds it again.
+ */
+export function performanceConversionName(input: {
+  customer: string;
+  isClient?: boolean;
+  event: string;
+}): string {
+  return [
+    performanceNamePrefix({ brandName: input.customer, isClient: input.isClient ?? true }),
+    input.event.trim().toUpperCase(),
+  ].join("_");
+}
+
+/** Meta conversion rule: any URL on the host, in Meta's own grammar. */
+export function hostScopedConversionRule(host: string): Record<string, unknown> {
+  return { url: { i_contains: host } };
+}
+
 export type PerformanceAdFormat =
   "Static" | "Carousel" | "Video" | "Influencer Video";
 

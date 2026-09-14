@@ -8,6 +8,7 @@ import {
   connectionRunsAsBrandPage,
   googlePauseOutcome,
   matchResponseAdsToPlan,
+  metaPromotedObjectFor,
   videoPayloadFor,
 } from "@/server/services/ads-write.service";
 import type { CreateZernioStandaloneAdInput } from "@/server/clients/zernio.client";
@@ -477,5 +478,103 @@ describe("connectionRunsAsBrandPage", () => {
         { platformUserId: "27501783656071882:page:101399685529192" },
       ),
     ).toBe(true);
+  });
+});
+
+describe("what a Meta ad set optimises toward", () => {
+  const client = {
+    name: "Winter Park Escapes",
+    relationship: "client" as const,
+    website: "https://www.winterparkescapes.com",
+  };
+  const purchase = { pixelId: "340252052212435", customEventType: "PURCHASE" };
+  const neverCalled = async () => {
+    throw new Error("must not provision");
+  };
+
+  it("scopes a client brand's purchase to its own host through a custom conversion", async () => {
+    const calls: unknown[] = [];
+    const warnings: string[] = [];
+    const result = await metaPromotedObjectFor({
+      brand: client,
+      meta: purchase,
+      validateOnly: false,
+      ensureCustomConversion: async (input) => {
+        calls.push(input);
+        return { customConversionId: "cc_wpe", reused: true };
+      },
+      warnings,
+    });
+
+    expect(result).toEqual({ pixelId: "340252052212435", customConversionId: "cc_wpe" });
+    expect(calls).toEqual([
+      {
+        name: "META_PERF+WINTER+PARK+ESCAPES_PURCHASE",
+        pixelId: "340252052212435",
+        customEventType: "PURCHASE",
+        rule: { url: { i_contains: "winterparkescapes.com" } },
+      },
+    ]);
+    expect(warnings).toEqual([
+      "Meta optimises on META_PERF+WINTER+PARK+ESCAPES_PURCHASE (PURCHASE on winterparkescapes.com), reused as custom conversion cc_wpe",
+    ]);
+  });
+
+  it("keeps Wander's own brands on the raw event", async () => {
+    const result = await metaPromotedObjectFor({
+      brand: { name: "Wander", relationship: "internal", website: "https://www.wander.com" },
+      meta: purchase,
+      validateOnly: false,
+      ensureCustomConversion: neverCalled,
+      warnings: [],
+    });
+    expect(result).toEqual(purchase);
+  });
+
+  it("falls back to the event, with a warning, when the client has no website to scope by", async () => {
+    const warnings: string[] = [];
+    const result = await metaPromotedObjectFor({
+      brand: { ...client, website: null },
+      meta: purchase,
+      validateOnly: false,
+      ensureCustomConversion: neverCalled,
+      warnings,
+    });
+    expect(result).toEqual(purchase);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/no website/);
+  });
+
+  it("provisions nothing on a dry run", async () => {
+    const result = await metaPromotedObjectFor({
+      brand: client,
+      meta: purchase,
+      validateOnly: true,
+      ensureCustomConversion: neverCalled,
+      warnings: [],
+    });
+    expect(result).toEqual(purchase);
+  });
+
+  it("lets an explicit custom conversion in the settings win", async () => {
+    const result = await metaPromotedObjectFor({
+      brand: client,
+      meta: { ...purchase, customConversionId: "cc_pinned" },
+      validateOnly: false,
+      ensureCustomConversion: neverCalled,
+      warnings: [],
+    });
+    expect(result).toEqual({ pixelId: "340252052212435", customConversionId: "cc_pinned" });
+  });
+
+  it("sends no promoted object when the settings name neither a pixel nor an event", async () => {
+    const result = await metaPromotedObjectFor({
+      brand: client,
+      meta: {},
+      validateOnly: false,
+      ensureCustomConversion: neverCalled,
+      warnings: [],
+    });
+    expect(result).toBeUndefined();
   });
 });

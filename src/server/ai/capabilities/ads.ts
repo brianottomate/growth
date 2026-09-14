@@ -1027,6 +1027,7 @@ export const setPlatformDraftAction = growthAction({
       .object({
         pixelId: z.string().trim().min(1).optional(),
         customEventType: z.string().trim().min(1).optional(),
+        customConversionId: z.string().trim().min(1).optional(),
         budgetMode: z.enum(["cbo", "abo"]).optional(),
       })
       .optional(),

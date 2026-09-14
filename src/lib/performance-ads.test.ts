@@ -14,6 +14,8 @@ import {
   performanceCampaignName,
   performanceNamePrefix,
   performancePeriod,
+  hostScopedConversionRule,
+  performanceConversionName,
 } from "./performance-ads";
 
 // The live Away & Stay build is the reference these conventions come from, so
@@ -206,5 +208,22 @@ describe("the name a draft is born with", () => {
     expect(campaignDraftName({ brandName: "", isClient: false, period: "202609" })).toBe(
       "META_WANDER_SALES_PURCHASE_202609",
     );
+  });
+});
+
+describe("conversion scoping", () => {
+  it("names the custom conversion with the Performance prefix and the event", () => {
+    expect(
+      performanceConversionName({ customer: "Winter Park Escapes", event: "PURCHASE" }),
+    ).toBe("META_PERF+WINTER+PARK+ESCAPES_PURCHASE");
+    expect(
+      performanceConversionName({ customer: "Wander", isClient: false, event: "purchase" }),
+    ).toBe("META_WANDER_PURCHASE");
+  });
+
+  it("writes the rule in Meta's grammar", () => {
+    expect(hostScopedConversionRule("winterparkescapes.com")).toEqual({
+      url: { i_contains: "winterparkescapes.com" },
+    });
   });
 });
