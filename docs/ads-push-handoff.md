@@ -168,7 +168,10 @@ booked anywhere in the fleet inside the 1-day view window counted.
 The push now pins a client ad set to a Custom Conversion scoped to the brand's
 host (`META_PERF+<BRAND>_<EVENT>`, rule `url i_contains <host>`), provisioned
 through Zernio's `POST /accounts/{id}/custom-conversions`, which reuses by name
-and pixel. Wander's own brands keep the raw event. A client brand with no
+and pixel. The ad set carries the conversion id alone: Meta rejects a pixel sent
+beside it (subcode 1885014). Wander's own brands keep the raw event. A client brand with no
 `website` falls back to the event and the push warns. `settings.meta.customConversionId`
-pins one by hand. Existing ad sets are not rewritten: edit the conversion event
-in Ads Manager, which restarts learning.
+pins one by hand. Existing ad sets cannot be rewritten at all: Meta refuses any
+change to pixel, conversion event, custom conversion or optimisation goal on a
+published ad set (subcode 3260011), so a mis-scoped ad set is replaced by a new
+one and paused. The scoping has to be right at push time.

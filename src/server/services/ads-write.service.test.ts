@@ -89,7 +89,14 @@ describe("assertMetaAdPayload", () => {
     ).toThrow(/image, a video, a carousel, or a creatives array/);
   });
 
-  it("accepts a conversions goal backed by a custom conversion, not just an event", () => {
+  it("accepts a conversions goal backed by a custom conversion on its own, never beside a pixel", () => {
+    expect(() =>
+      assertMetaAdPayload(
+        { ...base, goal: "conversions", promotedObject: { customConversionId: "cc_1" } },
+        account,
+      ),
+    ).not.toThrow();
+    // Live Meta answer (subcode 1885014) when both were sent for Winter Park Escapes.
     expect(() =>
       assertMetaAdPayload(
         {
@@ -99,7 +106,7 @@ describe("assertMetaAdPayload", () => {
         },
         account,
       ),
-    ).not.toThrow();
+    ).toThrow(/without pixelId/);
     expect(() =>
       assertMetaAdPayload({ ...base, goal: "conversions" }, account),
     ).toThrow(/pixelId/);
@@ -506,7 +513,7 @@ describe("what a Meta ad set optimises toward", () => {
       warnings,
     });
 
-    expect(result).toEqual({ pixelId: "340252052212435", customConversionId: "cc_wpe" });
+    expect(result).toEqual({ customConversionId: "cc_wpe" });
     expect(calls).toEqual([
       {
         name: "META_PERF+WINTER+PARK+ESCAPES_PURCHASE",
@@ -564,7 +571,7 @@ describe("what a Meta ad set optimises toward", () => {
       ensureCustomConversion: neverCalled,
       warnings: [],
     });
-    expect(result).toEqual({ pixelId: "340252052212435", customConversionId: "cc_pinned" });
+    expect(result).toEqual({ customConversionId: "cc_pinned" });
   });
 
   it("sends no promoted object when the settings name neither a pixel nor an event", async () => {

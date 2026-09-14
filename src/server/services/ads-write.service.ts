@@ -477,13 +477,20 @@ export function assertMetaAdPayload(
       "Meta catalog sales require promotedObject.productSetId, pixelId, and customEventType",
     );
   }
+  // Meta takes EITHER a pixel + event OR a custom conversion on its own;
+  // sending the pixel alongside the conversion is rejected (subcode 1885014).
   if (
     (goal === "conversions" || goal === "lead_conversion") &&
-    (!promotedObject?.pixelId ||
-      (!promotedObject.customEventType && !promotedObject.customConversionId))
+    !promotedObject?.customConversionId &&
+    (!promotedObject?.pixelId || !promotedObject.customEventType)
   ) {
     throw new Error(
-      `${goal} requires promotedObject.pixelId and an event or custom conversion`,
+      `${goal} requires promotedObject.pixelId and customEventType, or a customConversionId`,
+    );
+  }
+  if (promotedObject?.customConversionId && promotedObject.pixelId) {
+    throw new Error(
+      "promotedObject.customConversionId must be sent without pixelId — Meta rejects the pair",
     );
   }
   if (goal === "lead_generation" && !payload.leadGenFormId) {
@@ -2223,7 +2230,9 @@ async function pushToGoogle(args: PushArgs) {
  * first campaign reported nine purchases against two on its own host that
  * way. A client brand with a website therefore gets a Custom Conversion
  * scoped to its host, provisioned through Zernio (which reuses by name) and
- * pinned on the ad set. Wander's own brands keep the raw event, and an
+ * pinned on the ad set on its own: Meta rejects a pixel sent alongside it.
+ * It has to be right here: Meta will not let the conversion of a published
+ * ad set be edited afterwards (subcode 3260011). Wander's own brands keep the raw event, and an
  * explicit `customConversionId` in the settings always wins.
  */
 export async function metaPromotedObjectFor(args: {
@@ -2245,10 +2254,7 @@ export async function metaPromotedObjectFor(args: {
 }): Promise<CreateZernioStandaloneAdInput["promotedObject"]> {
   const { brand, meta, warnings } = args;
   if (meta.customConversionId) {
-    return {
-      pixelId: meta.pixelId,
-      customConversionId: meta.customConversionId,
-    };
+    return { customConversionId: meta.customConversionId };
   }
   if (!meta.pixelId && !meta.customEventType) return undefined;
 
@@ -2289,10 +2295,7 @@ export async function metaPromotedObjectFor(args: {
       conversion.reused ? "reused" : "created"
     } as custom conversion ${conversion.customConversionId}`,
   );
-  return {
-    pixelId: meta.pixelId,
-    customConversionId: conversion.customConversionId,
-  };
+  return { customConversionId: conversion.customConversionId };
 }
 
 // ---- META COMPILE ------------------------------------------------------
