@@ -15,6 +15,8 @@ import {
   leadDomainTable,
   type HubspotWebhookEventInsert,
 } from "@/server/db/leads-schema";
+import { DEMAND_BDR_PROPERTY } from "@/server/services/demand/owner-parity";
+import { applyDemandBdrChange } from "@/server/services/demand/owner-parity.service";
 import {
   applyContactPropertyChange,
   isMirroredContactProperty,
@@ -461,6 +463,20 @@ async function applyInline(rows: HubspotWebhookEventInsert[]) {
               ? `inline: re-hydrated contact after ${row.propertyName} change (mirrored ${stats.mirrored})`
               : "classified: contact no longer readable",
           );
+          continue;
+        }
+
+        // Demand-sales BDR parity: a person re-assigning `demand__bdr` in the
+        // CRM is mirrored onto the Customer.io profile so lifecycle email
+        // names the right rep. Our own API writes echo back here too and are
+        // dropped by changeSource (src/server/services/demand/owner-parity.ts).
+        if (row.propertyName === DEMAND_BDR_PROPERTY) {
+          const outcome = await applyDemandBdrChange({
+            contactId: row.objectId,
+            ownerId: clean(row.propertyValue),
+            changeSource: row.changeSource ?? null,
+          });
+          await markProcessed(row.eventId, outcome.note);
           continue;
         }
 

@@ -229,6 +229,10 @@ Each integration has a thin client; orchestration lives in `src/server/services/
   bridges in `cio-to-outreach-workflow.service.ts` and `outreach-to-cio-workflow.service.ts`.
 - **Instantly** (`instantly.client.ts`) — cold-email projection of the leads system-of-record.
 - **Outreach** (`outreach.client.ts`) — sales engagement (OAuth + webhooks).
+  Demand-sales BDR routing writes both Outreach and HubSpot Contact
+  `demand_*` properties on every sync (Outreach owner authoritative) — see
+  `docs/demand-sales-hubspot.md` before touching `sync.service.ts` or
+  `src/server/services/demand/`.
 - **HubSpot** (`hubspot.client.ts`) — CRM pull/merge/write-back for leads.
 - **Bright Data / Apify / X / Reddit / Meta** — social discovery verification, post scraping (`peer-scrape.service.ts`), listening.
 - **BigQuery, Firecrawl, Minerva, Claude, PostHog, Slack, search providers** — supporting.

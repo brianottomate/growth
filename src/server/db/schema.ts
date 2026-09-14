@@ -20,6 +20,7 @@ export * from "./launch-schema";
 export * from "./ads-schema";
 export * from "./affiliate-schema";
 export * from "./conversions-schema";
+export * from "./demand-schema";
 export * from "./amplification-schema";
 export * from "./cadence-schema";
 export * from "./funnel-schema";
