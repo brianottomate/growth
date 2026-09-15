@@ -285,6 +285,24 @@ async function cardFromAsset(brandId: string, mediaAssetId: string) {
 const STORY = getCompositionFormat("story");
 
 /**
+ * A built set's cards are the Studio's preview route with the spec in the
+ * URL, not frozen files. Their 9:16 is the same spec on the story canvas,
+ * which is one parameter away and needs no render here.
+ */
+export function storyTwinOfPreview(url: string): string | null {
+  try {
+    const parsed = new URL(url, "http://local");
+    if (!parsed.pathname.endsWith("/api/compositions/preview")) return null;
+    parsed.searchParams.set("formatId", "story");
+    return url.startsWith("/")
+      ? `${parsed.pathname}?${parsed.searchParams.toString()}`
+      : parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The 9:16 for one card, derived from its baseline.
  *
  * The best method available wins unless one is asked for by name: a card
@@ -307,6 +325,18 @@ async function deriveStory(input: {
       422,
       "A story cut of a video is uploaded, not derived",
     );
+  }
+  // A card drawn by the preview route is re-drawn on the story canvas by
+  // changing one parameter; nothing to render or store.
+  const twin = storyTwinOfPreview(card.url);
+  if (twin && (input.how === "auto" || input.how === "render")) {
+    return {
+      url: twin,
+      type: "image",
+      width: STORY.width,
+      height: STORY.height,
+      via: "render",
+    };
   }
   const asset = card.assetId
     ? await db.query.mediaAssetTable.findFirst({
@@ -557,6 +587,23 @@ export async function buildAdSet(input: {
     })),
   });
 
+  /** The card with its story twin riding on it, when the card is a preview. */
+  const withStory = (base: MediaItem): AdCard => {
+    const twin = storyTwinOfPreview(base.url);
+    return twin
+      ? {
+          ...base,
+          story: {
+            url: twin,
+            type: "image",
+            width: STORY.width,
+            height: STORY.height,
+            via: "render",
+          },
+        }
+      : base;
+  };
+
   /** A card: the composition that draws it, redrawn on read. */
   const card = (
     sourceUrl: string,
@@ -611,7 +658,9 @@ export async function buildAdSet(input: {
         linkUrl: home.listing.url,
         callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
         propertyName: home.listing.name,
-        media: [card(home.hero!, homeCopy.cardTitle)],
+        // The static is the one shape Meta takes a per-placement asset on,
+        // so it is born with its 9:16: the same card on the story canvas.
+        media: [withStory(card(home.hero!, homeCopy.cardTitle))],
       };
     } else if (item.kind === "carousel" && home && homeCopy) {
       // One home's own carousel is a walk through its rooms, which is the
