@@ -7,6 +7,7 @@ import { MediaThumbnail } from "@/components/media-thumbnail";
 import { cn } from "@/components/ui/lib/utils";
 import type { MediaItem } from "@/server/db/schema";
 import { isStoryFormat, sequenceNoun } from "@/lib/platform-sequence";
+import { SocialPostMock } from "@/components/social-mock";
 
 export type CompactPreviewLinkCard = {
   url: string;
@@ -192,89 +193,112 @@ export function CompactPlatformPreview({
         </span>
       </div>
 
-      <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
-        {channelBannerImageUrl && (
-          <div className="relative h-10 overflow-hidden border-b">
-            {/* eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts */}
-            <img
-              src={channelBannerImageUrl}
-              alt=""
-              className="size-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-          </div>
-        )}
-        {items.map((item, index) => (
-          <div
-            key={item.id}
-            className={cn(index > 0 && "border-border border-t")}
-          >
-            <div className="flex items-center gap-2 px-2.5 py-2">
-              {channelProfileImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts
-                <img
-                  src={channelProfileImageUrl}
-                  alt=""
-                  className="bg-muted size-6 rounded-full border object-cover"
-                />
-              ) : (
-                <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[9px] font-semibold">
-                  {identity.slice(0, 1).toUpperCase()}
-                </span>
-              )}
-              <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
-                {identity}
-              </span>
-              {(story || isThread) && (
-                <span className="text-muted-foreground text-[9px]">
-                  {index + 1}/{items.length}
-                </span>
-              )}
+      {/* Facebook and Instagram feed posts draw the same mock as the brand
+          previews and the ad previews, so the workbench shows what ships. */}
+      {!story &&
+      !isThread &&
+      !linkCard &&
+      (platform === "facebook" || platform === "instagram") ? (
+        <SocialPostMock
+          post={{
+            platform,
+            format,
+            name: channelName ?? brandName,
+            handle: username,
+            avatars: [{ url: channelProfileImageUrl }],
+            text,
+            media,
+            meta: scheduled ? "Scheduled" : "Draft",
+          }}
+          play={false}
+        />
+      ) : (
+        <div className="bg-background overflow-hidden rounded-lg border shadow-sm">
+          {channelBannerImageUrl && (
+            <div className="relative h-10 overflow-hidden border-b">
+              {/* eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts */}
+              <img
+                src={channelBannerImageUrl}
+                alt=""
+                className="size-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
             </div>
+          )}
+          {items.map((item, index) => (
+            <div
+              key={item.id}
+              className={cn(index > 0 && "border-border border-t")}
+            >
+              <div className="flex items-center gap-2 px-2.5 py-2">
+                {channelProfileImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- channel images may use arbitrary provider hosts
+                  <img
+                    src={channelProfileImageUrl}
+                    alt=""
+                    className="bg-muted size-6 rounded-full border object-cover"
+                  />
+                ) : (
+                  <span className="bg-muted flex size-6 items-center justify-center rounded-full text-[9px] font-semibold">
+                    {identity.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1 truncate text-[11px] font-medium">
+                  {identity}
+                </span>
+                {(story || isThread) && (
+                  <span className="text-muted-foreground text-[9px]">
+                    {index + 1}/{items.length}
+                  </span>
+                )}
+              </div>
 
-            <PreviewMedia
-              item={item}
-              platform={platform}
-              format={format}
-              contentTitle={contentTitle}
-              fallbackImage={
-                index === 0 && item.media.length === 0 ? linkCard?.image : null
-              }
-            />
+              <PreviewMedia
+                item={item}
+                platform={platform}
+                format={format}
+                contentTitle={contentTitle}
+                fallbackImage={
+                  index === 0 && item.media.length === 0
+                    ? linkCard?.image
+                    : null
+                }
+              />
 
-            <div className="px-2.5 py-2">
-              {story ? (
-                item.text.trim() ? (
-                  <p className="text-muted-foreground line-clamp-2 text-[9px] leading-relaxed whitespace-pre-wrap italic">
-                    Internal note: {item.text}
+              <div className="px-2.5 py-2">
+                {story ? (
+                  item.text.trim() ? (
+                    <p className="text-muted-foreground line-clamp-2 text-[9px] leading-relaxed whitespace-pre-wrap italic">
+                      Internal note: {item.text}
+                    </p>
+                  ) : null
+                ) : item.text.trim() ? (
+                  <p className="line-clamp-4 text-[10px] leading-relaxed whitespace-pre-wrap">
+                    {item.text}
                   </p>
-                ) : null
-              ) : item.text.trim() ? (
-                <p className="line-clamp-4 text-[10px] leading-relaxed whitespace-pre-wrap">
-                  {item.text}
-                </p>
-              ) : (
-                <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] italic">
-                  <ImageIcon className="size-3" />
-                  No post copy yet.
-                </div>
-              )}
+                ) : (
+                  <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] italic">
+                    <ImageIcon className="size-3" />
+                    No post copy yet.
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {linkCard && (
-          <div className="border-t px-2.5 py-2">
-            <div className="text-muted-foreground truncate text-[8px] tracking-wide uppercase">
-              {linkCard.domain}
-              {linkCard.predicted ? " · predicted" : ""}
+          {linkCard && (
+            <div className="border-t px-2.5 py-2">
+              <div className="text-muted-foreground truncate text-[8px] tracking-wide uppercase">
+                {linkCard.domain}
+                {linkCard.predicted ? " · predicted" : ""}
+              </div>
+              <div className="mt-0.5 line-clamp-2 text-[10px] font-medium">
+                {linkCard.title ?? linkCard.url}
+              </div>
             </div>
-            <div className="mt-0.5 line-clamp-2 text-[10px] font-medium">
-              {linkCard.title ?? linkCard.url}
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {readiness !== false && (
         <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">

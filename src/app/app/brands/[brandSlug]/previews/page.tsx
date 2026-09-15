@@ -2,7 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import { and, desc, eq, inArray, isNull, notInArray, or } from "drizzle-orm";
 
 import { db } from "@/server/db";
-import { brandTable, contentPostTable, memberTable } from "@/server/db/schema";
+import {
+  brandTable,
+  channelTable,
+  contentPostTable,
+  memberTable,
+} from "@/server/db/schema";
 import { getSession } from "@/server/better-auth/server";
 
 import { PreviewsClient, type PreviewIdea } from "./PreviewsClient";
@@ -82,6 +87,23 @@ export default async function BrandPreviewsPage({
     },
   });
 
+  // Drafts are not bound to a channel until they publish; the brand's own
+  // channel for the platform is what the post will actually show as.
+  const channels = await db.query.channelTable.findMany({
+    where: and(
+      eq(channelTable.brandId, brand.id),
+      isNull(channelTable.deletedAt),
+    ),
+    columns: {
+      platform: true,
+      displayName: true,
+      handle: true,
+      profileImageUrl: true,
+    },
+  });
+  const channelFor = (platform: string) =>
+    channels.find((channel) => channel.platform === platform) ?? null;
+
   const ideas: PreviewIdea[] = rows.map((row) => ({
     id: row.id,
     title: row.title ?? "Untitled idea",
@@ -104,11 +126,23 @@ export default async function BrandPreviewsPage({
           url: item.url,
           type: item.type,
           thumbnail: item.thumbnail ?? null,
+          width: item.width ?? null,
+          height: item.height ?? null,
         })),
         channel: {
-          displayName: spot.channel?.displayName ?? null,
-          handle: spot.channel?.handle ?? spot.username ?? null,
-          profileImageUrl: spot.channel?.profileImageUrl ?? null,
+          displayName:
+            spot.channel?.displayName ??
+            channelFor(spot.platform)?.displayName ??
+            null,
+          handle:
+            spot.channel?.handle ??
+            spot.username ??
+            channelFor(spot.platform)?.handle ??
+            null,
+          profileImageUrl:
+            spot.channel?.profileImageUrl ??
+            channelFor(spot.platform)?.profileImageUrl ??
+            null,
         },
       })),
   }));

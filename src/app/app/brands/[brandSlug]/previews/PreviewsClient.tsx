@@ -7,6 +7,7 @@ import { Check, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChannelLogo, platformLabel } from "@/components/channel-logos";
+import { SocialPostMock, type SocialMockMedia } from "@/components/social-mock";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/lib/utils";
 
@@ -18,11 +19,7 @@ export type PreviewSpot = {
   text: string;
   firstComment: string | null;
   scheduledAt: string | null;
-  media: {
-    url: string;
-    type: "image" | "video" | "carousel";
-    thumbnail: string | null;
-  }[];
+  media: SocialMockMedia[];
   channel: {
     displayName: string | null;
     handle: string | null;
@@ -40,6 +37,8 @@ export type PreviewIdea = {
   spots: PreviewSpot[];
 };
 
+type Brand = { name: string; logo: string | null };
+
 const dayLabel = (iso: string | null) =>
   iso
     ? new Intl.DateTimeFormat("en-US", {
@@ -49,144 +48,50 @@ const dayLabel = (iso: string | null) =>
       }).format(new Date(iso))
     : "No date";
 
-function frameAspect(format: string | null) {
-  if (format?.includes(".story") || format?.includes(".reel"))
-    return "aspect-[9/16]";
-  return "aspect-[4/5]";
-}
-
-function Frames({ spot }: { spot: PreviewSpot }) {
-  const aspect = frameAspect(spot.format);
-  if (spot.media.length === 0) {
-    return (
-      <div
-        className={cn(
-          "bg-muted text-muted-foreground flex w-full items-center justify-center text-xs",
-          aspect,
-        )}
-      >
-        No creative yet
-      </div>
-    );
-  }
-  if (spot.media.length === 1) {
-    const item = spot.media[0]!;
-    return (
-      <div className={cn("bg-muted relative w-full overflow-hidden", aspect)}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- library and provider hosts vary */}
-        <img
-          src={item.type === "video" ? (item.thumbnail ?? item.url) : item.url}
-          alt=""
-          className="size-full object-cover"
-        />
-      </div>
-    );
-  }
-  return (
-    <div className="bg-muted flex snap-x snap-mandatory gap-1 overflow-x-auto">
-      {spot.media.map((item, index) => (
-        <div
-          key={`${item.url}-${index}`}
-          className={cn(
-            "relative w-[88%] flex-none snap-center overflow-hidden",
-            aspect,
-          )}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- library and provider hosts vary */}
-          <img
-            src={
-              item.type === "video" ? (item.thumbnail ?? item.url) : item.url
-            }
-            alt=""
-            className="size-full object-cover"
-          />
-          <span className="absolute top-2 right-2 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
-            {index + 1}/{spot.media.length}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Provider avatars carry signed, expiring URLs; fall back to the brand logo, then an initial. */
-function Avatar({
-  sources,
-  initial,
-}: {
-  sources: (string | null)[];
-  initial: string;
-}) {
-  const candidates = sources.filter((s): s is string => Boolean(s));
-  const [index, setIndex] = useState(0);
-  const src = candidates[index];
-  if (!src) {
-    return (
-      <span className="bg-muted flex size-8 items-center justify-center rounded-full text-xs font-semibold">
-        {initial}
-      </span>
-    );
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- channel avatars live on provider hosts
-    <img
-      src={src}
-      alt=""
-      onError={() => setIndex((i) => i + 1)}
-      className="bg-muted size-8 rounded-full border object-cover"
-    />
-  );
-}
+const shortDay = (iso: string | null) =>
+  iso
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+      }).format(new Date(iso))
+    : "Not scheduled";
 
 function SpotMock({
   spot,
-  brandName,
-  logo,
+  brand,
+  plannedAt,
 }: {
   spot: PreviewSpot;
-  brandName: string;
-  logo: string | null;
+  brand: Brand;
+  plannedAt: string | null;
 }) {
-  const identity = spot.channel.displayName ?? brandName;
-  const handle = spot.channel.handle
-    ? `@${spot.channel.handle.replace(/^@/, "")}`
-    : null;
   return (
-    <article className="bg-background w-full max-w-sm overflow-hidden rounded-2xl border shadow-sm">
-      <header className="flex items-center gap-2.5 px-3 py-2.5">
-        <Avatar
-          sources={[spot.channel.profileImageUrl, logo]}
-          initial={identity.slice(0, 1).toUpperCase()}
-        />
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate text-sm font-semibold">{identity}</div>
-          <div className="text-muted-foreground truncate text-xs">
-            {handle ?? platformLabel(spot.platform)}
-          </div>
-        </div>
-        <ChannelLogo platform={spot.platform} className="size-4" />
-      </header>
-      <Frames spot={spot} />
-      <div className="space-y-2 px-3 py-3">
-        <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
-          {spot.text.trim() || (
-            <span className="text-muted-foreground italic">No copy yet.</span>
-          )}
-        </p>
-        {spot.firstComment && (
-          <p className="text-muted-foreground border-t pt-2 text-[11px] leading-relaxed">
-            <span className="font-medium">First comment · </span>
-            {spot.firstComment}
-          </p>
-        )}
-      </div>
-      <footer className="text-muted-foreground flex items-center justify-between border-t px-3 py-2 text-[11px]">
-        <span className="capitalize">{spot.status.replace("_", " ")}</span>
-        <span>
-          {spot.format?.split(".")[1] ?? platformLabel(spot.platform)}
+    <div className="min-w-0 space-y-2">
+      <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <ChannelLogo platform={spot.platform} className="size-3.5" />
+        <span className="font-medium">{platformLabel(spot.platform)}</span>
+        <span>· {spot.format?.split(".")[1] ?? "post"}</span>
+        <span className="ml-auto capitalize">
+          {spot.status.replace("_", " ")}
         </span>
-      </footer>
-    </article>
+      </div>
+      <SocialPostMock
+        post={{
+          platform: spot.platform,
+          format: spot.format,
+          name: spot.channel.displayName ?? brand.name,
+          handle: spot.channel.handle,
+          avatars: [
+            { url: spot.channel.profileImageUrl },
+            { url: brand.logo, fit: "contain" },
+          ],
+          text: spot.text,
+          media: spot.media,
+          firstComment: spot.firstComment,
+          meta: shortDay(spot.scheduledAt ?? plannedAt),
+        }}
+      />
+    </div>
   );
 }
 
@@ -194,13 +99,13 @@ function Picker({ ideas }: { ideas: PreviewIdea[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const [chosen, setChosen] = useState<string[]>([]);
-  const all = () =>
-    setChosen((current) =>
-      current.length === ideas.length ? [] : ideas.map((idea) => idea.id),
-    );
   const toggle = (id: string) =>
     setChosen((current) =>
       current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
+    );
+  const all = () =>
+    setChosen((current) =>
+      current.length === ideas.length ? [] : ideas.map((idea) => idea.id),
     );
   return (
     <div className="space-y-4">
@@ -269,7 +174,7 @@ export function PreviewsClient({
   ideas,
   picking,
 }: {
-  brand: { name: string; slug: string; logo: string | null };
+  brand: Brand & { slug: string };
   ideas: PreviewIdea[];
   picking: boolean;
 }) {
@@ -289,7 +194,7 @@ export function PreviewsClient({
       : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-10 p-6">
+    <div className="mx-auto w-full max-w-7xl space-y-10 p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
           <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
@@ -331,39 +236,47 @@ export function PreviewsClient({
       {picking ? (
         <Picker ideas={ideas} />
       ) : (
-        <div className="space-y-12">
+        <div className="space-y-14">
           {ideas.map((idea) => (
             <section key={idea.id} className="space-y-4">
-              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <span className="bg-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
-                  {dayLabel(idea.plannedAt)}
-                </span>
-                <h2 className="text-lg font-semibold">
-                  <Link
-                    href={`/app/content/${idea.id}`}
-                    className="hover:underline"
-                  >
-                    {idea.title}
-                  </Link>
-                </h2>
-                {idea.pillar && (
-                  <span className="text-muted-foreground text-xs">
-                    {idea.pillar}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  <span className="bg-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
+                    {dayLabel(idea.plannedAt)}
                   </span>
+                  <h2 className="text-lg font-semibold">
+                    <Link
+                      href={`/app/content/${idea.id}`}
+                      className="hover:underline"
+                    >
+                      {idea.title}
+                    </Link>
+                  </h2>
+                  {idea.pillar && (
+                    <span className="text-muted-foreground text-xs">
+                      {idea.pillar}
+                    </span>
+                  )}
+                </div>
+                {idea.hook && (
+                  <p className="text-muted-foreground max-w-3xl text-sm">
+                    {idea.hook}
+                  </p>
                 )}
               </div>
-              {idea.hook && (
-                <p className="text-muted-foreground max-w-3xl text-sm">
-                  {idea.hook}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-5">
+              {/* One row per idea: every platform rendering side by side, stacking only on phones. */}
+              <div
+                className="grid items-start gap-6 max-sm:!grid-cols-1"
+                style={{
+                  gridTemplateColumns: `repeat(${Math.min(Math.max(idea.spots.length, 1), 3)}, minmax(0, 1fr))`,
+                }}
+              >
                 {idea.spots.map((spot) => (
                   <SpotMock
                     key={spot.id}
                     spot={spot}
-                    brandName={brand.name}
-                    logo={brand.logo}
+                    brand={brand}
+                    plannedAt={idea.plannedAt}
                   />
                 ))}
                 {idea.spots.length === 0 && (
