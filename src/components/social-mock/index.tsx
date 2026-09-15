@@ -328,15 +328,24 @@ function FacebookPhotos({
         </div>
       );
     }
-    // 4:3 over 3fr:2fr columns leaves the left cell at exactly 4:5.
-    const side = Math.min(n - 1, 3);
+    // 4:3 over 3fr:2fr columns leaves the left cell at exactly 4:5. Facebook
+    // shows five photos in full (a 2x2 beside the lead) and folds the rest
+    // into +N on the last tile.
+    const side = Math.min(n - 1, 4);
     const rest = n - 1 - side;
     return (
       <div className="grid aspect-[4/3] min-h-0 grid-cols-[minmax(0,3fr)_minmax(0,2fr)] grid-rows-1 gap-0.5 bg-black">
         {frame(0)}
         <div
-          className="grid min-h-0 gap-0.5"
-          style={{ gridTemplateRows: `repeat(${side}, minmax(0, 1fr))` }}
+          className={cn(
+            "grid min-h-0 gap-0.5",
+            side === 4 ? "grid-cols-2 grid-rows-2" : "grid-cols-1",
+          )}
+          style={
+            side === 4
+              ? undefined
+              : { gridTemplateRows: `repeat(${side}, minmax(0, 1fr))` }
+          }
         >
           {Array.from({ length: side }, (_, j) =>
             j === side - 1 ? more(j + 1, rest) : frame(j + 1),

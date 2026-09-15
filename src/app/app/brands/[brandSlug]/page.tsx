@@ -171,6 +171,12 @@ export default async function BrandPage({
               Ads
             </Link>
             <Link
+              href={`/app/brands/${brand.slug}/content`}
+              className="text-muted-foreground hover:underline"
+            >
+              Content
+            </Link>
+            <Link
               href={`/app/brands/${brand.slug}/previews`}
               className="text-muted-foreground hover:underline"
             >

@@ -59,6 +59,18 @@ export default async function PerformanceBrandLayout({
             <Link href={`/app/brands/${slug}/ads`} className="hover:underline">
               Ads desk
             </Link>
+            <Link
+              href={`/app/brands/${slug}/content`}
+              className="hover:underline"
+            >
+              Content
+            </Link>
+            <Link
+              href={`/app/brands/${slug}/previews`}
+              className="hover:underline"
+            >
+              Previews
+            </Link>
           </div>
         </div>
       </div>

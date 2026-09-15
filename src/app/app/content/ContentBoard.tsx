@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -155,22 +156,46 @@ function Thumb({
   );
 }
 
+const VIEWS = ["board", "schedule", "list"] as const;
+
 export function ContentBoard({
   brands,
   currentUserId,
   initialBrandId,
   initialView = "board",
+  lockedBrandId,
 }: {
   brands: { id: string; name: string; slug: string | null }[];
   currentUserId: string;
   initialBrandId?: string;
   initialView?: "board" | "schedule" | "list";
+  /** A brand-scoped page: the filter is fixed and its control hidden. */
+  lockedBrandId?: string;
 }) {
   const trpc = useTRPC();
   const qc = useQueryClient();
   const router = useRouter();
 
-  const [brandFilter, setBrandFilter] = useState(initialBrandId ?? "all");
+  // The brand rides in the URL as its slug so a filtered board is a link
+  // someone can send; the id is accepted for older links.
+  const [brandParam, setBrandParam] = useQueryState(
+    "brand",
+    parseAsString.withDefault(
+      brands.find((brand) => brand.id === initialBrandId)?.slug ??
+        initialBrandId ??
+        "all",
+    ),
+  );
+  const brandFilter =
+    lockedBrandId ??
+    brands.find((brand) => brand.slug === brandParam || brand.id === brandParam)
+      ?.id ??
+    "all";
+  const setBrandFilter = (id: string) => {
+    if (lockedBrandId) return;
+    const brand = brands.find((candidate) => candidate.id === id);
+    void setBrandParam(brand ? (brand.slug ?? brand.id) : null);
+  };
   const [pillarFilter, setPillarFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [mineOnly, setMineOnly] = useState(false);
@@ -298,7 +323,10 @@ export function ContentBoard({
   // what needs review, what's done); Schedule is the zoomed-in posting worklist
   // (today, this week, month grid tucked behind a toggle); List is the backup
   // ledger (grouped rows, with the legacy Sheet rendering tucked inside).
-  const [view, setView] = useState<"board" | "schedule" | "list">(initialView);
+  const [view, setView] = useQueryState(
+    "view",
+    parseAsStringLiteral(VIEWS).withDefault(initialView),
+  );
   const [scheduleLayout, setScheduleLayout] = useState<"agenda" | "month">(
     "agenda",
   );
@@ -513,6 +541,21 @@ export function ContentBoard({
           </>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {!lockedBrandId && (
+            <SimpleSelect
+              value={brandFilter}
+              onValueChange={(v) => {
+                setBrandFilter(v);
+                setPillarFilter("all");
+              }}
+              options={[
+                { value: "all", label: "All brands" },
+                ...brands.map((b) => ({ value: b.id, label: b.name })),
+              ]}
+              size="sm"
+              aria-label="Brand"
+            />
+          )}
           <button
             onClick={() => setMineOnly((v) => !v)}
             className={cn(
@@ -525,16 +568,10 @@ export function ContentBoard({
             Mine
           </button>
           <FiltersPopover
-            brandFilter={brandFilter}
-            onBrandChange={(v) => {
-              setBrandFilter(v);
-              setPillarFilter("all");
-            }}
             pillarFilter={pillarFilter}
             onPillarChange={setPillarFilter}
             statusFilter={statusFilter}
             onStatusChange={setStatusFilter}
-            brands={brands}
             pillars={pillars}
             statusOptions={statusOptions}
           />
@@ -679,29 +716,23 @@ function Segmented<T extends string>({
   );
 }
 
-/** Brand / pillar / status collapsed into one popover; badge = active count. */
+/** Pillar / status collapsed into one popover; badge = active count. Brand sits in the toolbar. */
 function FiltersPopover({
-  brandFilter,
-  onBrandChange,
   pillarFilter,
   onPillarChange,
   statusFilter,
   onStatusChange,
-  brands,
   pillars,
   statusOptions,
 }: {
-  brandFilter: string;
-  onBrandChange: (v: string) => void;
   pillarFilter: string;
   onPillarChange: (v: string) => void;
   statusFilter: string;
   onStatusChange: (v: string) => void;
-  brands: { id: string; name: string }[];
   pillars: { slug: string; name: string }[];
   statusOptions: { value: string; label: string }[];
 }) {
-  const activeCount = [brandFilter, pillarFilter, statusFilter].filter(
+  const activeCount = [pillarFilter, statusFilter].filter(
     (v) => v !== "all",
   ).length;
   const row = "flex items-center justify-between gap-3";
@@ -729,19 +760,6 @@ function FiltersPopover({
       <PopoverContent align="end" className="w-64">
         <div className="flex flex-col gap-3">
           <div className={row}>
-            <span className={label}>Brand</span>
-            <SimpleSelect
-              value={brandFilter}
-              onValueChange={onBrandChange}
-              options={[
-                { value: "all", label: "All brands" },
-                ...brands.map((b) => ({ value: b.id, label: b.name })),
-              ]}
-              size="sm"
-              aria-label="Brand"
-            />
-          </div>
-          <div className={row}>
             <span className={label}>Pillar</span>
             <SimpleSelect
               value={pillarFilter}
@@ -767,7 +785,6 @@ function FiltersPopover({
           {activeCount > 0 && (
             <button
               onClick={() => {
-                onBrandChange("all");
                 onPillarChange("all");
                 onStatusChange("all");
               }}

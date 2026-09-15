@@ -10,7 +10,7 @@ import { ContentBoard } from "./ContentBoard";
 export default async function ContentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ brandId?: string; view?: string }>;
+  searchParams: Promise<{ brand?: string; brandId?: string; view?: string }>;
 }) {
   const session = await getSession();
   if (!session?.user) redirect("/signin");
@@ -39,9 +39,10 @@ export default async function ContentPage({
     .sort((a, b) => Number(b.slug === "wander") - Number(a.slug === "wander"));
 
   const sp = await searchParams;
-  const initialBrandId = brands.some((brand) => brand.id === sp.brandId)
-    ? sp.brandId
-    : undefined;
+  const wanted = sp.brand ?? sp.brandId;
+  const initialBrandId = brands.find(
+    (brand) => brand.slug === wanted || brand.id === wanted,
+  )?.id;
   const initialView =
     sp.view === "schedule" || sp.view === "list" || sp.view === "board"
       ? sp.view
