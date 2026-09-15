@@ -523,6 +523,13 @@ export async function getDraftCampaign(
       db.query.adTable.findMany({
         where: eq(adTable.campaignId, campaign.id),
         orderBy: [desc(adTable.createdAt)],
+        // The wall files an ad under its home; without the row the page
+        // falls back to the name and its links to the home's page go dark.
+        with: {
+          home: {
+            columns: { id: true, name: true, externalId: true, url: true },
+          },
+        },
       }),
       db.query.platformCampaignTable.findMany({
         where: eq(platformCampaignTable.campaignId, campaign.id),
