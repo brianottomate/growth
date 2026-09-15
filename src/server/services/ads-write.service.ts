@@ -53,6 +53,7 @@ import {
   type CreateZernioStandaloneAdInput,
   type ZernioAccount,
   type ZernioAdTargeting,
+  type ZernioPlacementAssets,
   type ZernioAdWriteResponse,
   type ZernioAudienceUser,
   type ZernioCarouselCard,
@@ -2421,6 +2422,70 @@ async function pushToMeta(args: PushArgs) {
       callToAction: metaCallToAction(content),
     }));
 
+  /**
+   * One ad, two files: the baseline for every placement, the 9:16 pinned to
+   * stories and reels. Meta's asset customization, which is how Brooke builds
+   * it by hand. Statics only; a carousel's cards are the carousel's.
+   */
+  const placementAssetsFor = (
+    content: AdCreativeContent,
+  ): ZernioPlacementAssets | undefined => {
+    const card = content.media[0];
+    if (!card || content.media.length !== 1 || card.type === "video") {
+      return undefined;
+    }
+    if (!card.story) return undefined;
+    return {
+      defaultImageUrl: card.url,
+      rules: [
+        {
+          imageUrl: card.story.url,
+          placements: {
+            publisherPlatforms: ["facebook", "instagram"],
+            facebookPositions: ["story", "facebook_reels"],
+            instagramPositions: ["story", "reels"],
+          },
+        },
+      ],
+    };
+  };
+
+  /**
+   * How a set's ads split across Meta's create shapes. The multi-creative
+   * shape takes N plain statics in one call but carries no per-placement
+   * assets, so a static with a story rides the single-creative or attach
+   * shape like a carousel does. The opening call takes the plain statics,
+   * else the first placed static, else the first carousel; everything else
+   * is attached one call at a time.
+   */
+  const splitForPush = (subset: typeof usable) => {
+    const carousels = subset.filter(({ content }) => isCarousel(content));
+    const statics = subset.filter(({ content }) => !isCarousel(content));
+    const placed = statics.filter(({ content }) =>
+      Boolean(placementAssetsFor(content)),
+    );
+    const plain = statics.filter((row) => !placed.includes(row));
+    if (plain.length > 0) {
+      return {
+        shape: "creatives" as const,
+        opening: plain,
+        trailing: [...placed, ...carousels],
+      };
+    }
+    if (placed.length > 0) {
+      return {
+        shape: "single" as const,
+        opening: placed.slice(0, 1),
+        trailing: [...placed.slice(1), ...carousels],
+      };
+    }
+    return {
+      shape: "carousel" as const,
+      opening: carousels.slice(0, 1),
+      trailing: carousels.slice(1),
+    };
+  };
+
   /** One ad set as the API sees it. */
   const adSetPayload = (setArgs: {
     audience: PlanAudience | null;
@@ -2468,21 +2533,27 @@ async function pushToMeta(args: PushArgs) {
     validateOnly: boolean;
     keyScope: string;
   }) => {
-    // "Statics" = anything the multi-creative shape carries directly: single
-    // images AND videos. Only carousels need the attach shape.
-    const statics = usable.filter(({ content }) => !isCarousel(content));
-    const carousels = usable.filter(({ content }) => isCarousel(content));
-    const leading = statics.length > 0 ? undefined : carousels[0];
-    const trailing = leading ? carousels.slice(1) : carousels;
-
+    const { shape, opening, trailing } = splitForPush(usable);
+    const lead = opening[0]!;
     const payload: CreateZernioStandaloneAdInput = {
       ...adSetPayload(setArgs),
-      ...(leading
-        ? {
+      ...(shape === "creatives"
+        ? { creatives: creativesFor(opening) }
+        : {
+            // A single-creative opening: the set's words are this ad's words.
             creatives: undefined,
-            carouselCards: carouselCardsFor(leading.content),
-          }
-        : { creatives: creativesFor(statics) }),
+            adName: adNameFor(lead.ad, lead.content),
+            headline: lead.content.headline,
+            body: lead.content.body,
+            linkUrl: lead.content.linkUrl ?? linkUrl,
+            callToAction: metaCallToAction(lead.content),
+            ...(shape === "carousel"
+              ? { carouselCards: carouselCardsFor(lead.content) }
+              : {
+                  imageUrl: lead.content.media[0]!.url,
+                  placementAssets: placementAssetsFor(lead.content),
+                }),
+          }),
     };
     const result = await createMetaAd(payload, {
       idempotencyKey: idempotencyKey(
@@ -2516,7 +2587,12 @@ async function pushToMeta(args: PushArgs) {
           body: content.body,
           linkUrl: content.linkUrl ?? linkUrl,
           callToAction: metaCallToAction(content),
-          carouselCards: carouselCardsFor(content),
+          ...(isCarousel(content)
+            ? { carouselCards: carouselCardsFor(content) }
+            : {
+                imageUrl: content.media[0]!.url,
+                placementAssets: placementAssetsFor(content),
+              }),
           ...metaDraftProviderControls(false),
         };
         attached.push({
@@ -2545,7 +2621,7 @@ async function pushToMeta(args: PushArgs) {
         });
       }
       throw new Error(
-        `Push failed while attaching carousel ${attached.length + 1} of ${trailing.length}${
+        `Push failed while attaching ad ${attached.length + 1} of ${trailing.length}${
           rollbackCampaignId
             ? " — the campaign was removed from Meta so nothing is half-built"
             : ""
@@ -2567,9 +2643,7 @@ async function pushToMeta(args: PushArgs) {
     },
     subset: typeof usable,
   ) => {
-    const statics = subset.filter(({ content }) => !isCarousel(content));
-    const carousels = subset.filter(({ content }) => isCarousel(content));
-    const opening = statics.length > 0 ? statics : carousels.slice(0, 1);
+    const { opening } = splitForPush(subset);
     const responseAds =
       set.result.ads ?? (set.result.ad ? [set.result.ad] : []);
     const byPlanId = matchResponseAdsToPlan(

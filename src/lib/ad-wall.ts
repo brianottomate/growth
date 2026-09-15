@@ -11,7 +11,25 @@ export type WallCard = {
   thumbnail: string | null;
   assetId: string | null;
   type: "image" | "video" | "carousel";
+  /** The 9:16 stories and reels show instead of the baseline, when there is one. */
+  story: {
+    url: string;
+    thumbnail: string | null;
+    assetId: string | null;
+    via: "upload" | "crop" | "extend" | "render";
+  } | null;
 };
+
+/** The files a placement mock draws: the story variants where they exist. */
+export function cardsForSurface(
+  cards: WallCard[],
+  surface: "facebook" | "instagram" | "story",
+) {
+  return cards.map((card) => {
+    const shown = surface === "story" && card.story ? card.story : card;
+    return { url: shown.url, thumbnail: shown.thumbnail, type: card.type };
+  });
+}
 
 export type WallAd = {
   id: string;
@@ -64,6 +82,14 @@ export function toWallAd(ad: {
       thumbnail: item.thumbnail ?? null,
       assetId: item.assetId ?? null,
       type: item.type,
+      story: item.story
+        ? {
+            url: item.story.url,
+            thumbnail: item.story.thumbnail ?? null,
+            assetId: item.story.assetId ?? null,
+            via: item.story.via,
+          }
+        : null,
     })),
   };
 }

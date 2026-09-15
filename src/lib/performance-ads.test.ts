@@ -280,7 +280,9 @@ import {
   applyCardEdit,
   homeNameFromFilename,
   orderHomesForSet,
+  parseCreativeFilename,
   performanceFormatFor,
+  placementOf,
 } from "./performance-ads";
 
 describe("what an ad is", () => {
@@ -436,5 +438,60 @@ describe("which homes a set built by count runs on", () => {
       "https://x.com/property/2/b",
     ]);
     expect(orderHomesForSet(homes, [], 10)).toHaveLength(3);
+  });
+});
+
+describe("a finished creative's filename, read whole", () => {
+  it("reads brand, home, format, headline and size", () => {
+    const parsed = parseCreativeFilename(
+      "LegacyRnR_Villa Soleil_StaticA_Your private wine country villa awaits_1080x1920.png",
+    );
+    expect(parsed).toMatchObject({
+      brand: "LegacyRnR",
+      home: "Villa Soleil",
+      format: "StaticA",
+      headline: "Your private wine country villa awaits",
+      width: 1080,
+      height: 1920,
+      placement: "story",
+    });
+  });
+
+  it("pairs a feed file with its story twin by everything but the size", () => {
+    const feed = parseCreativeFilename(
+      "LegacyRnR_Villa Soleil_StaticA_Your private wine country villa awaits_1080x1350.png",
+    );
+    const story = parseCreativeFilename(
+      "LegacyRnR_Villa Soleil_StaticA_Your private wine country villa awaits_1080x1920.png",
+    );
+    expect(feed.pairKey).toBe(story.pairKey);
+    expect(feed.placement).toBe("feed");
+    expect(story.placement).toBe("story");
+  });
+
+  it("drops the slide number from a carousel's headline and copes with no size", () => {
+    expect(
+      parseCreativeFilename(
+        "LegacyRnR_Sonoma Sanctuary_CarouselA_Slide02_1080x1350.png",
+      ),
+    ).toMatchObject({
+      home: "Sonoma Sanctuary",
+      headline: null,
+      placement: "feed",
+    });
+    expect(parseCreativeFilename("IMG_4021.jpg")).toMatchObject({
+      home: null,
+      headline: null,
+      width: null,
+      placement: null,
+    });
+  });
+
+  it("names the placement a ratio fits", () => {
+    expect(placementOf(1080, 1350)).toBe("feed");
+    expect(placementOf(1080, 1920)).toBe("story");
+    expect(placementOf(1080, 1080)).toBe("square");
+    expect(placementOf(1200, 630)).toBe("landscape");
+    expect(placementOf(1000, 700)).toBeNull();
   });
 });

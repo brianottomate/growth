@@ -117,6 +117,24 @@ export type AudienceGeographyPlan = {
   cities?: string[];
 };
 
+/**
+ * A placement's own file for one card, and how it came to be: uploaded as
+ * is, cropped from the baseline, extended past its edges by the outpaint, or
+ * re-rendered from the composition the baseline came from.
+ */
+export type AdPlacementVariant = MediaItem & {
+  via: "upload" | "crop" | "extend" | "render";
+};
+
+/**
+ * One card of an ad: the baseline file every placement falls back to, and
+ * the 9:16 that stories and reels show instead when there is one. The push
+ * sends both as one ad through Meta's placement asset customization.
+ */
+export type AdCard = MediaItem & {
+  story?: AdPlacementVariant;
+};
+
 /** Content of a `creative` ad: one image/carousel plus its copy. */
 export type AdCreativeContent = {
   /**
@@ -133,7 +151,7 @@ export type AdCreativeContent = {
   /** The home the ad is about, as the onboarding list names it; the push names the ad by it. */
   propertyName?: string;
   /** One item = static image; several = carousel, in this order. Empty on a shell awaiting its creative. */
-  media: MediaItem[];
+  media: AdCard[];
 };
 
 /** Content of a `text` ad: the asset pool Google/OpenAI render from. */
@@ -287,7 +305,6 @@ export const campaignTable = pgTable(
     launchId: t
       .text()
       .references(() => launchTable.id, { onDelete: "set null" }),
-
 
     startAt: t.timestamp({ withTimezone: true }),
     endAt: t.timestamp({ withTimezone: true }),

@@ -272,11 +272,29 @@ export const adsRouter = {
             index: z.number().int().min(0).max(9),
             to: z.number().int().min(0).max(9),
           }),
+          z.object({
+            op: z.literal("setStory"),
+            index: z.number().int().min(0).max(9),
+            mediaAssetId: z.string().min(1),
+          }),
+          z.object({
+            op: z.literal("clearStory"),
+            index: z.number().int().min(0).max(9),
+          }),
+          z.object({
+            op: z.literal("makeStory"),
+            index: z.number().int().min(0).max(9),
+            how: z.enum(["auto", "crop", "extend", "render"]).optional(),
+          }),
         ]),
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      editAdCards({ ...input, orgId: await organizationIdFor(ctx) }),
+      editAdCards({
+        ...input,
+        orgId: await organizationIdFor(ctx),
+        userId: ctx.session.user.id,
+      }),
     ),
 
   /** Put the approved drafts, or the named ones, into a campaign. */

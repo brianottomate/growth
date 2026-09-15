@@ -10,9 +10,20 @@ import {
   performanceAccountTable,
   performancePropertyTable,
 } from "@/server/db/schema";
-import type { AdCreativeContent } from "@/server/db/ads-schema";
+import sharp from "sharp";
+
+import type {
+  AdCard,
+  AdCreativeContent,
+  AdPlacementVariant,
+} from "@/server/db/ads-schema";
 import type { MediaItem } from "@/server/db/content-schema";
 import { db } from "@/server/db";
+import { isGeminiImageConfigured } from "@/server/clients/gemini-image.client";
+import {
+  freezeCompositionSchema,
+  getCompositionFormat,
+} from "@/lib/compositions";
 import {
   adFormatOf,
   applyCardEdit,
@@ -20,6 +31,7 @@ import {
   homeNameFromFilename,
   MAX_SET_HOMES,
   orderHomesForSet,
+  parseCreativeFilename,
   performanceAdName,
   performanceFormatFor,
   PERFORMANCE_AD_DEFAULTS,
@@ -34,7 +46,10 @@ import {
 
 import { writeAdSetCopy, type CopyHome } from "./ad-set-copy.service";
 import { deleteDraftAd } from "./ads-draft.service";
+import { extendToCanvas } from "./card-director.service";
+import { freezeComposition } from "./composition.service";
 import { ensureHome } from "./homes.service";
+import { importImageBuffer } from "./media.service";
 import { brandListings, brandWebsiteId } from "./wanderos-listings.service";
 
 // Building the set a Performance client actually runs.
@@ -257,7 +272,151 @@ async function cardFromAsset(brandId: string, mediaAssetId: string) {
       : {}),
     ...(derivedFrom ? { derivedFrom } : {}),
   };
-  return { item, name: asset.title ?? asset.filename ?? null };
+  return {
+    item,
+    name: asset.title ?? asset.filename ?? null,
+    /** The name the file arrived with, which is what the export convention is read from. */
+    filename: asset.filename ?? asset.title ?? null,
+  };
+}
+
+const STORY = getCompositionFormat("story");
+
+/**
+ * The 9:16 for one card, derived from its baseline.
+ *
+ * The best method available wins unless one is asked for by name: a card
+ * that came out of our composition pipeline is rendered again on the story
+ * canvas, so the type is set fresh rather than stretched; a finished upload
+ * is extended past its edges by the outpaint, which keeps everything the
+ * designer placed and adds sky and ground; a plain crop is the fallback, or
+ * the explicit choice when the edges are what should go.
+ */
+async function deriveStory(input: {
+  brand: OwnedBrand;
+  userId: string;
+  card: AdCard;
+  how: "auto" | "crop" | "extend" | "render";
+  home: string | null;
+}): Promise<AdPlacementVariant> {
+  const { brand, card } = input;
+  if (card.type === "video") {
+    throw new AdSetError(
+      422,
+      "A story cut of a video is uploaded, not derived",
+    );
+  }
+  const asset = card.assetId
+    ? await db.query.mediaAssetTable.findFirst({
+        where: eq(mediaAssetTable.id, card.assetId),
+        columns: { id: true, url: true, metadata: true },
+      })
+    : null;
+  const composition = (
+    asset?.metadata as { composition?: Record<string, unknown> } | null
+  )?.composition;
+
+  const asVariant = (
+    made: { id: string; url: string | null; thumbnailUrl?: string | null },
+    via: AdPlacementVariant["via"],
+  ): AdPlacementVariant => {
+    if (!made.url) throw new AdSetError(422, "The story file has no URL yet");
+    return {
+      url: made.url,
+      type: "image",
+      assetId: made.id,
+      ...(made.thumbnailUrl ? { thumbnail: made.thumbnailUrl } : {}),
+      width: STORY.width,
+      height: STORY.height,
+      ...(card.assetId ? { derivedFrom: card.assetId } : {}),
+      via,
+    };
+  };
+
+  // Render: the composition drawn again on the story canvas.
+  if ((input.how === "auto" || input.how === "render") && composition) {
+    const spec = freezeCompositionSchema.safeParse({
+      ...composition,
+      brandId: brand.id,
+      formatId: "story",
+      assetTitle: `${
+        typeof composition.title === "string" && composition.title
+          ? composition.title
+          : (input.home ?? brand.name)
+      } · Story`,
+    });
+    if (spec.success) {
+      const made = await freezeComposition({
+        userId: input.userId,
+        spec: spec.data,
+      });
+      return asVariant(made, "render");
+    }
+    if (input.how === "render") {
+      throw new AdSetError(
+        422,
+        "This card's composition cannot be re-rendered",
+      );
+    }
+  }
+
+  // Extend: more of the same scene above and below, via the outpaint.
+  if (input.how === "auto" || input.how === "extend") {
+    if (isGeminiImageConfigured && asset?.url) {
+      try {
+        const made = await extendToCanvas({
+          brandId: brand.id,
+          userId: input.userId,
+          source: { id: asset.id, url: asset.url },
+          formatId: "story",
+          home: input.home ?? brand.name,
+        });
+        return asVariant(made, "extend");
+      } catch (error) {
+        if (input.how === "extend") {
+          throw new AdSetError(
+            422,
+            error instanceof Error
+              ? error.message
+              : "The photo could not be extended",
+          );
+        }
+        console.error("story extend failed, cropping instead", error);
+      }
+    } else if (input.how === "extend") {
+      throw new AdSetError(422, "Photo extension is not configured here");
+    }
+  }
+
+  // Crop: the baseline covered onto the story canvas, centred.
+  const response = await fetch(card.url, {
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    throw new AdSetError(
+      422,
+      `The baseline could not be read (${response.status})`,
+    );
+  }
+  const bytes = await sharp(Buffer.from(await response.arrayBuffer()))
+    .resize(STORY.width, STORY.height, { fit: "cover", position: "centre" })
+    .png()
+    .toBuffer();
+  const made = await importImageBuffer({
+    brandId: brand.id,
+    uploadedBy: input.userId,
+    body: bytes,
+    contentType: "image/png",
+    filename: "story-crop.png",
+    title: `${input.home ?? brand.name} · Story crop`,
+    width: STORY.width,
+    height: STORY.height,
+    metadata: {
+      croppedFrom: card.assetId ?? card.url,
+      aspectRatio: "9:16",
+    },
+  });
+  return asVariant(made, "crop");
 }
 
 /** The house name for one ad, from its format and the home it is about. */
@@ -647,10 +806,47 @@ export async function createAdsFromAssets(input: {
     return { listing, label: listing?.name ?? guess ?? stem };
   };
 
-  const groups =
+  // Statics pair up by name: a 4:5 and its 9:16 twin differ only in the
+  // size, so one static is made with the story riding on its card. A file
+  // that arrives alone is a static on its own, whatever its size.
+  type Dropped = (typeof cards)[number] & {
+    parsed: ReturnType<typeof parseCreativeFilename>;
+  };
+  const parsedCards: Dropped[] = cards.map((card) => ({
+    ...card,
+    parsed: parseCreativeFilename(card.filename ?? ""),
+  }));
+  const groups: {
+    format: "static" | "carousel";
+    cards: Dropped[];
+    story?: Dropped;
+    headline?: string | null;
+  }[] =
     input.as === "statics"
-      ? cards.map((card) => ({ format: "static" as const, cards: [card] }))
-      : [{ format: "carousel" as const, cards }];
+      ? [...new Set(parsedCards.map((card) => card.parsed.pairKey))].map(
+          (key) => {
+            const twins = parsedCards.filter(
+              (card) => card.parsed.pairKey === key,
+            );
+            const story = twins.find(
+              (card) => card.parsed.placement === "story",
+            );
+            const base = twins.find((card) => card !== story) ?? story!;
+            return {
+              format: "static" as const,
+              cards: [base],
+              story: story && story !== base ? story : undefined,
+              headline: base.parsed.headline,
+            };
+          },
+        )
+      : [
+          {
+            format: "carousel" as const,
+            cards: parsedCards,
+            headline: parsedCards[0]?.parsed.headline,
+          },
+        ];
 
   const created: { adId: string; name: string; homeName: string | null }[] = [];
   for (const group of groups) {
@@ -666,14 +862,19 @@ export async function createAdsFromAssets(input: {
     const guessedHome = !listing && label && label !== group.cards[0]?.name;
     const content: AdCreativeContent = {
       format,
-      headline: label ?? brand.name,
+      headline: group.headline ?? label ?? brand.name,
       body: "",
       ...(listing ? { linkUrl: listing.url, propertyName: listing.name } : {}),
       // A home named by the file but not on any feed we can read still files
       // the ad under that name on the wall.
       ...(guessedHome ? { propertyName: label } : {}),
       callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
-      media: group.cards.map((card) => card.item),
+      media: group.cards.map((card, index) => ({
+        ...card.item,
+        ...(index === 0 && group.story
+          ? { story: { ...group.story.item, via: "upload" as const } }
+          : {}),
+      })),
     };
     const [row] = await db
       .insert(adTable)
@@ -753,16 +954,77 @@ export async function setAdHome(input: {
 export async function editAdCards(input: {
   adId: string;
   orgId: string;
+  /** Who is deriving; a story made by crop, extend or render is filed under them. */
+  userId?: string | null;
   edit:
     | { op: "replace"; index: number; mediaAssetId: string }
     | { op: "append"; mediaAssetId: string }
     | { op: "remove"; index: number }
-    | { op: "move"; index: number; to: number };
+    | { op: "move"; index: number; to: number }
+    | { op: "setStory"; index: number; mediaAssetId: string }
+    | { op: "clearStory"; index: number }
+    | {
+        op: "makeStory";
+        index: number;
+        how?: "auto" | "crop" | "extend" | "render";
+      };
 }) {
   const ad = await requireOwnedAd(input);
   const content = creativeContent(ad);
   const brand = ad.brand;
-  let edit: CardEdit<MediaItem>;
+  const cardAt = (index: number) => {
+    const card = content.media[index];
+    if (!card) {
+      throw new AdSetError(
+        422,
+        `This ad has ${content.media.length} card${content.media.length === 1 ? "" : "s"}; there is no card ${index + 1}`,
+      );
+    }
+    return card;
+  };
+
+  // The story variants ride on a card and are not cards themselves, so they
+  // are handled here rather than through the card rules.
+  if (
+    input.edit.op === "setStory" ||
+    input.edit.op === "clearStory" ||
+    input.edit.op === "makeStory"
+  ) {
+    const index = input.edit.index;
+    const card = cardAt(index);
+    let story: AdPlacementVariant | undefined;
+    if (input.edit.op === "setStory") {
+      const picked = await cardFromAsset(brand.id, input.edit.mediaAssetId);
+      if (picked.item.type === "video") {
+        throw new AdSetError(
+          422,
+          "A story variant is an image; a video ad takes one clip",
+        );
+      }
+      story = { ...picked.item, via: "upload" };
+    } else if (input.edit.op === "makeStory") {
+      if (!input.userId) {
+        throw new AdSetError(422, "Deriving a story needs a signed-in user");
+      }
+      story = await deriveStory({
+        brand,
+        userId: input.userId,
+        card,
+        how: input.edit.how ?? "auto",
+        home: content.propertyName ?? null,
+      });
+    }
+    const media: AdCard[] = [...content.media];
+    const { story: _dropped, ...base } = card;
+    media[index] = story ? { ...base, story } : base;
+    await db
+      .update(adTable)
+      .set({ content: { ...content, media } })
+      .where(eq(adTable.id, ad.id));
+    return { adId: ad.id, cards: media.length, story: story ?? null };
+  }
+
+  let edit: CardEdit<AdCard>;
   switch (input.edit.op) {
     case "replace":
       edit = {
@@ -780,7 +1042,7 @@ export async function editAdCards(input: {
     default:
       edit = input.edit;
   }
-  let media: MediaItem[];
+  let media: AdCard[];
   try {
     media = applyCardEdit(content, edit);
   } catch (error) {
@@ -793,7 +1055,7 @@ export async function editAdCards(input: {
     .update(adTable)
     .set({ content: { ...content, media } })
     .where(eq(adTable.id, ad.id));
-  return { adId: ad.id, cards: media.length };
+  return { adId: ad.id, cards: media.length, story: null };
 }
 
 /**

@@ -7,7 +7,12 @@ import { ChevronLeft } from "lucide-react";
 
 import { AD_MOCK_SURFACES, AdMock } from "@/components/ad-mock";
 import { cn } from "@/components/ui/lib/utils";
-import { homeGroupKey, type HomeGroup, type WallAd } from "@/lib/ad-wall";
+import {
+  cardsForSurface,
+  homeGroupKey,
+  type HomeGroup,
+  type WallAd,
+} from "@/lib/ad-wall";
 import { AD_FORMAT_LABEL } from "@/lib/performance-ads";
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
@@ -198,12 +203,8 @@ function AdAcross({
   // One card index shared across the placements, so paging a carousel pages
   // it everywhere and the same card is compared in each crop.
   const [card, setCard] = useState(0);
-  const media = ad.cards.map((item) => ({
-    url: item.url,
-    thumbnail: item.thumbnail,
-    type: item.type,
-  }));
   const shell = ad.cards.length === 0;
+  const stories = ad.cards.filter((item) => item.story).length;
 
   return (
     <li className={cn(panel, "p-4")}>
@@ -216,7 +217,14 @@ function AdAcross({
           ) : (
             AD_MOCK_SURFACES.map((option) => (
               <div key={option.id} className="space-y-1">
-                <p className={sectionLabel}>{option.label}</p>
+                <p className={sectionLabel}>
+                  {option.label}
+                  {option.id === "story"
+                    ? stories > 0
+                      ? " · its own 9:16"
+                      : " · cropped from the baseline"
+                    : ""}
+                </p>
                 <AdMock
                   surface={option.id}
                   brandName={brandName}
@@ -225,7 +233,7 @@ function AdAcross({
                   headline={ad.headline}
                   link={ad.linkUrl ?? landingUrl}
                   callToAction={ad.callToAction}
-                  media={media}
+                  media={cardsForSurface(ad.cards, option.id)}
                   card={card}
                   onCard={ad.cards.length > 1 ? setCard : undefined}
                   className={option.id === "story" ? "w-56" : "w-72"}

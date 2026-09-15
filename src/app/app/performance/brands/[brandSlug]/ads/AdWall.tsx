@@ -11,6 +11,7 @@ import {
   ImagePlus,
   Loader2,
   Replace,
+  Smartphone,
   Trash2,
   X,
 } from "lucide-react";
@@ -30,7 +31,13 @@ import { toast } from "@/components/ui/toast";
 import { AdPreviewDialog } from "@/app/app/brands/[brandSlug]/ads/_views/AdPreviewDialog";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
-import { groupWall, type AdState, type WallAd } from "@/lib/ad-wall";
+import {
+  cardsForSurface,
+  groupWall,
+  type AdState,
+  type WallAd,
+  type WallCard,
+} from "@/lib/ad-wall";
 import { AD_FORMAT_LABEL, cardCapacity } from "@/lib/performance-ads";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
@@ -337,11 +344,7 @@ function AdTile({
       headline={ad.headline}
       link={ad.linkUrl ?? landingUrl}
       callToAction={ad.callToAction}
-      media={ad.cards.map((item) => ({
-        url: item.url,
-        thumbnail: item.thumbnail,
-        type: item.type,
-      }))}
+      media={cardsForSurface(ad.cards, surface)}
       card={card}
       onCard={ad.cards.length > 1 ? setCard : undefined}
       className={cn("w-full", surface === "story" ? "max-w-60" : "max-w-80")}
@@ -351,68 +354,109 @@ function AdTile({
   const strip = (
     <ul className="flex flex-wrap gap-2">
       {ad.cards.map((item, index) => (
-        <li key={`${ad.id}-${index}`} className="group relative">
-          <button
-            type="button"
-            onClick={() => setCard(index)}
-            title={`Card ${index + 1}`}
-            className={cn(
-              "block overflow-hidden rounded-lg border transition",
-              card === index && ad.cards.length > 1
-                ? "border-sky-400 ring-2 ring-sky-400/40"
-                : "hover:border-white/30",
-            )}
-          >
-            {item.type === "video" ? (
-              <video
-                src={item.url}
-                className="size-16 bg-black object-cover"
-                muted
-                playsInline
-                preload="metadata"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={item.thumbnail ?? item.url}
-                alt={`Card ${index + 1}`}
-                loading="lazy"
-                className="size-16 object-cover"
-              />
-            )}
-          </button>
-          <span className="absolute top-1 left-1 rounded-full bg-black/55 px-1.5 text-[9px] font-medium text-white">
-            {index + 1}
-          </span>
-          {locked ? null : (
-            <span className="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/60 py-0.5 opacity-0 transition group-hover:opacity-100">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setPicking(index)}
-                title="Replace this card from the library"
-                className="text-white hover:text-sky-300"
-              >
-                <Replace className="size-3" />
-              </button>
-              {canRemove ? (
+        <li
+          key={`${ad.id}-${index}`}
+          className="group relative flex items-start gap-1"
+        >
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setCard(index)}
+              title={`Card ${index + 1}`}
+              className={cn(
+                "block overflow-hidden rounded-lg border transition",
+                card === index && ad.cards.length > 1
+                  ? "border-sky-400 ring-2 ring-sky-400/40"
+                  : "hover:border-white/30",
+              )}
+            >
+              {item.type === "video" ? (
+                <video
+                  src={item.url}
+                  className="size-16 bg-black object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.thumbnail ?? item.url}
+                  alt={`Card ${index + 1}`}
+                  loading="lazy"
+                  className="size-16 object-cover"
+                />
+              )}
+            </button>
+            <span className="absolute top-1 left-1 rounded-full bg-black/55 px-1.5 text-[9px] font-medium text-white">
+              {index + 1}
+            </span>
+            {locked ? null : (
+              <span className="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/60 py-0.5 opacity-0 transition group-hover:opacity-100">
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() =>
-                    editCards.mutate({
-                      adId: ad.id,
-                      edit: { op: "remove", index },
-                    })
-                  }
-                  title="Remove this card"
-                  className="text-white hover:text-red-300"
+                  onClick={() => setPicking(index)}
+                  title="Replace this card from the library"
+                  className="text-white hover:text-sky-300"
                 >
-                  <X className="size-3" />
+                  <Replace className="size-3" />
                 </button>
-              ) : null}
-            </span>
-          )}
+                {canRemove ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      editCards.mutate({
+                        adId: ad.id,
+                        edit: { op: "remove", index },
+                      })
+                    }
+                    title="Remove this card"
+                    className="text-white hover:text-red-300"
+                  >
+                    <X className="size-3" />
+                  </button>
+                ) : null}
+              </span>
+            )}
+          </div>
+          {item.type !== "video" ? (
+            <StorySlot
+              card={item}
+              locked={locked}
+              busy={busy}
+              onSet={(mediaAssetId) =>
+                editCards.mutate({
+                  adId: ad.id,
+                  edit: { op: "setStory", index, mediaAssetId },
+                })
+              }
+              onClear={() =>
+                editCards.mutate({
+                  adId: ad.id,
+                  edit: { op: "clearStory", index },
+                })
+              }
+              onMake={(how) =>
+                editCards.mutate({
+                  adId: ad.id,
+                  edit: { op: "makeStory", index, how },
+                })
+              }
+              onUpload={async (files) => {
+                const items = await uploadFiles(files);
+                const id = items.map(assetIdOf).find(Boolean);
+                if (id) {
+                  editCards.mutate({
+                    adId: ad.id,
+                    edit: { op: "setStory", index, mediaAssetId: id },
+                  });
+                }
+              }}
+              brandId={brandId}
+            />
+          ) : null}
         </li>
       ))}
       {canAdd && !shell ? (
@@ -699,5 +743,160 @@ function AdTile({
         />
       ) : null}
     </li>
+  );
+}
+
+const VIA_LABEL: Record<NonNullable<WallCard["story"]>["via"], string> = {
+  upload: "uploaded",
+  crop: "cropped",
+  extend: "extended",
+  render: "rendered",
+};
+
+/**
+ * The 9:16 beside a card: what stories and reels show instead of the
+ * baseline. Empty, it offers the ways to get one, best first: derive it
+ * (re-render, extend, or crop, whichever the card allows), or bring a file.
+ */
+function StorySlot({
+  card,
+  locked,
+  busy,
+  brandId,
+  onSet,
+  onClear,
+  onMake,
+  onUpload,
+}: {
+  card: WallCard;
+  locked: boolean;
+  busy: boolean;
+  brandId: string;
+  onSet: (mediaAssetId: string) => void;
+  onClear: () => void;
+  onMake: (how: "auto" | "crop" | "extend" | "render") => void;
+  onUpload: (files: File[]) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const story = card.story;
+  return (
+    <>
+      {story ? (
+        <div
+          className="group/story relative"
+          title={`Story · ${VIA_LABEL[story.via]}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={story.thumbnail ?? story.url}
+            alt="Story"
+            className="h-16 w-9 rounded-md border object-cover"
+          />
+          <span className="absolute bottom-0 left-0 w-full truncate rounded-b-md bg-black/60 px-0.5 text-center text-[7px] text-white">
+            {VIA_LABEL[story.via]}
+          </span>
+          {locked ? null : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onClear}
+              title="Drop the story file; stories will crop the baseline"
+              className="absolute -top-1 -right-1 hidden rounded-full bg-black/70 p-0.5 text-white group-hover/story:block hover:text-red-300"
+            >
+              <X className="size-2.5" />
+            </button>
+          )}
+        </div>
+      ) : locked ? null : (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setOpen(true)}
+          title="Give stories and reels their own 9:16"
+          className="text-muted-foreground hover:text-foreground flex h-16 w-9 flex-col items-center justify-center rounded-md border border-dashed text-[8px] hover:border-white/30 disabled:opacity-40"
+        >
+          <Smartphone className="size-3" />
+          9:16
+        </button>
+      )}
+      <SimpleDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="A 9:16 for stories and reels"
+        description="Without one, Meta crops the baseline. Derive one from it, or bring a file."
+        size="sm"
+      >
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                {
+                  how: "auto",
+                  label: "Make it",
+                  hint: "Best method for this card",
+                },
+                {
+                  how: "extend",
+                  label: "Extend",
+                  hint: "More sky and ground, by AI",
+                },
+                { how: "crop", label: "Crop", hint: "Centred, edges go" },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.how}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onMake(option.how);
+                }}
+                className="rounded-xl border p-2 text-left hover:border-white/30"
+              >
+                <p className="text-xs font-medium">{option.label}</p>
+                <p className="text-muted-foreground text-[10px]">
+                  {option.hint}
+                </p>
+              </button>
+            ))}
+          </div>
+          <Dropzone
+            compact
+            accept={MEDIA_ACCEPT}
+            multiple={false}
+            onFiles={(files) => {
+              setOpen(false);
+              void onUpload(files);
+            }}
+            title="Drop the 9:16"
+            hint="or click to browse · saved to the library"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              setOpen(false);
+              setPicking(true);
+            }}
+          >
+            <ImagePlus className="size-3.5" />
+            From the library
+          </Button>
+        </div>
+      </SimpleDialog>
+      {picking ? (
+        <MediaPickerDialog
+          brandId={brandId}
+          open
+          onOpenChange={(next) => !next && setPicking(false)}
+          existingAssetIds={card.assetId ? [card.assetId] : []}
+          onPick={(item) => {
+            setPicking(false);
+            if (item.assetId) onSet(item.assetId);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

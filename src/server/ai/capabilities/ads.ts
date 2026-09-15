@@ -1310,7 +1310,7 @@ export const setAdHomeAction = growthAction({
 
 export const editAdCardsAction = growthAction({
   description:
-    "One change to a drafted ad's cards, with a library asset: replace the card at an index, append a card, remove one, or move one. A static holds one card, a carousel two to ten (one while it is being filled), a video ad one clip. Works on ads in the brand's set and on ads in a campaign that has not been pushed.",
+    "One change to a drafted ad's cards. With a library asset: replace the card at an index, append a card, remove one, move one. Per placement: setStory pins a 9:16 library asset to a card for stories and reels, clearStory drops it, makeStory derives one from the card's baseline (auto picks the best method: re-render when the card came from a composition, extend the photo past its edges via outpaint, else a centred crop; or name crop/extend/render). A static holds one card, a carousel two to ten (one while it is being filled), a video ad one clip. Works on ads in the brand's set and on ads in a campaign that has not been pushed.",
   inputSchema: z.object({
     adId: z.string().min(1),
     edit: z.discriminatedUnion("op", [
@@ -1329,12 +1329,27 @@ export const editAdCardsAction = growthAction({
         index: z.number().int().min(0).max(9),
         to: z.number().int().min(0).max(9),
       }),
+      z.object({
+        op: z.literal("setStory"),
+        index: z.number().int().min(0).max(9),
+        mediaAssetId: z.string().min(1),
+      }),
+      z.object({
+        op: z.literal("clearStory"),
+        index: z.number().int().min(0).max(9),
+      }),
+      z.object({
+        op: z.literal("makeStory"),
+        index: z.number().int().min(0).max(9),
+        how: z.enum(["auto", "crop", "extend", "render"]).optional(),
+      }),
     ]),
   }),
   examples: [
     { adId: "ad_01", edit: { op: "append", mediaAssetId: "media_01" } },
   ],
-  execute: (input, ctx) => editAdCards({ ...input, orgId: ctx.orgId }),
+  execute: (input, ctx) =>
+    editAdCards({ ...input, orgId: ctx.orgId, userId: ctx.userId }),
 });
 
 export const attachAdSetAction = growthAction({

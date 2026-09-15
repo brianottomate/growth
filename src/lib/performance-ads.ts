@@ -475,12 +475,16 @@ export function homeNameFromFilename(filename: string): string | null {
   const formatAt = parts.findIndex(isFormat);
   // The property sits beside the format: after it in the ad convention,
   // before it in an export that carries slide and size after.
-  // The segment right after the brand is the only one before the format
-  // that can be a home; at index 1 the format follows the brand itself.
+  // Brand_Home_Format_Headline puts the home before the format; the ad
+  // convention Brand_Format_Home puts it after. When the format sits past
+  // the second segment the one before it is the home, and the one after is
+  // a headline; the brand prefix itself never is.
   const candidates =
-    formatAt > 0
-      ? [parts[formatAt + 1], formatAt >= 2 ? parts[formatAt - 1] : undefined]
-      : [parts[1]];
+    formatAt >= 2
+      ? [parts[formatAt - 1], parts[formatAt + 1]]
+      : formatAt === 1
+        ? [parts[2]]
+        : [parts[1]];
   return candidates.find(isHome) ?? null;
 }
 
@@ -585,4 +589,74 @@ export function orderHomesForSet<
     }
   }
   return picked.slice(0, count);
+}
+
+/** The placement a file's pixel ratio fits, by Meta's own crops. */
+export type CreativePlacement = "feed" | "square" | "story" | "landscape";
+
+export function placementOf(
+  width: number | null | undefined,
+  height: number | null | undefined,
+): CreativePlacement | null {
+  if (!width || !height) return null;
+  const ratio = width / height;
+  const near = (target: number) => Math.abs(ratio - target) < 0.04;
+  if (near(9 / 16)) return "story";
+  if (near(4 / 5)) return "feed";
+  if (near(1)) return "square";
+  if (near(1.91)) return "landscape";
+  return null;
+}
+
+export type ParsedCreativeFilename = {
+  brand: string | null;
+  home: string | null;
+  /** The format token as written, `StaticA`, `CarouselA`. */
+  format: string | null;
+  /** The headline drawn on the card, when the name carries one. */
+  headline: string | null;
+  width: number | null;
+  height: number | null;
+  placement: CreativePlacement | null;
+  /** Everything but the size: what pairs a 4:5 with its 9:16. */
+  pairKey: string;
+};
+
+/**
+ * Brooke's export names, read whole: `LegacyRnR_Villa Soleil_StaticA_Your
+ * private wine country villa awaits_1080x1920.png`. Brand, home, format,
+ * headline, size. The size is what tells a feed file from its story twin;
+ * everything before it is what says they are twins.
+ */
+export function parseCreativeFilename(
+  filename: string,
+): ParsedCreativeFilename {
+  const stem = filename.replace(/\.[a-z0-9]+$/i, "").trim();
+  const parts = stem
+    .split("_")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const size = /^(\d{2,5})x(\d{2,5})$/.exec(parts.at(-1) ?? "");
+  const width = size ? Number(size[1]) : null;
+  const height = size ? Number(size[2]) : null;
+  const body = size ? parts.slice(0, -1) : parts;
+  const formatAt = body.findIndex((part) =>
+    /^(static|carousel|video)[a-z]?$/i.test(part),
+  );
+  const home = homeNameFromFilename(filename);
+  const format = formatAt >= 0 ? body[formatAt]! : null;
+  // The headline is what follows the format, once the slide number is off.
+  const after = formatAt >= 0 ? body.slice(formatAt + 1) : [];
+  const headline =
+    after.filter((part) => !/^slide\s*\d+$/i.test(part)).join(" ") || null;
+  return {
+    brand: body[0] ?? null,
+    home,
+    format,
+    headline,
+    width,
+    height,
+    placement: placementOf(width, height),
+    pairKey: body.join("_").toLowerCase(),
+  };
 }

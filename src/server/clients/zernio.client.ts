@@ -1115,6 +1115,34 @@ export type ZernioPlatformSpecificData = {
   [key: string]: unknown;
 };
 
+/**
+ * Meta's "use a different creative per placement" on ONE ad: a default asset
+ * for every placement, and rules that pin another asset (and optionally its
+ * own copy) to chosen surfaces. Single-creative and attach shapes only.
+ * https://docs.zernio.com/platforms/meta-ads/creatives#placement-asset-customization
+ */
+export type ZernioPlacementAssets = {
+  defaultImageUrl?: string;
+  defaultVideoUrl?: string;
+  defaultThumbnailUrl?: string;
+  rules: Array<{
+    imageUrl?: string;
+    videoUrl?: string;
+    thumbnailUrl?: string;
+    headline?: string;
+    body?: string;
+    description?: string;
+    placements: {
+      publisherPlatforms?: string[];
+      facebookPositions?: string[];
+      instagramPositions?: string[];
+      messengerPositions?: string[];
+      audienceNetworkPositions?: string[];
+      devicePlatforms?: string[];
+    };
+  }>;
+};
+
 export type CreateZernioStandaloneAdInput = {
   accountId: string;
   adAccountId: string;
@@ -1207,6 +1235,8 @@ export type CreateZernioStandaloneAdInput = {
   endDate?: string;
   status?: "PAUSED";
   validateOnly?: boolean;
+  /** Meta only: one asset per placement on a single-image ad. */
+  placementAssets?: ZernioPlacementAssets;
   promotedObject?: {
     pixelId?: string;
     customEventType?: string;
