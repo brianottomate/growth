@@ -6,10 +6,10 @@ import { listAdSet } from "@/server/services/ad-set.service";
 
 import { brandAvatarUrl, loadPerformanceBrand } from "../_data";
 
-import { adFormatOf, MAX_SET_HOMES } from "@/lib/performance-ads";
+import { toWallAd, type WallAd } from "@/lib/ad-wall";
+import { MAX_SET_HOMES } from "@/lib/performance-ads";
 
 import { AdPreviewsWorkspace, type WorkspaceHome } from "./AdPreviewsWorkspace";
-import type { WallAd } from "./AdWall";
 
 export const metadata: Metadata = { title: "Ads · Wander Performance" };
 export const dynamic = "force-dynamic";
@@ -43,31 +43,8 @@ export default async function PerformanceBrandAdsPage({
   // The wall needs the words, the cards and the home; everything else about
   // an ad row is either derivable or not the reviewer's business.
   const ads: WallAd[] = drafted.flatMap((ad) => {
-    const content = ad.content;
-    if (!("media" in content)) return [];
-    return [
-      {
-        id: ad.id,
-        name: ad.name,
-        // `kept` is a retired middle state; anything not approved is a draft.
-        status:
-          ad.status === "approved" ? ("approved" as const) : ("drawn" as const),
-        format: adFormatOf(content),
-        headline: content.headline,
-        body: content.body,
-        callToAction: content.callToAction ?? null,
-        linkUrl: content.linkUrl ?? null,
-        homeId: ad.home?.externalId ?? null,
-        homeName: ad.home?.name ?? content.propertyName ?? null,
-        homeUrl: ad.home?.url ?? null,
-        cards: content.media.map((item) => ({
-          url: item.url,
-          thumbnail: item.thumbnail ?? null,
-          assetId: item.assetId ?? null,
-          type: item.type,
-        })),
-      },
-    ];
+    const row = toWallAd(ad);
+    return row ? [row] : [];
   });
   const homes: WorkspaceHome[] = listings
     .filter((home) => home.imageUrl)

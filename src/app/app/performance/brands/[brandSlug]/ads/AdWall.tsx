@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import {
   Check,
+  Eye,
   Home,
   ImagePlus,
   Loader2,
@@ -20,12 +21,16 @@ import {
   type AdMockSurface,
 } from "@/components/ad-mock";
 import { Button } from "@/components/ui/button";
+import { SimpleDialog } from "@/components/ui/dialog";
 import { Dropzone, MEDIA_ACCEPT } from "@/components/ui/dropzone";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/components/ui/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
+import { AdPreviewDialog } from "@/app/app/brands/[brandSlug]/ads/_views/AdPreviewDialog";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
+import type { AdState, WallAd } from "@/lib/ad-wall";
 import {
   AD_FORMAT_LABEL,
   cardCapacity,
@@ -36,28 +41,7 @@ import { useTRPC } from "@/trpc/react";
 
 import { HomePicker, type PickableHome } from "../HomePicker";
 
-export type WallCard = {
-  url: string;
-  thumbnail: string | null;
-  assetId: string | null;
-  type: "image" | "video" | "carousel";
-};
-
-export type WallAd = {
-  id: string;
-  name: string;
-  status: "drawn" | "approved";
-  format: AdFormat;
-  headline: string;
-  body: string;
-  callToAction: string | null;
-  linkUrl: string | null;
-  /** The WanderOS listing id of the home this ad is about. */
-  homeId: string | null;
-  homeName: string | null;
-  homeUrl: string | null;
-  cards: WallCard[];
-};
+export type { WallAd } from "@/lib/ad-wall";
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
 const sectionLabel =
@@ -117,22 +101,32 @@ export function groupWall(ads: WallAd[]) {
  * Every drafted ad as it will run, filed under its home, before any of it
  * reaches Meta. Each tile is the real ad: its cards can be replaced, added
  * by upload or from the library, and removed; its copy edited; its home
- * swapped. Approving is not a push. Nothing here talks to a platform.
+ * swapped. Approving is not a push. An ad already on a platform is shown
+ * and left alone. Nothing here talks to a platform.
  */
 export function AdWall({
   brandId,
   brandSlug,
   brandName,
   brandLogo,
+  landingUrl = null,
   homes,
   ads,
+  states = {},
+  title = "The wall",
 }: {
   brandId: string;
   brandSlug: string;
   brandName: string;
   brandLogo: string | null;
+  /** The campaign's landing page, for the Meta render of an ad without a link. */
+  landingUrl?: string | null;
+  /** Their homes, for binding; empty when their site is not connected. */
   homes: PickableHome[];
   ads: WallAd[];
+  /** Where each ad stands on a platform; an ad on one is read-only here. */
+  states?: Record<string, AdState>;
+  title?: string;
 }) {
   const [surface, setSurface] = useState<AdMockSurface>("instagram");
   const grouped = groupWall(ads);
@@ -140,10 +134,13 @@ export function AdWall({
   const shells = ads.filter((ad) => ad.cards.length === 0).length;
   const tile = {
     brandId,
+    brandSlug,
     brandName,
     brandLogo,
+    landingUrl,
     homes,
     surface,
+    states,
   };
 
   if (ads.length === 0) return null;
@@ -152,7 +149,7 @@ export function AdWall({
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className={sectionLabel}>
-          The wall · {ads.length} ads
+          {title} · {ads.length} ads
           {approved ? ` · ${approved} approved` : ""}
           {shells ? ` · ${shells} awaiting creative` : ""}
         </p>
@@ -241,18 +238,24 @@ const assetIdOf = (item: MediaItem) => item.assetId ?? null;
 function AdTile({
   ad,
   brandId,
+  brandSlug,
   brandName,
   brandLogo,
+  landingUrl,
   homes,
   surface,
+  states,
   slice = false,
 }: {
   ad: WallAd;
   brandId: string;
+  brandSlug: string;
   brandName: string;
   brandLogo: string | null;
+  landingUrl: string | null;
   homes: PickableHome[];
   surface: AdMockSurface;
+  states: Record<string, AdState>;
   /** The portfolio and catalog rows: the cards laid out beside the mock. */
   slice?: boolean;
 }) {
@@ -260,11 +263,18 @@ function AdTile({
   const trpc = useTRPC();
   const [card, setCard] = useState(0);
   const [editing, setEditing] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [homeName, setHomeName] = useState(ad.homeName ?? "");
   const [body, setBody] = useState(ad.body);
   const [headline, setHeadline] = useState(ad.headline);
   // Which slot the library picker fills: a card index to replace, or "append".
   const [picking, setPicking] = useState<number | "append" | null>(null);
   const { uploadFiles, uploading } = useMediaUpload(brandId);
+  // An ad already on a platform keeps the platform's copy of itself; the
+  // tile shows it and changes nothing.
+  const state = states[ad.id] ?? "draft";
+  const locked = state !== "draft";
 
   const onError = (error: { message: string }) => toast.error(error.message);
   const refresh = () => router.refresh();
@@ -302,10 +312,12 @@ function AdTile({
   );
 
   const capacity = cardCapacity(ad.format);
-  const canAdd = ad.cards.length < capacity;
-  const canRemove = ad.cards.length > 0;
+  const bindable = ad.format !== "portfolio" && ad.format !== "catalog";
+  const canAdd = !locked && ad.cards.length < capacity;
+  const canRemove = !locked && ad.cards.length > 0;
   const dirty = body !== ad.body || headline !== ad.headline;
   const busy =
+    locked ||
     setStatus.isPending ||
     setCopy.isPending ||
     editCards.isPending ||
@@ -354,7 +366,8 @@ function AdTile({
     <Dropzone
       compact
       accept={MEDIA_ACCEPT}
-      multiple={ad.format !== "static" && ad.format !== "video"}
+      multiple={capacity > 1}
+      disabled={locked}
       onFiles={(files) => void dropped(files, "append")}
       uploading={uploading}
       title={
@@ -362,7 +375,9 @@ function AdTile({
           ? "Drop the clip"
           : ad.format === "static"
             ? "Drop the creative"
-            : "Drop the cards, in order"
+            : ad.format === "catalog"
+              ? "Drop one card per home, in order"
+              : "Drop the cards, in order"
       }
       hint="or click to browse · saved to the library"
       className="min-h-40"
@@ -374,7 +389,7 @@ function AdTile({
       brandLogo={brandLogo}
       body={ad.body}
       headline={ad.headline}
-      link={ad.linkUrl}
+      link={ad.linkUrl ?? landingUrl}
       callToAction={ad.callToAction}
       media={ad.cards.map((item) => ({
         url: item.url,
@@ -423,33 +438,35 @@ function AdTile({
           <span className="absolute top-1 left-1 rounded-full bg-black/55 px-1.5 text-[9px] font-medium text-white">
             {index + 1}
           </span>
-          <span className="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/60 py-0.5 opacity-0 transition group-hover:opacity-100">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setPicking(index)}
-              title="Replace this card from the library"
-              className="text-white hover:text-sky-300"
-            >
-              <Replace className="size-3" />
-            </button>
-            {canRemove ? (
+          {locked ? null : (
+            <span className="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/60 py-0.5 opacity-0 transition group-hover:opacity-100">
               <button
                 type="button"
                 disabled={busy}
-                onClick={() =>
-                  editCards.mutate({
-                    adId: ad.id,
-                    edit: { op: "remove", index },
-                  })
-                }
-                title="Remove this card"
-                className="text-white hover:text-red-300"
+                onClick={() => setPicking(index)}
+                title="Replace this card from the library"
+                className="text-white hover:text-sky-300"
               >
-                <X className="size-3" />
+                <Replace className="size-3" />
               </button>
-            ) : null}
-          </span>
+              {canRemove ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    editCards.mutate({
+                      adId: ad.id,
+                      edit: { op: "remove", index },
+                    })
+                  }
+                  title="Remove this card"
+                  className="text-white hover:text-red-300"
+                >
+                  <X className="size-3" />
+                </button>
+              ) : null}
+            </span>
+          )}
         </li>
       ))}
       {canAdd && !shell ? (
@@ -497,60 +514,94 @@ function AdTile({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {/* One question, so one control: in the set, or not. Approved is
-              also what a rebuild leaves alone. */}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              setStatus.mutate({
-                adId: ad.id,
-                status: ad.status === "approved" ? "drawn" : "approved",
-              })
-            }
-            title={
-              ad.status === "approved"
-                ? "Approved. A rebuild leaves this one alone."
-                : "Approve. Keeps it through the next rebuild."
-            }
-            className={cn(
-              "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10.5px] font-medium transition disabled:opacity-40",
-              ad.status === "approved"
-                ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
-                : "text-muted-foreground hover:text-foreground hover:border-white/30",
-            )}
-          >
-            <Check className="size-3" />
-            {ad.status === "approved" ? "Approved" : "Approve"}
-          </button>
-          {homes.length > 0 &&
-          ad.format !== "portfolio" &&
-          ad.format !== "catalog" ? (
-            <HomePicker
-              homes={homes}
-              picked={ad.homeId ? [ad.homeId] : []}
-              max={1}
-              single
+          {locked ? (
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
+                state === "live"
+                  ? "bg-emerald-500/15 text-emerald-300"
+                  : "bg-sky-500/15 text-sky-300",
+              )}
+            >
+              {state}
+            </span>
+          ) : (
+            // One question, so one control: in the set, or not. Approved is
+            // also what a rebuild leaves alone.
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                setStatus.mutate({
+                  adId: ad.id,
+                  status: ad.status === "approved" ? "drawn" : "approved",
+                })
+              }
               title={
-                ad.homeName
-                  ? `Instead of ${ad.homeName}`
-                  : "Which home is this ad about?"
+                ad.status === "approved"
+                  ? "Approved. A rebuild leaves this one alone."
+                  : "Approve. Keeps it through the next rebuild."
               }
-              label={ad.homeName ? "Change home" : "Bind a home"}
-              onChange={(next) =>
-                setHome.mutate({ adId: ad.id, propertyId: next[0] ?? null })
-              }
-            />
+              className={cn(
+                "flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10.5px] font-medium transition disabled:opacity-40",
+                ad.status === "approved"
+                  ? "border-emerald-400 bg-emerald-500/20 text-emerald-200"
+                  : "text-muted-foreground hover:text-foreground hover:border-white/30",
+              )}
+            >
+              <Check className="size-3" />
+              {ad.status === "approved" ? "Approved" : "Approve"}
+            </button>
+          )}
+          {!locked && bindable ? (
+            homes.length > 0 ? (
+              <HomePicker
+                homes={homes}
+                picked={ad.homeId ? [ad.homeId] : []}
+                max={1}
+                single
+                title={
+                  ad.homeName
+                    ? `Instead of ${ad.homeName}`
+                    : "Which home is this ad about?"
+                }
+                label={ad.homeName ? "Change home" : "Bind a home"}
+                onChange={(next) =>
+                  setHome.mutate({ adId: ad.id, propertyId: next[0] ?? null })
+                }
+              />
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 rounded-full px-3 text-[11.5px]"
+                onClick={() => setNaming(true)}
+              >
+                {ad.homeName ? "Rename home" : "Name the home"}
+              </Button>
+            )
           ) : null}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => remove.mutate({ adId: ad.id })}
-            title="Delete this ad"
-            className="text-muted-foreground rounded-full p-1 hover:text-red-300 disabled:opacity-40"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
+          {!shell && ad.cards[0]?.type !== "video" ? (
+            <button
+              type="button"
+              onClick={() => setChecking(true)}
+              title="Check against Meta's own render"
+              className="text-muted-foreground hover:text-foreground rounded-full p-1"
+            >
+              <Eye className="size-3.5" />
+            </button>
+          ) : null}
+          {locked ? null : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => remove.mutate({ adId: ad.id })}
+              title="Delete this ad"
+              className="text-muted-foreground rounded-full p-1 hover:text-red-300 disabled:opacity-40"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -569,13 +620,15 @@ function AdTile({
               <p className="text-muted-foreground line-clamp-3 text-[11px] leading-snug whitespace-pre-line">
                 {ad.body || "No primary text yet."}
               </p>
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="text-[11px] text-sky-300 hover:underline"
-              >
-                Edit copy
-              </button>
+              {locked ? null : (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="text-[11px] text-sky-300 hover:underline"
+                >
+                  Edit copy
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -618,26 +671,76 @@ function AdTile({
               </div>
             </div>
           )}
-          {busy ? (
+          {busy && !locked ? (
             <p className="text-muted-foreground flex items-center gap-1 text-[11px]">
               <Loader2 className="size-3 animate-spin" />
               {uploading > 0 ? "Bringing the file in…" : "Saving…"}
             </p>
           ) : null}
-          {!ad.homeId &&
-          ad.format !== "portfolio" &&
-          ad.format !== "catalog" ? (
+          {!ad.homeId && bindable ? (
             <p className="text-muted-foreground flex items-center gap-1 text-[11px]">
               <Home className="size-3" />
               {ad.homeName
-                ? `Named for ${ad.homeName} by its file, not bound to a listing`
-                : "About no home yet"}
-              ; links to {ad.linkUrl ?? "the brand's site"}.
+                ? `${ad.homeName}, by name; no listing on their site yet.`
+                : "About no home yet."}{" "}
+              Links to {ad.linkUrl ?? landingUrl ?? "the brand's site"}.
             </p>
           ) : null}
         </div>
       </div>
 
+      {checking ? (
+        <AdPreviewDialog
+          ad={{
+            id: ad.id,
+            name: ad.name,
+            headline: ad.headline,
+            body: ad.body,
+            linkUrl: ad.linkUrl,
+            callToAction: ad.callToAction,
+            media: ad.cards.map((item) => ({
+              url: item.url,
+              thumbnail: item.thumbnail,
+              type: item.type,
+            })),
+          }}
+          brandName={brandName}
+          brandLogo={brandLogo}
+          brandSlug={brandSlug}
+          landingUrl={landingUrl}
+          open
+          onOpenChange={(next) => !next && setChecking(false)}
+        />
+      ) : null}
+      <SimpleDialog
+        open={naming}
+        onOpenChange={setNaming}
+        title="Which home is this ad about?"
+        description="Their site is not connected, so the home is a name for now. The listing takes over once it is."
+        size="sm"
+        footer={
+          <Button
+            size="sm"
+            loading={setHome.isPending}
+            onClick={() => {
+              setNaming(false);
+              setHome.mutate({
+                adId: ad.id,
+                homeName: homeName.trim() || null,
+              });
+            }}
+          >
+            {homeName.trim() ? "Bind" : "Unbind"}
+          </Button>
+        }
+      >
+        <Input
+          value={homeName}
+          onChange={(event) => setHomeName(event.target.value)}
+          placeholder="Sonoma Glass House"
+          autoFocus
+        />
+      </SimpleDialog>
       {picking !== null ? (
         <MediaPickerDialog
           brandId={brandId}

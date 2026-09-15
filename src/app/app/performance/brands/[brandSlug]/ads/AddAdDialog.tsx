@@ -21,22 +21,29 @@ type Format = (typeof HAND_MADE_AD_FORMATS)[number];
 /**
  * An ad before its creative: decide what it is and, when it is about one,
  * which home, and it lands on the wall as a slot to drop the file into. The
- * house name is filled in unless one is typed.
+ * home is picked from their site, or typed when the site is not connected.
+ * The house name is filled in unless one is typed.
  */
 export function AddAdDialog({
   brandId,
   homes,
+  campaignId = null,
 }: {
   brandId: string;
+  /** Their homes; empty when their site is not connected, so the home is typed. */
   homes: PickableHome[];
+  /** Land in this campaign rather than on the brand's wall. */
+  campaignId?: string | null;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<Format>("static");
   const [homeId, setHomeId] = useState<string | null>(null);
+  const [homeName, setHomeName] = useState("");
   const [name, setName] = useState("");
   const home = homeId ? (homes.find((row) => row.id === homeId) ?? null) : null;
+  const byName = homes.length === 0;
 
   const add = useMutation(
     trpc.ads.addAdShell.mutationOptions({
@@ -47,6 +54,7 @@ export function AddAdDialog({
         setOpen(false);
         setName("");
         setHomeId(null);
+        setHomeName("");
         router.refresh();
       },
       onError: (error) => toast.error(error.message),
@@ -77,7 +85,12 @@ export function AddAdDialog({
             add.mutate({
               brandId,
               format,
-              propertyId: homeId,
+              propertyId: format === "catalog" ? null : homeId,
+              homeName:
+                format === "catalog" || !byName
+                  ? null
+                  : homeName.trim() || null,
+              campaignId,
               name: name.trim() || null,
             })
           }
@@ -107,36 +120,59 @@ export function AddAdDialog({
               </button>
             ))}
           </div>
+          {format === "catalog" ? (
+            <p className="text-muted-foreground text-[11px]">
+              One card per home. Meta renders the live ad from the product set;
+              the cards here show the shape.
+            </p>
+          ) : null}
         </div>
-        <div className="space-y-1.5">
-          <Label>Home</Label>
-          <div className="flex items-center gap-2">
-            {home ? (
-              <span className="flex min-w-0 items-center gap-1.5 text-xs">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={home.thumbUrl ?? home.imageUrl}
-                  alt=""
-                  className="size-5 rounded-full object-cover"
-                />
-                <span className="truncate">{home.name}</span>
+        {format === "catalog" ? null : byName ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="shell-home">
+              Home{" "}
+              <span className="text-muted-foreground font-normal">
+                (by name; their site is not connected)
               </span>
-            ) : (
-              <span className="text-muted-foreground text-xs">
-                About no home in particular
-              </span>
-            )}
-            <HomePicker
-              homes={homes}
-              picked={homeId ? [homeId] : []}
-              max={1}
-              single
-              title="Which home is this ad about?"
-              label={home ? "Change" : "Pick a home"}
-              onChange={(next) => setHomeId(next[0] ?? null)}
+            </Label>
+            <Input
+              id="shell-home"
+              value={homeName}
+              onChange={(event) => setHomeName(event.target.value)}
+              placeholder="Leave empty for an ad about no home"
             />
           </div>
-        </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label>Home</Label>
+            <div className="flex items-center gap-2">
+              {home ? (
+                <span className="flex min-w-0 items-center gap-1.5 text-xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={home.thumbUrl ?? home.imageUrl}
+                    alt=""
+                    className="size-5 rounded-full object-cover"
+                  />
+                  <span className="truncate">{home.name}</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground text-xs">
+                  About no home in particular
+                </span>
+              )}
+              <HomePicker
+                homes={homes}
+                picked={homeId ? [homeId] : []}
+                max={1}
+                single
+                title="Which home is this ad about?"
+                label={home ? "Change" : "Pick a home"}
+                onChange={(next) => setHomeId(next[0] ?? null)}
+              />
+            </div>
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label htmlFor="shell-name">
             Name{" "}

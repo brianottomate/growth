@@ -210,6 +210,8 @@ export const adsRouter = {
         brandId: z.string().min(1),
         format: z.enum(HAND_MADE_AD_FORMATS),
         propertyId: z.string().min(1).nullish(),
+        homeName: z.string().trim().max(200).nullish(),
+        campaignId: z.string().min(1).nullish(),
         name: z.string().trim().max(300).nullish(),
       }),
     )
@@ -225,6 +227,8 @@ export const adsRouter = {
         mediaAssetIds: z.array(z.string().min(1)).min(1).max(50),
         as: z.enum(["statics", "carousel"]),
         propertyId: z.string().min(1).nullish(),
+        homeName: z.string().trim().max(200).nullish(),
+        campaignId: z.string().min(1).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) =>
@@ -236,7 +240,8 @@ export const adsRouter = {
     .input(
       z.object({
         adId: z.string().min(1),
-        propertyId: z.string().min(1).nullable(),
+        propertyId: z.string().min(1).nullish(),
+        homeName: z.string().trim().max(200).nullish(),
       }),
     )
     .mutation(async ({ ctx, input }) =>

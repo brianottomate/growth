@@ -1217,7 +1217,7 @@ export const buildAdSetAction = growthAction({
 
 export const addAdShellAction = growthAction({
   description:
-    "Add one empty ad of a declared format (static, carousel or video) to a brand's drafted set, optionally bound to one of their homes by WanderOS listing id. The creative comes afterwards with editAdCards, by upload into the library or from it. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
+    "Add one empty ad of a declared format (static, carousel, catalog or video), bound to one of their homes by WanderOS listing id, or by name alone when the brand's site is not connected. Lands on the brand's wall, or straight in a campaign when campaignId is given. The creative comes afterwards with editAdCards, by upload into the library or from it. Use this when the operator wants the ads to exist first and fill them in, or wants an ad the build does not make.",
   inputSchema: z.object({
     brandId: z.string().min(1),
     format: z.enum(HAND_MADE_AD_FORMATS),
@@ -1226,6 +1226,21 @@ export const addAdShellAction = growthAction({
       .min(1)
       .optional()
       .describe("WanderOS listing id; omit for a brand ad about no home."),
+    homeName: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe(
+        "The home by name, for a brand with no WanderOS site connected.",
+      ),
+    campaignId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "Put the ad in this draft campaign instead of on the brand's wall.",
+      ),
     name: z
       .string()
       .trim()
@@ -1247,6 +1262,21 @@ export const createAdsFromAssetsAction = growthAction({
     mediaAssetIds: z.array(z.string().min(1)).min(1).max(50),
     as: z.enum(["statics", "carousel"]),
     propertyId: z.string().min(1).optional(),
+    homeName: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe(
+        "Bind them all to this home by name, for a brand with no site connected.",
+      ),
+    campaignId: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "Put the ads in this draft campaign instead of on the brand's wall.",
+      ),
   }),
   examples: [
     {
@@ -1260,10 +1290,19 @@ export const createAdsFromAssetsAction = growthAction({
 
 export const setAdHomeAction = growthAction({
   description:
-    "Bind a drafted ad to one of the client's homes (WanderOS listing id), or unbind it with null. The link moves to that home's page unless someone typed one by hand, a name in the house convention follows the home, and the wall files the ad under it. This is how an ad is retrofitted onto a different home.",
+    "Bind a drafted ad to one of the client's homes (WanderOS listing id), or by name alone when their site is not connected, or unbind it with neither. The link moves to that home's page unless someone typed one by hand, a name in the house convention follows the home, and the wall files the ad under it. This is how an ad is retrofitted onto a different home.",
   inputSchema: z.object({
     adId: z.string().min(1),
-    propertyId: z.string().min(1).nullable(),
+    propertyId: z.string().min(1).nullable().optional(),
+    homeName: z
+      .string()
+      .trim()
+      .max(200)
+      .nullable()
+      .optional()
+      .describe(
+        "The home by name, for a brand with no WanderOS site connected.",
+      ),
   }),
   examples: [{ adId: "ad_01", propertyId: "1234567890123" }],
   execute: (input, ctx) => setAdHome({ ...input, orgId: ctx.orgId }),

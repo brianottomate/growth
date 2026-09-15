@@ -11,13 +11,17 @@ import { ChannelLogo, platformLabel } from "@/components/channel-logos";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/components/ui/lib/utils";
 import { getDraftCampaign } from "@/server/services/ads-draft.service";
+import { brandListings } from "@/server/services/wanderos-listings.service";
+import { toWallAd, type AdState, type WallAd } from "@/lib/ad-wall";
+import { AddAdDialog } from "@/app/app/performance/brands/[brandSlug]/ads/AddAdDialog";
+import { AdWall } from "@/app/app/performance/brands/[brandSlug]/ads/AdWall";
+import { CreativeDrop } from "@/app/app/performance/brands/[brandSlug]/ads/CreativeDrop";
+import type { PickableHome } from "@/app/app/performance/brands/[brandSlug]/HomePicker";
 
-import { AddAdButton } from "./AddAdButton";
 import { AskAssistantButton } from "./AskAssistantButton";
 import { Audiences } from "./Audiences";
 import { CreativePool } from "./CreativePool";
 import { DeleteCampaignButton } from "./DeleteCampaignButton";
-import { DraftedAds, type AdState } from "./DraftedAds";
 import { DraftFromHomesButton } from "./DraftFromHomesButton";
 import { money } from "./format";
 import { PlanPlatformButton } from "./PlanPlatformButton";
@@ -76,6 +80,32 @@ export async function CampaignView({
           { brandId: brand.id },
         ).catch(() => null)
       : null;
+
+  // Their homes, for binding an ad to one. Empty for a brand whose WanderOS
+  // site is not connected, in which case a home is a name typed on the tile.
+  const listings = await brandListings({
+    id: brand.id,
+    website: brand.website,
+  });
+  const homes: PickableHome[] = listings
+    .filter((home) => home.imageUrl)
+    .map((home) => ({
+      id: home.id,
+      name: home.name,
+      imageUrl: home.imageUrl!,
+      thumbUrl: home.thumbUrl ?? null,
+      bedrooms: home.bedrooms ?? null,
+      guests: home.guests ?? null,
+      nightlyFrom: home.nightlyFrom ?? null,
+    }));
+  // The page reads newest first; the wall reads in the order the ads were
+  // made, so the first home asked for is the first home shown.
+  const wall: WallAd[] = [...ads]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .flatMap((ad) => {
+      const row = toWallAd(ad);
+      return row ? [row] : [];
+    });
 
   const planned = [...platformCampaigns].sort((a, b) =>
     a.platform.localeCompare(b.platform),
@@ -238,50 +268,64 @@ export async function CampaignView({
               : undefined
           }
           actions={
-            ads.length > 0 ? (
-              <>
-                <DraftFromHomesButton
-                  campaignId={campaign.id}
-                  brandId={brand.id}
-                  lastRun={homesRun}
-                  label={homesRun ? "Homes run" : "From their homes"}
-                />
-                <AddAdButton
-                  campaignId={campaign.id}
-                  brandId={brand.id}
-                  inheritedLinkUrl={campaign.landingUrl}
-                />
-              </>
-            ) : null
+            <>
+              <DraftFromHomesButton
+                campaignId={campaign.id}
+                brandId={brand.id}
+                lastRun={homesRun}
+                label={homesRun ? "Homes run" : "From their homes"}
+              />
+              <AddAdDialog
+                brandId={brand.id}
+                homes={homes}
+                campaignId={campaign.id}
+              />
+              {ads.length > 0
+                ? ask("ads", `Review the ads for “${campaign.name}”`)
+                : null}
+            </>
           }
         >
-          <DraftedAds
-            ads={ads}
-            states={states}
-            brandId={brand.id}
-            brandSlug={brandSlug}
-            brandName={brandName}
-            brandLogo={brand.logo}
-            landingUrl={campaign.landingUrl}
-            campaignId={campaign.id}
-            homesRun={homesRun}
-            emptyActions={
-              <>
-                <DraftFromHomesButton
-                  campaignId={campaign.id}
-                  brandId={brand.id}
-                  lastRun={homesRun}
-                  variant="default"
-                />
-                <AddAdButton
-                  campaignId={campaign.id}
-                  brandId={brand.id}
-                  inheritedLinkUrl={campaign.landingUrl}
-                />
-                {ask("ads", `Draft the ads for “${campaign.name}”`)}
-              </>
-            }
-          />
+          <div className="space-y-4">
+            {wall.length === 0 ? (
+              <EmptyState
+                compact
+                icon={Radio}
+                title="No ads yet"
+                description="Draft them from their homes, add shells to fill, or drop finished creatives."
+                actions={
+                  <>
+                    <DraftFromHomesButton
+                      campaignId={campaign.id}
+                      brandId={brand.id}
+                      lastRun={homesRun}
+                      variant="default"
+                    />
+                    {ask("ads", `Draft the ads for “${campaign.name}”`)}
+                  </>
+                }
+              />
+            ) : (
+              <AdWall
+                brandId={brand.id}
+                brandSlug={brandSlug}
+                brandName={brandName}
+                brandLogo={brand.logo}
+                landingUrl={campaign.landingUrl}
+                homes={homes}
+                ads={wall}
+                states={states}
+                title="Ads"
+              />
+            )}
+            {anyPushed ? null : (
+              <CreativeDrop
+                brandId={brand.id}
+                homes={homes}
+                campaignId={campaign.id}
+              />
+            )}
+          </div>
         </Step>
 
         <Step

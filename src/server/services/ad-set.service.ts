@@ -161,6 +161,48 @@ async function onRecordHomeUrls(brandId: string): Promise<string[]> {
   return rows.flatMap((row) => (row.siteUrl ? [row.siteUrl] : []));
 }
 
+/**
+ * The campaign shells land in, when one is named: this brand's, and not yet
+ * on a platform, since an ad added to a pushed campaign would never be sent.
+ */
+async function campaignFor(brandId: string, campaignId: string) {
+  const campaign = await db.query.campaignTable.findFirst({
+    where: and(
+      eq(campaignTable.id, campaignId),
+      eq(campaignTable.brandId, brandId),
+      isNull(campaignTable.deletedAt),
+    ),
+    columns: { id: true, name: true },
+    with: { platformCampaigns: { columns: { externalId: true } } },
+  });
+  if (!campaign) throw new AdSetError(404, "Campaign not found on this brand");
+  if (campaign.platformCampaigns.some((row) => row.externalId)) {
+    throw new AdSetError(
+      422,
+      "That campaign is already on a platform; add ads to a new one",
+    );
+  }
+  return campaign;
+}
+
+/**
+ * The home an ad is about, from a listing when their site has one, or from
+ * a name alone when it does not. A brand whose WanderOS site is not
+ * connected yet still gets its ads filed by home; the listing takes over
+ * once the site is read.
+ */
+async function homeBinding(
+  brand: OwnedBrand,
+  input: { propertyId?: string | null; homeName?: string | null },
+) {
+  if (input.propertyId) {
+    const listing = await listingFor(brand, input.propertyId);
+    const home = await ensureHome({ brandId: brand.id, listing });
+    return { home, name: listing.name, url: listing.url as string | null };
+  }
+  return { home: null, name: input.homeName?.trim() || null, url: null };
+}
+
 /** The listing behind a WanderOS id, or 422 when it is not on their site. */
 async function listingFor(brand: OwnedBrand, propertyId: string) {
   const listings = await brandListings({
@@ -228,7 +270,10 @@ function adName(
     customer: brand.name,
     isClient: brand.relationship === "client",
     format: performanceFormatFor(format),
-    propertyName: propertyName ?? brand.name,
+    // The convention names a catalog ad by what it is; everything else by
+    // its home, or the brand when it has none.
+    propertyName:
+      propertyName ?? (format === "catalog" ? "Catalog" : brand.name),
   });
 }
 
@@ -502,21 +547,25 @@ export async function addAdShell(input: {
   brandId: string;
   orgId: string;
   format: Extract<AdFormat, "static" | "carousel" | "catalog" | "video">;
+  /** A home on their site, by WanderOS listing id. */
   propertyId?: string | null;
+  /** A home by name alone, for a brand whose site is not connected. */
+  homeName?: string | null;
+  /** Land in this campaign rather than on the brand's wall. */
+  campaignId?: string | null;
   name?: string | null;
 }) {
   const brand = await requireOwnedBrand(input);
-  const listing = input.propertyId
-    ? await listingFor(brand, input.propertyId)
+  const campaign = input.campaignId
+    ? await campaignFor(brand.id, input.campaignId)
     : null;
-  const home = listing
-    ? await ensureHome({ brandId: brand.id, listing })
-    : null;
+  const bound = await homeBinding(brand, input);
   const content: AdCreativeContent = {
     format: input.format,
-    headline: listing?.name ?? brand.name,
+    headline: bound.name ?? brand.name,
     body: "",
-    ...(listing ? { linkUrl: listing.url, propertyName: listing.name } : {}),
+    ...(bound.url ? { linkUrl: bound.url } : {}),
+    ...(bound.name ? { propertyName: bound.name } : {}),
     callToAction: PERFORMANCE_AD_DEFAULTS.callToAction,
     media: [],
   };
@@ -524,17 +573,15 @@ export async function addAdShell(input: {
     .insert(adTable)
     .values({
       brandId: brand.id,
-      campaignId: null,
-      homeId: home?.id ?? null,
-      name:
-        input.name?.trim() ||
-        adName(brand, input.format, listing?.name ?? null),
+      campaignId: campaign?.id ?? null,
+      homeId: bound.home?.id ?? null,
+      name: input.name?.trim() || adName(brand, input.format, bound.name),
       type: "creative",
       status: "drawn",
       content,
     })
     .returning({ id: adTable.id, name: adTable.name });
-  return { adId: row!.id, name: row!.name, homeName: listing?.name ?? null };
+  return { adId: row!.id, name: row!.name, homeName: bound.name };
 }
 
 /**
@@ -552,8 +599,15 @@ export async function createAdsFromAssets(input: {
   as: "statics" | "carousel";
   /** Bind every ad made here to this home instead of reading the filenames. */
   propertyId?: string | null;
+  /** The same, by name, for a brand whose site is not connected. */
+  homeName?: string | null;
+  /** Land in this campaign rather than on the brand's wall. */
+  campaignId?: string | null;
 }) {
   const brand = await requireOwnedBrand(input);
+  const campaign = input.campaignId
+    ? await campaignFor(brand.id, input.campaignId)
+    : null;
   if (input.mediaAssetIds.length === 0) {
     throw new AdSetError(422, "Pick at least one file");
   }
@@ -581,8 +635,10 @@ export async function createAdsFromAssets(input: {
   // name alone: a brand off WanderOS still gets its ads filed under the home
   // the filename says, and a file that names none falls back to its own stem
   // so five uploads are not five ads with one name.
+  const pinnedName = input.homeName?.trim() || null;
   const homeFor = (filename: string | null) => {
     if (pinned) return { listing: pinned, label: pinned.name };
+    if (pinnedName) return { listing: null, label: pinnedName };
     const guess = filename ? homeNameFromFilename(filename) : null;
     const listing = guess
       ? (byName.get(guess.trim().toLowerCase()) ?? null)
@@ -623,7 +679,7 @@ export async function createAdsFromAssets(input: {
       .insert(adTable)
       .values({
         brandId: brand.id,
-        campaignId: null,
+        campaignId: campaign?.id ?? null,
         homeId: home?.id ?? null,
         name: adName(brand, format, label),
         type: "creative",
@@ -651,17 +707,16 @@ export async function createAdsFromAssets(input: {
 export async function setAdHome(input: {
   adId: string;
   orgId: string;
-  propertyId: string | null;
+  /** A home on their site; neither field set unbinds. */
+  propertyId?: string | null;
+  /** A home by name alone, for a brand whose site is not connected. */
+  homeName?: string | null;
 }) {
   const ad = await requireOwnedAd(input);
   const content = creativeContent(ad);
   const brand = ad.brand;
-  const listing = input.propertyId
-    ? await listingFor(brand, input.propertyId)
-    : null;
-  const home = listing
-    ? await ensureHome({ brandId: brand.id, listing })
-    : null;
+  const bound = await homeBinding(brand, input);
+  const { home } = bound;
 
   const previousHome = ad.homeId
     ? await db.query.homeTable.findFirst({
@@ -672,22 +727,22 @@ export async function setAdHome(input: {
   const linkWasHome = !content.linkUrl || content.linkUrl === previousHome?.url;
   const format = adFormatOf(content);
   const next: AdCreativeContent = { ...content };
-  if (listing) next.propertyName = listing.name;
+  if (bound.name) next.propertyName = bound.name;
   else delete next.propertyName;
   if (linkWasHome) {
-    if (listing) next.linkUrl = listing.url;
+    if (bound.url) next.linkUrl = bound.url;
     else delete next.linkUrl;
   }
   // A name in the convention follows the home; a hand-typed one is kept.
   const name = ad.name.startsWith("META_")
-    ? adName(brand, format, listing?.name ?? null)
+    ? adName(brand, format, bound.name)
     : ad.name;
 
   await db
     .update(adTable)
     .set({ homeId: home?.id ?? null, name, content: next })
     .where(eq(adTable.id, ad.id));
-  return { adId: ad.id, name, homeName: listing?.name ?? null };
+  return { adId: ad.id, name, homeName: bound.name };
 }
 
 /**

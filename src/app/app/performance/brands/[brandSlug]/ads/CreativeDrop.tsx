@@ -7,6 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { SimpleDialog } from "@/components/ui/dialog";
 import { Dropzone, MEDIA_ACCEPT } from "@/components/ui/dropzone";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/components/ui/lib/utils";
 import { toast } from "@/components/ui/toast";
@@ -30,9 +31,13 @@ type Dropped = { item: MediaItem; filename: string };
 export function CreativeDrop({
   brandId,
   homes,
+  campaignId = null,
 }: {
   brandId: string;
+  /** Their homes; empty when their site is not connected, so a home is typed. */
   homes: PickableHome[];
+  /** Land in this campaign rather than on the brand's wall. */
+  campaignId?: string | null;
 }) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -40,7 +45,9 @@ export function CreativeDrop({
   const [dropped, setDropped] = useState<Dropped[]>([]);
   const [as, setAs] = useState<"statics" | "carousel">("statics");
   const [homeId, setHomeId] = useState<string | null>(null);
+  const [homeName, setHomeName] = useState("");
   const home = homeId ? (homes.find((row) => row.id === homeId) ?? null) : null;
+  const byName = homes.length === 0;
 
   const create = useMutation(
     trpc.ads.createAdsFromAssets.mutationOptions({
@@ -55,6 +62,7 @@ export function CreativeDrop({
         );
         setDropped([]);
         setHomeId(null);
+        setHomeName("");
         router.refresh();
       },
       onError: (error) => toast.error(error.message),
@@ -72,11 +80,13 @@ export function CreativeDrop({
   };
 
   const guesses = dropped.map((row) => homeNameFromFilename(row.filename));
-  const matched = guesses.filter(
-    (guess) =>
-      guess &&
-      homes.some((row) => row.name.toLowerCase() === guess.toLowerCase()),
-  ).length;
+  const matched = byName
+    ? guesses.filter(Boolean).length
+    : guesses.filter(
+        (guess) =>
+          guess &&
+          homes.some((row) => row.name.toLowerCase() === guess.toLowerCase()),
+      ).length;
 
   return (
     <>
@@ -104,6 +114,8 @@ export function CreativeDrop({
                 mediaAssetIds: dropped.map((row) => row.item.assetId!),
                 as,
                 propertyId: homeId,
+                homeName: byName ? homeName.trim() || null : null,
+                campaignId,
               })
             }
           >
@@ -161,36 +173,57 @@ export function CreativeDrop({
               </div>
             </div>
           ) : null}
-          <div className="space-y-1.5">
-            <Label>Home</Label>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground min-w-0 truncate text-xs">
-                {home
-                  ? `All about ${home.name}`
-                  : matched > 0
-                    ? `${matched} of ${dropped.length} name a home on their site`
-                    : "None named; bind homes on the wall afterwards"}
-              </span>
-              <HomePicker
-                homes={homes}
-                picked={homeId ? [homeId] : []}
-                max={1}
-                single
-                title="Bind them all to one home"
-                label={home ? "Change" : "Pin a home"}
-                onChange={(next) => setHomeId(next[0] ?? null)}
+          {byName ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="drop-home">
+                Home{" "}
+                <span className="text-muted-foreground font-normal">
+                  (by name; their site is not connected)
+                </span>
+              </Label>
+              <Input
+                id="drop-home"
+                value={homeName}
+                onChange={(event) => setHomeName(event.target.value)}
+                placeholder={
+                  matched > 0
+                    ? `Leave empty to read ${matched} of ${dropped.length} off the filenames`
+                    : "One home for all of them, or leave empty"
+                }
               />
-              {home ? (
-                <button
-                  type="button"
-                  onClick={() => setHomeId(null)}
-                  className="text-muted-foreground hover:text-foreground text-[11px]"
-                >
-                  Clear
-                </button>
-              ) : null}
             </div>
-          </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Home</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground min-w-0 truncate text-xs">
+                  {home
+                    ? `All about ${home.name}`
+                    : matched > 0
+                      ? `${matched} of ${dropped.length} name a home on their site`
+                      : "None named; bind homes on the wall afterwards"}
+                </span>
+                <HomePicker
+                  homes={homes}
+                  picked={homeId ? [homeId] : []}
+                  max={1}
+                  single
+                  title="Bind them all to one home"
+                  label={home ? "Change" : "Pin a home"}
+                  onChange={(next) => setHomeId(next[0] ?? null)}
+                />
+                {home ? (
+                  <button
+                    type="button"
+                    onClick={() => setHomeId(null)}
+                    className="text-muted-foreground hover:text-foreground text-[11px]"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
         </div>
       </SimpleDialog>
     </>
