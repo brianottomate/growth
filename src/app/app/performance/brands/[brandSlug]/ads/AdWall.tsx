@@ -30,73 +30,19 @@ import { toast } from "@/components/ui/toast";
 import { AdPreviewDialog } from "@/app/app/brands/[brandSlug]/ads/_views/AdPreviewDialog";
 import { MediaPickerDialog } from "@/app/app/content/[contentId]/MediaPickerDialog";
 import { useMediaUpload } from "@/app/app/media/use-media-upload";
-import type { AdState, WallAd } from "@/lib/ad-wall";
-import {
-  AD_FORMAT_LABEL,
-  cardCapacity,
-  type AdFormat,
-} from "@/lib/performance-ads";
+import { groupWall, type AdState, type WallAd } from "@/lib/ad-wall";
+import { AD_FORMAT_LABEL, cardCapacity } from "@/lib/performance-ads";
 import type { MediaItem } from "@/server/db/schema";
 import { useTRPC } from "@/trpc/react";
 
 import { HomePicker, type PickableHome } from "../HomePicker";
 
+export { groupWall } from "@/lib/ad-wall";
 export type { WallAd } from "@/lib/ad-wall";
 
 const panel = "bg-card overflow-hidden rounded-2xl border";
 const sectionLabel =
   "text-muted-foreground text-[10.5px] font-semibold tracking-[0.09em] uppercase";
-const FORMAT_ORDER: AdFormat[] = [
-  "static",
-  "carousel",
-  "video",
-  "portfolio",
-  "catalog",
-];
-
-type HomeGroup = {
-  homeId: string | null;
-  homeName: string;
-  homeUrl: string | null;
-  ads: WallAd[];
-};
-
-/**
- * The wall's order: one group per home in the order the homes first appear,
- * each home's static before its carousel; ads about no home after them; the
- * portfolio and catalog ads last, as the slice that closes the set.
- */
-export function groupWall(ads: WallAd[]) {
-  const byFormat = (a: WallAd, b: WallAd) =>
-    FORMAT_ORDER.indexOf(a.format) - FORMAT_ORDER.indexOf(b.format);
-  const slices = ads
-    .filter((ad) => ad.format === "portfolio" || ad.format === "catalog")
-    .sort(byFormat);
-  const rest = ads.filter((ad) => !slices.includes(ad));
-  const homes: HomeGroup[] = [];
-  const other: WallAd[] = [];
-  for (const ad of rest) {
-    if (!ad.homeId && !ad.homeName) {
-      other.push(ad);
-      continue;
-    }
-    const key = ad.homeId ?? ad.homeName;
-    let group = homes.find((row) => (row.homeId ?? row.homeName) === key);
-    if (!group) {
-      group = {
-        homeId: ad.homeId,
-        homeName: ad.homeName!,
-        homeUrl: ad.homeUrl,
-        ads: [],
-      };
-      homes.push(group);
-    }
-    group.ads.push(ad);
-  }
-  for (const group of homes) group.ads.sort(byFormat);
-  return { homes, other: other.sort(byFormat), slices };
-}
-
 /**
  * Every drafted ad as it will run, filed under its home, before any of it
  * reaches Meta. Each tile is the real ad: its cards can be replaced, added

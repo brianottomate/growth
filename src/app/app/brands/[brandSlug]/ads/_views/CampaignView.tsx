@@ -280,6 +280,14 @@ export async function CampaignView({
                 homes={homes}
                 campaignId={campaign.id}
               />
+              {ads.length > 0 ? (
+                <Link
+                  href={`/app/brands/${brandSlug}/ads/${campaign.id}/by-home`}
+                  className="text-muted-foreground hover:text-foreground px-2 text-xs"
+                >
+                  By home
+                </Link>
+              ) : null}
               {ads.length > 0
                 ? ask("ads", `Review the ads for “${campaign.name}”`)
                 : null}

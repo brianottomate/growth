@@ -67,3 +67,62 @@ export function toWallAd(ad: {
     })),
   };
 }
+
+const FORMAT_ORDER: AdFormat[] = [
+  "static",
+  "carousel",
+  "video",
+  "portfolio",
+  "catalog",
+];
+
+export type HomeGroup = {
+  /** The WanderOS listing id, or null for a home known by name alone. */
+  homeId: string | null;
+  homeName: string;
+  homeUrl: string | null;
+  ads: WallAd[];
+};
+
+/** A stable key for a home group, for anchors and filters. */
+export function homeGroupKey(group: Pick<HomeGroup, "homeId" | "homeName">) {
+  return (
+    group.homeId ?? group.homeName.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+  );
+}
+
+/**
+ * The wall's order: one group per home in the order the homes first appear,
+ * each home's static before its carousel; ads about no home after them; the
+ * portfolio and catalog ads last, as the slice that closes the set.
+ */
+export function groupWall(ads: WallAd[]) {
+  const byFormat = (a: WallAd, b: WallAd) =>
+    FORMAT_ORDER.indexOf(a.format) - FORMAT_ORDER.indexOf(b.format);
+  const slices = ads
+    .filter((ad) => ad.format === "portfolio" || ad.format === "catalog")
+    .sort(byFormat);
+  const rest = ads.filter((ad) => !slices.includes(ad));
+  const homes: HomeGroup[] = [];
+  const other: WallAd[] = [];
+  for (const ad of rest) {
+    if (!ad.homeId && !ad.homeName) {
+      other.push(ad);
+      continue;
+    }
+    const key = ad.homeId ?? ad.homeName;
+    let group = homes.find((row) => (row.homeId ?? row.homeName) === key);
+    if (!group) {
+      group = {
+        homeId: ad.homeId,
+        homeName: ad.homeName!,
+        homeUrl: ad.homeUrl,
+        ads: [],
+      };
+      homes.push(group);
+    }
+    group.ads.push(ad);
+  }
+  for (const group of homes) group.ads.sort(byFormat);
+  return { homes, other: other.sort(byFormat), slices };
+}
