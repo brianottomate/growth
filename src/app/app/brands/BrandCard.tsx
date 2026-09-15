@@ -46,6 +46,8 @@ const LABEL =
   "text-muted-foreground text-[10px] font-semibold tracking-wide uppercase";
 const QUIET_LINK =
   "text-muted-foreground hover:text-foreground text-xs transition-colors";
+const TAB =
+  "text-foreground/75 hover:bg-accent hover:text-foreground rounded-md px-2 py-1 transition-colors";
 
 /**
  * One card, four zones: identity · channels · strategy · media, with a
@@ -129,31 +131,7 @@ export function BrandCard({
             </p>
           )}
         </div>
-        <nav className="flex shrink-0 items-center gap-4 pt-1 text-[13px]">
-          {detailHref && (
-            <>
-              <Link
-                href={detailHref}
-                className="text-foreground/75 hover:text-foreground"
-              >
-                Strategy
-              </Link>
-              <Link
-                href={`${detailHref}/ads`}
-                className="text-foreground/75 hover:text-foreground"
-              >
-                Ads
-              </Link>
-            </>
-          )}
-          {readiness && (
-            <Link
-              href={`/app/performance/${readiness.accountId}`}
-              className="text-foreground/75 hover:text-foreground"
-            >
-              Account
-            </Link>
-          )}
+        <div className="flex shrink-0 items-center pt-1">
           <BrandMenu
             brand={{
               id: brand.id,
@@ -167,8 +145,38 @@ export function BrandCard({
             zernioProfileId={brand.zernioProfileId}
             links={brand.links ?? []}
           />
-        </nav>
+        </div>
       </div>
+
+      {/* sections */}
+      {(detailHref || readiness) && (
+        <nav className="flex flex-wrap items-center gap-1 border-t px-3 py-1.5 text-[13px]">
+          {detailHref && (
+            <>
+              <Link href={detailHref} className={TAB}>
+                Strategy
+              </Link>
+              <Link href={`${detailHref}/content`} className={TAB}>
+                Content
+              </Link>
+              <Link href={`${detailHref}/previews`} className={TAB}>
+                Previews
+              </Link>
+              <Link href={`${detailHref}/ads`} className={TAB}>
+                Ads
+              </Link>
+            </>
+          )}
+          {readiness && (
+            <Link
+              href={`/app/performance/${readiness.accountId}`}
+              className={TAB}
+            >
+              Account
+            </Link>
+          )}
+        </nav>
+      )}
 
       {/* channels */}
       <div className="border-t px-5 py-4">
