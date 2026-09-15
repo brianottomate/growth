@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/components/ui/lib/utils";
+import { posterForMedia } from "@/lib/media-url";
 
 /**
  * One post drawn the way its platform shows it. Organic previews (the brand
@@ -192,9 +193,11 @@ function Frame({ item, play }: { item: SocialMockMedia; play: boolean }) {
       </div>
     );
   } else {
+    // The stored `url` can be an expiring provider CDN link; a rehosted R2
+    // poster, when present, is in `thumbnail`. posterForMedia picks it.
     inner = (
       // oxlint-disable-next-line nextjs/no-img-element -- library and provider hosts vary
-      <img src={item.url} alt="" className={fill} />
+      <img src={posterForMedia(item) ?? item.url} alt="" className={fill} />
     );
   }
   return <div className="relative size-full min-h-0 min-w-0">{inner}</div>;
